@@ -22,6 +22,9 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN || '*',
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen({
+    port: Number(process.env.PORT) || 3000,
+    host: process.env.HOST || 'localhost',
+  });
 }
 bootstrap();
