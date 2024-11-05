@@ -4,7 +4,11 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import helmet from '@fastify/helmet';
+import cors from '@fastify/cors';
+import { config } from 'dotenv';
 import { AppModule } from './app.module';
+
+config();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -13,6 +17,10 @@ async function bootstrap() {
   );
 
   await app.register(helmet as any);
+
+  await app.register(cors as any, {
+    origin: process.env.CORS_ORIGIN || '*',
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }
