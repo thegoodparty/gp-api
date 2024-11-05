@@ -13,7 +13,13 @@ config();
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    new FastifyAdapter({
+      ...(process.env.LOG_LEVEL
+        ? {
+            logger: { level: process.env.LOG_LEVEL },
+          }
+        : {}),
+    }),
   );
 
   await app.register(helmet as any);
