@@ -7,10 +7,16 @@ import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import { config } from 'dotenv';
 import { AppModule } from './app.module';
+import { Logger } from '@nestjs/common';
+
+const APP_LISTEN_CONFIG = {
+  port: Number(process.env.PORT) || 3000,
+  host: process.env.HOST || 'localhost',
+};
 
 config();
 
-async function bootstrap() {
+const bootstrap = async () => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
@@ -28,9 +34,13 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN || '*',
   });
 
-  await app.listen({
-    port: Number(process.env.PORT) || 3000,
-    host: process.env.HOST || 'localhost',
-  });
-}
-bootstrap();
+  await app.listen(APP_LISTEN_CONFIG);
+  return app;
+};
+
+bootstrap().then(() => {
+  const logger = new Logger('bootstrap');
+  logger.log(
+    `App bootstrap successful => ${APP_LISTEN_CONFIG.host}:${APP_LISTEN_CONFIG.port}`,
+  );
+});
