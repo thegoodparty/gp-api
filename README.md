@@ -32,6 +32,14 @@
 $ npm install
 ```
 
+* Create a Postgres database for the project to connect to.
+* Copy `.env.example` to `.env` and fill in the necessary environment variables.
+* Run the following command to create the database tables:
+
+```bash
+$ npx prisma migrate dev
+```
+
 ## Compile and run the project
 
 ```bash

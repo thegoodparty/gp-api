@@ -12,3 +12,37 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum ContentType {
+  onboardingPrompts
+  blogHome
+  pledge
+  goodPartyTeamMembers
+  articleCategories
+  faqArticles
+  articleTags
+  recentGlossaryItems
+  aiChatPrompts
+  elections
+  redirects
+  glossaryItems
+  promptInputFields
+  glossaryItemsByTitle
+  aiContentCategories
+  privacyPage
+  candidateTestimonials
+  contentPromptsQuestions
+  blogSections
+  glossaryItemsByLetter
+  candidateContentPrompts
+  blogArticles
+  termsOfService
+}
+
+model Content {
+  createdAt BigInt      @map("created_at")
+  updatedAt BigInt      @map("updated_at")
+  id        String      @id
+  type      ContentType
+  data      Json        @db.JsonB
+}
