@@ -3,11 +3,14 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import { config } from 'dotenv';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
+import fastifyStatic from '@fastify/static';
+import { join } from 'path';
 
 config();
 
@@ -28,10 +31,24 @@ const bootstrap = async () => {
     }),
   );
 
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('API Documentation')
+    .setDescription('The API description')
+    .setVersion('1.0')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api', app, document);
+
   await app.register(helmet as any);
 
   await app.register(cors as any, {
     origin: process.env.CORS_ORIGIN || '*',
+  });
+
+  await app.register(fastifyStatic as any, {
+    root: join(__dirname, '..', 'public'),
+    prefix: '/public/',
   });
 
   await app.listen(APP_LISTEN_CONFIG);

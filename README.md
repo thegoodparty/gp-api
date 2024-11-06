@@ -32,9 +32,9 @@
 $ npm install
 ```
 
-* Create a Postgres database for the project to connect to.
-* Copy `.env.example` to `.env` and fill in the necessary environment variables.
-* Run the following command to create the database tables:
+- Create a Postgres database for the project to connect to.
+- Copy `.env.example` to `.env` and fill in the necessary environment variables.
+- Run the following command to create the database tables:
 
 ```bash
 $ npx prisma migrate dev
@@ -52,6 +52,11 @@ $ npm run start:dev
 # production mode
 $ npm run start:prod
 ```
+
+## Swagger / API documentation
+
+- Visit http://localhost:3000/api to see swagger documentation
+- Visit http://localhost:3000/api-json to get the JSON openApi representation of swagger config
 
 ## Run tests
 
