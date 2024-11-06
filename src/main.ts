@@ -9,12 +9,12 @@ import { config } from 'dotenv';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 
+config();
+
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
   host: process.env.HOST || 'localhost',
 };
-
-config();
 
 const bootstrap = async () => {
   const app = await NestFactory.create<NestFastifyApplication>(
