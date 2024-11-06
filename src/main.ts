@@ -48,7 +48,7 @@ const bootstrap = async () => {
 
   await app.register(fastifyStatic as any, {
     root: join(__dirname, '..', 'public'),
-    prefix: '/public/', // optional: default '/'
+    prefix: '/public/',
   });
 
   await app.listen(APP_LISTEN_CONFIG);
