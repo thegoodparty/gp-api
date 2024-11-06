@@ -45,4 +45,6 @@ model Content {
   id        String      @id
   type      ContentType
   data      Json        @db.JsonB
+
+  @@index([type])
 }
