@@ -1,5 +1,5 @@
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
-import { JobsService } from './jobs.service';
+import { Controller, Get, Param, NotFoundException } from '@nestjs/common'
+import { JobsService } from './jobs.service'
 
 @Controller('jobs')
 export class JobsController {
@@ -7,15 +7,15 @@ export class JobsController {
 
   @Get()
   async findAll() {
-    return await this.jobsService.findAll();
+    return await this.jobsService.findAll()
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    const job = await this.jobsService.findOne(id);
+    const job = await this.jobsService.findOne(id)
     if (!job) {
-      throw new NotFoundException(`Job with id ${id} not found`);
+      throw new NotFoundException(`Job with id ${id} not found`)
     }
-    return job;
+    return job
   }
 }
