@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import axios from 'axios'
-import { config } from 'dotenv'
-
-config()
 
 const API_BASE = 'https://api.ashbyhq.com/jobPosting'
 const ASHBEY_KEY = process.env.ASHBEY_KEY

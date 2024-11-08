@@ -1,3 +1,4 @@
+import './configrc'
 import { NestFactory } from '@nestjs/core'
 import {
   FastifyAdapter,
@@ -6,13 +7,10 @@ import {
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
-import { config } from 'dotenv'
 import { AppModule } from './app.module'
 import { Logger } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
-
-config()
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
