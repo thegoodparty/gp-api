@@ -30,7 +30,7 @@ const bootstrap = async () => {
         : {}),
     }),
   )
-  app.setGlobalPrefix('api/v1')
+  app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('API Documentation')
