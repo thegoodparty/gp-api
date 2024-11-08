@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common'
 import { ContentService } from './content.service'
 import { CreateContentDto } from './dto/create-content.dto'
@@ -40,8 +41,15 @@ export class ContentController {
     return this.contentService.remove(+id)
   }
 
-  @Get('seed')
-  seed() {
-    return 'ok'
+  @Get('sync')
+  async sync(@Query('seed') seed: boolean) {
+    console.log(`seed =>`, seed)
+    const [entries, deletedEntries] =
+      await this.contentService.syncContent(seed)
+
+    return {
+      entriesCount: entries.length,
+      deletedEntriesCount: deletedEntries.length,
+    }
   }
 }
