@@ -10,40 +10,39 @@ const ASHBEY_KEY = process.env.ASHBEY_KEY;
 @Injectable()
 export class JobsService {
   async findAll() {
-    const url = `${API_BASE}.list?`;
-
     try {
-      const response = await axios.post(
-        url,
-        { listedOnly: true },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Basic ${Buffer.from(ASHBEY_KEY + ':').toString(
-              'base64',
-            )}`,
-          },
-        },
-      );
-      if (response?.data && response?.data?.results) {
-        const jobs = response.data.results;
-        return jobs;
-      } else {
-        console.error(
-          'Failed to fetch data:',
-          response.status,
-          response.statusText,
-        );
-        return [];
-      }
+      const jobs = await fetchJobs('list', { listedOnly: true });
+      return jobs || [];
     } catch (error) {
       console.error('Error during fetch:', error.message);
       return [];
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} job`;
+  async findOne(id: string) {
+    try {
+      const job = await fetchJobs('info', { jobPostingId: id });
+      if (!job) {
+        return null;
+      }
+      return job;
+    } catch (error) {
+      console.error('Error during fetch:', error.message);
+      return null;
+    }
   }
+}
+
+async function fetchJobs(type: string, params?: any) {
+  const url = `${API_BASE}.${type}`;
+  const response = await axios.post(url, params, {
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Basic ${Buffer.from(ASHBEY_KEY + ':').toString(
+        'base64',
+      )}`,
+    },
+  });
+  return response?.data?.results;
 }
