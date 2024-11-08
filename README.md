@@ -71,6 +71,18 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Development
+### Testing
+You can run the tests in the Postman desktop app or you can run them using the Postman CLI in a terminal:
+- Install the Postman CLI tool: https://learning.postman.com/docs/postman-cli/postman-cli-installation/#system-requirements
+- Generate a Postman API key: https://learning.postman.com/docs/developer/postman-api/authentication/#generate-a-postman-api-key
+- Login to Postman CLI: `postman login --with-api-key [API_KEY]`
+- Get the IDs of the collection you want to test, and the environment you want to test with from Postman: https://learning.postman.com/docs/postman-cli/postman-cli-options/#signing-in-and-out:~:text=Then%20select%20the%20information%20icon
+- Run a collection: `postman run [collection_id] --environment [environment_id]`
+  
+(This will eventually be automated to run in an npm/npx script to automatically fetch the collection and environment keys for you)
+
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
