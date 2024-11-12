@@ -4,11 +4,13 @@ import {
   Param,
   NotFoundException,
   BadGatewayException,
+  Logger,
 } from '@nestjs/common'
 import { JobsService } from './jobs.service'
 
 @Controller('jobs')
 export class JobsController {
+  private readonly logger = new Logger(JobsService.name)
   constructor(private readonly jobsService: JobsService) {}
 
   @Get()
@@ -16,6 +18,10 @@ export class JobsController {
     try {
       return await this.jobsService.findAll()
     } catch (e) {
+      this.logger.log(
+        `Error at jobController findAll. e.message: ${e.message}`,
+        e,
+      )
       throw new BadGatewayException(
         e.message || 'Error occurred while fetching jobs',
       )
@@ -31,6 +37,10 @@ export class JobsController {
       }
       return job
     } catch (e) {
+      this.logger.log(
+        `Error at jobController findOne e.message:${e.message}`,
+        e,
+      )
       throw new BadGatewayException(
         e.message || `Error occurred while fetching job with id ${id}`,
       )
