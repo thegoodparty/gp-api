@@ -1,4 +1,10 @@
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Param,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common'
 import { JobsService } from './jobs.service'
 
 @Controller('jobs')
@@ -7,7 +13,13 @@ export class JobsController {
 
   @Get()
   async findAll() {
-    return await this.jobsService.findAll()
+    const jobs = await this.jobsService.findAll()
+    if (!jobs) {
+      throw new InternalServerErrorException(
+        `Error occurred while fetching jobs`,
+      )
+    }
+    return jobs
   }
 
   @Get(':id')

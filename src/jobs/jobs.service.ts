@@ -20,7 +20,7 @@ export class JobsService {
       return jobs || []
     } catch (error) {
       console.error('Error during fetch:', error.message)
-      return []
+      return null
     }
   }
 
