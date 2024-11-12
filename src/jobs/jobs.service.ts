@@ -5,6 +5,11 @@ import { firstValueFrom } from 'rxjs'
 const API_BASE = 'https://api.ashbyhq.com/jobPosting'
 const ASHBEY_KEY = process.env.ASHBEY_KEY
 
+interface FetchJobsParams {
+  listedOnly?: boolean
+  jobPostingId?: string
+}
+
 @Injectable()
 export class JobsService {
   constructor(private readonly httpService: HttpService) {}
@@ -32,7 +37,7 @@ export class JobsService {
     }
   }
 
-  async fetchJobs(type: string, params?: any) {
+  async fetchJobs(type: string, params?: FetchJobsParams) {
     const url = `${API_BASE}.${type}`
     const response = await firstValueFrom(
       this.httpService.post(url, params, {
