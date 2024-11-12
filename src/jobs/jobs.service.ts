@@ -15,26 +15,11 @@ export class JobsService {
   constructor(private readonly httpService: HttpService) {}
 
   async findAll() {
-    try {
-      const jobs = await this.fetchJobs('list', { listedOnly: true })
-      return jobs || []
-    } catch (error) {
-      console.error('Error during fetch:', error.message)
-      return null
-    }
+    return await this.fetchJobs('list', { listedOnly: true })
   }
 
   async findOne(id: string) {
-    try {
-      const job = await this.fetchJobs('info', { jobPostingId: id })
-      if (!job) {
-        return null
-      }
-      return job
-    } catch (error) {
-      console.error('Error during fetch:', error.message)
-      return null
-    }
+    return await this.fetchJobs('info', { jobPostingId: id })
   }
 
   async fetchJobs(type: string, params?: FetchJobsParams) {
