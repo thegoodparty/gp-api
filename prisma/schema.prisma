@@ -31,6 +31,7 @@ enum ContentType {
   privacyPage
   promptInputFields
   redirects
+  teamMember
   teamMilestone
   termsOfService
 }
@@ -43,4 +44,5 @@ model Content {
   data      Json        @db.JsonB
 
   @@index([type])
+  @@map("content")
 }

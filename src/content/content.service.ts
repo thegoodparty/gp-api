@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { CreateContentDto } from './dto/create-content.dto'
-import { UpdateContentDto } from './dto/update-content.dto'
 import { ContentfulService } from '../contentful/contentful.service'
-import { Content, ContentType } from '@prisma/client'
+import { ContentType } from '@prisma/client'
 import { difference, intersection } from '../shared/util/sets.util'
-import { InputJsonObject, InputJsonValue } from '@prisma/client/runtime/library'
+import { InputJsonObject } from '@prisma/client/runtime/library'
 
 // we have to do this for TypeScript enums 😢
 const CONTENT_TYPE_MAP: { [key: string]: ContentType } = {
@@ -26,6 +24,7 @@ const CONTENT_TYPE_MAP: { [key: string]: ContentType } = {
   privacyPage: ContentType.privacyPage,
   promptInputFields: ContentType.promptInputFields,
   redirects: ContentType.redirects,
+  teamMember: ContentType.teamMember,
   teamMilestone: ContentType.teamMilestone,
   termsOfService: ContentType.termsOfService,
 }
@@ -36,10 +35,6 @@ export class ContentService {
     private prisma: PrismaService,
     private contentfulService: ContentfulService,
   ) {}
-  create(createContentDto: CreateContentDto) {
-    console.log(`createContentDto =>`, createContentDto)
-    return 'This action adds a new content'
-  }
 
   findAll() {
     return this.prisma.content.findMany()
@@ -49,16 +44,7 @@ export class ContentService {
     return `This action returns a #${id} content`
   }
 
-  update(id: number, updateContentDto: UpdateContentDto) {
-    console.log(`updateContentDto =>`, updateContentDto)
-    return `This action updates a #${id} content`
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} content`
-  }
-
-  async getExistingContentIds() {
+  private async getExistingContentIds() {
     return new Set(
       (
         await this.prisma.content.findMany({
@@ -70,52 +56,64 @@ export class ContentService {
     )
   }
 
-  async syncContent(seed?: boolean) {
+  async syncContent(seed: boolean = false) {
     const [entries = [], deletedEntries = []] =
       await this.contentfulService.getSync(seed)
-    const entryIds = new Set(entries.map((entry) => entry.sys.id))
+    const recognizedEntries = entries.filter(
+      (entry) => CONTENT_TYPE_MAP[entry.sys.contentType.sys.id],
+    )
+    const entryIds = new Set(recognizedEntries.map((entry) => entry.sys.id))
     const existingContentIds = await this.getExistingContentIds()
     const existingEntries = intersection(existingContentIds, entryIds)
     const newEntryIds = difference(entryIds, existingContentIds)
     const deletedEntryIds = deletedEntries.map((entry) => entry.sys.id)
 
-    const updateEntries = entries.filter((entry) =>
+    const updateEntries = recognizedEntries.filter((entry) =>
       existingEntries.has(entry.sys.id),
     )
-    const createEntries = entries.filter((entry) =>
+    const createEntries = recognizedEntries.filter((entry) =>
       newEntryIds.has(entry.sys.id),
     )
 
-    this.prisma.$transaction(async (tx) => {
-      for (let entry of updateEntries) {
-        await tx.content.update({
-          where: {
-            id: entry.sys.id,
-          },
-          data: { ...entry.fields },
-        })
-      }
-      for (let entry of createEntries) {
-        console.dir(entry.sys, { depth: 4, colors: true })
-        // TODO: find out why exception isn't being thrown!?!?
-        // CONTENT_TYPE_MAP[entry.sys.contentType.sys.id] &&
-        await tx.content.create({
-          data: {
-            id: entry.sys.id,
-            type: CONTENT_TYPE_MAP[entry.sys.contentType.sys.id],
-            data: entry.fields as InputJsonObject,
-          },
-        })
-      }
-      await tx.content.deleteMany({
-        where: {
-          id: {
-            in: deletedEntryIds,
-          },
-        },
-      })
-    })
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const entry of updateEntries) {
+          await tx.content.update({
+            where: {
+              id: entry.sys.id,
+            },
+            data: {
+              data: entry.fields as InputJsonObject,
+            },
+          })
+        }
 
-    return [entries, deletedEntries]
+        for (const entry of createEntries) {
+          await tx.content.create({
+            data: {
+              id: entry.sys.id,
+              type: CONTENT_TYPE_MAP[entry.sys.contentType.sys.id],
+              data: entry.fields as InputJsonObject,
+            },
+          })
+        }
+
+        await tx.content.deleteMany({
+          where: {
+            id: {
+              in: deletedEntryIds,
+            },
+          },
+        })
+      },
+      { timeout: 60 * 1000 },
+    )
+
+    return {
+      entries: recognizedEntries,
+      createEntries,
+      updateEntries,
+      deletedEntries,
+    }
   }
 }
