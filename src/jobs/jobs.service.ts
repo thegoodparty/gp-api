@@ -1,0 +1,40 @@
+import { HttpService } from '@nestjs/axios'
+import { Injectable } from '@nestjs/common'
+import { firstValueFrom } from 'rxjs'
+
+const API_BASE = 'https://api.ashbyhq.com/jobPosting'
+const ASHBEY_KEY = process.env.ASHBEY_KEY
+
+interface FetchJobsParams {
+  listedOnly?: boolean
+  jobPostingId?: string
+}
+
+@Injectable()
+export class JobsService {
+  constructor(private readonly httpService: HttpService) {}
+
+  async findAll() {
+    return await this.fetchJobs('list', { listedOnly: true })
+  }
+
+  async findOne(id: string) {
+    return await this.fetchJobs('info', { jobPostingId: id })
+  }
+
+  async fetchJobs(type: string, params?: FetchJobsParams) {
+    const url = `${API_BASE}.${type}`
+    const response = await firstValueFrom(
+      this.httpService.post(url, params, {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Basic ${Buffer.from(ASHBEY_KEY + ':').toString(
+            'base64',
+          )}`,
+        },
+      }),
+    )
+    return response.data.results
+  }
+}
