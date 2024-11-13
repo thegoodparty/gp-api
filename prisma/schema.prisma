@@ -14,34 +14,30 @@ datasource db {
 }
 
 enum ContentType {
-  onboardingPrompts
+  aiChatPrompt
+  aiContentTemplate
+  articleCategory
+  blogArticle
   blogHome
-  pledge
+  blogSection
+  candidateTestimonial
+  election
+  faqArticle
+  faqOrder
+  glossaryItem
   goodPartyTeamMembers
-  articleCategories
-  faqArticles
-  articleTags
-  recentGlossaryItems
-  aiChatPrompts
-  elections
-  redirects
-  glossaryItems
-  promptInputFields
-  glossaryItemsByTitle
-  aiContentCategories
+  onboardingPrompts
+  pledge
   privacyPage
-  candidateTestimonials
-  contentPromptsQuestions
-  blogSections
-  glossaryItemsByLetter
-  candidateContentPrompts
-  blogArticles
+  promptInputFields
+  redirects
+  teamMilestone
   termsOfService
 }
 
 model Content {
-  createdAt BigInt      @map("created_at")
-  updatedAt BigInt      @map("updated_at")
+  createdAt DateTime?   @default(now()) @map("created_at")
+  updatedAt DateTime?   @updatedAt @map("updated_at")
   id        String      @id
   type      ContentType
   data      Json        @db.JsonB

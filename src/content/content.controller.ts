@@ -43,7 +43,6 @@ export class ContentController {
 
   @Get('sync')
   async sync(@Query('seed') seed: boolean) {
-    console.log(`seed =>`, seed)
     const [entries, deletedEntries] =
       await this.contentService.syncContent(seed)
 
