@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   NotFoundException,
+  HttpException,
   BadGatewayException,
   Logger,
 } from '@nestjs/common'
@@ -41,6 +42,9 @@ export class JobsController {
         `Error at jobController findOne e.message:${e.message}`,
         e,
       )
+      if (e instanceof HttpException) {
+        throw e
+      }
       throw new BadGatewayException(
         e.message || `Error occurred while fetching job with id ${id}`,
       )
