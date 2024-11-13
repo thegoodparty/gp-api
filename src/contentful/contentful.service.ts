@@ -8,6 +8,7 @@ const contentfulClient = createClient({
   accessToken: CONTENTFUL_ACCESS_TOKEN,
 })
 
+// TODO: Move this to a key/value store to persist across application instances
 let nextSyncToken = ''
 
 @Injectable()
