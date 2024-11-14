@@ -14,7 +14,11 @@ export default $config({
 
     cluster.addService('NestService', {
       loadBalancer: {
-        ports: [{ listen: '80/http' }],
+        domain: 'nest.goodparty.org',
+        ports: [
+          { listen: '80/http' },
+          { listen: '443/https', forward: '80/http' },
+        ],
       },
       environment: {
         PORT: '80',
@@ -22,7 +26,7 @@ export default $config({
       },
       image: {
         context: '../../gp-api', // Set the context to the main app directory
-        dockerfile: 'Dockerfile', // Dockerfile in the main app directory
+        dockerfile: 'Dockerfile',
       },
       dev: {
         command: 'node --watch main.js',
