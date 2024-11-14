@@ -2,8 +2,17 @@
 /* tslint:disable */
 /* eslint-disable */
 /* deno-fmt-ignore-file */
-import 'sst'
+import "sst"
 export {}
-declare module 'sst' {
-  export interface Resource {}
+declare module "sst" {
+  export interface Resource {
+    "GP-Service": {
+      "service": string
+      "type": "sst.aws.Service"
+      "url": string
+    }
+    "GP-VPC": {
+      "type": "sst.aws.Vpc"
+    }
+  }
 }

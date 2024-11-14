@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@tsconfig/node18": "^18.2.4",
     "@types/aws-lambda": "8.10.145",
     "@types/node": "^22.9.0",
     "sst": "^3.3.21",
