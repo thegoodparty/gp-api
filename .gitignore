@@ -3,6 +3,10 @@
 /node_modules
 /build
 
+# deployment files
+/deploy/node_modules
+/deploy/.sst
+
 # Logs
 logs
 *.log

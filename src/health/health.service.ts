@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+// import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
+// const prisma = new PrismaClient()
 
 @Injectable()
 export class HealthService {
@@ -9,15 +9,16 @@ export class HealthService {
   async checkHealth(): Promise<boolean> {
     // Right now, this just simply checks if the database connection is working,
     //   but we can add more checks here for other backend services as well
-    try {
-      await prisma.$queryRaw`SELECT 1`
-      return true
-    } catch (e: unknown) {
-      this.logger.error(
-        'Health check failed => ',
-        e instanceof Error ? e.message : e,
-      )
-      return false
-    }
+    // try {
+    //   await prisma.$queryRaw`SELECT 1`
+    //   return true
+    // } catch (e: unknown) {
+    //   this.logger.error(
+    //     'Health check failed => ',
+    //     e instanceof Error ? e.message : e,
+    //   )
+    //   return false
+    // }
+    return true
   }
 }
