@@ -3,20 +3,20 @@
 export default $config({
   app(input) {
     return {
-      name: 'NestApp',
+      name: 'GP-API',
       removal: input?.stage === 'production' ? 'retain' : 'remove',
       home: 'aws',
     }
   },
   async run() {
-    const vpc = new sst.aws.Vpc('NestVpc', {
+    const vpc = new sst.aws.Vpc('GP-VPC', {
       bastion: false,
       nat: 'managed',
       az: 2, // defaults to 2 availability zones and 2 NAT gateways
     })
-    const cluster = new sst.aws.Cluster('NestCluster', { vpc })
+    const cluster = new sst.aws.Cluster('GP-Cluster', { vpc })
 
-    cluster.addService('NestService', {
+    cluster.addService('GP-Service', {
       loadBalancer: {
         domain: 'gp-api.goodparty.org',
         ports: [
