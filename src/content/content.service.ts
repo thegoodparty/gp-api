@@ -57,7 +57,7 @@ export class ContentService {
   }
 
   async syncContent(seed: boolean = false) {
-    const [entries = [], deletedEntries = []] =
+    const { entries = [], deletedEntries = [] } =
       await this.contentfulService.getSync(seed)
     const recognizedEntries = entries.filter(
       (entry) => CONTENT_TYPE_MAP[entry.sys.contentType.sys.id],

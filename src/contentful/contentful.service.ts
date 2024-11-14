@@ -15,7 +15,7 @@ let nextSyncToken = ''
 export class ContentfulService {
   async getSync(
     initial = false,
-  ): Promise<[entries: Entry[], deletedEntries: DeletedEntry[]]> {
+  ): Promise<{ entries: Entry[]; deletedEntries: DeletedEntry[] }> {
     const {
       entries,
       deletedEntries,
@@ -24,11 +24,10 @@ export class ContentfulService {
       ...(initial || !nextSyncToken ? { initial: true } : { nextSyncToken }),
     })
     nextSyncToken = newToken
-    return [entries, deletedEntries]
+    return { entries, deletedEntries }
   }
 
   async getEntry(id: string) {
-    const entry = await contentfulClient.getEntry(id)
-    return entry
+    return await contentfulClient.getEntry(id)
   }
 }
