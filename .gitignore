@@ -4,8 +4,8 @@
 /build
 
 # deployment files
-/deploy/node_modules
-/deploy/.sst
+/src/node_modules
+.sst
 
 # Logs
 logs
