@@ -1,24 +1,9 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common'
+import { Controller, Get, Param, Query } from '@nestjs/common'
 import { ContentService } from './content.service'
-import { CreateContentDto } from './dto/create-content.dto'
-import { UpdateContentDto } from './dto/update-content.dto'
 
 @Controller('content')
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
-
-  @Post()
-  create(@Body() createContentDto: CreateContentDto) {
-    return this.contentService.create(createContentDto)
-  }
 
   @Get()
   findAll() {
@@ -30,18 +15,16 @@ export class ContentController {
     return this.contentService.findOne(+id)
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateContentDto: UpdateContentDto) {
-    return this.contentService.update(+id, updateContentDto)
-  }
+  @Get('sync')
+  async sync(@Query('seed') seed: boolean = false) {
+    const { entries, createEntries, updateEntries, deletedEntries } =
+      await this.contentService.syncContent(seed)
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.contentService.remove(+id)
-  }
-
-  @Get('seed')
-  seed() {
-    return 'ok'
+    return {
+      entriesCount: entries.length,
+      createEntriesCount: createEntries.length,
+      updateEntriesCount: updateEntries.length,
+      deletedEntriesCount: deletedEntries.length,
+    }
   }
 }

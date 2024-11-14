@@ -4,10 +4,18 @@ import { AppService } from './app.service'
 import { ContentModule } from './content/content.module'
 import { JobsModule } from './jobs/jobs.module'
 import { HealthModule } from './health/health.module'
+import { PrismaModule } from './prisma/prisma.module'
+import { ContentfulModule } from './contentful/contentful.module'
 
 @Module({
+  imports: [
+    ContentModule,
+    HealthModule,
+    PrismaModule,
+    ContentfulModule,
+    JobsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
-  imports: [ContentModule, JobsModule, HealthModule],
 })
 export class AppModule {}
