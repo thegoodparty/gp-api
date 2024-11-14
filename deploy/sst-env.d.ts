@@ -6,13 +6,13 @@ import "sst"
 export {}
 declare module "sst" {
   export interface Resource {
-    "GP-Service": {
+    "GP-VPC": {
+      "type": "sst.aws.Vpc"
+    }
+    "gp-api-develop": {
       "service": string
       "type": "sst.aws.Service"
       "url": string
-    }
-    "GP-VPC": {
-      "type": "sst.aws.Vpc"
     }
   }
 }
