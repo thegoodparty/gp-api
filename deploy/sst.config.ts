@@ -6,6 +6,11 @@ export default $config({
       name: 'GP-API',
       removal: input?.stage === 'production' ? 'retain' : 'remove',
       home: 'aws',
+      providers: {
+        aws: {
+          region: 'us-west-2',
+        },
+      },
     }
   },
   async run() {
