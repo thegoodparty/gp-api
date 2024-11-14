@@ -9,16 +9,29 @@ export default $config({
     }
   },
   async run() {
-    const vpc = new sst.aws.Vpc('GP-VPC', {
-      bastion: false,
-      nat: 'managed',
-      az: 2, // defaults to 2 availability zones and 2 NAT gateways
-    })
-    const cluster = new sst.aws.Cluster('GP-Cluster', { vpc })
+    const vpc =
+      $app.stage === 'production'
+        ? new sst.aws.Vpc('GP-VPC', {
+            bastion: false,
+            nat: 'managed',
+            az: 2, // defaults to 2 availability zones and 2 NAT gateways
+          })
+        : sst.aws.Vpc.get('GP-VPC', 'vpc-057b988559836aa8d') // other stages will use GP-VPC
 
-    cluster.addService('GP-Service', {
+    // Each stage will get its own Cluster.
+    const cluster = new sst.aws.Cluster('Fargate', { vpc })
+
+    // Change the domain based on the stage.
+    let domain = 'gp-api-test.goodparty.org'
+    if ($app.stage === 'develop') {
+      domain = 'gp-api-dev.goodparty.org'
+    } else if ($app.stage === 'production') {
+      domain = 'gp-api.goodparty.org'
+    }
+
+    cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
-        domain: 'gp-api.goodparty.org',
+        domain,
         ports: [
           { listen: '80/http' },
           { listen: '443/https', forward: '80/http' },
