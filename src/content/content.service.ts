@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ContentfulService } from '../contentful/contentful.service'
 import { ContentType } from '@prisma/client'
-import { difference, intersection } from '../shared/util/sets.util'
 import { InputJsonObject } from '@prisma/client/runtime/library'
 
 // we have to do this for TypeScript enums 😢
@@ -64,8 +63,8 @@ export class ContentService {
     )
     const entryIds = new Set(recognizedEntries.map((entry) => entry.sys.id))
     const existingContentIds = await this.getExistingContentIds()
-    const existingEntries = intersection(existingContentIds, entryIds)
-    const newEntryIds = difference(entryIds, existingContentIds)
+    const existingEntries = existingContentIds.intersection(entryIds)
+    const newEntryIds = entryIds.difference(existingContentIds)
     const deletedEntryIds = deletedEntries.map((entry) => entry.sys.id)
 
     const updateEntries = recognizedEntries.filter((entry) =>
