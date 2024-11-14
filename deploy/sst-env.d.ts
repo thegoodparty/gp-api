@@ -2,17 +2,8 @@
 /* tslint:disable */
 /* eslint-disable */
 /* deno-fmt-ignore-file */
-import "sst"
+import 'sst'
 export {}
-declare module "sst" {
-  export interface Resource {
-    "NestService": {
-      "service": string
-      "type": "sst.aws.Service"
-      "url": string
-    }
-    "NestVpc": {
-      "type": "sst.aws.Vpc"
-    }
-  }
+declare module 'sst' {
+  export interface Resource {}
 }
