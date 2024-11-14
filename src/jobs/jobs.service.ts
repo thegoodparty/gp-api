@@ -22,7 +22,7 @@ export class JobsService {
     return await this.fetchJobs('info', { jobPostingId: id })
   }
 
-  async fetchJobs(type: string, params?: FetchJobsParams) {
+  private async fetchJobs(type: string, params?: FetchJobsParams) {
     const url = `${API_BASE}.${type}`
     const response = await firstValueFrom(
       this.httpService.post(url, params, {
