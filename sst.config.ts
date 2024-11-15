@@ -42,7 +42,7 @@ export default $config({
           { listen: '443/https', forward: '3000/http' },
         ],
         health: {
-          '443/https': {
+          '3000/http': {
             path: '/v1/health',
             interval: '10 seconds',
           },
