@@ -59,8 +59,11 @@ export default $config({
       ssm: {
         // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
         //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
-        CONTENTFUL_ACCESS_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
+        // CONTENTFUL_ACCESS_TOKEN:
+        //   'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
+
+        SECRETS:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:gp-api-develop-secrets-udgc2V',
       },
       // todo: configure health checks.
       image: {
