@@ -53,7 +53,7 @@ export default $config({
       // },
       // todo: configure health checks.
       health: {
-        // @ts-expect-error
+        // @ts-ignore
         '443/https': {
           path: '/v1/health',
           interval: '10 seconds',
