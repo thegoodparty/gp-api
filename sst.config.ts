@@ -38,7 +38,7 @@ export default $config({
       loadBalancer: {
         domain,
         ports: [
-          // { listen: '80/http', forward: '443/https' },
+          { listen: '3000/http' },
           { listen: '443/https', forward: '3000/http' },
         ],
         // health: {
