@@ -41,6 +41,12 @@ export default $config({
           // { listen: '80/http', forward: '443/https' },
           { listen: '443/https', forward: '3000/http' },
         ],
+        health: {
+          '443/https': {
+            path: '/v1/health',
+            interval: '10 seconds',
+          },
+        },
       },
       environment: {
         PORT: '3000',
@@ -52,13 +58,6 @@ export default $config({
       //   //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
       // },
       // todo: configure health checks.
-      health: {
-        // @ts-ignore
-        '443/https': {
-          path: '/v1/health',
-          interval: '10 seconds',
-        },
-      },
       image: {
         // context: "../", // Set the context to the main app directory
         // dockerfile: "deploy/Dockerfile",
