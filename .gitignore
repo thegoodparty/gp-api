@@ -8,6 +8,7 @@ nestjs/node_modules
 sst/node_modules
 
 # SST specific
+.sst
 sst/.sst
 .build
 
