@@ -38,18 +38,21 @@ export default $config({
       loadBalancer: {
         domain,
         ports: [
-          { listen: '3000/http' },
-          { listen: '443/https', forward: '3000/http' },
+          { listen: '80/http' },
+          { listen: '443/https', forward: '80/http' },
+          // { listen: '3000/http' },
+          // { listen: '443/https', forward: '3000/http' },
         ],
-        // health: {
-        //   '3000/http': {
-        //     path: '/v1/health',
-        //     interval: '10 seconds',
-        //   },
-        // },
+        health: {
+          '80/http': {
+            path: '/v1/health',
+            interval: '30 seconds',
+          },
+        },
       },
       environment: {
-        PORT: '3000',
+        // PORT: '3000',
+        PORT: '80',
         HOST: '0.0.0.0',
       },
       // todo: use ssm for secrets.
