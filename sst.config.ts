@@ -38,12 +38,12 @@ export default $config({
       loadBalancer: {
         domain,
         ports: [
-          { listen: '80/http' },
-          { listen: '443/https', forward: '80/http' },
+          // { listen: '80/http', forward: '443/https' },
+          { listen: '443/https', forward: '3000/http' },
         ],
       },
       environment: {
-        PORT: '80',
+        PORT: '3000',
         HOST: '0.0.0.0',
       },
       // todo: use ssm for secrets.
@@ -52,12 +52,13 @@ export default $config({
       //   //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
       // },
       // todo: configure health checks.
-      // health: {
-      //   '443/https': {
-      //     path: '/health',
-      //     interval: '10 seconds',
-      //   },
-      // },
+      health: {
+        // @ts-expect-error
+        '443/https': {
+          path: '/v1/health',
+          interval: '10 seconds',
+        },
+      },
       image: {
         // context: "../", // Set the context to the main app directory
         // dockerfile: "deploy/Dockerfile",

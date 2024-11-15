@@ -39,7 +39,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/api/prisma/schema ./api/prisma/schema
 
 # Expose the application port
-# EXPOSE 3000
+EXPOSE 3000
 
 # Start the application
 CMD ["node", "dist/main.js"]
