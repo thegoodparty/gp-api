@@ -56,10 +56,12 @@ export default $config({
         HOST: '0.0.0.0',
       },
       // todo: use ssm for secrets.
-      // ssm: {
-      //   // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
-      //   //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
-      // },
+      ssm: {
+        // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
+        //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
+        CONTENTFUL_ACCESS_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
+      },
       // todo: configure health checks.
       image: {
         // context: "../", // Set the context to the main app directory
