@@ -61,9 +61,9 @@ export default $config({
       image: {
         // context: "../", // Set the context to the main app directory
         // dockerfile: "deploy/Dockerfile",
-        args: {
-          DOCKER_BUILDKIT: '0',
-        },
+        // args: {
+        //   DOCKER_BUILDKIT: '0',
+        // },
       },
       dev: {
         command: 'node --watch main.js',
