@@ -1,0 +1,47 @@
+{
+    "kind": "update",
+    "startTime": 1731698624,
+    "message": "chore: update dockerfile to use ecr images.",
+    "environment": {
+        "exec.kind": "auto.local",
+        "git.author": "Taylor Murray",
+        "git.author.email": "taylor@goodparty.org",
+        "git.committer": "Taylor Murray",
+        "git.committer.email": "taylor@goodparty.org",
+        "git.dirty": "true",
+        "git.head": "a63b8bb91f9c636dd5ef3f1792293742d3919cb0",
+        "git.headName": "refs/heads/develop",
+        "pulumi.arch": "amd64",
+        "pulumi.env.PULUMI_CONFIG_PASSPHRASE": "set",
+        "pulumi.env.PULUMI_DEBUG_COMMANDS": "true",
+        "pulumi.env.PULUMI_HOME": "set",
+        "pulumi.env.PULUMI_SKIP_UPDATE_CHECK": "true",
+        "pulumi.flag.event-log": "set",
+        "pulumi.flag.exec-kind": "set",
+        "pulumi.flag.non-interactive": "true",
+        "pulumi.flag.skip-preview": "true",
+        "pulumi.flag.stack": "set",
+        "pulumi.flag.target-dependents": "true",
+        "pulumi.flag.verbose": "set",
+        "pulumi.flag.yes": "true",
+        "pulumi.os": "darwin",
+        "pulumi.version": "v3.136.1",
+        "updatePlan": "false",
+        "vcs.kind": "github.com",
+        "vcs.owner": "thegoodparty",
+        "vcs.repo": "gp-api",
+        "vcs.root": "deploy/.sst"
+    },
+    "config": {
+        "aws:defaultTags": "{\"tags\":{\"sst:app\":\"GP-API\",\"sst:stage\":\"develop\"}}",
+        "aws:region": "us-west-2"
+    },
+    "version": 0,
+    "result": "succeeded",
+    "endTime": 1731698756,
+    "resourceChanges": {
+        "replace": 1,
+        "same": 31,
+        "update": 2
+    }
+}

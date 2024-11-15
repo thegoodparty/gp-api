@@ -1,0 +1,2768 @@
+{
+    "version": 3,
+    "checkpoint": {
+        "stack": "organization/GP-API/develop",
+        "latest": {
+            "manifest": {
+                "time": "2024-11-15T11:25:56.970577-08:00",
+                "magic": "3b1911ae6e2d8d1f468975cdca7c3c6a48585f5e805330548231ecc6cfbc84ff",
+                "version": "v3.136.1"
+            },
+            "secrets_providers": {
+                "type": "passphrase",
+                "state": {
+                    "salt": "v1:v1d/b2P7ego=:v1:rpDvG+1BnXZSFJ65:HASMCBjsMMcxliZcj0BJoMiKMwxQxQ=="
+                }
+            },
+            "resources": [
+                {
+                    "urn": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "custom": false,
+                    "type": "pulumi:pulumi:Stack",
+                    "created": "2024-11-14T21:39:52.775146Z",
+                    "modified": "2024-11-14T21:39:52.775146Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/runtime/stack.ts#38,23"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Cluster::Fargate",
+                    "custom": false,
+                    "type": "sst:aws:Cluster",
+                    "parent": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "created": "2024-11-14T21:39:55.776616Z",
+                    "modified": "2024-11-14T21:39:55.776616Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/cluster.ts#1731,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "custom": false,
+                    "type": "sst:aws:Service",
+                    "outputs": {
+                        "_hint": "https://gp-api-dev.goodparty.org/"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "created": "2024-11-14T21:39:55.787426Z",
+                    "modified": "2024-11-14T21:39:55.787426Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#98,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:sst:DevCommand::gp-api-developDev",
+                    "custom": false,
+                    "type": "sst:sst:DevCommand",
+                    "outputs": {
+                        "_dev": {
+                            "autostart": true,
+                            "aws": {
+                                "role": "arn:aws:iam::333022194791:role/GP-API-develop-gpapidevelopTaskRole-uswest2"
+                            },
+                            "command": "node --watch main.js",
+                            "directory": ".",
+                            "environment": {
+                                "AWS_REGION": "us-west-2",
+                                "HOST": "0.0.0.0",
+                                "PORT": "80"
+                            },
+                            "links": []
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "created": "2024-11-14T21:39:55.778764Z",
+                    "modified": "2024-11-14T21:39:55.778764Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/experimental/dev-command.ts#105,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:sst:LinkRef::gp-api-developLinkRef",
+                    "custom": false,
+                    "type": "sst:sst:LinkRef",
+                    "outputs": {
+                        "properties": {
+                            "service": "gp-api-develop.develop.GP-API.sst",
+                            "type": "sst.aws.Service",
+                            "url": "https://gp-api-dev.goodparty.org/"
+                        },
+                        "target": "gp-api-develop"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "created": "2024-11-14T21:39:55.773265Z",
+                    "modified": "2024-11-14T21:39:55.773265Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/link.ts#25,7"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Cluster$sst:sst:Version::FargateVersion",
+                    "custom": false,
+                    "type": "sst:sst:Version",
+                    "outputs": {
+                        "target": "Fargate",
+                        "version": 2
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Cluster::Fargate",
+                    "created": "2024-11-14T21:39:59.281577Z",
+                    "modified": "2024-11-14T21:39:59.281577Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/component.ts#417,7"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate::gp-api-developSsl",
+                    "custom": false,
+                    "type": "sst:aws:Certificate",
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "created": "2024-11-14T21:39:59.279439Z",
+                    "modified": "2024-11-14T21:39:59.279439Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/dns-validated-certificate.ts#35,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1",
+                    "custom": true,
+                    "id": "c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "type": "pulumi:providers:aws",
+                    "inputs": {
+                        "__internal": {},
+                        "defaultTags": "{\"tags\":{\"sst:app\":\"GP-API\",\"sst:stage\":\"develop\"}}",
+                        "region": "us-west-2",
+                        "skipCredentialsValidation": "false",
+                        "skipRegionValidation": "true",
+                        "version": "6.59.1"
+                    },
+                    "outputs": {
+                        "defaultTags": "{\"tags\":{\"sst:app\":\"GP-API\",\"sst:stage\":\"develop\"}}",
+                        "region": "us-west-2",
+                        "skipCredentialsValidation": "false",
+                        "skipRegionValidation": "true",
+                        "version": "6.59.1"
+                    },
+                    "created": "2024-11-14T21:39:59.277012Z",
+                    "modified": "2024-11-14T21:39:59.277012Z"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster",
+                    "custom": true,
+                    "id": "arn:aws:ecs:us-west-2:333022194791:cluster/GP-API-develop-FargateCluster",
+                    "type": "aws:ecs/cluster:Cluster",
+                    "inputs": {
+                        "__defaults": [],
+                        "name": "GP-API-develop-FargateCluster",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:ecs:us-west-2:333022194791:cluster/GP-API-develop-FargateCluster",
+                        "configuration": null,
+                        "id": "arn:aws:ecs:us-west-2:333022194791:cluster/GP-API-develop-FargateCluster",
+                        "name": "GP-API-develop-FargateCluster",
+                        "serviceConnectDefaults": null,
+                        "settings": [
+                            {
+                                "name": "containerInsights",
+                                "value": "disabled"
+                            }
+                        ],
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Cluster::Fargate",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "name": []
+                    },
+                    "created": "2024-11-14T21:40:10.186166Z",
+                    "modified": "2024-11-14T21:40:10.186166Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/cluster.ts#1758,14"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:acm/certificate:Certificate::gp-api-developSslCertificate",
+                    "custom": true,
+                    "id": "arn:aws:acm:us-west-2:333022194791:certificate/c4b7c5a6-48f9-4606-a726-f8ea2574bdb6",
+                    "type": "aws:acm/certificate:Certificate",
+                    "inputs": {
+                        "__defaults": [],
+                        "domainName": "gp-api-dev.goodparty.org",
+                        "subjectAlternativeNames": [],
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "validationMethod": "DNS"
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:acm:us-west-2:333022194791:certificate/c4b7c5a6-48f9-4606-a726-f8ea2574bdb6",
+                        "certificateAuthorityArn": "",
+                        "certificateBody": null,
+                        "certificateChain": null,
+                        "domainName": "gp-api-dev.goodparty.org",
+                        "domainValidationOptions": [
+                            {
+                                "domainName": "gp-api-dev.goodparty.org",
+                                "resourceRecordName": "_9e55098b3e6b9ceffc45789fa8efa9a2.gp-api-dev.goodparty.org.",
+                                "resourceRecordType": "CNAME",
+                                "resourceRecordValue": "_ba541939deaecb5a169381ed87c221d5.djqtsrsxkq.acm-validations.aws."
+                            }
+                        ],
+                        "earlyRenewalDuration": "",
+                        "id": "arn:aws:acm:us-west-2:333022194791:certificate/c4b7c5a6-48f9-4606-a726-f8ea2574bdb6",
+                        "keyAlgorithm": "RSA_2048",
+                        "notAfter": "",
+                        "notBefore": "",
+                        "options": {
+                            "certificateTransparencyLoggingPreference": "ENABLED"
+                        },
+                        "pendingRenewal": false,
+                        "privateKey": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "ciphertext": "v1:7ygn92yrgWMJu6N3:FTmvL9KA3NNIOQLLsb6+qvrhkdY="
+                        },
+                        "renewalEligibility": "INELIGIBLE",
+                        "renewalSummaries": [],
+                        "status": "PENDING_VALIDATION",
+                        "subjectAlternativeNames": [
+                            "gp-api-dev.goodparty.org"
+                        ],
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "type": "AMAZON_ISSUED",
+                        "validationEmails": [],
+                        "validationMethod": "DNS",
+                        "validationOptions": []
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate::gp-api-developSsl",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "domainName": [],
+                        "subjectAlternativeNames": [],
+                        "validationMethod": []
+                    },
+                    "additionalSecretOutputs": [
+                        "privateKey"
+                    ],
+                    "created": "2024-11-14T21:40:04.758696Z",
+                    "modified": "2024-11-14T21:40:04.758696Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/dns-validated-certificate.ts#45,14"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:cloudwatch/logGroup:LogGroup::gp-api-developLogGroupgp-api-develop",
+                    "custom": true,
+                    "id": "/sst/cluster/GP-API-develop-FargateCluster/gp-api-develop/gp-api-develop",
+                    "type": "aws:cloudwatch/logGroup:LogGroup",
+                    "inputs": {
+                        "__defaults": [
+                            "skipDestroy"
+                        ],
+                        "name": "/sst/cluster/GP-API-develop-FargateCluster/gp-api-develop/gp-api-develop",
+                        "retentionInDays": 30,
+                        "skipDestroy": false,
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:logs:us-west-2:333022194791:log-group:/sst/cluster/GP-API-develop-FargateCluster/gp-api-develop/gp-api-develop",
+                        "id": "/sst/cluster/GP-API-develop-FargateCluster/gp-api-develop/gp-api-develop",
+                        "kmsKeyId": "",
+                        "logGroupClass": "STANDARD",
+                        "name": "/sst/cluster/GP-API-develop-FargateCluster/gp-api-develop/gp-api-develop",
+                        "namePrefix": "",
+                        "retentionInDays": 30,
+                        "skipDestroy": false,
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "name": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster"
+                        ],
+                        "retentionInDays": []
+                    },
+                    "created": "2024-11-14T21:40:10.589083Z",
+                    "modified": "2024-11-14T21:40:10.589083Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/cloudwatch/logGroup.ts#139,9"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:iam/role:Role::gp-api-developTaskRole",
+                    "custom": true,
+                    "id": "GP-API-develop-gpapidevelopTaskRole-uswest2",
+                    "type": "aws:iam/role:Role",
+                    "inputs": {
+                        "__defaults": [
+                            "forceDetachPolicies",
+                            "maxSessionDuration",
+                            "path"
+                        ],
+                        "assumeRolePolicy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ecs-tasks.amazonaws.com\"},\"Sid\":\"AllowAssumeRole\"}],\"Version\":\"2012-10-17\"}",
+                        "forceDetachPolicies": false,
+                        "inlinePolicies": [
+                            {
+                                "__defaults": [],
+                                "name": "inline",
+                                "policy": "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ssmmessages:OpenDataChannel\",\n        \"ssmmessages:OpenControlChannel\",\n        \"ssmmessages:CreateDataChannel\",\n        \"ssmmessages:CreateControlChannel\"\n      ],\n      \"Resource\": \"*\"\n    }\n  ]\n}"
+                            }
+                        ],
+                        "maxSessionDuration": 3600,
+                        "name": "GP-API-develop-gpapidevelopTaskRole-uswest2",
+                        "path": "/",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:iam::333022194791:role/GP-API-develop-gpapidevelopTaskRole-uswest2",
+                        "assumeRolePolicy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ecs-tasks.amazonaws.com\"},\"Sid\":\"AllowAssumeRole\"}],\"Version\":\"2012-10-17\"}",
+                        "createDate": "2024-11-14T21:39:59Z",
+                        "description": "",
+                        "forceDetachPolicies": false,
+                        "id": "GP-API-develop-gpapidevelopTaskRole-uswest2",
+                        "inlinePolicies": [
+                            {
+                                "name": "inline",
+                                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"ssmmessages:OpenDataChannel\",\"ssmmessages:OpenControlChannel\",\"ssmmessages:CreateDataChannel\",\"ssmmessages:CreateControlChannel\"],\"Effect\":\"Allow\",\"Resource\":\"*\"}]}"
+                            }
+                        ],
+                        "managedPolicyArns": [],
+                        "maxSessionDuration": 3600,
+                        "name": "GP-API-develop-gpapidevelopTaskRole-uswest2",
+                        "namePrefix": "",
+                        "path": "/",
+                        "permissionsBoundary": "",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "uniqueId": "AROAU3CNLNRT6L5SHYPD3"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "assumeRolePolicy": [],
+                        "inlinePolicies": [],
+                        "name": []
+                    },
+                    "created": "2024-11-14T21:40:00.471856Z",
+                    "modified": "2024-11-14T21:40:00.471856Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#622,14"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:iam/role:Role::gp-api-developExecutionRole",
+                    "custom": true,
+                    "id": "GP-API-develop-gpapidevelopExecutionRole-uswest2",
+                    "type": "aws:iam/role:Role",
+                    "inputs": {
+                        "__defaults": [
+                            "forceDetachPolicies",
+                            "maxSessionDuration",
+                            "path"
+                        ],
+                        "assumeRolePolicy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ecs-tasks.amazonaws.com\"},\"Sid\":\"AllowAssumeRole\"}],\"Version\":\"2012-10-17\"}",
+                        "forceDetachPolicies": false,
+                        "inlinePolicies": [
+                            {
+                                "__defaults": [],
+                                "name": "inline",
+                                "policy": "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"ReadSsmAndSecrets\",\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ssm:GetParameters\",\n        \"ssm:GetParameterHistory\",\n        \"ssm:GetParameter\",\n        \"secretsmanager:GetSecretValue\"\n      ],\n      \"Resource\": \"*\"\n    }\n  ]\n}"
+                            }
+                        ],
+                        "managedPolicyArns": [
+                            "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+                        ],
+                        "maxSessionDuration": 3600,
+                        "name": "GP-API-develop-gpapidevelopExecutionRole-uswest2",
+                        "path": "/",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:iam::333022194791:role/GP-API-develop-gpapidevelopExecutionRole-uswest2",
+                        "assumeRolePolicy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ecs-tasks.amazonaws.com\"},\"Sid\":\"AllowAssumeRole\"}],\"Version\":\"2012-10-17\"}",
+                        "createDate": "2024-11-14T21:39:59Z",
+                        "description": "",
+                        "forceDetachPolicies": false,
+                        "id": "GP-API-develop-gpapidevelopExecutionRole-uswest2",
+                        "inlinePolicies": [
+                            {
+                                "name": "inline",
+                                "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"ssm:GetParameters\",\"ssm:GetParameterHistory\",\"ssm:GetParameter\",\"secretsmanager:GetSecretValue\"],\"Effect\":\"Allow\",\"Resource\":\"*\",\"Sid\":\"ReadSsmAndSecrets\"}]}"
+                            }
+                        ],
+                        "managedPolicyArns": [
+                            "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+                        ],
+                        "maxSessionDuration": 3600,
+                        "name": "GP-API-develop-gpapidevelopExecutionRole-uswest2",
+                        "namePrefix": "",
+                        "path": "/",
+                        "permissionsBoundary": "",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "uniqueId": "AROAU3CNLNRT4YBIBLATY"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "assumeRolePolicy": [],
+                        "inlinePolicies": [],
+                        "managedPolicyArns": [],
+                        "name": []
+                    },
+                    "created": "2024-11-14T21:40:00.616211Z",
+                    "modified": "2024-11-14T21:40:00.616211Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#654,14"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::pulumi:providers:pulumi-nodejs::default",
+                    "custom": true,
+                    "id": "40322d19-99c4-4934-ab54-86200412b162",
+                    "type": "pulumi:providers:pulumi-nodejs",
+                    "created": "2024-11-14T21:40:05.293327Z",
+                    "modified": "2024-11-14T21:40:05.293327Z"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$pulumi-nodejs:dynamic:Resource::gp-api-developSslCNAMEZoneLookup9e55098b3e6b9ceffc45789fa8efa9a2gpapidevgoodpartyorg.sst.aws.HostedZoneLookup",
+                    "custom": true,
+                    "id": "Z10392302OXMPNQLPO07K",
+                    "type": "pulumi-nodejs:dynamic:Resource",
+                    "inputs": {
+                        "__provider": "exports.handler = __f0;\n\nvar __provider_proto = {};\nObject.defineProperty(__f1, \"prototype\", { value: __provider_proto });\nObject.defineProperty(__provider_proto, \"constructor\", { configurable: true, writable: true, value: __f1 });\nObject.defineProperty(__provider_proto, \"name\", { configurable: true, writable: true, value: __f2 });\nObject.setPrototypeOf(__f4, global.Error);\nObject.defineProperty(__provider_proto, \"create\", { configurable: true, writable: true, value: __f3 });\nObject.defineProperty(__provider_proto, \"delete\", { configurable: true, writable: true, value: __f5 });\nObject.defineProperty(__provider_proto, \"update\", { configurable: true, writable: true, value: __f6 });\nObject.defineProperty(__provider_proto, \"read\", { configurable: true, writable: true, value: __f7 });\nvar __provider = Object.create(__provider_proto);\n__provider.type = \"Aws.HostedZoneLookup\";\n\nfunction __f1(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(type) {\n      this.type = type;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f2(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*name*/(action) {\n      return \"Resource.\" + this.type + \".\" + action;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f4(__0) {\n  return (function() {\n    with({ __super: global.Error, this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(method) {\n    __super.call(this, `Method \"${method}\" not found`);\n    this.method = method;\n};\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\nconst http = require(\"http\");\n\nfunction __call(__0, __1) {\n  return (function() {\n    with({ MethodNotFoundError: __f4, call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*call*/(method, args) {\n    return new Promise((resolve, reject) => {\n      const url = new URL(process.env.SST_SERVER + \"/rpc\");\n      const options = {\n        hostname: url.hostname,\n        port: url.port,\n        path: url.pathname,\n        method: \"POST\",\n        headers: {\n          \"Content-Type\": \"application/json\"\n        }\n      };\n      const req = http.request(options, (res) => {\n        let data = \"\";\n        res.on(\"data\", (chunk) => {\n          data += chunk;\n        });\n        res.on(\"end\", () => {\n          if (res.statusCode !== 200) {\n            reject(new Error(`Failed to call RPC: ${data}`));\n            return;\n          }\n          try {\n            const json = JSON.parse(data);\n            if (json.error) {\n              if (json.error.startsWith(\"rpc: can't find\")) {\n                reject(new MethodNotFoundError(method));\n                return;\n              }\n              reject(new Error(json.error));\n              return;\n            }\n            resolve(json.result);\n          } catch (error) {\n            reject(new Error(`Failed to parse JSON: ${error.message}`));\n          }\n        });\n      });\n      req.on(\"error\", (error) => {\n        reject(error);\n      });\n      req.setTimeout(0);\n      const body = JSON.stringify({\n        jsonrpc: \"1.0\",\n        method,\n        params: [args]\n      });\n      req.write(body);\n      req.end();\n    });\n  };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f3(__0) {\n  return (function() {\n    with({ call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*create*/(inputs) {\n      return call(this.name(\"Create\"), inputs);\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f5(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*delete*/(id, outs) {\n      return call(this.name(\"Delete\"), { id, outs }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return;\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f6(__0, __1, __2) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*update*/(id, olds, news) {\n      return call(this.name(\"Update\"), { id, olds, news }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError)\n          return {\n            id\n          };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f7(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*read*/(id, props) {\n      return call(this.name(\"Read\"), { id, props }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return { id, props };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f0() {\n  return (function() {\n    with({ provider: __provider, this: undefined, arguments: undefined }) {\n\nreturn () => provider;\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n",
+                        "domain": "_9e55098b3e6b9ceffc45789fa8efa9a2.gp-api-dev.goodparty.org"
+                    },
+                    "outputs": {
+                        "__provider": "exports.handler = __f0;\n\nvar __provider_proto = {};\nObject.defineProperty(__f1, \"prototype\", { value: __provider_proto });\nObject.defineProperty(__provider_proto, \"constructor\", { configurable: true, writable: true, value: __f1 });\nObject.defineProperty(__provider_proto, \"name\", { configurable: true, writable: true, value: __f2 });\nObject.setPrototypeOf(__f4, global.Error);\nObject.defineProperty(__provider_proto, \"create\", { configurable: true, writable: true, value: __f3 });\nObject.defineProperty(__provider_proto, \"delete\", { configurable: true, writable: true, value: __f5 });\nObject.defineProperty(__provider_proto, \"update\", { configurable: true, writable: true, value: __f6 });\nObject.defineProperty(__provider_proto, \"read\", { configurable: true, writable: true, value: __f7 });\nvar __provider = Object.create(__provider_proto);\n__provider.type = \"Aws.HostedZoneLookup\";\n\nfunction __f1(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(type) {\n      this.type = type;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f2(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*name*/(action) {\n      return \"Resource.\" + this.type + \".\" + action;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f4(__0) {\n  return (function() {\n    with({ __super: global.Error, this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(method) {\n    __super.call(this, `Method \"${method}\" not found`);\n    this.method = method;\n};\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\nconst http = require(\"http\");\n\nfunction __call(__0, __1) {\n  return (function() {\n    with({ MethodNotFoundError: __f4, call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*call*/(method, args) {\n    return new Promise((resolve, reject) => {\n      const url = new URL(process.env.SST_SERVER + \"/rpc\");\n      const options = {\n        hostname: url.hostname,\n        port: url.port,\n        path: url.pathname,\n        method: \"POST\",\n        headers: {\n          \"Content-Type\": \"application/json\"\n        }\n      };\n      const req = http.request(options, (res) => {\n        let data = \"\";\n        res.on(\"data\", (chunk) => {\n          data += chunk;\n        });\n        res.on(\"end\", () => {\n          if (res.statusCode !== 200) {\n            reject(new Error(`Failed to call RPC: ${data}`));\n            return;\n          }\n          try {\n            const json = JSON.parse(data);\n            if (json.error) {\n              if (json.error.startsWith(\"rpc: can't find\")) {\n                reject(new MethodNotFoundError(method));\n                return;\n              }\n              reject(new Error(json.error));\n              return;\n            }\n            resolve(json.result);\n          } catch (error) {\n            reject(new Error(`Failed to parse JSON: ${error.message}`));\n          }\n        });\n      });\n      req.on(\"error\", (error) => {\n        reject(error);\n      });\n      req.setTimeout(0);\n      const body = JSON.stringify({\n        jsonrpc: \"1.0\",\n        method,\n        params: [args]\n      });\n      req.write(body);\n      req.end();\n    });\n  };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f3(__0) {\n  return (function() {\n    with({ call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*create*/(inputs) {\n      return call(this.name(\"Create\"), inputs);\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f5(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*delete*/(id, outs) {\n      return call(this.name(\"Delete\"), { id, outs }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return;\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f6(__0, __1, __2) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*update*/(id, olds, news) {\n      return call(this.name(\"Update\"), { id, olds, news }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError)\n          return {\n            id\n          };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f7(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*read*/(id, props) {\n      return call(this.name(\"Read\"), { id, props }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return { id, props };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f0() {\n  return (function() {\n    with({ provider: __provider, this: undefined, arguments: undefined }) {\n\nreturn () => provider;\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n",
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate::gp-api-developSsl",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:pulumi-nodejs::default::40322d19-99c4-4934-ab54-86200412b162",
+                    "propertyDependencies": {
+                        "__provider": [],
+                        "domain": []
+                    },
+                    "created": "2024-11-14T21:40:05.669594Z",
+                    "modified": "2024-11-14T21:40:05.669594Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/providers/hosted-zone-lookup.ts#18,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:route53/record:Record::gp-api-developSslCNAMERecord9e55098b3e6b9ceffc45789fa8efa9a2gpapidevgoodpartyorg",
+                    "custom": true,
+                    "id": "Z10392302OXMPNQLPO07K__9e55098b3e6b9ceffc45789fa8efa9a2.gp-api-dev.goodparty.org._CNAME",
+                    "type": "aws:route53/record:Record",
+                    "inputs": {
+                        "__defaults": [],
+                        "name": "_9e55098b3e6b9ceffc45789fa8efa9a2.gp-api-dev.goodparty.org.",
+                        "records": [
+                            "_ba541939deaecb5a169381ed87c221d5.djqtsrsxkq.acm-validations.aws."
+                        ],
+                        "ttl": 60,
+                        "type": "CNAME",
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"2\"}",
+                        "aliases": [],
+                        "allowOverwrite": null,
+                        "cidrRoutingPolicy": null,
+                        "failoverRoutingPolicies": [],
+                        "fqdn": "_9e55098b3e6b9ceffc45789fa8efa9a2.gp-api-dev.goodparty.org",
+                        "geolocationRoutingPolicies": [],
+                        "geoproximityRoutingPolicy": null,
+                        "healthCheckId": "",
+                        "id": "Z10392302OXMPNQLPO07K__9e55098b3e6b9ceffc45789fa8efa9a2.gp-api-dev.goodparty.org._CNAME",
+                        "latencyRoutingPolicies": [],
+                        "multivalueAnswerRoutingPolicy": false,
+                        "name": "_9e55098b3e6b9ceffc45789fa8efa9a2.gp-api-dev.goodparty.org",
+                        "records": [
+                            "_ba541939deaecb5a169381ed87c221d5.djqtsrsxkq.acm-validations.aws."
+                        ],
+                        "setIdentifier": "",
+                        "ttl": 60,
+                        "type": "CNAME",
+                        "weightedRoutingPolicies": [],
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate::gp-api-developSsl",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$pulumi-nodejs:dynamic:Resource::gp-api-developSslCNAMEZoneLookup9e55098b3e6b9ceffc45789fa8efa9a2gpapidevgoodpartyorg.sst.aws.HostedZoneLookup"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "name": [],
+                        "records": [],
+                        "ttl": [],
+                        "type": [],
+                        "zoneId": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$pulumi-nodejs:dynamic:Resource::gp-api-developSslCNAMEZoneLookup9e55098b3e6b9ceffc45789fa8efa9a2gpapidevgoodpartyorg.sst.aws.HostedZoneLookup"
+                        ]
+                    },
+                    "created": "2024-11-14T21:40:50.564932Z",
+                    "modified": "2024-11-14T21:40:50.564932Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/dns.ts#192,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:acm/certificateValidation:CertificateValidation::gp-api-developSslValidation",
+                    "custom": true,
+                    "id": "2024-11-14 21:40:14.926 +0000 UTC",
+                    "type": "aws:acm/certificateValidation:CertificateValidation",
+                    "inputs": {
+                        "__defaults": [],
+                        "certificateArn": "arn:aws:acm:us-west-2:333022194791:certificate/c4b7c5a6-48f9-4606-a726-f8ea2574bdb6"
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":4500000000000}}",
+                        "certificateArn": "arn:aws:acm:us-west-2:333022194791:certificate/c4b7c5a6-48f9-4606-a726-f8ea2574bdb6",
+                        "id": "2024-11-14 21:40:14.926 +0000 UTC",
+                        "validationRecordFqdns": null
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate::gp-api-developSsl",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:route53/record:Record::gp-api-developSslCNAMERecord9e55098b3e6b9ceffc45789fa8efa9a2gpapidevgoodpartyorg",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:acm/certificate:Certificate::gp-api-developSslCertificate"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "certificateArn": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:acm/certificate:Certificate::gp-api-developSslCertificate"
+                        ]
+                    },
+                    "created": "2024-11-14T21:45:07.682083Z",
+                    "modified": "2024-11-14T21:45:07.682083Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/dns-validated-certificate.ts#85,14"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::pulumi:providers:docker-build::default_0_0_6",
+                    "custom": true,
+                    "id": "3b4eacbe-8384-41ae-a442-4df40520d685",
+                    "type": "pulumi:providers:docker-build",
+                    "inputs": {
+                        "__internal": {},
+                        "host": ""
+                    },
+                    "outputs": {
+                        "host": ""
+                    },
+                    "created": "2024-11-14T21:40:00.379856Z",
+                    "modified": "2024-11-14T21:40:00.379856Z"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                    "custom": true,
+                    "id": "vpc-057b988559836aa8d",
+                    "type": "aws:ec2/vpc:Vpc",
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:vpc/vpc-057b988559836aa8d",
+                        "assignGeneratedIpv6CidrBlock": false,
+                        "cidrBlock": "10.0.0.0/16",
+                        "defaultNetworkAclId": "acl-0a694efcda229a381",
+                        "defaultRouteTableId": "rtb-0b71f22d96cf7e6e7",
+                        "defaultSecurityGroupId": "sg-039c0c1df572e8631",
+                        "dhcpOptionsId": "dopt-0ccb6174",
+                        "enableDnsHostnames": true,
+                        "enableDnsSupport": true,
+                        "enableNetworkAddressUsageMetrics": false,
+                        "id": "vpc-057b988559836aa8d",
+                        "instanceTenancy": "default",
+                        "ipv4IpamPoolId": null,
+                        "ipv4NetmaskLength": null,
+                        "ipv6AssociationId": "",
+                        "ipv6CidrBlock": "",
+                        "ipv6CidrBlockNetworkBorderGroup": "",
+                        "ipv6IpamPoolId": "",
+                        "ipv6NetmaskLength": 0,
+                        "mainRouteTableId": "rtb-0b71f22d96cf7e6e7",
+                        "ownerId": "333022194791",
+                        "tags": {
+                            "Name": "GP-API-production-GP-VPC VPC",
+                            "sst:app": "GP-API",
+                            "sst:component-version": "2",
+                            "sst:ref-version": "2",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GP-VPC VPC",
+                            "sst:app": "GP-API",
+                            "sst:component-version": "2",
+                            "sst:ref-version": "2",
+                            "sst:stage": "production"
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/vpc.ts#82,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:sst:LinkRef::GP-VPCLinkRef",
+                    "custom": false,
+                    "type": "sst:sst:LinkRef",
+                    "outputs": {
+                        "properties": {
+                            "type": "sst.aws.Vpc"
+                        },
+                        "target": "GP-VPC"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "created": "2024-11-14T21:40:00.918774Z",
+                    "modified": "2024-11-14T21:40:00.918774Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/link.ts#25,7"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "custom": false,
+                    "type": "sst:aws:Vpc",
+                    "parent": "urn:pulumi:develop::GP-API::pulumi:pulumi:Stack::GP-API-develop",
+                    "created": "2024-11-14T21:40:00.9144Z",
+                    "modified": "2024-11-14T21:40:00.9144Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/vpc.ts#297,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/targetGroup:TargetGroup::gp-api-developTargetgp-api-developHTTP80",
+                    "custom": true,
+                    "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                    "type": "aws:lb/targetGroup:TargetGroup",
+                    "inputs": {
+                        "__defaults": [
+                            "lambdaMultiValueHeadersEnabled",
+                            "proxyProtocolV2",
+                            "slowStart"
+                        ],
+                        "lambdaMultiValueHeadersEnabled": false,
+                        "namePrefix": "HTTP",
+                        "port": 80,
+                        "protocol": "HTTP",
+                        "proxyProtocolV2": false,
+                        "slowStart": 0,
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "targetType": "ip",
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                        "arnSuffix": "targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                        "connectionTermination": null,
+                        "deregistrationDelay": 300,
+                        "healthCheck": {
+                            "enabled": true,
+                            "healthyThreshold": 5,
+                            "interval": 30,
+                            "matcher": "200",
+                            "path": "/",
+                            "port": "traffic-port",
+                            "protocol": "HTTP",
+                            "timeout": 5,
+                            "unhealthyThreshold": 2
+                        },
+                        "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                        "ipAddressType": "ipv4",
+                        "lambdaMultiValueHeadersEnabled": false,
+                        "loadBalancerArns": [],
+                        "loadBalancingAlgorithmType": "round_robin",
+                        "loadBalancingAnomalyMitigation": "off",
+                        "loadBalancingCrossZoneEnabled": "use_load_balancer_configuration",
+                        "name": "HTTP20241114214507935700000001",
+                        "namePrefix": "HTTP",
+                        "port": 80,
+                        "preserveClientIp": null,
+                        "protocol": "HTTP",
+                        "protocolVersion": "HTTP1",
+                        "proxyProtocolV2": false,
+                        "slowStart": 0,
+                        "stickiness": {
+                            "cookieDuration": 86400,
+                            "cookieName": "",
+                            "enabled": false,
+                            "type": "lb_cookie"
+                        },
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "targetFailovers": [],
+                        "targetGroupHealth": {
+                            "dnsFailover": {
+                                "minimumHealthyTargetsCount": "1",
+                                "minimumHealthyTargetsPercentage": "off"
+                            },
+                            "unhealthyStateRouting": {
+                                "minimumHealthyTargetsCount": 1,
+                                "minimumHealthyTargetsPercentage": "off"
+                            }
+                        },
+                        "targetHealthStates": [],
+                        "targetType": "ip",
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "namePrefix": [],
+                        "port": [],
+                        "protocol": [],
+                        "targetType": [],
+                        "vpcId": [
+                            "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc"
+                        ]
+                    },
+                    "created": "2024-11-14T21:45:08.98537Z",
+                    "modified": "2024-11-14T21:45:08.98537Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/lb/targetGroup.ts#349,9"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ec2/securityGroup:SecurityGroup::gp-api-developLoadBalancerSecurityGroup",
+                    "custom": true,
+                    "id": "sg-02dc07f596c9bb9b7",
+                    "type": "aws:ec2/securityGroup:SecurityGroup",
+                    "inputs": {
+                        "__defaults": [
+                            "name",
+                            "revokeRulesOnDelete"
+                        ],
+                        "description": "Managed by Pulumi",
+                        "egress": [
+                            {
+                                "__defaults": [
+                                    "self"
+                                ],
+                                "cidrBlocks": [
+                                    "0.0.0.0/0"
+                                ],
+                                "fromPort": 0,
+                                "protocol": "-1",
+                                "self": false,
+                                "toPort": 0
+                            }
+                        ],
+                        "ingress": [
+                            {
+                                "__defaults": [
+                                    "self"
+                                ],
+                                "cidrBlocks": [
+                                    "0.0.0.0/0"
+                                ],
+                                "fromPort": 0,
+                                "protocol": "-1",
+                                "self": false,
+                                "toPort": 0
+                            }
+                        ],
+                        "name": "gp-api-developLoadBalancerSecurityGroup-53e3924",
+                        "revokeRulesOnDelete": false,
+                        "tags": {
+                            "Name": "GP-API-develop-gpapidevelopLoadBalancerSecurityGroup",
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-develop-gpapidevelopLoadBalancerSecurityGroup",
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":600000000000,\"delete\":900000000000},\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:security-group/sg-02dc07f596c9bb9b7",
+                        "description": "Managed by Pulumi",
+                        "egress": [
+                            {
+                                "cidrBlocks": [
+                                    "0.0.0.0/0"
+                                ],
+                                "description": "",
+                                "fromPort": 0,
+                                "ipv6CidrBlocks": [],
+                                "prefixListIds": [],
+                                "protocol": "-1",
+                                "securityGroups": [],
+                                "self": false,
+                                "toPort": 0
+                            }
+                        ],
+                        "id": "sg-02dc07f596c9bb9b7",
+                        "ingress": [
+                            {
+                                "cidrBlocks": [
+                                    "0.0.0.0/0"
+                                ],
+                                "description": "",
+                                "fromPort": 0,
+                                "ipv6CidrBlocks": [],
+                                "prefixListIds": [],
+                                "protocol": "-1",
+                                "securityGroups": [],
+                                "self": false,
+                                "toPort": 0
+                            }
+                        ],
+                        "name": "gp-api-developLoadBalancerSecurityGroup-53e3924",
+                        "namePrefix": "",
+                        "ownerId": "333022194791",
+                        "revokeRulesOnDelete": false,
+                        "tags": {
+                            "Name": "GP-API-develop-gpapidevelopLoadBalancerSecurityGroup",
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-develop-gpapidevelopLoadBalancerSecurityGroup",
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "description": [],
+                        "egress": [],
+                        "ingress": [],
+                        "tags": [],
+                        "vpcId": [
+                            "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc"
+                        ]
+                    },
+                    "created": "2024-11-14T21:40:03.350713Z",
+                    "modified": "2024-11-14T21:40:03.350713Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#456,29"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$sst:sst:Version::GP-VPCVersion",
+                    "custom": false,
+                    "type": "sst:sst:Version",
+                    "outputs": {
+                        "target": "GP-VPC",
+                        "version": 2
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "created": "2024-11-14T21:40:01.016556Z",
+                    "modified": "2024-11-14T21:40:01.016556Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/component.ts#417,7"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/internetGateway:InternetGateway::GP-VPCInstanceGateway",
+                    "custom": true,
+                    "id": "igw-073e4316a05a51987",
+                    "type": "aws:ec2/internetGateway:InternetGateway",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCInstanceGateway"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:internet-gateway/igw-073e4316a05a51987",
+                        "id": "igw-073e4316a05a51987",
+                        "ownerId": "333022194791",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCInternetGateway",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCInternetGateway",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/internetGateway.ts#43,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPrivateSubnet2",
+                    "custom": true,
+                    "id": "subnet-0a38ece796ff3fc92",
+                    "type": "aws:ec2/subnet:Subnet",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPrivateSubnet2"
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:subnet/subnet-0a38ece796ff3fc92",
+                        "assignIpv6AddressOnCreation": false,
+                        "availabilityZone": "us-west-2b",
+                        "availabilityZoneId": "usw2-az1",
+                        "cidrBlock": "10.0.12.0/22",
+                        "customerOwnedIpv4Pool": "",
+                        "enableDns64": false,
+                        "enableLniAtDeviceIndex": 0,
+                        "enableResourceNameDnsARecordOnLaunch": false,
+                        "enableResourceNameDnsAaaaRecordOnLaunch": false,
+                        "id": "subnet-0a38ece796ff3fc92",
+                        "ipv6CidrBlock": "",
+                        "ipv6CidrBlockAssociationId": "",
+                        "ipv6Native": false,
+                        "mapCustomerOwnedIpOnLaunch": false,
+                        "mapPublicIpOnLaunch": false,
+                        "outpostArn": "",
+                        "ownerId": "333022194791",
+                        "privateDnsHostnameTypeOnLaunch": "ip-name",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPrivateSubnet2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPrivateSubnet2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/subnet.ts#67,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet1",
+                    "custom": true,
+                    "id": "subnet-0cb57b0f6d5910c91",
+                    "type": "aws:ec2/subnet:Subnet",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPublicSubnet1"
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:subnet/subnet-0cb57b0f6d5910c91",
+                        "assignIpv6AddressOnCreation": false,
+                        "availabilityZone": "us-west-2a",
+                        "availabilityZoneId": "usw2-az2",
+                        "cidrBlock": "10.0.0.0/22",
+                        "customerOwnedIpv4Pool": "",
+                        "enableDns64": false,
+                        "enableLniAtDeviceIndex": 0,
+                        "enableResourceNameDnsARecordOnLaunch": false,
+                        "enableResourceNameDnsAaaaRecordOnLaunch": false,
+                        "id": "subnet-0cb57b0f6d5910c91",
+                        "ipv6CidrBlock": "",
+                        "ipv6CidrBlockAssociationId": "",
+                        "ipv6Native": false,
+                        "mapCustomerOwnedIpOnLaunch": false,
+                        "mapPublicIpOnLaunch": true,
+                        "outpostArn": "",
+                        "ownerId": "333022194791",
+                        "privateDnsHostnameTypeOnLaunch": "ip-name",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPublicSubnet1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPublicSubnet1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/subnet.ts#67,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet2",
+                    "custom": true,
+                    "id": "subnet-000207d6af6383397",
+                    "type": "aws:ec2/subnet:Subnet",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPublicSubnet2"
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:subnet/subnet-000207d6af6383397",
+                        "assignIpv6AddressOnCreation": false,
+                        "availabilityZone": "us-west-2b",
+                        "availabilityZoneId": "usw2-az1",
+                        "cidrBlock": "10.0.8.0/22",
+                        "customerOwnedIpv4Pool": "",
+                        "enableDns64": false,
+                        "enableLniAtDeviceIndex": 0,
+                        "enableResourceNameDnsARecordOnLaunch": false,
+                        "enableResourceNameDnsAaaaRecordOnLaunch": false,
+                        "id": "subnet-000207d6af6383397",
+                        "ipv6CidrBlock": "",
+                        "ipv6CidrBlockAssociationId": "",
+                        "ipv6Native": false,
+                        "mapCustomerOwnedIpOnLaunch": false,
+                        "mapPublicIpOnLaunch": true,
+                        "outpostArn": "",
+                        "ownerId": "333022194791",
+                        "privateDnsHostnameTypeOnLaunch": "ip-name",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPublicSubnet2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPublicSubnet2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/subnet.ts#67,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/securityGroup:SecurityGroup::GP-VPCSecurityGroup",
+                    "custom": true,
+                    "id": "sg-039c0c1df572e8631",
+                    "type": "aws:ec2/securityGroup:SecurityGroup",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCSecurityGroup"
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:security-group/sg-039c0c1df572e8631",
+                        "description": "default VPC security group",
+                        "egress": [
+                            {
+                                "cidrBlocks": [
+                                    "0.0.0.0/0"
+                                ],
+                                "description": "",
+                                "fromPort": 0,
+                                "ipv6CidrBlocks": [],
+                                "prefixListIds": [],
+                                "protocol": "-1",
+                                "securityGroups": [],
+                                "self": false,
+                                "toPort": 0
+                            }
+                        ],
+                        "id": "sg-039c0c1df572e8631",
+                        "ingress": [
+                            {
+                                "cidrBlocks": [
+                                    "10.0.0.0/16"
+                                ],
+                                "description": "",
+                                "fromPort": 0,
+                                "ipv6CidrBlocks": [],
+                                "prefixListIds": [],
+                                "protocol": "-1",
+                                "securityGroups": [],
+                                "self": false,
+                                "toPort": 0
+                            }
+                        ],
+                        "name": "default",
+                        "namePrefix": "",
+                        "ownerId": "333022194791",
+                        "revokeRulesOnDelete": null,
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCSecurityGroup",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCSecurityGroup",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/securityGroup.ts#206,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPrivateSubnet1",
+                    "custom": true,
+                    "id": "subnet-05fc58b6239e28562",
+                    "type": "aws:ec2/subnet:Subnet",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPrivateSubnet1"
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:subnet/subnet-05fc58b6239e28562",
+                        "assignIpv6AddressOnCreation": false,
+                        "availabilityZone": "us-west-2a",
+                        "availabilityZoneId": "usw2-az2",
+                        "cidrBlock": "10.0.4.0/22",
+                        "customerOwnedIpv4Pool": "",
+                        "enableDns64": false,
+                        "enableLniAtDeviceIndex": 0,
+                        "enableResourceNameDnsARecordOnLaunch": false,
+                        "enableResourceNameDnsAaaaRecordOnLaunch": false,
+                        "id": "subnet-05fc58b6239e28562",
+                        "ipv6CidrBlock": "",
+                        "ipv6CidrBlockAssociationId": "",
+                        "ipv6Native": false,
+                        "mapCustomerOwnedIpOnLaunch": false,
+                        "mapPublicIpOnLaunch": false,
+                        "outpostArn": "",
+                        "ownerId": "333022194791",
+                        "privateDnsHostnameTypeOnLaunch": "ip-name",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPrivateSubnet1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPrivateSubnet1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/subnet.ts#67,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace::GP-VPCCloudmapNamespace",
+                    "custom": true,
+                    "id": "ns-bpckkkhib6wqx4pr",
+                    "type": "aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace",
+                    "inputs": {
+                        "vpc": "vpc-057b988559836aa8d"
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:servicediscovery:us-west-2:333022194791:namespace/ns-bpckkkhib6wqx4pr",
+                        "description": "",
+                        "hostedZone": "Z030682434C4RRIMFHGCL",
+                        "id": "ns-bpckkkhib6wqx4pr",
+                        "name": "sst",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpc": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/servicediscovery/privateDnsNamespace.ts#43,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/routeTable:RouteTable::GP-VPCPrivateRouteTable2",
+                    "custom": true,
+                    "id": "rtb-0684a84fbae693348",
+                    "type": "aws:ec2/routeTable:RouteTable",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPrivateRouteTable2"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:route-table/rtb-0684a84fbae693348",
+                        "id": "rtb-0684a84fbae693348",
+                        "ownerId": "333022194791",
+                        "propagatingVgws": [],
+                        "routes": [
+                            {
+                                "carrierGatewayId": "",
+                                "cidrBlock": "0.0.0.0/0",
+                                "coreNetworkArn": "",
+                                "destinationPrefixListId": "",
+                                "egressOnlyGatewayId": "",
+                                "gatewayId": "",
+                                "ipv6CidrBlock": "",
+                                "localGatewayId": "",
+                                "natGatewayId": "nat-0a4cdde15a5161ec9",
+                                "networkInterfaceId": "",
+                                "transitGatewayId": "",
+                                "vpcEndpointId": "",
+                                "vpcPeeringConnectionId": ""
+                            }
+                        ],
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPrivateRouteTable2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPrivateRouteTable2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/routeTable.ts#135,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/routeTable:RouteTable::GP-VPCPublicRouteTable1",
+                    "custom": true,
+                    "id": "rtb-07a7d1b5441cf87b8",
+                    "type": "aws:ec2/routeTable:RouteTable",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPublicRouteTable1"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:route-table/rtb-07a7d1b5441cf87b8",
+                        "id": "rtb-07a7d1b5441cf87b8",
+                        "ownerId": "333022194791",
+                        "propagatingVgws": [],
+                        "routes": [
+                            {
+                                "carrierGatewayId": "",
+                                "cidrBlock": "0.0.0.0/0",
+                                "coreNetworkArn": "",
+                                "destinationPrefixListId": "",
+                                "egressOnlyGatewayId": "",
+                                "gatewayId": "igw-073e4316a05a51987",
+                                "ipv6CidrBlock": "",
+                                "localGatewayId": "",
+                                "natGatewayId": "",
+                                "networkInterfaceId": "",
+                                "transitGatewayId": "",
+                                "vpcEndpointId": "",
+                                "vpcPeeringConnectionId": ""
+                            }
+                        ],
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPublicRouteTable1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPublicRouteTable1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/routeTable.ts#135,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/routeTable:RouteTable::GP-VPCPublicRouteTable2",
+                    "custom": true,
+                    "id": "rtb-0b1d9c437a852d108",
+                    "type": "aws:ec2/routeTable:RouteTable",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPublicRouteTable2"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:route-table/rtb-0b1d9c437a852d108",
+                        "id": "rtb-0b1d9c437a852d108",
+                        "ownerId": "333022194791",
+                        "propagatingVgws": [],
+                        "routes": [
+                            {
+                                "carrierGatewayId": "",
+                                "cidrBlock": "0.0.0.0/0",
+                                "coreNetworkArn": "",
+                                "destinationPrefixListId": "",
+                                "egressOnlyGatewayId": "",
+                                "gatewayId": "igw-073e4316a05a51987",
+                                "ipv6CidrBlock": "",
+                                "localGatewayId": "",
+                                "natGatewayId": "",
+                                "networkInterfaceId": "",
+                                "transitGatewayId": "",
+                                "vpcEndpointId": "",
+                                "vpcPeeringConnectionId": ""
+                            }
+                        ],
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPublicRouteTable2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPublicRouteTable2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/routeTable.ts#135,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/loadBalancer:LoadBalancer::gp-api-developLoadBalancer",
+                    "custom": true,
+                    "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:loadbalancer/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                    "type": "aws:lb/loadBalancer:LoadBalancer",
+                    "inputs": {
+                        "__defaults": [
+                            "clientKeepAlive",
+                            "desyncMitigationMode",
+                            "dnsRecordClientRoutingPolicy",
+                            "dropInvalidHeaderFields",
+                            "enableDeletionProtection",
+                            "enableHttp2",
+                            "enableTlsVersionAndCipherSuiteHeaders",
+                            "enableWafFailOpen",
+                            "enableXffClientPort",
+                            "enableZonalShift",
+                            "idleTimeout",
+                            "preserveHostHeader",
+                            "xffHeaderProcessingMode"
+                        ],
+                        "clientKeepAlive": 3600,
+                        "desyncMitigationMode": "defensive",
+                        "dnsRecordClientRoutingPolicy": "any_availability_zone",
+                        "dropInvalidHeaderFields": false,
+                        "enableCrossZoneLoadBalancing": true,
+                        "enableDeletionProtection": false,
+                        "enableHttp2": true,
+                        "enableTlsVersionAndCipherSuiteHeaders": false,
+                        "enableWafFailOpen": false,
+                        "enableXffClientPort": false,
+                        "enableZonalShift": false,
+                        "idleTimeout": 60,
+                        "internal": false,
+                        "loadBalancerType": "application",
+                        "name": "develop-gpapidevelopLoad",
+                        "preserveHostHeader": false,
+                        "securityGroups": [
+                            "sg-02dc07f596c9bb9b7"
+                        ],
+                        "subnets": [
+                            "subnet-0cb57b0f6d5910c91",
+                            "subnet-000207d6af6383397"
+                        ],
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "xffHeaderProcessingMode": "append"
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":600000000000,\"delete\":600000000000,\"update\":600000000000}}",
+                        "accessLogs": {
+                            "bucket": "",
+                            "enabled": false,
+                            "prefix": ""
+                        },
+                        "arn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:loadbalancer/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                        "arnSuffix": "app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                        "clientKeepAlive": 3600,
+                        "connectionLogs": {
+                            "bucket": "",
+                            "enabled": false,
+                            "prefix": ""
+                        },
+                        "customerOwnedIpv4Pool": "",
+                        "desyncMitigationMode": "defensive",
+                        "dnsName": "develop-gpapidevelopLoad-472451080.us-west-2.elb.amazonaws.com",
+                        "dnsRecordClientRoutingPolicy": null,
+                        "dropInvalidHeaderFields": false,
+                        "enableCrossZoneLoadBalancing": true,
+                        "enableDeletionProtection": false,
+                        "enableHttp2": true,
+                        "enableTlsVersionAndCipherSuiteHeaders": false,
+                        "enableWafFailOpen": false,
+                        "enableXffClientPort": false,
+                        "enableZonalShift": null,
+                        "enforceSecurityGroupInboundRulesOnPrivateLinkTraffic": "",
+                        "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:loadbalancer/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                        "idleTimeout": 60,
+                        "internal": false,
+                        "ipAddressType": "ipv4",
+                        "loadBalancerType": "application",
+                        "name": "develop-gpapidevelopLoad",
+                        "namePrefix": "",
+                        "preserveHostHeader": false,
+                        "securityGroups": [
+                            "sg-02dc07f596c9bb9b7"
+                        ],
+                        "subnetMappings": [
+                            {
+                                "allocationId": "",
+                                "ipv6Address": "",
+                                "outpostId": "",
+                                "privateIpv4Address": "",
+                                "subnetId": "subnet-000207d6af6383397"
+                            },
+                            {
+                                "allocationId": "",
+                                "ipv6Address": "",
+                                "outpostId": "",
+                                "privateIpv4Address": "",
+                                "subnetId": "subnet-0cb57b0f6d5910c91"
+                            }
+                        ],
+                        "subnets": [
+                            "subnet-000207d6af6383397",
+                            "subnet-0cb57b0f6d5910c91"
+                        ],
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d",
+                        "xffHeaderProcessingMode": "append",
+                        "zoneId": "Z1H1FL5HABSF5"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet1",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet2",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/securityGroup:SecurityGroup::GP-VPCSecurityGroup",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace::GP-VPCCloudmapNamespace",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ec2/securityGroup:SecurityGroup::gp-api-developLoadBalancerSecurityGroup"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "enableCrossZoneLoadBalancing": [],
+                        "internal": [],
+                        "loadBalancerType": [],
+                        "name": [],
+                        "securityGroups": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ec2/securityGroup:SecurityGroup::gp-api-developLoadBalancerSecurityGroup"
+                        ],
+                        "subnets": [
+                            "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet1",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet2",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/securityGroup:SecurityGroup::GP-VPCSecurityGroup",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace::GP-VPCCloudmapNamespace"
+                        ]
+                    },
+                    "created": "2024-11-14T21:43:16.289341Z",
+                    "modified": "2024-11-14T21:43:16.289341Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#483,28"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:servicediscovery/service:Service::gp-api-developCloudmapService",
+                    "custom": true,
+                    "id": "srv-nflyxu23gcr7grow",
+                    "type": "aws:servicediscovery/service:Service",
+                    "inputs": {
+                        "__defaults": [],
+                        "dnsConfig": {
+                            "__defaults": [
+                                "routingPolicy"
+                            ],
+                            "dnsRecords": [
+                                {
+                                    "__defaults": [],
+                                    "ttl": 60,
+                                    "type": "A"
+                                }
+                            ],
+                            "namespaceId": "ns-bpckkkhib6wqx4pr",
+                            "routingPolicy": "MULTIVALUE"
+                        },
+                        "forceDestroy": true,
+                        "name": "gp-api-develop.develop.GP-API",
+                        "namespaceId": "ns-bpckkkhib6wqx4pr",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:servicediscovery:us-west-2:333022194791:service/srv-nflyxu23gcr7grow",
+                        "description": "",
+                        "dnsConfig": {
+                            "dnsRecords": [
+                                {
+                                    "ttl": 60,
+                                    "type": "A"
+                                }
+                            ],
+                            "namespaceId": "ns-bpckkkhib6wqx4pr",
+                            "routingPolicy": "MULTIVALUE"
+                        },
+                        "forceDestroy": true,
+                        "healthCheckConfig": null,
+                        "healthCheckCustomConfig": null,
+                        "id": "srv-nflyxu23gcr7grow",
+                        "name": "gp-api-develop.develop.GP-API",
+                        "namespaceId": "ns-bpckkkhib6wqx4pr",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "type": "DNS_HTTP"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace::GP-VPCCloudmapNamespace"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "dnsConfig": [
+                            "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace::GP-VPCCloudmapNamespace"
+                        ],
+                        "forceDestroy": [],
+                        "name": [],
+                        "namespaceId": [
+                            "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace::GP-VPCCloudmapNamespace"
+                        ]
+                    },
+                    "created": "2024-11-14T21:40:02.038379Z",
+                    "modified": "2024-11-14T21:40:02.038379Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#868,14"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/natGateway:NatGateway::GP-VPCNatGateway1",
+                    "custom": true,
+                    "id": "nat-0f4635a5e808e375e",
+                    "type": "aws:ec2/natGateway:NatGateway",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCNatGateway1"
+                        }
+                    },
+                    "outputs": {
+                        "allocationId": "eipalloc-0cd60752db211a54b",
+                        "associationId": "eipassoc-0613eca1b5e3de235",
+                        "connectivityType": "public",
+                        "id": "nat-0f4635a5e808e375e",
+                        "networkInterfaceId": "eni-03176f46db113e2e6",
+                        "privateIp": "10.0.0.214",
+                        "publicIp": "52.25.0.84",
+                        "secondaryAllocationIds": [],
+                        "secondaryPrivateIpAddressCount": 0,
+                        "secondaryPrivateIpAddresses": [],
+                        "subnetId": "subnet-0cb57b0f6d5910c91",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCNatGateway1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCNatGateway1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/natGateway.ts#87,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/natGateway:NatGateway::GP-VPCNatGateway2",
+                    "custom": true,
+                    "id": "nat-0a4cdde15a5161ec9",
+                    "type": "aws:ec2/natGateway:NatGateway",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCNatGateway2"
+                        }
+                    },
+                    "outputs": {
+                        "allocationId": "eipalloc-01ff13183db81c70d",
+                        "associationId": "eipassoc-059b5cc65d2e6a780",
+                        "connectivityType": "public",
+                        "id": "nat-0a4cdde15a5161ec9",
+                        "networkInterfaceId": "eni-022d400548dd4cb49",
+                        "privateIp": "10.0.8.137",
+                        "publicIp": "52.13.184.240",
+                        "secondaryAllocationIds": [],
+                        "secondaryPrivateIpAddressCount": 0,
+                        "secondaryPrivateIpAddresses": [],
+                        "subnetId": "subnet-000207d6af6383397",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCNatGateway2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCNatGateway2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/natGateway.ts#87,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/routeTable:RouteTable::GP-VPCPrivateRouteTable1",
+                    "custom": true,
+                    "id": "rtb-0e1f3571f3109e6a2",
+                    "type": "aws:ec2/routeTable:RouteTable",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCPrivateRouteTable1"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:route-table/rtb-0e1f3571f3109e6a2",
+                        "id": "rtb-0e1f3571f3109e6a2",
+                        "ownerId": "333022194791",
+                        "propagatingVgws": [],
+                        "routes": [
+                            {
+                                "carrierGatewayId": "",
+                                "cidrBlock": "0.0.0.0/0",
+                                "coreNetworkArn": "",
+                                "destinationPrefixListId": "",
+                                "egressOnlyGatewayId": "",
+                                "gatewayId": "",
+                                "ipv6CidrBlock": "",
+                                "localGatewayId": "",
+                                "natGatewayId": "nat-0f4635a5e808e375e",
+                                "networkInterfaceId": "",
+                                "transitGatewayId": "",
+                                "vpcEndpointId": "",
+                                "vpcPeeringConnectionId": ""
+                            }
+                        ],
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCPrivateRouteTable1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCPrivateRouteTable1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpcId": "vpc-057b988559836aa8d"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/routeTable.ts#135,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/listener:Listener::gp-api-developListenerHTTP80",
+                    "custom": true,
+                    "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:listener/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8/c626cee891d8f558",
+                    "type": "aws:lb/listener:Listener",
+                    "inputs": {
+                        "__defaults": [],
+                        "defaultActions": [
+                            {
+                                "__defaults": [],
+                                "targetGroupArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                                "type": "forward"
+                            }
+                        ],
+                        "loadBalancerArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:loadbalancer/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                        "port": 80,
+                        "protocol": "HTTP",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":300000000000,\"update\":300000000000}}",
+                        "alpnPolicy": null,
+                        "arn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:listener/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8/c626cee891d8f558",
+                        "certificateArn": null,
+                        "defaultActions": [
+                            {
+                                "authenticateCognito": null,
+                                "authenticateOidc": null,
+                                "fixedResponse": null,
+                                "forward": null,
+                                "order": 1,
+                                "redirect": null,
+                                "targetGroupArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                                "type": "forward"
+                            }
+                        ],
+                        "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:listener/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8/c626cee891d8f558",
+                        "loadBalancerArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:loadbalancer/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                        "mutualAuthentication": null,
+                        "port": 80,
+                        "protocol": "HTTP",
+                        "sslPolicy": "",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tcpIdleTimeoutSeconds": null
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/targetGroup:TargetGroup::gp-api-developTargetgp-api-developHTTP80",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/loadBalancer:LoadBalancer::gp-api-developLoadBalancer"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "defaultActions": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/targetGroup:TargetGroup::gp-api-developTargetgp-api-developHTTP80"
+                        ],
+                        "loadBalancerArn": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/loadBalancer:LoadBalancer::gp-api-developLoadBalancer"
+                        ],
+                        "port": [],
+                        "protocol": []
+                    },
+                    "created": "2024-11-14T21:45:09.52761Z",
+                    "modified": "2024-11-14T21:45:09.52761Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/lb/listener.ts#357,9"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$pulumi-nodejs:dynamic:Resource::gp-api-developAAAAZoneLookupGpapidevgoodpartyorg.sst.aws.HostedZoneLookup",
+                    "custom": true,
+                    "id": "Z10392302OXMPNQLPO07K",
+                    "type": "pulumi-nodejs:dynamic:Resource",
+                    "inputs": {
+                        "__provider": "exports.handler = __f0;\n\nvar __provider_proto = {};\nObject.defineProperty(__f1, \"prototype\", { value: __provider_proto });\nObject.defineProperty(__provider_proto, \"constructor\", { configurable: true, writable: true, value: __f1 });\nObject.defineProperty(__provider_proto, \"name\", { configurable: true, writable: true, value: __f2 });\nObject.setPrototypeOf(__f4, global.Error);\nObject.defineProperty(__provider_proto, \"create\", { configurable: true, writable: true, value: __f3 });\nObject.defineProperty(__provider_proto, \"delete\", { configurable: true, writable: true, value: __f5 });\nObject.defineProperty(__provider_proto, \"update\", { configurable: true, writable: true, value: __f6 });\nObject.defineProperty(__provider_proto, \"read\", { configurable: true, writable: true, value: __f7 });\nvar __provider = Object.create(__provider_proto);\n__provider.type = \"Aws.HostedZoneLookup\";\n\nfunction __f1(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(type) {\n      this.type = type;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f2(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*name*/(action) {\n      return \"Resource.\" + this.type + \".\" + action;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f4(__0) {\n  return (function() {\n    with({ __super: global.Error, this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(method) {\n    __super.call(this, `Method \"${method}\" not found`);\n    this.method = method;\n};\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\nconst http = require(\"http\");\n\nfunction __call(__0, __1) {\n  return (function() {\n    with({ MethodNotFoundError: __f4, call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*call*/(method, args) {\n    return new Promise((resolve, reject) => {\n      const url = new URL(process.env.SST_SERVER + \"/rpc\");\n      const options = {\n        hostname: url.hostname,\n        port: url.port,\n        path: url.pathname,\n        method: \"POST\",\n        headers: {\n          \"Content-Type\": \"application/json\"\n        }\n      };\n      const req = http.request(options, (res) => {\n        let data = \"\";\n        res.on(\"data\", (chunk) => {\n          data += chunk;\n        });\n        res.on(\"end\", () => {\n          if (res.statusCode !== 200) {\n            reject(new Error(`Failed to call RPC: ${data}`));\n            return;\n          }\n          try {\n            const json = JSON.parse(data);\n            if (json.error) {\n              if (json.error.startsWith(\"rpc: can't find\")) {\n                reject(new MethodNotFoundError(method));\n                return;\n              }\n              reject(new Error(json.error));\n              return;\n            }\n            resolve(json.result);\n          } catch (error) {\n            reject(new Error(`Failed to parse JSON: ${error.message}`));\n          }\n        });\n      });\n      req.on(\"error\", (error) => {\n        reject(error);\n      });\n      req.setTimeout(0);\n      const body = JSON.stringify({\n        jsonrpc: \"1.0\",\n        method,\n        params: [args]\n      });\n      req.write(body);\n      req.end();\n    });\n  };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f3(__0) {\n  return (function() {\n    with({ call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*create*/(inputs) {\n      return call(this.name(\"Create\"), inputs);\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f5(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*delete*/(id, outs) {\n      return call(this.name(\"Delete\"), { id, outs }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return;\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f6(__0, __1, __2) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*update*/(id, olds, news) {\n      return call(this.name(\"Update\"), { id, olds, news }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError)\n          return {\n            id\n          };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f7(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*read*/(id, props) {\n      return call(this.name(\"Read\"), { id, props }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return { id, props };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f0() {\n  return (function() {\n    with({ provider: __provider, this: undefined, arguments: undefined }) {\n\nreturn () => provider;\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n",
+                        "domain": "gp-api-dev.goodparty.org"
+                    },
+                    "outputs": {
+                        "__provider": "exports.handler = __f0;\n\nvar __provider_proto = {};\nObject.defineProperty(__f1, \"prototype\", { value: __provider_proto });\nObject.defineProperty(__provider_proto, \"constructor\", { configurable: true, writable: true, value: __f1 });\nObject.defineProperty(__provider_proto, \"name\", { configurable: true, writable: true, value: __f2 });\nObject.setPrototypeOf(__f4, global.Error);\nObject.defineProperty(__provider_proto, \"create\", { configurable: true, writable: true, value: __f3 });\nObject.defineProperty(__provider_proto, \"delete\", { configurable: true, writable: true, value: __f5 });\nObject.defineProperty(__provider_proto, \"update\", { configurable: true, writable: true, value: __f6 });\nObject.defineProperty(__provider_proto, \"read\", { configurable: true, writable: true, value: __f7 });\nvar __provider = Object.create(__provider_proto);\n__provider.type = \"Aws.HostedZoneLookup\";\n\nfunction __f1(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(type) {\n      this.type = type;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f2(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*name*/(action) {\n      return \"Resource.\" + this.type + \".\" + action;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f4(__0) {\n  return (function() {\n    with({ __super: global.Error, this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(method) {\n    __super.call(this, `Method \"${method}\" not found`);\n    this.method = method;\n};\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\nconst http = require(\"http\");\n\nfunction __call(__0, __1) {\n  return (function() {\n    with({ MethodNotFoundError: __f4, call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*call*/(method, args) {\n    return new Promise((resolve, reject) => {\n      const url = new URL(process.env.SST_SERVER + \"/rpc\");\n      const options = {\n        hostname: url.hostname,\n        port: url.port,\n        path: url.pathname,\n        method: \"POST\",\n        headers: {\n          \"Content-Type\": \"application/json\"\n        }\n      };\n      const req = http.request(options, (res) => {\n        let data = \"\";\n        res.on(\"data\", (chunk) => {\n          data += chunk;\n        });\n        res.on(\"end\", () => {\n          if (res.statusCode !== 200) {\n            reject(new Error(`Failed to call RPC: ${data}`));\n            return;\n          }\n          try {\n            const json = JSON.parse(data);\n            if (json.error) {\n              if (json.error.startsWith(\"rpc: can't find\")) {\n                reject(new MethodNotFoundError(method));\n                return;\n              }\n              reject(new Error(json.error));\n              return;\n            }\n            resolve(json.result);\n          } catch (error) {\n            reject(new Error(`Failed to parse JSON: ${error.message}`));\n          }\n        });\n      });\n      req.on(\"error\", (error) => {\n        reject(error);\n      });\n      req.setTimeout(0);\n      const body = JSON.stringify({\n        jsonrpc: \"1.0\",\n        method,\n        params: [args]\n      });\n      req.write(body);\n      req.end();\n    });\n  };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f3(__0) {\n  return (function() {\n    with({ call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*create*/(inputs) {\n      return call(this.name(\"Create\"), inputs);\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f5(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*delete*/(id, outs) {\n      return call(this.name(\"Delete\"), { id, outs }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return;\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f6(__0, __1, __2) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*update*/(id, olds, news) {\n      return call(this.name(\"Update\"), { id, olds, news }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError)\n          return {\n            id\n          };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f7(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*read*/(id, props) {\n      return call(this.name(\"Read\"), { id, props }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return { id, props };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f0() {\n  return (function() {\n    with({ provider: __provider, this: undefined, arguments: undefined }) {\n\nreturn () => provider;\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n",
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:pulumi-nodejs::default::40322d19-99c4-4934-ab54-86200412b162",
+                    "propertyDependencies": {
+                        "__provider": [],
+                        "domain": []
+                    },
+                    "created": "2024-11-14T21:45:09.360978Z",
+                    "modified": "2024-11-14T21:45:09.360978Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/providers/hosted-zone-lookup.ts#18,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$pulumi-nodejs:dynamic:Resource::gp-api-developAZoneLookupGpapidevgoodpartyorg.sst.aws.HostedZoneLookup",
+                    "custom": true,
+                    "id": "Z10392302OXMPNQLPO07K",
+                    "type": "pulumi-nodejs:dynamic:Resource",
+                    "inputs": {
+                        "__provider": "exports.handler = __f0;\n\nvar __provider_proto = {};\nObject.defineProperty(__f1, \"prototype\", { value: __provider_proto });\nObject.defineProperty(__provider_proto, \"constructor\", { configurable: true, writable: true, value: __f1 });\nObject.defineProperty(__provider_proto, \"name\", { configurable: true, writable: true, value: __f2 });\nObject.setPrototypeOf(__f4, global.Error);\nObject.defineProperty(__provider_proto, \"create\", { configurable: true, writable: true, value: __f3 });\nObject.defineProperty(__provider_proto, \"delete\", { configurable: true, writable: true, value: __f5 });\nObject.defineProperty(__provider_proto, \"update\", { configurable: true, writable: true, value: __f6 });\nObject.defineProperty(__provider_proto, \"read\", { configurable: true, writable: true, value: __f7 });\nvar __provider = Object.create(__provider_proto);\n__provider.type = \"Aws.HostedZoneLookup\";\n\nfunction __f1(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(type) {\n      this.type = type;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f2(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*name*/(action) {\n      return \"Resource.\" + this.type + \".\" + action;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f4(__0) {\n  return (function() {\n    with({ __super: global.Error, this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(method) {\n    __super.call(this, `Method \"${method}\" not found`);\n    this.method = method;\n};\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\nconst http = require(\"http\");\n\nfunction __call(__0, __1) {\n  return (function() {\n    with({ MethodNotFoundError: __f4, call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*call*/(method, args) {\n    return new Promise((resolve, reject) => {\n      const url = new URL(process.env.SST_SERVER + \"/rpc\");\n      const options = {\n        hostname: url.hostname,\n        port: url.port,\n        path: url.pathname,\n        method: \"POST\",\n        headers: {\n          \"Content-Type\": \"application/json\"\n        }\n      };\n      const req = http.request(options, (res) => {\n        let data = \"\";\n        res.on(\"data\", (chunk) => {\n          data += chunk;\n        });\n        res.on(\"end\", () => {\n          if (res.statusCode !== 200) {\n            reject(new Error(`Failed to call RPC: ${data}`));\n            return;\n          }\n          try {\n            const json = JSON.parse(data);\n            if (json.error) {\n              if (json.error.startsWith(\"rpc: can't find\")) {\n                reject(new MethodNotFoundError(method));\n                return;\n              }\n              reject(new Error(json.error));\n              return;\n            }\n            resolve(json.result);\n          } catch (error) {\n            reject(new Error(`Failed to parse JSON: ${error.message}`));\n          }\n        });\n      });\n      req.on(\"error\", (error) => {\n        reject(error);\n      });\n      req.setTimeout(0);\n      const body = JSON.stringify({\n        jsonrpc: \"1.0\",\n        method,\n        params: [args]\n      });\n      req.write(body);\n      req.end();\n    });\n  };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f3(__0) {\n  return (function() {\n    with({ call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*create*/(inputs) {\n      return call(this.name(\"Create\"), inputs);\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f5(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*delete*/(id, outs) {\n      return call(this.name(\"Delete\"), { id, outs }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return;\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f6(__0, __1, __2) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*update*/(id, olds, news) {\n      return call(this.name(\"Update\"), { id, olds, news }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError)\n          return {\n            id\n          };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f7(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*read*/(id, props) {\n      return call(this.name(\"Read\"), { id, props }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return { id, props };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f0() {\n  return (function() {\n    with({ provider: __provider, this: undefined, arguments: undefined }) {\n\nreturn () => provider;\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n",
+                        "domain": "gp-api-dev.goodparty.org"
+                    },
+                    "outputs": {
+                        "__provider": "exports.handler = __f0;\n\nvar __provider_proto = {};\nObject.defineProperty(__f1, \"prototype\", { value: __provider_proto });\nObject.defineProperty(__provider_proto, \"constructor\", { configurable: true, writable: true, value: __f1 });\nObject.defineProperty(__provider_proto, \"name\", { configurable: true, writable: true, value: __f2 });\nObject.setPrototypeOf(__f4, global.Error);\nObject.defineProperty(__provider_proto, \"create\", { configurable: true, writable: true, value: __f3 });\nObject.defineProperty(__provider_proto, \"delete\", { configurable: true, writable: true, value: __f5 });\nObject.defineProperty(__provider_proto, \"update\", { configurable: true, writable: true, value: __f6 });\nObject.defineProperty(__provider_proto, \"read\", { configurable: true, writable: true, value: __f7 });\nvar __provider = Object.create(__provider_proto);\n__provider.type = \"Aws.HostedZoneLookup\";\n\nfunction __f1(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(type) {\n      this.type = type;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f2(__0) {\n  return (function() {\n    with({ this: undefined, arguments: undefined }) {\n\nreturn function /*name*/(action) {\n      return \"Resource.\" + this.type + \".\" + action;\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f4(__0) {\n  return (function() {\n    with({ __super: global.Error, this: undefined, arguments: undefined }) {\n\nreturn function /*constructor*/(method) {\n    __super.call(this, `Method \"${method}\" not found`);\n    this.method = method;\n};\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\nconst http = require(\"http\");\n\nfunction __call(__0, __1) {\n  return (function() {\n    with({ MethodNotFoundError: __f4, call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*call*/(method, args) {\n    return new Promise((resolve, reject) => {\n      const url = new URL(process.env.SST_SERVER + \"/rpc\");\n      const options = {\n        hostname: url.hostname,\n        port: url.port,\n        path: url.pathname,\n        method: \"POST\",\n        headers: {\n          \"Content-Type\": \"application/json\"\n        }\n      };\n      const req = http.request(options, (res) => {\n        let data = \"\";\n        res.on(\"data\", (chunk) => {\n          data += chunk;\n        });\n        res.on(\"end\", () => {\n          if (res.statusCode !== 200) {\n            reject(new Error(`Failed to call RPC: ${data}`));\n            return;\n          }\n          try {\n            const json = JSON.parse(data);\n            if (json.error) {\n              if (json.error.startsWith(\"rpc: can't find\")) {\n                reject(new MethodNotFoundError(method));\n                return;\n              }\n              reject(new Error(json.error));\n              return;\n            }\n            resolve(json.result);\n          } catch (error) {\n            reject(new Error(`Failed to parse JSON: ${error.message}`));\n          }\n        });\n      });\n      req.on(\"error\", (error) => {\n        reject(error);\n      });\n      req.setTimeout(0);\n      const body = JSON.stringify({\n        jsonrpc: \"1.0\",\n        method,\n        params: [args]\n      });\n      req.write(body);\n      req.end();\n    });\n  };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f3(__0) {\n  return (function() {\n    with({ call: __call, this: undefined, arguments: undefined }) {\n\nreturn async function /*create*/(inputs) {\n      return call(this.name(\"Create\"), inputs);\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f5(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*delete*/(id, outs) {\n      return call(this.name(\"Delete\"), { id, outs }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return;\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f6(__0, __1, __2) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*update*/(id, olds, news) {\n      return call(this.name(\"Update\"), { id, olds, news }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError)\n          return {\n            id\n          };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f7(__0, __1) {\n  return (function() {\n    with({ call: __call, MethodNotFoundError: __f4, this: undefined, arguments: undefined }) {\n\nreturn async function /*read*/(id, props) {\n      return call(this.name(\"Read\"), { id, props }).catch((ex) => {\n        if (ex instanceof MethodNotFoundError) return { id, props };\n        throw ex;\n      });\n    };\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n\nfunction __f0() {\n  return (function() {\n    with({ provider: __provider, this: undefined, arguments: undefined }) {\n\nreturn () => provider;\n\n    }\n  }).apply(undefined, undefined).apply(this, arguments);\n}\n",
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:pulumi-nodejs::default::40322d19-99c4-4934-ab54-86200412b162",
+                    "propertyDependencies": {
+                        "__provider": [],
+                        "domain": []
+                    },
+                    "created": "2024-11-14T21:45:09.359783Z",
+                    "modified": "2024-11-14T21:45:09.359783Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/providers/hosted-zone-lookup.ts#18,5"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/listener:Listener::gp-api-developListenerHTTPS443",
+                    "custom": true,
+                    "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:listener/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8/9c6e9be154301e40",
+                    "type": "aws:lb/listener:Listener",
+                    "inputs": {
+                        "__defaults": [],
+                        "certificateArn": "arn:aws:acm:us-west-2:333022194791:certificate/c4b7c5a6-48f9-4606-a726-f8ea2574bdb6",
+                        "defaultActions": [
+                            {
+                                "__defaults": [],
+                                "targetGroupArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                                "type": "forward"
+                            }
+                        ],
+                        "loadBalancerArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:loadbalancer/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                        "port": 443,
+                        "protocol": "HTTPS",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":300000000000,\"update\":300000000000}}",
+                        "alpnPolicy": null,
+                        "arn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:listener/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8/9c6e9be154301e40",
+                        "certificateArn": "arn:aws:acm:us-west-2:333022194791:certificate/c4b7c5a6-48f9-4606-a726-f8ea2574bdb6",
+                        "defaultActions": [
+                            {
+                                "authenticateCognito": null,
+                                "authenticateOidc": null,
+                                "fixedResponse": null,
+                                "forward": null,
+                                "order": 1,
+                                "redirect": null,
+                                "targetGroupArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784",
+                                "type": "forward"
+                            }
+                        ],
+                        "id": "arn:aws:elasticloadbalancing:us-west-2:333022194791:listener/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8/9c6e9be154301e40",
+                        "loadBalancerArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:loadbalancer/app/develop-gpapidevelopLoad/ccd6fa58c9a097d8",
+                        "mutualAuthentication": {
+                            "ignoreClientCertificateExpiry": false,
+                            "mode": "off",
+                            "trustStoreArn": ""
+                        },
+                        "port": 443,
+                        "protocol": "HTTPS",
+                        "sslPolicy": "ELBSecurityPolicy-2016-08",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tcpIdleTimeoutSeconds": null
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/targetGroup:TargetGroup::gp-api-developTargetgp-api-developHTTP80",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/loadBalancer:LoadBalancer::gp-api-developLoadBalancer"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "certificateArn": [],
+                        "defaultActions": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/targetGroup:TargetGroup::gp-api-developTargetgp-api-developHTTP80"
+                        ],
+                        "loadBalancerArn": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/loadBalancer:LoadBalancer::gp-api-developLoadBalancer"
+                        ],
+                        "port": [],
+                        "protocol": []
+                    },
+                    "created": "2024-11-14T21:45:09.88905Z",
+                    "modified": "2024-11-14T21:45:09.88905Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/lb/listener.ts#357,9"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:route53/record:Record::gp-api-developARecordGpapidevgoodpartyorg",
+                    "custom": true,
+                    "id": "Z10392302OXMPNQLPO07K_gp-api-dev.goodparty.org_A",
+                    "type": "aws:route53/record:Record",
+                    "inputs": {
+                        "__defaults": [],
+                        "aliases": [
+                            {
+                                "__defaults": [],
+                                "evaluateTargetHealth": true,
+                                "name": "develop-gpapidevelopLoad-472451080.us-west-2.elb.amazonaws.com",
+                                "zoneId": "Z1H1FL5HABSF5"
+                            }
+                        ],
+                        "name": "gp-api-dev.goodparty.org",
+                        "type": "A",
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"2\"}",
+                        "aliases": [
+                            {
+                                "evaluateTargetHealth": true,
+                                "name": "develop-gpapidevelopload-472451080.us-west-2.elb.amazonaws.com",
+                                "zoneId": "Z1H1FL5HABSF5"
+                            }
+                        ],
+                        "allowOverwrite": null,
+                        "cidrRoutingPolicy": null,
+                        "failoverRoutingPolicies": [],
+                        "fqdn": "gp-api-dev.goodparty.org",
+                        "geolocationRoutingPolicies": [],
+                        "geoproximityRoutingPolicy": null,
+                        "healthCheckId": "",
+                        "id": "Z10392302OXMPNQLPO07K_gp-api-dev.goodparty.org_A",
+                        "latencyRoutingPolicies": [],
+                        "multivalueAnswerRoutingPolicy": false,
+                        "name": "gp-api-dev.goodparty.org",
+                        "records": null,
+                        "setIdentifier": "",
+                        "ttl": 0,
+                        "type": "A",
+                        "weightedRoutingPolicies": [],
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$pulumi-nodejs:dynamic:Resource::gp-api-developAZoneLookupGpapidevgoodpartyorg.sst.aws.HostedZoneLookup"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "aliases": [],
+                        "name": [],
+                        "type": [],
+                        "zoneId": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$pulumi-nodejs:dynamic:Resource::gp-api-developAZoneLookupGpapidevgoodpartyorg.sst.aws.HostedZoneLookup"
+                        ]
+                    },
+                    "created": "2024-11-14T21:45:47.859602Z",
+                    "modified": "2024-11-14T21:45:47.859602Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/dns.ts#192,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:route53/record:Record::gp-api-developAAAARecordGpapidevgoodpartyorg",
+                    "custom": true,
+                    "id": "Z10392302OXMPNQLPO07K_gp-api-dev.goodparty.org_AAAA",
+                    "type": "aws:route53/record:Record",
+                    "inputs": {
+                        "__defaults": [],
+                        "aliases": [
+                            {
+                                "__defaults": [],
+                                "evaluateTargetHealth": true,
+                                "name": "develop-gpapidevelopLoad-472451080.us-west-2.elb.amazonaws.com",
+                                "zoneId": "Z1H1FL5HABSF5"
+                            }
+                        ],
+                        "name": "gp-api-dev.goodparty.org",
+                        "type": "AAAA",
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"2\"}",
+                        "aliases": [
+                            {
+                                "evaluateTargetHealth": true,
+                                "name": "develop-gpapidevelopload-472451080.us-west-2.elb.amazonaws.com",
+                                "zoneId": "Z1H1FL5HABSF5"
+                            }
+                        ],
+                        "allowOverwrite": null,
+                        "cidrRoutingPolicy": null,
+                        "failoverRoutingPolicies": [],
+                        "fqdn": "gp-api-dev.goodparty.org",
+                        "geolocationRoutingPolicies": [],
+                        "geoproximityRoutingPolicy": null,
+                        "healthCheckId": "",
+                        "id": "Z10392302OXMPNQLPO07K_gp-api-dev.goodparty.org_AAAA",
+                        "latencyRoutingPolicies": [],
+                        "multivalueAnswerRoutingPolicy": false,
+                        "name": "gp-api-dev.goodparty.org",
+                        "records": null,
+                        "setIdentifier": "",
+                        "ttl": 0,
+                        "type": "AAAA",
+                        "weightedRoutingPolicies": [],
+                        "zoneId": "Z10392302OXMPNQLPO07K"
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$pulumi-nodejs:dynamic:Resource::gp-api-developAAAAZoneLookupGpapidevgoodpartyorg.sst.aws.HostedZoneLookup"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "aliases": [],
+                        "name": [],
+                        "type": [],
+                        "zoneId": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$pulumi-nodejs:dynamic:Resource::gp-api-developAAAAZoneLookupGpapidevgoodpartyorg.sst.aws.HostedZoneLookup"
+                        ]
+                    },
+                    "created": "2024-11-14T21:45:40.653478Z",
+                    "modified": "2024-11-14T21:45:40.653478Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/dns.ts#192,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/eip:Eip::GP-VPCElasticIp1",
+                    "custom": true,
+                    "id": "eipalloc-0cd60752db211a54b",
+                    "type": "aws:ec2/eip:Eip",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCElasticIp1"
+                        }
+                    },
+                    "outputs": {
+                        "address": null,
+                        "allocationId": "eipalloc-0cd60752db211a54b",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:elastic-ip/eipalloc-0cd60752db211a54b",
+                        "associateWithPrivateIp": null,
+                        "associationId": "eipassoc-0613eca1b5e3de235",
+                        "carrierIp": "",
+                        "customerOwnedIp": "",
+                        "customerOwnedIpv4Pool": "",
+                        "domain": "vpc",
+                        "id": "eipalloc-0cd60752db211a54b",
+                        "instance": "",
+                        "ipamPoolId": null,
+                        "networkBorderGroup": "us-west-2",
+                        "networkInterface": "eni-03176f46db113e2e6",
+                        "privateDns": "ip-10-0-0-214.us-west-2.compute.internal",
+                        "privateIp": "10.0.0.214",
+                        "ptrRecord": "",
+                        "publicDns": "ec2-52-25-0-84.us-west-2.compute.amazonaws.com",
+                        "publicIp": "52.25.0.84",
+                        "publicIpv4Pool": "amazon",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCElasticIp1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCElasticIp1",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpc": true
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/eip.ts#129,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/eip:Eip::GP-VPCElasticIp2",
+                    "custom": true,
+                    "id": "eipalloc-01ff13183db81c70d",
+                    "type": "aws:ec2/eip:Eip",
+                    "inputs": {
+                        "tags": {
+                            "Name": "GP-API-develop-GPVPCElasticIp2"
+                        }
+                    },
+                    "outputs": {
+                        "address": null,
+                        "allocationId": "eipalloc-01ff13183db81c70d",
+                        "arn": "arn:aws:ec2:us-west-2:333022194791:elastic-ip/eipalloc-01ff13183db81c70d",
+                        "associateWithPrivateIp": null,
+                        "associationId": "eipassoc-059b5cc65d2e6a780",
+                        "carrierIp": "",
+                        "customerOwnedIp": "",
+                        "customerOwnedIpv4Pool": "",
+                        "domain": "vpc",
+                        "id": "eipalloc-01ff13183db81c70d",
+                        "instance": "",
+                        "ipamPoolId": null,
+                        "networkBorderGroup": "us-west-2",
+                        "networkInterface": "eni-022d400548dd4cb49",
+                        "privateDns": "ip-10-0-8-137.us-west-2.compute.internal",
+                        "privateIp": "10.0.8.137",
+                        "ptrRecord": "",
+                        "publicDns": "ec2-52-13-184-240.us-west-2.compute.amazonaws.com",
+                        "publicIp": "52.13.184.240",
+                        "publicIpv4Pool": "amazon",
+                        "tags": {
+                            "Name": "GP-API-production-GPVPCElasticIp2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "tagsAll": {
+                            "Name": "GP-API-production-GPVPCElasticIp2",
+                            "sst:app": "GP-API",
+                            "sst:stage": "production"
+                        },
+                        "vpc": true
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Vpc::GP-VPC",
+                    "external": true,
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ec2/eip.ts#129,16"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$docker-build:index:Image::gp-api-developImagegp-api-develop",
+                    "custom": true,
+                    "id": "sha256:0ebf46bb25ea9430c9e8eb0120d1bac47fffca9295778a5991f6300404251754",
+                    "type": "docker-build:index:Image",
+                    "inputs": {
+                        "buildArgs": {
+                            "SST_RESOURCE_App": "{\"name\":\"GP-API\",\"stage\":\"develop\"}"
+                        },
+                        "buildOnPreview": true,
+                        "context": {
+                            "location": "/Users/taylor/Documents/Code/Nest/gp-api/"
+                        },
+                        "dockerfile": {
+                            "inline": "",
+                            "location": "/Users/taylor/Documents/Code/Nest/gp-api/deploy/Dockerfile"
+                        },
+                        "exec": false,
+                        "load": false,
+                        "network": "default",
+                        "noCache": false,
+                        "platforms": [
+                            "linux/amd64"
+                        ],
+                        "pull": false,
+                        "push": true,
+                        "registries": [
+                            {
+                                "address": "https://333022194791.dkr.ecr.us-west-2.amazonaws.com",
+                                "password": {
+                                    "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                                    "ciphertext": "v1:UIk6KPkA5yE4YToJ:YLL1IC46E1F5E9cYnjqAu46ytGV/RLCAoUTVaQoeSNoZdpbd871UFbwmcEKgyLqcKWoAHqNVOXrhl9YLVCbC9Yd15bnvV4lWo2IavbctlnL5AKqcUPgCCi6VhReWnM71S4kUrwA9b6nohLcVBdoj+7ikozt6QaK0L3/wrYf/YutV+5uwppNvjiuaEFZouUrgjt8pvSqt7WzxPOB1wLBC0WAphbProa7vE0mLeHdpWL6pTv/4bzPkWxS29he+Rh2L4ClYexWVnwMyCHDWQ4fgOxUQSTVo/X02hnaEOjX0m2hIXBmMVoJpNXE+4YvEHSysH9Haqhi5AYkKiiS9Uc9qju5ZdAyV3fO8eWHD7A1q2KEw34ibZc+vFZvLf++PN5v1DJVFlTlcXFnh3Fdws0duUBjvh5dNGUwmpOnJHhJWxnqtHwWb/UbNSGf6BdJ53GbgJjvoCIL7r466an7/1LZ0pv/Fbn/Qv9s6NoFx6lNB5BAAmeWfz72yUAohiT4IrzS9gOnNk0WhnuvDEnBkBq93qqpn3pVu5R558vzuq8z7XSptRwDXefkr1XLS9CKu079q6gyxTnsSau9cQBJ0qwln8BShAOGhkIDvCDNNgnnsjPcK+vCtp8K3sanrk8lJEOV8CWE9e0QWUzd1Mnqsm3BWHiHpX8mk56+Hsn/tNBI134AmearhkaEqIfsFTQwK++h0c9XVmHYmTbRZn4YYnUsOwrKsPDHBoHOnkS0xoeu0ZWZ8NCdpPL7hC2UD/H7LT7pWkXzPdwBImhwGeepzCCYPj0gU59UWeZ4nebhH/p+iM32tD4/emfVDJidFNcAMNdoMWx5vstpdiYASVanXqwG3LLLA3fY/t7nxda4lGLH1ldjgrIsnC+OmFH2PFUuDNcgLmVPzhZ5XNf4DXTjYsaaZvwmRpQPsRyhuVKnYUYUdKO0rF87eFgftKNqlNFx9u3sr858PKX6CEBEvyhrz6wQn+235eVmQ77gDqLkE7nDZ+lJT4n2+klS/TctRs66bk2vXHn/cksLtjdi00BlVD3lD1xo/apfQPx3DugN833SBebhp6Qlehd/9yawTr0Kd0iKV/x7z0pmhD7Ci+V5ClKVCU7o37gM/2j8snAwwanXicWTBCyJ+HJp/sVuu5Hmr7RNX3Eq4o1JP3IKM2tGhMSSwA07050Y9DU8nRQlvi2rzutRZgeBwhcY3qF0WKTkU8WxNYHd9YrKFSb3sjjnPMtzFL9U65qSgaZTC1lv2MFVGQIyD/d0S1zvejS6It9Em7hB9s9pi18vrvVx/Q+6oeUT99SJqbBmoFoJJmZDqRPAwncqdiaP3B5od2ZgKiFfXNLanR5WQQFYZ1C5sCyly9IBuPk8CyYw9glITi0m2qp4kzbDDvfCdn3sEx39FngxpC38Nklxns4lqIfJ9yBDAnWlQwu4aZYSgBaRNaWWywmFXG56XjUIxPyKJ0gvZoq43UlQ2o/zP0jqzX6oJHYDA+9/zGgOBkR7GXX28FZZ21CJsx+5Ll725vbvtlaKXa77qAnCYl+FSPkpn49KF+nMclbL03o9nE7eXB4hOKdbzMfyzcjviFsqvoYFiICD+xHM5gSOtMjAoOZZKR2uE6NWaty6FmfLv9pmtT9mXRra49P2trvhlJItTMRIjZ4Wyvob/fgV2k82cqcGFoIcBOS3abuAgue0VD3PTljnl3yC0c2oziX/Anhwdk4tSgxBWS6ogH2401e83JCF8HrBoUzT9tPRZkPlpNg17+pGkV1lIEfFzalFVQbvY7cLUucY2VaivmK1F5afmuIdDgI5/n1EaLDbxV/abYrPTmZeIpp4GwnCtayXCPxi9n6pums63TkfoOY5ymDX1KhtbiNnRJQjWCVo8baZGdfZtIR7gf0RwB06WcCKznlzOllqzpTFeZqov1KHE1KtnRwr4mfU9EuC2JOXoAPvNnT0LCn96Cf03c1VfFH/QnGktx/WbOf9ZX3GwAa4awyVicyr1qAiFEAUcllrVYxwhHyhh9C2icDAKFgN0yH2DaJtTOl0f82dLRshibQhOK36PIEfl6st5qP6Dd/VxseFzdBc441KhM++u/Yw28GZ+MRZeC3td6oERwTo3uf9h4h10GlzcjSNsSDawEzRIdvC3vS/A3Wqn0txMLM4RcrR1sGIcQv0Bx5I+bKzLlgUTtcFKXtJhorSqVaqhzIcm/3zubO5/OTBmI4n8OT5iNN69v+iMGTqcVE0nEj54Gm4XPczputqAV/9Uj/2j3x6qI0RmR2Hchw/qZ/OzFEDbAMwmMYPODeFV5Q4K/AIEaniUcDSMjjMMd3YIDDeF4HxsU7DbXQQA67yd77nsoN1utNeiqnavknRVU+MjRUw+X1yOHcg6GJAtH9VhxtqQ4gRXxvZooxSYsfuyZEhdM9UJjA4bpw=="
+                                },
+                                "username": "AWS"
+                            }
+                        ],
+                        "tags": [
+                            "333022194791.dkr.ecr.us-west-2.amazonaws.com/sst-asset:gp-api-develop"
+                        ],
+                        "target": ""
+                    },
+                    "outputs": {
+                        "buildArgs": {
+                            "SST_RESOURCE_App": "{\"name\":\"GP-API\",\"stage\":\"develop\"}"
+                        },
+                        "buildOnPreview": true,
+                        "context": {
+                            "location": "/Users/taylor/Documents/Code/Nest/gp-api/"
+                        },
+                        "contextHash": "d22a394212e2b2af03663837589111d04d1d5b597c032a4c00fc21838cf4058c",
+                        "digest": "sha256:3ecd971b13d62be4d1b44c84b25fa72686f18dbeba740fc0921a246f8e871ea8",
+                        "dockerfile": {
+                            "inline": "",
+                            "location": "/Users/taylor/Documents/Code/Nest/gp-api/deploy/Dockerfile"
+                        },
+                        "exec": false,
+                        "load": false,
+                        "network": "default",
+                        "noCache": false,
+                        "platforms": [
+                            "linux/amd64"
+                        ],
+                        "pull": false,
+                        "push": true,
+                        "ref": "333022194791.dkr.ecr.us-west-2.amazonaws.com/sst-asset:gp-api-develop@sha256:3ecd971b13d62be4d1b44c84b25fa72686f18dbeba740fc0921a246f8e871ea8",
+                        "registries": [
+                            {
+                                "address": "https://333022194791.dkr.ecr.us-west-2.amazonaws.com",
+                                "password": {
+                                    "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                                    "ciphertext": "v1:IAH3OdhECu5bKpWl:Uis0o+9X2ND1e+tkSdr9865nOoIjKY1kV4ZCU+JVH6cX1+h/BechsBXe32hkTGXR0DptnvJNkj4A0MD2HBhzdiMScW1JxHKS6t03H+yGxm0kNRTs+bFSNeG1z1OI1taGzxPRUT1UGWWDfFSmwX6MdBdQVeZtD4I3xRUdamF2qjPiFeJb/i1l0hSOOADv7kU2dRxA3uV2F2U11rsqyHrysYwR9EUHFeRwaQ+DNzy564ICnjEapnE0KELM4Na8xL5HrcSaR7cRqS2Lr6GpFdPGOgE/+uH1XhesHwRmj/G/fXYwjB/3c2A9Q0FdwJ4bUQDjzuJwDgiAWedePJcccNhsXrebbmfXMeoD0Cpqp7IEVxEbaq2FOI4tBAH5HevEOsiGrqdymuv3AH6E7hFhQQ1HlsU8zynYMFuJ71mEkhzU+YvnarXIQkEaljnkRBIJafXbOn8jFGGgHZbskIsA7DrIy9tZT2++7KZiofpNvPCAp56kwSWxhjzBNLUfbduSltPauoViY+ZeXM/lCexHL3pj+c6sKgXe45ZLyq2Cu+39ixclf98sJqJdwkA19UkrJS0j3IZy1WDrcpicNwBMTljlSLfFJJ0v8WLBdmX7oSkWfoMO2HQtrv/NkALJGXviwhXzdO8cFH15OYAdPCMivIZacOmRB56sjk3m6MnTg/Zs1Ew612+VAAGPRwI8wiEhVqhqF0DkhZfQvj48z+IkoBq/NsgaoTSBZzMzPhdU0yj/M/CSeGdW4REtc8HW/Gwy4QTBeF9drFaMaAhQ9lOlcsu/FU+cvlYt3b1QtPIZdwrozr5gRgAoJ+wxJMt2j+8qs5tNVmxKp4r0Uj/BbICNcy1M06k+4YfIBWMyKmG7YNiOobtQWyD+B5kEpCzIbqS7k2vP5VIpwrUuGwHEq7GEuDujb0QXiC/SXPIly9hznaAd+rDoKpnrpuyAZx/VRs+TqYITsK6oKkz2ER/Ac7ELukoe/50qWfJtybFAiF/lJNs4St9EUTNOWYVuDeHUDLKGk8BG/OKqW05CB9/Gbb/FQL2mehAIQYNfV9hAyXW6uzlnaZ+o7oQ7IMl4Vgo9DE8ppcdDNToGEmU6xWmjxhu+g/ZgfpKdJoyNPjsolb1Pdyf/CXXUzZBhbYoVhWf/pkG0hbqWZwTeeGlqvGV+xb/RQPLGUIPUH6EiT4C33mK7HN6KwcrdpTPF0cHfLsskZ6gw/VCpwxy3r5P+KK2iIJ47wtMw+RGFxwj1SJ6a3ra34uclIRPUEd8jOO9+hSQrNgK8C8/3Xlk4yoroQqWk0AheB98LOX47kWU/fokrhcX56Z6mk/pzzJQ+iw1QTgceuKnZIZMQ4lNHbu1Xzc5ndjndKQlzX3gLWrLtvJcySbpdcRcUjAzUAH5NJu18KXODQlC3pb4Lbu7f93bGQzzuhokckMNjqrdTzPvj6Nad/ADujo6RVw752G2iXN7b1ErlNINkW+jt4hS0s1SHCN2DTDam7TGeqcdOiO841x9Nhy0cfne/W2Og9UZXG+ZOX6sZAdq6r8HFKCP8pKp4RL/hl6gl49Y3SVOBx9zqCqwq9E1yh0PzGhosGkvKFnhDDrsuDpJs3s64zaum3m9hHX5Yl8Il3GcRa93LW/TVfeWoHNrW1zG9l+S61TAXpTiz+Lv5og4TKuQTApOgDaq8LIQ80zci52G6vCS0SiNpfPPqj8MQxoTYl4CgCLNxWT/30k+/RKBSUZzXzXOFF/I6uqOkKV9hid03nTzQl0T4yQvHqGcNOgoWIDrIkMivjRJa/wMbfL9OTqdy8r8qJeXTKBIkB3NU9Kq0LP3v8jPzYL1DUPi2M2kANI9sPc/gwSr07K7sZ9a9XURoNuVyQNKueGmCJxwk8ieST9OEZjLUOZP6EGj60tT3+m29pkxT/6LbUU6TeFs6mhctF6fFuRnyKHKl5zIv4HzxqOUNOazOD7Pb0G6YyTQ8DC5r0ijISihq3y06wT2IjDz4WKGCuNjsKFKYVdIgU+vgeo/eQYNyr59KiGeuQcwoPsjpXnIIicnAVqPxoDAMj8QKWNhoJLKS/Oa+lE6+SyFox7B3p/i62omC7T9tIoWrdiR3zh5yDxMjs4f/4sPP3p2kUKL7akDYNvmOM72rcsUkhkUrehlFkNR/3gVfZ2ZX7ldBCs4C31QcKUd8nHYR1OXmh0IV0xUIU3uavNvYIk8M4YIgyowGv/YjkQqR4JEzzvcejGVuMP9dh4y86btBaU0fQIFGLEiKay4x4YhlsrUw3jf5XnUf7TTGsD+oPlhA5ag3YZUkrz2YQA3GV8Io5WEaNjZfZt+nfgmjQmldBHWqGaVOaXJgF1sEYnG+2LejK+Bk0q2x+uB0rtfKl3lXhd/5etszl2MAUL+6kHbW2cxiQBnTnEbTOahWpnqG7vaXFHy0oQ=="
+                                },
+                                "username": "AWS"
+                            }
+                        ],
+                        "tags": [
+                            "333022194791.dkr.ecr.us-west-2.amazonaws.com/sst-asset:gp-api-develop"
+                        ],
+                        "target": ""
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:docker-build::default_0_0_6::3b4eacbe-8384-41ae-a442-4df40520d685",
+                    "propertyDependencies": {
+                        "buildArgs": [],
+                        "buildOnPreview": [],
+                        "context": [],
+                        "dockerfile": [],
+                        "network": [],
+                        "platforms": [],
+                        "push": [],
+                        "registries": [],
+                        "tags": []
+                    },
+                    "created": "2024-11-14T21:47:15.372869Z",
+                    "modified": "2024-11-15T19:25:55.367639Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/image.ts#788,9"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ecs/taskDefinition:TaskDefinition::gp-api-developTask",
+                    "custom": true,
+                    "id": "GP-API-develop-FargateCluster-gp-api-develop",
+                    "type": "aws:ecs/taskDefinition:TaskDefinition",
+                    "inputs": {
+                        "__defaults": [
+                            "skipDestroy"
+                        ],
+                        "containerDefinitions": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "ciphertext": "v1:Mk3B103FHl2SKQsU:KVa/5KNNAFsTdkUFLlDioNNSwGNuCYR4Lu30FqEESGJ6TIWnD5Cobvx7UciFarAxD8qwIJiGQtDF2Y4AubsMctwbOAxg7pEy8L0QHK+9e7Bg1iAg/HF16MRhnaLURKCqboSevJCg52LVePTzORen/JPsQAvEe3uqlt6CRQw6h+949jrG4CZbkf0RLmPGDOVuzhVkS+I9wVSHBSLGQxmB4de+amB6LnRy7PioUP/9+2zlhPda/uG9SLL7ZH5oHoBwsa7BjhtzyopBjGFfrfoSoY3O9v4/rnTt+O1fWhhPxQXby52xfUoWvkFb75qbe4mCCupkckhmDW9wCBqVBF9rjtPGzv2r5tTFHNHGKxejQxOTQhEIkyetDaXbek2DV6GyHCA00P2SwkgI5RPMIwpf+74xDhW6BBkbrVBZn+GevhJ0wi3Oul/6wbVsZX0P3Ct4ZuYdNsuNmlq9CkL4ORj9itARkEo0R3qbAtShyeBJplTtXD0/pjOSARrn48jOwgeYC7f81acLV5yFJPgzV+MT1tIUDvziCNMV6jPgjtQZ94eYSgSKos8trlvTkcYbqaR8ir6jf4hIh877Q2JrVxCPTO8my4jI/BRyJNyGbJ8UGVajqBQj1hB7ooRibQV433ZbfohKquHkzWFuUK9tH4OBGCf5R1ey/zGJvSnfyumBbrv+i41CuPjY33y3WY14fBhWYNUsW6TJ42nv9E/U7fFoXBomqeTIainM5HjJbJfNM4BiYv2H7laDdDnafoshPL7NMDX2CQ0JgOvyiqGzgO/BD3cwUNXDCev01+1g8/IKDsk73AzC70f5iq+xt5wsBdqmAuK9qj5GaYuMmAUi+xWvUEsrQ873yWeZ3H62mdVguB6yXjL9RmqseR9/od1aAmFo/UqRC+jtuOzFnDkv4rMyuy2F4EwYKp4QYiBI+UFI61wiplkrW6w1bGCkFyOLCzm/M5tINRroPzC4FK/UC1fPsy9fkOB7l+3dHoHSdhbbWCKjfQXQsZ7R1Cf+QnanwB/G"
+                        },
+                        "cpu": "256",
+                        "executionRoleArn": "arn:aws:iam::333022194791:role/GP-API-develop-gpapidevelopExecutionRole-uswest2",
+                        "family": "GP-API-develop-FargateCluster-gp-api-develop",
+                        "memory": "512",
+                        "networkMode": "awsvpc",
+                        "requiresCompatibilities": [
+                            "FARGATE"
+                        ],
+                        "runtimePlatform": {
+                            "__defaults": [],
+                            "cpuArchitecture": "X86_64",
+                            "operatingSystemFamily": "LINUX"
+                        },
+                        "skipDestroy": false,
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "taskRoleArn": "arn:aws:iam::333022194791:role/GP-API-develop-gpapidevelopTaskRole-uswest2",
+                        "trackLatest": true,
+                        "volumes": []
+                    },
+                    "outputs": {
+                        "__meta": "{\"schema_version\":\"1\"}",
+                        "arn": "arn:aws:ecs:us-west-2:333022194791:task-definition/GP-API-develop-FargateCluster-gp-api-develop:3",
+                        "arnWithoutRevision": "arn:aws:ecs:us-west-2:333022194791:task-definition/GP-API-develop-FargateCluster-gp-api-develop",
+                        "containerDefinitions": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "ciphertext": "v1:hL1SzKkchKM/siDK:CVSMq6icNM/o3Ip3dzkqgFFPrxYTSwRVeMp4dx3Ds3vBxwkvdiep5mxlS0CSoiQ9MI6+cQsuaenbfwWiDRcktyupHW653ynX639YLFyEQCvv+RBp6j8ETN0DZJymqw15exZDI2HiSm8CSGfwftYpLy7ZlJvMGCwRl/DtswUhwBjyJn/jFzdSPme2dnZ8cAuZqpRrIy7skqqOGYIkwLyVC21xOuDOWg54Kbj1oCuiusbaDvtM5T3Jzb/OJtyDbNix9xXMqdAKtj1wuUpMp4i+Iw3vUdJVOTDuQIE1OpHwoiMfIOct7irbwfmowV2tzbqhoVN5/ZYwYBMU2GLKPP22EBOuJkhC04LBt5pcpSdqIA8Ow0xP/pPB5DBj1yOMEDIrxPO/vaLpVp3sifdKS02G68J2+omx2famLoDd3FAicYpWKZCY5sRC58JLCdyVZmjJVPOt/lSwt5dtc/95Blu5RXluPaNHdPnQNNew5nOKOkHoIObXFfJQRBS8OVJODXew4FOGIMlWzG/Ayy4jFT/DJCsAquQ7Xzm5Q27QOhCjbmM4x9QNhygKAG+RkSXSzoHHDrSRC2Do487BTwJRC5coatB9yRJ0LNeLD9n6Sfebi+G1ouSoz2fJ2sp0/6wlgXu49zs1xlXE+L35S2m8CepKOtc1bIs3WLjgOCQWOBEP/IkajRRR0MTpYxqzT1yrZ0X0wEvsDrqUNvzYEwN1vGiGQM3MUNq21KOWAzkknU9JR1OVJpczapPOnX0x0eCC1wZN/JUMi4WL9GnSV5rslwnTFTPWW4DqcQAEbsb+Wz80OsaQNy9XP/YGFYvsTbE+UieigdJpJB/MbpXl8OxgfpIJfmnh1tYuSq3Wbrsi7uV3oZxEoE8zdGYVsbD89JN6Y7gp0lmXjl+zIvWlnmmfqPu3UcqRsLyxUHljz4LCz1iAbi46BJkO8j9JIAm7xn8SJ8shjTrHwAaqzzy5zenTNu+e+5AMFrUz9UMgokUATS73jkjEH0KkT8Uh5fx5L+FVgPQRkGaGC7sdat+xSsYgB0SR+Ghj9RkKhE5gzQCNQTFFqWO5aDuD+EN2bjqks8QEsaouedGBK867HMynjV5LrjWAuN8WxQVBz2oWxXqJxiI7fAjhLk0xohNt6f2hdlUDSKI6zBnDSg=="
+                        },
+                        "cpu": "256",
+                        "ephemeralStorage": null,
+                        "executionRoleArn": "arn:aws:iam::333022194791:role/GP-API-develop-gpapidevelopExecutionRole-uswest2",
+                        "family": "GP-API-develop-FargateCluster-gp-api-develop",
+                        "id": "GP-API-develop-FargateCluster-gp-api-develop",
+                        "inferenceAccelerators": [],
+                        "ipcMode": "",
+                        "memory": "512",
+                        "networkMode": "awsvpc",
+                        "pidMode": "",
+                        "placementConstraints": [],
+                        "proxyConfiguration": null,
+                        "requiresCompatibilities": [
+                            "FARGATE"
+                        ],
+                        "revision": 3,
+                        "runtimePlatform": {
+                            "cpuArchitecture": "X86_64",
+                            "operatingSystemFamily": "LINUX"
+                        },
+                        "skipDestroy": false,
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "taskRoleArn": "arn:aws:iam::333022194791:role/GP-API-develop-gpapidevelopTaskRole-uswest2",
+                        "trackLatest": true,
+                        "volumes": []
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$docker-build:index:Image::gp-api-developImagegp-api-develop",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:cloudwatch/logGroup:LogGroup::gp-api-developLogGroupgp-api-develop",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:iam/role:Role::gp-api-developExecutionRole",
+                        "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:iam/role:Role::gp-api-developTaskRole"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "containerDefinitions": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$docker-build:index:Image::gp-api-developImagegp-api-develop",
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:cloudwatch/logGroup:LogGroup::gp-api-developLogGroupgp-api-develop"
+                        ],
+                        "cpu": [],
+                        "executionRoleArn": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:iam/role:Role::gp-api-developExecutionRole"
+                        ],
+                        "family": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster"
+                        ],
+                        "memory": [],
+                        "networkMode": [],
+                        "requiresCompatibilities": [],
+                        "runtimePlatform": [],
+                        "taskRoleArn": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:iam/role:Role::gp-api-developTaskRole"
+                        ],
+                        "trackLatest": [],
+                        "volumes": []
+                    },
+                    "created": "2024-11-15T19:25:55.819913Z",
+                    "modified": "2024-11-15T19:25:55.819913Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/ecs/taskDefinition.ts#446,9"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ecs/service:Service::gp-api-developService",
+                    "custom": true,
+                    "id": "arn:aws:ecs:us-west-2:333022194791:service/GP-API-develop-FargateCluster/gp-api-develop",
+                    "type": "aws:ecs/service:Service",
+                    "inputs": {
+                        "__defaults": [
+                            "deploymentMaximumPercent",
+                            "deploymentMinimumHealthyPercent",
+                            "enableEcsManagedTags",
+                            "schedulingStrategy",
+                            "waitForSteadyState"
+                        ],
+                        "cluster": "arn:aws:ecs:us-west-2:333022194791:cluster/GP-API-develop-FargateCluster",
+                        "deploymentCircuitBreaker": {
+                            "__defaults": [],
+                            "enable": true,
+                            "rollback": true
+                        },
+                        "deploymentMaximumPercent": 200,
+                        "deploymentMinimumHealthyPercent": 100,
+                        "desiredCount": 1,
+                        "enableEcsManagedTags": false,
+                        "enableExecuteCommand": true,
+                        "launchType": "FARGATE",
+                        "loadBalancers": [
+                            {
+                                "__defaults": [],
+                                "containerName": "gp-api-develop",
+                                "containerPort": 80,
+                                "targetGroupArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784"
+                            }
+                        ],
+                        "name": "gp-api-develop",
+                        "networkConfiguration": {
+                            "__defaults": [],
+                            "assignPublicIp": true,
+                            "securityGroups": [
+                                "sg-039c0c1df572e8631"
+                            ],
+                            "subnets": [
+                                "subnet-0cb57b0f6d5910c91",
+                                "subnet-000207d6af6383397"
+                            ]
+                        },
+                        "schedulingStrategy": "REPLICA",
+                        "serviceRegistries": {
+                            "__defaults": [],
+                            "registryArn": "arn:aws:servicediscovery:us-west-2:333022194791:service/srv-nflyxu23gcr7grow"
+                        },
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "taskDefinition": "arn:aws:ecs:us-west-2:333022194791:task-definition/GP-API-develop-FargateCluster-gp-api-develop:3",
+                        "waitForSteadyState": false
+                    },
+                    "outputs": {
+                        "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"update\":1200000000000},\"schema_version\":\"1\"}",
+                        "alarms": null,
+                        "capacityProviderStrategies": [],
+                        "cluster": "arn:aws:ecs:us-west-2:333022194791:cluster/GP-API-develop-FargateCluster",
+                        "deploymentCircuitBreaker": {
+                            "enable": true,
+                            "rollback": true
+                        },
+                        "deploymentController": {
+                            "type": "ECS"
+                        },
+                        "deploymentMaximumPercent": 200,
+                        "deploymentMinimumHealthyPercent": 100,
+                        "desiredCount": 1,
+                        "enableEcsManagedTags": false,
+                        "enableExecuteCommand": true,
+                        "forceDelete": null,
+                        "forceNewDeployment": null,
+                        "healthCheckGracePeriodSeconds": 0,
+                        "iamRole": "/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS",
+                        "id": "arn:aws:ecs:us-west-2:333022194791:service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "launchType": "FARGATE",
+                        "loadBalancers": [
+                            {
+                                "containerName": "gp-api-develop",
+                                "containerPort": 80,
+                                "elbName": "",
+                                "targetGroupArn": "arn:aws:elasticloadbalancing:us-west-2:333022194791:targetgroup/HTTP20241114214507935700000001/e4ddd90d5d8e9784"
+                            }
+                        ],
+                        "name": "gp-api-develop",
+                        "networkConfiguration": {
+                            "assignPublicIp": true,
+                            "securityGroups": [
+                                "sg-039c0c1df572e8631"
+                            ],
+                            "subnets": [
+                                "subnet-000207d6af6383397",
+                                "subnet-0cb57b0f6d5910c91"
+                            ]
+                        },
+                        "orderedPlacementStrategies": [],
+                        "placementConstraints": [],
+                        "platformVersion": "LATEST",
+                        "propagateTags": "NONE",
+                        "schedulingStrategy": "REPLICA",
+                        "serviceConnectConfiguration": null,
+                        "serviceRegistries": {
+                            "containerName": "",
+                            "containerPort": 0,
+                            "port": 0,
+                            "registryArn": "arn:aws:servicediscovery:us-west-2:333022194791:service/srv-nflyxu23gcr7grow"
+                        },
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "taskDefinition": "arn:aws:ecs:us-west-2:333022194791:task-definition/GP-API-develop-FargateCluster-gp-api-develop:3",
+                        "triggers": {},
+                        "volumeConfiguration": null,
+                        "waitForSteadyState": false
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet1",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet2",
+                        "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/securityGroup:SecurityGroup::GP-VPCSecurityGroup",
+                        "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/targetGroup:TargetGroup::gp-api-developTargetgp-api-developHTTP80",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:servicediscovery/service:Service::gp-api-developCloudmapService",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ecs/taskDefinition:TaskDefinition::gp-api-developTask",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:acm/certificateValidation:CertificateValidation::gp-api-developSslValidation"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "cluster": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster"
+                        ],
+                        "deploymentCircuitBreaker": [],
+                        "desiredCount": [],
+                        "enableExecuteCommand": [],
+                        "launchType": [],
+                        "loadBalancers": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$sst:aws:Certificate$aws:acm/certificateValidation:CertificateValidation::gp-api-developSslValidation",
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:lb/targetGroup:TargetGroup::gp-api-developTargetgp-api-developHTTP80"
+                        ],
+                        "name": [],
+                        "networkConfiguration": [
+                            "urn:pulumi:develop::GP-API::aws:ec2/vpc:Vpc::GP-VPCVpc",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet1",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/subnet:Subnet::GP-VPCPublicSubnet2",
+                            "urn:pulumi:develop::GP-API::sst:aws:Vpc$aws:ec2/securityGroup:SecurityGroup::GP-VPCSecurityGroup"
+                        ],
+                        "serviceRegistries": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:servicediscovery/service:Service::gp-api-developCloudmapService"
+                        ],
+                        "taskDefinition": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ecs/taskDefinition:TaskDefinition::gp-api-developTask"
+                        ]
+                    },
+                    "created": "2024-11-14T21:47:16.678826Z",
+                    "modified": "2024-11-15T19:25:56.714242Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#887,14"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget",
+                    "custom": true,
+                    "id": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                    "type": "aws:appautoscaling/target:Target",
+                    "inputs": {
+                        "__defaults": [],
+                        "maxCapacity": 1,
+                        "minCapacity": 1,
+                        "resourceId": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "scalableDimension": "ecs:service:DesiredCount",
+                        "serviceNamespace": "ecs",
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "outputs": {
+                        "arn": "arn:aws:application-autoscaling:us-west-2:333022194791:scalable-target/0ec53374c68f03b846a49eb3ac12ea57846a",
+                        "id": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "maxCapacity": 1,
+                        "minCapacity": 1,
+                        "resourceId": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "roleArn": "arn:aws:iam::333022194791:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService",
+                        "scalableDimension": "ecs:service:DesiredCount",
+                        "serviceNamespace": "ecs",
+                        "suspendedState": {
+                            "dynamicScalingInSuspended": false,
+                            "dynamicScalingOutSuspended": false,
+                            "scheduledScalingSuspended": false
+                        },
+                        "tags": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        },
+                        "tagsAll": {
+                            "sst:app": "GP-API",
+                            "sst:stage": "develop"
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster",
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ecs/service:Service::gp-api-developService"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "maxCapacity": [],
+                        "minCapacity": [],
+                        "resourceId": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Cluster$aws:ecs/cluster:Cluster::FargateCluster",
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:ecs/service:Service::gp-api-developService"
+                        ],
+                        "scalableDimension": [],
+                        "serviceNamespace": []
+                    },
+                    "created": "2024-11-14T21:47:17.235389Z",
+                    "modified": "2024-11-14T21:47:17.235389Z",
+                    "sourcePosition": "project:///../file:/Users/taylor/Documents/Code/Nest/gp-api/deploy/.sst/platform/src/components/aws/service.ts#935,22"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/policy:Policy::gp-api-developAutoScalingCpuPolicy",
+                    "custom": true,
+                    "id": "GP-API-develop-gpapidevelopAutoScalingCpuPolicy",
+                    "type": "aws:appautoscaling/policy:Policy",
+                    "inputs": {
+                        "__defaults": [],
+                        "name": "GP-API-develop-gpapidevelopAutoScalingCpuPolicy",
+                        "policyType": "TargetTrackingScaling",
+                        "resourceId": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "scalableDimension": "ecs:service:DesiredCount",
+                        "serviceNamespace": "ecs",
+                        "targetTrackingScalingPolicyConfiguration": {
+                            "__defaults": [
+                                "disableScaleIn"
+                            ],
+                            "disableScaleIn": false,
+                            "predefinedMetricSpecification": {
+                                "__defaults": [],
+                                "predefinedMetricType": "ECSServiceAverageCPUUtilization"
+                            },
+                            "targetValue": 70
+                        }
+                    },
+                    "outputs": {
+                        "alarmArns": [
+                            "arn:aws:cloudwatch:us-west-2:333022194791:alarm:TargetTracking-service/GP-API-develop-FargateCluster/gp-api-develop-AlarmHigh-0f5c806f-5af5-4d56-b84c-bb9ad3a0d857",
+                            "arn:aws:cloudwatch:us-west-2:333022194791:alarm:TargetTracking-service/GP-API-develop-FargateCluster/gp-api-develop-AlarmLow-6fee37bb-8033-4c54-ad41-cdf8abe84321"
+                        ],
+                        "arn": "arn:aws:autoscaling:us-west-2:333022194791:scalingPolicy:3374c68f-03b8-46a4-9eb3-ac12ea57846a:resource/ecs/service/GP-API-develop-FargateCluster/gp-api-develop:policyName/GP-API-develop-gpapidevelopAutoScalingCpuPolicy",
+                        "id": "GP-API-develop-gpapidevelopAutoScalingCpuPolicy",
+                        "name": "GP-API-develop-gpapidevelopAutoScalingCpuPolicy",
+                        "policyType": "TargetTrackingScaling",
+                        "resourceId": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "scalableDimension": "ecs:service:DesiredCount",
+                        "serviceNamespace": "ecs",
+                        "stepScalingPolicyConfiguration": null,
+                        "targetTrackingScalingPolicyConfiguration": {
+                            "customizedMetricSpecification": null,
+                            "disableScaleIn": false,
+                            "predefinedMetricSpecification": {
+                                "predefinedMetricType": "ECSServiceAverageCPUUtilization",
+                                "resourceLabel": ""
+                            },
+                            "scaleInCooldown": 0,
+                            "scaleOutCooldown": 0,
+                            "targetValue": 70
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "name": [],
+                        "policyType": [],
+                        "resourceId": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                        ],
+                        "scalableDimension": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                        ],
+                        "serviceNamespace": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                        ],
+                        "targetTrackingScalingPolicyConfiguration": []
+                    },
+                    "created": "2024-11-14T21:47:17.695581Z",
+                    "modified": "2024-11-14T21:47:17.695581Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/appautoscaling/policy.ts#336,9"
+                },
+                {
+                    "urn": "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/policy:Policy::gp-api-developAutoScalingMemoryPolicy",
+                    "custom": true,
+                    "id": "GP-API-develop-gpapidevelopAutoScalingMemoryPolicy",
+                    "type": "aws:appautoscaling/policy:Policy",
+                    "inputs": {
+                        "__defaults": [],
+                        "name": "GP-API-develop-gpapidevelopAutoScalingMemoryPolicy",
+                        "policyType": "TargetTrackingScaling",
+                        "resourceId": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "scalableDimension": "ecs:service:DesiredCount",
+                        "serviceNamespace": "ecs",
+                        "targetTrackingScalingPolicyConfiguration": {
+                            "__defaults": [
+                                "disableScaleIn"
+                            ],
+                            "disableScaleIn": false,
+                            "predefinedMetricSpecification": {
+                                "__defaults": [],
+                                "predefinedMetricType": "ECSServiceAverageMemoryUtilization"
+                            },
+                            "targetValue": 70
+                        }
+                    },
+                    "outputs": {
+                        "alarmArns": [
+                            "arn:aws:cloudwatch:us-west-2:333022194791:alarm:TargetTracking-service/GP-API-develop-FargateCluster/gp-api-develop-AlarmHigh-6eacb55b-5e9d-4d22-8024-dff2bee5baa9",
+                            "arn:aws:cloudwatch:us-west-2:333022194791:alarm:TargetTracking-service/GP-API-develop-FargateCluster/gp-api-develop-AlarmLow-a714dcb9-b2bd-4b1a-8e3b-0a280e60cd1e"
+                        ],
+                        "arn": "arn:aws:autoscaling:us-west-2:333022194791:scalingPolicy:3374c68f-03b8-46a4-9eb3-ac12ea57846a:resource/ecs/service/GP-API-develop-FargateCluster/gp-api-develop:policyName/GP-API-develop-gpapidevelopAutoScalingMemoryPolicy",
+                        "id": "GP-API-develop-gpapidevelopAutoScalingMemoryPolicy",
+                        "name": "GP-API-develop-gpapidevelopAutoScalingMemoryPolicy",
+                        "policyType": "TargetTrackingScaling",
+                        "resourceId": "service/GP-API-develop-FargateCluster/gp-api-develop",
+                        "scalableDimension": "ecs:service:DesiredCount",
+                        "serviceNamespace": "ecs",
+                        "stepScalingPolicyConfiguration": null,
+                        "targetTrackingScalingPolicyConfiguration": {
+                            "customizedMetricSpecification": null,
+                            "disableScaleIn": false,
+                            "predefinedMetricSpecification": {
+                                "predefinedMetricType": "ECSServiceAverageMemoryUtilization",
+                                "resourceLabel": ""
+                            },
+                            "scaleInCooldown": 0,
+                            "scaleOutCooldown": 0,
+                            "targetValue": 70
+                        }
+                    },
+                    "parent": "urn:pulumi:develop::GP-API::sst:aws:Service::gp-api-develop",
+                    "dependencies": [
+                        "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                    ],
+                    "provider": "urn:pulumi:develop::GP-API::pulumi:providers:aws::default_6_59_1::c4f82bfc-ee8d-4199-81fd-64462ac7ae08",
+                    "propertyDependencies": {
+                        "name": [],
+                        "policyType": [],
+                        "resourceId": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                        ],
+                        "scalableDimension": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                        ],
+                        "serviceNamespace": [
+                            "urn:pulumi:develop::GP-API::sst:aws:Service$aws:appautoscaling/target:Target::gp-api-developAutoScalingTarget"
+                        ],
+                        "targetTrackingScalingPolicyConfiguration": []
+                    },
+                    "created": "2024-11-14T21:47:17.866863Z",
+                    "modified": "2024-11-14T21:47:17.866863Z",
+                    "sourcePosition": "project:///platform/node_modules/@pulumi/appautoscaling/policy.ts#336,9"
+                }
+            ],
+            "metadata": {}
+        }
+    }
+}

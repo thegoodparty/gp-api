@@ -1,22 +1,14 @@
 {
-  "name": "deploy",
-  "version": "1.0.0",
-  "description": "deploy gp-api",
-  "main": "index.js",
+  "name": "gp-api",
+  "private": true,
+  "workspaces": [
+    "api",
+    "deploy"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@tsconfig/node18": "^18.2.4",
-    "@types/aws-lambda": "8.10.145",
-    "@types/node": "^22.9.0",
-    "sst": "^3.3.21",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
-  },
-  "dependencies": {
-    "sst": "3.3.21"
+    "start": "npm run start -w=api",
+    "start:dev": "npm run start:dev -w=api",
+    "build": "npm run build -w=api",
+    "deploy:dev": "npm run deploy:dev -w=deploy"
   }
 }
