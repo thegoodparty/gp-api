@@ -6,6 +6,7 @@ import { JobsModule } from './jobs/jobs.module'
 import { HealthModule } from './health/health.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ContentfulModule } from './contentful/contentful.module'
+import { RacesModule } from './races/races.module'
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ContentfulModule } from './contentful/contentful.module'
     PrismaModule,
     ContentfulModule,
     JobsModule,
+    RacesModule
   ],
   controllers: [AppController],
   providers: [AppService],
