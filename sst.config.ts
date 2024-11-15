@@ -41,12 +41,12 @@ export default $config({
           // { listen: '80/http', forward: '443/https' },
           { listen: '443/https', forward: '3000/http' },
         ],
-        health: {
-          '3000/http': {
-            path: '/v1/health',
-            interval: '10 seconds',
-          },
-        },
+        // health: {
+        //   '3000/http': {
+        //     path: '/v1/health',
+        //     interval: '10 seconds',
+        //   },
+        // },
       },
       environment: {
         PORT: '3000',
