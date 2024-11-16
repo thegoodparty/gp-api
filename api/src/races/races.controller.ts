@@ -40,7 +40,7 @@ export class RacesController {
     return this.racesService.remove(+id)
   }
 
-  @Get()
+  @Get('seed')
   seed() {
     return this.racesService.seed()
   }

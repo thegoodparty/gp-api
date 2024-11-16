@@ -4,12 +4,11 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-
 // enable prismaSchemaFolder feature
 
 generator client {
-  provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl"]
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-musl"]
   previewFeatures = ["prismaSchemaFolder"]
 }
 
@@ -59,7 +58,7 @@ model Race {
   hashId         String        @unique
   positionSlug   String?
   state          String        @db.Char(2)
-  electionDate   BigInt?
+  electionDate   DateTime?
   level          String
   subAreaName    String?
   subAreaValue   String?

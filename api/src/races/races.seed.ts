@@ -12,6 +12,24 @@ export interface MunicipalityDataType {
   state: string
 }
 
+export interface RaceDataType {
+  municipalitySlug: string
+  countySlug: string
+  name: string
+  slug: string
+  state: string
+  type: string
+  data: any
+  ballotId: string
+  ballotHashId: string
+  hashId: string
+  positionSlug: string
+  electionDate: string
+  level: string
+  subAreaName: string
+  subAreaValue: string
+}
+
 export const countiesSeedData = [
   {
     slug: 'ca/los-angeles',
@@ -484,6 +502,69 @@ export const municipalitiesSeedData = [
       cbsa_metro: 'TRUE',
       csa_fips: '',
       csa_name: '',
+    },
+  },
+]
+
+export const racesSeedData = [
+  {
+    municipalitySlug: 'ca/los-angeles/los-angeles',
+    countySlug: 'ca/los-angeles',
+    ballotId: '1653341',
+    ballotHashId:
+      'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb25FbGVjdGlvbi8xNjUzMzQx',
+    hashId: 'fdabc1',
+    positionSlug: 'city-legislature',
+    state: 'CA',
+    electionDate: '2025-11-04',
+    level: 'city',
+    subAreaName: 'District',
+    subAreaValue: '10',
+    data: {
+      position_name: 'Los Angeles City Council - District 10',
+      state: 'CA',
+      race_id: 1653341,
+      is_primary: true,
+      is_judicial: false,
+      sub_area_name: 'District',
+      sub_area_value: '10',
+      filing_periods:
+        '[{\\"start_on\\"=>\\"2023-11-13\\",\\"end_on\\"=>\\"2023-12-08\\"}]',
+      election_day: '2024-03-05',
+      normalized_position_name: 'City Legislature',
+      level: 'city',
+      filing_date_start: '2023-11-13',
+      filing_date_end: '2023-12-08',
+    },
+  },
+  {
+    municipalitySlug: 'ca/los-angeles/long-beach',
+    countySlug: 'ca/los-angeles',
+    ballotId: '1653348',
+    ballotHashId:
+      'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb25FbGVjdGlvbi8xNjUzMzQ4',
+    hashId: '168fda',
+    positionSlug: 'city-legislature',
+    state: 'CA',
+    electionDate: '2025-12-04',
+    level: 'city',
+    subAreaName: 'District',
+    subAreaValue: '2',
+    data: {
+      position_name: 'Long Beach City Council - District 2',
+      state: 'CA',
+      race_id: 1653348,
+      is_primary: true,
+      is_judicial: false,
+      sub_area_name: 'District',
+      sub_area_value: '2',
+      filing_periods:
+        '[{\\"start_on\\"=>\\"2023-11-13\\",\\"end_on\\"=>\\"2023-12-08\\"}]',
+      election_day: '2024-03-05',
+      normalized_position_name: 'City Legislature',
+      level: 'city',
+      filing_date_start: '2023-11-13',
+      filing_date_end: '2023-12-08',
     },
   },
 ]
