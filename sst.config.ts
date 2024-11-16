@@ -54,16 +54,21 @@ export default $config({
         // PORT: '3000',
         PORT: '80',
         HOST: '0.0.0.0',
+        NODE_ENV: 'production',
+        LOG_LEVEL: 'debug',
+        CORS_ORIGIN:
+          $app.stage === 'production' ? 'goodparty.org' : 'dev.goodparty.org',
       },
-      // todo: use ssm for secrets.
       ssm: {
         // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
         //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
-        // CONTENTFUL_ACCESS_TOKEN:
-        //   'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
-
-        SECRETS:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:gp-api-develop-secrets-udgc2V',
+        CONTENTFUL_ACCESS_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
+        CONTENTFUL_SPACE_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_SPACE_ID-BvsxFz',
+        // todo: secrets for more stages.
+        DATABASE_URL:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
       },
       // todo: configure health checks.
       image: {
