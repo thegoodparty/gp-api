@@ -39,4 +39,9 @@ export class RacesController {
   remove(@Param('id') id: string) {
     return this.racesService.remove(+id)
   }
+
+  @Get()
+  seed() {
+    return this.racesService.seed()
+  }
 }
