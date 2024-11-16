@@ -9,8 +9,9 @@ sst/node_modules
 
 # SST specific
 .sst
-sst/.sst
+deploy/.sst
 .build
+sst-env.d.ts
 
 # Logs
 logs

@@ -1,4 +1,6 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
+import * as dotenv from 'dotenv'
+dotenv.config()
 
 export default $config({
   app(input) {
@@ -73,9 +75,11 @@ export default $config({
       image: {
         // context: "../", // Set the context to the main app directory
         // dockerfile: "deploy/Dockerfile",
-        // args: {
-        //   DOCKER_BUILDKIT: '0',
-        // },
+        args: {
+          // DOCKER_BUILDKIT: '1',
+          DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
+          DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
+        },
       },
       dev: {
         command: 'node --watch main.js',
