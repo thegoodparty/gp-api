@@ -54,21 +54,30 @@ export default $config({
         // PORT: '3000',
         PORT: '80',
         HOST: '0.0.0.0',
+        LOG_LEVEL: 'debug',
+        CORS_ORIGIN:
+          $app.stage === 'production' ? 'goodparty.org' : 'dev.goodparty.org',
       },
-      // todo: use ssm for secrets.
       ssm: {
         // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
         //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
         CONTENTFUL_ACCESS_TOKEN:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
+        CONTENTFUL_SPACE_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_SPACE_ID-BvsxFz',
+        // todo: secrets for more stages.
+        DATABASE_URL:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
       },
       // todo: configure health checks.
       image: {
         // context: "../", // Set the context to the main app directory
         // dockerfile: "deploy/Dockerfile",
-        // args: {
-        //   DOCKER_BUILDKIT: '0',
-        // },
+        args: {
+          // DOCKER_BUILDKIT: '1',
+          DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
+          DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
+        },
       },
       dev: {
         command: 'node --watch main.js',
