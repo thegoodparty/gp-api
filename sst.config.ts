@@ -54,7 +54,6 @@ export default $config({
         // PORT: '3000',
         PORT: '80',
         HOST: '0.0.0.0',
-        NODE_ENV: 'production',
         LOG_LEVEL: 'debug',
         CORS_ORIGIN:
           $app.stage === 'production' ? 'goodparty.org' : 'dev.goodparty.org',
