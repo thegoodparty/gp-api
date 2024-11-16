@@ -1,5 +1,4 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
-import * as dotenv from 'dotenv'
 
 export default $config({
   app(input) {
@@ -15,8 +14,6 @@ export default $config({
     }
   },
   async run() {
-    dotenv.config()
-
     const vpc =
       $app.stage === 'production'
         ? new sst.aws.Vpc('GP-VPC', {
