@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common'
 import { ContentService } from './content.service'
+import { ContentType } from '@prisma/client'
 
 @Controller('content')
 export class ContentController {
@@ -11,8 +12,13 @@ export class ContentController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.contentService.findOne(+id)
+  findById(@Param('id') id: string) {
+    return this.contentService.findById(id)
+  }
+
+  @Get('type/:type')
+  findByType(@Param('type') type: ContentType) {
+    return this.contentService.findByType(type)
   }
 
   @Get('sync')
