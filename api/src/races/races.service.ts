@@ -1,36 +1,97 @@
 import { Injectable } from '@nestjs/common'
-import { CreateRaceDto } from './dto/create-race.dto'
-import { UpdateRaceDto } from './dto/update-race.dto'
 import { PrismaService } from 'src/prisma/prisma.service'
 import {
   countiesSeedData,
-  CountyDataType,
   municipalitiesSeedData,
-  MunicipalityDataType,
   racesSeedData,
 } from './races.seed'
+import slugify from 'slugify'
+import * as moment from 'moment'
+
+import { Race } from '@prisma/client'
+
+interface ExtendedRace extends Race {
+  municipality?: any
+  county?: any
+  data: any
+}
 
 @Injectable()
 export class RacesService {
   constructor(private prisma: PrismaService) {}
-  create(createRaceDto: CreateRaceDto) {
-    return 'This action adds a new race'
-  }
 
-  findAll() {
-    return `This action returns all races`
-  }
+  async findOne(
+    state: string,
+    county: string,
+    city: string,
+    positionSlug: string,
+  ) {
+    let countyRecord
+    let cityRecord
+    if (county) {
+      const slug = `${slugify(state, { lower: true })}/${slugify(county, {
+        lower: true,
+      })}`
+      countyRecord = await this.prisma.county.findUnique({
+        where: { slug },
+      })
+    }
+    if (city && countyRecord) {
+      const slug = `${slugify(state, { lower: true })}/${slugify(county, {
+        lower: true,
+      })}/${slugify(city, {
+        lower: true,
+      })}`
+      cityRecord = await this.prisma.municipality.findUnique({
+        where: { slug },
+      })
+    }
+    const nextYear = moment().startOf('year').add(2, 'year').format('M D, YYYY')
 
-  findOne(id: number) {
-    return `This action returns a #${id} race`
-  }
+    const now = moment().format('M D, YYYY')
+    const query = {
+      state: state.toUpperCase(),
+      positionSlug,
+      electionDate: {
+        gte: new Date(now),
+        lt: new Date(nextYear),
+      },
+    }
+    if (city && cityRecord) {
+      query['municipalityId'] = cityRecord.id
+    } else if (countyRecord) {
+      query['countyId'] = countyRecord.id
+    }
+    const races = (await this.prisma.race.findMany({
+      where: query,
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })) as ExtendedRace[]
 
-  update(id: number, updateRaceDto: UpdateRaceDto) {
-    return `This action updates a #${id} race`
-  }
+    if (races.length === 0) {
+      return false
+    }
 
-  remove(id: number) {
-    return `This action removes a #${id} race`
+    const race = races[0]
+
+    const positions = []
+    for (let i = 0; i < races.length; i++) {
+      positions.push(races[i].data.position_name)
+    }
+
+    race.municipality = cityRecord
+    race.county = countyRecord
+
+    const cleanRace = this.filterRace(race, state)
+
+    const otherRaces = await this.getOtherRaces(race)
+
+    return {
+      race: cleanRace,
+      otherRaces,
+      positions,
+    }
   }
 
   async seed() {
@@ -88,5 +149,95 @@ export class RacesService {
       })
     }
     return 'race data is seeded'
+  }
+
+  private async getOtherRaces(race: {
+    municipality?: { id: string }
+    county?: { id: string }
+  }) {
+    let otherRaces = []
+
+    if (race.municipality) {
+      otherRaces = await this.prisma.race.findMany({
+        where: { municipalityId: race.municipality.id },
+        select: { data: true, hashId: true, positionSlug: true },
+      })
+    } else if (race.county) {
+      otherRaces = await this.prisma.race.findMany({
+        where: { countyId: race.county.id },
+        select: { data: true, hashId: true, positionSlug: true },
+      })
+    }
+
+    const dedups = {}
+    return otherRaces
+      .map((otherRace) => {
+        if (!dedups[otherRace.positionSlug]) {
+          dedups[otherRace.positionSlug] = true
+          return {
+            name: otherRace.data.normalized_position_name,
+            slug: otherRace.positionSlug,
+          }
+        }
+      })
+      .filter(Boolean)
+  }
+
+  private filterRace(race, state) {
+    const {
+      election_name,
+      position_name,
+      election_day,
+      level,
+      partisan_type,
+      salary,
+      employment_type,
+      filing_date_start,
+      filing_date_end,
+      normalized_position_name,
+      position_description,
+      frequency,
+      filing_office_address,
+      filing_phone_number,
+      paperwork_instructions,
+      filing_requirements,
+      eligibility_requirements,
+      is_runoff,
+      is_primary,
+    } = race.data as any
+
+    const filtered = {
+      hashId: race.hashId,
+      positionName: position_name,
+      // locationName: name,
+      electionDate: election_day,
+      electionName: election_name,
+      state,
+      level,
+      partisanType: partisan_type,
+      salary,
+      employmentType: employment_type,
+      filingDateStart: filing_date_start,
+      filingDateEnd: filing_date_end,
+      normalizedPositionName: normalized_position_name,
+      positionDescription: position_description,
+      frequency,
+      subAreaName: race.subAreaName,
+      subAreaValue: race.subAreaValue,
+      filingOfficeAddress: filing_office_address,
+      filingPhoneNumber: filing_phone_number,
+      paperworkInstructions: paperwork_instructions,
+      filingRequirements: filing_requirements,
+      eligibilityRequirements: eligibility_requirements,
+      isRunoff: is_runoff,
+      isPriamry: is_primary,
+      municipality: race.municipality
+        ? { name: race.municipality.name, slug: race.municipality.slug }
+        : null,
+      county: race.county
+        ? { name: race.county.name, slug: race.county.slug }
+        : null,
+    }
+    return filtered
   }
 }

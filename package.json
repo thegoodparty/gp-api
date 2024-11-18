@@ -11,5 +11,9 @@
     "build": "npm run build -w=api",
     "deploy:dev": "npm run deploy:dev -w=deploy",
     "migrate:dev": "npx prisma migrate dev --name"
+  },
+  "dependencies": {
+    "moment": "^2.30.1",
+    "slugify": "^1.6.6"
   }
 }

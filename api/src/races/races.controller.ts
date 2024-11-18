@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common'
 import { RacesService } from './races.service'
 import { CreateRaceDto } from './dto/create-race.dto'
@@ -15,29 +16,16 @@ import { UpdateRaceDto } from './dto/update-race.dto'
 export class RacesController {
   constructor(private readonly racesService: RacesService) {}
 
-  @Post()
-  create(@Body() createRaceDto: CreateRaceDto) {
-    return this.racesService.create(createRaceDto)
-  }
-
   @Get()
-  findAll() {
-    return this.racesService.findAll()
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.racesService.findOne(+id)
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateRaceDto: UpdateRaceDto) {
-    return this.racesService.update(+id, updateRaceDto)
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.racesService.remove(+id)
+  findRaces(
+    @Query('state') state?: string,
+    @Query('county') county?: string,
+    @Query('city') city?: string,
+    @Query('positionSlug') positionSlug?: string,
+  ) {
+    if (state && county && city && positionSlug) {
+      return this.racesService.findOne(state, county, city, positionSlug)
+    }
   }
 
   @Get('seed')

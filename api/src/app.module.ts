@@ -15,7 +15,7 @@ import { RacesModule } from './races/races.module'
     PrismaModule,
     ContentfulModule,
     JobsModule,
-    RacesModule
+    RacesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
