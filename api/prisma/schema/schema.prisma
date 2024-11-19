@@ -4,8 +4,13 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
+
+// enable prismaSchemaFolder feature
+
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl"]
+  previewFeatures = ["prismaSchemaFolder"]
 }
 
 datasource db {

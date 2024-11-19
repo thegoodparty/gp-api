@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ContentService } from './content.service'
 import { ContentController } from './content.controller'
-import { PrismaModule } from 'src/prisma/prisma.module'
+import { PrismaModule } from '../prisma/prisma.module'
 import { ContentfulModule } from '../contentful/contentful.module'
 import { Content } from '@prisma/client'
 

@@ -1,7 +1,17 @@
 # compiled output
-/dist
-/node_modules
-/build
+dist/
+api/dist
+
+# Node.js runtime environment
+node_modules
+nestjs/node_modules
+sst/node_modules
+
+# SST specific
+.sst
+deploy/.sst
+.build
+sst-env.d.ts
 
 # Logs
 logs
@@ -37,10 +47,12 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+sst/.env
+/nestjs/.env
+/nestjs/.env.development.local
+/nestjs/.env.test.local
+/nestjs/.env.production.local
+/nestjs/.env.local
 
 # temp directory
 .temp
