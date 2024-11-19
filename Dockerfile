@@ -35,7 +35,7 @@ WORKDIR /app
 
 # Copy only necessary files to the runtime image
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/api/dist ./dist
 COPY --from=builder /app/api/prisma/schema ./api/prisma/schema
 
 # Expose the application port
