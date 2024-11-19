@@ -1,18 +1,5 @@
-import {
-  ContentfulClientApi,
-  ContentfulCollection,
-  createClient,
-  DeletedEntry,
-  Entry,
-  EntryCollection,
-  EntrySkeletonType,
-  LocaleCode,
-} from 'contentful'
+import { createClient, DeletedEntry, Entry } from 'contentful'
 import { Injectable } from '@nestjs/common'
-import {
-  AddChainModifier,
-  ChainModifiers,
-} from 'contentful/dist/types/types/client'
 
 const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env
 
@@ -29,32 +16,20 @@ const CALLS = 8
 
 @Injectable()
 export class ContentfulService {
-  private parseEntries(entries: EntryCollection<EntrySkeletonType>[]) {
-    return entries.reduce((acc, entryCollection) => {
-      const rawItems = entryCollection.items
-
-      const items = contentfulClient.parseEntries(
-        entryCollection as EntryCollection<
-          EntrySkeletonType,
-          AddChainModifier<ChainModifiers, 'WITHOUT_LINK_RESOLUTION'>
-        >,
-      ).items
-      return acc.concat(items)
-    }, [])
-  }
-
   async getAllEntries(): Promise<Entry[]> {
-    const allEntries = []
+    const allEntryCollections = []
 
     for (let i = 0; i < CALLS; i++) {
-      const entries = await contentfulClient.getEntries({
+      const entryCollection = await contentfulClient.getEntries({
         limit: LIMIT,
         skip: i * LIMIT,
       })
-      allEntries.push(entries.items as Entry[])
+      allEntryCollections.push(entryCollection)
     }
 
-    return this.parseEntries(allEntries)
+    return allEntryCollections.reduce((acc, entryCollection) => {
+      return [...acc, ...entryCollection.items]
+    }, [] as Entry[])
   }
 
   async getSync(initial = false): Promise<{
@@ -66,9 +41,12 @@ export class ContentfulService {
       ...(initial || !nextSyncToken ? { initial: true } : { nextSyncToken }),
     })
     const { deletedEntries, nextSyncToken: newToken } = syncCollection
-    const entries = await this.getAllEntries()
     nextSyncToken = newToken
-    return { allEntries: entries, deletedEntries }
+
+    return {
+      allEntries: await this.getAllEntries(),
+      deletedEntries,
+    }
   }
 
   async getEntry(id: string) {
