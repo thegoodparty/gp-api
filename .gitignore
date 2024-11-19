@@ -1,6 +1,6 @@
 # compiled output
-/dist
-/nestjs/dist
+dist/
+api/dist
 
 # Node.js runtime environment
 node_modules
