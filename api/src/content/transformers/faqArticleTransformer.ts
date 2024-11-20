@@ -1,33 +1,8 @@
-import { ContentRaw, Transformer } from '../content.module'
-import { Content } from '@prisma/client'
-
-export type FaqArticleCategoryRaw = {
-  sys: {
-    id: string
-  }
-  fields: {
-    name: string
-    order?: number
-  }
-}
-
-type FaqArticleContentRawData = {
-  data: {
-    category?: FaqArticleCategoryRaw[]
-  }
-}
-
-export type FaqArticleContentRaw = ContentRaw<FaqArticleContentRawData>
-
-export type FaqArticleContentAugmented = Partial<Content> & {
-  category?: {
-    id: string
-    fields: {
-      name: string
-      order?: number
-    }
-  }
-}
+import {
+  FaqArticleContentAugmented,
+  FaqArticleContentRaw,
+  Transformer,
+} from '../content.types'
 
 export const faqArticleTransformer: Transformer = (
   content: FaqArticleContentRaw,

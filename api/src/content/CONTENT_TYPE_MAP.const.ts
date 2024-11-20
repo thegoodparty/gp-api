@@ -1,7 +1,7 @@
 import { ContentType } from '@prisma/client'
-import { Transformer } from './content.module'
 import { noOpTransformer } from './transformers/no-op-transformer'
 import { faqArticleTransformer } from './transformers/faqArticleTransformer'
+import { Transformer } from './content.types'
 
 export const CONTENT_TYPE_MAP: {
   [key: string]: { name: ContentType; transformer: Transformer }
