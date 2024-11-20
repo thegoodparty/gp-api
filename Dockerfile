@@ -1,5 +1,5 @@
 # Use the public.ecr.aws BuildKit image
-FROM public.ecr.aws/vend/moby/buildkit:buildx-stable-1 AS moby/buildkit:buildx-stable-1
+FROM public.ecr.aws/vend/moby/buildkit:buildx-stable-1 AS buildkit
 
 # Stage 1: Install dependencies and build application
 FROM public.ecr.aws/docker/library/node:22-alpine AS builder
