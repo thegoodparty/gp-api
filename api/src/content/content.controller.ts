@@ -22,9 +22,9 @@ export class ContentController {
   }
 
   @Get('sync')
-  async sync(@Query('seed') seed: boolean = false) {
+  async sync() {
     const { entries, createEntries, updateEntries, deletedEntries } =
-      await this.contentService.syncContent(seed)
+      await this.contentService.syncContent()
 
     return {
       entriesCount: entries.length,

@@ -32,15 +32,14 @@ export class ContentfulService {
     }, [] as Entry[])
   }
 
-  async getSync(initial = false): Promise<{
+  async getSync(): Promise<{
     allEntries: Entry[]
     deletedEntries: DeletedEntry[]
   }> {
-    const syncCollection = await contentfulClient.sync({
-      type: 'DeletedEntry',
-      ...(initial || !nextSyncToken ? { initial: true } : { nextSyncToken }),
-    })
-    const { deletedEntries, nextSyncToken: newToken } = syncCollection
+    const { deletedEntries, nextSyncToken: newToken } =
+      await contentfulClient.sync({
+        ...(!nextSyncToken ? { initial: true } : { nextSyncToken }),
+      })
     nextSyncToken = newToken
 
     return {

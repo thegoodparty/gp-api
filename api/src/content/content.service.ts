@@ -51,10 +51,7 @@ export class ContentService {
     )
   }
 
-  private async getSyncEntriesCategorized(allEntries: Entry[]) {
-    const recognizedEntries = allEntries.filter(
-      (entry) => CONTENT_TYPE_MAP[entry.sys.contentType.sys.id].name,
-    )
+  private async getSyncEntriesCategorized(recognizedEntries: Entry[]) {
     const entryIds = new Set(recognizedEntries.map((entry) => entry.sys.id))
     const existingContentIds = await this.getExistingContentIds()
     const existingEntries = existingContentIds.intersection(entryIds)
@@ -70,9 +67,9 @@ export class ContentService {
     }
   }
 
-  async syncContent(seed: boolean = false) {
+  async syncContent() {
     const { allEntries = [], deletedEntries = [] } =
-      await this.contentfulService.getSync(seed)
+      await this.contentfulService.getSync()
     const recognizedEntries = allEntries.filter((entry: Entry) =>
       Boolean(CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]),
     )
@@ -102,6 +99,8 @@ export class ContentService {
             },
           })
         }
+
+        console.log(`deletedEntryIds =>`, deletedEntryIds)
 
         await tx.content.deleteMany({
           where: {
