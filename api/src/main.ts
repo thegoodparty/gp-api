@@ -8,7 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import { AppModule } from './app.module'
-import { Logger } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 
@@ -26,6 +26,12 @@ const bootstrap = async () => {
             logger: { level: process.env.LOG_LEVEL },
           }
         : {}),
+    }),
+  )
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
     }),
   )
   app.setGlobalPrefix('v1')
