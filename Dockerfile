@@ -30,8 +30,8 @@ ENV DATABASE_URL=$DATABASE_URL
 
 # Generate Prisma client
 # Note: the CodeBuild project must be configured to be on the VPC.
-RUN npx prisma migrate deploy --schema=./api/prisma/schema/schema.prisma
-RUN npx prisma generate --schema=./api/prisma/schema/schema.prisma
+RUN npm run migrate:deploy
+RUN npm run generate
 
 # Build the application (output in /dist)
 RUN npm run build
