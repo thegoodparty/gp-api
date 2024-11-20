@@ -30,7 +30,15 @@ ENV DATABASE_URL=$DATABASE_URL
 
 # Generate Prisma client
 # Note: the CodeBuild project must be configured to be on the VPC.
-RUN npm run migrate:deploy
+
+ARG STAGE
+if [ "$STAGE" = "develop" ]; then
+RUN print "Running migration in develop stage"
+  RUN npm run migrate:deploy:dev
+else
+  RUN npm run migrate:deploy:prod
+fi
+
 RUN npm run generate
 
 # Build the application (output in /dist)
