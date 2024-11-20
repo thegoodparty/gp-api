@@ -5,6 +5,9 @@
     "api",
     "deploy"
   ],
+  "engines": {
+    "node": ">=22.11.0"
+  },
   "scripts": {
     "start": "npm run start -w=api",
     "start:dev": "npm run start:dev -w=api",
