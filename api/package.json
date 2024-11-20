@@ -15,6 +15,7 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint-format": "npm run lint && npm run format",
     "migrate:dev": "npx prisma migrate dev",
+    "migrate:deploy": "npx prisma migrate deploy",
     "prisma-format": "npx foreach -g \"prisma/schema/*.prisma\" -x \"npx prisma-case-format -c prisma/.prisma-case-format.yaml -f #{path}\""
   },
   "dependencies": {
