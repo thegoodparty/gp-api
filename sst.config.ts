@@ -69,10 +69,10 @@ export default $config({
         // todo: secrets for more stages.
         DATABASE_URL:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
-        DATABASE_USER:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_USER-r3RdQP',
-        DATABASE_PASSWORD:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_PASSWORD-oK78dZ',
+        // DATABASE_USER:
+        //   'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_USER-r3RdQP',
+        // DATABASE_PASSWORD:
+        //   'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_PASSWORD-oK78dZ',
       },
       image: {
         // context: "../", // Set the context to the main app directory
@@ -88,9 +88,28 @@ export default $config({
       },
     })
 
+    // this is the builtin sst aws postgres construct
+    // to customize things like storage autoscaling, encryption, multi-az, etc
+    // then we need to use the pulumi aws rds constructs.
+    // todo: make main and dev share the same database ?
+    const database = new sst.aws.Postgres('GP-API-DB', {
+      vpc,
+      database: 'gpdb',
+      instance: 't3.small', // m7g.large is latest generation.
+      storage: '100 GB',
+      username: 'gpuser',
+      version: '16.2', // 16.4 is the latest.
+      // specifying vpc subnet not necessary because it will use the private subnet in the vpc by default.
+      // vpc: { subenets: []}}
+      // if we have connection pool issues, we can turn on rds proxy.
+      // proxy: true
+    })
+
     // Could not get serverlessv2 with pulumi to work.
+    // also could not specify the vpc or subnets.
+
     // const rdsCluster = new aws.rds.Cluster('rdsCluster', {
-    //   clusterIdentifier: 'example',
+    //   clusterIdentifier: 'gp-api-db',
     //   engine: aws.rds.EngineType.AuroraPostgresql,
     //   engineMode: aws.rds.EngineMode.Provisioned,
     //   engineVersion: '16.2',
@@ -103,7 +122,9 @@ export default $config({
     //     maxCapacity: 1,
     //     minCapacity: 0.5,
     //   },
-    //   // vpcSecurityGroupIds:
+    // not sure how to get the vpc and subnets from the pulumi vpc construct.
+    // dbSubnetGroupName: vpc.privateSubnets.get().values[0].dbSubnetGroupName,
+    // vpcSecurityGroupIds:
     // })
 
     // const rdsInstance = new aws.rds.ClusterInstance('rdsInstance', {

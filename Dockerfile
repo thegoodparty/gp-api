@@ -19,7 +19,7 @@ RUN ls -la
 RUN npm install
 
 # Generate Prisma client
-# RUN npx prisma migrate deploy --schema=./api/prisma/schema/schema.prisma
+RUN npx prisma migrate deploy --schema=./api/prisma/schema/schema.prisma
 RUN npx prisma generate --schema=./api/prisma/schema/schema.prisma
 
 # Build the application (output in /dist)
