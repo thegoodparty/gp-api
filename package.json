@@ -9,6 +9,7 @@
     "start": "npm run start -w=api",
     "start:dev": "npm run start:dev -w=api",
     "build": "npm run build -w=api",
-    "deploy:dev": "npm run deploy:dev -w=deploy"
+    "deploy:dev": "npm run deploy:dev -w=deploy",
+    "migrate:deploy": "npm run migrate:deploy -w=api"
   }
 }
