@@ -13,7 +13,7 @@ import {
   Transformer,
 } from '../content.types'
 
-const blogArticleTransformer: Transformer = (
+export const blogArticleTransformer: Transformer = (
   rawContent: BlogArticleContentRaw,
 ): BlogArticleAugmented => {
   const {

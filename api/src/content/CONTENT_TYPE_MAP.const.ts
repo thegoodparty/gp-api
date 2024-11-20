@@ -2,6 +2,7 @@ import { ContentType } from '@prisma/client'
 import { noOpTransformer } from './transformers/no-op-transformer'
 import { faqArticleTransformer } from './transformers/faqArticleTransformer'
 import { Transformer } from './content.types'
+import { blogArticleTransformer } from './transformers/blogArticleTransformer'
 
 export const CONTENT_TYPE_MAP: {
   [key: string]: { name: ContentType; transformer: Transformer }
@@ -18,7 +19,10 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.articleCategory,
     transformer: noOpTransformer,
   },
-  blogArticle: { name: ContentType.blogArticle, transformer: noOpTransformer },
+  blogArticle: {
+    name: ContentType.blogArticle,
+    transformer: blogArticleTransformer,
+  },
   blogHome: { name: ContentType.blogHome, transformer: noOpTransformer },
   blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
   candidateTestimonial: {
