@@ -35,6 +35,7 @@ export default $config({
       domain = 'gp-api.goodparty.org'
     }
 
+    const dbUrl = new sst.Secret('DBURL')
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain,
@@ -79,8 +80,10 @@ export default $config({
         // dockerfile: "deploy/Dockerfile",
         args: {
           DOCKER_BUILDKIT: '1',
+          // CACHEBUST: '1',
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
+          DATABASE_URL: dbUrl.value,
         },
       },
       dev: {

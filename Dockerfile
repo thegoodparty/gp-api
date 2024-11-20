@@ -18,6 +18,11 @@ RUN ls -la
 
 RUN npm install
 
+# Set the docker build args into environment variables on runner.
+# ARG CACHEBUST
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
 # Generate Prisma client
 RUN npx prisma migrate deploy --schema=./api/prisma/schema/schema.prisma
 RUN npx prisma generate --schema=./api/prisma/schema/schema.prisma
