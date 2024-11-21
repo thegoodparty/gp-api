@@ -6,7 +6,58 @@ import {
   UpdateCampaignDto,
 } from './campaigns.dto'
 
-const buildQueryWhereClause = ({
+@Injectable()
+export class CampaignsService {
+  constructor(private prismaService: PrismaService) {}
+
+  async findAll(query: CampaignListQuery) {
+    let campaigns
+
+    if (Object.values(query).every((value) => !value)) {
+      // if values are empty get all campaigns
+      campaigns = await this.prismaService.campaign.findMany({
+        include: { user: true, pathToVictory: true },
+      })
+    } else {
+      const sql = buildCustomCampaignListQuery(query)
+      console.log(sql)
+      campaigns = await this.prismaService.$queryRawUnsafe(sql)
+    }
+
+    // TODO: still need this?
+    // const campaignVolunteersMapping = await CampaignVolunteer.find({
+    //   campaign: campaigns.map((campaign) => campaign.id),
+    // }).populate('user');
+    // campaigns = attachTeamMembers(campaigns, campaignVolunteersMapping)
+
+    return campaigns
+  }
+
+  findOne(query: any) {
+    return this.prismaService.campaign.findFirst({ where: query })
+  }
+
+  findById(id: number) {
+    return this.prismaService.campaign.findFirst({ where: { id } })
+  }
+
+  findBySlug(slug: string) {
+    return this.prismaService.campaign.findFirst({ where: { slug } })
+  }
+
+  create(createCampaignDto: CreateCampaignDto) {
+    return this.prismaService.campaign.create({ data: createCampaignDto })
+  }
+
+  update(id: number, updateCampaignDto: UpdateCampaignDto) {
+    return this.prismaService.campaign.update({
+      where: { id },
+      data: updateCampaignDto,
+    })
+  }
+}
+
+function buildQueryWhereClause({
   id,
   state,
   slug,
@@ -18,7 +69,8 @@ const buildQueryWhereClause = ({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}) => `
+}) {
+  return `
   ${id ? ` AND c.id = ${id}` : ''}
   ${slug ? ` AND c.slug ILIKE '%${slug}%'` : ''}
   ${email ? ` AND u.email ILIKE '%${email}%'` : ''}
@@ -51,8 +103,9 @@ const buildQueryWhereClause = ({
   }
   ${p2vStatus ? ` AND p.data->>'p2vStatus' = '${p2vStatus}'` : ''}
 `
+}
 
-const buildCustomCampaignListQuery = ({
+function buildCustomCampaignListQuery({
   id,
   state,
   slug,
@@ -64,7 +117,10 @@ const buildCustomCampaignListQuery = ({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}) => `
+}) {
+  console.log(generalElectionDateStart)
+
+  return `
   SELECT
     c.*,
     u.first_name as "first_name",
@@ -92,42 +148,29 @@ const buildCustomCampaignListQuery = ({
   })}
   ORDER BY c.id DESC;
 `
-
-@Injectable()
-export class CampaignsService {
-  constructor(private prismaService: PrismaService) {}
-
-  findAll(query: CampaignListQuery) {
-    if (Object.values(query).every((value) => !value)) {
-      // if values are empty get all campaigns
-      return this.prismaService.campaign.findMany()
-    } else {
-      const sql = buildCustomCampaignListQuery(query)
-
-      return this.prismaService.$queryRawUnsafe(sql)
-    }
-  }
-
-  findOne(query: any) {
-    return this.prismaService.campaign.findFirst({ where: query })
-  }
-
-  findById(id: number) {
-    return this.prismaService.campaign.findFirst({ where: { id } })
-  }
-
-  findBySlug(slug: string) {
-    return this.prismaService.campaign.findFirst({ where: { slug } })
-  }
-
-  create(createCampaignDto: CreateCampaignDto) {
-    return this.prismaService.campaign.create({ data: createCampaignDto })
-  }
-
-  update(id: number, updateCampaignDto: UpdateCampaignDto) {
-    return this.prismaService.campaign.update({
-      where: { id },
-      data: updateCampaignDto,
-    })
-  }
 }
+
+// TODO: still need this?
+// function attachTeamMembers(campaigns, campaignVolunteersMapping) {
+//   const teamMembersMap = campaignVolunteersMapping.reduce(
+//     (members, { user, campaign, role }) => {
+//       const teamMember = {
+//         ...user,
+//         role,
+//       }
+
+//       return {
+//         ...members,
+//         [campaign]: members[campaign]
+//           ? [...members[campaign], teamMember]
+//           : [teamMember],
+//       }
+//     },
+//     {},
+//   )
+
+//   return campaigns.map((campaign) => ({
+//     ...campaign,
+//     teamMembers: teamMembersMap[campaign.id] || [],
+//   }))
+// }

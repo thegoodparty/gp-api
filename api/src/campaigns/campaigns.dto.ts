@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
 import {
   IsString,
   IsNotEmpty,
@@ -6,8 +7,8 @@ import {
   IsEmail,
   IsOptional,
   IsNumber,
-  IsDate,
   IsIn,
+  IsDateString,
 } from 'class-validator'
 import { IsState } from 'src/shared/validations/isState'
 
@@ -59,33 +60,34 @@ export class CampaignListQuery {
 
   @ApiProperty()
   @IsOptional()
-  @IsDate()
+  @Transform(({ value }) => String(value).toUpperCase())
+  @IsIn(['LOCAL', 'CITY', 'COUNTY', 'STATE', 'FEDERAL'])
   level: string
 
   @ApiProperty()
   @IsOptional()
-  @IsDate()
-  primaryElectionDateStart: Date
+  @IsDateString()
+  primaryElectionDateStart: string
 
   @ApiProperty()
   @IsOptional()
-  @IsDate()
-  primaryElectionDateEnd: Date
+  @IsDateString()
+  primaryElectionDateEnd: string
 
   @ApiProperty()
   @IsOptional()
-  @IsIn(['active'])
+  @IsIn(['active', 'inactive'])
   campaignStatus: string
 
   @ApiProperty()
   @IsOptional()
-  @IsDate()
-  generalElectionDateStart: Date
+  @IsDateString()
+  generalElectionDateStart: string
 
   @ApiProperty()
   @IsOptional()
-  @IsDate()
-  generalElectionDateEnd: Date
+  @IsDateString()
+  generalElectionDateEnd: string
 
   @ApiProperty()
   @IsOptional()

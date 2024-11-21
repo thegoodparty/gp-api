@@ -10,8 +10,9 @@ import { faker } from '@faker-js/faker'
 import { deepMerge } from '../src/shared/helpers/objectHelper'
 import { STATE_CODES } from '../src/shared/constants/states'
 
-// TODO: need a schema enum for this?
+// TODO: need a schema enum for these?
 const LEVELS = ['LOCAL', 'CITY', 'COUNTY', 'STATE', 'FEDERAL']
+const P2V_STATUS = ['Waiting', 'Complete', 'Failed']
 
 export const userFactory = generateFactory<User>(() => ({
   id: faker.number.int({ max: 2147483647 }),
@@ -38,17 +39,15 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     didWin: undefined,
     dateVerified: undefined,
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
-    data: {
+    data: {},
+    details: {
+      state: faker.helpers.arrayElement(STATE_CODES),
+      ballotLevel: faker.helpers.arrayElement(LEVELS),
       electionDate: electionDate.toISOString().split('T')[0],
       primaryElectionDate: faker.date
         .past({ refDate: electionDate })
         .toISOString()
         .split('T')[0],
-      p2vStatus: 'Waiting',
-    },
-    details: {
-      state: faker.helpers.arrayElement(STATE_CODES),
-      ballotLevel: faker.helpers.arrayElement(LEVELS),
     },
     aiContent: {},
     vendorTsData: {},
@@ -61,13 +60,32 @@ export const pathToVictoryFactory = generateFactory<PathToVictory>(() => ({
   updatedAt: faker.date.anytime(),
   campaignId: faker.number.int(),
   data: {
-    foo: 'dc2f6c7c-ad6a-408b-9b6e-e273280b572d',
-    bar: 8466451537068032,
-    bike: 'd',
-    a: 'T',
-    b: 0.3825467659626156,
-    name: 'Jewel',
-    prop: '0b1',
+    p2vStatus: faker.helpers.arrayElement(P2V_STATUS),
+    // copy/pasted values below
+    men: '6988',
+    asian: 0,
+    white: 0,
+    women: '7917',
+    indies: '5030',
+    hispanic: 0,
+    voteGoal: 2705,
+    voterMap:
+      'https://www.google.com/maps/d/u/0/embed?mid=1d2eV6vp2ALJpVvFu_l_stWSr4Re6H8g&ehbc=2E312F',
+    budgetLow: 0,
+    democrats: '7113',
+    winNumber: 2604,
+    budgetHigh: 0,
+    finalVotes: '2894',
+    p2vComplete: '2024-02-26',
+    republicans: '2677',
+    allAvailVoters: '7432',
+    averageTurnout: 0,
+    africanAmerican: 0,
+    availVotersTo35: '1656',
+    voterProjection: 1131,
+    projectedTurnout: 5105,
+    voterContactGoal: 12076,
+    totalRegisteredVoters: 14820,
   },
 }))
 
