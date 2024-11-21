@@ -70,10 +70,6 @@ export default $config({
         // todo: secrets for more stages.
         DATABASE_URL:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
-        // DATABASE_USER:
-        //   'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_USER-r3RdQP',
-        // DATABASE_PASSWORD:
-        //   'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_PASSWORD-oK78dZ',
       },
       image: {
         // context: "../", // Set the context to the main app directory
@@ -83,7 +79,8 @@ export default $config({
           // CACHEBUST: '1',
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
-          DATABASE_URL: dbUrl.value,
+          DATABASE_URL: dbUrl.value, // so we can run migrations.
+          STAGE: $app.stage,
         },
       },
       dev: {

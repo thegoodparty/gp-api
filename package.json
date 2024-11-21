@@ -9,10 +9,13 @@
     "node": ">=22.11.0"
   },
   "scripts": {
-    "start": "npm run start -w=api",
-    "start:dev": "npm run start:dev -w=api",
-    "build": "npm run build -w=api",
-    "deploy:dev": "npm run deploy:dev -w=deploy",
-    "migrate:deploy": "npm run migrate:deploy -w=api"
+    "start": "npm run start --prefix api",
+    "start:dev": "npm run start:dev --prefix api",
+    "build": "npm run build --prefix api",
+    "migrate:dev": "npm run migrate:dev --prefix api",
+    "migrate:deploy": "npm run migrate:deploy --prefix api",
+    "migrate:reset": "npm run migrate:reset --prefix api",
+    "generate": "npm run generate --prefix api",
+    "deploy:dev": "npm run deploy:dev -w=deploy"
   }
 }
