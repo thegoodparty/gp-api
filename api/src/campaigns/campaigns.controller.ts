@@ -27,7 +27,16 @@ export class CampaignsController {
 
   @Get(':id')
   async findOne(@Param('id', ParseIntPipe) id: number) {
-    const campaign = await this.campaignsService.findOne(id)
+    const campaign = await this.campaignsService.findById(id)
+
+    if (!campaign) throw new NotFoundException()
+
+    return campaign
+  }
+
+  @Get('slug/:slug')
+  async findBySlug(@Param('slug') slug: string) {
+    const campaign = await this.campaignsService.findBySlug(slug)
 
     if (!campaign) throw new NotFoundException()
 

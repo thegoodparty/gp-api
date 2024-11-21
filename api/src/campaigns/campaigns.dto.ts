@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsNumber,
   IsDate,
+  IsIn,
 } from 'class-validator'
 import { IsState } from 'src/shared/validations/isState'
 
@@ -73,7 +74,7 @@ export class CampaignListQuery {
 
   @ApiProperty()
   @IsOptional()
-  @IsString()
+  @IsIn(['active'])
   campaignStatus: string
 
   @ApiProperty()
