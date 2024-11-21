@@ -4,22 +4,29 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseIntPipe,
   Post,
+  Put,
+  Query,
 } from '@nestjs/common'
 import { CampaignsService } from './campaigns.service'
-import { CreateCampaignDto, GetCampaignParams } from './campaigns.dto'
+import {
+  CampaignListQuery,
+  CreateCampaignDto,
+  UpdateCampaignDto,
+} from './campaigns.dto'
 
 @Controller('campaigns')
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
   @Get()
-  getCampaigns() {
-    return this.campaignsService.findAll()
+  findAll(@Query() query: CampaignListQuery) {
+    return this.campaignsService.findAll(query)
   }
 
   @Get(':id')
-  async getCampaign(@Param() { id }: GetCampaignParams) {
+  async findOne(@Param('id', ParseIntPipe) id: number) {
     const campaign = await this.campaignsService.findOne(id)
 
     if (!campaign) throw new NotFoundException()
@@ -28,18 +35,18 @@ export class CampaignsController {
   }
 
   @Post()
-  async createCampaign(@Body() createCampaignDto: CreateCampaignDto) {
+  async create(@Body() createCampaignDto: CreateCampaignDto) {
     const campaign = await this.campaignsService.create(createCampaignDto)
     return campaign
   }
 
-  // @Put(':id')
-  // updateCampaign(
-  //   @Param('id', ParseIntPipe) id: number,
-  //   @Body() campaign: Partial<Campaign>,
-  // ) {
-  //   return `Updated: ${id} - ${campaign}`
-  // }
+  @Put(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateCampaignDto: UpdateCampaignDto,
+  ) {
+    return await this.campaignsService.update(id, updateCampaignDto)
+  }
 
   // @Delete(':id')
   // deleteCampaign(@Param('id', ParseIntPipe) id: number) {

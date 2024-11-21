@@ -12,6 +12,11 @@ generator client {
   // previewFeatures = ["prismaSchemaFolder"]
 }
 
+generator fakeData {
+  provider = "prisma-generator-fake-data"
+  output   = "./faker.ts"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -100,12 +105,17 @@ model Campaign {
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
   slug                  String                  @unique
+  /// FAKE:faker.datatype.boolean(0.5)
   isActive              Boolean?                @map("is_active")
+  /// FAKE:faker.datatype.boolean(0.5)
   isVerified            Boolean?                @map("is_verified")
+  /// FAKE:faker.datatype.boolean(0.5)
   isPro                 Boolean?                @default(false) @map("is_pro")
+  /// FAKE:faker.datatype.boolean(0.1)
   isDemo                Boolean                 @default(false) @map("is_demo")
   didWin                Boolean?                @map("did_win")
   dateVerified          DateTime?               @map("date_verified")
+  /// FAKE:faker.helpers.arrayElement([CampaignTier.WIN, CampaignTier.LOSE, CampaignTier.TOSSUP])
   tier                  CampaignTier?
   data                  Json                    @default("{}") @db.JsonB
   details               Json                    @default("{}") @db.JsonB

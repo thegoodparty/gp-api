@@ -13,6 +13,7 @@
     "migrate:deploy": "npm run migrate:deploy --prefix api",
     "migrate:reset": "npm run migrate:reset --prefix api",
     "generate": "npm run generate --prefix api",
+    "prisma-format": "npm run prisma-format --prefix api",
     "deploy:dev": "npm run deploy:dev -w=deploy"
   }
 }
