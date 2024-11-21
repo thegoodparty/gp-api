@@ -4,11 +4,17 @@ import { ContentfulService } from '../contentful/contentful.service'
 import { Content, ContentType } from '@prisma/client'
 import { InputJsonObject } from '@prisma/client/runtime/library'
 import { Entry } from 'contentful'
-import { CONTENT_TYPE_MAP } from './CONTENT_TYPE_MAP.const'
+import {
+  CONTENT_TYPE_MAP,
+  InferredContentTypes,
+} from './CONTENT_TYPE_MAP.const'
 
-const transformContent = (entry: Content) => {
-  const transformer = CONTENT_TYPE_MAP[entry.type]?.transformer
-  return transformer ? transformer(entry) : entry
+const transformContent = (
+  type: ContentType | InferredContentTypes,
+  entries: Content[],
+) => {
+  const transformer = CONTENT_TYPE_MAP[type]?.transformer
+  return transformer ? transformer(entries) : entries
 }
 
 @Injectable()
@@ -30,13 +36,17 @@ export class ContentService {
     })
   }
 
-  async findByType(type: ContentType) {
+  async findByType(type: ContentType | InferredContentTypes) {
+    const queryType =
+      CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
+
     const entries = await this.prisma.content.findMany({
       where: {
-        type,
+        type: queryType,
       },
     })
-    return entries.map(transformContent)
+
+    return transformContent(type, entries)
   }
 
   private async getExistingContentIds() {

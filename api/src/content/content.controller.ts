@@ -1,6 +1,16 @@
-import { Controller, Get, Param, Query } from '@nestjs/common'
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Param,
+  Query,
+} from '@nestjs/common'
 import { ContentService } from './content.service'
 import { ContentType } from '@prisma/client'
+import {
+  CONTENT_TYPE_MAP,
+  InferredContentTypes,
+} from './CONTENT_TYPE_MAP.const'
 
 @Controller('content')
 export class ContentController {
@@ -17,7 +27,10 @@ export class ContentController {
   }
 
   @Get('type/:type')
-  findByType(@Param('type') type: ContentType) {
+  findByType(@Param('type') type: ContentType | InferredContentTypes) {
+    if (!CONTENT_TYPE_MAP[type]) {
+      throw new BadRequestException(`${type} is not a valid content type`)
+    }
     return this.contentService.findByType(type)
   }
 

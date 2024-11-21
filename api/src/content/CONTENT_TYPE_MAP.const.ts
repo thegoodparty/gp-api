@@ -1,11 +1,19 @@
 import { ContentType } from '@prisma/client'
 import { noOpTransformer } from './transformers/no-op-transformer'
 import { faqArticleTransformer } from './transformers/faqArticleTransformer'
-import { Transformer } from './content.types'
 import { blogArticleTransformer } from './transformers/blogArticleTransformer'
+import { articleTagsTransformer } from './transformers/articleTagsTransformer'
+
+export enum InferredContentTypes {
+  articleTag = 'articleTag',
+}
 
 export const CONTENT_TYPE_MAP: {
-  [key: string]: { name: ContentType; transformer: Transformer }
+  [key in ContentType | InferredContentTypes]: {
+    name: ContentType | InferredContentTypes
+    transformer: any
+    inferredFrom?: ContentType
+  }
 } = {
   aiChatPrompt: {
     name: ContentType.aiChatPrompt,
@@ -18,6 +26,11 @@ export const CONTENT_TYPE_MAP: {
   articleCategory: {
     name: ContentType.articleCategory,
     transformer: noOpTransformer,
+  },
+  articleTag: {
+    name: InferredContentTypes.articleTag,
+    transformer: articleTagsTransformer,
+    inferredFrom: ContentType.blogArticle,
   },
   blogArticle: {
     name: ContentType.blogArticle,

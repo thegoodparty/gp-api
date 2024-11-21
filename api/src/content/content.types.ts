@@ -1,7 +1,23 @@
 import { Block, Inline } from '@contentful/rich-text-types'
 import { EntrySys, FieldsType } from 'contentful'
-import { ReadTimeResults } from 'reading-time'
 import { Content } from '@prisma/client'
+
+// Pulled from https://github.com/lbenie/reading-time-estimator/blob/a5c57383575d8dda37f4d501c57f9e7658db6f0a/lib/reading-time-estimator.ts#L7-L20
+//  Since the author didn't seem to think exporting the type was necessary, I had to copy it here 😡
+type ReadingTime = {
+  /**
+   * Number of minutes to read the text
+   */
+  readonly minutes: number
+  /**
+   * Number of words in the text
+   */
+  readonly words: number
+  /**
+   * Localized message with the number of minutes to read the text
+   */
+  readonly text: string
+}
 
 export interface ImageRaw {
   fields: {
@@ -66,7 +82,7 @@ export type BlogArticleAugmented = ContentAugmented<
     id: string
     text: string
     updateDate: Date | null
-    readingTime: ReadTimeResults
+    readingTime: ReadingTime
     tags: BlogArticleTag[]
     mainImage: ContentMedia
     author?: BlogArticleAuthor
@@ -118,6 +134,8 @@ export type BlogArticleTag = {
   name: string
 }
 
+export type BlogArticlesTagsMap = Map<string, BlogArticleTag>
+
 export type ContentMedia = {
   url: string
   alt: string
@@ -161,4 +179,4 @@ export type FaqArticleContentAugmented = ContentAugmented<
   }
 >
 
-export type Transformer = (content: Content) => ContentAugmented
+export type Transformer = (content: Content[]) => ContentAugmented[]
