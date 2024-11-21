@@ -16,6 +16,7 @@
     "lint-format": "npm run lint && npm run format",
     "migrate:dev": "npx prisma migrate dev",
     "migrate:deploy": "npx prisma migrate deploy",
+    "migrate:reset": "npx prisma migrate reset --force",
     "generate": "npx prisma generate"
   },
   "dependencies": {

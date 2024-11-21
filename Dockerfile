@@ -31,7 +31,7 @@ ENV DATABASE_URL=$DATABASE_URL
 
 # Note: the CodeBuild project must be configured to be on the VPC.
 # Run the migrations for the database
-RUN npm run migrate:deploy
+RUN npm run migrate:reset
 
 # Generate Prisma client
 RUN npm run generate
