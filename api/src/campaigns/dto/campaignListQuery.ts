@@ -2,8 +2,6 @@ import { ApiProperty } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
 import {
   IsString,
-  IsNotEmpty,
-  IsBoolean,
   IsEmail,
   IsOptional,
   IsNumber,
@@ -11,31 +9,6 @@ import {
   IsDateString,
 } from 'class-validator'
 import { IsState } from 'src/shared/validations/isState'
-
-export class CreateCampaignDto {
-  @IsString()
-  @IsNotEmpty()
-  @ApiProperty()
-  slug: string
-
-  @IsBoolean()
-  @ApiProperty()
-  isDemo: boolean = false
-
-  @IsBoolean()
-  @ApiProperty()
-  isActive: boolean = false
-}
-
-export class UpdateCampaignDto {
-  @IsBoolean()
-  @ApiProperty()
-  isDemo: boolean
-
-  @IsBoolean()
-  @ApiProperty()
-  isActive: boolean
-}
 
 export class CampaignListQuery {
   @ApiProperty()

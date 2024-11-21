@@ -1,10 +1,8 @@
 import { PrismaClient } from '@prisma/client'
-import {
-  campaignFactory,
-  campaignUpdateHistoryFactory,
-  pathToVictoryFactory,
-  userFactory,
-} from './factories'
+import { campaignFactory } from './factories/campaign.factory'
+import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
+import { userFactory } from './factories/user.factory'
+import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 
 const NUM_CAMPAIGNS = 20
 const NUM_UPDATE_HISTORY = 3

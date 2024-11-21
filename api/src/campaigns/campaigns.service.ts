@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import {
-  CampaignListQuery,
-  CreateCampaignDto,
-  UpdateCampaignDto,
-} from './campaigns.dto'
+import { UpdateCampaignDto } from './dto/updateCampaignDto'
+import { CampaignListQuery } from './dto/campaignListQuery'
+import { CreateCampaignDto } from './dto/createCampaignDto'
 
 @Injectable()
 export class CampaignsService {
@@ -20,7 +18,6 @@ export class CampaignsService {
       })
     } else {
       const sql = buildCustomCampaignListQuery(query)
-      console.log(sql)
       campaigns = await this.prismaService.$queryRawUnsafe(sql)
     }
 

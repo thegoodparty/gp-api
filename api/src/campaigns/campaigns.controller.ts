@@ -10,11 +10,9 @@ import {
   Query,
 } from '@nestjs/common'
 import { CampaignsService } from './campaigns.service'
-import {
-  CampaignListQuery,
-  CreateCampaignDto,
-  UpdateCampaignDto,
-} from './campaigns.dto'
+import { UpdateCampaignDto } from './dto/updateCampaignDto'
+import { CreateCampaignDto } from './dto/createCampaignDto'
+import { CampaignListQuery } from './dto/campaignListQuery'
 
 @Controller('campaigns')
 export class CampaignsController {
