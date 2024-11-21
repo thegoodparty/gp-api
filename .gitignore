@@ -1,6 +1,7 @@
 # compiled output
 dist/
 api/dist
+api/prisma/faker
 
 # Node.js runtime environment
 node_modules
