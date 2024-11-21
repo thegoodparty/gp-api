@@ -32,12 +32,8 @@ ENV DATABASE_URL=$DATABASE_URL
 # Note: the CodeBuild project must be configured to be on the VPC.
 
 ARG STAGE
-if [ "$STAGE" = "develop" ]; then
-RUN print "Running migration in develop stage"
-  RUN npm run migrate:deploy:dev
-else
-  RUN npm run migrate:deploy:prod
-fi
+# TODO: make sure we migrate for appropriate stage.
+RUN npm run migrate:deploy:dev
 
 RUN npm run generate
 
