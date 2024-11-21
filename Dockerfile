@@ -25,16 +25,15 @@ RUN npm install
 # ARG CACHEBUST
 
 # Set the docker build args into environment variables on runner.
+ARG STAGE
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 
-# Generate Prisma client
 # Note: the CodeBuild project must be configured to be on the VPC.
+# Run the migrations for the database
+RUN npm run migrate:deploy
 
-ARG STAGE
-# TODO: make sure we migrate for appropriate stage.
-RUN npm run migrate:deploy:dev
-
+# Generate Prisma client
 RUN npm run generate
 
 # Build the application (output in /dist)
@@ -52,7 +51,7 @@ WORKDIR /app
 # Copy only necessary files to the runtime image
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/api/dist ./dist
-COPY --from=builder /app/api/prisma/schema ./api/prisma/schema
+COPY --from=builder /app/api/prisma ./api/prisma
 
 # Expose the application port
 # EXPOSE 3000
