@@ -69,9 +69,9 @@ const buildCustomCampaignListQuery = ({
     c.*,
     u.first_name as "first_name",
     u.last_name as "last_name",
-    -- u.phone as "phone",
+    u.phone as "phone",
     u.email as "email",
-    -- u."metaData",
+    u.meta_data,
     p.data as "pathToVictory"
   FROM public.campaign AS c
   JOIN public.user AS u ON u.id = c.user_id
@@ -103,8 +103,6 @@ export class CampaignsService {
       return this.prismaService.campaign.findMany()
     } else {
       const sql = buildCustomCampaignListQuery(query)
-
-      console.log('SEARCH', sql)
 
       return this.prismaService.$queryRawUnsafe(sql)
     }

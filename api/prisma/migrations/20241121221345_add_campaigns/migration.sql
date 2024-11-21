@@ -13,7 +13,7 @@ CREATE TABLE "user" (
     "last_name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
-    "metaData" JSONB NOT NULL,
+    "meta_data" JSONB NOT NULL,
 
     CONSTRAINT "user_pkey" PRIMARY KEY ("id")
 );

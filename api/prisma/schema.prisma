@@ -25,7 +25,7 @@ model User {
   lastName              String                  @map("last_name")
   email                 String
   phone                 String
-  metaData              Json                    @db.JsonB
+  metaData              Json                    @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
   campaign              Campaign[]
 
