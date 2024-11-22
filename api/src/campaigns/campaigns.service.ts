@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { UpdateCampaignDto } from './dto/updateCampaignDto'
-import { CampaignListQuery } from './dto/campaignListQuery'
-import { CreateCampaignDto } from './dto/createCampaignDto'
+import { UpdateCampaignDto } from './dto/updateCampaign.dto'
+import { CampaignListDto } from './dto/campaignList.dto'
+import { CreateCampaignDto } from './dto/createCampaign.dto'
 
 @Injectable()
 export class CampaignsService {
   constructor(private prismaService: PrismaService) {}
 
-  async findAll(query: CampaignListQuery) {
+  async findAll(query: CampaignListDto) {
     let campaigns
 
     if (Object.values(query).every((value) => !value)) {

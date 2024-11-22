@@ -10,16 +10,16 @@ import {
   Query,
 } from '@nestjs/common'
 import { CampaignsService } from './campaigns.service'
-import { UpdateCampaignDto } from './dto/updateCampaignDto'
-import { CreateCampaignDto } from './dto/createCampaignDto'
-import { CampaignListQuery } from './dto/campaignListQuery'
+import { UpdateCampaignDto } from './dto/updateCampaign.dto'
+import { CreateCampaignDto } from './dto/createCampaign.dto'
+import { CampaignListDto } from './dto/campaignList.dto'
 
 @Controller('campaigns')
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
   @Get()
-  findAll(@Query() query: CampaignListQuery) {
+  findAll(@Query() query: CampaignListDto) {
     return this.campaignsService.findAll(query)
   }
 

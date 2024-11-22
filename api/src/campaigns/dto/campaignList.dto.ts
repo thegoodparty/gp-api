@@ -10,7 +10,7 @@ import {
 } from 'class-validator'
 import { IsState } from 'src/shared/validations/isState'
 
-export class CampaignListQuery {
+export class CampaignListDto {
   @ApiProperty()
   @IsOptional()
   @IsNumber()
