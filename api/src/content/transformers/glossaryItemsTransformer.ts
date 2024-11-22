@@ -1,23 +1,6 @@
-import { ContentAugmented, ContentRaw } from '../content.types'
-import { Content } from '@prisma/client'
-import { FieldsType } from 'contentful'
+import { GlossaryItemAugmented, GlossaryItemRaw } from '../content.types'
 import slugify from 'slugify'
 import { transformContentMedia } from '../util/transformContentMedia.util'
-
-type GlossaryItemRawData = {
-  data: FieldsType & {
-    title: string
-  }
-}
-
-type GlossaryItemRaw = ContentRaw<GlossaryItemRawData>
-
-type GlossaryItemAugmented = ContentAugmented<
-  Partial<Content> & {
-    slug: string
-  }
-> &
-  FieldsType
 
 export const glossaryItemsTransformer = (
   glossaryItems: GlossaryItemRaw[],
