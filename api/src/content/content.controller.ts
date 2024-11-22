@@ -26,6 +26,11 @@ export class ContentController {
     return this.contentService.findById(id)
   }
 
+  @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}`)
+  findGlossaryItems() {
+    return this.contentService.fetchGlossaryItems()
+  }
+
   @Get('type/:type')
   findByType(@Param('type') type: ContentType | InferredContentTypes) {
     if (!CONTENT_TYPE_MAP[type]) {

@@ -4,7 +4,7 @@ import {
   Transformer,
 } from '../content.types'
 
-export const faqArticleTransformer: Transformer = (
+export const faqArticlesTransformer: Transformer = (
   content: FaqArticleContentRaw[],
 ) =>
   content.map((entry: FaqArticleContentRaw): FaqArticleContentAugmented => {

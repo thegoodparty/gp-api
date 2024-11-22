@@ -14,7 +14,7 @@ import {
 import { Content } from '@prisma/client'
 import { readingTime } from 'reading-time-estimator'
 
-export const blogArticleTransformer: Transformer = (
+export const blogArticlesTransformer: Transformer = (
   content: Content[],
 ): BlogArticleAugmented[] =>
   content.map((rawContent: BlogArticleContentRaw): BlogArticleAugmented => {

@@ -1,8 +1,9 @@
 import { ContentType } from '@prisma/client'
 import { noOpTransformer } from './transformers/no-op-transformer'
-import { faqArticleTransformer } from './transformers/faqArticleTransformer'
-import { blogArticleTransformer } from './transformers/blogArticleTransformer'
+import { faqArticlesTransformer } from './transformers/faqArticlesTransformer'
+import { blogArticlesTransformer } from './transformers/blogArticlesTransformer'
 import { articleTagsTransformer } from './transformers/articleTagsTransformer'
+import { glossaryItemsTransformer } from './transformers/glossaryItemsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -34,7 +35,7 @@ export const CONTENT_TYPE_MAP: {
   },
   blogArticle: {
     name: ContentType.blogArticle,
-    transformer: blogArticleTransformer,
+    transformer: blogArticlesTransformer,
   },
   blogHome: { name: ContentType.blogHome, transformer: noOpTransformer },
   blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
@@ -45,12 +46,12 @@ export const CONTENT_TYPE_MAP: {
   election: { name: ContentType.election, transformer: noOpTransformer },
   faqArticle: {
     name: ContentType.faqArticle,
-    transformer: faqArticleTransformer,
+    transformer: faqArticlesTransformer,
   },
   faqOrder: { name: ContentType.faqOrder, transformer: noOpTransformer },
   glossaryItem: {
     name: ContentType.glossaryItem,
-    transformer: noOpTransformer,
+    transformer: glossaryItemsTransformer,
   },
   goodPartyTeamMembers: {
     name: ContentType.goodPartyTeamMembers,

@@ -49,6 +49,15 @@ export class ContentService {
     return transformContent(type, entries)
   }
 
+  async fetchGlossaryItems() {
+    const entries = await this.prisma.content.findMany({
+      where: {
+        type: ContentType.glossaryItem,
+      },
+    })
+    return transformContent(ContentType.glossaryItem, entries)
+  }
+
   private async getExistingContentIds() {
     return new Set(
       (

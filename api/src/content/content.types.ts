@@ -5,17 +5,8 @@ import { Content } from '@prisma/client'
 // Pulled from https://github.com/lbenie/reading-time-estimator/blob/a5c57383575d8dda37f4d501c57f9e7658db6f0a/lib/reading-time-estimator.ts#L7-L20
 //  Since the author didn't seem to think exporting the type was necessary, I had to copy it here 😡
 type ReadingTime = {
-  /**
-   * Number of minutes to read the text
-   */
   readonly minutes: number
-  /**
-   * Number of words in the text
-   */
   readonly words: number
-  /**
-   * Localized message with the number of minutes to read the text
-   */
   readonly text: string
 }
 
