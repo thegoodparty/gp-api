@@ -1,16 +1,14 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Param,
-  Query,
-} from '@nestjs/common'
+import { BadRequestException, Controller, Get, Param } from '@nestjs/common'
 import { ContentService } from './content.service'
 import { ContentType } from '@prisma/client'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
+import {
+  groupGlossaryItemsByAlpha,
+  mapGlossaryItemsToSlug,
+} from './util/glossaryItems.util'
 
 @Controller('content')
 export class ContentController {
@@ -27,8 +25,24 @@ export class ContentController {
   }
 
   @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}`)
-  findGlossaryItems() {
+  getGlossaryItems() {
     return this.contentService.fetchGlossaryItems()
+  }
+
+  // TODO: This endpoint shouldn't be needed: https://goodparty.atlassian.net/browse/WEB-3374
+  @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}/by-letter`)
+  async getGlossaryItemsGroupedByAlpha() {
+    return groupGlossaryItemsByAlpha(
+      await this.contentService.fetchGlossaryItems(),
+    )
+  }
+
+  // TODO: This endpoint shouldn't be needed: https://goodparty.atlassian.net/browse/WEB-3374
+  @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}/by-slug`)
+  async getGlossaryItemsMappedBySlug() {
+    return mapGlossaryItemsToSlug(
+      await this.contentService.fetchGlossaryItems(),
+    )
   }
 
   @Get('type/:type')
