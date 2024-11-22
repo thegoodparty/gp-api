@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { UpdateCampaignDto } from './dto/updateCampaign.dto'
-import { CampaignListDto } from './dto/campaignList.dto'
-import { CreateCampaignDto } from './dto/createCampaign.dto'
+import { UpdateCampaignBody } from './schemas/updateCampaign.schema'
+import { CampaignListQuery } from './schemas/campaignList.schema'
+import { CreateCampaignBody } from './schemas/createCampaign.schema'
 import { Prisma } from '@prisma/client'
 import { deepMerge } from 'src/shared/helpers/objectHelper'
 
@@ -11,7 +11,7 @@ export class CampaignsService {
   constructor(private prismaService: PrismaService) {}
 
   async findAll(
-    query: CampaignListDto,
+    query: CampaignListQuery,
     include: Prisma.CampaignInclude = {
       user: true,
       pathToVictory: true,
@@ -50,7 +50,7 @@ export class CampaignsService {
     })
   }
 
-  async create(createCampaignDto: CreateCampaignDto) {
+  async create(body: CreateCampaignBody) {
     // TODO: get user from request
     // const { user } = this.req;
     // const userName = await sails.helpers.user.name(user);
@@ -70,7 +70,7 @@ export class CampaignsService {
 
     const newCampaign = await this.prismaService.campaign.create({
       data: {
-        ...createCampaignDto,
+        ...body,
         isActive: false,
         // TODO: pull from request user
         // userId:
@@ -78,7 +78,7 @@ export class CampaignsService {
         //   zip: user.zip,
         // },
         data: {
-          slug: createCampaignDto.slug,
+          slug: body.slug,
           currentStep: 'registration',
         },
       },
@@ -91,58 +91,62 @@ export class CampaignsService {
     return newCampaign
   }
 
-  async update(id: number, updateCampaignDto: UpdateCampaignDto) {
-    const { data, details, pathToVictory } = updateCampaignDto
+  async update(id: number, body: UpdateCampaignBody) {
+    const { data, details, pathToVictory } = body
 
-    const campaign = await this.prismaService.campaign.findFirst({
-      where: { id },
-      include: { pathToVictory: true },
-    })
+    return this.prismaService.$transaction(async (tx) => {
+      const campaign = await tx.campaign.findFirst({
+        where: { id },
+        include: { pathToVictory: true },
+      })
 
-    if (!campaign) return false
+      if (!campaign) return false
 
-    const updateData = {
-      data: deepMerge(campaign.data as object, data),
-      details: deepMerge(campaign.details as object, details),
-    }
+      const updateData = {
+        data: data ? deepMerge(campaign.data as object, data) : undefined,
+        details: details
+          ? deepMerge(campaign.details as object, details)
+          : undefined,
+      }
 
-    if (pathToVictory && campaign.pathToVictory) {
-      /// TODO:
-      // if (pathToVictory.hasOwnProperty('viability')) {
-      //   await updateViability(campaign, columnKey2, value)
-      // } else {
-      //   await updatePathToVictory(campaign, columnKey, value)
+      if (pathToVictory && campaign.pathToVictory) {
+        /// TODO:
+        // if (pathToVictory.hasOwnProperty('viability')) {
+        //   await updateViability(campaign, columnKey2, value)
+        // } else {
+        //   await updatePathToVictory(campaign, columnKey, value)
+        // }
+
+        updateData['pathToVictory'] = {
+          update: {
+            data: {
+              data: deepMerge(
+                campaign.pathToVictory.data as object,
+                pathToVictory,
+              ),
+            },
+          },
+        }
+      }
+
+      // TODO:
+      // try {
+      //   await sails.helpers.crm.updateCampaign(updated)
+      // } catch (e) {
+      //   sails.helpers.log(campaign.slug, 'error updating crm', e)
       // }
 
-      updateData['pathToVictory'] = {
-        update: {
-          data: {
-            data: deepMerge(
-              campaign.pathToVictory.data as object,
-              pathToVictory,
-            ),
-          },
-        },
-      }
-    }
+      // try {
+      //   await sails.helpers.fullstory.customAttr(user.id)
+      // } catch (e) {
+      //   sails.helpers.log(campaign.slug, 'error updating fullstory', e)
+      // }
 
-    // TODO:
-    // try {
-    //   await sails.helpers.crm.updateCampaign(updated)
-    // } catch (e) {
-    //   sails.helpers.log(campaign.slug, 'error updating crm', e)
-    // }
-
-    // try {
-    //   await sails.helpers.fullstory.customAttr(user.id)
-    // } catch (e) {
-    //   sails.helpers.log(campaign.slug, 'error updating fullstory', e)
-    // }
-
-    return this.prismaService.campaign.update({
-      where: { id: campaign.id },
-      data: updateData,
-      include: { pathToVictory: true },
+      return tx.campaign.update({
+        where: { id: campaign.id },
+        data: updateData,
+        include: { pathToVictory: true },
+      })
     })
   }
 }
@@ -309,7 +313,7 @@ function buildCustomCampaignListQuery({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}) {
+}: Partial<CampaignListQuery>) {
   console.log(generalElectionDateStart)
 
   return `

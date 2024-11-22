@@ -1,7 +1,10 @@
 import { createClient, DeletedEntry, Entry } from 'contentful'
 import { Injectable } from '@nestjs/common'
 
-const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env
+const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env as Record<
+  string,
+  string
+>
 
 const contentfulClient = createClient({
   space: CONTENTFUL_SPACE_ID,
@@ -23,7 +26,7 @@ export class ContentfulService {
     } = await contentfulClient.sync({
       ...(initial || !nextSyncToken ? { initial: true } : { nextSyncToken }),
     })
-    nextSyncToken = newToken
+    nextSyncToken = newToken as string
     return { entries, deletedEntries }
   }
 

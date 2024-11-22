@@ -9,28 +9,31 @@ import {
   Post,
   Put,
   Query,
-  UsePipes,
-  ValidationPipe,
 } from '@nestjs/common'
 import { CampaignsService } from './campaigns.service'
-import { UpdateCampaignDto } from './dto/updateCampaign.dto'
-import { CreateCampaignDto } from './dto/createCampaign.dto'
-import { CampaignListDto } from './dto/campaignList.dto'
-import { Prisma } from '@prisma/client'
+import {
+  UpdateCampaignBody,
+  updateCampaignSchema,
+} from './schemas/updateCampaign.schema'
+import {
+  createCampaignSchema,
+  CreateCampaignBody,
+} from './schemas/createCampaign.schema'
+import {
+  campaignListSchema,
+  CampaignListQuery,
+} from './schemas/campaignList.schema'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 @Controller('campaigns')
-@UsePipes(
-  new ValidationPipe({
-    whitelist: true,
-    transform: true,
-    transformOptions: { enableImplicitConversion: true },
-  }),
-)
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
   @Get()
-  findAll(@Query() query: CampaignListDto) {
+  findAll(
+    @Query(new ZodValidationPipe(campaignListSchema)) query: CampaignListQuery,
+  ) {
     return this.campaignsService.findAll(query)
   }
 
@@ -58,16 +61,20 @@ export class CampaignsController {
   }
 
   @Post()
-  async create(@Body() createCampaignDto: CreateCampaignDto) {
+  async create(
+    @Body(new ZodValidationPipe(createCampaignSchema)) body: CreateCampaignBody,
+  ) {
     try {
-      const campaign = await this.campaignsService.create(createCampaignDto)
+      const campaign = await this.campaignsService.create(body)
       return { slug: campaign.slug }
     } catch (e) {
-      if (e.code === 'P2002') {
-        throw new BadRequestException(
-          'A new campaign cannot be created with this slug',
-          { cause: e },
-        )
+      if (e instanceof PrismaClientKnownRequestError) {
+        if (e.code === 'P2002') {
+          throw new BadRequestException(
+            'A new campaign cannot be created with this slug',
+            { cause: e },
+          )
+        }
       }
 
       throw e
@@ -77,10 +84,11 @@ export class CampaignsController {
   @Put(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateCampaignDto: UpdateCampaignDto,
+    @Body(new ZodValidationPipe(updateCampaignSchema))
+    body: UpdateCampaignBody,
   ) {
     // TODO get campaign from req user
-    const updateResp = await this.campaignsService.update(id, updateCampaignDto)
+    const updateResp = await this.campaignsService.update(id, body)
 
     if (updateResp === false) throw new NotFoundException()
     return updateResp

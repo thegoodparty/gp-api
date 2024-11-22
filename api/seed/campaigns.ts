@@ -9,10 +9,10 @@ const NUM_UPDATE_HISTORY = 3
 
 async function main() {
   const prisma = new PrismaClient()
-  const fakeUsers = []
-  const fakeCampaigns = []
-  const fakeP2Vs = []
-  const fakeUpdateHistory = []
+  const fakeUsers: any[] = []
+  const fakeCampaigns: any[] = []
+  const fakeP2Vs: any[] = []
+  const fakeUpdateHistory: any[] = []
 
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
     const user = userFactory()

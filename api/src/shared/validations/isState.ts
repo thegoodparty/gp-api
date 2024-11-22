@@ -1,39 +1,23 @@
-import {
-  registerDecorator,
-  ValidationOptions,
-  ValidationArguments,
-} from 'class-validator'
-
 import { STATES, STATE_CODES } from '../constants/states'
+import { z } from 'zod'
 
-export function IsState(
-  stateLength: 'short' | 'long' = 'short',
-  validationOptions?: ValidationOptions,
-) {
-  return function (obj: object, propertyName: string) {
-    registerDecorator({
-      name: 'IsState',
-      target: obj.constructor,
-      propertyName,
-      constraints: [stateLength],
-      options: {
-        message: `Must be a valid state ${stateLength === 'short' ? 'code' : ''}`,
-        ...validationOptions,
-      },
-      validator: {
-        validate(value: any, args: ValidationArguments) {
-          const [stateLength] = args.constraints
-          const input = String(value).toLowerCase()
+/**
+ * Validaiton function intended to be used in a zod schema
+ * @example
+ * const schema = z.object({
+ *   name: z.string().optional(),
+ *   state: isState().optional() /// etc
+ * })
+ */
+export function isState(stateLength: 'long' | 'short' = 'short') {
+  return z.string().refine(
+    (value: any) => {
+      const input = String(value).toLowerCase()
 
-          const compareFn = (state) => state.toLowerCase() === input
-
-          if (stateLength === 'short') {
-            return STATE_CODES.some(compareFn)
-          } else {
-            return STATES.some(compareFn)
-          }
-        },
-      },
-    })
-  }
+      return (stateLength === 'short' ? STATE_CODES : STATES).some(
+        (state) => state.toLowerCase() === input,
+      )
+    },
+    { message: 'Must be a valid state' },
+  )
 }
