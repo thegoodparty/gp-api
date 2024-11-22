@@ -28,13 +28,13 @@ const bootstrap = async () => {
         : {}),
     }),
   )
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  )
+  // app.useGlobalPipes(
+  //   new ValidationPipe({
+  //     whitelist: true,
+  //     transform: true,
+  //     transformOptions: { enableImplicitConversion: true },
+  //   }),
+  // )
   app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()

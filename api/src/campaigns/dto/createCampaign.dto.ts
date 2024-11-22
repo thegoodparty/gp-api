@@ -10,8 +10,4 @@ export class CreateCampaignDto {
   @IsBoolean()
   @ApiProperty()
   isDemo: boolean = false
-
-  @IsBoolean()
-  @ApiProperty()
-  isActive: boolean = false
 }

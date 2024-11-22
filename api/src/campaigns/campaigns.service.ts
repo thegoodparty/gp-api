@@ -3,18 +3,26 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { UpdateCampaignDto } from './dto/updateCampaign.dto'
 import { CampaignListDto } from './dto/campaignList.dto'
 import { CreateCampaignDto } from './dto/createCampaign.dto'
+import { Prisma } from '@prisma/client'
+import { deepMerge } from 'src/shared/helpers/objectHelper'
 
 @Injectable()
 export class CampaignsService {
   constructor(private prismaService: PrismaService) {}
 
-  async findAll(query: CampaignListDto) {
+  async findAll(
+    query: CampaignListDto,
+    include: Prisma.CampaignInclude = {
+      user: true,
+      pathToVictory: true,
+    },
+  ) {
     let campaigns
 
     if (Object.values(query).every((value) => !value)) {
       // if values are empty get all campaigns
       campaigns = await this.prismaService.campaign.findMany({
-        include: { user: true, pathToVictory: true },
+        include,
       })
     } else {
       const sql = buildCustomCampaignListQuery(query)
@@ -30,29 +38,216 @@ export class CampaignsService {
     return campaigns
   }
 
-  findOne(query: any) {
-    return this.prismaService.campaign.findFirst({ where: query })
+  findOne(
+    where: Prisma.CampaignWhereInput,
+    include: Prisma.CampaignInclude = {
+      pathToVictory: true,
+    },
+  ) {
+    return this.prismaService.campaign.findFirst({
+      where,
+      include,
+    })
   }
 
-  findById(id: number) {
-    return this.prismaService.campaign.findFirst({ where: { id } })
+  async create(createCampaignDto: CreateCampaignDto) {
+    // TODO: get user from request
+    // const { user } = this.req;
+    // const userName = await sails.helpers.user.name(user);
+    // if (userName === '') {
+    //   console.log('No user name');
+    //   return exits.badRequest('No user name');
+    // }
+    // const slug = await findSlug(userName);
+
+    // TODO: see if the user already have campaign
+    // const existing = await sails.helpers.campaign.byUser(user.id)
+    // if (existing) {
+    //   return exits.success({
+    //     slug: existing.slug,
+    //   })
+    // }
+
+    const newCampaign = await this.prismaService.campaign.create({
+      data: {
+        ...createCampaignDto,
+        isActive: false,
+        // TODO: pull from request user
+        // userId:
+        // details: {
+        //   zip: user.zip,
+        // },
+        data: {
+          slug: createCampaignDto.slug,
+          currentStep: 'registration',
+        },
+      },
+    })
+
+    // TODO:
+    // await claimExistingCampaignRequests(user, newCampaign)
+    // await createCrmUser(user.firstName, user.lastName, user.email)
+
+    return newCampaign
   }
 
-  findBySlug(slug: string) {
-    return this.prismaService.campaign.findFirst({ where: { slug } })
-  }
+  async update(id: number, updateCampaignDto: UpdateCampaignDto) {
+    const { data, details, pathToVictory } = updateCampaignDto
 
-  create(createCampaignDto: CreateCampaignDto) {
-    return this.prismaService.campaign.create({ data: createCampaignDto })
-  }
-
-  update(id: number, updateCampaignDto: UpdateCampaignDto) {
-    return this.prismaService.campaign.update({
+    const campaign = await this.prismaService.campaign.findFirst({
       where: { id },
-      data: updateCampaignDto,
+      include: { pathToVictory: true },
+    })
+
+    if (!campaign) return false
+
+    const updateData = {
+      data: deepMerge(campaign.data as object, data),
+      details: deepMerge(campaign.details as object, details),
+    }
+
+    if (pathToVictory && campaign.pathToVictory) {
+      /// TODO:
+      // if (pathToVictory.hasOwnProperty('viability')) {
+      //   await updateViability(campaign, columnKey2, value)
+      // } else {
+      //   await updatePathToVictory(campaign, columnKey, value)
+      // }
+
+      updateData['pathToVictory'] = {
+        update: {
+          data: {
+            data: deepMerge(
+              campaign.pathToVictory.data as object,
+              pathToVictory,
+            ),
+          },
+        },
+      }
+    }
+
+    // TODO:
+    // try {
+    //   await sails.helpers.crm.updateCampaign(updated)
+    // } catch (e) {
+    //   sails.helpers.log(campaign.slug, 'error updating crm', e)
+    // }
+
+    // try {
+    //   await sails.helpers.fullstory.customAttr(user.id)
+    // } catch (e) {
+    //   sails.helpers.log(campaign.slug, 'error updating fullstory', e)
+    // }
+
+    return this.prismaService.campaign.update({
+      where: { id: campaign.id },
+      data: updateData,
+      include: { pathToVictory: true },
     })
   }
 }
+
+// async function claimExistingCampaignRequests(user, campaign) {
+//   const campaignRequests = await CampaignRequest.find({
+//     candidateEmail: user.email,
+//   }).populate('user')
+
+//   if (campaignRequests?.length) {
+//     for (const campaignRequest of campaignRequests) {
+//       const { user } = campaignRequest
+
+//       await CampaignRequest.updateOne({
+//         id: campaignRequest.id,
+//       }).set({
+//         campaign: campaign.id,
+//       })
+
+//       await Notification.create({
+//         isRead: false,
+//         data: {
+//           type: 'campaignRequest',
+//           title: `${await sails.helpers.user.name(
+//             user,
+//           )} has requested to manage your campaign`,
+//           subTitle: 'You have a request!',
+//           link: '/dashboard/team',
+//         },
+//         user: user.id,
+//       })
+//     }
+//   }
+// }
+
+// async function updatePathToVictory(campaign, columnKey, value) {
+//   try {
+//     const p2v = await PathToVictory.findOrCreate(
+//       {
+//         campaign: campaign.id,
+//       },
+//       {
+//         campaign: campaign.id,
+//       },
+//     )
+
+//     const data = p2v.data || {}
+//     const updatedData = {
+//       ...data,
+//       [columnKey]: value,
+//     }
+
+//     await PathToVictory.updateOne({ id: p2v.id }).set({
+//       data: updatedData,
+//     })
+
+//     if (!campaign.pathToVictory) {
+//       await Campaign.updateOne({ id: campaign.id }).set({
+//         pathToVictory: p2v.id,
+//       })
+//     }
+//   } catch (e) {
+//     console.log('Error at updatePathToVictory', e)
+//     await sails.helpers.slack.errorLoggerHelper(
+//       'Error at updatePathToVictory',
+//       e,
+//     )
+//   }
+// }
+
+// async function updateViability(campaign, columnKey, value) {
+//   try {
+//     const p2v = await PathToVictory.findOrCreate(
+//       {
+//         campaign: campaign.id,
+//       },
+//       {
+//         campaign: campaign.id,
+//       },
+//     )
+
+//     const data = p2v.data || {}
+//     const viability = data.viability || {}
+//     const updatedData = {
+//       ...data,
+//       viability: {
+//         ...viability,
+//         [columnKey]: value,
+//       },
+//     }
+
+//     await PathToVictory.updateOne({ id: p2v.id }).set({
+//       data: updatedData,
+//     })
+
+//     if (!campaign.pathToVictory) {
+//       await Campaign.updateOne({ id: campaign.id }).set({
+//         pathToVictory: p2v.id,
+//       })
+//     }
+//   } catch (e) {
+//     console.log('Error at updateViability', e)
+//     await sails.helpers.slack.errorLoggerHelper('Error at updateViability', e)
+//   }
+// }
 
 function buildQueryWhereClause({
   id,
