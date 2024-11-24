@@ -14,5 +14,9 @@
     "migrate:reset": "npm run migrate:reset --prefix api",
     "generate": "npm run generate --prefix api",
     "deploy:dev": "npm run deploy:dev -w=deploy"
+  },
+  "dependencies": {
+    "moment": "^2.30.1",
+    "slugify": "^1.6.6"
   }
 }

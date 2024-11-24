@@ -50,3 +50,43 @@ model Content {
   @@index([type])
   @@map("content")
 }
+
+model Race {
+  id             String        @id @default(cuid())
+  ballotId       String        @unique
+  ballotHashId   String?
+  hashId         String        @unique
+  positionSlug   String?
+  state          String        @db.Char(2)
+  electionDate   DateTime?
+  level          String
+  subAreaName    String?
+  subAreaValue   String?
+  data           Json?
+  county         County?       @relation(fields: [countyId], references: [id])
+  countyId       String?
+  municipality   Municipality? @relation(fields: [municipalityId], references: [id])
+  municipalityId String?
+}
+
+model County {
+  id             String         @id @default(cuid())
+  slug           String         @unique
+  name           String
+  state          String         @db.Char(2)
+  data           Json?
+  municipalities Municipality[]
+  races          Race[]
+}
+
+model Municipality {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  name     String
+  type     String
+  state    String  @db.Char(2)
+  data     Json?
+  county   County? @relation(fields: [countyId], references: [id])
+  countyId String?
+  races    Race[]
+}
