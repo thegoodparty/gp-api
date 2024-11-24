@@ -1,33 +1,26 @@
-export interface CountyDataType {
-  name: string
-  slug: string
-  state: string
-}
-
-export interface MunicipalityDataType {
-  name: string
-  slug: string
-  countySlug: string
-  type: string
-  state: string
-}
-
-export interface RaceDataType {
-  municipalitySlug: string
-  countySlug: string
-  name: string
-  slug: string
-  state: string
-  type: string
-  data: any
-  ballotId: string
-  ballotHashId: string
-  hashId: string
-  positionSlug: string
-  electionDate: string
-  level: string
-  subAreaName: string
-  subAreaValue: string
+export interface RaceData {
+  hashId?: string
+  election_name?: string
+  position_name?: string
+  election_day?: string
+  level?: string
+  partisan_type?: string
+  salary?: string
+  employment_type?: string
+  filing_date_start?: string
+  filing_date_end?: string
+  normalized_position_name?: string
+  position_description?: string
+  frequency?: string
+  filing_office_address?: string
+  filing_phone_number?: string
+  paperwork_instructions?: string
+  filing_requirements?: string
+  eligibility_requirements?: string
+  is_runoff?: string
+  is_primary?: string
+  municipality: any
+  county: any
 }
 
 export const countiesSeedData = [

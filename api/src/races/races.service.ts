@@ -3,12 +3,13 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import {
   countiesSeedData,
   municipalitiesSeedData,
+  RaceData,
   racesSeedData,
 } from './races.seed'
 import slugify from 'slugify'
 import * as moment from 'moment'
 
-import { Race } from '@prisma/client'
+import { Race, County, Municipality } from '@prisma/client'
 
 interface ExtendedRace extends Race {
   municipality?: any
@@ -229,7 +230,7 @@ export class RacesService {
       .filter(Boolean)
   }
 
-  private filterRace(race, state) {
+  private filterRace(race: ExtendedRace, state: string) {
     const {
       election_name,
       position_name,
@@ -250,7 +251,7 @@ export class RacesService {
       eligibility_requirements,
       is_runoff,
       is_primary,
-    } = race.data as any
+    } = race.data as RaceData
 
     const filtered = {
       hashId: race.hashId,
@@ -287,7 +288,7 @@ export class RacesService {
     return filtered
   }
 
-  private async getCounty(state: string, county: string) {
+  private async getCounty(state: string, county: string): Promise<County> {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}`
@@ -296,7 +297,11 @@ export class RacesService {
     })
   }
 
-  private async getMunicipality(state: string, county: string, city: string) {
+  private async getMunicipality(
+    state: string,
+    county: string,
+    city: string,
+  ): Promise<Municipality> {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}/${slugify(city, {
@@ -307,7 +312,12 @@ export class RacesService {
     })
   }
 
-  private deduplicateRaces(races, state, county, city) {
+  private deduplicateRaces(
+    races: any,
+    state: string,
+    county: County,
+    city: Municipality,
+  ) {
     const uniqueRaces = new Map<string, any>()
 
     races.forEach((race) => {
