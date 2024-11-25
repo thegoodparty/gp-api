@@ -1,4 +1,4 @@
-import { deepMerge } from '../../src/shared/helpers/objectHelper'
+import { deepMerge } from '../../src/shared/util/objects.util'
 
 /**
  * Helper to make a factory function that merges a default generator with a custom props object

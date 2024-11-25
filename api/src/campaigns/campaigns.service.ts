@@ -4,7 +4,7 @@ import { UpdateCampaignBody } from './schemas/updateCampaign.schema'
 import { CampaignListQuery } from './schemas/campaignList.schema'
 import { CreateCampaignBody } from './schemas/createCampaign.schema'
 import { Prisma } from '@prisma/client'
-import { deepMerge } from 'src/shared/helpers/objectHelper'
+import { deepMerge } from 'src/shared/util/objects.util'
 
 @Injectable()
 export class CampaignsService {

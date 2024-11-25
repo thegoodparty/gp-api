@@ -1,4 +1,4 @@
-import { flip } from '../helpers/objectHelper'
+import { flip } from '../util/objects.util'
 
 export const SHORT_TO_LONG_STATE = {
   AL: 'Alabama',

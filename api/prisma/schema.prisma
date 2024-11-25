@@ -27,7 +27,7 @@ model User {
   phone                 String
   metaData              Json                    @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
-  campaign              Campaign[]
+  campaigns             Campaign[]
 
   @@map("user")
 }

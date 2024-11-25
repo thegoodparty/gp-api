@@ -11,8 +11,8 @@ import { z } from 'zod'
  */
 export function isState(stateLength: 'long' | 'short' = 'short') {
   return z.string().refine(
-    (value: any) => {
-      const input = String(value).toLowerCase()
+    (value) => {
+      const input = value.toLowerCase()
 
       return (stateLength === 'short' ? STATE_CODES : STATES).some(
         (state) => state.toLowerCase() === input,
