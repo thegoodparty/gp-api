@@ -4,7 +4,7 @@ import seedCampaigns from './campaigns'
 const prisma = new PrismaClient()
 
 async function main() {
-  seedCampaigns(prisma)
+  await seedCampaigns(prisma)
 }
 
 main()
