@@ -4,9 +4,10 @@ import {
   Transformer,
 } from '../content.types'
 
-export const faqArticlesTransformer: Transformer = (
-  content: FaqArticleContentRaw[],
-) =>
+export const faqArticlesTransformer: Transformer<
+  FaqArticleContentRaw,
+  FaqArticleContentAugmented
+> = (content: FaqArticleContentRaw[]) =>
   content.map((entry: FaqArticleContentRaw): FaqArticleContentAugmented => {
     const {
       id,
