@@ -12,7 +12,6 @@ import {
   Transformer,
 } from '../content.types'
 import { Content } from '@prisma/client'
-import { readingTime } from 'reading-time-estimator'
 
 export const blogArticlesTransformer: Transformer = (
   content: Content[],
@@ -28,17 +27,12 @@ export const blogArticlesTransformer: Transformer = (
       ...restRawData
     } = data
     const text = documentToPlainTextString(restRawData.body)
-    const readingTimeResult = readingTime(text, 200)
-    const readingTimeWithMs = {
-      ...readingTimeResult,
-      time: readingTimeResult.minutes * 60 * 1000,
-    }
+
     return {
       ...restRawData,
       id,
       type,
       text,
-      readingTime: readingTimeWithMs,
       updateDate: updatedAt,
       mainImage: transformContentMedia(restRawData.mainImage),
       tags: [...transformBlogArticleRawTags(restRawData.tags).values()],
