@@ -6,9 +6,10 @@ import {
 } from '../content.types'
 import { transformBlogArticleRawTags } from '../util/transformBlogArticleRawTags.util'
 
-export const articleTagsTransformer: Transformer = (
-  articles: BlogArticleContentRaw[],
-): BlogArticleTag[] => [
+export const articleTagsTransformer: Transformer<
+  BlogArticleContentRaw,
+  BlogArticleTag
+> = (articles: BlogArticleContentRaw[]): BlogArticleTag[] => [
   ...articles
     .reduce(
       (

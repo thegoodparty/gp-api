@@ -11,11 +11,11 @@ import {
   BlogArticleContentRaw,
   Transformer,
 } from '../content.types'
-import { Content } from '@prisma/client'
 
-export const blogArticlesTransformer: Transformer = (
-  content: Content[],
-): BlogArticleAugmented[] =>
+export const blogArticlesTransformer: Transformer<
+  BlogArticleContentRaw,
+  BlogArticleAugmented
+> = (content: BlogArticleContentRaw[]): BlogArticleAugmented[] =>
   content.map((rawContent: BlogArticleContentRaw): BlogArticleAugmented => {
     const { data, id, updatedAt, type } = rawContent
     const {
