@@ -1,10 +1,8 @@
 import { Campaign, CampaignTier } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import { STATE_CODES } from '../../src/shared/constants/states'
+import { LEVELS } from 'src/shared/constants/governmentLevels'
 import { generateFactory } from './generate'
-
-// TODO: need a schema enum for these?
-const LEVELS = ['LOCAL', 'CITY', 'COUNTY', 'STATE', 'FEDERAL']
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.past()
