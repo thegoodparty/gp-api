@@ -47,6 +47,7 @@ lerna-debug.log*
 !.vscode/extensions.json
 
 # dotenv environment variable files
+.env
 api/.env
 sst/.env
 /nestjs/.env
