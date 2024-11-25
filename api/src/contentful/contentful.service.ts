@@ -11,20 +11,41 @@ const contentfulClient = createClient({
 // TODO: Move this to a key/value store to persist across application instances
 let nextSyncToken = ''
 
+const LIMIT = 300
+const CALLS = 8
+
 @Injectable()
 export class ContentfulService {
-  async getSync(
-    initial = false,
-  ): Promise<{ entries: Entry[]; deletedEntries: DeletedEntry[] }> {
-    const {
-      entries,
-      deletedEntries,
-      nextSyncToken: newToken,
-    } = await contentfulClient.sync({
-      ...(initial || !nextSyncToken ? { initial: true } : { nextSyncToken }),
-    })
+  async getAllEntries(): Promise<Entry[]> {
+    const allEntryCollections = []
+
+    for (let i = 0; i < CALLS; i++) {
+      const entryCollection = await contentfulClient.getEntries({
+        limit: LIMIT,
+        skip: i * LIMIT,
+      })
+      allEntryCollections.push(entryCollection)
+    }
+
+    return allEntryCollections.reduce((acc, entryCollection) => {
+      return [...acc, ...entryCollection.items]
+    }, [] as Entry[])
+  }
+
+  async getSync(): Promise<{
+    allEntries: Entry[]
+    deletedEntries: DeletedEntry[]
+  }> {
+    const { deletedEntries, nextSyncToken: newToken } =
+      await contentfulClient.sync({
+        ...(!nextSyncToken ? { initial: true } : { nextSyncToken }),
+      })
     nextSyncToken = newToken
-    return { entries, deletedEntries }
+
+    return {
+      allEntries: await this.getAllEntries(),
+      deletedEntries,
+    }
   }
 
   async getEntry(id: string) {

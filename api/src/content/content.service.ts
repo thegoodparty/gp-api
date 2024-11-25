@@ -1,31 +1,20 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { ContentfulService } from '../contentful/contentful.service'
-import { ContentType } from '@prisma/client'
+import { Content, ContentType } from '@prisma/client'
 import { InputJsonObject } from '@prisma/client/runtime/library'
+import { Entry } from 'contentful'
+import {
+  CONTENT_TYPE_MAP,
+  InferredContentTypes,
+} from './CONTENT_TYPE_MAP.const'
 
-// we have to do this for TypeScript enums 😢
-const CONTENT_TYPE_MAP: { [key: string]: ContentType } = {
-  aiChatPrompt: ContentType.aiChatPrompt,
-  aiContentTemplate: ContentType.aiContentTemplate,
-  articleCategory: ContentType.articleCategory,
-  blogArticle: ContentType.blogArticle,
-  blogHome: ContentType.blogHome,
-  blogSection: ContentType.blogSection,
-  candidateTestimonial: ContentType.candidateTestimonial,
-  election: ContentType.election,
-  faqArticle: ContentType.faqArticle,
-  faqOrder: ContentType.faqOrder,
-  glossaryItem: ContentType.glossaryItem,
-  goodPartyTeamMembers: ContentType.goodPartyTeamMembers,
-  onboardingPrompts: ContentType.onboardingPrompts,
-  pledge: ContentType.pledge,
-  privacyPage: ContentType.privacyPage,
-  promptInputFields: ContentType.promptInputFields,
-  redirects: ContentType.redirects,
-  teamMember: ContentType.teamMember,
-  teamMilestone: ContentType.teamMilestone,
-  termsOfService: ContentType.termsOfService,
+const transformContent = (
+  type: ContentType | InferredContentTypes,
+  entries: Content[],
+) => {
+  const transformer = CONTENT_TYPE_MAP[type]?.transformer
+  return transformer ? transformer(entries) : entries
 }
 
 @Injectable()
@@ -35,12 +24,38 @@ export class ContentService {
     private contentfulService: ContentfulService,
   ) {}
 
-  findAll() {
+  async findAll() {
     return this.prisma.content.findMany()
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} content`
+  async findById(id: string) {
+    return this.prisma.content.findUnique({
+      where: {
+        id,
+      },
+    })
+  }
+
+  async findByType(type: ContentType | InferredContentTypes) {
+    const queryType =
+      CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
+
+    const entries = await this.prisma.content.findMany({
+      where: {
+        type: queryType,
+      },
+    })
+
+    return transformContent(type, entries)
+  }
+
+  async fetchGlossaryItems() {
+    const entries = await this.prisma.content.findMany({
+      where: {
+        type: ContentType.glossaryItem,
+      },
+    })
+    return transformContent(ContentType.glossaryItem, entries)
   }
 
   private async getExistingContentIds() {
@@ -55,24 +70,31 @@ export class ContentService {
     )
   }
 
-  async syncContent(seed: boolean = false) {
-    const { entries = [], deletedEntries = [] } =
-      await this.contentfulService.getSync(seed)
-    const recognizedEntries = entries.filter(
-      (entry) => CONTENT_TYPE_MAP[entry.sys.contentType.sys.id],
-    )
+  private async getSyncEntriesCategorized(recognizedEntries: Entry[]) {
     const entryIds = new Set(recognizedEntries.map((entry) => entry.sys.id))
     const existingContentIds = await this.getExistingContentIds()
     const existingEntries = existingContentIds.intersection(entryIds)
     const newEntryIds = entryIds.difference(existingContentIds)
-    const deletedEntryIds = deletedEntries.map((entry) => entry.sys.id)
 
-    const updateEntries = recognizedEntries.filter((entry) =>
-      existingEntries.has(entry.sys.id),
+    return {
+      createEntries: recognizedEntries.filter((entry) =>
+        newEntryIds.has(entry.sys.id),
+      ),
+      updateEntries: recognizedEntries.filter((entry) =>
+        existingEntries.has(entry.sys.id),
+      ),
+    }
+  }
+
+  async syncContent() {
+    const { allEntries = [], deletedEntries = [] } =
+      await this.contentfulService.getSync()
+    const recognizedEntries = allEntries.filter((entry: Entry) =>
+      Boolean(CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]),
     )
-    const createEntries = recognizedEntries.filter((entry) =>
-      newEntryIds.has(entry.sys.id),
-    )
+    const { createEntries, updateEntries } =
+      await this.getSyncEntriesCategorized(recognizedEntries)
+    const deletedEntryIds = deletedEntries.map((entry) => entry.sys.id)
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -91,11 +113,13 @@ export class ContentService {
           await tx.content.create({
             data: {
               id: entry.sys.id,
-              type: CONTENT_TYPE_MAP[entry.sys.contentType.sys.id],
+              type: CONTENT_TYPE_MAP[entry.sys.contentType.sys.id].name,
               data: entry.fields as InputJsonObject,
             },
           })
         }
+
+        console.log(`deletedEntryIds =>`, deletedEntryIds)
 
         await tx.content.deleteMany({
           where: {
