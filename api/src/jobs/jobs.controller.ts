@@ -19,13 +19,15 @@ export class JobsController {
     try {
       return await this.jobsService.findAll()
     } catch (e) {
-      this.logger.log(
-        `Error at jobController findAll. e.message: ${e.message}`,
-        e,
-      )
-      throw new BadGatewayException(
-        e.message || 'Error occurred while fetching jobs',
-      )
+      if (e instanceof Error) {
+        this.logger.log(
+          `Error at jobController findAll. e.message: ${e.message}`,
+          e,
+        )
+        throw new BadGatewayException(
+          e.message || 'Error occurred while fetching jobs',
+        )
+      }
     }
   }
 
@@ -38,16 +40,18 @@ export class JobsController {
       }
       return job
     } catch (e) {
-      this.logger.log(
-        `Error at jobController findOne e.message:${e.message}`,
-        e,
-      )
-      if (e instanceof HttpException) {
-        throw e
+      if (e instanceof Error) {
+        this.logger.log(
+          `Error at jobController findOne e.message:${e.message}`,
+          e,
+        )
+        if (e instanceof HttpException) {
+          throw e
+        }
+        throw new BadGatewayException(
+          e.message || `Error occurred while fetching job with id ${id}`,
+        )
       }
-      throw new BadGatewayException(
-        e.message || `Error occurred while fetching job with id ${id}`,
-      )
     }
   }
 }

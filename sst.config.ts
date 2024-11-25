@@ -12,6 +12,15 @@ export default $config({
           region: 'us-west-2',
         },
       },
+      // deploy the runner into the vpc so it can access the database.
+      autodeploy: {
+        runner: {
+          vpc: {
+            id: 'vpc-057b988559836aa8d',
+            subnets: ['subnet-05fc58b6239e28562', 'subnet-0a38ece796ff3fc92'],
+          },
+        },
+      },
     }
   },
   async run() {
