@@ -1,4 +1,10 @@
-import { createClient, DeletedEntry, Entry } from 'contentful'
+import {
+  createClient,
+  DeletedEntry,
+  Entry,
+  EntryCollection,
+  EntrySkeletonType,
+} from 'contentful'
 import { Injectable } from '@nestjs/common'
 
 const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env as Record<
@@ -20,7 +26,7 @@ const CALLS = 8
 @Injectable()
 export class ContentfulService {
   async getAllEntries(): Promise<Entry[]> {
-    const allEntryCollections: any[] = []
+    const allEntryCollections: EntryCollection<EntrySkeletonType>[] = []
 
     for (let i = 0; i < CALLS; i++) {
       const entryCollection = await contentfulClient.getEntries({
