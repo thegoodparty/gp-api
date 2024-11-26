@@ -2,22 +2,22 @@
   "name": "gp-api",
   "private": true,
   "workspaces": [
-      "api",
-      "deploy"
+    "api",
+    "deploy"
   ],
   "engines": {
-      "node": ">=22.11.0"
+    "node": ">=22.11.0"
   },
   "scripts": {
-      "start": "npm run start --prefix api",
-      "start:dev": "npm run start:dev --prefix api",
-      "build": "npm run build --prefix api",
-      "migrate:dev": "npm run migrate:dev --prefix api",
-      "migrate:deploy": "npm run migrate:deploy --prefix api",
-      "migrate:reset": "npm run migrate:reset --prefix api",
-      "generate": "npm run generate --prefix api",
-      "prisma-format": "npm run prisma-format --prefix api",
-      "deploy:dev": "npm run deploy:dev -w=deploy",
-      "seed": "npm run seed --prefix api"
+    "start": "npm run start --prefix api",
+    "start:dev": "npm run start:dev --prefix api",
+    "build": "npm run build --prefix api",
+    "migrate:dev": "npm run migrate:dev --prefix api",
+    "migrate:deploy": "npm run migrate:deploy --prefix api",
+    "migrate:reset": "npm run migrate:reset --prefix api",
+    "generate": "npm run generate --prefix api",
+    "prisma-format": "npm run prisma-format --prefix api",
+    "deploy:dev": "npm run deploy:dev -w=deploy",
+    "seed": "npm run seed --prefix api"
   }
 }
