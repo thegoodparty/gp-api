@@ -279,7 +279,7 @@ function buildCampaignListFilters({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}: Partial<CampaignListQuery>): Prisma.CampaignWhereInput {
+}: CampaignListQuery): Prisma.CampaignWhereInput {
   // base query
   const where: Prisma.CampaignWhereInput = {
     NOT: {
