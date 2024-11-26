@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadGatewayException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { Client } from '@hubspot/api-client';
+import { capitalizeString } from 'src/shared/util/strings.util';
 
 @Injectable()
 export class DeclareService {
@@ -11,7 +11,7 @@ export class DeclareService {
   constructor (private readonly httpService: HttpService) {}
   
   
-  async getDeclarations(): Promise<{ signatures: string }> {
+  async getDeclarations(): Promise<string> {
     const formId = 'f51c1352-c778-40a8-b589-b911c31e64b1';
     const hubspotToken = process.env.HUBSPOT_TOKEN;
 
@@ -34,11 +34,9 @@ export class DeclareService {
       );
       throw new BadGatewayException('Failed to fetch data from Hubspot API');
     }
+    
 
     const data = response.data?.results || [];
-
-    console.log('Full response:', response);
-    console.log('Data:', data);
 
     const uniqueSignatures = new Set<string>();
 
@@ -49,12 +47,10 @@ export class DeclareService {
           let lastName = submission.values[1].value;
           // format the names to look nice and prevent duplicates.
           if (firstName && firstName.length >= 2) {
-            firstName =
-              firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase().trim();
+            firstName = capitalizeString(firstName);
           }
           if (lastName && lastName.length >= 2) {
-            lastName =
-              lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase().trim();
+            lastName = capitalizeString(lastName);
           }
 
           uniqueSignatures.add(`${firstName} ${lastName}`)
@@ -64,6 +60,6 @@ export class DeclareService {
 
     const signatures = Array.from(uniqueSignatures).join(', ');
 
-    return { signatures };
+    return signatures;
   }
 }

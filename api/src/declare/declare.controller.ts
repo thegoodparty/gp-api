@@ -7,14 +7,6 @@ export class DeclareController {
 
   @Get('list')
   async listDeclarations() {
-    try {
-      return await this.declareService.getDeclarations();
-    } catch (error) {
-      console.error('Error at declare list:', error);
-      throw new HttpException(
-        { message: 'Error fetching declarations', error },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return await this.declareService.getDeclarations();
   }
 }
