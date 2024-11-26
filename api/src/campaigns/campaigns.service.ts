@@ -5,6 +5,24 @@ import { CampaignListQuery } from './schemas/campaignList.schema'
 import { CreateCampaignBody } from './schemas/createCampaign.schema'
 import { Prisma } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
+import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
+
+const DEFAULT_FIND_ALL_INCLUDE = {
+  user: {
+    select: {
+      firstName: true,
+      lastName: true,
+      phone: true,
+      email: true,
+      metaData: true,
+    },
+  },
+  pathToVictory: {
+    select: {
+      data: true,
+    },
+  },
+} as const
 
 @Injectable()
 export class CampaignsService {
@@ -12,22 +30,18 @@ export class CampaignsService {
 
   async findAll(
     query: CampaignListQuery,
-    include: Prisma.CampaignInclude = {
-      user: true,
-      pathToVictory: true,
-    },
+    include: Prisma.CampaignInclude = DEFAULT_FIND_ALL_INCLUDE,
   ) {
-    let campaigns
-
-    if (Object.values(query).every((value) => !value)) {
-      // if values are empty get all campaigns
-      campaigns = await this.prismaService.campaign.findMany({
-        include,
-      })
-    } else {
-      const sql = buildCustomCampaignListQuery(query)
-      campaigns = await this.prismaService.$queryRawUnsafe(sql)
+    const args: Prisma.CampaignFindManyArgs = {
+      include,
     }
+
+    // if any filters are present, build where query object
+    if (Object.values(query).some((value) => !!value)) {
+      args.where = buildCampaignListFilters(query)
+    }
+
+    const campaigns = await this.prismaService.campaign.findMany(args)
 
     // TODO: still need this?
     // const campaignVolunteersMapping = await CampaignVolunteer.find({
@@ -253,7 +267,7 @@ export class CampaignsService {
 //   }
 // }
 
-function buildQueryWhereClause({
+function buildCampaignListFilters({
   id,
   state,
   slug,
@@ -265,85 +279,72 @@ function buildQueryWhereClause({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}) {
-  return `
-  ${id ? ` AND c.id = ${id}` : ''}
-  ${slug ? ` AND c.slug ILIKE '%${slug}%'` : ''}
-  ${email ? ` AND u.email ILIKE '%${email}%'` : ''}
-  ${state ? ` AND c.details->>'state' = '${state}'` : ''}
-  ${level ? ` AND c.details->>'ballotLevel' = '${level.toUpperCase()}'` : ''}
-  ${
-    campaignStatus
-      ? ` AND c.is_active = ${campaignStatus === 'active' ? 'true' : 'false'}`
-      : ''
-  }
-  ${
-    primaryElectionDateStart
-      ? ` AND c.details->>'primaryElectionDate' >= '${primaryElectionDateStart}'`
-      : ''
-  }
-  ${
-    primaryElectionDateEnd
-      ? ` AND c.details->>'primaryElectionDate' <= '${primaryElectionDateEnd}'`
-      : ''
-  }
-  ${
-    generalElectionDateStart
-      ? ` AND c.details->>'electionDate' >= '${generalElectionDateStart}'`
-      : ''
-  }
-  ${
-    generalElectionDateEnd
-      ? ` AND c.details->>'electionDate' <= '${generalElectionDateEnd}'`
-      : ''
-  }
-  ${p2vStatus ? ` AND p.data->>'p2vStatus' = '${p2vStatus}'` : ''}
-`
-}
+}: Partial<CampaignListQuery>): Prisma.CampaignWhereInput {
+  const AND: Prisma.CampaignWhereInput[] = []
 
-function buildCustomCampaignListQuery({
-  id,
-  state,
-  slug,
-  email,
-  level,
-  primaryElectionDateStart,
-  primaryElectionDateEnd,
-  campaignStatus,
-  generalElectionDateStart,
-  generalElectionDateEnd,
-  p2vStatus,
-}: Partial<CampaignListQuery>) {
-  console.log(generalElectionDateStart)
+  if (id) AND.push({ id })
+  if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
+  if (email) {
+    AND.push({
+      user: {
+        email: {
+          equals: email,
+          mode: 'insensitive',
+        },
+      },
+    })
+  }
+  if (state) AND.push(caseInsensitiveCompare('details', ['state'], state))
+  if (level) AND.push(caseInsensitiveCompare('details', ['ballotLevel'], level))
+  if (campaignStatus) {
+    AND.push({
+      isActive: campaignStatus === 'active',
+    })
+  }
+  if (p2vStatus) {
+    AND.push({
+      pathToVictory: caseInsensitiveCompare('data', ['p2vStatus'], p2vStatus),
+    })
+  }
+  if (generalElectionDateStart) {
+    AND.push({
+      details: {
+        path: ['electionDate'],
+        gte: generalElectionDateStart,
+      },
+    })
+  }
+  if (generalElectionDateEnd) {
+    AND.push({
+      details: {
+        path: ['electionDate'],
+        lte: generalElectionDateEnd,
+      },
+    })
+  }
+  if (primaryElectionDateStart) {
+    AND.push({
+      details: {
+        path: ['primaryElectionDate'],
+        gte: primaryElectionDateStart,
+      },
+    })
+  }
+  if (primaryElectionDateEnd) {
+    AND.push({
+      details: {
+        path: ['primaryElectionDate'],
+        lte: primaryElectionDateEnd,
+      },
+    })
+  }
 
-  return `
-  SELECT
-    c.*,
-    u.first_name as "first_name",
-    u.last_name as "last_name",
-    u.phone as "phone",
-    u.email as "email",
-    u.meta_data,
-    p.data as "pathToVictory"
-  FROM public.campaign AS c
-  JOIN public.user AS u ON u.id = c.user_id
-  LEFT JOIN public.path_to_victory as p ON p.campaign_id = c.id
-  WHERE c.user_id IS NOT NULL
-  ${buildQueryWhereClause({
-    id,
-    state,
-    slug,
-    email,
-    level,
-    primaryElectionDateStart,
-    primaryElectionDateEnd,
-    campaignStatus,
-    generalElectionDateStart,
-    generalElectionDateEnd,
-    p2vStatus,
-  })}
-  ORDER BY c.id DESC;
-`
+  return {
+    NOT: {
+      user: null,
+    },
+    AND,
+  }
 }
 
 // TODO: still need this?
