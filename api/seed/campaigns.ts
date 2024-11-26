@@ -7,14 +7,14 @@ import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 const NUM_CAMPAIGNS = 20
 const NUM_UPDATE_HISTORY = 3
 
-async function main() {
-  const prisma = new PrismaClient()
+export default async function seedCampaigns(prisma: PrismaClient) {
   const fakeUsers: any[] = []
   const fakeCampaigns: any[] = []
   const fakeP2Vs: any[] = []
   const fakeUpdateHistory: any[] = []
 
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
+    // TODO: move user seeding to its own file
     const user = userFactory()
     const camp = campaignFactory({ userId: user.id })
     const p2v = pathToVictoryFactory({ campaignId: camp.id })
@@ -41,5 +41,3 @@ async function main() {
 
   console.log(`Created ${count} campaigns`)
 }
-
-main()
