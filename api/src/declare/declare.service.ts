@@ -1,25 +1,32 @@
 import { Injectable, Logger, BadGatewayException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom } from 'rxjs';
 import { Client } from '@hubspot/api-client';
 
 @Injectable()
 export class DeclareService {
   private readonly logger = new Logger(DeclareService.name);
-  private readonly hubspotClient: Client;
+  private readonly hubspotApiUrl = 'https://api.hubapi.com';
 
-  constructor () {
-    const hubspotToken = process.env.HUBSPOT_TOKEN;
-    if (!hubspotToken) {
-      this.logger.error('HUBSPOT_TOKEN is not defined in env variables');
-      throw new Error('HUBSPOT_TOKEN is required');
-    }
-    this.hubspotClient = new Client({accessToken: hubspotToken });
-  }
+  constructor (private readonly httpService: HttpService) {}
+  
+  
   async getDeclarations(): Promise<{ signatures: string }> {
     const formId = 'f51c1352-c778-40a8-b589-b911c31e64b1';
+    const hubspotToken = process.env.HUBSPOT_TOKEN;
 
     let response;
     try {
-      response = await this.hubspotClient.marketing.forms.formsApi.getById(formId);
+      response = await lastValueFrom(
+        this.httpService.get(
+          `${this.hubspotApiUrl}/form-integrations/v1/submissions/forms/${formId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${hubspotToken}`,
+            },
+          },
+        ),
+      );
     } catch (error: any) {
       this.logger.error(
         `Failed to fetch data from HubSpot API: ${error.message}`,
@@ -28,7 +35,10 @@ export class DeclareService {
       throw new BadGatewayException('Failed to fetch data from Hubspot API');
     }
 
-    const data = response.results;
+    const data = response.data?.results || [];
+
+    console.log('Full response:', response);
+    console.log('Data:', data);
 
     const uniqueSignatures = new Set<string>();
 
