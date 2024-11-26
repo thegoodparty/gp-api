@@ -280,7 +280,16 @@ function buildCampaignListFilters({
   generalElectionDateEnd,
   p2vStatus,
 }: Partial<CampaignListQuery>): Prisma.CampaignWhereInput {
-  const AND: Prisma.CampaignWhereInput[] = []
+  // base query
+  const where: Prisma.CampaignWhereInput = {
+    NOT: {
+      user: null,
+    },
+    AND: [],
+  }
+
+  // store AND array in var for easy push access
+  const AND = where.AND as Prisma.CampaignWhereInput[]
 
   if (id) AND.push({ id })
   if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
@@ -339,12 +348,7 @@ function buildCampaignListFilters({
     })
   }
 
-  return {
-    NOT: {
-      user: null,
-    },
-    AND,
-  }
+  return where
 }
 
 // TODO: still need this?
