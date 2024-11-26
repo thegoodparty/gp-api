@@ -19,6 +19,9 @@
     "prisma-format": "npm run prisma-format --prefix api",
     "deploy:dev": "npm run deploy:dev -w=deploy"
   },
+  "prisma": {
+    "seed": "ts-node api/seed/seed.ts"
+  },
   "dependencies": {
     "moment": "^2.30.1",
     "slugify": "^1.6.6"

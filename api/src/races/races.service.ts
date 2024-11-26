@@ -27,8 +27,8 @@ export class RacesService {
     city: string,
     positionSlug: string,
   ) {
-    let countyRecord
-    let cityRecord
+    let countyRecord: County | null | undefined
+    let cityRecord: Municipality | null | undefined
     if (county) {
       countyRecord = await this.getCounty(state, county)
     }
@@ -64,22 +64,16 @@ export class RacesService {
 
     const race = races[0]
 
-    const positions = []
-    for (let i = 0; i < races.length; i++) {
-      positions.push(races[i].data.position_name)
-    }
-
     race.municipality = cityRecord
     race.county = countyRecord
 
     const cleanRace = this.filterRace(race, state)
 
-    const otherRaces = await this.getOtherRaces(race)
+    // const otherRaces = await this.getOtherRaces(race)
 
     return {
       race: cleanRace,
-      otherRaces,
-      positions,
+      // otherRaces,
     }
   }
 
@@ -198,37 +192,37 @@ export class RacesService {
     return 'race data is seeded'
   }
 
-  private async getOtherRaces(race: {
-    municipality?: { id: string }
-    county?: { id: string }
-  }) {
-    let otherRaces = []
+  // private async getOtherRaces(race: {
+  //   municipality?: { id: string }
+  //   county?: { id: string }
+  // }) {
+  //   let otherRaces: Race[] = []
 
-    if (race.municipality) {
-      otherRaces = await this.prisma.race.findMany({
-        where: { municipalityId: race.municipality.id },
-        select: { data: true, hashId: true, positionSlug: true },
-      })
-    } else if (race.county) {
-      otherRaces = await this.prisma.race.findMany({
-        where: { countyId: race.county.id },
-        select: { data: true, hashId: true, positionSlug: true },
-      })
-    }
+  //   if (race.municipality) {
+  //     otherRaces = await this.prisma.race.findMany({
+  //       where: { municipalityId: race.municipality.id },
+  //       select: { data: true, hashId: true, positionSlug: true },
+  //     })
+  //   } else if (race.county) {
+  //     otherRaces = await this.prisma.race.findMany({
+  //       where: { countyId: race.county.id },
+  //       select: { data: true, hashId: true, positionSlug: true },
+  //     })
+  //   }
 
-    const dedups = {}
-    return otherRaces
-      .map((otherRace) => {
-        if (!dedups[otherRace.positionSlug]) {
-          dedups[otherRace.positionSlug] = true
-          return {
-            name: otherRace.data.normalized_position_name,
-            slug: otherRace.positionSlug,
-          }
-        }
-      })
-      .filter(Boolean)
-  }
+  //   const dedups = {}
+  //   return otherRaces
+  //     .map((otherRace) => {
+  //       if (!dedups[otherRace.positionSlug]) {
+  //         dedups[otherRace.positionSlug] = true
+  //         return {
+  //           name: otherRace.data.normalized_position_name,
+  //           slug: otherRace.positionSlug,
+  //         }
+  //       }
+  //     })
+  //     .filter(Boolean)
+  // }
 
   private filterRace(race: ExtendedRace, state: string) {
     const {
@@ -288,7 +282,10 @@ export class RacesService {
     return filtered
   }
 
-  private async getCounty(state: string, county: string): Promise<County> {
+  private async getCounty(
+    state: string,
+    county: string,
+  ): Promise<County | null> {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}`
@@ -301,7 +298,7 @@ export class RacesService {
     state: string,
     county: string,
     city: string,
-  ): Promise<Municipality> {
+  ): Promise<Municipality | null> {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}/${slugify(city, {

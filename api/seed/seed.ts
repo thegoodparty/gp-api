@@ -1,10 +1,12 @@
 import { PrismaClient } from '@prisma/client'
-import seedCampaigns from './campaigns'
+// import seedCampaigns from './campaigns'
+import seedRaces from './races'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  await seedCampaigns(prisma)
+  await seedRaces(prisma)
+  // await seedCampaigns(prisma)
 }
 
 main()
