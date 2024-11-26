@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ContentfulModule } from './contentful/contentful.module'
 import { DeclareModule } from './declare/declare.module';
+import { CampaignsModule } from './campaigns/campaigns.module'
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DeclareModule } from './declare/declare.module';
     ContentfulModule,
     JobsModule,
     DeclareModule,
+    CampaignsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

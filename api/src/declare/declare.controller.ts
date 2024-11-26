@@ -13,7 +13,7 @@ export class DeclareController {
       console.error('Error at declare list:', error);
       throw new HttpException(
         { message: 'Error fetching declarations', error },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
