@@ -1,7 +1,7 @@
 import { Campaign, CampaignTier } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import { STATE_CODES } from '../../src/shared/constants/states'
-import { LEVELS } from 'src/shared/constants/governmentLevels'
+import { LEVELS } from '../../src/shared/constants/governmentLevels'
 import { generateFactory } from './generate'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
