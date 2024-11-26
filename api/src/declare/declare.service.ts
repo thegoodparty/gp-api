@@ -1,7 +1,8 @@
 import { Injectable, Logger, BadGatewayException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { capitalizeString } from 'src/shared/util/strings.util';
+
+const capitalizeString = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().trim();
 
 @Injectable()
 export class DeclareService {
