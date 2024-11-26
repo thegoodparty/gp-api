@@ -18,6 +18,7 @@ export default $config({
           vpc: {
             id: 'vpc-057b988559836aa8d',
             subnets: ['subnet-05fc58b6239e28562', 'subnet-0a38ece796ff3fc92'],
+            securityGroups: ['sg-039c0c1df572e8631'],
           },
         },
       },
