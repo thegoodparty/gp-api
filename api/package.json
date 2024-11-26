@@ -17,8 +17,12 @@
     "migrate:dev": "npx prisma migrate dev",
     "migrate:deploy": "npx prisma migrate deploy",
     "migrate:reset": "npx prisma migrate reset --force",
+    "seed": "npx prisma db seed",
     "generate": "npx prisma generate",
     "prisma-format": "npx prisma-case-format -c prisma/.prisma-case-format.yaml -f prisma/schema.prisma"
+  },
+  "prisma": {
+    "seed": "ts-node seed/seed.ts"
   },
   "dependencies": {
     "@contentful/rich-text-plain-text-renderer": "^17.0.0",
