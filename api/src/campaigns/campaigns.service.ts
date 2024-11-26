@@ -314,8 +314,8 @@ function buildCustomCampaignListQuery({
   generalElectionDateEnd,
   p2vStatus,
 }: Partial<CampaignListQuery>) {
-  console.log(generalElectionDateStart)
-
+  // TODO: This ends up spreading the `user` record across the response object
+  //  instead of nesting it under `campaign.user` as it should be
   return `
   SELECT
     c.*,
@@ -325,8 +325,8 @@ function buildCustomCampaignListQuery({
     u.email as "email",
     u.meta_data,
     p.data as "pathToVictory"
-  FROM public.campaign AS c
-  JOIN public.user AS u ON u.id = c.user_id
+  FROM public.campaigns AS c
+  JOIN public.users AS u ON u.id = c.user_id
   LEFT JOIN public.path_to_victory as p ON p.campaign_id = c.id
   WHERE c.user_id IS NOT NULL
   ${buildQueryWhereClause({

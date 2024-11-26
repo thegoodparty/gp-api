@@ -10,5 +10,5 @@ model User {
   campaignUpdateHistory CampaignUpdateHistory[]
   campaigns             Campaign[]
 
-  @@map("user")
+  @@map("users")
 }

@@ -26,5 +26,5 @@ model Campaign {
   userId                Int?                    @map("user_id")
 
   @@index([slug])
-  @@map("campaign")
+  @@map("campaigns")
 }
