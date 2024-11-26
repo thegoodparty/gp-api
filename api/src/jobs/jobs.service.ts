@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common'
 import { firstValueFrom } from 'rxjs'
 
 const API_BASE = 'https://api.ashbyhq.com/jobPosting'
-const ASHBEY_KEY = process.env.ASHBEY_KEY
+const ASHBY_KEY = process.env.ASHBY_KEY
 
 interface FetchJobsParams {
   listedOnly?: boolean
@@ -29,7 +29,7 @@ export class JobsService {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          Authorization: `Basic ${Buffer.from(ASHBEY_KEY + ':').toString(
+          Authorization: `Basic ${Buffer.from(ASHBY_KEY + ':').toString(
             'base64',
           )}`,
         },

@@ -18,6 +18,7 @@
     "generate": "npm run generate --prefix api",
     "prisma-format": "npm run prisma-format --prefix api",
     "deploy:dev": "npm run deploy:dev -w=deploy",
+<<<<<<< HEAD
     "seed": "npx prisma db seed"
   },
   "prisma": {
@@ -25,5 +26,8 @@
   },
   "dependencies": {
     "@hubspot/api-client": "^12.0.1"
+=======
+    "seed": "npm run seed --prefix api"
+>>>>>>> origin/develop
   }
 }
