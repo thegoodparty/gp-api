@@ -137,9 +137,11 @@ export default $config({
     autodeploy: {
       runner: {
         engine: 'codebuild',
+        timeout: '10 minutes',
+        architecture: 'x86_64',
         vpc: {
           id: 'vpc-0763fa52c32ebcf6a',
-          subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+          subnets: ['subnet-053357b931f0524d4'],
           securityGroups: ['sg-01de8d67b0f0ec787'],
         },
       },
