@@ -10,14 +10,14 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+ARG CACHEBUST
+
 # Install dependencies
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 
-# Copy application source files, including Prisma in src/
-COPY api/ ./api
-
-# DO AN LS 
-RUN ls -la
+# Copy application source files, prisma files, and seed data
+COPY src/ ./src
+COPY prisma/ ./prisma
 
 RUN npm install
 
@@ -31,7 +31,7 @@ ENV DATABASE_URL=$DATABASE_URL
 
 # Note: the CodeBuild project must be configured to be on the VPC.
 # Run the migrations for the database
-RUN npm run migrate:deploy
+# RUN npm run migrate:deploy
 
 # Generate Prisma client
 RUN npm run generate
@@ -48,10 +48,23 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+# DO AN LS 
+RUN echo "Initial ls of /app"
+RUN ls -la
+
 # Copy only necessary files to the runtime image
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/api/dist ./dist
-COPY --from=builder /app/api/prisma ./api/prisma
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+
+RUN echo "Final ls of /app"
+# DO AN LS 
+RUN ls -la
+
+RUN echo "Final ls of /app/dist"
+
+# DO AN LS 
+RUN ls -la /app/dist
 
 # Expose the application port
 # EXPOSE 3000
