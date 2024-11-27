@@ -133,33 +133,18 @@ export default $config({
     // })
   },
   // deploy the runner into the vpc so it can access the database.
-  console: {
-    autodeploy: {
-      runner: {
-        engine: 'codebuild',
-        timeout: '10 minutes',
-        architecture: 'x86_64',
-        vpc: {
-          id: 'vpc-0763fa52c32ebcf6a',
-          subnets: ['subnet-053357b931f0524d4'],
-          securityGroups: ['sg-01de8d67b0f0ec787'],
-        },
-      },
-      target(event) {
-        if (event.type === 'branch' && event.action === 'pushed') {
-          return {
-            stage: event.branch
-              .replace(/[^a-zA-Z0-9-]/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-/g, '')
-              .replace(/-$/g, ''),
-          }
-        }
-
-        if (event.type === 'pull_request') {
-          return { stage: `pr-${event.number}` }
-        }
-      },
-    },
-  },
+  // console: {
+  //   autodeploy: {
+  //     runner: {
+  //       engine: 'codebuild',
+  //       timeout: '10 minutes',
+  //       architecture: 'x86_64',
+  //       vpc: {
+  //         id: 'vpc-0763fa52c32ebcf6a',
+  //         subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+  //         securityGroups: ['sg-01de8d67b0f0ec787'],
+  //       },
+  //     },
+  //   },
+  // },
 })
