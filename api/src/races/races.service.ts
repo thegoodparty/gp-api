@@ -1,11 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import {
-  countiesSeedData,
-  municipalitiesSeedData,
-  RaceData,
-  racesSeedData,
-} from './races.seed2'
 import slugify from 'slugify'
 import * as moment from 'moment'
 
@@ -69,12 +63,7 @@ export class RacesService {
 
     const cleanRace = this.filterRace(race, state)
 
-    // const otherRaces = await this.getOtherRaces(race)
-
-    return {
-      race: cleanRace,
-      // otherRaces,
-    }
+    return cleanRace
   }
 
   async byCity(state: string, county: string, city: string) {
@@ -103,126 +92,15 @@ export class RacesService {
       },
     })
 
-    const dedupedRaced = this.deduplicateRaces(
+    const dedupedRaces = this.deduplicateRaces(
       races,
       state,
       countyRecord,
       municipalityRecord,
     )
 
-    const {
-      population,
-      density,
-      income_household_median,
-      unemployment_rate,
-      home_value,
-      county_name,
-    } = municipalityRecord.data as any
-
-    const shortCity = {
-      population,
-      density,
-      income_household_median,
-      unemployment_rate,
-      home_value,
-      county_name,
-      city: (municipalityRecord.data as any).city,
-    }
-
-    return {
-      races: dedupedRaced,
-      municipality: shortCity,
-    }
+    return dedupedRaces
   }
-
-  async seed() {
-    const counties: Record<string, string> = {}
-    const municipalities: Record<string, string> = {}
-
-    // Seed counties and store their IDs
-    for (const countyData of countiesSeedData) {
-      const county = await this.prisma.county.create({
-        data: countyData,
-      })
-      counties[countyData.slug] = county.id
-    }
-
-    // Seed municipalities and store their IDs
-    for (const municipalityData of municipalitiesSeedData) {
-      const countyId = counties[municipalityData.countySlug]
-      const municipality = await this.prisma.municipality.create({
-        data: {
-          name: municipalityData.name,
-          slug: municipalityData.slug,
-          state: municipalityData.state,
-          type: municipalityData.type,
-          data: municipalityData.data,
-          county: {
-            connect: { id: countyId },
-          },
-        },
-      })
-      municipalities[municipalityData.slug] = municipality.id
-    }
-
-    // Seed races and associate with counties and municipalities
-    for (const raceData of racesSeedData) {
-      const countyId = counties[raceData.countySlug]
-      const municipalityId = municipalities[raceData.municipalitySlug]
-
-      await this.prisma.race.create({
-        data: {
-          ballotId: raceData.ballotId,
-          ballotHashId: raceData.ballotHashId,
-          hashId: raceData.hashId,
-          positionSlug: raceData.positionSlug,
-          state: raceData.state,
-          electionDate: new Date(raceData.electionDate),
-          level: raceData.level,
-          subAreaName: raceData.subAreaName,
-          subAreaValue: raceData.subAreaValue,
-          data: raceData.data,
-          county: countyId ? { connect: { id: countyId } } : undefined,
-          municipality: municipalityId
-            ? { connect: { id: municipalityId } }
-            : undefined,
-        },
-      })
-    }
-    return 'race data is seeded'
-  }
-
-  // private async getOtherRaces(race: {
-  //   municipality?: { id: string }
-  //   county?: { id: string }
-  // }) {
-  //   let otherRaces: Race[] = []
-
-  //   if (race.municipality) {
-  //     otherRaces = await this.prisma.race.findMany({
-  //       where: { municipalityId: race.municipality.id },
-  //       select: { data: true, hashId: true, positionSlug: true },
-  //     })
-  //   } else if (race.county) {
-  //     otherRaces = await this.prisma.race.findMany({
-  //       where: { countyId: race.county.id },
-  //       select: { data: true, hashId: true, positionSlug: true },
-  //     })
-  //   }
-
-  //   const dedups = {}
-  //   return otherRaces
-  //     .map((otherRace) => {
-  //       if (!dedups[otherRace.positionSlug]) {
-  //         dedups[otherRace.positionSlug] = true
-  //         return {
-  //           name: otherRace.data.normalized_position_name,
-  //           slug: otherRace.positionSlug,
-  //         }
-  //       }
-  //     })
-  //     .filter(Boolean)
-  // }
 
   private filterRace(race: ExtendedRace, state: string) {
     const {
@@ -245,12 +123,11 @@ export class RacesService {
       eligibility_requirements,
       is_runoff,
       is_primary,
-    } = race.data as RaceData
+    } = race.data
 
     const filtered = {
       hashId: race.hashId,
       positionName: position_name,
-      // locationName: name,
       electionDate: election_day,
       electionName: election_name,
       state,

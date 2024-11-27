@@ -25,12 +25,12 @@ export class RacesController {
       return race
     }
     if (state && county && city) {
-      return await this.racesService.byCity(state, county, city)
+      const race = await this.racesService.byCity(state, county, city)
+      if (!race) {
+        throw new NotFoundException('Races not found')
+      }
+      return race
     }
-  }
-
-  @Get('seed')
-  seed() {
-    return this.racesService.seed()
+    throw new NotFoundException('Race not found')
   }
 }
