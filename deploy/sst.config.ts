@@ -12,18 +12,6 @@ export default $config({
           region: 'us-west-2',
         },
       },
-      // deploy the runner into the vpc so it can access the database.
-      console: {
-        autodeploy: {
-          runner: {
-            vpc: {
-              id: 'vpc-0763fa52c32ebcf6a',
-              subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-              securityGroups: ['sg-01de8d67b0f0ec787'],
-            },
-          },
-        },
-      },
     }
   },
   async run() {
@@ -143,5 +131,18 @@ export default $config({
     //   engine: aws.rds.EngineType.AuroraPostgresql,
     //   engineVersion: rdsCluster.engineVersion,
     // })
+  },
+  // deploy the runner into the vpc so it can access the database.
+  console: {
+    autodeploy: {
+      runner: {
+        engine: 'codebuild',
+        vpc: {
+          id: 'vpc-0763fa52c32ebcf6a',
+          subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+          securityGroups: ['sg-01de8d67b0f0ec787'],
+        },
+      },
+    },
   },
 })
