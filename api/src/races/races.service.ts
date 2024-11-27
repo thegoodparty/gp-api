@@ -69,7 +69,9 @@ export class RacesService {
   async byCity(state: string, county: string, city: string) {
     const countyRecord = await this.getCounty(state, county)
     const municipalityRecord = await this.getMunicipality(state, county, city)
-    if (!countyRecord || !municipalityRecord) {
+    console.log('countyRecord', countyRecord)
+    console.log('municipalityRecord', municipalityRecord)
+    if (!countyRecord && !municipalityRecord) {
       return false
     }
 
@@ -80,7 +82,7 @@ export class RacesService {
     const races = await this.prisma.race.findMany({
       where: {
         state: state.toUpperCase(),
-        municipalityId: municipalityRecord.id,
+        municipalityId: municipalityRecord?.id,
         electionDate: {
           gte: new Date(now),
           lt: new Date(nextYear),
@@ -189,8 +191,8 @@ export class RacesService {
   private deduplicateRaces(
     races: any,
     state: string,
-    county: County,
-    city: Municipality,
+    county: County | null,
+    city: Municipality | null,
   ) {
     const uniqueRaces = new Map<string, any>()
 
