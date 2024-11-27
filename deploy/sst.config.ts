@@ -16,9 +16,9 @@ export default $config({
       autodeploy: {
         runner: {
           vpc: {
-            id: 'vpc-049666a3f2fdceaaf',
-            subnets: ['subnet-05f00609d6b7845dd', 'subnet-05bd02bfe17d801e8'],
-            securityGroups: ['sg-0f7b46f0d92d96d07'],
+            id: 'vpc-0763fa52c32ebcf6a',
+            subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+            securityGroups: ['sg-01de8d67b0f0ec787'],
           },
         },
       },
@@ -32,7 +32,7 @@ export default $config({
             nat: 'managed',
             az: 2, // defaults to 2 availability zones and 2 NAT gateways
           })
-        : sst.aws.Vpc.get('api', 'vpc-049666a3f2fdceaaf') // other stages will use GP-VPC
+        : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use GP-VPC
 
     // Each stage will get its own Cluster.
     const cluster = new sst.aws.Cluster('fargate', { vpc })
@@ -92,9 +92,6 @@ export default $config({
           // DATABASE_URL: dbUrl.value, // so we can run migrations.
           STAGE: $app.stage,
         },
-      },
-      dev: {
-        command: 'node --watch main.js',
       },
     })
 
