@@ -10,6 +10,7 @@ import { DeclareModule } from './declare/declare.module';
 import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
+import { TopIssuesModule } from './top-issues/top-issues.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module'
     JobsModule,
     DeclareModule,
     CampaignsModule,
+    TopIssuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

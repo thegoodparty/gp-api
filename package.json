@@ -25,6 +25,7 @@
     "seed": "ts-node ./seed/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.701.0",
     "@contentful/rich-text-plain-text-renderer": "^17.0.0",
     "@fastify/cors": "^8.5.0",
     "@fastify/helmet": "^11.1.1",
