@@ -12,16 +12,6 @@ export default $config({
           region: 'us-west-2',
         },
       },
-      // deploy the runner into the vpc so it can access the database.
-      autodeploy: {
-        runner: {
-          vpc: {
-            id: 'vpc-049666a3f2fdceaaf',
-            subnets: ['subnet-05f00609d6b7845dd', 'subnet-05bd02bfe17d801e8'],
-            securityGroups: ['sg-0f7b46f0d92d96d07'],
-          },
-        },
-      },
     }
   },
   async run() {
@@ -32,7 +22,7 @@ export default $config({
             nat: 'managed',
             az: 2, // defaults to 2 availability zones and 2 NAT gateways
           })
-        : sst.aws.Vpc.get('api', 'vpc-049666a3f2fdceaaf') // other stages will use GP-VPC
+        : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use GP-VPC
 
     // Each stage will get its own Cluster.
     const cluster = new sst.aws.Cluster('fargate', { vpc })
@@ -93,9 +83,6 @@ export default $config({
           STAGE: $app.stage,
         },
       },
-      dev: {
-        command: 'node --watch main.js',
-      },
     })
 
     // this is the builtin sst aws postgres construct
@@ -145,4 +132,19 @@ export default $config({
     //   engineVersion: rdsCluster.engineVersion,
     // })
   },
+  // deploy the runner into the vpc so it can access the database.
+  // console: {
+  //   autodeploy: {
+  //     runner: {
+  //       engine: 'codebuild',
+  //       timeout: '10 minutes',
+  //       architecture: 'x86_64',
+  //       vpc: {
+  //         id: 'vpc-0763fa52c32ebcf6a',
+  //         subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+  //         securityGroups: ['sg-01de8d67b0f0ec787'],
+  //       },
+  //     },
+  //   },
+  // },
 })
