@@ -135,10 +135,11 @@ export default $config({
   // deploy the runner into the vpc so it can access the database.
   console: {
     autodeploy: {
+      // @ts-ignore
       runner: {
-        engine: 'codebuild',
-        timeout: '10 minutes',
-        architecture: 'x86_64',
+        // engine: 'codebuild',
+        // timeout: '10 minutes',
+        // architecture: 'x86_64',
         vpc: {
           id: 'vpc-0763fa52c32ebcf6a',
           subnets: ['subnet-053357b931f0524d4'],
