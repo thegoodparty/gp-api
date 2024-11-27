@@ -1,7 +1,7 @@
 import { County } from '@prisma/client'
 import { faker } from '@faker-js/faker'
-import { generateFactory } from '../generate'
 import slugify from 'slugify'
+import { generateFactory } from '../../../seed/factories/generate'
 
 const counties = [
   'Los Angeles',
@@ -12,6 +12,13 @@ const counties = [
   'Santa Clara',
   'Alameda',
   'Sacramento',
+  'Contra Costa',
+  'Fresno',
+  'Kern',
+  'San Francisco',
+  'Ventura',
+  'San Mateo',
+  'San Joaquin',
 ]
 
 export const countyFactory = generateFactory<County>(() => {
@@ -21,8 +28,6 @@ export const countyFactory = generateFactory<County>(() => {
     slug: `ca/${slugify(county, { lower: true })}`,
     name: county,
     state: 'CA',
-    createdAt: new Date(),
-    updatedAt: faker.date.anytime(),
     data: {
       county,
       county_full: `${county} County`,
@@ -43,7 +48,7 @@ export const countyFactory = generateFactory<County>(() => {
     return faker.helpers.arrayElement(counties)
   }
   function randomPercentage() {
-    return faker.number.float({ min: 0, max: 100, fractionDigits: 1 })
+    return faker.number.float({ min: 0, max: 100, fractionDigits: 2 })
   }
   function randomNumber(min: number, max: number) {
     return faker.number.int({ min, max })

@@ -163,14 +163,21 @@ model County {
   races          Race[]
 }
 
+enum MunicipalityType {
+  city
+  village
+  town
+  township
+}
+
 model Municipality {
-  id       String  @id @default(cuid())
-  slug     String  @unique
+  id       String           @id @default(cuid())
+  slug     String           @unique
   name     String
-  type     String
-  state    String  @db.Char(2)
+  type     MunicipalityType
+  state    String           @db.Char(2)
   data     Json?
-  county   County? @relation(fields: [countyId], references: [id])
+  county   County?          @relation(fields: [countyId], references: [id])
   countyId String?
   races    Race[]
 }

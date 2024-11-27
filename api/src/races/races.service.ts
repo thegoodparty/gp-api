@@ -5,7 +5,7 @@ import {
   municipalitiesSeedData,
   RaceData,
   racesSeedData,
-} from './races.seed'
+} from './races.seed2'
 import slugify from 'slugify'
 import * as moment from 'moment'
 

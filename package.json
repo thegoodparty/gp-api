@@ -18,10 +18,10 @@
     "generate": "npm run generate --prefix api",
     "prisma-format": "npm run prisma-format --prefix api",
     "deploy:dev": "npm run deploy:dev -w=deploy",
-    "seed": "npx prisma db seed"
+    "seed": "npm run seed --prefix api"
   },
   "prisma": {
-    "seed": "ts-node api/seed/seed.ts"
+    "seed": "ts-node ./seed/seed.ts"
   },
   "dependencies": {
     "moment": "^2.30.1",

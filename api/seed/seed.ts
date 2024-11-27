@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
+import seedRaces from '../src/races/races.seed'
 // import seedCampaigns from './campaigns'
-import seedRaces from './races'
 
 const prisma = new PrismaClient()
 
