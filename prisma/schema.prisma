@@ -130,7 +130,27 @@ model Campaign {
   campaignUpdateHistory CampaignUpdateHistory[]
   user                  User?                   @relation(fields: [userId], references: [id])
   userId                Int?                    @map("user_id")
+  topIssues             TopIssue[]              @relation("CampaignTopIssues")
+  positions             Position[]              @relation("CampaignPositions")
 
   @@index([slug])
   @@map("campaign")
+}
+
+model Position {
+  id         Int        @id @default(autoincrement())
+  name       String     @unique
+  topIssue   TopIssue?  @relation(fields: [topIssueId], references: [id])
+  topIssueId Int?
+  campaigns  Campaign[] @relation("CampaignPositions")
+
+  @@map("position")
+}
+
+model TopIssue {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  icon      String?
+  positions Position[]
+  campaigns Campaign[] @relation("CampaignTopIssues")
 }
