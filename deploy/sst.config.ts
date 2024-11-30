@@ -4,7 +4,7 @@
 export default $config({
   app(input) {
     return {
-      name: 'GP-API',
+      name: 'gp',
       removal: input?.stage === 'master' ? 'retain' : 'remove',
       home: 'aws',
       providers: {
@@ -12,29 +12,20 @@ export default $config({
           region: 'us-west-2',
         },
       },
-      // deploy the runner into the vpc so it can access the database.
-      autodeploy: {
-        runner: {
-          vpc: {
-            id: 'vpc-057b988559836aa8d',
-            subnets: ['subnet-05fc58b6239e28562', 'subnet-0a38ece796ff3fc92'],
-          },
-        },
-      },
     }
   },
   async run() {
     const vpc =
-      $app.stage === 'production'
-        ? new sst.aws.Vpc('GP-VPC', {
+      $app.stage === 'master'
+        ? new sst.aws.Vpc('api', {
             bastion: false,
             nat: 'managed',
             az: 2, // defaults to 2 availability zones and 2 NAT gateways
           })
-        : sst.aws.Vpc.get('GP-VPC', 'vpc-057b988559836aa8d') // other stages will use GP-VPC
+        : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use GP-VPC
 
     // Each stage will get its own Cluster.
-    const cluster = new sst.aws.Cluster('Fargate', { vpc })
+    const cluster = new sst.aws.Cluster('fargate', { vpc })
 
     // Change the domain based on the stage.
     let domain = 'gp-api-test.goodparty.org'
@@ -44,7 +35,7 @@ export default $config({
       domain = 'gp-api.goodparty.org'
     }
 
-    const dbUrl = new sst.Secret('DBURL')
+    // const dbUrl = new sst.Secret('DBURL')
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain,
@@ -81,19 +72,16 @@ export default $config({
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
       },
       image: {
-        // context: "../", // Set the context to the main app directory
-        // dockerfile: "deploy/Dockerfile",
+        context: '../', // Set the context to the main app directory
+        dockerfile: './Dockerfile',
         args: {
           DOCKER_BUILDKIT: '1',
-          // CACHEBUST: '1',
+          CACHEBUST: '1',
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
-          DATABASE_URL: dbUrl.value, // so we can run migrations.
+          // DATABASE_URL: dbUrl.value, // so we can run migrations.
           STAGE: $app.stage,
         },
-      },
-      dev: {
-        command: 'node --watch main.js',
       },
     })
 
@@ -101,18 +89,19 @@ export default $config({
     // to customize things like storage autoscaling, encryption, multi-az, etc
     // then we need to use the pulumi aws rds constructs.
     // todo: make main and dev share the same database ?
-    const database = new sst.aws.Postgres('GP-API-DB', {
-      vpc,
-      database: 'gpdb',
-      instance: 't3.small', // m7g.large is latest generation.
-      storage: '100 GB',
-      username: 'gpuser',
-      version: '16.2', // 16.4 is the latest.
-      // specifying vpc subnet not necessary because it will use the private subnet in the vpc by default.
-      // vpc: { subenets: []}}
-      // if we have connection pool issues, we can turn on rds proxy.
-      // proxy: true
-    })
+
+    // const database = new sst.aws.Postgres('rds', {
+    //   vpc,
+    //   database: 'gpdb',
+    //   instance: 't3.small', // m7g.large is latest generation.
+    //   storage: '100 GB',
+    //   username: 'gpuser',
+    //   version: '16.2', // 16.4 is the latest.
+    //   // specifying vpc subnet not necessary because it will use the private subnet in the vpc by default.
+    //   // vpc: { subenets: []}}
+    //   // if we have connection pool issues, we can turn on rds proxy.
+    //   // proxy: true
+    // })
 
     // Could not get serverlessv2 with pulumi to work.
     // also could not specify the vpc or subnets.
@@ -143,4 +132,19 @@ export default $config({
     //   engineVersion: rdsCluster.engineVersion,
     // })
   },
+  // deploy the runner into the vpc so it can access the database.
+  // console: {
+  //   autodeploy: {
+  //     runner: {
+  //       engine: 'codebuild',
+  //       timeout: '10 minutes',
+  //       architecture: 'x86_64',
+  //       vpc: {
+  //         id: 'vpc-0763fa52c32ebcf6a',
+  //         subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+  //         securityGroups: ['sg-01de8d67b0f0ec787'],
+  //       },
+  //     },
+  //   },
+  // },
 })

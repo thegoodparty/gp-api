@@ -4,14 +4,14 @@
   "description": "deploy gp-api",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy:dev": "npx sst deploy --stage develop"
+    "deploy:dev": "npx sst deploy --stage develop",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@tsconfig/node18": "^18.2.4",
-    "@types/aws-lambda": "8.10.145",
+    "@types/aws-lambda": "8.10.146",
     "@types/node": "^22.9.0",
     "sst": "^3.3.21",
     "ts-node": "^10.9.2",
@@ -20,6 +20,6 @@
   "dependencies": {
     "@pulumi/aws": "^6.59.1",
     "dotenv": "^16.4.5",
-    "sst": "3.3.21"
+    "sst": "3.3.30"
   }
 }
