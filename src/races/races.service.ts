@@ -16,6 +16,7 @@ export class RacesService {
     city: string,
     positionSlug: string,
   ) {
+
     let countyRecord: County | null | undefined
     let cityRecord: Municipality | null | undefined
     if (county) {
@@ -64,8 +65,6 @@ export class RacesService {
   async byCity(state: string, county: string, city: string) {
     const countyRecord = await this.getCounty(state, county)
     const municipalityRecord = await this.getMunicipality(state, county, city)
-    console.log('countyRecord', countyRecord)
-    console.log('municipalityRecord', municipalityRecord)
     if (!countyRecord && !municipalityRecord) {
       return false
     }

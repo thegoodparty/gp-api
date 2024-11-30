@@ -30,10 +30,6 @@ export default async function seedRaces(prisma: PrismaClient) {
     fakeCounties.push(county)
   }
 
-  console.log('fakeCounties', fakeCounties)
-  console.log('fakeMunicipalities', fakeMunicipalities)
-  console.log('fakeRaces', fakeRaces)
-
   await prisma.county.createMany({ data: fakeCounties })
   await prisma.municipality.createMany({ data: fakeMunicipalities })
   const { count } = await prisma.race.createMany({ data: fakeRaces })

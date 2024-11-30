@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker'
 import { generateFactory } from '../../../seed/factories/generate'
-import { Race } from '../races.types'
+import { Race } from '../../../src/races/races.types'
 
 export const raceFactory = generateFactory<Race>(() => {
   const subAreaName = 'District'

@@ -6,10 +6,11 @@ import { JobsModule } from './jobs/jobs.module'
 import { HealthModule } from './health/health.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ContentfulModule } from './contentful/contentful.module'
-import { DeclareModule } from './declare/declare.module';
+import { DeclareModule } from './declare/declare.module'
 import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
+import { RacesModule } from './races/races.module'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module'
     JobsModule,
     DeclareModule,
     CampaignsModule,
+    RacesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
