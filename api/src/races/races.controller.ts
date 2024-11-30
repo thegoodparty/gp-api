@@ -1,5 +1,8 @@
 import { Controller, Get, Query, NotFoundException } from '@nestjs/common'
 import { RacesService } from './races.service'
+import { NormalizedRace } from './races.types'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { RacesListQuery, racesListSchema } from './schemas/racesList.schema'
 
 @Controller('races')
 export class RacesController {
@@ -7,11 +10,9 @@ export class RacesController {
 
   @Get()
   async findRaces(
-    @Query('state') state?: string,
-    @Query('county') county?: string,
-    @Query('city') city?: string,
-    @Query('positionSlug') positionSlug?: string,
-  ) {
+    @Query(new ZodValidationPipe(racesListSchema)) query: RacesListQuery,
+  ): Promise<NormalizedRace | NormalizedRace[]> {
+    const { state, county, city, positionSlug } = query
     if (state && county && city && positionSlug) {
       const race = await this.racesService.findOne(
         state,
@@ -25,11 +26,34 @@ export class RacesController {
       return race
     }
     if (state && county && city) {
-      const race = await this.racesService.byCity(state, county, city)
-      if (!race) {
+      const races = await this.racesService.byCity(state, county, city)
+      if (!races || races.length === 0) {
         throw new NotFoundException('Races not found')
       }
-      return race
+      return races
+    }
+    if (state && county) {
+      const races = await this.racesService.byCounty(state, county)
+      if (!races || races.length === 0) {
+        throw new NotFoundException('Races not found')
+      }
+      return races
+    }
+
+    if (state && county) {
+      const races = await this.racesService.byCounty(state, county)
+      if (!races || races.length === 0) {
+        throw new NotFoundException('Races not found')
+      }
+      return races
+    }
+
+    if (state) {
+      const races = await this.racesService.byState(state)
+      if (!races || races.length === 0) {
+        throw new NotFoundException('Races not found')
+      }
+      return races
     }
     throw new NotFoundException('Race not found')
   }

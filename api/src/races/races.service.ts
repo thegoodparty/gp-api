@@ -3,13 +3,8 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import slugify from 'slugify'
 import * as moment from 'moment'
 
-import { Race, County, Municipality } from '@prisma/client'
-
-interface ExtendedRace extends Race {
-  municipality?: any
-  county?: any
-  data: any
-}
+import { County, Municipality } from '@prisma/client'
+import { ExtendedRace, NormalizedRace, RaceData } from './races.types'
 
 @Injectable()
 export class RacesService {
@@ -61,7 +56,7 @@ export class RacesService {
     race.municipality = cityRecord
     race.county = countyRecord
 
-    const cleanRace = this.filterRace(race, state)
+    const cleanRace = this.normalizeRace(race, state)
 
     return cleanRace
   }
@@ -104,7 +99,64 @@ export class RacesService {
     return dedupedRaces
   }
 
-  private filterRace(race: ExtendedRace, state: string) {
+  async byCounty(state: string, county: string) {
+    const countyRecord = await this.getCounty(state, county)
+    console.log('countyRecord', countyRecord)
+    if (!countyRecord) {
+      return false
+    }
+
+    const nextYear = moment().startOf('year').add(2, 'year').format('M D, YYYY')
+
+    const now = moment().format('M D, YYYY')
+
+    const races = await this.prisma.race.findMany({
+      where: {
+        state: state.toUpperCase(),
+        countyId: countyRecord?.id,
+        level: 'county',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      select: { data: true, hashId: true, positionSlug: true, countyId: true },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    const dedupedRaces = this.deduplicateRaces(races, state, countyRecord)
+
+    return dedupedRaces
+  }
+
+  async byState(state: string) {
+    const nextYear = moment().startOf('year').add(2, 'year').format('M D, YYYY')
+
+    const now = moment().format('M D, YYYY')
+
+    const races = await this.prisma.race.findMany({
+      where: {
+        state: state.toUpperCase(),
+        level: 'state',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      select: { data: true, hashId: true, positionSlug: true, countyId: true },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    const dedupedRaces = this.deduplicateRaces(races, state)
+
+    return dedupedRaces
+  }
+
+  private normalizeRace(race: ExtendedRace, state: string): NormalizedRace {
     const {
       election_name,
       position_name,
@@ -125,9 +177,9 @@ export class RacesService {
       eligibility_requirements,
       is_runoff,
       is_primary,
-    } = race.data
+    } = race.data as RaceData
 
-    const filtered = {
+    const normalized = {
       hashId: race.hashId,
       positionName: position_name,
       electionDate: election_day,
@@ -142,15 +194,15 @@ export class RacesService {
       normalizedPositionName: normalized_position_name,
       positionDescription: position_description,
       frequency,
-      subAreaName: race.subAreaName,
-      subAreaValue: race.subAreaValue,
+      subAreaName: race.subAreaName ?? undefined,
+      subAreaValue: race.subAreaValue ?? undefined,
       filingOfficeAddress: filing_office_address,
       filingPhoneNumber: filing_phone_number,
       paperworkInstructions: paperwork_instructions,
       filingRequirements: filing_requirements,
       eligibilityRequirements: eligibility_requirements,
       isRunoff: is_runoff,
-      isPriamry: is_primary,
+      isPrimary: is_primary,
       municipality: race.municipality
         ? { name: race.municipality.name, slug: race.municipality.slug }
         : null,
@@ -158,7 +210,7 @@ export class RacesService {
         ? { name: race.county.name, slug: race.county.slug }
         : null,
     }
-    return filtered
+    return normalized
   }
 
   private async getCounty(
@@ -191,8 +243,8 @@ export class RacesService {
   private deduplicateRaces(
     races: any,
     state: string,
-    county: County | null,
-    city: Municipality | null,
+    county?: County | null,
+    city?: Municipality | null,
   ) {
     const uniqueRaces = new Map<string, any>()
 

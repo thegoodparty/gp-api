@@ -135,6 +135,13 @@ model Campaign {
   @@map("campaign")
 }
 
+enum LevelType {
+  city
+  county
+  state
+  federal
+}
+
 model Race {
   id             String        @id @default(cuid())
   ballotId       String        @unique
@@ -143,10 +150,10 @@ model Race {
   positionSlug   String?
   state          String        @db.Char(2)
   electionDate   DateTime?
-  level          String
+  level          LevelType
   subAreaName    String?
   subAreaValue   String?
-  data           Json?
+  data           Json?         @default("{}") @db.JsonB
   county         County?       @relation(fields: [countyId], references: [id])
   countyId       String?
   municipality   Municipality? @relation(fields: [municipalityId], references: [id])
@@ -158,7 +165,7 @@ model County {
   slug           String         @unique
   name           String
   state          String         @db.Char(2)
-  data           Json?
+  data           Json?          @default("{}") @db.JsonB
   municipalities Municipality[]
   races          Race[]
 }
@@ -176,7 +183,7 @@ model Municipality {
   name     String
   type     MunicipalityType
   state    String           @db.Char(2)
-  data     Json?
+  data     Json?            @default("{}") @db.JsonB
   county   County?          @relation(fields: [countyId], references: [id])
   countyId String?
   races    Race[]
