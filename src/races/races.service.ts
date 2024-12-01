@@ -16,7 +16,6 @@ export class RacesService {
     city: string,
     positionSlug: string,
   ) {
-
     let countyRecord: County | null | undefined
     let cityRecord: Municipality | null | undefined
     if (county) {
