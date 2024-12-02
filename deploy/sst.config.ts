@@ -22,7 +22,7 @@ export default $config({
             nat: 'managed',
             az: 2, // defaults to 2 availability zones and 2 NAT gateways
           })
-        : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use GP-VPC
+        : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
     // Each stage will get its own Cluster.
     const cluster = new sst.aws.Cluster('fargate', { vpc })
@@ -36,6 +36,7 @@ export default $config({
     }
 
     // const dbUrl = new sst.Secret('DBURL')
+
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain,
@@ -106,23 +107,57 @@ export default $config({
     // Could not get serverlessv2 with pulumi to work.
     // also could not specify the vpc or subnets.
 
-    // const rdsCluster = new aws.rds.Cluster('rdsCluster', {
+    // Create a Security Group for the RDS Cluster
+    // const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
+    //   name: 'api-rds-security-group',
+    //   description: 'Allow traffic to RDS',
+    //   vpcId: 'vpc-0763fa52c32ebcf6a', // Replace with your VPC ID
+    //   ingress: [
+    //     {
+    //       protocol: 'tcp',
+    //       fromPort: 5432,
+    //       toPort: 5432,
+    //       cidrBlocks: ['0.0.0.0/0'], // Adjust as needed
+    //     },
+    //   ],
+    //   egress: [
+    //     {
+    //       protocol: '-1',
+    //       fromPort: 0,
+    //       toPort: 0,
+    //       cidrBlocks: ['0.0.0.0/0'],
+    //     },
+    //   ],
+    // })
+
+    // // Create a Subnet Group for the RDS Cluster
+    // const subnetGroup = new aws.rds.SubnetGroup('subnetGroup', {
+    //   name: 'api-rds-subnet-group',
+    //   subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+    //   tags: {
+    //     Name: 'api-rds-subnet-group',
+    //   },
+    // })
+
+    // const dbUser = new sst.Secret('DBUSER')
+    // const dbPassword = new sst.Secret('DBPASSWORD')
+    // new aws.rds.Cluster('rdsCluster', {
     //   clusterIdentifier: 'gp-api-db',
     //   engine: aws.rds.EngineType.AuroraPostgresql,
     //   engineMode: aws.rds.EngineMode.Provisioned,
     //   engineVersion: '16.2',
-    //   databaseName: $app.stage === 'production' ? 'apiprod' : 'apidev',
+    //   databaseName: 'gpdb', //$app.stage === 'production' ? 'apiprod' : 'apidev',
     //   manageMasterUserPassword: false,
-    //   masterUsername: process.env.DATABASE_USER || 'admin',
-    //   masterPassword: process.env.DATABASE_PASSWORD || 'password',
+    //   // todo: use the sst secrets for this.
+    //   masterUsername: dbUser.value.toString() || '',
+    //   masterPassword: dbPassword.value.toString() || '',
+    //   dbSubnetGroupName: subnetGroup.name,
+    //   vpcSecurityGroupIds: [rdsSecurityGroup.id],
     //   storageEncrypted: true,
     //   serverlessv2ScalingConfiguration: {
-    //     maxCapacity: 1,
+    //     maxCapacity: 2,
     //     minCapacity: 0.5,
     //   },
-    // not sure how to get the vpc and subnets from the pulumi vpc construct.
-    // dbSubnetGroupName: vpc.privateSubnets.get().values[0].dbSubnetGroupName,
-    // vpcSecurityGroupIds:
     // })
 
     // const rdsInstance = new aws.rds.ClusterInstance('rdsInstance', {
@@ -133,18 +168,18 @@ export default $config({
     // })
   },
   // deploy the runner into the vpc so it can access the database.
-  // console: {
-  //   autodeploy: {
-  //     runner: {
-  //       engine: 'codebuild',
-  //       timeout: '10 minutes',
-  //       architecture: 'x86_64',
-  //       vpc: {
-  //         id: 'vpc-0763fa52c32ebcf6a',
-  //         subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-  //         securityGroups: ['sg-01de8d67b0f0ec787'],
-  //       },
-  //     },
-  //   },
-  // },
+  console: {
+    autodeploy: {
+      runner: {
+        engine: 'codebuild',
+        timeout: '10 minutes',
+        architecture: 'x86_64',
+        vpc: {
+          id: 'vpc-0763fa52c32ebcf6a',
+          subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+          securityGroups: ['sg-01de8d67b0f0ec787'],
+        },
+      },
+    },
+  },
 })
