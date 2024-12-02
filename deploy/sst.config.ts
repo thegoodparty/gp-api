@@ -1,5 +1,5 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
-// import * as aws from '@pulumi/aws'
+import * as aws from '@pulumi/aws'
 
 export default $config({
   app(input) {
