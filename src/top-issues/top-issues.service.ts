@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { svgUploader } from 'src/shared/util/svgUploader.util';
 import crypto from 'crypto';
+import { PrismaClient } from '@prisma/client';
+import { createTopIssueSchema } from './schemas/topIssues.schema';
+
+const prisma = new PrismaClient();
 
 function md5(data: string) {
   return crypto.createHash('md5').update(data).digest('hex');
@@ -9,9 +13,13 @@ function md5(data: string) {
 @Injectable()
 export class TopIssuesService {
 
-  async create(name: string, icon?: string | null): Promise<object> {
-    // Create a new top issue, and hold the newly created id in a variable
-    const id = '';
+  async create(name: string, icon: string | null): Promise<object> {
+    const validatedCreateTopIssue = createTopIssueSchema.parse({name});
+    const { id } = await prisma.topIssue.create({
+      data: {
+        name: validatedCreateTopIssue.name,
+      }
+    })
 
     const iconUrl = icon
       ? await svgUploader(
@@ -21,5 +29,15 @@ export class TopIssuesService {
       )
     : null;
 
+    const updatedTopIssue = await prisma.topIssue.update({
+      where: { id },
+      data: { icon: iconUrl },
+    });
+
+    return {
+      id: updatedTopIssue.id,
+      name: updatedTopIssue.name,
+      icon: updatedTopIssue.icon,
+    }
   }
 }
