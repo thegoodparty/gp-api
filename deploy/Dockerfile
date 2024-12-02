@@ -22,7 +22,7 @@ COPY prisma/ ./prisma
 RUN npm install
 
 # Optionally bust the cache to force a rebuild of the following steps
-# ARG CACHEBUST
+ARG CACHEBUST
 
 # Set the docker build args into environment variables on runner.
 ARG STAGE
