@@ -36,6 +36,23 @@ export default $config({
     }
 
     const dbUrl = new sst.Secret('DBURL')
+    const dbName = new sst.Secret('DBNAME')
+    const dbUser = new sst.Secret('DBUSER')
+    const dbPassword = new sst.Secret('DBPASSWORD')
+    const dbIps = new sst.Secret('DBIPS')
+
+    if (
+      !dbName.value ||
+      !dbUser.value ||
+      !dbPassword.value ||
+      !dbIps.value ||
+      !dbUrl.value
+    ) {
+      throw new Error(
+        'DBNAME, DBUSER, DBPASSWORD, DBURL, DBIPS secrets must be set.',
+      )
+    }
+
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain,
@@ -84,15 +101,6 @@ export default $config({
         },
       },
     })
-
-    const dbName = new sst.Secret('DBNAME')
-    const dbUser = new sst.Secret('DBUSER')
-    const dbPassword = new sst.Secret('DBPASSWORD')
-    const dbIps = new sst.Secret('DBIPS')
-
-    if (!dbName.value || !dbUser.value || !dbPassword.value || !dbIps.value) {
-      throw new Error('DBNAME, DBUSER, DBPASSWORD, DBIPS secrets must be set.')
-    }
 
     // Create a Security Group for the RDS Cluster
     const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
