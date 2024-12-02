@@ -104,61 +104,61 @@ export default $config({
     //   // proxy: true
     // })
 
-    // Could not get serverlessv2 with pulumi to work.
-    // also could not specify the vpc or subnets.
+    const dbName = new sst.Secret('DBNAME')
+    const dbUser = new sst.Secret('DBUSER')
+    const dbPassword = new sst.Secret('DBPASSWORD')
+    const dbIps = new sst.Secret('DBIPS')
 
     // Create a Security Group for the RDS Cluster
-    // const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
-    //   name: 'api-rds-security-group',
-    //   description: 'Allow traffic to RDS',
-    //   vpcId: 'vpc-0763fa52c32ebcf6a', // Replace with your VPC ID
-    //   ingress: [
-    //     {
-    //       protocol: 'tcp',
-    //       fromPort: 5432,
-    //       toPort: 5432,
-    //       cidrBlocks: ['0.0.0.0/0'], // Adjust as needed
-    //     },
-    //   ],
-    //   egress: [
-    //     {
-    //       protocol: '-1',
-    //       fromPort: 0,
-    //       toPort: 0,
-    //       cidrBlocks: ['0.0.0.0/0'],
-    //     },
-    //   ],
-    // })
+    const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
+      name: 'api-rds-security-group',
+      description: 'Allow traffic to RDS',
+      vpcId: 'vpc-0763fa52c32ebcf6a',
+      ingress: [
+        {
+          protocol: 'tcp',
+          fromPort: 5432,
+          toPort: 5432,
+          cidrBlocks: [dbIps.value.toString()],
+        },
+      ],
+      egress: [
+        {
+          protocol: '-1',
+          fromPort: 0,
+          toPort: 0,
+          cidrBlocks: ['0.0.0.0/0'],
+        },
+      ],
+    })
 
-    // // Create a Subnet Group for the RDS Cluster
-    // const subnetGroup = new aws.rds.SubnetGroup('subnetGroup', {
-    //   name: 'api-rds-subnet-group',
-    //   subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-    //   tags: {
-    //     Name: 'api-rds-subnet-group',
-    //   },
-    // })
+    // Create a Subnet Group for the RDS Cluster
+    const subnetGroup = new aws.rds.SubnetGroup('subnetGroup', {
+      name: 'api-rds-subnet-group',
+      subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+      tags: {
+        Name: 'api-rds-subnet-group',
+      },
+    })
 
-    // const dbUser = new sst.Secret('DBUSER')
-    // const dbPassword = new sst.Secret('DBPASSWORD')
-    // new aws.rds.Cluster('rdsCluster', {
-    //   clusterIdentifier: 'gp-api-db',
-    //   engine: aws.rds.EngineType.AuroraPostgresql,
-    //   engineMode: aws.rds.EngineMode.Provisioned,
-    //   engineVersion: '16.2',
-    //   databaseName: 'gpdb', //$app.stage === 'production' ? 'apiprod' : 'apidev',
-    //   manageMasterUserPassword: false,
-    //   // todo: use the sst secrets for this.
-    //   masterUsername: dbUser.value.toString() || '',
-    //   masterPassword: dbPassword.value.toString() || '',
-    //   dbSubnetGroupName: subnetGroup.name,
-    //   vpcSecurityGroupIds: [rdsSecurityGroup.id],
-    //   storageEncrypted: true,
-    //   serverlessv2ScalingConfiguration: {
-    //     maxCapacity: 2,
-    //     minCapacity: 0.5,
-    //   },
-    // })
+    new aws.rds.Cluster('rdsCluster', {
+      clusterIdentifier: 'gp-api-db',
+      engine: aws.rds.EngineType.AuroraPostgresql,
+      engineMode: aws.rds.EngineMode.Provisioned,
+      engineVersion: '16.2',
+      databaseName: dbName.value.toString(),
+      manageMasterUserPassword: false,
+      // todo: use the sst secrets for this.
+      masterUsername: dbUser.value.toString() || '',
+      masterPassword: dbPassword.value.toString() || '',
+      dbSubnetGroupName: subnetGroup.name,
+      vpcSecurityGroupIds: [rdsSecurityGroup.id],
+      storageEncrypted: true,
+      serverlessv2ScalingConfiguration: {
+        maxCapacity: 64,
+        minCapacity: 0.5,
+      },
+    })
 
     // const rdsInstance = new aws.rds.ClusterInstance('rdsInstance', {
     //   clusterIdentifier: rdsCluster.id,
@@ -168,18 +168,18 @@ export default $config({
     // })
   },
   // deploy the runner into the vpc so it can access the database.
-  console: {
-    autodeploy: {
-      runner: {
-        engine: 'codebuild',
-        timeout: '10 minutes',
-        architecture: 'x86_64',
-        vpc: {
-          id: 'vpc-0763fa52c32ebcf6a',
-          subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-          securityGroups: ['sg-01de8d67b0f0ec787'],
-        },
-      },
-    },
-  },
+  // console: {
+  //   autodeploy: {
+  //     runner: {
+  //       engine: 'codebuild',
+  //       timeout: '10 minutes',
+  //       architecture: 'x86_64',
+  //       vpc: {
+  //         id: 'vpc-0763fa52c32ebcf6a',
+  //         subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+  //         securityGroups: ['sg-01de8d67b0f0ec787'],
+  //       },
+  //     },
+  //   },
+  // },
 })
