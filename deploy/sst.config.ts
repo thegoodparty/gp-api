@@ -86,28 +86,14 @@ export default $config({
       },
     })
 
-    // this is the builtin sst aws postgres construct
-    // to customize things like storage autoscaling, encryption, multi-az, etc
-    // then we need to use the pulumi aws rds constructs.
-    // todo: make main and dev share the same database ?
-
-    // const database = new sst.aws.Postgres('rds', {
-    //   vpc,
-    //   database: 'gpdb',
-    //   instance: 't3.small', // m7g.large is latest generation.
-    //   storage: '100 GB',
-    //   username: 'gpuser',
-    //   version: '16.2', // 16.4 is the latest.
-    //   // specifying vpc subnet not necessary because it will use the private subnet in the vpc by default.
-    //   // vpc: { subenets: []}}
-    //   // if we have connection pool issues, we can turn on rds proxy.
-    //   // proxy: true
-    // })
-
     const dbName = new sst.Secret('DBNAME')
     const dbUser = new sst.Secret('DBUSER')
     const dbPassword = new sst.Secret('DBPASSWORD')
     const dbIps = new sst.Secret('DBIPS')
+
+    if (!dbName.value || !dbUser.value || !dbPassword.value || !dbIps.value) {
+      throw new Error('DBNAME, DBUSER, DBPASSWORD, DBIPS secrets must be set.')
+    }
 
     // Create a Security Group for the RDS Cluster
     const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
@@ -147,7 +133,7 @@ export default $config({
       engineMode: aws.rds.EngineMode.Provisioned,
       engineVersion: '16.2',
       databaseName: dbName.value,
-      manageMasterUserPassword: true,
+      // manageMasterUserPassword: true,
       masterUsername: dbUser.value || '',
       masterPassword: dbPassword.value || '',
       dbSubnetGroupName: subnetGroup.name,
@@ -166,7 +152,8 @@ export default $config({
     //   engineVersion: rdsCluster.engineVersion,
     // })
   },
-  // deploy the runner into the vpc so it can access the database.
+  // todo: deploy the runner into the vpc so it can access the database.
+  // sst currently has a bug with this feature as of 3.3.40
   // console: {
   //   autodeploy: {
   //     runner: {
