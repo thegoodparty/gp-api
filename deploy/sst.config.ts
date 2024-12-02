@@ -147,8 +147,7 @@ export default $config({
       engineMode: aws.rds.EngineMode.Provisioned,
       engineVersion: '16.2',
       databaseName: dbName.value,
-      manageMasterUserPassword: false,
-      // todo: use the sst secrets for this.
+      manageMasterUserPassword: true,
       masterUsername: dbUser.value || '',
       masterPassword: dbPassword.value || '',
       dbSubnetGroupName: subnetGroup.name,
