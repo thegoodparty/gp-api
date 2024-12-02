@@ -119,7 +119,7 @@ export default $config({
           protocol: 'tcp',
           fromPort: 5432,
           toPort: 5432,
-          cidrBlocks: [dbIps.value.toString()],
+          cidrBlocks: [dbIps.value],
         },
       ],
       egress: [
@@ -146,11 +146,11 @@ export default $config({
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineMode: aws.rds.EngineMode.Provisioned,
       engineVersion: '16.2',
-      databaseName: dbName.value.toString(),
+      databaseName: dbName.value,
       manageMasterUserPassword: false,
       // todo: use the sst secrets for this.
-      masterUsername: dbUser.value.toString() || '',
-      masterPassword: dbPassword.value.toString() || '',
+      masterUsername: dbUser.value || '',
+      masterPassword: dbPassword.value || '',
       dbSubnetGroupName: subnetGroup.name,
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
