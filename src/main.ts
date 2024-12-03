@@ -11,6 +11,8 @@ import { AppModule } from './app.module'
 import { Logger } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
+import type { FastifyCookieOptions } from '@fastify/cookie'
+import cookie from '@fastify/cookie'
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
@@ -49,6 +51,10 @@ const bootstrap = async () => {
     root: join(__dirname, '..', 'public'),
     prefix: '/public/',
   })
+
+  await app.register(cookie, {
+    secret: process.env.AUTH_SECRET,
+  } as FastifyCookieOptions)
 
   await app.listen(APP_LISTEN_CONFIG)
   return app
