@@ -14,6 +14,7 @@ import { AdminCampaignsService } from './adminCampaigns.service'
 import { AdminCreateCamapaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
+import { AdminSendCreateEmailSchema } from './schemas/adminSendCreateEmail.schema'
 
 @Controller('admin/campaigns')
 @UsePipes(ZodValidationPipe)
@@ -55,5 +56,17 @@ export class AdminCampaignsController {
     }
 
     return true
+  }
+
+  @Post('email')
+  @HttpCode(204)
+  async sendEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
+    const result = await this.adminCampaignsService.sendCreateEmail(userId)
+
+    if (typeof result === 'string') {
+      throw new BadRequestException(result)
+    }
+
+    return result
   }
 }
