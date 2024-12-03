@@ -138,17 +138,17 @@ model Campaign {
 }
 
 model Position {
-  id                String             @id @default(cuid())
+  id                Int                @id @default(autoincrement())
   name              String             @unique
   topIssue          TopIssue?          @relation(fields: [topIssueId], references: [id])
-  topIssueId        String?
+  topIssueId        Int?
   campaignPositions CampaignPosition[]
 
   @@map("position")
 }
 
 model TopIssue {
-  id                String             @id @default(cuid())
+  id                Int                @id @default(autoincrement())
   name              String             @unique
   icon              String?
   positions         Position[]
@@ -159,15 +159,15 @@ model TopIssue {
 }
 
 model CampaignPosition {
-  id          String    @id @default(cuid())
+  id          Int       @id @default(autoincrement())
   description String?
   order       Int?
   campaign    Campaign  @relation(fields: [campaignId], references: [id])
   campaignId  Int
   position    Position  @relation(fields: [positionId], references: [id])
-  positionId  String
+  positionId  Int
   topIssue    TopIssue? @relation(fields: [topIssueId], references: [id])
-  topIssueId  String?
+  topIssueId  Int?
 
   @@index([campaignId])
   @@index([positionId])
