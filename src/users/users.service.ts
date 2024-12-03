@@ -2,7 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { Prisma, User } from '@prisma/client'
 import { genSalt, hash } from 'bcrypt'
-import { CreateUserInput } from './schemas/CreateUserInput.schema'
+import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { trimMany } from '../shared/util/strings.util'
 
 type UniqueUserWhere = Prisma.AtLeast<
@@ -27,7 +27,7 @@ export class UsersService {
     })
   }
 
-  async createUser(userData: CreateUserInput): Promise<User> {
+  async createUser(userData: CreateUserInputDto): Promise<User> {
     const {
       password = '',
       firstName,

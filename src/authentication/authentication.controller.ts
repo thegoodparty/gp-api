@@ -6,32 +6,27 @@ import {
   HttpStatus,
   Post,
   Res,
+  UsePipes,
 } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
 import { FastifyReply } from 'fastify'
-import {
-  CreateUserInput,
-  CreateUserInputSchema,
-} from '../users/schemas/CreateUserInput.schema'
+import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { clearAuthToken, setAuthToken } from './util/auth-token.util'
-import {
-  LoginRequestPayload,
-  LoginPayloadSchema,
-} from './schemas/LoginPayload.schema'
+import { LoginRequestPayloadDto } from './schemas/LoginPayload.schema'
 import { ReadUserOutputDTO } from '../users/schemas/ReadUserOutput.schema'
 
 type LoginResult = { user: ReadUserOutputDTO; token: string }
 
 @Controller('authentication')
+@UsePipes(ZodValidationPipe)
 export class AuthenticationController {
   constructor(private authenticationService: AuthenticationService) {}
 
   @Post('register')
   @HttpCode(HttpStatus.NO_CONTENT)
   async register(
-    @Body(new ZodValidationPipe(CreateUserInputSchema))
-    userData: CreateUserInput,
+    @Body() userData: CreateUserInputDto,
     @Res({ passthrough: true }) response: FastifyReply,
   ) {
     const { token } = await this.authenticationService.register(userData)
@@ -39,9 +34,10 @@ export class AuthenticationController {
   }
 
   @Post('login')
+  @UsePipes(ZodValidationPipe)
   async login(
-    @Body(new ZodValidationPipe(LoginPayloadSchema))
-    loginPayload: LoginRequestPayload,
+    @Body()
+    loginPayload: LoginRequestPayloadDto,
     @Res({ passthrough: true }) response: FastifyReply,
   ): Promise<LoginResult> {
     const { token, user } = await this.authenticationService.login(loginPayload)

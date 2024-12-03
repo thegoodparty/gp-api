@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { toLowerAndTrim } from '../../shared/util/strings.util'
+import { createZodDto } from 'nestjs-zod'
 
 export const LoginPayloadSchema = z.object({
   email: z
@@ -14,4 +15,4 @@ export const LoginPayloadSchema = z.object({
     .optional(),
 })
 
-export type LoginRequestPayload = z.infer<typeof LoginPayloadSchema>
+export class LoginRequestPayloadDto extends createZodDto(LoginPayloadSchema) {}
