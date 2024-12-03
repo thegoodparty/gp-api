@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { AdminCreateCamapaignDto } from './schemas/adminCreateCampaign.schema'
+import { AdminCreateCamapaignSchema } from './schemas/adminCreateCampaign.schema'
 import {
   PrismaClientKnownRequestError,
-  PrismaClientUnknownRequestError,
   PrismaClientValidationError,
 } from '@prisma/client/runtime/library'
 import { findSlug } from 'src/shared/util/slug.util'
@@ -14,7 +13,7 @@ import { Prisma } from '@prisma/client'
 export class AdminCampaignsService {
   constructor(private prismaService: PrismaService) {}
 
-  async create(body: AdminCreateCamapaignDto) {
+  async create(body: AdminCreateCamapaignSchema) {
     const { firstName, lastName, email, zip, phone, party, otherParty } = body
 
     // check if user with email exists first

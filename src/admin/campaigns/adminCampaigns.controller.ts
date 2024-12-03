@@ -11,7 +11,7 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { AdminCampaignsService } from './adminCampaigns.service'
-import { AdminCreateCamapaignDto } from './schemas/adminCreateCampaign.schema'
+import { AdminCreateCamapaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 
@@ -21,7 +21,7 @@ export class AdminCampaignsController {
   constructor(private readonly adminCampaignsService: AdminCampaignsService) {}
 
   @Post()
-  async create(@Body() body: AdminCreateCamapaignDto) {
+  async create(@Body() body: AdminCreateCamapaignSchema) {
     const result = await this.adminCampaignsService.create(body)
 
     if (typeof result === 'string') {
