@@ -17,6 +17,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  sales
+  campaign
+}
+
 model User {
   id                    Int                     @id @default(autoincrement())
   createdAt             DateTime                @default(now()) @map("created_at")
@@ -29,7 +34,7 @@ model User {
   metaData              Json                    @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
   campaigns             Campaign[]
-  role                  String?
+  role                  UserRole?
 
   @@map("user")
 }
