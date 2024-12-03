@@ -70,6 +70,14 @@ export default $config({
           },
         },
       },
+      memory: '0.5 GB',
+      cpu: '0.25 vCPU',
+      scaling: {
+        min: $app.stage === 'master' ? 2 : 1,
+        max: 16,
+        cpuUtilization: 50,
+        memoryUtilization: 50,
+      },
       environment: {
         // PORT: '3000',
         PORT: '80',

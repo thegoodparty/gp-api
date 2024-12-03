@@ -10,6 +10,9 @@
   - Added the required column `zip` to the `user` table without a default value. This is not possible if the table is not empty.
 
 */
+-- CreateEnum
+CREATE TYPE "UserRole" AS ENUM ('sales', 'campaign');
+
 -- DropForeignKey
 ALTER TABLE "campaign_position" DROP CONSTRAINT "campaign_position_campaignId_fkey";
 
@@ -41,7 +44,7 @@ ALTER TABLE "position" DROP COLUMN "topIssueId",
 ADD COLUMN     "top_issue_id" INTEGER;
 
 -- AlterTable
-ALTER TABLE "user" ADD COLUMN     "role" TEXT,
+ALTER TABLE "user" ADD COLUMN     "role" "UserRole",
 ADD COLUMN     "zip" TEXT NOT NULL;
 
 -- CreateIndex
@@ -51,9 +54,6 @@ CREATE INDEX "campaign_position_campaign_id_idx" ON "campaign_position"("campaig
 CREATE INDEX "campaign_position_position_id_idx" ON "campaign_position"("position_id");
 
 -- AddForeignKey
-ALTER TABLE "position" ADD CONSTRAINT "position_top_issue_id_fkey" FOREIGN KEY ("top_issue_id") REFERENCES "top_issue"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "campaign_position" ADD CONSTRAINT "campaign_position_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -61,3 +61,6 @@ ALTER TABLE "campaign_position" ADD CONSTRAINT "campaign_position_position_id_fk
 
 -- AddForeignKey
 ALTER TABLE "campaign_position" ADD CONSTRAINT "campaign_position_top_issue_id_fkey" FOREIGN KEY ("top_issue_id") REFERENCES "top_issue"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "position" ADD CONSTRAINT "position_top_issue_id_fkey" FOREIGN KEY ("top_issue_id") REFERENCES "top_issue"("id") ON DELETE SET NULL ON UPDATE CASCADE;

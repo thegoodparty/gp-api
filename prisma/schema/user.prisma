@@ -1,0 +1,21 @@
+enum UserRole {
+  sales
+  campaign
+}
+
+model User {
+  id                    Int                     @id @default(autoincrement())
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  firstName             String                  @map("first_name")
+  lastName              String                  @map("last_name")
+  email                 String
+  phone                 String
+  zip                   String
+  role                  UserRole?
+  metaData              Json                    @map("meta_data") @db.JsonB
+  campaignUpdateHistory CampaignUpdateHistory[]
+  campaigns             Campaign[]
+
+  @@map("user")
+}

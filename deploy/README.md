@@ -1,22 +1,24 @@
 # Deployment Guide for gp-api
 
-This guide provides comprehensive instructions for deploying the gp-api application using SSTv3, AWS Fargate, and related infrastructure.
+This guide provides comprehensive instructions for deploying the gp-api application using SSTv3, AWS Fargate, RDS Serverless Aurora Postgres and related infrastructure.
 
 ## Table of Contents
 
 1. [Usage](#usage)
    - [Install Dependencies](#install-dependencies)
    - [Deploy the Application](#deploy-the-application)
+   - [Deployment Secrets](#deployment-secrets)
 2. [Environment Variables](#environment-variables)
-3. [Database Configuration](#database-configuration)
-4. [VPC Configuration](#vpc-configuration)
-5. [Continuous Integration/Continuous Deployment (CI/CD)](#continuous-integrationcontinuous-deployment-cicd)
+3. [Scaling Configuration](#scaling)
+4. [Database Configuration](#database-configuration)
+5. [VPC Configuration](#vpc-configuration)
+6. [Continuous Integration/Continuous Deployment (CI/CD)](#continuous-integrationcontinuous-deployment-cicd)
    - [ECS Deployment Details](#ecs-deployment-details)
-6. [Logs](#logs)
-7. [Benefits](#benefits)
+7. [Logs](#logs)
+8. [Benefits](#benefits)
    - [Why Use AWS Fargate?](#why-use-aws-fargate)
    - [Why Use SST and Pulumi?](#why-use-sst-and-pulumi)
-8. [Resources](#resources)
+9. [Resources](#resources)
 
 ## Usage
 
@@ -33,6 +35,9 @@ npm install
 
 ### Deploy the Application (cli)
 
+Note: you should never really need to deploy from the cli (see the [CI/CD section](#continuous-integrationcontinuous-deployment-cicd) below)
+Because CI/CD will take care of the deployment process.
+However, if you are working on the config or need to debug it can be helpful to deploy locally.
 Use the following commands to deploy the application from the deploy folder:
 
 ```bash
@@ -43,12 +48,31 @@ npx sst deploy --stage develop
 npx sst deploy --stage master
 ```
 
+### Deployment Secrets
+
+Note: these secrets are only for the deployment phase. For application secrets see: [Environment Variables](#environment-variables).
+
+Each stage has its own secrets. More on sst Secrets can be found in the specific resources at the bottom of the README. Secrets must be set for all required deployment variables per stage. Below are EXAMPLE secrets only.
+
+```
+npx sst secret set DBNAME dbname --stage develop
+npx sst secret set DBUSER dbuser --stage develop
+npx sst secret set DBPASSWORD dbpassword --stage develop
+npx sst secret set DBIPS 172.0.0.0/16 --stage develop
+```
+
+## Scaling
+
+- **Database Scaling Configuration**: Occasionally, the `serverlessv2ScalingConfiguration` may need to be updated to increase the `minCapacity` to prevent cold start times on the database.
+- **Task Configuration**: The ECS tasks `memory` and `cpu` in the sst.config.ts can easily be adjusted if we decide we want each Task to be able to handle more load or if the need arises for more ram per task.
+- **Task Autoscaling Configuration**: We can adjust the `scaling` params to set the minimum and maximum amount of Task concurrency for each stage to enable autoscaling and also we can adjust the memory/ram requirements for launching a new task. The master stage should always have a minimum of 2 Tasks for A/B Deployment or there will be downtime during updates.
+
 ## Environment Variables
 
 To add environment variables to the application, use AWS Secrets Manager:
 
 1. Create a plaintext secret in AWS Secrets Manager.
-2. Provide the secret's ARN under the SSM configuration for the service in the deployment settings.
+2. Provide the secret's ARN under the `ssm` configuration for the service in the `sst.config.ts`
 
 This ensures secure storage and retrieval of environment-specific variables.
 
@@ -57,7 +81,6 @@ This ensures secure storage and retrieval of environment-specific variables.
 The application uses **Amazon RDS Serverless v2** for PostgreSQL. Key considerations:
 
 - **Accessing the Database**: You must be connected to the VPC to access the database. Use the VPN service to establish the connection.
-- **Scaling Configuration**: Occasionally, the `serverlessv2ScalingConfiguration` may need to be updated to increase the `minCapacity` to prevent cold start times.
 
 Database migrations are automatically applied during deployment using:
 
@@ -77,7 +100,7 @@ Both the Fargate cluster and the RDS database are configured to use this VPC.
 
 ## Continuous Integration/Continuous Deployment (CI/CD)
 
-This project is configured with SST's auto-deployment feature. Simply push changes to the `gp-api` repository, and the CI/CD pipeline will trigger a CodeBuild process to deploy the updates automatically.
+This project is configured with SST's auto-deployment feature. Simply push changes to the `gp-api` repository, and the CI/CD pipeline will trigger a CodeBuild process to build the project on the latest node image and upload it to ECR and deploy it automatically on Fargate.
 
 ### ECS Deployment Details
 
@@ -86,10 +109,8 @@ This project is configured with SST's auto-deployment feature. Simply push chang
 - **ECS Task Definition**: Specifies the container image, resources, and environment variables required for the application.
 - **Deployment Process**: When auto-deployment is triggered:
   1. CodeBuild builds the application and uploads the new Docker image to Amazon ECR.
-  2. ECS initiates an A/B deployment for the service.
+  2. Autodeploy initiates an update of the ECS service causing a new Deployment.
   3. Deployment status can be tracked in the **Deployments** tab of the ECS service in the AWS Management Console.
-
-**Learn more about ECS:** [ECS Documentation](https://aws.amazon.com/ecs/documentation/)
 
 ## Logs
 
@@ -119,8 +140,15 @@ Logging is critical for troubleshooting and monitoring.
 - **Integration**: Simplifies working with AWS services like Lambda, RDS, and Fargate.
 - **Development Experience**: Includes features like live debugging, automatic CI/CD pipelines, and staging environments.
 
-## Resources
+## General Resources
 
 - [SST Documentation](https://sst.dev)
 - [Pulumi Documentation](https://www.pulumi.com)
 - [ECS Documentation](https://docs.aws.amazon.com/ecs/)
+
+## Specific Resources
+
+- [SST Cluster Construct](https://sst.dev/docs/component/aws/cluster)
+- [SST Secret Construct](https://sst.dev/docs/component/secret/)
+- [SST VPC Construct](https://sst.dev/docs/component/aws/vpc)
+- [Pulumi RDS Construct](https://www.pulumi.com/registry/packages/aws/api-docs/rds/cluster/)

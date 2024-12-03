@@ -1,0 +1,15 @@
+model CampaignPosition {
+  id          Int       @id @default(autoincrement())
+  description String?
+  order       Int?
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  campaignId  Int       @map("campaign_id")
+  position    Position  @relation(fields: [positionId], references: [id])
+  positionId  Int       @map("position_id")
+  topIssue    TopIssue? @relation(fields: [topIssueId], references: [id])
+  topIssueId  Int?      @map("top_issue_id")
+
+  @@index([campaignId])
+  @@index([positionId])
+  @@map("campaign_position")
+}

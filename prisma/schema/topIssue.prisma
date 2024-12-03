@@ -1,0 +1,10 @@
+model TopIssue {
+  id                Int                @id @default(autoincrement())
+  name              String             @unique
+  icon              String?
+  positions         Position[]
+  campaigns         Campaign[]
+  campaignPositions CampaignPosition[]
+
+  @@map("top_issue")
+}
