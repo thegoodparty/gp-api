@@ -14,9 +14,12 @@ import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { clearAuthToken, setAuthToken } from './util/auth-token.util'
 import { LoginRequestPayloadDto } from './schemas/LoginPayload.schema'
-import { ReadUserOutputDTO } from '../users/schemas/ReadUserOutput.schema'
+import {
+  ReadUserOutput,
+  ReadUserOutputSchema,
+} from '../users/schemas/ReadUserOutput.schema'
 
-type LoginResult = { user: ReadUserOutputDTO; token: string }
+type LoginResult = { user: ReadUserOutput; token: string }
 
 @Controller('authentication')
 @UsePipes(ZodValidationPipe)
@@ -43,7 +46,7 @@ export class AuthenticationController {
     const { token, user } = await this.authenticationService.login(loginPayload)
     setAuthToken(token, response)
     return {
-      user: new ReadUserOutputDTO(user),
+      user: ReadUserOutputSchema.parse(user),
       //TODO: token should NOT be exposed to the client on the response body here. Fix this.
       token,
     }
