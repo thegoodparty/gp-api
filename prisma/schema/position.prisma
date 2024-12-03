@@ -1,0 +1,9 @@
+model Position {
+  id                Int                @id @default(autoincrement())
+  name              String             @unique
+  topIssue          TopIssue?          @relation(fields: [topIssueId], references: [id])
+  topIssueId        Int?
+  campaignPositions CampaignPosition[]
+
+  @@map("position")
+}

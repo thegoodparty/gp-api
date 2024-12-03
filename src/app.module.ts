@@ -6,6 +6,7 @@ import { JobsModule } from './jobs/jobs.module'
 import { HealthModule } from './health/health.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ContentfulModule } from './contentful/contentful.module'
+import { DeclareModule } from './declare/declare.module';
 import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module'
     PrismaModule,
     ContentfulModule,
     JobsModule,
+    DeclareModule,
     CampaignsModule,
   ],
   controllers: [AppController],

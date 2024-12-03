@@ -10,19 +10,17 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+# Optionally bust the cache to force a rebuild of the following steps
+ARG CACHEBUST
+
 # Install dependencies
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 
-# Copy application source files, including Prisma in src/
-COPY api/ ./api
-
-# DO AN LS 
-RUN ls -la
+# Copy application source files, prisma files, and seed data
+COPY src/ ./src
+COPY prisma/ ./prisma
 
 RUN npm install
-
-# Optionally bust the cache to force a rebuild of the following steps
-# ARG CACHEBUST
 
 # Set the docker build args into environment variables on runner.
 ARG STAGE
@@ -48,10 +46,23 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+# DO AN LS 
+RUN echo "Initial ls of /app"
+RUN ls -la
+
 # Copy only necessary files to the runtime image
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/api/dist ./dist
-COPY --from=builder /app/api/prisma ./api/prisma
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+
+RUN echo "Final ls of /app"
+# DO AN LS 
+RUN ls -la
+
+RUN echo "Final ls of /app/dist"
+
+# DO AN LS 
+RUN ls -la /app/dist
 
 # Expose the application port
 # EXPOSE 3000
