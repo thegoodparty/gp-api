@@ -10,6 +10,7 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+# Optionally bust the cache to force a rebuild of the following steps
 ARG CACHEBUST
 
 # Install dependencies
@@ -21,9 +22,6 @@ COPY prisma/ ./prisma
 
 RUN npm install
 
-# Optionally bust the cache to force a rebuild of the following steps
-# ARG CACHEBUST
-
 # Set the docker build args into environment variables on runner.
 ARG STAGE
 ARG DATABASE_URL
@@ -31,7 +29,7 @@ ENV DATABASE_URL=$DATABASE_URL
 
 # Note: the CodeBuild project must be configured to be on the VPC.
 # Run the migrations for the database
-# RUN npm run migrate:deploy
+RUN npm run migrate:deploy
 
 # Generate Prisma client
 RUN npm run generate

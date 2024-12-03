@@ -12,14 +12,13 @@
   "devDependencies": {
     "@tsconfig/node18": "^18.2.4",
     "@types/aws-lambda": "8.10.146",
-    "@types/node": "^22.9.0",
-    "sst": "^3.3.21",
+    "@types/node": "^22.10.1",
+    "sst": "^3.3.41",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@pulumi/aws": "^6.59.1",
-    "dotenv": "^16.4.5",
-    "sst": "3.3.30"
+    "@pulumi/aws": "^6.62.0",
+    "dotenv": "^16.4.5"
   }
 }
