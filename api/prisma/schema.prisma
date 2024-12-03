@@ -23,13 +23,16 @@ model User {
   updatedAt             DateTime                @updatedAt @map("updated_at")
   firstName             String                  @map("first_name")
   lastName              String                  @map("last_name")
-  email                 String
+  name                  String
+  password              String?
+  email                 String                  @unique
   phone                 String
-  metaData              Json                    @map("meta_data") @db.JsonB
+  zip                   String?
+  metaData              Json?                   @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
   campaigns             Campaign[]
 
-  @@map("user")
+  @@map("users")
 }
 
 enum ContentType {
