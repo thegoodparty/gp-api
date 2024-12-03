@@ -9,31 +9,22 @@ import {
   Post,
   Put,
   Query,
+  UsePipes,
 } from '@nestjs/common'
 import { CampaignsService } from './campaigns.service'
-import {
-  UpdateCampaignBody,
-  updateCampaignSchema,
-} from './schemas/updateCampaign.schema'
-import {
-  createCampaignSchema,
-  CreateCampaignBody,
-} from './schemas/createCampaign.schema'
-import {
-  campaignListSchema,
-  CampaignListQuery,
-} from './schemas/campaignList.schema'
+import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
+import { CreateCampaignSchema } from './schemas/createCampaign.schema'
+import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 @Controller('campaigns')
+@UsePipes(ZodValidationPipe)
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
   @Get()
-  findAll(
-    @Query(new ZodValidationPipe(campaignListSchema)) query: CampaignListQuery,
-  ) {
+  findAll(@Query() query: CampaignListSchema) {
     return this.campaignsService.findAll(query)
   }
 
@@ -61,9 +52,7 @@ export class CampaignsController {
   }
 
   @Post()
-  async create(
-    @Body(new ZodValidationPipe(createCampaignSchema)) body: CreateCampaignBody,
-  ) {
+  async create(@Body() body: CreateCampaignSchema) {
     try {
       const campaign = await this.campaignsService.create(body)
       return { slug: campaign.slug }
@@ -84,8 +73,7 @@ export class CampaignsController {
   @Put(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body(new ZodValidationPipe(updateCampaignSchema))
-    body: UpdateCampaignBody,
+    @Body() body: UpdateCampaignSchema,
   ) {
     // TODO get campaign from req user
     const updateResp = await this.campaignsService.update(id, body)

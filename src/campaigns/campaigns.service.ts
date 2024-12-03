@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { UpdateCampaignBody } from './schemas/updateCampaign.schema'
-import { CampaignListQuery } from './schemas/campaignList.schema'
-import { CreateCampaignBody } from './schemas/createCampaign.schema'
+import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
+import { CampaignListSchema } from './schemas/campaignList.schema'
+import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { Prisma } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
@@ -29,7 +29,7 @@ export class CampaignsService {
   constructor(private prismaService: PrismaService) {}
 
   async findAll(
-    query: CampaignListQuery,
+    query: CampaignListSchema,
     include: Prisma.CampaignInclude = DEFAULT_FIND_ALL_INCLUDE,
   ) {
     const args: Prisma.CampaignFindManyArgs = {
@@ -64,7 +64,7 @@ export class CampaignsService {
     })
   }
 
-  async create(body: CreateCampaignBody) {
+  async create(body: CreateCampaignSchema) {
     // TODO: get user from request
     // const { user } = this.req;
     // const userName = await sails.helpers.user.name(user);
@@ -105,7 +105,7 @@ export class CampaignsService {
     return newCampaign
   }
 
-  async update(id: number, body: UpdateCampaignBody) {
+  async update(id: number, body: UpdateCampaignSchema) {
     const { data, details, pathToVictory } = body
 
     return this.prismaService.$transaction(async (tx) => {
@@ -279,7 +279,7 @@ function buildCampaignListFilters({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}: CampaignListQuery): Prisma.CampaignWhereInput {
+}: CampaignListSchema): Prisma.CampaignWhereInput {
   // base query
   const where: Prisma.CampaignWhereInput = {
     NOT: {

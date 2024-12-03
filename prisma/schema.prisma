@@ -25,9 +25,11 @@ model User {
   lastName              String                  @map("last_name")
   email                 String
   phone                 String
+  zip                   String
   metaData              Json                    @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
   campaigns             Campaign[]
+  role                  String?
 
   @@map("user")
 }
@@ -141,7 +143,7 @@ model Position {
   id                Int                @id @default(autoincrement())
   name              String             @unique
   topIssue          TopIssue?          @relation(fields: [topIssueId], references: [id])
-  topIssueId        Int?
+  topIssueId        Int?               @map("top_issue_id")
   campaignPositions CampaignPosition[]
 
   @@map("position")
@@ -163,11 +165,11 @@ model CampaignPosition {
   description String?
   order       Int?
   campaign    Campaign  @relation(fields: [campaignId], references: [id])
-  campaignId  Int
+  campaignId  Int       @map("campaign_id")
   position    Position  @relation(fields: [positionId], references: [id])
-  positionId  Int
+  positionId  Int       @map("position_id")
   topIssue    TopIssue? @relation(fields: [topIssueId], references: [id])
-  topIssueId  Int?
+  topIssueId  Int?      @map("top_issue_id")
 
   @@index([campaignId])
   @@index([positionId])
