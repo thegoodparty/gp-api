@@ -25,16 +25,42 @@ export default $config({
           })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
+    let bucketName
+    let domain
+    if ($app.stage === 'master') {
+      domain = 'gp-api.goodparty.org'
+      bucketName = 'assets.goodparty.org'
+    } else if ($app.stage === 'develop') {
+      domain = 'gp-api-dev.goodparty.org'
+      bucketName = 'assets-dev.goodparty.org'
+    } else {
+      domain = `gp-api-${$app.stage}.goodparty.org`
+      bucketName = `assets-${$app.stage}.goodparty.org`
+    }
+
+    let assetsBucket
+    if ($app.stage === 'master') {
+      assetsBucket = sst.aws.Bucket.get('assets.goodparty.org', bucketName)
+    } else {
+      assetsBucket = new sst.aws.Bucket(bucketName, {
+        access: 'cloudfront',
+      })
+    }
+
+    if ($app.stage !== 'master') {
+      // production bucket was setup manually.
+      new sst.aws.Router('assetsRouter', {
+        routes: {
+          '/*': {
+            bucket: assetsBucket,
+          },
+        },
+        domain: bucketName,
+      })
+    }
+
     // Each stage will get its own Cluster.
     const cluster = new sst.aws.Cluster('fargate', { vpc })
-
-    // Change the domain based on the stage.
-    let domain = 'gp-api-test.goodparty.org'
-    if ($app.stage === 'develop') {
-      domain = 'gp-api-dev.goodparty.org'
-    } else if ($app.stage === 'master') {
-      domain = 'gp-api.goodparty.org'
-    }
 
     const dbUrl = new sst.Secret('DBURL')
     const dbName = new sst.Secret('DBNAME')
@@ -109,6 +135,7 @@ export default $config({
           STAGE: $app.stage,
         },
       },
+      link: [assetsBucket],
     })
 
     // Create a Security Group for the RDS Cluster

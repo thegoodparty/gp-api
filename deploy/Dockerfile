@@ -19,6 +19,7 @@ COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 # Copy application source files, prisma files, and seed data
 COPY src/ ./src
 COPY prisma/ ./prisma
+COPY seed/ ./seed
 
 RUN npm install
 
@@ -46,26 +47,17 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# DO AN LS 
-RUN echo "Initial ls of /app"
-RUN ls -la
-
 # Copy only necessary files to the runtime image
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-
-RUN echo "Final ls of /app"
-# DO AN LS 
-RUN ls -la
-
-RUN echo "Final ls of /app/dist"
-
-# DO AN LS 
-RUN ls -la /app/dist
+COPY --from=builder /app/seed ./seed
 
 # Expose the application port
 # EXPOSE 3000
+
+# Set the NODE_ENV to production
+ENV NODE_ENV=production
 
 # Start the application
 CMD ["node", "dist/main.js"]
