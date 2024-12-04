@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { svgUploader } from 'src/shared/util/svgUploader.util';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import { createTopIssueSchema } from './schemas/topIssues.schema';
+import { CreateTopIssueSchema } from './schemas/topIssues.schema';
 
 const prisma = new PrismaClient();
 
@@ -13,11 +13,12 @@ function md5(data: string) {
 @Injectable()
 export class TopIssuesService {
 
-  async create(name: string, icon: string | null): Promise<object> {
-    const validatedCreateTopIssue = createTopIssueSchema.parse({name});
+  async create(body: CreateTopIssueSchema): Promise<object> {
+    const { name, icon } = body;
+
     const { id } = await prisma.topIssue.create({
       data: {
-        name: validatedCreateTopIssue.name,
+        name: name,
       }
     })
 
@@ -40,4 +41,6 @@ export class TopIssuesService {
       icon: updatedTopIssue.icon,
     }
   }
+
+  //async delete(id: number)
 }

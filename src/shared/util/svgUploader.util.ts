@@ -11,7 +11,7 @@ export async function svgUploader(fileName: string, bucketName: string, svgData:
       CacheControl: 'max-age=31536000',
       Body: svgData,
     },
-    bucketPath,
+    bucketName,
   );
 
   return `https://${bucketPath}/${fileName}`;
