@@ -56,6 +56,7 @@ export default $config({
 
     if ($app.stage !== 'master') {
       // production bucket was setup manually. so no need to setup cloudfront.
+      // chore: re-deploy.
       new sst.aws.Router(`assets-${$app.stage}`, {
         routes: {
           '/*': {
