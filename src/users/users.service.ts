@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { Prisma, User } from '@prisma/client'
 import { genSalt, hash } from 'bcrypt'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
+import { generateRandomPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 
 type UniqueUserWhere = Prisma.AtLeast<
@@ -37,8 +38,11 @@ export class UsersService {
       phone,
       name,
     } = userData
+    const trimmedPassword = password
+      ? password.trim()
+      : generateRandomPassword()
     const hashedPassword =
-      password && (await hash(password.trim(), await genSalt()))
+      password && (await hash(trimmedPassword, await genSalt()))
     const existingUser = await this.findUser({ email })
     if (existingUser) {
       throw new ConflictException('User with this email already exists')

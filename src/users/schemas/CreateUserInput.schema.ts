@@ -2,6 +2,14 @@ import { z } from 'zod'
 import { toLowerAndTrim } from '../../shared/util/strings.util'
 import { createZodDto } from 'nestjs-zod'
 
+export const passwordSchema = z
+  .string()
+  .min(8, { message: 'Password must be at least 8 characters long' })
+  .regex(/[a-zA-Z]/, {
+    message: 'Password must contain at least one letter',
+  })
+  .regex(/\d/, { message: 'Password must contain at least one number' })
+
 export const CreateUserInputSchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
@@ -9,14 +17,7 @@ export const CreateUserInputSchema = z.object({
     .string()
     .email()
     .transform((v) => toLowerAndTrim(v)),
-  password: z
-    .string()
-    .min(8, { message: 'Password must be at least 8 characters long' })
-    .regex(/[a-zA-Z]/, {
-      message: 'Password must contain at least one letter',
-    })
-    .regex(/\d/, { message: 'Password must contain at least one number' })
-    .optional(),
+  password: passwordSchema,
   name: z.string().optional(),
   zip: z
     .string()

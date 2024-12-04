@@ -14,6 +14,7 @@ import {
 import { findSlug } from 'src/shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Prisma } from '@prisma/client'
+import { generateRandomPassword } from '../../users/util/passwords.util'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -45,6 +46,7 @@ export class AdminCampaignsService {
           lastName,
           name: `${firstName} ${lastName}`,
           email,
+          password: generateRandomPassword(),
           zip,
           phone,
           metaData: {},
