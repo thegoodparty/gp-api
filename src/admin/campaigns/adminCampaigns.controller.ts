@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,7 +10,7 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { AdminCampaignsService } from './adminCampaigns.service'
-import { AdminCreateCamapaignSchema } from './schemas/adminCreateCampaign.schema'
+import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { AdminSendCreateEmailSchema } from './schemas/adminSendCreateEmail.schema'
@@ -22,51 +21,27 @@ export class AdminCampaignsController {
   constructor(private readonly adminCampaignsService: AdminCampaignsService) {}
 
   @Post()
-  async create(@Body() body: AdminCreateCamapaignSchema) {
-    const result = await this.adminCampaignsService.create(body)
-
-    if (typeof result === 'string') {
-      throw new BadRequestException(result)
-    }
-
-    return result
+  create(@Body() body: AdminCreateCampaignSchema) {
+    return this.adminCampaignsService.create(body)
   }
 
   @Put(':id')
-  async update(
+  update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AdminUpdateCampaignSchema,
   ) {
-    const result = await this.adminCampaignsService.update(id, body)
-
-    if (typeof result === 'string') {
-      throw new BadRequestException(result)
-    }
-
-    return result
+    return this.adminCampaignsService.update(id, body)
   }
 
   @Delete(':id')
   @HttpCode(204)
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    const result = await this.adminCampaignsService.delete(id)
-
-    if (typeof result === 'string') {
-      throw new BadRequestException(result)
-    }
-
-    return true
+  delete(@Param('id', ParseIntPipe) id: number) {
+    return this.adminCampaignsService.delete(id)
   }
 
   @Post('email')
   @HttpCode(204)
   async sendEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
-    const result = await this.adminCampaignsService.sendCreateEmail(userId)
-
-    if (typeof result === 'string') {
-      throw new BadRequestException(result)
-    }
-
-    return result
+    return this.adminCampaignsService.sendCreateEmail(userId)
   }
 }

@@ -2,7 +2,7 @@ import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import { isMobilePhone, isPostalCode } from 'validator'
 
-export class AdminCreateCamapaignSchema extends createZodDto(
+export class AdminCreateCampaignSchema extends createZodDto(
   z
     .object({
       firstName: z.string(),

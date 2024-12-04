@@ -1,6 +1,12 @@
-import { Injectable, NotImplementedException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { AdminCreateCamapaignSchema } from './schemas/adminCreateCampaign.schema'
+import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -13,7 +19,7 @@ import { Prisma } from '@prisma/client'
 export class AdminCampaignsService {
   constructor(private prismaService: PrismaService) {}
 
-  async create(body: AdminCreateCamapaignSchema) {
+  async create(body: AdminCreateCampaignSchema) {
     const { firstName, lastName, email, zip, phone, party, otherParty } = body
 
     // check if user with email exists first
@@ -27,7 +33,7 @@ export class AdminCampaignsService {
     })
 
     if (exists > 0) {
-      return 'Email already in use'
+      throw new ConflictException('Email already in use')
     }
 
     // create new user
@@ -37,6 +43,7 @@ export class AdminCampaignsService {
         data: {
           firstName,
           lastName,
+          name: `${firstName} ${lastName}`,
           email,
           zip,
           phone,
@@ -48,7 +55,7 @@ export class AdminCampaignsService {
       console.log(error)
 
       if (error instanceof PrismaClientValidationError) {
-        return 'User creation failed - ' + error.name
+        throw new BadRequestException('User creation failed - ' + error.name)
       }
 
       throw error
@@ -118,7 +125,9 @@ export class AdminCampaignsService {
       console.log(error)
 
       if (error instanceof PrismaClientValidationError) {
-        return 'Failed to update campaign - ' + error.name
+        throw new BadRequestException(
+          'Failed to update campaign - ' + error.name,
+        )
       }
 
       throw error
@@ -127,14 +136,18 @@ export class AdminCampaignsService {
 
   async delete(id: number) {
     try {
-      return await this.prismaService.campaign.delete({ where: { id } })
+      await this.prismaService.campaign.delete({ where: { id } })
+      return true
     } catch (error) {
       console.log(error)
 
       if (error instanceof PrismaClientKnownRequestError) {
-        if (error.code === 'P2025') return 'Campaign not found'
+        if (error.code === 'P2025')
+          throw new NotFoundException('Campaign not found')
 
-        return 'Failed to update campaign - ' + (error as any).name
+        throw new BadRequestException(
+          'Failed to update campaign - ' + (error as any).name,
+        )
       }
 
       throw error
@@ -147,7 +160,7 @@ export class AdminCampaignsService {
     })
 
     if (!user) {
-      return 'No user found for id - ' + userId
+      throw new NotFoundException('No user found for id - ' + userId)
     }
 
     throw new NotImplementedException()
