@@ -18,3 +18,9 @@ export class CreateTopIssueSchema extends createZodDto(
     icon: z.string().nullable()
   }).strict(),
 ) {}
+
+export class DeleteTopIssueSchema extends createZodDto(
+  z.object({
+    id: z.number()
+  }).strict()
+) {}
