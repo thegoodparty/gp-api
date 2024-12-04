@@ -19,7 +19,7 @@
     "migrate:reset": "npx prisma migrate reset --force",
     "seed": "npx prisma db seed",
     "generate": "npx prisma generate",
-    "prisma-format": "npx prisma-case-format -c prisma/.prisma-case-format.yaml -f prisma/schema.prisma"
+    "prisma-format": "for file in prisma/schema/*.prisma; do npx prisma-case-format -c prisma/.prisma-case-format.yaml -f \"$file\"; done"
   },
   "prisma": {
     "seed": "ts-node ./seed/seed.ts"
@@ -52,6 +52,7 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "slugify": "^1.6.6",
+    "validator": "^13.12.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -66,6 +67,7 @@
     "@types/node": "^20.3.1",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.0",
+    "@types/validator": "^13.12.2",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.0.0",

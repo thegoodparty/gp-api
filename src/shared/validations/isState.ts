@@ -2,7 +2,7 @@ import { STATES, STATE_CODES } from '../constants/states'
 import { z } from 'zod'
 
 /**
- * Validaiton function intended to be used in a zod schema
+ * State validation function intended to be used in a zod schema
  * @example
  * const schema = z.object({
  *   name: z.string().optional(),
