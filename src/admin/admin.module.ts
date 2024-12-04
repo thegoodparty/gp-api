@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common'
 import { AdminCampaignsController } from './campaigns/adminCampaigns.controller'
 import { AdminCampaignsService } from './campaigns/adminCampaigns.service'
-import { PrismaModule } from 'src/prisma/prisma.module'
 
 @Module({
-  imports: [PrismaModule],
+  imports: [],
   controllers: [AdminCampaignsController],
   providers: [AdminCampaignsService],
 })
