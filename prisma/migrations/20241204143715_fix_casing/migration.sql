@@ -7,7 +7,6 @@
   - You are about to drop the column `topIssueId` on the `position` table. All the data in the column will be lost.
   - Added the required column `campaign_id` to the `campaign_position` table without a default value. This is not possible if the table is not empty.
   - Added the required column `position_id` to the `campaign_position` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `zip` to the `user` table without a default value. This is not possible if the table is not empty.
 
 */
 -- CreateEnum
@@ -44,8 +43,8 @@ ALTER TABLE "position" DROP COLUMN "topIssueId",
 ADD COLUMN     "top_issue_id" INTEGER;
 
 -- AlterTable
-ALTER TABLE "user" ADD COLUMN     "role" "UserRole",
-ADD COLUMN     "zip" TEXT NOT NULL;
+ALTER TABLE "user" ADD COLUMN     "is_admin" BOOLEAN DEFAULT false,
+ADD COLUMN     "role" "UserRole";
 
 -- CreateIndex
 CREATE INDEX "campaign_position_campaign_id_idx" ON "campaign_position"("campaign_id");
