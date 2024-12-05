@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService } from '../shared/services/prisma.service'
 import { ContentfulService } from '../contentful/contentful.service'
 import { Content, ContentType } from '@prisma/client'
 import { InputJsonObject } from '@prisma/client/runtime/library'

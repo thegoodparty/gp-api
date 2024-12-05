@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { PrismaService } from 'src/prisma/prisma.service'
+import { PrismaService } from 'src/shared/services/prisma.service'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import {
   PrismaClientKnownRequestError,

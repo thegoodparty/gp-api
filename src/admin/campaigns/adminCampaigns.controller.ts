@@ -45,7 +45,7 @@ export class AdminCampaignsController {
 
   @Post('email')
   @HttpCode(204)
-  sendEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
+  sendAccountCreateEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
     return this.emailService.sendSetPasswordEmail(userId)
   }
 }
