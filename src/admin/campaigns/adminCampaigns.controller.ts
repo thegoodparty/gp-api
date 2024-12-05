@@ -14,7 +14,7 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { AdminSendCreateEmailSchema } from './schemas/adminSendCreateEmail.schema'
-import { EmailService } from 'src/shared/email/email.service'
+import { EmailService } from 'src/shared/services/email.service'
 
 @Controller('admin/campaigns')
 @UsePipes(ZodValidationPipe)
