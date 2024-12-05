@@ -1,6 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, UsePipes } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Put, UsePipes } from '@nestjs/common';
 import { TopIssuesService } from './top-issues.service';
-import { CreateTopIssueDto, CreateTopIssueSchema, DeleteTopIssueDto, UpdateTopIssueDto, UpdateTopIssueSchema } from './schemas/topIssues.schema';
+import { CreateTopIssueDto, UpdateTopIssueDto } from './schemas/topIssues.schema';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 @Controller('top-issues')
@@ -9,46 +9,27 @@ export class TopIssuesController {
   constructor(private readonly topIssuesService: TopIssuesService) {}
   
   @Get()
-  async listTopIssues() {
-    const result = await this.topIssuesService.list();
-
-    if (typeof result === 'string') {
-      throw new BadRequestException(result);
-    }
-
-    return result;
+  listTopIssues() {
+    return this.topIssuesService.list();
   }
 
   @Post()
   async createTopIssue(@Body() body: CreateTopIssueDto) {
-    const result = await this.topIssuesService.create(body);
-
-    if (typeof result === 'string') {
-      throw new BadRequestException(result);
-    }
-
-    return result;
+    return await this.topIssuesService.create(body);
   }
 
   @Put(':id')
-  async updateTopIssue(@Body() body: UpdateTopIssueDto) {
-    const result = await this.topIssuesService.update(body);
-
-    if (typeof result === 'string') {
-      throw new BadRequestException(result);
-    }
-
-    return result;
+  async updateTopIssue(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateTopIssueDto
+  ) {
+    return await this.topIssuesService.update(id, body);
   }
 
   @Delete(':id')
-  async deleteTopIssue(@Param('id') param: DeleteTopIssueDto) {
-    const result = await this.topIssuesService.delete(param);
+  @HttpCode(204)
+  async deleteTopIssue(@Param('id', ParseIntPipe) id: number) {
+    await this.topIssuesService.delete(id);
 
-    if (typeof result === 'string') {
-      throw new BadRequestException(result);
-    }
-
-    return result;
   }
 }

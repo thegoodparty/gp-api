@@ -22,9 +22,3 @@ export const CreateTopIssueOutputSchema = z.object({
   icon: z.string().nullable(),
 })
 export class TopIssueOutputDto extends createZodDto(CreateTopIssueOutputSchema) {};
-
-
-export const DeleteTopIssueSchema = z.object({
-  id: z.number()
-}).strict()
-export class DeleteTopIssueDto extends createZodDto(DeleteTopIssueSchema) {};

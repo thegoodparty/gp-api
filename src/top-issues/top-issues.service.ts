@@ -1,15 +1,8 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { svgUploader } from 'src/shared/util/svgUploader.util';
-import * as crypto from 'crypto';
-import { CreateTopIssueDto, TopIssueOutputDto, CreateTopIssueSchema, DeleteTopIssueDto, UpdateTopIssueDto, UpdateTopIssueSchema } from './schemas/topIssues.schema';
-import { s3DeleteFile } from 'src/shared/util/s3DeleteFile.util';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { CreateTopIssueDto, TopIssueOutputDto, UpdateTopIssueDto } from './schemas/topIssues.schema';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Campaign, TopIssue } from '@prisma/client';
-import { Prisma } from '@prisma/client';
-import { toNamespacedPath } from 'path';
+import { TopIssue } from '@prisma/client';
 import { PrismaClientValidationError } from '@prisma/client/runtime/library';
-
-const assetsBase = process.env.ASSETS_BASE;
 
 @Injectable()
 export class TopIssuesService {
@@ -22,7 +15,8 @@ export class TopIssuesService {
     try {
       const { id } = await this.prismaService.topIssue.create({
         data: {
-          name: name,
+          name, 
+          icon
         }
       })
 
@@ -31,28 +25,39 @@ export class TopIssuesService {
         name,
         icon
       }
-    } catch (error: any) {
-      // if (error instanceof error) {
-
-      // }
-      this.logger.error(`Failed to create Top Issue ${error.message}`,
-        error?.response?.data || error.stack
-      )
-
-      //        `Failed to fetch data from HubSpot API: ${error.message}`,
-      //error?.response?.data || error.stack,
+    } catch (error: unknown) {
       if (error instanceof PrismaClientValidationError) {
-        throw new BadRequestException(
-          'Failed to create Top Issue - ' + error.name
-        );
+        this.logger.error(`Validation error ${error.message}`, error.stack);
+        throw new BadRequestException('Failed to create Top Issue - ' + error.message);
       }
-
+      if (error instanceof Error) {
+        this.logger.error(`Failed to create Top Issue ${error.message}`, error.stack);
+        throw new InternalServerErrorException('An unexpected error occured.');
+      }
       throw error;
     }
   }
 
-  async delete(param: DeleteTopIssueDto) {
-    const { id } = param;
+  async update(id: number, body: UpdateTopIssueDto): Promise<TopIssue> {
+    const { name, icon } = body;
+    try {
+      return await this.prismaService.topIssue.update({
+        where: { id },
+        data: { name, icon }
+      });
+    } catch (error) {
+      if (error instanceof PrismaClientValidationError) {
+        this.logger.error(`Validation error: ${error.message}`, error.stack);
+        throw new BadRequestException('Failed to update Top Issue - ' + error.message);
+      } else if (error instanceof Error) {
+        this.logger.error(`Failed to update Top Issue: ${error.message}`, error.stack);
+        throw new InternalServerErrorException('An unexpected error occurred.');
+      }
+      throw error;
+    }
+  }
+
+  async delete(id: number): Promise<void> {
     const issue = await this.prismaService.topIssue.findUnique({
       where: { id },
       include: {
@@ -63,62 +68,28 @@ export class TopIssuesService {
     });
 
     if (!issue) {
-      this.logger.error(`Top issue with id ${id} not found`);
+      this.logger.error(`Failed to delete Top Issue with id ${id}`);
       throw new NotFoundException(`Top issue with id ${id} not found`);
     }
 
-    const positionsLength = issue.positions.length; // Caching for performance
-    const positionIds = new Array<number>(positionsLength);
-    for (let i = 0; i < positionsLength; i++) {
-      positionIds[i] = issue.positions[i].id;
-    }
-
-    const campaignsLength = issue.campaigns.length;
-    const campaignIds = new Array<number>(campaignsLength);
-    for (let i = 0; i < campaignsLength; i++) {
-      campaignIds[i] = issue.campaigns[i].id;
-    }
-
-    const campaignPositionsLength = issue.campaignPositions.length;
-    const campaignPositionIds = new Array<number>(campaignPositionsLength);
-    for (let i = 0; i < campaignPositionsLength; i++) {
-      campaignPositionIds[i] = issue.campaignPositions[i].id;
-    }
+    const positionIds = issue.positions.map((position) => position.id);
+    const campaignPositionIds = issue.campaignPositions.map((cp) => cp.id);
+    
 
     await this.prismaService.$transaction(async (prisma) => {
       if (campaignPositionIds.length > 0) {
-        await this.prismaService.campaignPosition.deleteMany({
+        await prisma.campaignPosition.deleteMany({
           where: { id: { in: campaignPositionIds } },
         });
       }
 
       if (positionIds.length > 0) {
-        await this.prismaService.position.deleteMany({
+        await prisma.position.deleteMany({
           where: { id: { in: positionIds } },
         });
       }
 
-      // !! Do I actually need to do this???
-      //
-      // if (campaignIds.length > 0) {
-      //   const disconnectTopIssuePromises: Promise<Campaign>[] = [];
-      //   for (let i = 0; i < campaignsLength; i++) {
-      //     const campaignId = campaignIds[i];
-      //     disconnectTopIssuePromises.push(
-      //       this.prismaService.campaign.update({
-      //         where: { id: campaignId },
-      //         data: {
-      //           topIssues: {
-      //             disconnect: { id },
-      //           },
-      //         },
-      //       })
-      //     );
-      //   }
-      //   await Promise.all(disconnectTopIssuePromises);
-      // }
-
-      await this.prismaService.topIssue.delete({
+      await prisma.topIssue.delete({
         where: { id },
       });
     });
@@ -138,19 +109,5 @@ export class TopIssuesService {
     return topIssues;
   }
 
-  async update(body: UpdateTopIssueDto): Promise<UpdateTopIssueDto> {
-    const { id, name, icon } = body;
-    await this.prismaService.topIssue.update({
-      where: { id },
-      data: {
-        name: name,
-      }
-    })
 
-    return {
-      id,
-      name,
-      icon,
-    }
-  }
 }

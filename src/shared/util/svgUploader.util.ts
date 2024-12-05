@@ -1,7 +1,7 @@
 import { s3Uploader } from "./s3Uploader.util";
 
 export async function svgUploader(fileName: string, bucketName: string, svgData: string): Promise<string> {
-  const assetsBase = process.env.ASSETS_BASE; // Figure this out
+  const assetsBase = process.env.ASSETS_BASE;
   const bucketPath = `${assetsBase}/${bucketName}`;
 
   await s3Uploader(
