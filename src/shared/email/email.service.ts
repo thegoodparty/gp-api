@@ -5,14 +5,8 @@ import Mailgun from 'mailgun.js'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ConfigService } from '@nestjs/config'
 import { nanoid } from 'nanoid'
+import { IMailgunClient } from 'mailgun.js/Interfaces'
 
-const mailgun = new Mailgun(FormData)
-const mg = mailgun.client({
-  key: process.env.MAILGUN_API_KEY as string,
-  username: 'api',
-})
-
-const appBase = process.env.CORS_ORIGIN
 const EMAIL_DOMAIN = 'mg.goodparty.org'
 
 type SendEmailInput = {
@@ -34,10 +28,21 @@ type SendTemplateEmailInput = {
 
 @Injectable()
 export class EmailService {
+  private appBase: string
+  private mailgun: Mailgun
+  private mg: IMailgunClient
+
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
-  ) {}
+  ) {
+    this.appBase = this.config.get('CORS_ORIGIN') as string
+    this.mailgun = new Mailgun(FormData)
+    this.mg = this.mailgun.client({
+      key: this.config.get('MAILGUN_API_KEY') as string,
+      username: 'api',
+    })
+  }
 
   async sendEmail({
     to,
@@ -70,7 +75,10 @@ export class EmailService {
       to,
       subject,
       template,
-      'h:X-Mailgun-Variables': JSON.stringify({ appBase, ...variables }),
+      'h:X-Mailgun-Variables': JSON.stringify({
+        appBase: this.appBase,
+        ...variables,
+      }),
     }
 
     if (cc) {
@@ -102,7 +110,7 @@ export class EmailService {
     const { firstName, lastName, email, role, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${appBase}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${this.appBase}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
       content: getSetPasswordEmailContent(firstName, lastName, link, role),
@@ -136,7 +144,7 @@ export class EmailService {
   private async sendEmailWithRetry(emailData, retryCount = 5) {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
-        return await mg.messages.create(EMAIL_DOMAIN, emailData)
+        return await this.mg.messages.create(EMAIL_DOMAIN, emailData)
       } catch (error: any) {
         if (error.status === 429) {
           // Rate limit exceeded
