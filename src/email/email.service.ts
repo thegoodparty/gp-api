@@ -1,13 +1,9 @@
 import { Injectable, NotImplementedException } from '@nestjs/common'
-import { User, UserRole } from '@prisma/client'
-import * as FormData from 'form-data'
-import Mailgun from 'mailgun.js'
-import { PrismaService } from 'src/shared/services/prisma.service'
 import { ConfigService } from '@nestjs/config'
 import { nanoid } from 'nanoid'
-import { IMailgunClient } from 'mailgun.js/Interfaces'
-
-const EMAIL_DOMAIN = 'mg.goodparty.org'
+import { User, UserRole } from '@prisma/client'
+import { PrismaService } from 'src/shared/services/prisma.service'
+import { MailgunService } from './mailgun.service'
 
 type SendEmailInput = {
   to: string
@@ -29,19 +25,13 @@ type SendTemplateEmailInput = {
 @Injectable()
 export class EmailService {
   private appBase: string
-  private mailgun: Mailgun
-  private mg: IMailgunClient
 
   constructor(
+    private mailgun: MailgunService,
     private prisma: PrismaService,
     private config: ConfigService,
   ) {
     this.appBase = this.config.get('CORS_ORIGIN') as string
-    this.mailgun = new Mailgun(FormData)
-    this.mg = this.mailgun.client({
-      key: this.config.get('MAILGUN_API_KEY') as string,
-      username: 'api',
-    })
   }
 
   async sendEmail({
@@ -144,7 +134,7 @@ export class EmailService {
   private async sendEmailWithRetry(emailData, retryCount = 5) {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
-        return await this.mg.messages.create(EMAIL_DOMAIN, emailData)
+        return await this.mailgun.sendMessage(emailData)
       } catch (error: any) {
         if (error.status === 429) {
           // Rate limit exceeded
