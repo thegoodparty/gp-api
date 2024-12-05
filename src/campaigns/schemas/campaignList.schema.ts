@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
 import { LEVELS } from 'src/shared/constants/governmentLevels'
-import { isState } from 'src/shared/validations/isState'
+import { isState } from 'src/shared/util/zod.util'
 import { z } from 'zod'
 
 const STATUS_FILTERS = ['active', 'inactive'] as const

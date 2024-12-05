@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  NotImplementedException,
 } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
@@ -152,24 +151,6 @@ export class AdminCampaignsService {
 
       throw error
     }
-  }
-
-  async sendCreateEmail(userId: number) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    })
-
-    if (!user) {
-      throw new NotFoundException('No user found for id - ' + userId)
-    }
-
-    throw new NotImplementedException()
-
-    // TODO: riimplement
-    // const { firstName, lastName, email, role } = user
-    // await sendEmail(firstName, lastName, email, role)
-    //
-    // return true
   }
 }
 

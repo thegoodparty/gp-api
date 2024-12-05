@@ -14,11 +14,15 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { AdminSendCreateEmailSchema } from './schemas/adminSendCreateEmail.schema'
+import { EmailService } from 'src/shared/email/email.service'
 
 @Controller('admin/campaigns')
 @UsePipes(ZodValidationPipe)
 export class AdminCampaignsController {
-  constructor(private readonly adminCampaignsService: AdminCampaignsService) {}
+  constructor(
+    private readonly adminCampaignsService: AdminCampaignsService,
+    private readonly emailService: EmailService,
+  ) {}
 
   @Post()
   create(@Body() body: AdminCreateCampaignSchema) {
@@ -41,7 +45,7 @@ export class AdminCampaignsController {
 
   @Post('email')
   @HttpCode(204)
-  async sendEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
-    return this.adminCampaignsService.sendCreateEmail(userId)
+  sendEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
+    return this.emailService.sendSetPasswordEmail(userId)
   }
 }
