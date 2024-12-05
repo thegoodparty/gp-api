@@ -70,7 +70,7 @@ export class AuthenticationController {
       return await this.emailService.sendRecoverPasswordEmail(email)
     } catch (e) {
       if (e instanceof NotFoundException) {
-        // don't want to expose that user with email/phone doesn't exist
+        // don't want to expose that user with email doesn't exist
         return
       }
 
