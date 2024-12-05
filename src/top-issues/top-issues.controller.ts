@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, UsePipes } from '@nestjs/common';
 import { TopIssuesService } from './top-issues.service';
-import { CreateTopIssueSchema } from './schemas/topIssues.schema';
+import { CreateTopIssueDto, CreateTopIssueSchema, DeleteTopIssueDto, UpdateTopIssueDto, UpdateTopIssueSchema } from './schemas/topIssues.schema';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 @Controller('top-issues')
@@ -20,7 +20,7 @@ export class TopIssuesController {
   }
 
   @Post()
-  async createTopIssue(@Body() body: CreateTopIssueSchema) {
+  async createTopIssue(@Body() body: CreateTopIssueDto) {
     const result = await this.topIssuesService.create(body);
 
     if (typeof result === 'string') {
@@ -31,13 +31,19 @@ export class TopIssuesController {
   }
 
   @Put(':id')
-  updateTopIssue(@Param('id') id: number, @Body() updateTopIssueDto: any) {
+  async updateTopIssue(@Body() body: UpdateTopIssueDto) {
+    const result = await this.topIssuesService.update(body);
 
+    if (typeof result === 'string') {
+      throw new BadRequestException(result);
+    }
+
+    return result;
   }
 
   @Delete(':id')
-  async deleteTopIssue(@Param('id') id: number) {
-    const result = await this.topIssuesService.delete(id);
+  async deleteTopIssue(@Param('id') param: DeleteTopIssueDto) {
+    const result = await this.topIssuesService.delete(param);
 
     if (typeof result === 'string') {
       throw new BadRequestException(result);

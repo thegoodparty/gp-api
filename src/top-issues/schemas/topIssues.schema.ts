@@ -1,25 +1,30 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-export class UpdateTopIssueSchema extends createZodDto(
-  z.object({
-    id: z.number(),
-    name: z.string(),
-    icon: z.string().nullable(),
-  })
-  .strict()
+export const UpdateTopIssueSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  icon: z.string().nullable(),
+})
+.strict()
+export class UpdateTopIssueDto extends createZodDto(UpdateTopIssueSchema) {};
 
-) {}
 
-export class CreateTopIssueSchema extends createZodDto(
-  z.object({ 
-    name: z.string(), 
-    icon: z.string().nullable()
-  }).strict(),
-) {}
+export const CreateTopIssueSchema = z.object({ 
+  name: z.string(), 
+  icon: z.string().nullable()
+}).strict()
+export class CreateTopIssueDto extends createZodDto(CreateTopIssueSchema) {};
 
-export class DeleteTopIssueSchema extends createZodDto(
-  z.object({
-    id: z.number()
-  }).strict()
-) {}
+export const CreateTopIssueOutputSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  icon: z.string().nullable(),
+})
+export class TopIssueOutputDto extends createZodDto(CreateTopIssueOutputSchema) {};
+
+
+export const DeleteTopIssueSchema = z.object({
+  id: z.number()
+}).strict()
+export class DeleteTopIssueDto extends createZodDto(DeleteTopIssueSchema) {};

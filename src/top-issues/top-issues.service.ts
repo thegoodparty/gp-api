@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { svgUploader } from 'src/shared/util/svgUploader.util';
 import * as crypto from 'crypto';
-import { CreateTopIssueSchema, UpdateTopIssueSchema } from './schemas/topIssues.schema';
+import { CreateTopIssueDto, TopIssueOutputDto, CreateTopIssueSchema, DeleteTopIssueDto, UpdateTopIssueDto, UpdateTopIssueSchema } from './schemas/topIssues.schema';
 import { s3DeleteFile } from 'src/shared/util/s3DeleteFile.util';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Campaign, TopIssue } from '@prisma/client';
@@ -11,16 +11,12 @@ import { PrismaClientValidationError } from '@prisma/client/runtime/library';
 
 const assetsBase = process.env.ASSETS_BASE;
 
-function md5(data: string) {
-  return crypto.createHash('md5').update(data).digest('hex');
-}
-
 @Injectable()
 export class TopIssuesService {
   private readonly logger = new Logger(TopIssuesService.name);
   constructor(private prismaService: PrismaService) {}
 
-  async create(body: CreateTopIssueSchema): Promise<object> {
+  async create(body: CreateTopIssueDto): Promise<TopIssueOutputDto> {
     const { name, icon } = body;
 
     try {
@@ -55,7 +51,8 @@ export class TopIssuesService {
     }
   }
 
-  async delete(id: number) {
+  async delete(param: DeleteTopIssueDto) {
+    const { id } = param;
     const issue = await this.prismaService.topIssue.findUnique({
       where: { id },
       include: {
@@ -141,7 +138,7 @@ export class TopIssuesService {
     return topIssues;
   }
 
-  async update(body: UpdateTopIssueSchema): Promise<object> {
+  async update(body: UpdateTopIssueDto): Promise<UpdateTopIssueDto> {
     const { id, name, icon } = body;
     await this.prismaService.topIssue.update({
       where: { id },
