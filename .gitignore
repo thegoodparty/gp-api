@@ -48,7 +48,6 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
-api/.env
 sst/.env
 /nestjs/.env
 /nestjs/.env.development.local

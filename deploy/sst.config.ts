@@ -25,16 +25,50 @@ export default $config({
           })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
+    let bucketDomain: string
+    let apiDomain: string
+    if ($app.stage === 'master') {
+      apiDomain = 'gp-api.goodparty.org'
+      bucketDomain = 'assets.goodparty.org'
+    } else if ($app.stage === 'develop') {
+      apiDomain = 'gp-api-dev.goodparty.org'
+      bucketDomain = 'assets-dev.goodparty.org'
+    } else {
+      apiDomain = `gp-api-${$app.stage}.goodparty.org`
+      bucketDomain = `assets-${$app.stage}.goodparty.org`
+    }
+
+    let assetsBucket
+    if ($app.stage === 'master') {
+      assetsBucket = sst.aws.Bucket.get('assetsBucket', 'assets.goodparty.org')
+    } else {
+      // Each stage will get its own Bucket.
+      assetsBucket = new sst.aws.Bucket('assets', {
+        access: 'cloudfront',
+        // use a transformation to set the bucket name to the bucketDomain.
+        transform: {
+          bucket: {
+            bucket: bucketDomain,
+          },
+        },
+      })
+    }
+
+    if ($app.stage !== 'master') {
+      // production bucket was setup manually. so no need to setup cloudfront.
+      // chore: re-deploy.
+      new sst.aws.Router(`assets-${$app.stage}`, {
+        routes: {
+          '/*': {
+            bucket: assetsBucket,
+          },
+        },
+        domain: bucketDomain,
+      })
+    }
+
     // Each stage will get its own Cluster.
     const cluster = new sst.aws.Cluster('fargate', { vpc })
-
-    // Change the domain based on the stage.
-    let domain = 'gp-api-test.goodparty.org'
-    if ($app.stage === 'develop') {
-      domain = 'gp-api-dev.goodparty.org'
-    } else if ($app.stage === 'master') {
-      domain = 'gp-api.goodparty.org'
-    }
 
     const dbUrl = new sst.Secret('DBURL')
     const dbName = new sst.Secret('DBNAME')
@@ -56,7 +90,7 @@ export default $config({
 
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
-        domain,
+        domain: apiDomain,
         ports: [
           { listen: '80/http' },
           { listen: '443/https', forward: '80/http' },
@@ -109,6 +143,7 @@ export default $config({
           STAGE: $app.stage,
         },
       },
+      link: [assetsBucket],
     })
 
     // Create a Security Group for the RDS Cluster

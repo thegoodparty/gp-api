@@ -3,11 +3,11 @@ model CampaignPosition {
   description String?
   order       Int?
   campaign    Campaign  @relation(fields: [campaignId], references: [id])
-  campaignId  Int
+  campaignId  Int       @map("campaign_id")
   position    Position  @relation(fields: [positionId], references: [id])
-  positionId  Int
+  positionId  Int       @map("position_id")
   topIssue    TopIssue? @relation(fields: [topIssueId], references: [id])
-  topIssueId  Int?
+  topIssueId  Int?      @map("top_issue_id")
 
   @@index([campaignId])
   @@index([positionId])
