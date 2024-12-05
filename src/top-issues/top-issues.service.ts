@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { svgUploader } from 'src/shared/util/svgUploader.util';
 import * as crypto from 'crypto';
-import { CreateTopIssueSchema } from './schemas/topIssues.schema';
+import { CreateTopIssueSchema, UpdateTopIssueSchema } from './schemas/topIssues.schema';
 import { s3DeleteFile } from 'src/shared/util/s3DeleteFile.util';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Campaign } from '@prisma/client';
+import { Campaign, TopIssue } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { toNamespacedPath } from 'path';
+import { PrismaClientValidationError } from '@prisma/client/runtime/library';
 
 const assetsBase = process.env.ASSETS_BASE;
 
@@ -15,34 +17,41 @@ function md5(data: string) {
 
 @Injectable()
 export class TopIssuesService {
+  private readonly logger = new Logger(TopIssuesService.name);
   constructor(private prismaService: PrismaService) {}
 
   async create(body: CreateTopIssueSchema): Promise<object> {
     const { name, icon } = body;
 
-    const { id } = await this.prismaService.topIssue.create({
-      data: {
-        name: name,
+    try {
+      const { id } = await this.prismaService.topIssue.create({
+        data: {
+          name: name,
+        }
+      })
+
+      return {
+        id,
+        name,
+        icon
       }
-    })
+    } catch (error: any) {
+      // if (error instanceof error) {
 
-    const iconUrl = icon
-      ? await svgUploader(
-        `topissue-icon-${id}-${md5(icon)}.svg`,
-        'top-issue-icons',
-        icon,
+      // }
+      this.logger.error(`Failed to create Top Issue ${error.message}`,
+        error?.response?.data || error.stack
       )
-    : null;
 
-    const updatedTopIssue = await this.prismaService.topIssue.update({
-      where: { id },
-      data: { icon: iconUrl },
-    });
+      //        `Failed to fetch data from HubSpot API: ${error.message}`,
+      //error?.response?.data || error.stack,
+      if (error instanceof PrismaClientValidationError) {
+        throw new BadRequestException(
+          'Failed to create Top Issue - ' + error.name
+        );
+      }
 
-    return {
-      id: updatedTopIssue.id,
-      name: updatedTopIssue.name,
-      icon: updatedTopIssue.icon,
+      throw error;
     }
   }
 
@@ -57,16 +66,8 @@ export class TopIssuesService {
     });
 
     if (!issue) {
+      this.logger.error(`Top issue with id ${id} not found`);
       throw new NotFoundException(`Top issue with id ${id} not found`);
-    }  
-
-    const { icon } = issue;
-
-    if (icon) {
-      await s3DeleteFile(
-        `${assetsBase}/top-issue-icons`,
-        `top-issue-icons/${id}-topissue-icon.svg`,
-      );
     }
 
     const positionsLength = issue.positions.length; // Caching for performance
@@ -100,27 +101,59 @@ export class TopIssuesService {
         });
       }
 
-      if (campaignIds.length > 0) {
-        const disconnectTopIssuePromises: Promise<Campaign>[] = [];
-        for (let i = 0; i < campaignsLength; i++) {
-          const campaignId = campaignIds[i];
-          disconnectTopIssuePromises.push(
-            this.prismaService.campaign.update({
-              where: { id: campaignId },
-              data: {
-                topIssues: {
-                  disconnect: { id },
-                },
-              },
-            })
-          );
-        }
-        await Promise.all(disconnectTopIssuePromises);
-      }
+      // !! Do I actually need to do this???
+      //
+      // if (campaignIds.length > 0) {
+      //   const disconnectTopIssuePromises: Promise<Campaign>[] = [];
+      //   for (let i = 0; i < campaignsLength; i++) {
+      //     const campaignId = campaignIds[i];
+      //     disconnectTopIssuePromises.push(
+      //       this.prismaService.campaign.update({
+      //         where: { id: campaignId },
+      //         data: {
+      //           topIssues: {
+      //             disconnect: { id },
+      //           },
+      //         },
+      //       })
+      //     );
+      //   }
+      //   await Promise.all(disconnectTopIssuePromises);
+      // }
 
       await this.prismaService.topIssue.delete({
         where: { id },
       });
     });
+  }
+
+  async list(): Promise<TopIssue[]> {
+    const topIssues = await this.prismaService.topIssue.findMany({
+      include: { positions: true }
+    })
+
+    for (let topIssue of topIssues) {
+      if (topIssue.positions && Array.isArray(topIssue.positions)) {
+        topIssue.positions.sort((a, b) => a.name.localeCompare(b.name));
+      }
+    }
+
+    return topIssues;
+  }
+
+  async update(body: UpdateTopIssueSchema): Promise<object> {
+    const { id, name, icon } = body;
+    await this.prismaService.topIssue.update({
+      where: { id },
+      data: {
+        name: name,
+      }
+    })
+
+    return {
+      id,
+      name,
+      icon,
+    }
   }
 }

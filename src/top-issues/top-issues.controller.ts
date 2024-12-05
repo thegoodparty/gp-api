@@ -9,8 +9,14 @@ export class TopIssuesController {
   constructor(private readonly topIssuesService: TopIssuesService) {}
   
   @Get()
-  listTopIssues() {
+  async listTopIssues() {
+    const result = await this.topIssuesService.list();
 
+    if (typeof result === 'string') {
+      throw new BadRequestException(result);
+    }
+
+    return result;
   }
 
   @Post()
@@ -30,7 +36,13 @@ export class TopIssuesController {
   }
 
   @Delete(':id')
-  deleteTopIssue(@Param('id') id: number) {
+  async deleteTopIssue(@Param('id') id: number) {
+    const result = await this.topIssuesService.delete(id);
 
+    if (typeof result === 'string') {
+      throw new BadRequestException(result);
+    }
+
+    return result;
   }
 }
