@@ -47,15 +47,13 @@ export class EmailService {
     messageHeader,
     from,
   }: SendEmailInput) {
-    await this.sendEmailWithRetry({
+    return await this.sendEmailWithRetry({
       from: from || 'GoodParty.org <noreply@goodparty.org>',
       to,
       subject,
       text: message,
       html: getBasicEmailContent(message, messageHeader, subject),
     })
-
-    return { message: 'email sent successfully' }
   }
 
   async sendTemplateEmail({
@@ -108,7 +106,12 @@ export class EmailService {
       `${this.appBase}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
-      content: getSetPasswordEmailContent(firstName, lastName, link, role),
+      content: getSetPasswordEmailContent(
+        firstName as string,
+        lastName as string,
+        link,
+        role,
+      ),
     }
     const subject =
       role === 'sales'
