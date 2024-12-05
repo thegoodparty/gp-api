@@ -6,6 +6,8 @@ import { IMailgunClient } from 'mailgun.js/Interfaces'
 
 const EMAIL_DOMAIN = 'mg.goodparty.org'
 
+export type EmailData = MailgunMessageData & { variables?: Record<string, any> }
+
 @Injectable()
 export class MailgunService {
   private mailgun: Mailgun
@@ -19,7 +21,11 @@ export class MailgunService {
     })
   }
 
-  sendMessage(emailData: MailgunMessageData) {
+  sendMessage({ variables, ...emailData }: EmailData) {
+    if (variables) {
+      emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
+    }
+
     return this.client.messages.create(EMAIL_DOMAIN, emailData)
   }
 }

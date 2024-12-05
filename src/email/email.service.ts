@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { nanoid } from 'nanoid'
 import { Prisma, User } from '@prisma/client'
 import { PrismaService } from 'src/shared/services/prisma.service'
-import { MailgunService } from './mailgun.service'
+import { EmailData, MailgunService } from './mailgun.service'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import {
   getSetPasswordEmailContent,
@@ -64,15 +64,15 @@ export class EmailService {
     from,
     cc,
   }: SendTemplateEmailInput) {
-    const data: Record<string, string> = {
+    const data: EmailData = {
       from: from || 'GoodParty.org <noreply@goodparty.org>',
       to,
       subject,
       template,
-      'h:X-Mailgun-Variables': JSON.stringify({
+      variables: {
         appBase: this.appBase,
         ...variables,
-      }),
+      },
     }
 
     if (cc) {
@@ -148,7 +148,7 @@ export class EmailService {
     }
   }
 
-  private async sendEmailWithRetry(emailData, retryCount = 5) {
+  private async sendEmailWithRetry(emailData: EmailData, retryCount = 5) {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
         return await this.mailgun.sendMessage(emailData)
