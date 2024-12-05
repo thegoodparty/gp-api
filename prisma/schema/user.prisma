@@ -7,20 +7,20 @@ model User {
   id                          Int                     @id @default(autoincrement())
   createdAt                   DateTime                @default(now()) @map("created_at")
   updatedAt                   DateTime                @updatedAt @map("updated_at")
-  passwordResetToken          String?                 @map("password_reset_token")
-  passwordResetTokenExpiresAt BigInt?                 @map("password_reset_token_expires_at")
-  firstName                   String                  @map("first_name")
-  lastName                    String                  @map("last_name")
-  name                        String
-  password                    String?
+  firstName                   String?                 @default("") @map("first_name")
+  lastName                    String?                 @default("") @map("last_name")
+  name                        String?
+  password                    String
   email                       String                  @unique
-  phone                       String
+  phone                       String?
   zip                         String?
   role                        UserRole?
   isAdmin                     Boolean?                @default(false) @map("is_admin")
   metaData                    Json?                   @map("meta_data") @db.JsonB
   campaignUpdateHistory       CampaignUpdateHistory[]
   campaigns                   Campaign[]
+  passwordResetToken          String?                 @map("password_reset_token")
+  passwordResetTokenExpiresAt BigInt?                 @map("password_reset_token_expires_at")
 
   @@map("user")
 }
