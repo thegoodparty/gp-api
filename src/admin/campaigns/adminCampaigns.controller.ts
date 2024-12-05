@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Post,
@@ -38,13 +39,13 @@ export class AdminCampaignsController {
   }
 
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.adminCampaignsService.delete(id)
   }
 
   @Post('email')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   sendAccountCreateEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
     return this.emailService.sendSetPasswordEmail(userId)
   }

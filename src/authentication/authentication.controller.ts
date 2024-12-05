@@ -4,6 +4,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Post,
   Res,
   UsePipes,
@@ -18,13 +19,18 @@ import {
   ReadUserOutput,
   ReadUserOutputSchema,
 } from '../users/schemas/ReadUserOutput.schema'
+import { EmailService } from 'src/email/email.service'
+import { RecoverPasswordSchema } from './schemas/recoverPassword.schema'
 
 type LoginResult = { user: ReadUserOutput; token: string }
 
 @Controller('authentication')
 @UsePipes(ZodValidationPipe)
 export class AuthenticationController {
-  constructor(private authenticationService: AuthenticationService) {}
+  constructor(
+    private authenticationService: AuthenticationService,
+    private emailService: EmailService,
+  ) {}
 
   @Post('register')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -55,5 +61,20 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Res({ passthrough: true }) response: FastifyReply) {
     clearAuthToken(response)
+  }
+
+  @Post('recover-password-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async sendRecoverPasswordEmail(@Body() { email }: RecoverPasswordSchema) {
+    try {
+      return await this.emailService.sendRecoverPasswordEmail(email)
+    } catch (e) {
+      if (e instanceof NotFoundException) {
+        // don't want to expose that user with email/phone doesn't exist
+        return
+      }
+
+      throw e
+    }
   }
 }
