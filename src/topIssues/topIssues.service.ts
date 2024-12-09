@@ -13,18 +13,12 @@ export class TopIssuesService {
     const { name, icon } = body;
 
     try {
-      const { id } = await this.prismaService.topIssue.create({
+      return await this.prismaService.topIssue.create({
         data: {
           name, 
           icon
         }
       })
-
-      return {
-        id,
-        name,
-        icon
-      }
     } catch (error: unknown) {
       if (error instanceof PrismaClientValidationError) {
         this.logger.error(`Validation error ${error.message}`, error.stack);

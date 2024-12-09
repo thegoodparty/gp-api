@@ -13,11 +13,15 @@ export default async function seedCampaigns(prisma: PrismaClient) {
   const fakeP2Vs: any[] = []
   const fakeUpdateHistory: any[] = []
 
+  const campaignIds: number[] = [];
+
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
     // TODO: move user seeding to its own file
     const user = userFactory()
     const camp = campaignFactory({ userId: user.id })
     const p2v = pathToVictoryFactory({ campaignId: camp.id })
+
+    campaignIds.push(camp.id);
 
     for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
       fakeUpdateHistory[NUM_UPDATE_HISTORY * i + j] =
@@ -39,5 +43,7 @@ export default async function seedCampaigns(prisma: PrismaClient) {
   })
   await prisma.campaignUpdateHistory.createMany({ data: fakeUpdateHistory })
 
-  console.log(`Created ${count} campaigns`)
+  console.log(`Created ${count} campaigns`);
+
+  return campaignIds;
 }
