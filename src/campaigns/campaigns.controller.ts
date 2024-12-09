@@ -53,21 +53,8 @@ export class CampaignsController {
 
   @Post()
   async create(@Body() body: CreateCampaignSchema) {
-    try {
       const campaign = await this.campaignsService.create(body)
       return { slug: campaign.slug }
-    } catch (e) {
-      if (e instanceof PrismaClientKnownRequestError) {
-        if (e.code === 'P2002') {
-          throw new BadRequestException(
-            'A new campaign cannot be created with this slug',
-            { cause: e },
-          )
-        }
-      }
-
-      throw e
-    }
   }
 
   @Put(':id')

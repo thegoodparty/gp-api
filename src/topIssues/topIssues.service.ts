@@ -11,44 +11,20 @@ export class TopIssuesService {
 
   async create(body: CreateTopIssueDto): Promise<TopIssueOutputDto> {
     const { name, icon } = body;
-
-    try {
-      return await this.prismaService.topIssue.create({
-        data: {
-          name, 
-          icon
-        }
-      })
-    } catch (error: unknown) {
-      if (error instanceof PrismaClientValidationError) {
-        this.logger.error(`Validation error ${error.message}`, error.stack);
-        throw new BadRequestException('Failed to create Top Issue - ' + error.message);
+    return await this.prismaService.topIssue.create({
+      data: {
+        name, 
+        icon
       }
-      if (error instanceof Error) {
-        this.logger.error(`Failed to create Top Issue ${error.message}`, error.stack);
-        throw new InternalServerErrorException('An unexpected error occured.');
-      }
-      throw error;
-    }
+    })
   }
 
   async update(id: number, body: UpdateTopIssueDto): Promise<TopIssue> {
     const { name, icon } = body;
-    try {
       return await this.prismaService.topIssue.update({
         where: { id },
         data: { name, icon }
       });
-    } catch (error) {
-      if (error instanceof PrismaClientValidationError) {
-        this.logger.error(`Validation error: ${error.message}`, error.stack);
-        throw new BadRequestException('Failed to update Top Issue - ' + error.message);
-      } else if (error instanceof Error) {
-        this.logger.error(`Failed to update Top Issue: ${error.message}`, error.stack);
-        throw new InternalServerErrorException('An unexpected error occurred.');
-      }
-      throw error;
-    }
   }
 
   async delete(id: number): Promise<void> {

@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TopIssuesController } from './topIssues.controller';
 import { TopIssuesService } from './topIssues.service';
-import { PrismaService } from 'src/prisma/prisma.service';
 
 @Module({
   controllers: [TopIssuesController],
