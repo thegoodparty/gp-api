@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getSetPasswordEmailContent,
@@ -28,10 +27,7 @@ type SendTemplateEmailInput = {
 
 @Injectable()
 export class EmailService {
-  constructor(
-    private mailgun: MailgunService,
-    private prisma: PrismaService,
-  ) {}
+  constructor(private mailgun: MailgunService) {}
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
     return await this.sendEmailWithRetry({
@@ -83,8 +79,6 @@ export class EmailService {
   }
 
   async sendSetPasswordEmail(user: User) {
-    // const user = await this.generatePasswordResetToken({ id: userId })
-
     const { firstName, lastName, email, role, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
