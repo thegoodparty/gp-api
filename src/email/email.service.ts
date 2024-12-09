@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getSetPasswordEmailContent,

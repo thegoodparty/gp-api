@@ -4,13 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { PrismaService } from 'src/shared/services/prisma.service'
+import { PrismaService } from '../../prisma/prisma.service'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
 } from '@prisma/client/runtime/library'
-import { findSlug } from 'src/shared/util/slug.util'
+import { findSlug } from '../../shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Prisma } from '@prisma/client'
 import { generateRandomPassword } from '../../users/util/passwords.util'
