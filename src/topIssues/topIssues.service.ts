@@ -67,14 +67,14 @@ export class TopIssuesService {
 
   async list(): Promise<TopIssue[]> {
     const topIssues = await this.prismaService.topIssue.findMany({
-      include: { positions: true }
-    })
-
-    for (let topIssue of topIssues) {
-      if (topIssue.positions && Array.isArray(topIssue.positions)) {
-        topIssue.positions.sort((a, b) => a.name.localeCompare(b.name));
+      include: { 
+        positions: {
+          orderBy: {
+            name: 'asc',
+          }
+        }
       }
-    }
+    });
 
     return topIssues;
   }
