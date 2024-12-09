@@ -14,16 +14,11 @@ import { AdminCampaignsService } from './adminCampaigns.service'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { AdminSendCreateEmailSchema } from './schemas/adminSendCreateEmail.schema'
-import { EmailService } from 'src/email/email.service'
 
 @Controller('admin/campaigns')
 @UsePipes(ZodValidationPipe)
 export class AdminCampaignsController {
-  constructor(
-    private readonly adminCampaignsService: AdminCampaignsService,
-    private readonly emailService: EmailService,
-  ) {}
+  constructor(private readonly adminCampaignsService: AdminCampaignsService) {}
 
   @Post()
   create(@Body() body: AdminCreateCampaignSchema) {
@@ -42,11 +37,5 @@ export class AdminCampaignsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.adminCampaignsService.delete(id)
-  }
-
-  @Post('email')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  sendAccountCreateEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
-    return this.emailService.sendSetPasswordEmail(userId)
   }
 }

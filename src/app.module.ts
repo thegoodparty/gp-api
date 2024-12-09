@@ -11,11 +11,9 @@ import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
 import { AdminModule } from './admin/admin.module'
 import { SharedModule } from './shared/shared.module'
-import { ConfigModule } from './config/config.module'
 
 @Module({
   imports: [
-    ConfigModule,
     SharedModule,
     UsersModule,
     AuthenticationModule,

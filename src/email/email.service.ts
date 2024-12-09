@@ -1,21 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
-import { nanoid } from 'nanoid'
-import { Prisma, User } from '@prisma/client'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
 import { EmailData, MailgunService } from './mailgun.service'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import {
   getSetPasswordEmailContent,
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
 } from './util/content.util'
+import { User } from '@prisma/client'
+
+const APP_BASE = process.env.CORS_ORIGIN as string
 
 type SendEmailInput = {
   to: string
   subject: string
   message: string
-  messageHeader?: string
   from?: string
 }
 
@@ -30,29 +28,18 @@ type SendTemplateEmailInput = {
 
 @Injectable()
 export class EmailService {
-  private appBase: string
-
   constructor(
     private mailgun: MailgunService,
     private prisma: PrismaService,
-    private config: ConfigService,
-  ) {
-    this.appBase = this.config.get('CORS_ORIGIN') as string
-  }
+  ) {}
 
-  async sendEmail({
-    to,
-    subject,
-    message,
-    messageHeader,
-    from,
-  }: SendEmailInput) {
+  async sendEmail({ to, subject, message, from }: SendEmailInput) {
     return await this.sendEmailWithRetry({
       from: from || 'GoodParty.org <noreply@goodparty.org>',
       to,
       subject,
       text: message,
-      html: getBasicEmailContent(message, messageHeader, subject),
+      html: getBasicEmailContent(message, subject),
     })
   }
 
@@ -70,7 +57,7 @@ export class EmailService {
       subject,
       template,
       variables: {
-        appBase: this.appBase,
+        appBase: APP_BASE,
         ...variables,
       },
     }
@@ -82,13 +69,11 @@ export class EmailService {
     return await this.sendEmailWithRetry(data)
   }
 
-  async sendRecoverPasswordEmail(userEmail: string) {
-    const user = await this.generatePasswordResetToken({ email: userEmail })
-
+  async sendRecoverPasswordEmail(user: User) {
     const { firstName, lastName, email, passwordResetToken } = user
-    const lowerCaseEmail = email.toLowerCase().replace('+', '%2b')
+    const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${this.appBase}/reset-password?email=${lowerCaseEmail}&token=${passwordResetToken}`,
+      `${APP_BASE}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
     const subject = 'Reset your password - The Good Party'
@@ -97,13 +82,13 @@ export class EmailService {
     return await this.sendEmail({ to: user.email, subject, message })
   }
 
-  async sendSetPasswordEmail(userId: number) {
-    const user = await this.generatePasswordResetToken({ id: userId })
+  async sendSetPasswordEmail(user: User) {
+    // const user = await this.generatePasswordResetToken({ id: userId })
 
     const { firstName, lastName, email, role, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${this.appBase}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${APP_BASE}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
       content: getSetPasswordEmailContent(
@@ -124,28 +109,6 @@ export class EmailService {
       template: 'blank-email',
       variables,
     })
-  }
-
-  private async generatePasswordResetToken(
-    where: Prisma.UserWhereUniqueInput,
-  ): Promise<User> {
-    try {
-      return await this.prisma.user.update({
-        where,
-        data: {
-          passwordResetToken: nanoid(48),
-          passwordResetTokenExpiresAt:
-            Date.now() + this.config.get('passwordResetTokenTTL'),
-        },
-      })
-    } catch (e) {
-      if (e instanceof PrismaClientKnownRequestError) {
-        console.log('Could not find user to reset password')
-        throw new NotFoundException('User not found')
-      }
-
-      throw e
-    }
   }
 
   private async sendEmailWithRetry(emailData: EmailData, retryCount = 5) {

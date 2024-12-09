@@ -189,13 +189,7 @@ GoodParty.org Team
   `
 }
 
-export function getBasicEmailContent(
-  msg = '',
-  // messageHeader was present in old tg-api version but not used
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  messageHeader = '',
-  subject = '',
-) {
+export function getBasicEmailContent(msg = '', subject = '') {
   return `
 <style type="text/css">
   html, body {
