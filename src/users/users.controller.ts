@@ -1,10 +1,9 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   HttpCode,
   HttpStatus,
-  NotFoundException,
+  NotImplementedException,
   Post,
   UsePipes,
 } from '@nestjs/common'
@@ -12,11 +11,8 @@ import { EmailService } from 'src/email/email.service'
 import { SetPasswordEmailSchema } from './schemas/SetPasswordEmail.schema'
 import { RecoverPasswordSchema } from './schemas/RecoverPasswordEmail.schema'
 import { UsersService } from './users.service'
-import { User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ResetPasswordSchema } from './schemas/ResetPassword.schema'
-import { TokenExpiredError } from '@nestjs/jwt'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
@@ -56,7 +52,8 @@ export class UsersController {
     const user = await this.usersService.findUserByResetToken(token)
 
     // TODO: update user with new password
+    throw new NotImplementedException('Reset PW not implemented yet')
 
-    return true
+    return
   }
 }
