@@ -16,7 +16,7 @@ export const userFactory = generateFactory<User>(() => {
     name,
     email: faker.internet.email(),
     password: generateRandomPassword(),
-    phone: faker.phone.number(),
+    phone: faker.phone.number({ style: 'national' }),
     zip: faker.location.zipCode(),
     metaData: {},
   }

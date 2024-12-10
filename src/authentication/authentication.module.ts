@@ -16,7 +16,6 @@ if (!process.env.AUTH_SECRET) {
 
 @Module({
   providers: [AuthenticationService],
-
   imports: [
     UsersModule,
     PassportModule,
