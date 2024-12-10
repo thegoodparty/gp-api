@@ -28,45 +28,13 @@ export class TopIssuesService {
   }
 
   async delete(id: number): Promise<void> {
-    const issue = await this.prismaService.topIssue.findUnique({
+    await this.prismaService.topIssue.delete({
       where: { id },
-      include: {
-        positions: true,
-        campaignPositions: true,
-        campaigns: true,
-      },
-    });
-
-    if (!issue) {
-      this.logger.error(`Failed to delete Top Issue with id ${id}`);
-      throw new NotFoundException(`Top issue with id ${id} not found`);
-    }
-
-    const positionIds = issue.positions.map((position) => position.id);
-    const campaignPositionIds = issue.campaignPositions.map((cp) => cp.id);
-    
-
-    await this.prismaService.$transaction(async (prisma) => {
-      if (campaignPositionIds.length > 0) {
-        await prisma.campaignPosition.deleteMany({
-          where: { id: { in: campaignPositionIds } },
-        });
-      }
-
-      if (positionIds.length > 0) {
-        await prisma.position.deleteMany({
-          where: { id: { in: positionIds } },
-        });
-      }
-
-      await prisma.topIssue.delete({
-        where: { id },
-      });
     });
   }
 
   async list(): Promise<TopIssue[]> {
-    const topIssues = await this.prismaService.topIssue.findMany({
+    return await this.prismaService.topIssue.findMany({
       include: { 
         positions: {
           orderBy: {
@@ -75,8 +43,6 @@ export class TopIssuesService {
         }
       }
     });
-
-    return topIssues;
   }
 
 
