@@ -52,13 +52,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       message = 'Failed to intialize Prisma Client: ' + exception.message;
 
     } else if (exception instanceof HttpException) {
-      statusCode = exception.getStatus();
-      const responseMessage = exception.getResponse();
-
-      message =
-        typeof responseMessage === 'string'
-        ? responseMessage
-        : (responseMessage as any).message || JSON.stringify(responseMessage);
+      throw HttpException;
     }
 
     this.logger.error(
