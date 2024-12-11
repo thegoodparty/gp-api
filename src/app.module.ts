@@ -11,6 +11,7 @@ import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
 import { AdminModule } from './admin/admin.module'
+import { QueueModule } from './queue/queue.module'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AdminModule } from './admin/admin.module'
     DeclareModule,
     CampaignsModule,
     AdminModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [AppService],
