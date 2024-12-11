@@ -1,6 +1,7 @@
 import { User } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
+import { generateRandomPassword } from '../../src/users/util/passwords.util'
 
 export const userFactory = generateFactory<User>(() => {
   const firstName = faker.person.firstName()
@@ -14,7 +15,8 @@ export const userFactory = generateFactory<User>(() => {
     lastName,
     name,
     email: faker.internet.email(),
-    phone: faker.phone.number(),
+    password: generateRandomPassword(),
+    phone: faker.phone.number({ style: 'national' }),
     zip: faker.location.zipCode(),
     metaData: {},
   }
