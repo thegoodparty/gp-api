@@ -14,9 +14,9 @@ export const userFactory = generateFactory<User>(() => {
     firstName,
     lastName,
     name,
-    email: faker.internet.email(),
+    email: faker.internet.email().toLowerCase(),
     password: generateRandomPassword(),
-    phone: faker.phone.number(),
+    phone: faker.number.int({ min: 1000000000, max: 9999999999 }).toString(),
     zip: faker.location.zipCode(),
     metaData: {},
   }

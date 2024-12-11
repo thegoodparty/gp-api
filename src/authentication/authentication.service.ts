@@ -2,8 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { UsersService } from '../users/users.service'
 import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
-import { LoginRequestPayloadDto } from './schemas/LoginPayload.schema'
+import {
+  LoginPayload,
+  LoginRequestPayloadDto,
+} from './schemas/LoginPayload.schema'
 import { compare } from 'bcrypt'
+import { User } from '@prisma/client'
 
 @Injectable()
 export class AuthenticationService {
@@ -24,11 +28,14 @@ export class AuthenticationService {
     }
   }
 
-  async login({ email, password }: LoginRequestPayloadDto) {
+  async validateUser(
+    email: LoginPayload['email'],
+    password: LoginPayload['password'],
+  ) {
     const user = await this.usersService.findUser({ email })
 
     if (!user) {
-      throw new UnauthorizedException('User email not found')
+      throw new UnauthorizedException('ReqUser email not found')
     }
 
     const validPassword = await compare(
@@ -39,9 +46,6 @@ export class AuthenticationService {
     if (!validPassword) {
       throw new UnauthorizedException('Invalid password')
     }
-    return {
-      user,
-      token: this.generateAuthToken({ email: user.email, sub: user.id }),
-    }
+    return user
   }
 }

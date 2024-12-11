@@ -1,5 +1,6 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common'
 import { HealthService } from './health.service'
+import { PublicAccess } from '../authentication/decorators/public-access.decorator'
 
 @Controller('health')
 export class HealthController {
@@ -7,6 +8,7 @@ export class HealthController {
     this.healthService = healthService
   }
 
+  @PublicAccess()
   @Get()
   async getHealth() {
     if (await this.healthService.checkHealth()) {

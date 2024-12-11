@@ -3,9 +3,10 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateCampaignSchema } from './schemas/createCampaign.schema'
-import { Prisma } from '@prisma/client'
+import { Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
+import { ReqUser } from '../authentication/decorators/req-user.decorator'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -64,7 +65,7 @@ export class CampaignsService {
     })
   }
 
-  async create(body: CreateCampaignSchema) {
+  async create(campaignData: CreateCampaignSchema, user: User) {
     // TODO: get user from request
     // const { user } = this.req;
     // const userName = await sails.helpers.user.name(user);
@@ -84,15 +85,14 @@ export class CampaignsService {
 
     const newCampaign = await this.prismaService.campaign.create({
       data: {
-        ...body,
+        ...campaignData,
         isActive: false,
-        // TODO: pull from request user
-        // userId:
-        // details: {
-        //   zip: user.zip,
-        // },
+        userId: user.id,
+        details: {
+          zip: user.zip,
+        },
         data: {
-          slug: body.slug,
+          slug: campaignData.slug,
           currentStep: 'registration',
         },
       },

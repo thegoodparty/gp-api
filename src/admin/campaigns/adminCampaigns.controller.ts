@@ -14,8 +14,10 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { AdminSendCreateEmailSchema } from './schemas/adminSendCreateEmail.schema'
+import { Roles } from '../../authentication/decorators/roles.decorator'
 
 @Controller('admin/campaigns')
+@Roles('admin')
 @UsePipes(ZodValidationPipe)
 export class AdminCampaignsController {
   constructor(private readonly adminCampaignsService: AdminCampaignsService) {}

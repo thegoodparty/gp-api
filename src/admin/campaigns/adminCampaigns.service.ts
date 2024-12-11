@@ -13,7 +13,7 @@ import {
 } from '@prisma/client/runtime/library'
 import { findSlug } from 'src/shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Prisma } from '@prisma/client'
+import { Prisma, UserRole } from '@prisma/client'
 import { generateRandomPassword } from '../../users/util/passwords.util'
 
 @Injectable()
@@ -50,7 +50,7 @@ export class AdminCampaignsService {
           zip,
           phone,
           metaData: {},
-          role: 'campaign',
+          roles: [UserRole.candidate],
         },
       })
     } catch (error) {

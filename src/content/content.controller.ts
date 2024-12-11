@@ -9,8 +9,10 @@ import {
   groupGlossaryItemsByAlpha,
   mapGlossaryItemsToSlug,
 } from './util/glossaryItems.util'
+import { PublicAccess } from '../authentication/decorators/public-access.decorator'
 
 @Controller('content')
+@PublicAccess()
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 
@@ -53,6 +55,7 @@ export class ContentController {
     return this.contentService.findByType(type)
   }
 
+  @PublicAccess()
   @Get('sync')
   async sync() {
     const { entries, createEntries, updateEntries, deletedEntries } =
