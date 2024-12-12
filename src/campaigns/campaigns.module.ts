@@ -6,5 +6,6 @@ import { CampaignsService } from './campaigns.service'
   imports: [],
   controllers: [CampaignsController],
   providers: [CampaignsService],
+  exports: [CampaignsService],
 })
 export class CampaignsModule {}

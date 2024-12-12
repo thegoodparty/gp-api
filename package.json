@@ -22,7 +22,7 @@
     "prisma-format": "for file in prisma/schema/*.prisma; do npx prisma-case-format -c prisma/.prisma-case-format.yaml -f \"$file\"; done"
   },
   "prisma": {
-    "seed": "ts-node ./seed/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts"
   },
   "dependencies": {
     "@contentful/rich-text-plain-text-renderer": "^17.0.0",

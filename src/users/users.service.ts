@@ -1,27 +1,13 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common'
+import { ConflictException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { Prisma, User } from '@prisma/client'
-import { genSalt, hash } from 'bcrypt'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
-import { generateRandomPassword } from './util/passwords.util'
+import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
-import { nanoid } from 'nanoid'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { JwtService, TokenExpiredError } from '@nestjs/jwt'
-
-const PASSWORD_RESET_TOKEN_TTL = '30 days'
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private prisma: PrismaService,
-    private jwt: JwtService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   getAllUsers() {
     return this.prisma.user.findMany()
@@ -39,24 +25,38 @@ export class UsersService {
     })
   }
 
-  async findUserByResetToken(token: string) {
-    try {
-      this.jwt.verify(token)
-      return await this.prisma.user.findFirstOrThrow({
-        where: { passwordResetToken: token },
-      })
-    } catch (e) {
-      if (
-        e instanceof SyntaxError || // token parse failed
-        e instanceof PrismaClientKnownRequestError // token doesn't match a user
-      ) {
-        throw new BadRequestException('Invalid token')
-      } else if (e instanceof TokenExpiredError) {
-        throw new BadRequestException('Token has expired')
-      }
+  findUserByResetToken(email: string, token: string) {
+    return this.prisma.user.findFirstOrThrow({
+      where: {
+        email: { equals: email, mode: 'insensitive' },
+        passwordResetToken: token,
+      },
+    })
+  }
 
-      throw e
-    }
+  async updatePassword(
+    userId: number,
+    password: string,
+    clearResetToken?: boolean,
+  ) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        // hash password
+        password: await hashPassword(password),
+        // clear reset token
+        passwordResetToken: clearResetToken ? null : undefined,
+      },
+    })
+  }
+
+  setResetToken(userId: number, passwordResetToken: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordResetToken,
+      },
+    })
   }
 
   async createUser(userData: CreateUserInputDto): Promise<User> {
@@ -69,11 +69,10 @@ export class UsersService {
       phone,
       name,
     } = userData
-    const trimmedPassword = password
-      ? password.trim()
-      : generateRandomPassword()
-    const hashedPassword =
-      password && (await hash(trimmedPassword, await genSalt()))
+
+    const hashedPassword = await hashPassword(
+      password ?? generateRandomPassword(),
+    )
     const existingUser = await this.findUser({ email })
     if (existingUser) {
       throw new ConflictException('User with this email already exists')
@@ -110,30 +109,5 @@ export class UsersService {
         id,
       },
     })
-  }
-
-  async generatePasswordResetToken(userId: number): Promise<User> {
-    const token = nanoid(48)
-
-    const jwt = this.jwt.sign(
-      { token },
-      { expiresIn: PASSWORD_RESET_TOKEN_TTL },
-    )
-
-    try {
-      return await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          passwordResetToken: jwt,
-        },
-      })
-    } catch (e) {
-      if (e instanceof PrismaClientKnownRequestError) {
-        console.log('Could not find user to reset password')
-        throw new NotFoundException('User not found')
-      }
-
-      throw e
-    }
   }
 }
