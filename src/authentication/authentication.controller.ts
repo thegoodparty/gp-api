@@ -29,7 +29,6 @@ export class AuthenticationController {
   @UseGuards(AuthGuard('local'))
   @Post('login')
   async login(@Request() { user }: RequestWithUser): Promise<LoginResult> {
-    console.log(`user =>`, user)
     return {
       user: ReadUserOutputSchema.parse(user),
       token: this.authenticationService.generateAuthToken({
