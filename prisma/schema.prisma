@@ -143,7 +143,7 @@ enum LevelType {
 }
 
 model Race {
-  id             String        @id @default(cuid())
+  id             Int           @id @default(autoincrement())
   ballotId       String        @unique
   ballotHashId   String?
   hashId         String        @unique
@@ -155,13 +155,13 @@ model Race {
   subAreaValue   String?
   data           Json?         @default("{}") @db.JsonB
   county         County?       @relation(fields: [countyId], references: [id])
-  countyId       String?
+  countyId       Int?
   municipality   Municipality? @relation(fields: [municipalityId], references: [id])
-  municipalityId String?
+  municipalityId Int?
 }
 
 model County {
-  id             String         @id @default(cuid())
+  id             Int            @id @default(autoincrement())
   slug           String         @unique
   name           String
   state          String         @db.Char(2)
@@ -178,13 +178,13 @@ enum MunicipalityType {
 }
 
 model Municipality {
-  id       String           @id @default(cuid())
+  id       Int              @id @default(autoincrement())
   slug     String           @unique
   name     String
   type     MunicipalityType
   state    String           @db.Char(2)
   data     Json?            @default("{}") @db.JsonB
   county   County?          @relation(fields: [countyId], references: [id])
-  countyId String?
+  countyId Int?
   races    Race[]
 }

@@ -11,50 +11,21 @@ export class RacesController {
   @Get()
   async findRaces(
     @Query(new ZodValidationPipe(racesListSchema)) query: RacesListQuery,
-  ): Promise<NormalizedRace | NormalizedRace[]> {
+  ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
     const { state, county, city, positionSlug } = query
-    if (state && county && city && positionSlug) {
-      const race = await this.racesService.findOne(
-        state,
-        county,
-        city,
-        positionSlug,
-      )
-      if (!race) {
-        throw new NotFoundException('Race not found')
-      }
-      return race
-    }
-    if (state && county && city) {
-      const races = await this.racesService.byCity(state, county, city)
-      if (!races || races.length === 0) {
-        throw new NotFoundException('Races not found')
-      }
-      return races
-    }
-    if (state && county) {
-      const races = await this.racesService.byCounty(state, county)
-      if (!races || races.length === 0) {
-        throw new NotFoundException('Races not found')
-      }
-      return races
+
+    // Delegate the logic to the service
+    const races = await this.racesService.findRaces(
+      state,
+      county,
+      city,
+      positionSlug,
+    )
+
+    if (!races || (Array.isArray(races) && races.length === 0)) {
+      throw new NotFoundException('Race(s) not found')
     }
 
-    if (state && county) {
-      const races = await this.racesService.byCounty(state, county)
-      if (!races || races.length === 0) {
-        throw new NotFoundException('Races not found')
-      }
-      return races
-    }
-
-    if (state) {
-      const races = await this.racesService.byState(state)
-      if (!races || races.length === 0) {
-        throw new NotFoundException('Races not found')
-      }
-      return races
-    }
-    throw new NotFoundException('Race not found')
+    return races
   }
 }

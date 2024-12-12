@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import slugify from 'slugify'
-import * as moment from 'moment'
+import { startOfYear, addYears, format } from 'date-fns'
 
 import { County, Municipality } from '@prisma/client'
 import { ExtendedRace, NormalizedRace, RaceData } from './races.types'
@@ -9,6 +9,32 @@ import { ExtendedRace, NormalizedRace, RaceData } from './races.types'
 @Injectable()
 export class RacesService {
   constructor(private prisma: PrismaService) {}
+
+  async findRaces(
+    state?: string,
+    county?: string,
+    city?: string,
+    positionSlug?: string,
+  ): Promise<NormalizedRace | NormalizedRace[] | boolean | null> {
+    if (state && county && city && positionSlug) {
+      return this.findOne(state, county, city, positionSlug)
+    }
+
+    if (state && county && city) {
+      return this.byCity(state, county, city)
+    }
+
+    if (state && county) {
+      return this.byCounty(state, county)
+    }
+
+    if (state) {
+      return this.byState(state)
+    }
+
+    // Return null or throw an error if no criteria match
+    return null
+  }
 
   async findOne(
     state: string,
@@ -24,9 +50,9 @@ export class RacesService {
     if (city && countyRecord) {
       cityRecord = await this.getMunicipality(state, county, city)
     }
-    const nextYear = moment().startOf('year').add(2, 'year').format('M D, YYYY')
+    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
-    const now = moment().format('M D, YYYY')
+    const now = format(new Date(), 'M d, yyyy')
     const query = {
       state: state.toUpperCase(),
       positionSlug,
@@ -40,18 +66,16 @@ export class RacesService {
     } else if (countyRecord) {
       query['countyId'] = countyRecord.id
     }
-    const races = (await this.prisma.race.findMany({
+    const race = (await this.prisma.race.findFirst({
       where: query,
       orderBy: {
         electionDate: 'asc',
       },
-    })) as ExtendedRace[]
+    })) as ExtendedRace
 
-    if (races.length === 0) {
+    if (!race) {
       return false
     }
-
-    const race = races[0]
 
     race.municipality = cityRecord
     race.county = countyRecord
@@ -68,9 +92,9 @@ export class RacesService {
       return false
     }
 
-    const nextYear = moment().startOf('year').add(2, 'year').format('M D, YYYY')
+    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
-    const now = moment().format('M D, YYYY')
+    const now = format(new Date(), 'M d, yyyy')
 
     const races = await this.prisma.race.findMany({
       where: {
@@ -99,14 +123,13 @@ export class RacesService {
 
   async byCounty(state: string, county: string) {
     const countyRecord = await this.getCounty(state, county)
-    console.log('countyRecord', countyRecord)
     if (!countyRecord) {
       return false
     }
 
-    const nextYear = moment().startOf('year').add(2, 'year').format('M D, YYYY')
+    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
-    const now = moment().format('M D, YYYY')
+    const now = format(new Date(), 'M d, yyyy')
 
     const races = await this.prisma.race.findMany({
       where: {
@@ -130,9 +153,9 @@ export class RacesService {
   }
 
   async byState(state: string) {
-    const nextYear = moment().startOf('year').add(2, 'year').format('M D, YYYY')
+    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
-    const now = moment().format('M D, YYYY')
+    const now = format(new Date(), 'M d, yyyy')
 
     const races = await this.prisma.race.findMany({
       where: {
