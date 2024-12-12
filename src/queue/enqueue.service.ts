@@ -45,14 +45,11 @@ export class EnqueueService {
       groupId: 'gp-queue', // Required for FIFO queues
     }
 
-    let resp
     try {
       //await this.sqsService.send(process.env.SQS_QUEUE_URL || '', message)
-      resp = await producer.send(message)
+      await producer.send(message)
     } catch (error) {
       console.log('error queueing message', error)
     }
-
-    console.log('resp', resp)
   }
 }

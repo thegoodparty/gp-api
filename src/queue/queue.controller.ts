@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  NotFoundException,
-  HttpException,
-  BadGatewayException,
-  Logger,
-} from '@nestjs/common'
+import { Controller, Get, BadGatewayException, Logger } from '@nestjs/common'
 import { EnqueueService } from './enqueue.service'
 
 @Controller('queue')

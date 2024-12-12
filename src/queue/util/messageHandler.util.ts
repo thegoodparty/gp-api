@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { Message } from '@aws-sdk/client-sqs'
+import { QueueMessage } from '../queue.types'
 
 @Injectable()
 export class MessageHandler {
   constructor() {}
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
-  async handleMessage(message: any) {
+  async handleMessage(message: Message) {
     try {
       const date = new Date().toLocaleString('en-US', {
         timeZone: 'America/Los_Angeles',
@@ -25,7 +27,9 @@ export class MessageHandler {
 }
 
 // Function to process message and decide if requeue is necessary
-async function handleMessageAndMaybeRequeue(message: any): Promise<boolean> {
+async function handleMessageAndMaybeRequeue(
+  message: Message,
+): Promise<boolean> {
   try {
     await handleMessage(message) // Your main processing logic
     return false // No requeue needed
@@ -35,7 +39,7 @@ async function handleMessageAndMaybeRequeue(message: any): Promise<boolean> {
   }
 }
 
-async function handleMessage(message) {
+async function handleMessage(message: Message) {
   // console.log(`consumer received message: ${message.Body}`);
   if (!message) {
     return
@@ -44,29 +48,29 @@ async function handleMessage(message) {
   if (!body) {
     return
   }
-  const action = JSON.parse(body)
-  const { type, data } = action
-  console.log('processing queue message type ', type)
+  const queueMessage: QueueMessage = JSON.parse(body)
 
-  switch (type) {
+  console.log('processing queue message type ', queueMessage.type)
+
+  switch (queueMessage.type) {
     case 'generateAiContent':
       console.log('received generateAiContent message')
       // we will call the ai service here?
-      //   await handleGenerateAiContent(data)
+      //   await handleGenerateAiContent(queueMessage.data)
       break
     case 'pathToVictory':
       console.log('received pathToVictory message')
       // we will call the path to victory service here?
-      //   await handlePathToVictoryMessage(data)
+      //   await handlePathToVictoryMessage(queueMessage.data)
       break
     case 'calculateGeoLocation':
       //   await sails.helpers.geocoding.calculateGeoLocation()
       break
     case 'calculateDkRoutes':
       //   await sails.helpers.geocoding.calculateRoutes(
-      //     data.campaignId,
-      //     data.dkCampaignId,
-      //     data.maxHousesPerRoute,
+      //     queueMessage.data.campaignId,
+      //     queueMessage.data.dkCampaignId,
+      //     queueMessage.data.maxHousesPerRoute,
       //   )
       break
   }

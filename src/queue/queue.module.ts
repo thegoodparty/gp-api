@@ -12,8 +12,7 @@ import { QueueController } from './queue.controller'
           name: process.env.SQS_QUEUE || '',
           queueUrl: process.env.SQS_QUEUE_URL || '',
           region: process.env.AWS_REGION,
-          waitTimeSeconds: 1,
-          pollingWaitTimeMs: 1000,
+          pollingWaitTimeMs: 10000,
         },
       ],
       producers: [
