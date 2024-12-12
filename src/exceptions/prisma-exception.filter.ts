@@ -25,8 +25,8 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse()
     const request = ctx.getRequest()
 
-    let statusCode: HttpStatus | null = HttpStatus.INTERNAL_SERVER_ERROR
-    let message: string | null = 'Internal server error'
+    let statusCode: HttpStatus | null = null
+    let message: string | null = null
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       switch (exception.code) {
@@ -55,6 +55,10 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof Prisma.PrismaClientInitializationError) {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR
       message = 'Failed to initialize Prisma Client: ' + exception.message
+    }
+
+    if (!statusCode || !message) {
+      throw exception
     }
 
     this.logger.error(
