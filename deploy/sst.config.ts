@@ -1,5 +1,5 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
-// import * as aws from '@pulumi/aws'
+import * as aws from '@pulumi/aws'
 
 export default $config({
   app(input) {
@@ -10,6 +10,7 @@ export default $config({
       providers: {
         aws: {
           region: 'us-west-2',
+          version: '6.60.0',
         },
       },
     }
@@ -22,23 +23,74 @@ export default $config({
             nat: 'managed',
             az: 2, // defaults to 2 availability zones and 2 NAT gateways
           })
-        : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use GP-VPC
+        : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
+
+    let bucketDomain: string
+    let apiDomain: string
+    if ($app.stage === 'master') {
+      apiDomain = 'gp-api.goodparty.org'
+      bucketDomain = 'assets.goodparty.org'
+    } else if ($app.stage === 'develop') {
+      apiDomain = 'gp-api-dev.goodparty.org'
+      bucketDomain = 'assets-dev.goodparty.org'
+    } else {
+      apiDomain = `gp-api-${$app.stage}.goodparty.org`
+      bucketDomain = `assets-${$app.stage}.goodparty.org`
+    }
+
+    let assetsBucket
+    if ($app.stage === 'master') {
+      assetsBucket = sst.aws.Bucket.get('assetsBucket', 'assets.goodparty.org')
+    } else {
+      // Each stage will get its own Bucket.
+      assetsBucket = new sst.aws.Bucket('assets', {
+        access: 'cloudfront',
+        // use a transformation to set the bucket name to the bucketDomain.
+        transform: {
+          bucket: {
+            bucket: bucketDomain,
+          },
+        },
+      })
+    }
+
+    if ($app.stage !== 'master') {
+      // production bucket was setup manually. so no need to setup cloudfront.
+      // chore: re-deploy.
+      new sst.aws.Router(`assets-${$app.stage}`, {
+        routes: {
+          '/*': {
+            bucket: assetsBucket,
+          },
+        },
+        domain: bucketDomain,
+      })
+    }
 
     // Each stage will get its own Cluster.
     const cluster = new sst.aws.Cluster('fargate', { vpc })
 
-    // Change the domain based on the stage.
-    let domain = 'gp-api-test.goodparty.org'
-    if ($app.stage === 'develop') {
-      domain = 'gp-api-dev.goodparty.org'
-    } else if ($app.stage === 'master') {
-      domain = 'gp-api.goodparty.org'
+    const dbUrl = new sst.Secret('DBURL')
+    const dbName = new sst.Secret('DBNAME')
+    const dbUser = new sst.Secret('DBUSER')
+    const dbPassword = new sst.Secret('DBPASSWORD')
+    const dbIps = new sst.Secret('DBIPS')
+
+    if (
+      !dbName.value ||
+      !dbUser.value ||
+      !dbPassword.value ||
+      !dbIps.value ||
+      !dbUrl.value
+    ) {
+      throw new Error(
+        'DBNAME, DBUSER, DBPASSWORD, DBURL, DBIPS secrets must be set.',
+      )
     }
 
-    // const dbUrl = new sst.Secret('DBURL')
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
-        domain,
+        domain: apiDomain,
         ports: [
           { listen: '80/http' },
           { listen: '443/https', forward: '80/http' },
@@ -51,6 +103,14 @@ export default $config({
             interval: '30 seconds',
           },
         },
+      },
+      memory: '0.5 GB',
+      cpu: '0.25 vCPU',
+      scaling: {
+        min: $app.stage === 'master' ? 2 : 1,
+        max: 16,
+        cpuUtilization: 50,
+        memoryUtilization: 50,
       },
       environment: {
         // PORT: '3000',
@@ -79,60 +139,72 @@ export default $config({
           CACHEBUST: '1',
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
-          // DATABASE_URL: dbUrl.value, // so we can run migrations.
+          DATABASE_URL: dbUrl.value, // so we can run migrations.
           STAGE: $app.stage,
         },
       },
+      link: [assetsBucket],
     })
 
-    // this is the builtin sst aws postgres construct
-    // to customize things like storage autoscaling, encryption, multi-az, etc
-    // then we need to use the pulumi aws rds constructs.
-    // todo: make main and dev share the same database ?
+    // Create a Security Group for the RDS Cluster
+    const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
+      name: 'api-rds-security-group',
+      description: 'Allow traffic to RDS',
+      vpcId: 'vpc-0763fa52c32ebcf6a',
+      ingress: [
+        {
+          protocol: 'tcp',
+          fromPort: 5432,
+          toPort: 5432,
+          cidrBlocks: [dbIps.value],
+        },
+      ],
+      egress: [
+        {
+          protocol: '-1',
+          fromPort: 0,
+          toPort: 0,
+          cidrBlocks: ['0.0.0.0/0'],
+        },
+      ],
+    })
 
-    // const database = new sst.aws.Postgres('rds', {
-    //   vpc,
-    //   database: 'gpdb',
-    //   instance: 't3.small', // m7g.large is latest generation.
-    //   storage: '100 GB',
-    //   username: 'gpuser',
-    //   version: '16.2', // 16.4 is the latest.
-    //   // specifying vpc subnet not necessary because it will use the private subnet in the vpc by default.
-    //   // vpc: { subenets: []}}
-    //   // if we have connection pool issues, we can turn on rds proxy.
-    //   // proxy: true
-    // })
+    // Create a Subnet Group for the RDS Cluster
+    const subnetGroup = new aws.rds.SubnetGroup('subnetGroup', {
+      name: 'api-rds-subnet-group',
+      subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+      tags: {
+        Name: 'api-rds-subnet-group',
+      },
+    })
 
-    // Could not get serverlessv2 with pulumi to work.
-    // also could not specify the vpc or subnets.
+    const rdsCluster = new aws.rds.Cluster('rdsCluster', {
+      clusterIdentifier: 'gp-api-db',
+      engine: aws.rds.EngineType.AuroraPostgresql,
+      engineMode: aws.rds.EngineMode.Provisioned,
+      engineVersion: '16.2',
+      databaseName: dbName.value,
+      // manageMasterUserPassword: true,
+      masterUsername: dbUser.value || '',
+      masterPassword: dbPassword.value || '',
+      dbSubnetGroupName: subnetGroup.name,
+      vpcSecurityGroupIds: [rdsSecurityGroup.id],
+      storageEncrypted: true,
+      serverlessv2ScalingConfiguration: {
+        maxCapacity: 64,
+        minCapacity: 0.5,
+      },
+    })
 
-    // const rdsCluster = new aws.rds.Cluster('rdsCluster', {
-    //   clusterIdentifier: 'gp-api-db',
-    //   engine: aws.rds.EngineType.AuroraPostgresql,
-    //   engineMode: aws.rds.EngineMode.Provisioned,
-    //   engineVersion: '16.2',
-    //   databaseName: $app.stage === 'production' ? 'apiprod' : 'apidev',
-    //   manageMasterUserPassword: false,
-    //   masterUsername: process.env.DATABASE_USER || 'admin',
-    //   masterPassword: process.env.DATABASE_PASSWORD || 'password',
-    //   storageEncrypted: true,
-    //   serverlessv2ScalingConfiguration: {
-    //     maxCapacity: 1,
-    //     minCapacity: 0.5,
-    //   },
-    // not sure how to get the vpc and subnets from the pulumi vpc construct.
-    // dbSubnetGroupName: vpc.privateSubnets.get().values[0].dbSubnetGroupName,
-    // vpcSecurityGroupIds:
-    // })
-
-    // const rdsInstance = new aws.rds.ClusterInstance('rdsInstance', {
-    //   clusterIdentifier: rdsCluster.id,
-    //   instanceClass: 'db.serverless',
-    //   engine: aws.rds.EngineType.AuroraPostgresql,
-    //   engineVersion: rdsCluster.engineVersion,
-    // })
+    new aws.rds.ClusterInstance('rdsInstance', {
+      clusterIdentifier: rdsCluster.id,
+      instanceClass: 'db.serverless',
+      engine: aws.rds.EngineType.AuroraPostgresql,
+      engineVersion: rdsCluster.engineVersion,
+    })
   },
-  // deploy the runner into the vpc so it can access the database.
+  // todo: deploy the runner into the vpc so it can access the database.
+  // sst currently has a bug with this feature as of 3.3.40
   // console: {
   //   autodeploy: {
   //     runner: {

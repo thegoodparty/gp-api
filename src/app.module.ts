@@ -11,6 +11,8 @@ import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
 import { RacesModule } from './races/races.module'
+import { TopIssuesModule } from './topIssues/topIssues.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { RacesModule } from './races/races.module'
     DeclareModule,
     CampaignsModule,
     RacesModule,
+    TopIssuesModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

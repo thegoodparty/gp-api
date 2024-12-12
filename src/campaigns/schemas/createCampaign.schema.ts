@@ -1,5 +1,6 @@
+import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 
-export const createCampaignSchema = z.object({ slug: z.string() })
-
-export type CreateCampaignBody = z.infer<typeof createCampaignSchema>
+export class CreateCampaignSchema extends createZodDto(
+  z.object({ slug: z.string() }),
+) {}
