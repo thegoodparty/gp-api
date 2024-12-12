@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 import { SqsModule } from '@ssut/nestjs-sqs'
 import { EnqueueService } from './enqueue.service'
-import { MessageHandler } from './util/messageHandler.util'
+import { ConsumerService } from './consumer.service'
 import { QueueController } from './queue.controller'
 
 @Module({
@@ -25,7 +25,7 @@ import { QueueController } from './queue.controller'
     }),
   ],
   controllers: [QueueController],
-  providers: [MessageHandler, EnqueueService],
+  providers: [ConsumerService, EnqueueService],
   exports: [EnqueueService],
 })
 export class QueueModule {}

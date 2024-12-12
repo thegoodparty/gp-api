@@ -1,19 +1,14 @@
 import { Injectable } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
-import { QueueMessage } from '../queue.types'
+import { QueueMessage } from './queue.types'
 
 @Injectable()
-export class MessageHandler {
+export class ConsumerService {
   constructor() {}
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
     try {
-      const date = new Date().toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-      })
-      console.log(`[${date}] Received message: ${message.Body}`)
-
       const shouldRequeue = await handleMessageAndMaybeRequeue(message)
       // Return a rejected promise if requeue is needed without throwing an error
       if (shouldRequeue) {
@@ -55,23 +50,13 @@ async function handleMessage(message: Message) {
   switch (queueMessage.type) {
     case 'generateAiContent':
       console.log('received generateAiContent message')
-      // we will call the ai service here?
+      // we will call the ai service here
       //   await handleGenerateAiContent(queueMessage.data)
       break
     case 'pathToVictory':
       console.log('received pathToVictory message')
-      // we will call the path to victory service here?
+      // we will call the path to victory service here
       //   await handlePathToVictoryMessage(queueMessage.data)
-      break
-    case 'calculateGeoLocation':
-      //   await sails.helpers.geocoding.calculateGeoLocation()
-      break
-    case 'calculateDkRoutes':
-      //   await sails.helpers.geocoding.calculateRoutes(
-      //     queueMessage.data.campaignId,
-      //     queueMessage.data.dkCampaignId,
-      //     queueMessage.data.maxHousesPerRoute,
-      //   )
       break
   }
 }
