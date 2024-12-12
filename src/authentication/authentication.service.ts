@@ -35,7 +35,7 @@ export class AuthenticationService {
     const user = await this.usersService.findUser({ email })
 
     if (!user) {
-      throw new UnauthorizedException('ReqUser email not found')
+      throw new UnauthorizedException('User email not found')
     }
 
     const validPassword = await compare(

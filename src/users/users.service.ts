@@ -76,7 +76,7 @@ export class UsersService {
       password && (await hash(trimmedPassword, await genSalt()))
     const existingUser = await this.findUser({ email })
     if (existingUser) {
-      throw new ConflictException('ReqUser with this email already exists')
+      throw new ConflictException('User with this email already exists')
     }
 
     // TODO: create/update customer in CRM:
