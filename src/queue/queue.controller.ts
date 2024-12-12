@@ -4,7 +4,7 @@ import { QueueMessage } from './queue.types'
 
 @Controller('queue')
 export class QueueController {
-  private readonly logger = new Logger(EnqueueService.name)
+  private readonly logger = new Logger(QueueController.name)
   constructor(private readonly queueService: EnqueueService) {}
 
   @Get()

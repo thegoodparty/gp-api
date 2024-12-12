@@ -3,23 +3,15 @@ import { SqsModule } from '@ssut/nestjs-sqs'
 import { EnqueueService } from './enqueue.service'
 import { ConsumerService } from './consumer.service'
 import { QueueController } from './queue.controller'
+import { queueConfig } from './queue.config'
 
 @Module({
   imports: [
     SqsModule.register({
       consumers: [
         {
-          name: process.env.SQS_QUEUE || '',
-          queueUrl: process.env.SQS_QUEUE_URL || '',
-          region: process.env.AWS_REGION,
+          ...queueConfig,
           pollingWaitTimeMs: 10000,
-        },
-      ],
-      producers: [
-        {
-          name: process.env.SQS_QUEUE || '',
-          queueUrl: process.env.SQS_QUEUE_URL || '',
-          region: process.env.AWS_REGION,
         },
       ],
     }),
