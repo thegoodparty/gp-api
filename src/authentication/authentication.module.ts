@@ -4,6 +4,10 @@ import { UsersModule } from '../users/users.module'
 import { PassportModule } from '@nestjs/passport'
 import { JwtModule } from '@nestjs/jwt'
 import { AuthenticationController } from './authentication.controller'
+import { JwtAuthStrategy } from './auth-strategies/JwtAuth.strategy'
+import { APP_GUARD } from '@nestjs/core'
+import { RolesGuard } from './guards/Roles.guard'
+import { LocalStrategy } from './auth-strategies/local.strategy'
 
 const JWT_EXPIRATION = '1y'
 
@@ -15,7 +19,15 @@ if (!process.env.AUTH_SECRET) {
 }
 
 @Module({
-  providers: [AuthenticationService],
+  providers: [
+    AuthenticationService,
+    LocalStrategy,
+    JwtAuthStrategy,
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
   imports: [
     UsersModule,
     PassportModule,
@@ -25,7 +37,7 @@ if (!process.env.AUTH_SECRET) {
       signOptions: { expiresIn: JWT_EXPIRATION },
     }),
   ],
-
+  exports: [AuthenticationService, JwtModule],
   controllers: [AuthenticationController],
 })
 export class AuthenticationModule {}

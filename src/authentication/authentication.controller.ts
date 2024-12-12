@@ -1,59 +1,40 @@
 import {
   Body,
   Controller,
-  Delete,
-  HttpCode,
-  HttpStatus,
   Post,
-  Res,
+  Request,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
-import { FastifyReply } from 'fastify'
-import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { clearAuthToken, setAuthToken } from './util/auth-token.util'
-import { LoginRequestPayloadDto } from './schemas/LoginPayload.schema'
-import {
-  ReadUserOutput,
-  ReadUserOutputSchema,
-} from '../users/schemas/ReadUserOutput.schema'
+import { ReadUserOutputSchema } from '../users/schemas/ReadUserOutput.schema'
+import { AuthGuard } from '@nestjs/passport'
+import { LoginResult, RequestWithUser } from './authentication.types'
+import { PublicAccess } from './decorators/PublicAccess.decorator'
+import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
 
-type LoginResult = { user: ReadUserOutput; token: string }
-
+@PublicAccess()
 @Controller('authentication')
 @UsePipes(ZodValidationPipe)
 export class AuthenticationController {
   constructor(private authenticationService: AuthenticationService) {}
 
   @Post('register')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async register(
-    @Body() userData: CreateUserInputDto,
-    @Res({ passthrough: true }) response: FastifyReply,
-  ) {
-    const { token } = await this.authenticationService.register(userData)
-    setAuthToken(token, response)
+  async register(@Body() userData: RegisterUserInputDto) {
+    const { token, user } = await this.authenticationService.register(userData)
+    return { user: ReadUserOutputSchema.parse(user), token }
   }
 
+  @UseGuards(AuthGuard('local'))
   @Post('login')
-  async login(
-    @Body()
-    loginPayload: LoginRequestPayloadDto,
-    @Res({ passthrough: true }) response: FastifyReply,
-  ): Promise<LoginResult> {
-    const { token, user } = await this.authenticationService.login(loginPayload)
-    setAuthToken(token, response)
+  async login(@Request() { user }: RequestWithUser): Promise<LoginResult> {
     return {
       user: ReadUserOutputSchema.parse(user),
-      //TODO: token should NOT be exposed to the client on the response body here. Fix this.
-      token,
+      token: this.authenticationService.generateAuthToken({
+        email: user.email,
+        sub: user.id,
+      }),
     }
-  }
-
-  @Delete('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Res({ passthrough: true }) response: FastifyReply) {
-    clearAuthToken(response)
   }
 }

@@ -104,6 +104,14 @@ export class UsersService {
     })
   }
 
+  async deleteUser(id: number) {
+    return this.prisma.user.delete({
+      where: {
+        id,
+      },
+    })
+  }
+
   async generatePasswordResetToken(userId: number): Promise<User> {
     const token = nanoid(48)
 

@@ -2,57 +2,63 @@ import {
   ArgumentsHost,
   Catch,
   ExceptionFilter,
-  HttpException,
   HttpStatus,
   Logger,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+} from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 
-@Catch()
+const prismaErrorClasses = [
+  Prisma.PrismaClientKnownRequestError,
+  Prisma.PrismaClientUnknownRequestError,
+  Prisma.PrismaClientRustPanicError,
+  Prisma.PrismaClientInitializationError,
+  Prisma.PrismaClientValidationError,
+]
+
+@Catch(...prismaErrorClasses)
 export class PrismaExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(PrismaExceptionFilter.name);
+  private readonly logger = new Logger(PrismaExceptionFilter.name)
 
   catch(exception: any, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
-    const request = ctx.getRequest();
+    console.dir(exception, { depth: 3, colors: true })
+    const ctx = host.switchToHttp()
+    const response = ctx.getResponse()
+    const request = ctx.getRequest()
 
-    let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    let statusCode: HttpStatus | null = null
+    let message: string | null = null
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       switch (exception.code) {
         case 'P2002': // Unique constraint violation
-          statusCode = HttpStatus.CONFLICT;
-          message = `Duplicate field: ${exception.meta?.target}`;
-          break;
+          statusCode = HttpStatus.CONFLICT
+          message = `Duplicate field: ${exception.meta?.target}`
+          break
         case 'P2025': // Record not found
-          statusCode = HttpStatus.NOT_FOUND;
-          message = 'Record not found';
-          break;
+          statusCode = HttpStatus.NOT_FOUND
+          message = 'Record not found'
+          break
         default:
-          statusCode = HttpStatus.BAD_REQUEST;
-          message = exception.message;
-          break;
+          statusCode = HttpStatus.BAD_REQUEST
+          message = exception.message
+          break
       }
     } else if (exception instanceof Prisma.PrismaClientRustPanicError) {
-      statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = 'A Prisma internal error occured. Please try again later.';
-
+      statusCode = HttpStatus.INTERNAL_SERVER_ERROR
+      message = 'A Prisma internal error occured. Please try again later.'
     } else if (exception instanceof Prisma.PrismaClientValidationError) {
-      statusCode = HttpStatus.BAD_REQUEST;
-      message = 'Validation error: ' + exception.message;
-
+      statusCode = HttpStatus.BAD_REQUEST
+      message = 'Validation error: ' + exception.message
     } else if (exception instanceof Prisma.PrismaClientUnknownRequestError) {
-      statusCode = HttpStatus.BAD_REQUEST;
-      message = 'An unknown error occured while processing the request.';
-
+      statusCode = HttpStatus.BAD_REQUEST
+      message = 'An unknown error occured while processing the request.'
     } else if (exception instanceof Prisma.PrismaClientInitializationError) {
-      statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = 'Failed to intialize Prisma Client: ' + exception.message;
+      statusCode = HttpStatus.INTERNAL_SERVER_ERROR
+      message = 'Failed to initialize Prisma Client: ' + exception.message
+    }
 
-    } else if (exception instanceof HttpException) {
-      throw HttpException;
+    if (!statusCode || !message) {
+      throw exception
     }
 
     this.logger.error(
@@ -63,13 +69,13 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         method: request.method,
         statusCode,
       },
-    );
+    )
 
     response.status(statusCode).send({
       statusCode,
       timestamp: new Date().toISOString,
       path: request.url,
       error: message,
-    });
+    })
   }
 }
