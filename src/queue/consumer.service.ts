@@ -8,14 +8,10 @@ export class ConsumerService {
   constructor() {}
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
-    try {
-      const shouldRequeue = await handleMessageAndMaybeRequeue(message)
-      // Return a rejected promise if requeue is needed without throwing an error
-      if (shouldRequeue) {
-        return Promise.reject('Requeuing message without stopping the process')
-      }
-    } catch (error) {
-      console.error('Error processing message:', error)
+    const shouldRequeue = await handleMessageAndMaybeRequeue(message)
+    // Return a rejected promise if requeue is needed without throwing an error
+    if (shouldRequeue) {
+      return Promise.reject('Requeuing message without stopping the process')
     }
     return true // Return true to delete the message from the queue
   }
