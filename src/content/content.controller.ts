@@ -55,7 +55,6 @@ export class ContentController {
     return this.contentService.findByType(type)
   }
 
-  @PublicAccess()
   @Get('sync')
   async sync() {
     const { entries, createEntries, updateEntries, deletedEntries } =
