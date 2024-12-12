@@ -4,9 +4,13 @@ import { faqArticlesTransformer } from './transformers/faqArticlesTransformer'
 import { blogArticlesTransformer } from './transformers/blogArticlesTransformer'
 import { articleTagsTransformer } from './transformers/articleTagsTransformer'
 import { glossaryItemsTransformer } from './transformers/glossaryItemsTransformer'
+import { candidateContentPromptsTransformer } from './transformers/candidateContentPromptsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
+  candidateContentPrompts = 'candidateContentPrompts',
+  contentPromptsQuestions = 'contentPromptsQuestions',
+  aiContentCategories = 'aiContentCategories',
 }
 
 export const CONTENT_TYPE_MAP: {
@@ -20,9 +24,15 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.aiChatPrompt,
     transformer: noOpTransformer,
   },
-  aiContentTemplate: {
-    name: ContentType.aiContentTemplate,
+  aiContentCategories: {
+    name: InferredContentTypes.aiContentCategories,
+    //transformer: aiContentCategoriesTransformer,
     transformer: noOpTransformer,
+    inferredFrom: ContentType.aiContentTemplate
+  },
+  aiContentTemplate: { 
+    name: ContentType.aiContentTemplate,
+    transformer: candidateContentPromptsTransformer,
   },
   articleCategory: {
     name: ContentType.articleCategory,
@@ -39,9 +49,21 @@ export const CONTENT_TYPE_MAP: {
   },
   blogHome: { name: ContentType.blogHome, transformer: noOpTransformer },
   blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
+  candidateContentPrompts: {
+    name: InferredContentTypes.candidateContentPrompts,
+    //transformer: candidateContentPromptsTransformer,
+    transformer: noOpTransformer,
+    inferredFrom: ContentType.aiContentTemplate
+  },
   candidateTestimonial: {
     name: ContentType.candidateTestimonial,
     transformer: noOpTransformer,
+  },
+  contentPromptsQuestions: {
+    name: InferredContentTypes.contentPromptsQuestions,
+    //transformer: contentPromptsQuestionsTransformer,
+    transformer: noOpTransformer,
+    inferredFrom: ContentType.aiContentTemplate
   },
   election: { name: ContentType.election, transformer: noOpTransformer },
   faqArticle: {

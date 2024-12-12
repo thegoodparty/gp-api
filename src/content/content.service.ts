@@ -39,7 +39,7 @@ export class ContentService {
   async findByType(type: ContentType | InferredContentTypes) {
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
-
+    console.log('queryType: ', queryType);
     const entries = await this.prisma.content.findMany({
       where: {
         type: queryType,

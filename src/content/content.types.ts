@@ -1,5 +1,5 @@
 import { Block, Inline } from '@contentful/rich-text-types'
-import { EntrySys, FieldsType } from 'contentful'
+import { EntrySys, FieldsType, Metadata } from 'contentful'
 import { Content } from '@prisma/client'
 
 export interface ImageRaw {
@@ -15,6 +15,51 @@ export interface ImageRaw {
     }
     title?: string
   }
+}
+
+export type AIContentTemplateRaw = {
+  name: string;
+  content: string;
+  category: {
+    sys: EntrySys;
+    fields: {
+      order: number;
+      title: string;
+    };
+    metadata: Metadata;
+  };
+  requiresAdditionalQuestions: boolean;
+}
+
+
+export type AIContentTemplateAugmented = {
+  id: string;
+  name: string;
+  content: string;
+  category: {
+    title: string;
+    order: number;
+  };
+  requiresAdditionalQuestions: boolean;
+}
+
+export type CandidateContentPrompts = {
+  [key: string]: string; // Multiple entries of key: templateName, value: templateBody (names I made up)
+}
+
+export type ContentPromptsQuestions = { // The use unknown
+  [key: string]: boolean; // Multiple entries of key: templateName, value: boolean
+}
+
+export type AIContentCategories = {
+  name: string;
+  templates: AIContentCategoriesTemplateEntry[];
+  order: number;
+}
+
+export type AIContentCategoriesTemplateEntry = {
+  key: string;
+  name: string;
 }
 
 export type BlogArticleAuthorFieldsRaw = {
