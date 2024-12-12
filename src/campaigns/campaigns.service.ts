@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/prisma/prisma.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
-import { ReqUser } from '../authentication/decorators/req-user.decorator'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {

@@ -1,8 +1,8 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import { isMobilePhone, isPostalCode } from 'validator'
-
 import { PasswordSchema } from '../../../users/schemas/Password.schema'
+import { WriteEmailSchema } from '../../../users/schemas/Email.schema'
 
 export class AdminCreateCampaignSchema extends createZodDto(
   z
@@ -10,7 +10,7 @@ export class AdminCreateCampaignSchema extends createZodDto(
       firstName: z.string(),
       lastName: z.string(),
       phone: z.string().refine((value) => isMobilePhone(value, 'en-US')),
-      email: z.string().email('Must be a valid email'),
+      email: WriteEmailSchema,
       password: PasswordSchema,
       zip: z.string().refine((value) => isPostalCode(value, 'US')),
       party: z.string(),

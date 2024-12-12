@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Post,
@@ -13,7 +14,6 @@ import { AdminCampaignsService } from './adminCampaigns.service'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { AdminSendCreateEmailSchema } from './schemas/adminSendCreateEmail.schema'
 import { Roles } from '../../authentication/decorators/roles.decorator'
 
 @Controller('admin/campaigns')
@@ -36,14 +36,8 @@ export class AdminCampaignsController {
   }
 
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.adminCampaignsService.delete(id)
-  }
-
-  @Post('email')
-  @HttpCode(204)
-  async sendEmail(@Body() { userId }: AdminSendCreateEmailSchema) {
-    return this.adminCampaignsService.sendCreateEmail(userId)
   }
 }

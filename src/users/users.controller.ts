@@ -6,6 +6,7 @@ import {
   HttpCode,
   Logger,
   NotFoundException,
+  NotImplementedException,
   Param,
   Post,
   UseGuards,
@@ -18,12 +19,20 @@ import { UserOwnerOrAdminGuard } from './guards/user-owner-or-admin.guard'
 import { Roles } from '../authentication/decorators/roles.decorator'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword } from './util/passwords.util'
+import { RecoverPasswordSchema } from './schemas/RecoverPasswordEmail.schema'
+import { SetPasswordEmailSchema } from './schemas/SetPasswordEmail.schema'
+import { ResetPasswordSchema } from './schemas/ResetPassword.schema'
+import { HttpStatus } from '@nestjs/common'
+import { EmailService } from '../email/email.service'
 
 @Controller('users')
 export class UsersController {
   private readonly logger = new Logger(UsersController.name)
 
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private emailService: EmailService,
+  ) {}
 
   @Roles('admin')
   @Post()
@@ -63,5 +72,40 @@ export class UsersController {
         `request to delete user that does not exist, w/ id: ${id}`,
       )
     }
+  }
+
+  @Post('recover-password-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async sendRecoverPasswordEmail(@Body() { email }: RecoverPasswordSchema) {
+    let user = await this.usersService.findUserByEmail(email)
+
+    if (!user) {
+      // don't want to expose that user with email doesn't exist
+      return
+    }
+
+    // generate and set reset token on user
+    // TODO: make this method just create the token, then use a service update
+    //  method to set it on the user
+    user = await this.usersService.generatePasswordResetToken(user.id)
+
+    return await this.emailService.sendRecoverPasswordEmail(user)
+  }
+
+  @Post('set-password-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  // TODO: make this admin only!
+  async sendSetPasswordEmail(@Body() { userId }: SetPasswordEmailSchema) {
+    const user = await this.usersService.generatePasswordResetToken(userId)
+    return this.emailService.sendSetPasswordEmail(user)
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: ResetPasswordSchema) {
+    const { token, password, confirmPassword } = body
+    const user = await this.usersService.findUserByResetToken(token)
+
+    // TODO: update user with new password
+    throw new NotImplementedException('Reset PW not implemented yet')
   }
 }

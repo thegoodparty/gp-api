@@ -10,10 +10,11 @@ import { DeclareModule } from './declare/declare.module'
 import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
-import { AdminModule } from './admin/admin.module'
 import { JwtStrategy } from './authentication/auth-strategies/jwtPassport.strategy'
 import { APP_GUARD } from '@nestjs/core'
 import { JwtAuthGuard } from './authentication/guards/jwt-auth.guard'
+import { TopIssuesModule } from './topIssues/topIssues.module'
+import { AdminModule } from './admin/admin.module'
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { JwtAuthGuard } from './authentication/guards/jwt-auth.guard'
     JobsModule,
     DeclareModule,
     CampaignsModule,
+    TopIssuesModule,
     AdminModule,
   ],
   controllers: [AppController],
