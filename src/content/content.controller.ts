@@ -9,7 +9,7 @@ import {
   groupGlossaryItemsByAlpha,
   mapGlossaryItemsToSlug,
 } from './util/glossaryItems.util'
-import { PublicAccess } from '../authentication/decorators/public-access.decorator'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 
 @Controller('content')
 @PublicAccess()

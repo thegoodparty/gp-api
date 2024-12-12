@@ -18,10 +18,10 @@ import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { ReqUser } from '../authentication/decorators/req-user.decorator'
+import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
-import { CampaignOwnersOrAdminGuard } from './guards/campaign-owners-or-admin.guard'
-import { Roles } from '../authentication/decorators/roles.decorator'
+import { CampaignOwnersOrAdminGuard } from './guards/CampaignOwnersOrAdmin.guard'
+import { Roles } from '../authentication/decorators/Roles.decorator'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)

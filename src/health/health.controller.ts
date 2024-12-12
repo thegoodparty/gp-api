@@ -1,6 +1,6 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common'
 import { HealthService } from './health.service'
-import { PublicAccess } from '../authentication/decorators/public-access.decorator'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 
 @Controller('health')
 export class HealthController {

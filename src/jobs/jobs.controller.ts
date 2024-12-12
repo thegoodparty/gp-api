@@ -8,7 +8,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { JobsService } from './jobs.service'
-import { PublicAccess } from '../authentication/decorators/public-access.decorator'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 
 @Controller('jobs')
 @PublicAccess()

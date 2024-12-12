@@ -11,7 +11,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { ReadUserOutputSchema } from '../users/schemas/ReadUserOutput.schema'
 import { AuthGuard } from '@nestjs/passport'
 import { LoginResult, RequestWithUser } from './authentication.types'
-import { PublicAccess } from './decorators/public-access.decorator'
+import { PublicAccess } from './decorators/PublicAccess.decorator'
 import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
 
 @PublicAccess()

@@ -10,9 +10,9 @@ import { DeclareModule } from './declare/declare.module'
 import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
-import { JwtStrategy } from './authentication/auth-strategies/jwtPassport.strategy'
+import { JwtAuthStrategy } from './authentication/auth-strategies/JwtAuth.strategy'
 import { APP_GUARD } from '@nestjs/core'
-import { JwtAuthGuard } from './authentication/guards/jwt-auth.guard'
+import { JwtAuthGuard } from './authentication/guards/JwtAuth.guard'
 import { TopIssuesModule } from './topIssues/topIssues.module'
 import { AdminModule } from './admin/admin.module'
 
@@ -37,7 +37,7 @@ import { AdminModule } from './admin/admin.module'
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    JwtStrategy,
+    JwtAuthStrategy,
   ],
 })
 export class AppModule {}

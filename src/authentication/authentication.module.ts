@@ -4,9 +4,9 @@ import { UsersModule } from '../users/users.module'
 import { PassportModule } from '@nestjs/passport'
 import { JwtModule } from '@nestjs/jwt'
 import { AuthenticationController } from './authentication.controller'
-import { JwtStrategy } from './auth-strategies/jwtPassport.strategy'
+import { JwtAuthStrategy } from './auth-strategies/JwtAuth.strategy'
 import { APP_GUARD } from '@nestjs/core'
-import { RolesGuard } from './guards/roles.guard'
+import { RolesGuard } from './guards/Roles.guard'
 import { LocalStrategy } from './auth-strategies/local.strategy'
 
 const JWT_EXPIRATION = '1y'
@@ -22,7 +22,7 @@ if (!process.env.AUTH_SECRET) {
   providers: [
     AuthenticationService,
     LocalStrategy,
-    JwtStrategy,
+    JwtAuthStrategy,
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
