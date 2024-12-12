@@ -63,7 +63,7 @@ $ npm run start:prod
 You can run the tests in the Postman desktop app or you can run them using the Postman CLI in a terminal:
 - Install the Postman CLI tool: https://learning.postman.com/docs/postman-cli/postman-cli-installation/#system-requirements
 - Generate a Postman API key: https://learning.postman.com/docs/developer/postman-api/authentication/#generate-a-postman-api-key
-- Login to Postman CLI: `postman validateUser --with-api-key [API_KEY]`
+- Login to Postman CLI: `postman login --with-api-key [API_KEY]`
 - Get the IDs of the collection you want to test, and the environment you want to test with from Postman: https://learning.postman.com/docs/postman-cli/postman-cli-options/#signing-in-and-out:~:text=Then%20select%20the%20information%20icon
 - Run a collection: `postman run [collection_id] --environment [environment_id]`
   
