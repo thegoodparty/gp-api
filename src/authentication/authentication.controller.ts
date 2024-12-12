@@ -79,8 +79,8 @@ export class AuthenticationController {
     }
 
     // generate and set reset token on user
-    user = await this.authenticationService.generatePasswordResetToken(user.id)
-
+    const token = this.authenticationService.generatePasswordResetToken()
+    user = await this.usersService.setResetToken(user.id, token)
     return await this.emailService.sendRecoverPasswordEmail(user)
   }
 
@@ -88,8 +88,8 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   // TODO: make this admin only!
   async sendSetPasswordEmail(@Body() { userId }: SetPasswordEmailSchema) {
-    const user =
-      await this.authenticationService.generatePasswordResetToken(userId)
+    const token = this.authenticationService.generatePasswordResetToken()
+    const user = await this.usersService.setResetToken(userId, token)
     return this.emailService.sendSetPasswordEmail(user)
   }
 

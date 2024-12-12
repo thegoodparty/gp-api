@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -69,42 +70,28 @@ export class AuthenticationService {
       user = await this.usersService.findUserByResetToken(email, token)
     } catch (e) {
       if (
+        e instanceof TokenExpiredError || // token expired
         e instanceof SyntaxError || // token parse failed
         e instanceof PrismaClientKnownRequestError // token doesn't match a user
       ) {
-        throw new BadRequestException('Invalid token')
-      } else if (e instanceof TokenExpiredError) {
-        throw new BadRequestException('Token has expired')
+        throw new ForbiddenException(
+          e instanceof TokenExpiredError
+            ? 'Token has expired'
+            : 'Invalid token',
+        )
       }
-
       throw e
     }
 
-    try {
-      return await this.usersService.updatePassword(user.id, password, true)
-    } catch (e) {
-      console.log(e)
-      throw new BadRequestException('Failed to update password')
-    }
+    return await this.usersService.updatePassword(user.id, password, true)
   }
 
-  async generatePasswordResetToken(userId: number): Promise<User> {
+  generatePasswordResetToken() {
     const token = nanoid(48)
 
-    const jwt = this.jwtService.sign(
+    return this.jwtService.sign(
       { token },
       { expiresIn: PASSWORD_RESET_TOKEN_TTL },
     )
-
-    try {
-      return await this.usersService.setResetToken(userId, jwt)
-    } catch (e) {
-      if (e instanceof PrismaClientKnownRequestError) {
-        console.log('Could not find user to reset password')
-        throw new NotFoundException('User not found')
-      }
-
-      throw e
-    }
   }
 }
