@@ -1,19 +1,21 @@
+import { Logger } from '@nestjs/common';
 import {
   Transformer,
   AIContentTemplateRaw,
   CandidateContentPrompts
 } from '../content.types';
 
+const logger = new Logger('CandidateContentPromptsTransformer');
+
 export const candidateContentPromptsTransformer: Transformer<
   AIContentTemplateRaw,
   CandidateContentPrompts
 > = (templates: AIContentTemplateRaw[]): CandidateContentPrompts[] => {
   const result = templates.reduce<CandidateContentPrompts>((acc, template) => {
-    if (template.name && template.content) {
-      console.log('template.name and template.content found, transforming');
-      acc[template.name] = template.content;
+    if (template.data.name && template.data.content) {
+      acc[template.data.name] = template.data.content;
     } else {
-      console.log('template.name and/or template.content not found');
+      logger.warn('template.data.name and/or template.data.content not found', template);
     }
     return acc;
   }, {});

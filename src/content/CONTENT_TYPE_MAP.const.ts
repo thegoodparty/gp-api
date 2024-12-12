@@ -51,8 +51,8 @@ export const CONTENT_TYPE_MAP: {
   blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
   candidateContentPrompts: {
     name: InferredContentTypes.candidateContentPrompts,
-    //transformer: candidateContentPromptsTransformer,
-    transformer: noOpTransformer,
+    transformer: candidateContentPromptsTransformer,
+    //transformer: noOpTransformer,
     inferredFrom: ContentType.aiContentTemplate
   },
   candidateTestimonial: {

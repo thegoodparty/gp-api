@@ -1,5 +1,5 @@
 import { Block, Inline } from '@contentful/rich-text-types'
-import { EntrySys, FieldsType, Metadata } from 'contentful'
+import { EntrySys, FieldsType, Metadata, Asset } from 'contentful'
 import { Content } from '@prisma/client'
 
 export interface ImageRaw {
@@ -18,17 +18,16 @@ export interface ImageRaw {
 }
 
 export type AIContentTemplateRaw = {
-  name: string;
-  content: string;
-  category: {
-    sys: EntrySys;
-    fields: {
-      order: number;
-      title: string;
-    };
-    metadata: Metadata;
-  };
-  requiresAdditionalQuestions: boolean;
+  createdAt: Date,
+  updatedAt: Date,
+  id: string,
+  type: string,
+  data: {
+    name: string,
+    content: string,
+    category: Asset,
+    requiresAdditionalQuestions: boolean
+  }
 }
 
 
