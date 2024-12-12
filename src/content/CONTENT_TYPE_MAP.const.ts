@@ -5,6 +5,7 @@ import { blogArticlesTransformer } from './transformers/blogArticlesTransformer'
 import { articleTagsTransformer } from './transformers/articleTagsTransformer'
 import { glossaryItemsTransformer } from './transformers/glossaryItemsTransformer'
 import { candidateContentPromptsTransformer } from './transformers/candidateContentPromptsTransformer'
+import { contentPromptsQuestionsTransformer } from './transformers/contentPromptsQuestionsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -61,8 +62,8 @@ export const CONTENT_TYPE_MAP: {
   },
   contentPromptsQuestions: {
     name: InferredContentTypes.contentPromptsQuestions,
-    //transformer: contentPromptsQuestionsTransformer,
-    transformer: noOpTransformer,
+    transformer: contentPromptsQuestionsTransformer,
+    //transformer: noOpTransformer,
     inferredFrom: ContentType.aiContentTemplate
   },
   election: { name: ContentType.election, transformer: noOpTransformer },
