@@ -12,6 +12,7 @@ import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
 import { AdminModule } from './admin/admin.module'
 import { QueueModule } from './queue/queue.module'
+import { TopIssuesModule } from './topIssues/topIssues.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { QueueModule } from './queue/queue.module'
     JobsModule,
     DeclareModule,
     CampaignsModule,
+    TopIssuesModule,
     AdminModule,
     QueueModule,
   ],

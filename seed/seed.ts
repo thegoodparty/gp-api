@@ -1,10 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 import seedCampaigns from './campaigns'
+import seedTopIssues from './topIssues'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  await seedCampaigns(prisma)
+  const campaignIds = await seedCampaigns(prisma);
+  await seedTopIssues(prisma, campaignIds);
 }
 
 main()
