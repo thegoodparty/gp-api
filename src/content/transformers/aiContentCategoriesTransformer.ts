@@ -2,27 +2,46 @@ import { Logger } from '@nestjs/common';
 import {
   Transformer,
   AIContentTemplateRaw,
-  //aiContentCategories
+  AIContentCategories
 } from '../content.types';
 import { camelCase } from 'lodash';
-import { ContentfulService } from 'src/contentful/contentful.service';
 
 const logger = new Logger('aiContentCategoriesTransformer');
 
-// export const aiContentCategoriesTransformer: Transformer<
-//   AIContentTemplateRaw,
-//   aiContentCategories
-// > = (templates: AIContentTemplateRaw[]): aiContentCategories[] => {
-//   const result = templates.reduce<aiContentCategories>((acc, template) => {
-//     //contentfulService.getEntry
-//     if (template.data.name && template.data.content) {
-//       const name = camelCase(template.data.name);
-//       acc[name] = template.data.content;
-//     } else {
-//       logger.warn('template.data.name and/or template.data.content not found', template);
-//     }
-//     return acc;
-//   }, {});
+// AIContentCategories are grouped by the title found under each AIContentTemplateRaw's data.category.fields
+// MPX: Several AIContentTemplateRaw's are used to make each 'AIContentCategories' object
 
-//   return [result];
-// };
+export const aiContentCategoriesTransformer: Transformer<
+  AIContentTemplateRaw,
+  AIContentCategories
+> = (aiContents: AIContentTemplateRaw[]): AIContentCategories[] => {
+  const aiContentCategoriesHash = {};
+  const aiContentCategories: any = [];
+
+  for (const aiContent of aiContents) {
+    const { order, title } = aiContent.data.category.fields;
+    const { name } = aiContent.data;
+    const key = camelCase(name)
+    
+    if (!aiContentCategoriesHash[title]) {
+      aiContentCategoriesHash[title] = [];
+      aiContentCategories.push({ title, order });
+    }
+    aiContentCategoriesHash[title].push({ key, name})
+  }
+
+  return combineAiContentAndCategories(aiContentCategories, aiContentCategoriesHash);
+}
+
+
+function combineAiContentAndCategories(categories, categoriesHash) {
+  categories.sort((a, b) => a.order - b.order);
+  const combined: any = [];
+  categories.forEach((category) => {
+    combined.push({
+      name: category.title,
+      templates: categoriesHash[category.title],
+    });
+  });
+  return combined;
+}

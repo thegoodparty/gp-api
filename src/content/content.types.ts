@@ -25,10 +25,17 @@ export type AIContentTemplateRaw = {
   data: {
     name: string,
     content: string,
-    category: Asset,
+    category: {
+      fields: {
+        order: number,
+        title: string,
+      }
+    },
     requiresAdditionalQuestions: boolean
   }
 }
+
+
 
 
 export type AIContentTemplateAugmented = {
