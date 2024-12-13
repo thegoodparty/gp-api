@@ -50,7 +50,6 @@
     "nanoid": "^3.3.8",
     "nestjs-zod": "^4.2.0",
     "passport": "^0.7.0",
-    "passport-google-oauth2": "^0.2.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.2.0",
