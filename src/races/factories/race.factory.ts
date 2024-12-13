@@ -16,7 +16,7 @@ export const raceFactory = generateFactory<Race>(() => {
   const filingDateStart = faker.date.anytime().toString()
   const filingDateEnd = faker.date.anytime().toString()
   return {
-    id: faker.string.uuid(),
+    id: faker.number.int({ max: 2147483647 }),
     ballotId,
     ballotHashId,
     hashId,

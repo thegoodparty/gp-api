@@ -4,7 +4,7 @@ import { municipalityFactory } from './factories/municipality.factory'
 import { raceFactory } from './factories/race.factory'
 
 const NUM_COUNTIES = 2
-const NUM_MUNICIPALITIES_PER_COUNTY = 2
+const NUM_MUNICIPALITIES_PER_COUNTY = 1
 const NUM_RACES = 2
 
 export default async function seedRaces(prisma: PrismaClient) {
@@ -13,11 +13,20 @@ export default async function seedRaces(prisma: PrismaClient) {
   const fakeRaces: any[] = []
 
   for (let i = 0; i < NUM_COUNTIES; i++) {
-    // TODO: move user seeding to its own file
     const county = countyFactory()
+    if (i === 0) {
+      // for testing
+      county.name = 'Los Angeles'
+      county.slug = 'ca/los-angeles'
+    }
 
     for (let j = 0; j < NUM_MUNICIPALITIES_PER_COUNTY; j++) {
       const municipality = municipalityFactory()
+      if (i === 0 && j === 0) {
+        // for testing
+        municipality.name = 'Los Angeles'
+        municipality.slug = 'ca/los-angeles/los-angeles'
+      }
       municipality.countyId = county.id
       fakeMunicipalities.push(municipality)
 
