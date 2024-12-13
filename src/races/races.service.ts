@@ -32,8 +32,7 @@ export class RacesService {
       return this.byState(state)
     }
 
-    // Return null or throw an error if no criteria match
-    return null
+    return []
   }
 
   async findOne(
