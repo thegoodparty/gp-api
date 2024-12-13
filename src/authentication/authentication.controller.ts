@@ -76,11 +76,12 @@ export class AuthenticationController {
 
   @Roles(UserRole.admin)
   @Post('set-password-email')
-  @HttpCode(HttpStatus.NO_CONTENT)
   async sendSetPasswordEmail(@Body() { userId }: SetPasswordEmailSchema) {
     const token = this.authenticationService.generatePasswordResetToken()
     const user = await this.usersService.setResetToken(userId, token)
-    return this.emailService.sendSetPasswordEmail(user)
+    await this.emailService.sendSetPasswordEmail(user)
+
+    return { token }
   }
 
   @Post('reset-password')

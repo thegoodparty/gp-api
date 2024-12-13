@@ -1,23 +1,17 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
 import { UsersService } from '../users/users.service'
 import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
-import {
-  LoginPayload,
-  LoginRequestPayloadDto,
-} from './schemas/LoginPayload.schema'
+import { LoginPayload } from './schemas/LoginPayload.schema'
 import { compare } from 'bcrypt'
-import { User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { nanoid } from 'nanoid'
 
-const PASSWORD_RESET_TOKEN_TTL = '30 days'
+const PASSWORD_RESET_TOKEN_TTL = '1h'
 
 @Injectable()
 export class AuthenticationService {
