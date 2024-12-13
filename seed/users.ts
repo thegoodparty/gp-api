@@ -1,10 +1,22 @@
-import { PrismaClient, User } from '@prisma/client'
+import { PrismaClient, User, UserRole } from '@prisma/client'
 import { userFactory } from './factories/user.factory'
+import { hashSync, genSaltSync } from 'bcrypt'
 
 const NUM_USERS = 20
 
+const ADMIN_FIRST_NAME = 'Tyler'
+const ADMIN_LAST_NAME = 'Durden'
+const ADMIN_USER = {
+  email: 'tyler@fightclub.org',
+  password: hashSync('no1TalksAboutFightClub', genSaltSync()),
+  firstName: ADMIN_FIRST_NAME,
+  lastName: ADMIN_LAST_NAME,
+  name: `${ADMIN_FIRST_NAME} ${ADMIN_LAST_NAME}`,
+  roles: [UserRole.admin],
+}
 // define some user objects here for non random seeds
 const FIXED_USERS: Partial<User>[] = [
+  ADMIN_USER,
   {
     id: 1,
     firstName: 'Homer',

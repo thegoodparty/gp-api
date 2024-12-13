@@ -1,4 +1,4 @@
-import { User } from '@prisma/client'
+import { User, UserRole } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 import { generateRandomPassword } from '../../src/users/util/passwords.util'
@@ -18,6 +18,7 @@ export const userFactory = generateFactory<User>(() => {
     password: generateRandomPassword(),
     phone: faker.string.numeric({ length: 10, allowLeadingZeros: false }),
     zip: faker.location.zipCode(),
+    roles: [faker.helpers.enumValue(UserRole)],
     metaData: {},
   }
 })

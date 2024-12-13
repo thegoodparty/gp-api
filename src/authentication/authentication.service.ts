@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common'
-import { JwtService, TokenExpiredError } from '@nestjs/jwt'
+import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
 import { UsersService } from '../users/users.service'
 import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
 import {
@@ -72,6 +72,7 @@ export class AuthenticationService {
       if (
         e instanceof TokenExpiredError || // token expired
         e instanceof SyntaxError || // token parse failed
+        e instanceof JsonWebTokenError || // malformed token
         e instanceof PrismaClientKnownRequestError // token doesn't match a user
       ) {
         throw new ForbiddenException(

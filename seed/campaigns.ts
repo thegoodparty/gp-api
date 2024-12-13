@@ -40,19 +40,6 @@ export default async function seedCampaigns(prisma: PrismaClient) {
     }
   }
 
-  const ADMIN_FIRST_NAME = 'Tyler'
-  const ADMIN_LAST_NAME = 'Durden'
-  const adminUser = userFactory({
-    email: 'tyler@fightclub.org',
-    password: hashSync('no1TalksAboutFightClub', genSaltSync()),
-    firstName: ADMIN_FIRST_NAME,
-    lastName: ADMIN_LAST_NAME,
-    name: `${ADMIN_FIRST_NAME} ${ADMIN_LAST_NAME}`,
-    roles: ['admin'],
-  })
-
-  fakeUsers.push(adminUser)
-
   await prisma.user.createMany({ data: fakeUsers })
   const { count } = await prisma.campaign.createMany({ data: fakeCampaigns })
   await prisma.pathToVictory.createMany({

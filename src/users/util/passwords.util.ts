@@ -27,3 +27,11 @@ export const generateRandomPassword = (
 
   return randString
 }
+
+/** function to trim and hash password string
+ * @example
+ * const hashed = hashPassword('TextPassword123')
+ */
+export const hashPassword = async (password: string) => {
+  return await hash(password.trim(), await genSalt())
+}

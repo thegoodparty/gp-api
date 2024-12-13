@@ -1,19 +1,15 @@
 import {
   Body,
   Controller,
-  Delete,
   HttpCode,
   HttpStatus,
   Post,
   Request,
-  Res,
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { clearAuthToken, setAuthToken } from './util/auth-token.util'
-import { LoginRequestPayloadDto } from './schemas/LoginPayload.schema'
 import {
   ReadUserOutput,
   ReadUserOutputSchema,
@@ -24,12 +20,12 @@ import { UsersService } from 'src/users/users.service'
 import { EmailService } from 'src/email/email.service'
 import { ResetPasswordSchema } from './schemas/ResetPassword.schema'
 import { CampaignsService } from 'src/campaigns/campaigns.service'
-import { UserRole } from '@prisma/client'
 import { AuthGuard } from '@nestjs/passport'
-import { FastifyReply } from 'fastify'
 import { RequestWithUser } from './authentication.types'
 import { PublicAccess } from './decorators/PublicAccess.decorator'
 import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
+import { Roles } from './decorators/Roles.decorator'
+import { UserRole } from '@prisma/client'
 
 type LoginResult = { user: ReadUserOutput; token: string }
 
@@ -62,12 +58,6 @@ export class AuthenticationController {
     }
   }
 
-  @Delete('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Res({ passthrough: true }) response: FastifyReply) {
-    clearAuthToken(response)
-  }
-
   @Post('recover-password-email')
   @HttpCode(HttpStatus.NO_CONTENT)
   async sendRecoverPasswordEmail(@Body() { email }: RecoverPasswordSchema) {
@@ -84,9 +74,9 @@ export class AuthenticationController {
     return await this.emailService.sendRecoverPasswordEmail(user)
   }
 
+  @Roles(UserRole.admin)
   @Post('set-password-email')
   @HttpCode(HttpStatus.NO_CONTENT)
-  // TODO: make this admin only!
   async sendSetPasswordEmail(@Body() { userId }: SetPasswordEmailSchema) {
     const token = this.authenticationService.generatePasswordResetToken()
     const user = await this.usersService.setResetToken(userId, token)
@@ -94,10 +84,7 @@ export class AuthenticationController {
   }
 
   @Post('reset-password')
-  async resetPassword(
-    @Body() body: ResetPasswordSchema,
-    @Res({ passthrough: true }) response: FastifyReply,
-  ) {
+  async resetPassword(@Body() body: ResetPasswordSchema) {
     const { email, token, password, adminCreate } = body
 
     const user = await this.authenticationService.updatePasswordWithToken(
@@ -109,7 +96,7 @@ export class AuthenticationController {
 
     // TODO: "adminCreate" should probably be "loginAfterReset" or something more descriptive
     // leaving as is for now compatibility with existing frontend
-    if (adminCreate && user.role !== UserRole.sales) {
+    if (adminCreate) {
       // check if the campaign attached to this user is marked as created by admin
       // to automatically login after the password change
       const campaign = await this.campaignsService.findByUser(user.id)
@@ -120,17 +107,12 @@ export class AuthenticationController {
       }
 
       // otherwise log in for user
-      const authToken = this.authenticationService.generateAuthToken({
-        email: user.email,
-        sub: user.id,
-      })
-
-      setAuthToken(authToken, response)
-
       return {
         user: userOut,
-        //TODO: token should NOT be exposed to the client on the response body here. Fix this.
-        token,
+        token: this.authenticationService.generateAuthToken({
+          email: user.email,
+          sub: user.id,
+        }),
       }
     }
 
