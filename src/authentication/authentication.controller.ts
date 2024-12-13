@@ -10,10 +10,7 @@ import {
 } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
 import { ZodValidationPipe } from 'nestjs-zod'
-import {
-  ReadUserOutput,
-  ReadUserOutputSchema,
-} from '../users/schemas/ReadUserOutput.schema'
+import { ReadUserOutputSchema } from '../users/schemas/ReadUserOutput.schema'
 import { RecoverPasswordSchema } from './schemas/RecoverPasswordEmail.schema'
 import { SetPasswordEmailSchema } from './schemas/SetPasswordEmail.schema'
 import { UsersService } from 'src/users/users.service'
@@ -21,13 +18,11 @@ import { EmailService } from 'src/email/email.service'
 import { ResetPasswordSchema } from './schemas/ResetPassword.schema'
 import { CampaignsService } from 'src/campaigns/campaigns.service'
 import { AuthGuard } from '@nestjs/passport'
-import { RequestWithUser } from './authentication.types'
+import { LoginResult, RequestWithUser } from './authentication.types'
 import { PublicAccess } from './decorators/PublicAccess.decorator'
 import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
 import { Roles } from './decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'
-
-type LoginResult = { user: ReadUserOutput; token: string }
 
 @PublicAccess()
 @Controller('authentication')
