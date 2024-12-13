@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Post,
   Request,
+  Res,
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
@@ -22,7 +23,10 @@ import { LoginResult, RequestWithUser } from './authentication.types'
 import { PublicAccess } from './decorators/PublicAccess.decorator'
 import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
 import { Roles } from './decorators/Roles.decorator'
-import { UserRole } from '@prisma/client'
+import { User, UserRole } from '@prisma/client'
+import { ReqUser } from './decorators/ReqUser.decorator'
+import { userHasRole } from 'src/users/util/roles.util'
+import { FastifyReply } from 'fastify'
 
 @PublicAccess()
 @Controller('authentication')
@@ -69,17 +73,27 @@ export class AuthenticationController {
     return await this.emailService.sendRecoverPasswordEmail(user)
   }
 
-  @Roles(UserRole.admin)
+  @Roles(UserRole.admin, UserRole.sales)
   @Post('send-set-password-email')
-  async sendSetPasswordEmail(@Body() { userId }: SetPasswordEmailSchema) {
+  async sendSetPasswordEmail(
+    @ReqUser() reqUser: User,
+    @Res({ passthrough: true }) response: FastifyReply,
+    @Body() { userId }: SetPasswordEmailSchema,
+  ) {
     const token = this.authenticationService.generatePasswordResetToken()
     const user = await this.usersService.setResetToken(userId, token)
     await this.emailService.sendSetPasswordEmail(user)
 
-    return { token }
+    if (userHasRole(reqUser, UserRole.admin)) {
+      response.statusCode = HttpStatus.OK
+      return { token }
+    }
+
+    response.statusCode = HttpStatus.NO_CONTENT
   }
 
   @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() body: ResetPasswordSchema) {
     const { email, token, password, adminCreate } = body
 

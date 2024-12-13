@@ -14,9 +14,16 @@ const ADMIN_USER = {
   name: `${ADMIN_FIRST_NAME} ${ADMIN_LAST_NAME}`,
   roles: [UserRole.admin],
 }
+
+const SALES_USER = {
+  email: 'sales@fightclub.org',
+  password: hashSync('iDoTalkAboutFightClub1', genSaltSync()),
+  roles: [UserRole.sales],
+}
 // define some user objects here for non random seeds
 const FIXED_USERS: Partial<User>[] = [
   ADMIN_USER,
+  SALES_USER,
   {
     id: 1,
     firstName: 'Homer',
