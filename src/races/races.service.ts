@@ -4,7 +4,7 @@ import slugify from 'slugify'
 import { startOfYear, addYears, format } from 'date-fns'
 
 import { County, Municipality } from '@prisma/client'
-import { ExtendedRace, NormalizedRace, RaceData } from './races.types'
+import { NormalizedRace, Race, RaceData, RaceQuery } from './races.types'
 
 @Injectable()
 export class RacesService {
@@ -60,18 +60,19 @@ export class RacesService {
         gte: new Date(now),
         lt: new Date(nextYear),
       },
-    }
+    } as RaceQuery
+
     if (city && cityRecord) {
-      query['municipalityId'] = cityRecord.id
+      query.municipalityId = cityRecord.id
     } else if (countyRecord) {
-      query['countyId'] = countyRecord.id
+      query.countyId = countyRecord.id
     }
     const race = (await this.prisma.race.findFirst({
       where: query,
       orderBy: {
         electionDate: 'asc',
       },
-    })) as ExtendedRace
+    })) as Race
 
     if (!race) {
       return false
@@ -177,7 +178,7 @@ export class RacesService {
     return dedupedRaces
   }
 
-  private normalizeRace(race: ExtendedRace, state: string): NormalizedRace {
+  private normalizeRace(race: Race, state: string): NormalizedRace {
     const {
       election_name,
       position_name,

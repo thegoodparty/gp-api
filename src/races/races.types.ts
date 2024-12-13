@@ -1,4 +1,4 @@
-import { Race as PrismaRace } from '@prisma/client'
+import { County, Municipality, Race as PrismaRace } from '@prisma/client'
 
 export type RaceData = {
   position_name?: string
@@ -30,11 +30,8 @@ export type RaceData = {
 
 export type Race = Omit<PrismaRace, 'data'> & {
   data?: RaceData | null
-}
-
-export type ExtendedRace = Race & {
-  municipality?: any
-  county?: any
+  municipality?: Municipality | null | undefined
+  county?: County | null | undefined
 }
 
 export type NormalizedRace = {
@@ -69,4 +66,15 @@ export type NormalizedRace = {
     name: string
     slug: string
   } | null
+}
+
+export type RaceQuery = {
+  state: string
+  positionSlug: string
+  electionDate: {
+    gte: Date
+    lt: Date
+  }
+  municipalityId?: number
+  countyId?: number
 }
