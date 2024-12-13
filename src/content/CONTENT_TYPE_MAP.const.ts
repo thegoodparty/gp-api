@@ -7,12 +7,14 @@ import { glossaryItemsTransformer } from './transformers/glossaryItemsTransforme
 import { candidateContentPromptsTransformer } from './transformers/candidateContentPromptsTransformer'
 import { contentPromptsQuestionsTransformer } from './transformers/contentPromptsQuestionsTransformer'
 import { aiContentCategoriesTransformer } from './transformers/aiContentCategoriesTransformer'
+import { aiChatPromptsTransformer } from './transformers/aiChatPromptTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
   candidateContentPrompts = 'candidateContentPrompts',
   contentPromptsQuestions = 'contentPromptsQuestions',
   aiContentCategories = 'aiContentCategories',
+  aiChatPrompts = 'aiChatPrompts'
 }
 
 export const CONTENT_TYPE_MAP: {
@@ -26,6 +28,11 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.aiChatPrompt,
     transformer: noOpTransformer,
   },
+  aiChatPrompts: {
+    name: InferredContentTypes.aiChatPrompts,
+    transformer: aiChatPromptsTransformer,
+    inferredFrom: ContentType.aiChatPrompt
+  },
   aiContentCategories: {
     name: InferredContentTypes.aiContentCategories,
     transformer: aiContentCategoriesTransformer,
@@ -33,7 +40,7 @@ export const CONTENT_TYPE_MAP: {
   },
   aiContentTemplate: { 
     name: ContentType.aiContentTemplate,
-    transformer: candidateContentPromptsTransformer,
+    transformer: noOpTransformer,
   },
   articleCategory: {
     name: ContentType.articleCategory,

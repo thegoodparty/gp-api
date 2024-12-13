@@ -35,8 +35,28 @@ export type AIContentTemplateRaw = {
   }
 }
 
+export type AIChatPrompt = {
+  createdAt: Date,
+  updatedAt: Date,
+  id: string,
+  type: string,
+  data: AIChatPromptContents
+}
 
+export type AIChatPrompts = {
+  [key: string]: AIChatPromptContentsWithId
+}
 
+export type AIChatPromptContents = {
+  name: string;
+  systemPrompt: string;
+  initialPrompt: string;
+  candidateJson: object;
+}
+
+export type AIChatPromptContentsWithId = AIChatPromptContents & {
+  id: number;
+}
 
 export type AIContentTemplateAugmented = {
   id: string;
