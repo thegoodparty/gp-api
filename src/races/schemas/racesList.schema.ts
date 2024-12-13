@@ -5,7 +5,7 @@ export const racesListSchema = z.object({
   state: z.string().min(1, 'State is required'),
   county: z.string().optional(),
   city: z.string().optional(),
-  positionSlug: z.string().optional(),
+  positionSlug: z.string(),
 })
 
 export class RacesListQueryDto extends createZodDto(racesListSchema) {}

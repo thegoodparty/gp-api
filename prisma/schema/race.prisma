@@ -10,7 +10,7 @@ model Race {
     ballotId       String        @unique
     ballotHashId   String?
     hashId         String        @unique
-    positionSlug   String?
+    positionSlug   String
     state          String        @db.Char(2)
     electionDate   DateTime?
     level          LevelType
