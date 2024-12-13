@@ -15,7 +15,11 @@ export function deepMerge(obj1: object, obj2: object) {
 
   for (const key in obj2) {
     if (obj2.hasOwnProperty(key)) {
-      if (typeof obj2[key] === 'object' && typeof obj1[key] === 'object') {
+      if (
+        typeof obj2[key] === 'object' &&
+        typeof obj1[key] === 'object' &&
+        !Array.isArray(obj2[key])
+      ) {
         // If both values are objects, recursively merge them
         result[key] = deepMerge(obj1[key], obj2[key])
       } else {

@@ -14,41 +14,31 @@ export default async function seedCampaigns(prisma: PrismaClient) {
   const fakeP2Vs: any[] = []
   const fakeUpdateHistory: any[] = []
 
+  const existingUsers = await prisma.user.findMany({ take: NUM_CAMPAIGNS })
+
   const campaignIds: number[] = []
 
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
-    // TODO: move user seeding to its own file
-    const user = userFactory()
+    let user = existingUsers[i]
+    if (!user) {
+      user = userFactory()
+      fakeUsers.push(user)
+    }
     const camp = campaignFactory({ userId: user.id })
-    const p2v = pathToVictoryFactory({ campaignId: camp.id })
 
     campaignIds.push(camp.id)
+    fakeCampaigns.push(camp)
+    fakeP2Vs.push(pathToVictoryFactory({ campaignId: camp.id }))
 
     for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
-      fakeUpdateHistory[NUM_UPDATE_HISTORY * i + j] =
+      fakeUpdateHistory.push(
         campaignUpdateHistoryFactory({
           campaignId: camp.id,
           userId: user.id,
-        })
+        }),
+      )
     }
-
-    fakeUsers[i] = user
-    fakeCampaigns[i] = camp
-    fakeP2Vs[i] = p2v
   }
-
-  const ADMIN_FIRST_NAME = 'Tyler'
-  const ADMIN_LAST_NAME = 'Durden'
-  const adminUser = userFactory({
-    email: 'tyler@fightclub.org',
-    password: hashSync('no1TalksAboutFightClub', genSaltSync()),
-    firstName: ADMIN_FIRST_NAME,
-    lastName: ADMIN_LAST_NAME,
-    name: `${ADMIN_FIRST_NAME} ${ADMIN_LAST_NAME}`,
-    roles: ['admin'],
-  })
-
-  fakeUsers.push(adminUser)
 
   await prisma.user.createMany({ data: fakeUsers })
   const { count } = await prisma.campaign.createMany({ data: fakeCampaigns })
