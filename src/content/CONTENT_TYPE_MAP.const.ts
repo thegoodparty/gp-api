@@ -8,6 +8,7 @@ import { candidateContentPromptsTransformer } from './transformers/candidateCont
 import { contentPromptsQuestionsTransformer } from './transformers/contentPromptsQuestionsTransformer'
 import { aiContentCategoriesTransformer } from './transformers/aiContentCategoriesTransformer'
 import { aiChatPromptsTransformer } from './transformers/aiChatPromptTransformer'
+import { onboardingPromptsTransformer } from './transformers/onboardingPromptsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -89,7 +90,7 @@ export const CONTENT_TYPE_MAP: {
   },
   onboardingPrompts: {
     name: ContentType.onboardingPrompts,
-    transformer: noOpTransformer,
+    transformer: onboardingPromptsTransformer,
   },
   pledge: { name: ContentType.pledge, transformer: noOpTransformer },
   privacyPage: { name: ContentType.privacyPage, transformer: noOpTransformer },

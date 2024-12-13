@@ -212,6 +212,30 @@ export type FaqArticleCategoryRaw = {
   }
 }
 
+export type OnboardingPromptsAugmented = {
+  slogan: string;
+  why: string;
+  aboutMe: string;
+  policyPlatform: string;
+  communicationsStrategy: string;
+  messageBox: string;
+  pathToVictory: string;
+  mobilizing: string;
+  getOutTheVote: string;
+  operationalPlan: string;
+  timeline: string;
+  searchForOffice: string;
+}
+
+export type OnboardingPromptsRaw = {
+  createdAt: Date;
+  updatedAt: Date;
+  id: number;
+  type: string;
+  data: OnboardingPromptsAugmented
+}
+
+
 type FaqArticleContentRawData = {
   data: {
     category?: FaqArticleCategoryRaw[]
