@@ -53,7 +53,7 @@ export class AuthenticationController {
     }
   }
 
-  @Post('recover-password-email')
+  @Post('send-recover-password-email')
   @HttpCode(HttpStatus.NO_CONTENT)
   async sendRecoverPasswordEmail(@Body() { email }: RecoverPasswordSchema) {
     let user = await this.usersService.findUserByEmail(email)
@@ -70,7 +70,7 @@ export class AuthenticationController {
   }
 
   @Roles(UserRole.admin)
-  @Post('set-password-email')
+  @Post('send-set-password-email')
   async sendSetPasswordEmail(@Body() { userId }: SetPasswordEmailSchema) {
     const token = this.authenticationService.generatePasswordResetToken()
     const user = await this.usersService.setResetToken(userId, token)
