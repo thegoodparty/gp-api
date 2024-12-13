@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { Strategy } from "passport-jwt";
+import { Strategy } from 'passport-strategy'
 
-@Injectable()
+
+
 export class SocialLoginStrategy extends Strategy {
-  constructor() {
+  constructor(options) {
     super();
   }
 }
