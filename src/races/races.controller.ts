@@ -1,8 +1,7 @@
 import { Controller, Get, Query, NotFoundException } from '@nestjs/common'
 import { RacesService } from './races.service'
 import { NormalizedRace } from './races.types'
-import { ZodValidationPipe } from 'nestjs-zod'
-import { RacesListQuery, racesListSchema } from './schemas/racesList.schema'
+import { RacesListQueryDto } from './schemas/racesList.schema'
 
 @Controller('races')
 export class RacesController {
@@ -10,7 +9,7 @@ export class RacesController {
 
   @Get()
   async findRaces(
-    @Query(new ZodValidationPipe(racesListSchema)) query: RacesListQuery,
+    @Query() query: RacesListQueryDto,
   ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
     const { state, county, city, positionSlug } = query
 

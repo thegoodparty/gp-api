@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { createZodDto } from 'nestjs-zod'
 
 export const racesListSchema = z.object({
   state: z.string().min(1, 'State is required'),
@@ -7,4 +8,4 @@ export const racesListSchema = z.object({
   positionSlug: z.string().optional(),
 })
 
-export type RacesListQuery = z.infer<typeof racesListSchema>
+export class RacesListQueryDto extends createZodDto(racesListSchema) {}
