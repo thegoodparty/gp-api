@@ -9,6 +9,7 @@ import { contentPromptsQuestionsTransformer } from './transformers/contentPrompt
 import { aiContentCategoriesTransformer } from './transformers/aiContentCategoriesTransformer'
 import { aiChatPromptsTransformer } from './transformers/aiChatPromptTransformer'
 import { onboardingPromptsTransformer } from './transformers/onboardingPromptsTransformer'
+import { promptInputFieldsTransformer } from './transformers/promptInputFieldsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -96,7 +97,7 @@ export const CONTENT_TYPE_MAP: {
   privacyPage: { name: ContentType.privacyPage, transformer: noOpTransformer },
   promptInputFields: {
     name: ContentType.promptInputFields,
-    transformer: noOpTransformer,
+    transformer: promptInputFieldsTransformer,
   },
   redirects: { name: ContentType.redirects, transformer: noOpTransformer },
   teamMember: { name: ContentType.teamMember, transformer: noOpTransformer },

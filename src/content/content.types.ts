@@ -235,6 +235,30 @@ export type OnboardingPromptsRaw = {
   data: OnboardingPromptsAugmented
 }
 
+export type PromptInputFieldsRaw = {
+  createdAt: Date,
+  updatedAt: Date,
+  id: number,
+  type: string,
+  data: {
+    fieldId: string;
+    contentInput: ContentInput[]
+  }
+}
+
+export type ContentInput = {
+  fields: PromptInputQuestion
+}
+
+export type PromptInputQuestion = {
+  title: string;
+  helperText: string;
+}
+
+export type PromptInputFieldsAugmented = {
+  [key: string]: PromptInputQuestion[]
+}
+
 
 type FaqArticleContentRawData = {
   data: {
