@@ -1,4 +1,3 @@
-import { ImportTemplate } from '@hubspot/api-client/lib/codegen/crm/imports';
 import {
   Transformer,
   PromptInputFieldsAugmented,

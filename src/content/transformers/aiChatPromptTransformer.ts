@@ -1,10 +1,8 @@
-import { Logger } from '@nestjs/common';
 import {
   Transformer,
   AIChatPrompt,
   AIChatPrompts,
 } from '../content.types';
-import { camelCase } from 'lodash';
 
 export const aiChatPromptsTransformer: Transformer<
   AIChatPrompt,

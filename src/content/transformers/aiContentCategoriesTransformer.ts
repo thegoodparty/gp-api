@@ -1,12 +1,9 @@
-import { Logger } from '@nestjs/common';
 import {
   Transformer,
   AIContentTemplateRaw,
   AIContentCategories
 } from '../content.types';
 import { camelCase } from 'lodash';
-
-const logger = new Logger('aiContentCategoriesTransformer');
 
 // AIContentCategories are grouped by the title found under each AIContentTemplateRaw's data.category.fields
 // MPX: Several AIContentTemplateRaw's are used to make each 'AIContentCategories' object
