@@ -1,4 +1,4 @@
-import { ContentType } from '@prisma/client'
+import { Content, ContentType } from '@prisma/client'
 import { noOpTransformer } from './transformers/no-op-transformer'
 import { faqArticlesTransformer } from './transformers/faqArticlesTransformer'
 import { blogArticlesTransformer } from './transformers/blogArticlesTransformer'
@@ -10,25 +10,28 @@ import { aiContentCategoriesTransformer } from './transformers/aiContentCategori
 import { aiChatPromptsTransformer } from './transformers/aiChatPromptTransformer'
 import { onboardingPromptsTransformer } from './transformers/onboardingPromptsTransformer'
 import { promptInputFieldsTransformer } from './transformers/promptInputFieldsTransformer'
+import { noop } from 'lodash'
+import { articleCategoriesTransformer } from './transformers/articleCategoriesTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
   candidateContentPrompts = 'candidateContentPrompts',
   contentPromptsQuestions = 'contentPromptsQuestions',
   aiContentCategories = 'aiContentCategories',
-  aiChatPrompts = 'aiChatPrompts'
+  aiChatPrompts = 'aiChatPrompts',
+  articleCategories = 'articleCategories',
 }
 
 export const CONTENT_TYPE_MAP: {
   [key in ContentType | InferredContentTypes]: {
     name: ContentType | InferredContentTypes
     transformer: any
-    inferredFrom?: ContentType
+    inferredFrom?: ContentType | ContentType[]
   }
 } = {
   aiChatPrompt: {
     name: ContentType.aiChatPrompt,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
   },
   aiChatPrompts: {
     name: InferredContentTypes.aiChatPrompts,
@@ -42,11 +45,16 @@ export const CONTENT_TYPE_MAP: {
   },
   aiContentTemplate: { 
     name: ContentType.aiContentTemplate,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
   },
   articleCategory: {
     name: ContentType.articleCategory,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
+  },
+  articleCategories: {
+    name: InferredContentTypes.articleCategories,
+    transformer: articleCategoriesTransformer,
+    inferredFrom: [ContentType.articleCategory, ContentType.faqArticle]
   },
   articleTag: {
     name: InferredContentTypes.articleTag,

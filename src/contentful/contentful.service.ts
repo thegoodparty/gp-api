@@ -30,7 +30,7 @@ export class ContentfulService {
     for (let i = 0; i < CALLS; i++) {
       const entryCollection = await contentfulClient.getEntries({
         limit: LIMIT,
-        include: 5,
+        include: 10,
         skip: i * LIMIT,
       });
       allEntryCollections.push(entryCollection);

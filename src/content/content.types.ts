@@ -83,6 +83,32 @@ export type AIContentCategories = {
   order: number;
 }
 
+export type ArticleCategories = {
+  fields: {
+    name: string;
+    order: number;
+  },
+  id: string;
+  name: string;
+  articles: ArticleFields[],
+  order: number;
+}
+
+type ArticleFields = {
+  title: string;
+  id: string;
+}
+
+export type ArticleCategoryRaw = {
+  id: string;
+  type: 'articleCategory';
+  data: { 
+    name: string; 
+    order: 1 
+  }
+}
+
+
 export type AIContentCategoriesTemplateEntry = {
   key: string;
   name: string;
@@ -261,7 +287,10 @@ export type PromptInputFieldsAugmented = {
 
 
 type FaqArticleContentRawData = {
+  type: 'faqArticle';
+  id: string;
   data: {
+    title: string;
     category?: FaqArticleCategoryRaw[]
   }
 }
