@@ -73,7 +73,7 @@ export type CandidateContentPrompts = {
   [key: string]: string; // Multiple entries of key: templateName, value: templateBody (names I made up)
 }
 
-export type ContentPromptsQuestions = { // The use unknown
+export type ContentPromptsQuestions = {
   [key: string]: boolean; // Multiple entries of key: templateName, value: boolean
 }
 
