@@ -33,6 +33,7 @@ export class RacesService {
       result = await this.byState(state)
     }
 
+    // Ensure we always return an array for consistency
     return !result ? [] : Array.isArray(result) ? result : [result]
   }
 
