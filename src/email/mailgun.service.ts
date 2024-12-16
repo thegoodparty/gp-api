@@ -28,6 +28,11 @@ export class MailgunService {
       emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
     }
 
+    if (process.env.MAILGUN_INTERCEPT_EMAIL) {
+      // override to email address to send to MAILGUN_INTERCEPT_EMAIL
+      emailData.to = process.env.MAILGUN_INTERCEPT_EMAIL
+    }
+
     return this.client.messages.create(EMAIL_DOMAIN, emailData)
   }
 }

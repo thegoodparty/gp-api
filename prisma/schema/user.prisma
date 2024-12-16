@@ -1,6 +1,9 @@
 enum UserRole {
+  admin
   sales
-  campaign
+  candidate
+  campaignManager
+  demo
 }
 
 model User {
@@ -14,8 +17,7 @@ model User {
   email                 String                  @unique
   phone                 String?
   zip                   String?
-  role                  UserRole?
-  isAdmin               Boolean?                @default(false) @map("is_admin")
+  roles                 UserRole[]              @default([])
   metaData              Json?                   @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
   campaigns             Campaign[]

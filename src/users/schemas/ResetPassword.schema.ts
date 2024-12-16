@@ -1,12 +1,12 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { passwordSchema } from '../util/passwords.util'
+import { PasswordSchema } from './Password.schema'
 
 export class ResetPasswordSchema extends createZodDto(
   z
     .object({
       token: z.string(),
-      password: passwordSchema,
+      password: PasswordSchema,
       confirmPassword: z.string(),
     })
     .strict()

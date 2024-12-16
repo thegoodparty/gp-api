@@ -58,9 +58,9 @@ export function getSetPasswordEmailContent(
   firstName: string,
   lastName: string,
   link: string,
-  role?: UserRole | null,
+  roles?: UserRole[] | null,
 ) {
-  if (role === UserRole.sales) {
+  if (roles?.includes(UserRole.sales)) {
     return `<table border="0" cellpadding="0" cellspacing="0" height="100%" width="100%">
           <tbody>
             <tr>
