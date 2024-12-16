@@ -15,24 +15,25 @@ export class RacesService {
     county?: string,
     city?: string,
     positionSlug?: string,
-  ): Promise<NormalizedRace | NormalizedRace[] | boolean | null> {
+  ): Promise<NormalizedRace[]> {
+    let result: NormalizedRace | NormalizedRace[] | null = null
     if (state && county && city && positionSlug) {
-      return this.findOne(state, county, city, positionSlug)
+      result = await this.findOne(state, county, city, positionSlug)
     }
 
     if (state && county && city) {
-      return this.byCity(state, county, city)
+      result = await this.byCity(state, county, city)
     }
 
     if (state && county) {
-      return this.byCounty(state, county)
+      result = await this.byCounty(state, county)
     }
 
     if (state) {
-      return this.byState(state)
+      result = await this.byState(state)
     }
 
-    return []
+    return !result ? [] : Array.isArray(result) ? result : [result]
   }
 
   async findOne(
@@ -74,22 +75,20 @@ export class RacesService {
     })) as Race
 
     if (!race) {
-      return false
+      return null
     }
 
     race.municipality = cityRecord
     race.county = countyRecord
 
-    const cleanRace = this.normalizeRace(race, state)
-
-    return cleanRace
+    return this.normalizeRace(race, state)
   }
 
   async byCity(state: string, county: string, city: string) {
     const countyRecord = await this.getCounty(state, county)
     const municipalityRecord = await this.getMunicipality(state, county, city)
     if (!countyRecord && !municipalityRecord) {
-      return false
+      return null
     }
 
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
@@ -105,26 +104,24 @@ export class RacesService {
           lt: new Date(nextYear),
         },
       },
-      select: { data: true, hashId: true, positionSlug: true, countyId: true },
+      // select: { data: true, hashId: true, positionSlug: true, countyId: true },
       orderBy: {
         electionDate: 'asc',
       },
     })
 
-    const dedupedRaces = this.deduplicateRaces(
-      races,
+    return this.deduplicateRaces(
+      races as Race[],
       state,
       countyRecord,
       municipalityRecord,
     )
-
-    return dedupedRaces
   }
 
   async byCounty(state: string, county: string) {
     const countyRecord = await this.getCounty(state, county)
     if (!countyRecord) {
-      return false
+      return null
     }
 
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
@@ -147,9 +144,7 @@ export class RacesService {
       },
     })
 
-    const dedupedRaces = this.deduplicateRaces(races, state, countyRecord)
-
-    return dedupedRaces
+    return this.deduplicateRaces(races as Race[], state, countyRecord)
   }
 
   async byState(state: string) {
@@ -172,9 +167,7 @@ export class RacesService {
       },
     })
 
-    const dedupedRaces = this.deduplicateRaces(races, state)
-
-    return dedupedRaces
+    return this.deduplicateRaces(races as Race[], state)
   }
 
   private normalizeRace(race: Race, state: string): NormalizedRace {
@@ -200,7 +193,9 @@ export class RacesService {
       is_primary,
     } = race.data as RaceData
 
-    const normalized = {
+    return {
+      ...race,
+      ballotHashId: race.hashId,
       hashId: race.hashId,
       positionName: position_name,
       electionDate: election_day,
@@ -215,8 +210,8 @@ export class RacesService {
       normalizedPositionName: normalized_position_name,
       positionDescription: position_description,
       frequency,
-      subAreaName: race.subAreaName ?? undefined,
-      subAreaValue: race.subAreaValue ?? undefined,
+      subAreaName: race.subAreaName,
+      subAreaValue: race.subAreaValue,
       filingOfficeAddress: filing_office_address,
       filingPhoneNumber: filing_phone_number,
       paperworkInstructions: paperwork_instructions,
@@ -231,7 +226,6 @@ export class RacesService {
         ? { name: race.county.name, slug: race.county.slug }
         : null,
     }
-    return normalized
   }
 
   private async getCounty(
@@ -241,7 +235,7 @@ export class RacesService {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}`
-    return await this.prisma.county.findUnique({
+    return this.prisma.county.findUnique({
       where: { slug },
     })
   }
@@ -256,42 +250,55 @@ export class RacesService {
     })}/${slugify(city, {
       lower: true,
     })}`
-    return await this.prisma.municipality.findUnique({
+    return this.prisma.municipality.findUnique({
       where: { slug },
     })
   }
-
+  // select: { data: true, hashId: true, positionSlug: true, countyId: true }
   private deduplicateRaces(
-    races: any,
+    races: Race[],
     state: string,
     county?: County | null,
     city?: Municipality | null,
-  ) {
-    const uniqueRaces = new Map<string, any>()
+  ): NormalizedRace[] {
+    const uniqueRaces = new Map<string, NormalizedRace>()
 
     races.forEach((race) => {
-      if (!uniqueRaces.has(race.positionSlug)) {
-        const { data, positionSlug } = race
+      if (!race.positionSlug || !uniqueRaces.has(race.positionSlug)) {
+        const { data, positionSlug, ...withoutData } = race
         const {
           election_name,
           election_day,
           normalized_position_name,
           position_description,
           level,
-        } = data
+          frequency,
+        } = data as RaceData
 
-        race.electionName = election_name
-        race.date = election_day
-        race.normalizedPositionName = normalized_position_name
-        race.positionDescription = position_description
-        race.level = level
-        race.positionSlug = positionSlug
-        race.state = state
-        race.county = county
-        race.city = city
+        // race.electionName = election_name
+        // race.date = election_day
+        // race.normalizedPositionName = normalized_position_name
+        // race.positionDescription = position_description
+        // race.level = level
+        // race.positionSlug = positionSlug
+        // race.state = state
+        // race.county = county
+        // race.city = city
 
-        delete race.data
-        uniqueRaces.set(race.positionSlug, race)
+        uniqueRaces.set(positionSlug as string, {
+          ...withoutData,
+          electionDate: election_day,
+          electionName: election_name,
+          date: election_day,
+          normalizedPositionName: normalized_position_name,
+          positionDescription: position_description,
+          level,
+          positionSlug: positionSlug,
+          state: state,
+          county: county,
+          municipality: city,
+          frequency,
+        })
       }
     })
 

@@ -34,12 +34,13 @@ export const raceFactory = generateFactory<Race>(() => {
       is_judicial: faker.datatype.boolean(),
       sub_area_name: subAreaName,
       sub_area_value: subAreaValue,
-      filing_periods: JSON.stringify([
+      filing_periods: [
         {
           start_on: filingDateStart,
           end_on: filingDateEnd,
         },
-      ]),
+      ],
+      frequency: [],
       election_day: electionDay.toISOString(),
       normalized_position_name: 'City Legislature',
       level,

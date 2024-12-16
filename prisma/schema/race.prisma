@@ -1,53 +1,53 @@
 enum LevelType {
-    city
-    county
-    state
-    federal
+  city
+  county
+  state
+  federal
 }
 
 model Race {
-    id             Int           @id @default(autoincrement())
-    ballotId       String        @unique
-    ballotHashId   String?
-    hashId         String        @unique
-    positionSlug   String
-    state          String        @db.Char(2)
-    electionDate   DateTime?
-    level          LevelType
-    subAreaName    String?
-    subAreaValue   String?
-    data           Json?         @default("{}") @db.JsonB
-    county         County?       @relation(fields: [countyId], references: [id])
-    countyId       Int?
-    municipality   Municipality? @relation(fields: [municipalityId], references: [id])
-    municipalityId Int?
+  id             Int           @id @default(autoincrement())
+  ballotId       String        @unique
+  ballotHashId   String?
+  hashId         String        @unique
+  positionSlug   String
+  state          String        @db.Char(2)
+  electionDate   DateTime?
+  level          LevelType
+  subAreaName    String
+  subAreaValue   String
+  data           Json          @default("{}") @db.JsonB
+  county         County?       @relation(fields: [countyId], references: [id])
+  countyId       Int?
+  municipality   Municipality? @relation(fields: [municipalityId], references: [id])
+  municipalityId Int?
 }
 
 model County {
-    id             Int            @id @default(autoincrement())
-    slug           String         @unique
-    name           String
-    state          String         @db.Char(2)
-    data           Json?          @default("{}") @db.JsonB
-    municipalities Municipality[]
-    races          Race[]
+  id             Int            @id @default(autoincrement())
+  slug           String         @unique
+  name           String
+  state          String         @db.Char(2)
+  data           Json?          @default("{}") @db.JsonB
+  municipalities Municipality[]
+  races          Race[]
 }
 
 enum MunicipalityType {
-    city
-    village
-    town
-    township
+  city
+  village
+  town
+  township
 }
 
 model Municipality {
-    id       Int              @id @default(autoincrement())
-    slug     String           @unique
-    name     String
-    type     MunicipalityType
-    state    String           @db.Char(2)
-    data     Json?            @default("{}") @db.JsonB
-    county   County?          @relation(fields: [countyId], references: [id])
-    countyId Int?
-    races    Race[]
+  id       Int              @id @default(autoincrement())
+  slug     String           @unique
+  name     String
+  type     MunicipalityType
+  state    String           @db.Char(2)
+  data     Json?            @default("{}") @db.JsonB
+  county   County?          @relation(fields: [countyId], references: [id])
+  countyId Int?
+  races    Race[]
 }
