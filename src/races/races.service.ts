@@ -16,25 +16,24 @@ export class RacesService {
     city?: string,
     positionSlug?: string,
   ): Promise<NormalizedRace[]> {
-    let result: NormalizedRace | NormalizedRace[] | null = null
     if (state && county && city && positionSlug) {
-      result = await this.findOne(state, county, city, positionSlug)
+      const singleRace = await this.findOne(state, county, city, positionSlug)
+      return singleRace ? [singleRace] : []
     }
 
     if (state && county && city) {
-      result = await this.byCity(state, county, city)
+      return await this.byCity(state, county, city)
     }
 
     if (state && county) {
-      result = await this.byCounty(state, county)
+      return await this.byCounty(state, county)
     }
 
     if (state) {
-      result = await this.byState(state)
+      return await this.byState(state)
     }
 
-    // Ensure we always return an array for consistency
-    return !result ? [] : Array.isArray(result) ? result : [result]
+    return []
   }
 
   async findOne(
@@ -89,7 +88,7 @@ export class RacesService {
     const countyRecord = await this.getCounty(state, county)
     const municipalityRecord = await this.getMunicipality(state, county, city)
     if (!countyRecord && !municipalityRecord) {
-      return null
+      return []
     }
 
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
@@ -122,7 +121,7 @@ export class RacesService {
   async byCounty(state: string, county: string) {
     const countyRecord = await this.getCounty(state, county)
     if (!countyRecord) {
-      return null
+      return []
     }
 
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
@@ -255,7 +254,7 @@ export class RacesService {
       where: { slug },
     })
   }
-  // select: { data: true, hashId: true, positionSlug: true, countyId: true }
+
   private deduplicateRaces(
     races: Race[],
     state: string,
@@ -264,7 +263,7 @@ export class RacesService {
   ): NormalizedRace[] {
     const uniqueRaces = new Map<string, NormalizedRace>()
 
-    races.forEach((race) => {
+    for (let race of races) {
       if (!race.positionSlug || !uniqueRaces.has(race.positionSlug)) {
         const { data, positionSlug, ...withoutData } = race
         const {
@@ -275,16 +274,6 @@ export class RacesService {
           level,
           frequency,
         } = data as RaceData
-
-        // race.electionName = election_name
-        // race.date = election_day
-        // race.normalizedPositionName = normalized_position_name
-        // race.positionDescription = position_description
-        // race.level = level
-        // race.positionSlug = positionSlug
-        // race.state = state
-        // race.county = county
-        // race.city = city
 
         uniqueRaces.set(positionSlug as string, {
           ...withoutData,
@@ -301,8 +290,8 @@ export class RacesService {
           frequency,
         })
       }
-    })
+    }
 
-    return Array.from(uniqueRaces.values())
+    return [...uniqueRaces.values()]
   }
 }

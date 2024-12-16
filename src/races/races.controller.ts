@@ -2,29 +2,17 @@ import { Controller, Get, Query, NotFoundException } from '@nestjs/common'
 import { RacesService } from './races.service'
 import { NormalizedRace } from './races.types'
 import { RacesListQueryDto } from './schemas/racesList.schema'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 
 @Controller('races')
+@PublicAccess()
 export class RacesController {
   constructor(private readonly racesService: RacesService) {}
 
   @Get()
   async findRaces(
-    @Query() query: RacesListQueryDto,
+    @Query() { state, county, city, positionSlug }: RacesListQueryDto,
   ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
-    const { state, county, city, positionSlug } = query
-
-    // Delegate the logic to the service
-    const races = await this.racesService.findRaces(
-      state,
-      county,
-      city,
-      positionSlug,
-    )
-
-    if (!races || (Array.isArray(races) && races.length === 0)) {
-      throw new NotFoundException('Race(s) not found')
-    }
-
-    return races
+    return await this.racesService.findRaces(state, county, city, positionSlug)
   }
 }

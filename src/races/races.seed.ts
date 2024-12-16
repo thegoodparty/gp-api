@@ -33,6 +33,7 @@ export default async function seedRaces(prisma: PrismaClient) {
       for (let k = 0; k < NUM_RACES; k++) {
         const race = raceFactory()
         race.municipalityId = municipality.id
+        race.countyId = county.id
         fakeRaces.push(race)
       }
     }
