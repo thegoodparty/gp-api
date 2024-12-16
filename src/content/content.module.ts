@@ -6,6 +6,6 @@ import { ContentfulModule } from '../contentful/contentful.module'
 @Module({
   controllers: [ContentController],
   providers: [ContentService],
-  imports: [ContentfulModule, ContentfulModule],
+  imports: [ContentfulModule],
 })
 export class ContentModule {}

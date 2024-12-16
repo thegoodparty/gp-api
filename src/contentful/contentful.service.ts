@@ -4,7 +4,6 @@ import {
   Entry,
   EntryCollection,
   EntrySkeletonType,
-  EntrySys,
 } from 'contentful'
 import { Injectable } from '@nestjs/common'
 

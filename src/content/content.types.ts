@@ -1,5 +1,5 @@
 import { Block, Inline } from '@contentful/rich-text-types'
-import { EntrySys, FieldsType, Metadata, Asset } from 'contentful'
+import { EntrySys, FieldsType } from 'contentful'
 import { Content } from '@prisma/client'
 
 export interface ImageRaw {
