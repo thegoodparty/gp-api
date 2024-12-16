@@ -73,7 +73,7 @@ export class CampaignsController {
     @Body() body: UpdateCampaignSchema,
   ) {
     // TODO get campaign from req user
-    const updateResp = await this.campaignsService.update(id, body)
+    const updateResp = await this.campaignsService.updateJsonFields(id, body)
 
     if (updateResp === false) throw new NotFoundException()
     return updateResp
