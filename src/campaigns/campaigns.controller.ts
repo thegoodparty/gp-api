@@ -35,7 +35,7 @@ export class CampaignsController {
 
   @Get('mine')
   findUserCampaign(@ReqUser() user: User) {
-    return this.campaignsService.findByUser(user.id)
+    return this.campaignsService.findByUser(user.id, { pathToVictory: true })
   }
 
   @UseGuards(CampaignOwnersOrAdminGuard)
