@@ -3,7 +3,6 @@ import { campaignFactory } from './factories/campaign.factory'
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { userFactory } from './factories/user.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
-import { genSalt, genSaltSync, hash, hashSync } from 'bcrypt'
 
 const NUM_CAMPAIGNS = 20
 const NUM_UPDATE_HISTORY = 3
