@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { CampaignsService } from '../campaigns.service'
 import { RenameAiContentSchema } from './schemas/RenameAiContent.schema'
 import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
@@ -12,15 +13,13 @@ import {
   CampaignAiContent,
   CampaignDetailsContent,
 } from '../campaigns.types'
-import { UsersService } from 'src/users/users.service'
-import { Campaign, Prisma } from '@prisma/client'
+import { positionsToStr, againstToStr, replaceAll } from './util/prompt.util'
 
 @Injectable()
 export class CampaignsAiService {
   constructor(
     private campaignsService: CampaignsService,
     private contentService: ContentService,
-    private usersService: UsersService,
   ) {}
 
   async createContent(userId: number, inputs: CreateAiContentSchema) {
@@ -31,8 +30,14 @@ export class CampaignsAiService {
 
     const campaign = await this.campaignsService.findByUser(userId, {
       pathToVictory: true,
-      campaignPositions: true,
+      campaignPositions: {
+        include: {
+          topIssue: true,
+          position: true,
+        },
+      },
       campaignUpdateHistory: true,
+      user: true,
     })
     const { slug, id } = campaign
     const aiContent = (campaign.aiContent ?? {}) as CampaignAiContent
@@ -69,9 +74,9 @@ export class CampaignsAiService {
 
     // generating a new ai content here
     const cmsPrompts = await this.contentService.getAiContentPrompts()
-
     const keyNoDigits = key.replace(/\d+/g, '') // we allow multiple keys like key1, key2
     let prompt = cmsPrompts[keyNoDigits] as string
+
     prompt = await this.promptReplace(prompt, campaign)
     if (!prompt || prompt === '') {
       // await sails.helpers.slack.errorLoggerHelper('empty prompt replace', {
@@ -161,16 +166,17 @@ export class CampaignsAiService {
   }
 
   async deleteContent(userId: number, aiContentKey: string) {
-    const campaign = await this.campaignsService.findByUser(userId)
+    const campaign = (await this.campaignsService.findByUser(
+      userId,
+    )) as Campaign & { aiContent: CampaignAiContent }
+
     if (!campaign.aiContent || !campaign.aiContent[aiContentKey]) {
       // nothing to delete
-      return false
+      throw new NotFoundException('Content not found')
     }
 
     delete campaign.aiContent[aiContentKey]
-    delete (campaign.aiContent as CampaignAiContent).generationStatus?.[
-      aiContentKey
-    ]
+    delete campaign.aiContent.generationStatus?.[aiContentKey]
 
     await this.campaignsService.update(campaign.id, {
       aiContent: campaign.aiContent,
@@ -179,13 +185,19 @@ export class CampaignsAiService {
     return true
   }
 
-  async promptReplace(
+  private async promptReplace(
     prompt: string,
     campaign: Prisma.CampaignGetPayload<{
       include: {
         pathToVictory: true
-        campaignPositions: true
+        campaignPositions: {
+          include: {
+            topIssue: true
+            position: true
+          }
+        }
         campaignUpdateHistory: true
+        user: true
       }
     }>,
   ) {
@@ -193,15 +205,9 @@ export class CampaignsAiService {
       let newPrompt = prompt
 
       const campaignPositions = campaign.campaignPositions
+      const user = campaign.user as User
 
-      const user = await this.usersService.findUser({
-        id: campaign.userId as number,
-      })
-
-      // TODO: throw more specific error
-      if (!user) throw new Error('NO USER BRO')
-
-      const name = `${user.firstName} ${user.lastName}`
+      const name = user.name || `${user.firstName} ${user.lastName}`
       const details = (campaign.details || {}) as CampaignDetailsContent
 
       const positionsStr = positionsToStr(
@@ -525,48 +531,4 @@ export class CampaignsAiService {
       return ''
     }
   }
-}
-
-function positionsToStr(campaignPositions, customIssues) {
-  if (!campaignPositions && !customIssues) {
-    return ''
-  }
-  let str = ''
-  campaignPositions.forEach((campaignPosition, i) => {
-    const { position, topIssue } = campaignPosition
-    if (position || topIssue) {
-      str += `Issue #${i + 1}: ${topIssue?.name}. Position on the issue: ${
-        position?.name
-      }. Candidate's position: ${campaignPosition?.description}. `
-    }
-  })
-
-  if (customIssues) {
-    customIssues.forEach((issue) => {
-      str += `${issue?.title} - ${issue?.position}, `
-    })
-  }
-  return str
-}
-
-function replaceAll(string, search, replace) {
-  const replaceStr = replace || 'unknown'
-  return string.split(`[[${search}]]`).join(replaceStr)
-}
-
-function againstToStr(runningAgainst) {
-  if (!runningAgainst) {
-    return ''
-  }
-  let str = ''
-  if (runningAgainst.length > 1) {
-    str = `${runningAgainst.length} candidates who are: `
-  }
-  runningAgainst.forEach((opponent, index) => {
-    if (index > 0) {
-      str += 'and also running against '
-    }
-    str += `name: ${opponent.name}, party: ${opponent.party} ,description: ${opponent.description}. `
-  })
-  return str
 }

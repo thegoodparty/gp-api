@@ -15,4 +15,7 @@ export type CampaignAiContent = NestedRecords & {
 export type CampaignDataContent = NestedRecords & {
   createdBy?: 'admin' | string
 }
-export type CampaignDetailsContent = NestedRecords
+export type CampaignDetailsContent = NestedRecords & {
+  customIssues?: Record<'title' | 'position', string>[]
+  runningAgainst?: Record<'name' | 'party' | 'description', string>[]
+}

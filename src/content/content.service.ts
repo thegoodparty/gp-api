@@ -1,7 +1,11 @@
-import { Injectable } from '@nestjs/common'
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { ContentfulService } from '../contentful/contentful.service'
-import { Content, ContentType } from '@prisma/client'
+import { Content, ContentType, Prisma } from '@prisma/client'
 import { InputJsonObject } from '@prisma/client/runtime/library'
 import { Entry } from 'contentful'
 import {
@@ -55,6 +59,35 @@ export class ContentService {
       },
     })
     return transformContent(ContentType.glossaryItem, entries)
+  }
+
+  async getAiContentPrompts() {
+    const prompts = await this.prisma.content.findMany({
+      where: {
+        OR: [
+          {
+            type: ContentType.onboardingPrompts,
+          },
+          {
+            type: ContentType.candidateContentPrompts,
+          },
+        ],
+      },
+    })
+
+    // should be one content record for each "type" of prompt
+    if (prompts.length !== 2) {
+      throw new NotFoundException('Prompt content not found')
+    }
+
+    try {
+      return {
+        ...(prompts[0].data as Prisma.JsonObject),
+        ...(prompts[1].data as Prisma.JsonObject),
+      }
+    } catch (_e) {
+      throw new InternalServerErrorException('Failed to load prompts')
+    }
   }
 
   private async getExistingContentIds() {

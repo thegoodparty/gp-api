@@ -64,14 +64,14 @@ export class CampaignsService {
     })
   }
 
-  findByUser(
+  findByUser<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
-    include?: Prisma.CampaignInclude,
+    include?: T,
   ) {
     return this.prismaService.campaign.findFirstOrThrow({
       where: { userId },
       include,
-    })
+    }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
   async create(campaignData: CreateCampaignSchema, user: User) {
