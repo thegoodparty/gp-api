@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, Prisma, User } from '@prisma/client'
+import { Prisma, User } from '@prisma/client'
 import { CampaignsService } from '../campaigns.service'
 import { RenameAiContentSchema } from './schemas/RenameAiContent.schema'
 import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
@@ -316,30 +316,30 @@ export class CampaignsAiService {
       console.log('messages', messages)
       generateError = true
 
-      if (e.data) {
-        // await sails.helpers.slack.errorLoggerHelper(
-        //   'error at AI queue consumer (with msg): ',
-        //   e.data.error,
-        // )
-        // await sails.helpers.slack.aiLoggerHelper(
-        //   'error at AI queue consumer (with msg): ',
-        //   e.data.error,
-        // )
-        console.log('error', e.data.error)
-      } else {
-        // await sails.helpers.slack.errorLoggerHelper(
-        //   'error at AI queue consumer. Queue Message: ',
-        //   message,
-        // )
-        // await sails.helpers.slack.errorLoggerHelper(
-        //   'error at AI queue consumer debug: ',
-        //   e,
-        // )
-        // await sails.helpers.slack.aiLoggerHelper(
-        //   'error at AI queue consumer debug: ',
-        //   e,
-        // )
-      }
+      // if (e.data) {
+      //   // await sails.helpers.slack.errorLoggerHelper(
+      //   //   'error at AI queue consumer (with msg): ',
+      //   //   e.data.error,
+      //   // )
+      //   // await sails.helpers.slack.aiLoggerHelper(
+      //   //   'error at AI queue consumer (with msg): ',
+      //   //   e.data.error,
+      //   // )
+      //   console.log('error', e.data.error)
+      // } else {
+      //   // await sails.helpers.slack.errorLoggerHelper(
+      //   //   'error at AI queue consumer. Queue Message: ',
+      //   //   message,
+      //   // )
+      //   // await sails.helpers.slack.errorLoggerHelper(
+      //   //   'error at AI queue consumer debug: ',
+      //   //   e,
+      //   // )
+      //   // await sails.helpers.slack.aiLoggerHelper(
+      //   //   'error at AI queue consumer debug: ',
+      //   //   e,
+      //   // )
+      // }
     }
 
     // Failed to generate content.

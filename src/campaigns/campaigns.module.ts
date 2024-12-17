@@ -1,15 +1,12 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { CampaignsController } from './campaigns.controller'
 import { CampaignsService } from './campaigns.service'
-import { CampaignsAiController } from './ai/campaignsAi.controller'
-import { CampaignsAiService } from './ai/campaignsAi.service'
-import { ContentModule } from 'src/content/content.module'
-import { AiModule } from 'src/ai/ai.module'
+import { CampaignsAiModule } from './ai/campaignsAi.module'
 
 @Module({
-  imports: [ContentModule, AiModule],
-  controllers: [CampaignsController, CampaignsAiController],
-  providers: [CampaignsService, CampaignsAiService],
+  imports: [forwardRef(() => CampaignsAiModule)],
+  controllers: [CampaignsController],
+  providers: [CampaignsService],
   exports: [CampaignsService],
 })
 export class CampaignsModule {}
