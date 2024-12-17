@@ -64,6 +64,18 @@ export class CampaignsService {
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
+  findOneOrThrow(
+    where: Prisma.CampaignWhereInput,
+    include: Prisma.CampaignInclude = {
+      pathToVictory: true,
+    },
+  ) {
+    return this.prismaService.campaign.findFirstOrThrow({
+      where,
+      include,
+    })
+  }
+
   findByUser<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,

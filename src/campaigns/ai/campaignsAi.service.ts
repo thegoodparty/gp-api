@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
@@ -11,16 +12,19 @@ import { ContentService } from 'src/content/content.service'
 import {
   AiContentGenerationStatus,
   CampaignAiContent,
-  CampaignDetailsContent,
+  CampaignDetails,
   GenerationStatus,
 } from '../campaigns.types'
 import { positionsToStr, againstToStr, replaceAll } from './util/prompt.util'
+import { AiService } from 'src/ai/ai.service'
+import { AiChatMessage } from 'src/ai/ai.types'
 
 @Injectable()
 export class CampaignsAiService {
   constructor(
     private campaignsService: CampaignsService,
     private contentService: ContentService,
+    private aiService: AiService,
   ) {}
 
   async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
@@ -99,7 +103,8 @@ export class CampaignsAiService {
     }
     aiContent.generationStatus[key].status = GenerationStatus.processing
     aiContent.generationStatus[key].prompt = prompt as string
-    aiContent.generationStatus[key].existingChat = chat || []
+    aiContent.generationStatus[key].existingChat =
+      (chat as AiChatMessage[]) || []
     aiContent.generationStatus[key].inputValues = inputValues
     aiContent.generationStatus[key].createdAt = new Date().valueOf()
 
@@ -185,6 +190,214 @@ export class CampaignsAiService {
     return true
   }
 
+  async handleGenerateAiContent(message: {
+    slug: string
+    key: string
+    regenerate: boolean
+  }) {
+    const { slug, key, regenerate } = message
+
+    let campaign = await this.campaignsService.findOneOrThrow({ slug })
+    let aiContent = campaign.aiContent as CampaignAiContent
+    const { prompt, existingChat, inputValues } =
+      aiContent.generationStatus?.[key] || {}
+
+    if (!aiContent || !prompt) {
+      // await sails.helpers.slack.slackHelper(
+      //   {
+      //     title: 'Missing prompt',
+      //     body: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${
+      //       campaign?.id
+      //     }. message: ${JSON.stringify(message)}`,
+      //   },
+      //   'dev',
+      // )
+      throw new InternalServerErrorException(
+        `error generating ai content. slug: ${slug}, key: ${key}`,
+      )
+    }
+
+    const chat = existingChat || []
+    const messages = [
+      { role: 'user', content: prompt } as AiChatMessage,
+      ...chat,
+    ]
+    let chatResponse
+    let generateError = false
+
+    try {
+      // await sails.helpers.slack.aiLoggerHelper(
+      //   'handling campaign from queue',
+      //   message,
+      // )
+
+      let maxTokens = 2000
+      if (existingChat && existingChat.length > 0) {
+        maxTokens = 2500
+      }
+
+      const completion = await this.aiService.llmChatCompletion(
+        messages,
+        maxTokens,
+        0.7,
+        0.9,
+      )
+
+      chatResponse = completion.content
+      const totalTokens = completion.tokens
+
+      // await sails.helpers.slack.aiLoggerHelper(
+      //   `[ ${slug} - ${key} ] Generation Complete. Tokens Used:`,
+      //   totalTokens,
+      // )
+
+      // TODO: figure out if this second load necessary?
+      campaign = (await this.campaignsService.findOne({ slug })) || campaign
+      aiContent = campaign.aiContent as CampaignAiContent
+      let oldVersion
+      if (chatResponse && chatResponse !== '') {
+        try {
+          const oldVersionData = aiContent[key]
+          oldVersion = {
+            // todo: try to convert oldVersionData.updatedAt to a date object.
+            date: new Date().toString(),
+            text: oldVersionData.content,
+          }
+        } catch (e) {
+          // dont warn because this is expected to fail sometimes.
+          // console.log('error getting old version', e);
+        }
+        aiContent[key] = {
+          name: camelToSentence(key), // todo: check if this overwrites a name they've chosen.
+          updatedAt: new Date().valueOf(),
+          inputValues,
+          content: chatResponse,
+        }
+
+        console.log('saving campaign version', key)
+        console.log('inputValues', inputValues)
+        console.log('oldVersion', oldVersion)
+
+        await this.saveCampaignVersion(
+          aiContent,
+          key,
+          campaign.id,
+          inputValues,
+          oldVersion,
+          regenerate ? regenerate : false,
+        )
+
+        if (
+          !aiContent?.generationStatus ||
+          typeof aiContent.generationStatus !== 'object'
+        ) {
+          aiContent.generationStatus = {}
+        }
+        if (
+          !aiContent?.generationStatus[key] ||
+          typeof aiContent.generationStatus[key] !== 'object'
+        ) {
+          aiContent.generationStatus[key] = {} as AiContentGenerationStatus
+        }
+
+        aiContent.generationStatus[key].status = 'completed'
+
+        await this.campaignsService.update(campaign.id, { aiContent })
+
+        // await sails.helpers.slack.aiLoggerHelper(
+        //   `updated campaign with ai. chatResponse: key: ${key}`,
+        //   chatResponse,
+        // )
+      }
+    } catch (e) {
+      // catches llmChatCompletion errors
+      // catches saveCampaignVersion errors
+      console.log('error at consumer', e)
+      console.log('messages', messages)
+      generateError = true
+
+      if (e.data) {
+        // await sails.helpers.slack.errorLoggerHelper(
+        //   'error at AI queue consumer (with msg): ',
+        //   e.data.error,
+        // )
+        // await sails.helpers.slack.aiLoggerHelper(
+        //   'error at AI queue consumer (with msg): ',
+        //   e.data.error,
+        // )
+        console.log('error', e.data.error)
+      } else {
+        // await sails.helpers.slack.errorLoggerHelper(
+        //   'error at AI queue consumer. Queue Message: ',
+        //   message,
+        // )
+        // await sails.helpers.slack.errorLoggerHelper(
+        //   'error at AI queue consumer debug: ',
+        //   e,
+        // )
+        // await sails.helpers.slack.aiLoggerHelper(
+        //   'error at AI queue consumer debug: ',
+        //   e,
+        // )
+      }
+    }
+
+    // Failed to generate content.
+    if (!chatResponse || chatResponse === '' || generateError) {
+      try {
+        // if data does not have key campaignPlanAttempts
+        if (!aiContent.campaignPlanAttempts) {
+          aiContent.campaignPlanAttempts = {}
+        }
+        if (!aiContent.campaignPlanAttempts[key]) {
+          aiContent.campaignPlanAttempts[key] = 1
+        }
+        aiContent.campaignPlanAttempts[key] = aiContent.campaignPlanAttempts[
+          key
+        ]
+          ? aiContent.campaignPlanAttempts[key] + 1
+          : 1
+
+        // await sails.helpers.slack.aiLoggerHelper(
+        //   'Current Attempts:',
+        //   aiContent.campaignPlanAttempts[key],
+        // )
+
+        // After 3 attempts, we give up.
+        if (
+          aiContent.generationStatus?.[key]?.status &&
+          aiContent.generationStatus[key].status !== 'completed' &&
+          aiContent.campaignPlanAttempts[key] >= 3
+        ) {
+          // await sails.helpers.slack.aiLoggerHelper(
+          //   'Deleting generationStatus for key',
+          //   key,
+          // )
+          delete aiContent.generationStatus[key]
+        }
+        await this.campaignsService.update(campaign.id, { aiContent })
+      } catch (e) {
+        // await sails.helpers.slack.aiLoggerHelper(
+        //   'Error at consumer updating campaign with ai.',
+        //   key,
+        //   e,
+        // )
+        // await sails.helpers.slack.errorLoggerHelper(
+        //   'Error at consumer updating campaign with ai.',
+        //   key,
+        //   e,
+        // )
+        console.log('error at consumer', e)
+      }
+      // throw an Error so that the message goes back to the queue or the DLQ.
+      throw new InternalServerErrorException(
+        `error generating ai content. slug: ${slug}, key: ${key}`,
+      )
+    }
+  }
+
+  private async saveCampaignVersion(...inputs: any[]) {}
+
   private async promptReplace(
     prompt: string,
     campaign: Prisma.CampaignGetPayload<{
@@ -208,7 +421,7 @@ export class CampaignsAiService {
       const user = campaign.user as User
 
       const name = user.name || `${user.firstName} ${user.lastName}`
-      const details = (campaign.details || {}) as CampaignDetailsContent
+      const details = (campaign.details || {}) as CampaignDetails
 
       const positionsStr = positionsToStr(
         campaignPositions,
@@ -531,4 +744,9 @@ export class CampaignsAiService {
       return ''
     }
   }
+}
+
+const camelToSentence = (text) => {
+  const result = text.replace(/([A-Z])/g, ' $1')
+  return result.charAt(0).toUpperCase() + result.slice(1)
 }

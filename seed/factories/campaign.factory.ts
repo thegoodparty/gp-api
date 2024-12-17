@@ -33,7 +33,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         name: 'Launch Social Media Copy',
         content:
           '<p>📢 Exciting News! 📢 I am thrilled to announce my candidacy for the US Senate as an Independent candidate!</p>',
-        updatedAt: faker.date.past().toISOString().split('T')[0],
+        updatedAt: faker.date.past().valueOf(),
         inputValues: {},
       },
     },
