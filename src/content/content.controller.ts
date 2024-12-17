@@ -9,8 +9,10 @@ import {
   groupGlossaryItemsByAlpha,
   mapGlossaryItemsToSlug,
 } from './util/glossaryItems.util'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 
 @Controller('content')
+@PublicAccess()
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 

@@ -15,4 +15,6 @@ export const LoginPayloadSchema = z.object({
     .optional(),
 })
 
+export type LoginPayload = z.infer<typeof LoginPayloadSchema>
+
 export class LoginRequestPayloadDto extends createZodDto(LoginPayloadSchema) {}
