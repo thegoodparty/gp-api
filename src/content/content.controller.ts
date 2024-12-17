@@ -47,7 +47,6 @@ export class ContentController {
 
   @Get('type/:type')
   findByType(@Param('type') type: ContentType | InferredContentTypes) {
-    console.log('findByType: ', type);
     if (!CONTENT_TYPE_MAP[type]) {
       throw new BadRequestException(`${type} is not a valid content type`)
     }
