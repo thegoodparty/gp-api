@@ -59,4 +59,9 @@ export class ContentfulService {
       deletedEntries,
     }
   }
+
+  async getEntry(id: string) {
+    return await contentfulClient.getEntry(id)
+  }
 }
+
