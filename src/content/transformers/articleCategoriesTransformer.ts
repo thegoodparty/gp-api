@@ -11,29 +11,73 @@ export const articleCategoriesTransformer: Transformer<
 FaqArticleContentRaw,
   ArticleCategories
 > = (inputs: (FaqArticleContentRaw | ArticleCategoryRaw)[]): ArticleCategories[] => {
-  const articleCategories = {};
+  const articleCategories: ArticleCategories[] = [];
   for (const input of inputs) {
-    if (input.type === 'articleCategory') {
-      input.data.name
+    if (input.type === 'faqArticle') {
+      const categoryFields = input.data.category?.[0]?.fields ?? null;
+      const foundCategory = articleCategories.find(category => category.fields.name === categoryFields?.name);
+
+      if (categoryFields && !foundCategory) {
+        articleCategories.push({
+          fields: {
+            name: categoryFields.name,
+            order: categoryFields.order || 9999
+          },
+          name: categoryFields.name,
+          id: null,
+          articles: [{
+            title: input.data.title,
+            id: input.id,
+          }],
+          order: categoryFields.order || 9999
+        } as ArticleCategories) 
+      } else if (categoryFields && foundCategory) {
+        foundCategory.articles.push({
+          title: input.data.title,
+          id: input.id
+        });
+      }
+    } else if (input.type === 'articleCategory') {
+      const categoryName = input.data.name;
+      const foundCategory = articleCategories.find(category => category.fields.name === categoryName);
+
+      if (!foundCategory && categoryName) {
+        articleCategories.push({
+          fields: {
+            name: categoryName,
+            order: input.data.order
+          },
+          name: categoryName,
+          id: input.id,
+          articles: [],
+          order: input.data.order
+      });
+      } else if (foundCategory && categoryName && !foundCategory.id) {
+        foundCategory.id = input.id;
+      }
     }
   }
 
-  return [
-    {
-      fields: {
-        name: 'string',
-        order: 1,
-    },
-    id: 'string',
-    name: 'string',
-    articles: [
-      {
-        title: 'string',
-        id: 'string',
-      }
-    ],
-    order: 1
-}]
+  articleCategories.sort(compareArticleCategories);
+
+  return articleCategories;
+
+  // return [
+  //   {
+  //     fields: {
+  //       name: 'string',
+  //       order: 1,
+  //   },
+  //   id: 'string',
+  //   name: 'string',
+  //   articles: [
+  //     {
+  //       title: 'string',
+  //       id: 'string',
+  //     }
+  //   ],
+  //   order: 1
+  // }]
 }
 
 function compareArticleCategories(a, b) {
@@ -46,28 +90,6 @@ function compareArticleCategories(a, b) {
     return -1;
   }
   return 0;
-}
-
-function addArticlesToCategories(mapped) {
-  const { articleCategories, faqArticles } = mapped;
-
-  const categoriesById = {};
-  articleCategories.forEach((category) => {
-    categoriesById[category.id] = {
-      ...category,
-      name: category.fields.name,
-      articles: [],
-    };
-  });
-  faqArticles.forEach((article) => {
-    if (article.category && categoriesById[article.category.id]) {
-      categoriesById[article.category.id].articles.push({
-        title: article.title,
-        id: article.id,
-      });
-    }
-  });
-  mapped.articleCategories = Object.values(categoriesById);
 }
 
 // Input:  {

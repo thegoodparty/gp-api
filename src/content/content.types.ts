@@ -88,7 +88,7 @@ export type ArticleCategories = {
     name: string;
     order: number;
   },
-  id: string;
+  id: string | null;
   name: string;
   articles: ArticleFields[],
   order: number;
