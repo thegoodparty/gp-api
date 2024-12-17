@@ -6,8 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
-  Req,
-  UseGuards,
+  Res,
   UsePipes,
 } from '@nestjs/common'
 import { CampaignsAiService } from './campaignsAi.service'
@@ -25,16 +24,16 @@ export class CampaignsAiController {
 
   @Post()
   async create(
-    @Req() req: FastifyReply,
+    @Res({ passthrough: true }) res: FastifyReply,
     @ReqUser() user: User,
     @Body() body: CreateAiContentSchema,
   ) {
     const result = await this.aiService.createContent(user.id, body)
 
     if (result.step === 'created') {
-      req.statusCode = HttpStatus.CREATED
+      res.statusCode = HttpStatus.CREATED
     } else {
-      req.statusCode = HttpStatus.OK
+      res.statusCode = HttpStatus.OK
     }
 
     return result
@@ -47,6 +46,7 @@ export class CampaignsAiController {
   }
 
   @Delete(':key')
+  @HttpCode(HttpStatus.NO_CONTENT)
   delete(@ReqUser() user: User, @Param('key') key: string) {
     return this.aiService.deleteContent(user.id, key)
   }
