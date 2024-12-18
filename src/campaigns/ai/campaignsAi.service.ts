@@ -23,13 +23,12 @@ export class CampaignsAiService {
     private contentService: ContentService,
   ) {}
 
-  async createContent(userId: number, inputs: CreateAiContentSchema) {
+  async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
     const { key, regenerate, editMode, chat, inputValues } = inputs
 
     // TODO: integrate with sqs implementation
     // await sails.helpers.queue.consumer()
 
-    const campaign = await this.campaignsService.findByUser(userId)
     const { slug, id } = campaign
     const aiContent = (campaign.aiContent ?? {}) as CampaignAiContent
 
@@ -152,10 +151,9 @@ export class CampaignsAiService {
     }
   }
 
-  async updateContentName(userId: number, inputs: RenameAiContentSchema) {
+  async updateContentName(campaign: Campaign, inputs: RenameAiContentSchema) {
     const { key, name } = inputs
 
-    const campaign = await this.campaignsService.findByUser(userId)
     const { aiContent } = campaign
 
     if (!aiContent?.[key]) {
@@ -169,21 +167,19 @@ export class CampaignsAiService {
     })
   }
 
-  async deleteContent(userId: number, aiContentKey: string) {
-    const campaign = (await this.campaignsService.findByUser(
-      userId,
-    )) as Campaign & { aiContent: CampaignAiContent }
+  async deleteContent(campaign: Campaign, aiContentKey: string) {
+    const aiContent = campaign.aiContent as CampaignAiContent
 
-    if (!campaign.aiContent || !campaign.aiContent[aiContentKey]) {
+    if (!aiContent || !aiContent[aiContentKey]) {
       // nothing to delete
       throw new NotFoundException('Content not found')
     }
 
-    delete campaign.aiContent[aiContentKey]
-    delete campaign.aiContent.generationStatus?.[aiContentKey]
+    delete aiContent[aiContentKey]
+    delete aiContent.generationStatus?.[aiContentKey]
 
     await this.campaignsService.update(campaign.id, {
-      aiContent: campaign.aiContent,
+      aiContent,
     })
 
     return true

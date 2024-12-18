@@ -17,11 +17,15 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { User } from '@prisma/client'
 import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
+import { CampaignsService } from '../campaigns.service'
 
 @Controller('campaigns/ai')
 @UsePipes(ZodValidationPipe)
 export class CampaignsAiController {
-  constructor(private aiService: CampaignsAiService) {}
+  constructor(
+    private campaignsAiService: CampaignsAiService,
+    private campaignsService: CampaignsService,
+  ) {}
 
   @Post()
   async create(
@@ -29,7 +33,9 @@ export class CampaignsAiController {
     @ReqUser() user: User,
     @Body() body: CreateAiContentSchema,
   ) {
-    const result = await this.aiService.createContent(user.id, body)
+    // TODO: use a decorator to inject needed campaign for user instead of this findByUser everywhere
+    const campaign = await this.campaignsService.findByUser(user.id)
+    const result = await this.campaignsAiService.createContent(campaign, body)
 
     if (result.created) {
       res.statusCode = HttpStatus.CREATED
@@ -42,13 +48,15 @@ export class CampaignsAiController {
 
   @Put('rename')
   @HttpCode(HttpStatus.OK)
-  rename(@ReqUser() user: User, @Body() body: RenameAiContentSchema) {
-    return this.aiService.updateContentName(user.id, body)
+  async rename(@ReqUser() user: User, @Body() body: RenameAiContentSchema) {
+    const campaign = await this.campaignsService.findByUser(user.id)
+    return this.campaignsAiService.updateContentName(campaign, body)
   }
 
   @Delete(':key')
   @HttpCode(HttpStatus.NO_CONTENT)
-  delete(@ReqUser() user: User, @Param('key') key: string) {
-    return this.aiService.deleteContent(user.id, key)
+  async delete(@ReqUser() user: User, @Param('key') key: string) {
+    const campaign = await this.campaignsService.findByUser(user.id)
+    return this.campaignsAiService.deleteContent(campaign, key)
   }
 }
