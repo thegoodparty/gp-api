@@ -314,37 +314,37 @@ export class CampaignsAiService {
         //   chatResponse,
         // )
       }
-    } catch (e) {
-      // catches llmChatCompletion errors
-      // catches saveCampaignVersion errors
+    } catch (e: any) {
       console.log('error at consumer', e)
       console.log('messages', messages)
       generateError = true
 
-      // if (e.data) {
-      //   // await sails.helpers.slack.errorLoggerHelper(
-      //   //   'error at AI queue consumer (with msg): ',
-      //   //   e.data.error,
-      //   // )
-      //   // await sails.helpers.slack.aiLoggerHelper(
-      //   //   'error at AI queue consumer (with msg): ',
-      //   //   e.data.error,
-      //   // )
-      //   console.log('error', e.data.error)
-      // } else {
-      //   // await sails.helpers.slack.errorLoggerHelper(
-      //   //   'error at AI queue consumer. Queue Message: ',
-      //   //   message,
-      //   // )
-      //   // await sails.helpers.slack.errorLoggerHelper(
-      //   //   'error at AI queue consumer debug: ',
-      //   //   e,
-      //   // )
-      //   // await sails.helpers.slack.aiLoggerHelper(
-      //   //   'error at AI queue consumer debug: ',
-      //   //   e,
-      //   // )
-      // }
+      if (e.data) {
+        // TODO: uncomment slack logging when implemented
+        // await sails.helpers.slack.errorLoggerHelper(
+        //   'error at AI queue consumer (with msg): ',
+        //   e.data.error,
+        // )
+        // await sails.helpers.slack.aiLoggerHelper(
+        //   'error at AI queue consumer (with msg): ',
+        //   e.data.error,
+        // )
+        console.log('error', e.data?.error)
+      } else {
+        // TODO: uncomment slack logging when implemented
+        // await sails.helpers.slack.errorLoggerHelper(
+        //   'error at AI queue consumer. Queue Message: ',
+        //   message,
+        // )
+        // await sails.helpers.slack.errorLoggerHelper(
+        //   'error at AI queue consumer debug: ',
+        //   e,
+        // )
+        // await sails.helpers.slack.aiLoggerHelper(
+        //   'error at AI queue consumer debug: ',
+        //   e,
+        // )
+      }
     }
 
     // Failed to generate content.
