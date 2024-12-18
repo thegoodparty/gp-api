@@ -15,6 +15,7 @@ import { articleCategoriesTransformer } from './transformers/articleCategoriesTr
 import { goodPartyTeamMembersTransformer } from './transformers/goodPartyTeamMembersTransformer'
 import { termsOfServiceTransformer } from './transformers/termsOfServiceTransformer'
 import { redirectsTransformer } from './transformers/redirectsTransformer'
+import { blogHomeTransformer } from './transformers/blogHomeTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -69,7 +70,10 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.blogArticle,
     transformer: blogArticlesTransformer,
   },
-  blogHome: { name: ContentType.blogHome, transformer: noOpTransformer },
+  blogHome: { 
+    name: ContentType.blogHome, 
+    transformer: blogHomeTransformer
+  },
   blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
   candidateContentPrompts: {
     name: InferredContentTypes.candidateContentPrompts,

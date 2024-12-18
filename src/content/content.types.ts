@@ -79,6 +79,15 @@ export type AIContentTemplateAugmented = {
   requiresAdditionalQuestions: boolean;
 }
 
+type ArticleFaq = {
+  sys: {
+    id: string;
+  },
+  fields: {
+    title: string;
+  }
+}
+
 export type CandidateContentPrompts = {
   [key: string]: string; // Multiple entries of key: templateName, value: templateBody (names I made up)
 }
@@ -234,6 +243,18 @@ export type ContentMedia = {
   }
 }
 
+export type BlogHomeRaw = {
+  data: {
+    topTags: BlogArticleTagRaw[];
+    articleFaqs: ArticleFaq[];
+  }
+}
+
+export type BlogHomeAugmented = {
+  tags: BlogArticleTag[];
+  faqs: FaqBasic[];
+}
+
 export type ContentRaw<T extends object = {}> = Content & { data: object } & T
 
 export type ContentAugmented<T extends object = {}> = T
@@ -262,6 +283,11 @@ export type FaqArticleCategoryRaw = {
     name: string
     order?: number
   }
+}
+
+type FaqBasic = {
+  title: string;
+  id: string;
 }
 
 export type OnboardingPromptsAugmented = {
