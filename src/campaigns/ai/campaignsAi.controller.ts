@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
   Res,
   UsePipes,
 } from '@nestjs/common'
@@ -39,7 +40,7 @@ export class CampaignsAiController {
     return result
   }
 
-  @Post('rename') // TODO: should be a PATCH instead?
+  @Put('rename')
   @HttpCode(HttpStatus.OK)
   rename(@ReqUser() user: User, @Body() body: RenameAiContentSchema) {
     return this.aiService.updateContentName(user.id, body)

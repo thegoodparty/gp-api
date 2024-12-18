@@ -52,16 +52,16 @@ export class CampaignsService {
     return campaigns
   }
 
-  findOne(
+  findOne<T extends Prisma.CampaignInclude>(
     where: Prisma.CampaignWhereInput,
-    include: Prisma.CampaignInclude = {
+    include: T = {
       pathToVictory: true,
-    },
+    } as any, // TODO: figure out how to properly type this default instead of using any
   ) {
     return this.prismaService.campaign.findFirst({
       where,
       include,
-    })
+    }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
   findByUser<T extends Prisma.CampaignInclude>(

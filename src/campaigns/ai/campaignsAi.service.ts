@@ -12,6 +12,7 @@ import {
   AiContentGenerationStatus,
   CampaignAiContent,
   CampaignDetailsContent,
+  GenerationStatus,
 } from '../campaigns.types'
 import { positionsToStr, againstToStr, replaceAll } from './util/prompt.util'
 
@@ -28,17 +29,7 @@ export class CampaignsAiService {
     // TODO: integrate with sqs implementation
     // await sails.helpers.queue.consumer()
 
-    const campaign = await this.campaignsService.findByUser(userId, {
-      pathToVictory: true,
-      campaignPositions: {
-        include: {
-          topIssue: true,
-          position: true,
-        },
-      },
-      campaignUpdateHistory: true,
-      user: true,
-    })
+    const campaign = await this.campaignsService.findByUser(userId)
     const { slug, id } = campaign
     const aiContent = (campaign.aiContent ?? {}) as CampaignAiContent
 
@@ -50,11 +41,10 @@ export class CampaignsAiService {
       !regenerate &&
       aiContent.generationStatus[key] !== undefined &&
       aiContent.generationStatus[key].status !== undefined &&
-      aiContent.generationStatus[key].status === 'processing'
+      aiContent.generationStatus[key].status === GenerationStatus.processing
     ) {
       return {
-        status: 'processing',
-        step: 'waiting',
+        status: GenerationStatus.processing,
         key,
       }
     }
@@ -63,11 +53,11 @@ export class CampaignsAiService {
     if (
       !editMode &&
       aiContent.generationStatus[key] !== undefined &&
-      aiContent.generationStatus[key].status === 'completed' &&
+      aiContent.generationStatus[key].status === GenerationStatus.completed &&
       existing
     ) {
       return {
-        status: 'completed',
+        status: GenerationStatus.completed,
         chatResponse: aiContent[key],
       }
     }
@@ -77,7 +67,21 @@ export class CampaignsAiService {
     const keyNoDigits = key.replace(/\d+/g, '') // we allow multiple keys like key1, key2
     let prompt = cmsPrompts[keyNoDigits] as string
 
-    prompt = await this.promptReplace(prompt, campaign)
+    const campaignWithRelations = await this.campaignsService.findOne(
+      { id: campaign.id },
+      {
+        pathToVictory: true,
+        campaignPositions: {
+          include: {
+            topIssue: true,
+            position: true,
+          },
+        },
+        campaignUpdateHistory: true,
+        user: true,
+      },
+    )
+    prompt = await this.promptReplace(prompt, campaignWithRelations)
     if (!prompt || prompt === '') {
       // await sails.helpers.slack.errorLoggerHelper('empty prompt replace', {
       //   cmsPrompt: cmsPrompts[keyNoDigits],
@@ -94,7 +98,7 @@ export class CampaignsAiService {
     if (!aiContent.generationStatus[key]) {
       aiContent.generationStatus[key] = {} as AiContentGenerationStatus
     }
-    aiContent.generationStatus[key].status = 'processing'
+    aiContent.generationStatus[key].status = GenerationStatus.processing
     aiContent.generationStatus[key].prompt = prompt as string
     aiContent.generationStatus[key].existingChat = chat || []
     aiContent.generationStatus[key].inputValues = inputValues
@@ -112,7 +116,7 @@ export class CampaignsAiService {
       await this.campaignsService.update(campaign.id, {
         aiContent,
       })
-    } catch (_e) {
+    } catch (e) {
       // await sails.helpers.slack.errorLoggerHelper(
       //   'Error updating generationStatus',
       //   {
@@ -122,7 +126,7 @@ export class CampaignsAiService {
       //     success,
       //   },
       // )
-      throw new BadRequestException('Error updating generationStatus')
+      throw e
     }
 
     // TODO: enqueue message using SQS queue stuff!!!
@@ -142,8 +146,7 @@ export class CampaignsAiService {
     // await sails.helpers.queue.consumer()
 
     return {
-      status: 'processing',
-      step: 'created',
+      status: GenerationStatus.processing,
       key,
     }
   }

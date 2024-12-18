@@ -1,7 +1,12 @@
 type NestedRecords = Record<string, any>
 
+export enum GenerationStatus {
+  processing = 'processing',
+  completed = 'completed',
+}
+
 export type AiContentGenerationStatus = {
-  status: string
+  status: GenerationStatus
   createdAt: number
   // TODO: make sure these types are correct
   prompt?: string
