@@ -8,8 +8,10 @@ import {
   Logger,
 } from '@nestjs/common'
 import { JobsService } from './jobs.service'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 
 @Controller('jobs')
+@PublicAccess()
 export class JobsController {
   private readonly logger = new Logger(JobsService.name)
   constructor(private readonly jobsService: JobsService) {}

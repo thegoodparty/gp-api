@@ -3,9 +3,10 @@ import { PrismaService } from '../prisma/prisma.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateCampaignSchema } from './schemas/createCampaign.schema'
-import { Prisma } from '@prisma/client'
-import { deepMerge } from '../shared/util/objects.util'
-import { caseInsensitiveCompare } from '../prisma/util/json.util'
+import { Prisma, User } from '@prisma/client'
+import { deepMerge } from 'src/shared/util/objects.util'
+import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
+import { Campaign } from './campaigns.types'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -49,7 +50,7 @@ export class CampaignsService {
     // }).populate('user');
     // campaigns = attachTeamMembers(campaigns, campaignVolunteersMapping)
 
-    return campaigns
+    return campaigns as Campaign[]
   }
 
   findOne(
@@ -61,10 +62,16 @@ export class CampaignsService {
     return this.prismaService.campaign.findFirst({
       where,
       include,
-    })
+    }) as Promise<Campaign>
   }
 
-  async create(body: CreateCampaignSchema) {
+  findByUser(userId: Prisma.CampaignWhereInput['userId']) {
+    return this.prismaService.campaign.findFirstOrThrow({
+      where: { userId },
+    }) as Promise<Campaign>
+  }
+
+  async create(campaignData: CreateCampaignSchema, user: User) {
     // TODO: get user from request
     // const { user } = this.req;
     // const userName = await sails.helpers.user.name(user);
@@ -84,15 +91,14 @@ export class CampaignsService {
 
     const newCampaign = await this.prismaService.campaign.create({
       data: {
-        ...body,
+        ...campaignData,
         isActive: false,
-        // TODO: pull from request user
-        // userId:
-        // details: {
-        //   zip: user.zip,
-        // },
+        userId: user.id,
+        details: {
+          zip: user.zip,
+        },
         data: {
-          slug: body.slug,
+          slug: campaignData.slug,
           currentStep: 'registration',
         },
       },
@@ -102,7 +108,7 @@ export class CampaignsService {
     // await claimExistingCampaignRequests(user, newCampaign)
     // await createCrmUser(user.firstName, user.lastName, user.email)
 
-    return newCampaign
+    return newCampaign as Campaign
   }
 
   async update(id: number, body: UpdateCampaignSchema) {
@@ -160,7 +166,7 @@ export class CampaignsService {
         where: { id: campaign.id },
         data: updateData,
         include: { pathToVictory: true },
-      })
+      }) as Promise<Campaign>
     })
   }
 }

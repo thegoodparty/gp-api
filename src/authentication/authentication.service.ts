@@ -1,9 +1,17 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
-import { JwtService } from '@nestjs/jwt'
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common'
+import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
 import { UsersService } from '../users/users.service'
 import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
-import { LoginRequestPayloadDto } from './schemas/LoginPayload.schema'
+import { LoginPayload } from './schemas/LoginPayload.schema'
 import { compare } from 'bcrypt'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { nanoid } from 'nanoid'
+
+const PASSWORD_RESET_TOKEN_TTL = '1h'
 
 @Injectable()
 export class AuthenticationService {
@@ -24,7 +32,10 @@ export class AuthenticationService {
     }
   }
 
-  async login({ email, password }: LoginRequestPayloadDto) {
+  async validateUser(
+    email: LoginPayload['email'],
+    password: LoginPayload['password'],
+  ) {
     const user = await this.usersService.findUser({ email })
 
     if (!user) {
@@ -39,9 +50,43 @@ export class AuthenticationService {
     if (!validPassword) {
       throw new UnauthorizedException('Invalid password')
     }
-    return {
-      user,
-      token: this.generateAuthToken({ email: user.email, sub: user.id }),
+    return user
+  }
+
+  async updatePasswordWithToken(
+    email: string,
+    token: string,
+    password: string,
+  ) {
+    let user
+    try {
+      this.jwtService.verify(token)
+      user = await this.usersService.findUserByResetToken(email, token)
+    } catch (e) {
+      if (
+        e instanceof TokenExpiredError || // token expired
+        e instanceof SyntaxError || // token parse failed
+        e instanceof JsonWebTokenError || // malformed token
+        e instanceof PrismaClientKnownRequestError // token doesn't match a user
+      ) {
+        throw new ForbiddenException(
+          e instanceof TokenExpiredError
+            ? 'Token has expired'
+            : 'Invalid token',
+        )
+      }
+      throw e
     }
+
+    return await this.usersService.updatePassword(user.id, password, true)
+  }
+
+  generatePasswordResetToken() {
+    const token = nanoid(48)
+
+    return this.jwtService.sign(
+      { token },
+      { expiresIn: PASSWORD_RESET_TOKEN_TTL },
+    )
   }
 }

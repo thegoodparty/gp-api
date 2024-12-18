@@ -13,8 +13,7 @@ import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import type { FastifyCookieOptions } from '@fastify/cookie'
 import cookie from '@fastify/cookie'
-import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter';
-import { Prisma } from '@prisma/client'
+import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
@@ -58,7 +57,7 @@ const bootstrap = async () => {
     secret: process.env.AUTH_SECRET,
   } as FastifyCookieOptions)
 
-  app.useGlobalFilters(new PrismaExceptionFilter());
+  app.useGlobalFilters(new PrismaExceptionFilter())
 
   await app.listen(APP_LISTEN_CONFIG)
   return app

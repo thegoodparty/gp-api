@@ -22,7 +22,7 @@
     "prisma-format": "for file in prisma/schema/*.prisma; do npx prisma-case-format -c prisma/.prisma-case-format.yaml -f \"$file\"; done"
   },
   "prisma": {
-    "seed": "ts-node ./seed/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts"
   },
   "dependencies": {
     "@contentful/rich-text-plain-text-renderer": "^17.0.0",
@@ -44,6 +44,7 @@
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
     "contentful": "^11.2.2",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "jsonwebtoken": "^9.0.2",
@@ -52,6 +53,7 @@
     "nestjs-zod": "^4.2.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "slugify": "^1.6.6",

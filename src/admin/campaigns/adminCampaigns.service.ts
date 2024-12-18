@@ -12,7 +12,7 @@ import {
 } from '@prisma/client/runtime/library'
 import { findSlug } from '../../shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Prisma } from '@prisma/client'
+import { Prisma, UserRole } from '@prisma/client'
 import { generateRandomPassword } from '../../users/util/passwords.util'
 
 @Injectable()
@@ -37,8 +37,7 @@ export class AdminCampaignsService {
     }
 
     // create new user
-    let user
-    user = await this.prismaService.user.create({
+    const user = await this.prismaService.user.create({
       data: {
         firstName,
         lastName,
@@ -48,7 +47,7 @@ export class AdminCampaignsService {
         zip,
         phone,
         metaData: {},
-        role: 'campaign',
+        roles: [UserRole.candidate],
       },
     })
 
@@ -110,12 +109,12 @@ export class AdminCampaignsService {
     //TODO: reimplment
     // await sails.helpers.crm.updateCampaign(updatedCampaign);
 
-      return updatedCampaign
+    return updatedCampaign
   }
 
   async delete(id: number) {
-      await this.prismaService.campaign.delete({ where: { id } })
-      return true
+    await this.prismaService.campaign.delete({ where: { id } })
+    return true
   }
 }
 

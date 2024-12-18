@@ -5,7 +5,7 @@ import {
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
 } from './util/content.util'
-import { User } from '@prisma/client'
+import { User, UserRole } from '@prisma/client'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -79,7 +79,7 @@ export class EmailService {
   }
 
   async sendSetPasswordEmail(user: User) {
-    const { firstName, lastName, email, role, passwordResetToken } = user
+    const { firstName, lastName, email, roles, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
       `${APP_BASE}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
@@ -89,13 +89,12 @@ export class EmailService {
         firstName as string,
         lastName as string,
         link,
-        role,
+        roles,
       ),
     }
-    const subject =
-      role === 'sales'
-        ? "You've been added to the GoodParty.org Admin"
-        : 'Welcome to GoodParty.org! Set Up Your Account and Access Your Campaign Tools'
+    const subject = roles.includes(UserRole.sales)
+      ? "You've been added to the GoodParty.org Admin"
+      : 'Welcome to GoodParty.org! Set Up Your Account and Access Your Campaign Tools'
 
     return await this.sendTemplateEmail({
       to: email,
