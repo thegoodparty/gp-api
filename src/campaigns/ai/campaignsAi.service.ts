@@ -148,6 +148,7 @@ export class CampaignsAiService {
     return {
       status: GenerationStatus.processing,
       key,
+      created: true,
     }
   }
 

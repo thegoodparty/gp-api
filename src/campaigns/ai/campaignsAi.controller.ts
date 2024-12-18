@@ -31,7 +31,7 @@ export class CampaignsAiController {
   ) {
     const result = await this.aiService.createContent(user.id, body)
 
-    if (result.step === 'created') {
+    if (result.created) {
       res.statusCode = HttpStatus.CREATED
     } else {
       res.statusCode = HttpStatus.OK
