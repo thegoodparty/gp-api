@@ -382,6 +382,17 @@ export type GoodPartyTeamMembersAugmented = {
   id: string;
 }
 
+export type RedirectsRaw = {
+  data: {
+    pathname: string;
+    redirectUrl: string;
+  }
+}
+
+export type RedirectsAugmented = {
+  [key: string]: string // Key is the pathname, value is the redirectUrl
+}
+
 export type TermsOfServiceRaw = {
   data: {
     [key: string]: string;

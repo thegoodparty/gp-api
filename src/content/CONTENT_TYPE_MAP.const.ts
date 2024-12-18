@@ -14,6 +14,7 @@ import { candidateTestimonialsTransformer } from './transformers/candidateTestim
 import { articleCategoriesTransformer } from './transformers/articleCategoriesTransformer'
 import { goodPartyTeamMembersTransformer } from './transformers/goodPartyTeamMembersTransformer'
 import { termsOfServiceTransformer } from './transformers/termsOfServiceTransformer'
+import { redirectsTransformer } from './transformers/redirectsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -119,8 +120,8 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.promptInputFields,
     transformer: promptInputFieldsTransformer,
   },
-  redirects: { name: ContentType.redirects, transformer: noOpTransformer },
-  teamMember: { name: ContentType.teamMember, transformer: noOpTransformer },
+  redirects: { name: ContentType.redirects, transformer: redirectsTransformer },
+  teamMember: { name: ContentType.teamMember, transformer: noOpTransformer }, // Not supported
   teamMilestone: {
     name: ContentType.teamMilestone,
     transformer: noOpTransformer, // Previously supported
