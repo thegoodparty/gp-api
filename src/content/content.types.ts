@@ -7,6 +7,7 @@ export interface ImageRaw {
     file: {
       url: string
       details?: {
+        size?: number;
         image?: {
           width: number
           height: number
@@ -15,6 +16,15 @@ export interface ImageRaw {
     }
     title?: string
   }
+}
+
+export interface ImageClean {
+  url: string;
+  alt?: string;
+  size?: {
+    width: number;
+    height: number;
+  } | null
 }
 
 export type AIContentTemplateRaw = {
@@ -228,6 +238,22 @@ export type ContentRaw<T extends object = {}> = Content & { data: object } & T
 
 export type ContentAugmented<T extends object = {}> = T
 
+export type CandidateTestimonialAugmented = {
+  name: string;
+  office: string;
+  image: ImageClean;
+  testimonial: string;
+}
+
+export type CandidateTestimonalRaw = {
+  data: {
+    name: string;
+    image: ImageRaw;
+    office: string;
+    testimonial: string;
+  }
+}
+
 export type FaqArticleCategoryRaw = {
   sys: {
     id: string
@@ -325,3 +351,33 @@ export type GlossaryItemAugmented = ContentAugmented<
   }
 > &
   FieldsType
+
+
+export type GoodPartyTeamMembersRaw = {
+  data: {
+    name: string;
+    members: TeamMember[]
+  }
+}
+
+export type TeamMember = {
+  sys: {
+    id: string;
+  }
+  fields: {
+    role: string;
+    fullName: string;
+    goodPhoto: ImageRaw;
+    partyRole: string;
+    partyPhoto: ImageRaw;
+  }
+}
+
+export type GoodPartyTeamMembersAugmented = {
+  fullName: string;
+  role: string;
+  goodPhoto: ImageClean;
+  partyPhoto: ImageClean;
+  partyRole: string;
+  id: string;
+}

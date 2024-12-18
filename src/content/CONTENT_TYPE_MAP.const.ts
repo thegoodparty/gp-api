@@ -10,8 +10,9 @@ import { aiContentCategoriesTransformer } from './transformers/aiContentCategori
 import { aiChatPromptsTransformer } from './transformers/aiChatPromptTransformer'
 import { onboardingPromptsTransformer } from './transformers/onboardingPromptsTransformer'
 import { promptInputFieldsTransformer } from './transformers/promptInputFieldsTransformer'
-import { noop } from 'lodash'
+import { candidateTestimonialsTransformer } from './transformers/candidateTestimonialsTransformer'
 import { articleCategoriesTransformer } from './transformers/articleCategoriesTransformer'
+import { goodPartyTeamMembersTransformer } from './transformers/goodPartyTeamMembersTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -20,6 +21,7 @@ export enum InferredContentTypes {
   aiContentCategories = 'aiContentCategories',
   aiChatPrompts = 'aiChatPrompts',
   articleCategories = 'articleCategories',
+  candidateTestimonials = 'candidateTestimonials',
 }
 
 export const CONTENT_TYPE_MAP: {
@@ -70,32 +72,41 @@ export const CONTENT_TYPE_MAP: {
   candidateContentPrompts: {
     name: InferredContentTypes.candidateContentPrompts,
     transformer: candidateContentPromptsTransformer,
-    //transformer: noOpTransformer,
     inferredFrom: ContentType.aiContentTemplate
   },
   candidateTestimonial: {
     name: ContentType.candidateTestimonial,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
+  },
+  candidateTestimonials: {
+    name: InferredContentTypes.candidateTestimonials,
+    transformer: candidateTestimonialsTransformer,
+    inferredFrom: ContentType.candidateTestimonial
   },
   contentPromptsQuestions: {
     name: InferredContentTypes.contentPromptsQuestions,
     transformer: contentPromptsQuestionsTransformer,
-    //transformer: noOpTransformer,
     inferredFrom: ContentType.aiContentTemplate
   },
-  election: { name: ContentType.election, transformer: noOpTransformer },
+  election: { 
+    name: ContentType.election, 
+    transformer: noOpTransformer // Previously supported
+  },
   faqArticle: {
     name: ContentType.faqArticle,
     transformer: faqArticlesTransformer,
   },
-  faqOrder: { name: ContentType.faqOrder, transformer: noOpTransformer },
+  faqOrder: { 
+    name: ContentType.faqOrder, 
+    transformer: noOpTransformer 
+  },
   glossaryItem: {
     name: ContentType.glossaryItem,
     transformer: glossaryItemsTransformer,
   },
   goodPartyTeamMembers: {
     name: ContentType.goodPartyTeamMembers,
-    transformer: noOpTransformer,
+    transformer: goodPartyTeamMembersTransformer,
   },
   onboardingPrompts: {
     name: ContentType.onboardingPrompts,
