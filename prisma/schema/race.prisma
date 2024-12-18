@@ -51,3 +51,12 @@ model Municipality {
   countyId Int?
   races    Race[]
 }
+
+model CensusEntity {
+  id       Int      @id @default(autoincrement())
+  mtfcc    String
+  mtfccType String
+  geoId    String
+  name     String
+  state    String
+}

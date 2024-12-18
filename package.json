@@ -47,6 +47,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
+    "graphql-request": "^7.1.2",
     "jsonwebtoken": "^9.0.2",
     "mailgun.js": "^10.2.4",
     "nanoid": "^3.3.8",
