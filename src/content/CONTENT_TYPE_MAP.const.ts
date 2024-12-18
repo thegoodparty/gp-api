@@ -13,6 +13,7 @@ import { promptInputFieldsTransformer } from './transformers/promptInputFieldsTr
 import { candidateTestimonialsTransformer } from './transformers/candidateTestimonialsTransformer'
 import { articleCategoriesTransformer } from './transformers/articleCategoriesTransformer'
 import { goodPartyTeamMembersTransformer } from './transformers/goodPartyTeamMembersTransformer'
+import { termsOfServiceTransformer } from './transformers/termsOfServiceTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -122,10 +123,10 @@ export const CONTENT_TYPE_MAP: {
   teamMember: { name: ContentType.teamMember, transformer: noOpTransformer },
   teamMilestone: {
     name: ContentType.teamMilestone,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // Previously supported
   },
   termsOfService: {
     name: ContentType.termsOfService,
-    transformer: noOpTransformer,
+    transformer: termsOfServiceTransformer,
   },
 }

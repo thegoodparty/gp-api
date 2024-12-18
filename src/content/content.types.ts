@@ -381,3 +381,13 @@ export type GoodPartyTeamMembersAugmented = {
   partyRole: string;
   id: string;
 }
+
+export type TermsOfServiceRaw = {
+  data: {
+    [key: string]: string;
+  }
+}
+
+export type TermsOfServiceAugmented = {
+  [key: string]: string
+}
