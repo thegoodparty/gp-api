@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
-import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
-import { CampaignListSchema } from './schemas/campaignList.schema'
-import { CreateCampaignSchema } from './schemas/createCampaign.schema'
+import { PrismaService } from '../../prisma/prisma.service'
+import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
+import { CampaignListSchema } from '../schemas/campaignList.schema'
+import { CreateCampaignSchema } from '../schemas/createCampaign.schema'
 import { Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
+import { findSlug } from 'src/shared/util/slug.util'
+import { getFullName } from 'src/users/util/users.util'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -87,22 +89,7 @@ export class CampaignsService {
   }
 
   async create(campaignData: CreateCampaignSchema, user: User) {
-    // TODO: get user from request
-    // const { user } = this.req;
-    // const userName = await sails.helpers.user.name(user);
-    // if (userName === '') {
-    //   console.log('No user name');
-    //   return exits.badRequest('No user name');
-    // }
-    // const slug = await findSlug(userName);
-
-    // TODO: see if the user already have campaign
-    // const existing = await sails.helpers.campaign.byUser(user.id)
-    // if (existing) {
-    //   return exits.success({
-    //     slug: existing.slug,
-    //   })
-    // }
+    const slug = await findSlug(this.prismaService, getFullName(user))
 
     const newCampaign = await this.prismaService.campaign.create({
       data: {
@@ -113,7 +100,7 @@ export class CampaignsService {
           zip: user.zip,
         },
         data: {
-          slug: campaignData.slug,
+          slug,
           currentStep: 'registration',
         },
       },

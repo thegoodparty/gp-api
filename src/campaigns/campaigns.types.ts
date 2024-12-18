@@ -1,7 +1,15 @@
 import { AiChatMessage } from 'src/ai/ai.types'
 
+export type CampaignPlanVersionData = Record<string, AiContentVersion[]>
+
+export type AiContentVersion = {
+  date: Date | string
+  text: string
+  language?: string
+}
+
 // TODO: make sure this type is correct
-type AiContentInputValues = Record<
+export type AiContentInputValues = Record<
   string,
   string | boolean | number | undefined
 >

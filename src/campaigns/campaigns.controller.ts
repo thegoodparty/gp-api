@@ -1,6 +1,6 @@
 import {
-  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   NotFoundException,
@@ -12,7 +12,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignsService } from './campaigns.service'
+import { CampaignsService } from './services/campaigns.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
@@ -63,6 +63,11 @@ export class CampaignsController {
     @ReqUser() user: User,
     @Body() campaignData: CreateCampaignSchema,
   ) {
+    // see if the user already has campaign
+    const existing = await this.campaignsService.findByUser(user.id)
+    if (existing) {
+      throw new ConflictException('User campaign already exists.')
+    }
     return await this.campaignsService.create(campaignData, user)
   }
 

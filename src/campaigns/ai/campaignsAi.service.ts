@@ -5,24 +5,29 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Prisma, User } from '@prisma/client'
-import { CampaignsService } from '../campaigns.service'
+import { CampaignsService } from '../services/campaigns.service'
 import { RenameAiContentSchema } from './schemas/RenameAiContent.schema'
 import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/content.service'
 import {
   AiContentGenerationStatus,
+  AiContentInputValues,
+  AiContentVersion,
   CampaignAiContent,
   CampaignDetails,
   GenerationStatus,
+  CampaignPlanVersionData,
 } from '../campaigns.types'
 import { positionsToStr, againstToStr, replaceAll } from './util/prompt.util'
 import { AiService } from 'src/ai/ai.service'
 import { AiChatMessage } from 'src/ai/ai.types'
+import { CampaignPlanVersionsService } from '../services/campaignPlanVersions.service'
 
 @Injectable()
 export class CampaignsAiService {
   constructor(
     private campaignsService: CampaignsService,
+    private campaignPlanVersionsService: CampaignPlanVersionsService,
     private contentService: ContentService,
     private aiService: AiService,
   ) {}
@@ -278,14 +283,14 @@ export class CampaignsAiService {
         console.log('inputValues', inputValues)
         console.log('oldVersion', oldVersion)
 
-        await this.saveCampaignVersion(
+        await this.saveCampaignVersion({
           aiContent,
           key,
-          campaign.id,
+          campaignId: campaign.id,
           inputValues,
           oldVersion,
-          regenerate ? regenerate : false,
-        )
+          regenerate: regenerate ? regenerate : false,
+        })
 
         if (
           !aiContent?.generationStatus ||
@@ -396,7 +401,114 @@ export class CampaignsAiService {
     }
   }
 
-  private async saveCampaignVersion(...inputs: any[]) {}
+  private async saveCampaignVersion(inputs: {
+    aiContent: CampaignAiContent
+    key: string
+    campaignId: number
+    inputValues?: AiContentInputValues | AiContentInputValues[]
+    regenerate: boolean
+    oldVersion: { date: Date; text: string }
+  }) {
+    const { aiContent, key, campaignId, inputValues, oldVersion, regenerate } =
+      inputs
+
+    // we determine language by examining inputValues and tag it on the version.
+    let language = 'English'
+    if (Array.isArray(inputValues) && inputValues.length > 0) {
+      inputValues.forEach((inputValue) => {
+        if (inputValue?.language) {
+          language = inputValue.language as string
+        }
+      })
+    }
+
+    const newVersion = {
+      date: new Date().toString(),
+      text: aiContent[key].content,
+      // if new inputValues are specified we use those
+      // otherwise we use the inputValues from the prior generation.
+      inputValues:
+        Array.isArray(inputValues) && inputValues.length > 0
+          ? inputValues
+          : aiContent[key]?.inputValues,
+      language: language,
+    }
+
+    const existingVersions =
+      await this.campaignPlanVersionsService.findByCampaignId(campaignId)
+
+    let versions = {}
+    if (existingVersions) {
+      versions = existingVersions?.data as CampaignPlanVersionData
+    }
+
+    let foundKey = false
+    if (!versions[key]) {
+      versions[key] = []
+    } else {
+      foundKey = true
+    }
+
+    // determine if we should update the current version or add a new one.
+    // if regenerate is true, we should always add a new version.
+    // if regenerate is false and its been less than 5 minutes since the last generation
+    // we should update the existing version.
+
+    let updateExistingVersion = false
+    if (regenerate === false && foundKey === true && versions[key].length > 0) {
+      const lastVersion = versions[key][0] as AiContentVersion
+      const lastVersionDate = new Date(lastVersion?.date || 0)
+      const now = new Date()
+      const diff = now.getTime() - lastVersionDate.getTime()
+      if (diff < 300000) {
+        updateExistingVersion = true
+      }
+    }
+
+    if (updateExistingVersion === true) {
+      for (let i = 0; i < versions[key].length; i++) {
+        const version = versions[key][i]
+        if (
+          JSON.stringify(version.inputValues) === JSON.stringify(inputValues)
+        ) {
+          // this version already exists. lets update it.
+          versions[key][i].text = newVersion.text
+          versions[key][i].date = new Date().toString()
+          break
+        }
+      }
+    }
+
+    if (!foundKey && oldVersion) {
+      console.log(`no key found for ${key} yet we have oldVersion`)
+      // here, we determine if we need to save an older version of the content.
+      // because in the past we didn't create a Content version for every new generation.
+      // otherwise if they translate they won't have the old version to go back to.
+      versions[key].push(oldVersion)
+    }
+
+    if (updateExistingVersion === false) {
+      console.log('adding new version')
+      // add new version to the top of the list.
+      const length = versions[key].unshift(newVersion)
+      if (length > 10) {
+        versions[key].length = 10
+      }
+    }
+
+    if (existingVersions) {
+      await this.campaignPlanVersionsService.update(campaignId, {
+        data: versions,
+      })
+    } else {
+      await this.campaignPlanVersionsService.create({
+        campaignId: campaignId,
+        data: versions,
+      })
+    }
+
+    return true
+  }
 
   private async promptReplace(
     prompt: string,
