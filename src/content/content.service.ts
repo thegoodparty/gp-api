@@ -1,13 +1,14 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { ContentfulService } from '../contentful/contentful.service'
-import { Content, ContentType } from '@prisma/client'
+import { Content, ContentType, Prisma } from '@prisma/client'
 import { InputJsonObject } from '@prisma/client/runtime/library'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
+import { isObject } from 'src/shared/util/objects.util'
 
 const transformContent = (
   type: ContentType | InferredContentTypes,
@@ -55,6 +56,35 @@ export class ContentService {
       },
     })
     return transformContent(ContentType.glossaryItem, entries)
+  }
+
+  async getAiContentPrompts() {
+    const prompts = (await this.prisma.content.findMany({
+      where: {
+        OR: [
+          {
+            type: ContentType.onboardingPrompts,
+          },
+          {
+            type: ContentType.candidateContentPrompts,
+          },
+        ],
+      },
+    })) as Array<Omit<Content, 'data'> & { data: Prisma.JsonObject }>
+
+    if (
+      // should be one content record for each "type" of prompt
+      prompts.length !== 2 ||
+      // ensure that there is prompt data available
+      !prompts.some((prompt) => isObject(prompt.data))
+    ) {
+      throw new Error('Prompt content not found')
+    }
+
+    return {
+      ...prompts[0].data,
+      ...prompts[1].data,
+    }
   }
 
   private async getExistingContentIds() {

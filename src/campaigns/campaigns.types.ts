@@ -1,18 +1,26 @@
-import { Campaign as PrismaCampaign } from '@prisma/client'
+type NestedRecords = Record<string, any>
 
-type NestedRecords = Record<
-  string,
-  string | Record<string, string | Record<string, string>>
->
+export enum GenerationStatus {
+  processing = 'processing',
+  completed = 'completed',
+}
 
-export type CampaignAiContent = NestedRecords
+export type AiContentGenerationStatus = {
+  status: GenerationStatus
+  createdAt: number
+  // TODO: make sure these types are correct
+  prompt?: string
+  existingChat?: Array<Record<string, string>>
+  inputValues?: Record<string, string | boolean | number | undefined>
+}
+
+export type CampaignAiContent = NestedRecords & {
+  generationStatus?: Record<string, AiContentGenerationStatus>
+}
 export type CampaignDataContent = NestedRecords & {
   createdBy?: 'admin' | string
 }
-export type CampaignDetailsContent = NestedRecords
-
-export type Campaign = PrismaCampaign & {
-  aiContent?: CampaignAiContent
-  data?: CampaignDataContent
-  details?: CampaignDetailsContent
+export type CampaignDetailsContent = NestedRecords & {
+  customIssues?: Record<'title' | 'position', string>[]
+  runningAgainst?: Record<'name' | 'party' | 'description', string>[]
 }
