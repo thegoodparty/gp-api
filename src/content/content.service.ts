@@ -78,7 +78,7 @@ export class ContentService {
       // ensure that there is prompt data available
       !prompts.some((prompt) => isObject(prompt.data))
     ) {
-      throw new NotFoundException('Prompt content not found')
+      throw new Error('Prompt content not found')
     }
 
     return {

@@ -30,11 +30,10 @@ export class CampaignsAiController {
   @Post()
   async create(
     @Res({ passthrough: true }) res: FastifyReply,
-    @ReqUser() user: User,
+    @ReqUser() { id: userId }: User,
     @Body() body: CreateAiContentSchema,
   ) {
-    // TODO: use a decorator to inject needed campaign for user instead of this findByUser everywhere
-    const campaign = await this.campaignsService.findByUser(user.id)
+    const campaign = await this.loadCampaign(userId)
     const result = await this.campaignsAiService.createContent(campaign, body)
 
     if (result.created) {
@@ -48,15 +47,23 @@ export class CampaignsAiController {
 
   @Put('rename')
   @HttpCode(HttpStatus.OK)
-  async rename(@ReqUser() user: User, @Body() body: RenameAiContentSchema) {
-    const campaign = await this.campaignsService.findByUser(user.id)
+  async rename(
+    @ReqUser() { id: userId }: User,
+    @Body() body: RenameAiContentSchema,
+  ) {
+    const campaign = await this.loadCampaign(userId)
     return this.campaignsAiService.updateContentName(campaign, body)
   }
 
   @Delete(':key')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@ReqUser() user: User, @Param('key') key: string) {
-    const campaign = await this.campaignsService.findByUser(user.id)
+  async delete(@ReqUser() { id: userId }: User, @Param('key') key: string) {
+    const campaign = await this.loadCampaign(userId)
     return this.campaignsAiService.deleteContent(campaign, key)
+  }
+
+  private loadCampaign(userId: number) {
+    // TODO: use a decorator to inject needed campaign for user instead of this findByUser everywhere
+    return this.campaignsService.findByUser(userId)
   }
 }
