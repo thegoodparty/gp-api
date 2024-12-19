@@ -83,14 +83,14 @@ export class CampaignsAiService {
     )
     prompt = await this.aiService.promptReplace(prompt, campaignWithRelations)
     if (!prompt || prompt === '') {
-      await this.slack.errorLoggerHelper('empty prompt replace', {
+      await this.slack.errorMessage('empty prompt replace', {
         cmsPrompt: cmsPrompts[keyNoDigits],
         promptAfterReplace: prompt,
         campaign,
       })
       throw new Error('No prompt found')
     }
-    await this.slack.aiLoggerHelper('prompt', {
+    await this.slack.aiMessage('prompt', {
       cmsPrompt: cmsPrompts[keyNoDigits],
       promptAfterReplace: prompt,
     })
@@ -105,7 +105,7 @@ export class CampaignsAiService {
     aiContent.generationStatus[key].inputValues = inputValues
     aiContent.generationStatus[key].createdAt = new Date().valueOf()
 
-    await this.slack.slackHelper(
+    await this.slack.message(
       {
         title: 'Debugging generationStatus',
         body: JSON.stringify(aiContent.generationStatus),
@@ -118,7 +118,7 @@ export class CampaignsAiService {
         aiContent,
       })
     } catch (e) {
-      await this.slack.errorLoggerHelper('Error updating generationStatus', {
+      await this.slack.errorMessage('Error updating generationStatus', {
         aiContent,
         key,
         id,
@@ -136,7 +136,7 @@ export class CampaignsAiService {
       },
     }
     await this.queue.sendMessage(queueMessage)
-    await this.slack.aiLoggerHelper('Enqueued AI prompt', queueMessage)
+    await this.slack.aiMessage('Enqueued AI prompt', queueMessage)
 
     return {
       status: GenerationStatus.processing,
@@ -159,7 +159,7 @@ export class CampaignsAiService {
       aiContent.generationStatus?.[key] || {}
 
     if (!aiContent || !prompt) {
-      await this.slack.slackHelper(
+      await this.slack.message(
         {
           title: 'Missing prompt',
           body: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${
@@ -180,7 +180,7 @@ export class CampaignsAiService {
     let generateError = false
 
     try {
-      await this.slack.aiLoggerHelper('handling campaign from queue', message)
+      await this.slack.aiMessage('handling campaign from queue', message)
 
       let maxTokens = 2000
       if (existingChat && existingChat.length > 0) {
@@ -197,7 +197,7 @@ export class CampaignsAiService {
       chatResponse = completion.content
       const totalTokens = completion.tokens
 
-      await this.slack.aiLoggerHelper(
+      await this.slack.aiMessage(
         `[ ${slug} - ${key} ] Generation Complete. Tokens Used:`,
         totalTokens,
       )
@@ -255,7 +255,7 @@ export class CampaignsAiService {
 
         await this.campaignsService.update(campaign.id, { aiContent })
 
-        await this.slack.aiLoggerHelper(
+        await this.slack.aiMessage(
           `updated campaign with ai. chatResponse: key: ${key}`,
           chatResponse,
         )
@@ -266,25 +266,22 @@ export class CampaignsAiService {
       generateError = true
 
       if (e.data) {
-        await this.slack.errorLoggerHelper(
+        await this.slack.errorMessage(
           'error at AI queue consumer (with msg): ',
           e.data.error,
         )
-        await this.slack.aiLoggerHelper(
+        await this.slack.aiMessage(
           'error at AI queue consumer (with msg): ',
           e.data.error,
         )
         this.logger.error('error', e.data?.error)
       } else {
-        await this.slack.errorLoggerHelper(
+        await this.slack.errorMessage(
           'error at AI queue consumer. Queue Message: ',
           message,
         )
-        await this.slack.errorLoggerHelper(
-          'error at AI queue consumer debug: ',
-          e,
-        )
-        await this.slack.aiLoggerHelper('error at AI queue consumer debug: ', e)
+        await this.slack.errorMessage('error at AI queue consumer debug: ', e)
+        await this.slack.aiMessage('error at AI queue consumer debug: ', e)
       }
     }
 
@@ -304,7 +301,7 @@ export class CampaignsAiService {
           ? aiContent.campaignPlanAttempts[key] + 1
           : 1
 
-        await this.slack.aiLoggerHelper(
+        await this.slack.aiMessage(
           'Current Attempts:',
           aiContent.campaignPlanAttempts[key],
         )
@@ -316,20 +313,17 @@ export class CampaignsAiService {
             GenerationStatus.completed &&
           aiContent.campaignPlanAttempts[key] >= 3
         ) {
-          await this.slack.aiLoggerHelper(
-            'Deleting generationStatus for key',
-            key,
-          )
+          await this.slack.aiMessage('Deleting generationStatus for key', key)
           delete aiContent.generationStatus[key]
         }
         await this.campaignsService.update(campaign.id, { aiContent })
       } catch (e) {
-        await this.slack.aiLoggerHelper(
+        await this.slack.aiMessage(
           'Error at consumer updating campaign with ai.',
           key,
           e,
         )
-        await this.slack.errorLoggerHelper(
+        await this.slack.errorMessage(
           'Error at consumer updating campaign with ai.',
           key,
           e,

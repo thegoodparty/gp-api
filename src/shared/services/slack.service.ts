@@ -4,15 +4,18 @@ import { Injectable } from '@nestjs/common'
 export class SlackService {
   // TODO: placeholder service for slack logging
 
-  async errorLoggerHelper(...args: any[]) {
+  // sails.helpers.slack.errorLoggerHelper
+  async errorMessage(...args: any[]) {
     console.log('SLACK ERROR LOGGER', args)
   }
 
-  async aiLoggerHelper(...args: any[]) {
+  // sails.helpers.slack.aiLoggerHelper
+  async aiMessage(...args: any[]) {
     console.log('SLACK AI LOGGER', args)
   }
 
-  async slackHelper(...args: any[]) {
+  // sails.helpers.slack.slackHelper
+  async message(...args: any[]) {
     console.log('SLACK BASIC LOGGER', args)
   }
 }

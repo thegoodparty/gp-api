@@ -29,7 +29,7 @@ export class AiService {
   ) {
     const models = AI_MODELS.split(',')
     if (models.length === 0) {
-      await this.slack.slackHelper(
+      await this.slack.message(
         {
           title: 'Error',
           body: `AI Models are not configured. Please specify AI models.`,
@@ -97,7 +97,7 @@ export class AiService {
       this.logger.error('Error in utils/ai/llmChatCompletion', error)
       this.logger.error('error response', error?.response)
 
-      await this.slack.errorLoggerHelper('Error in AI completion (raw)', error)
+      await this.slack.errorMessage('Error in AI completion (raw)', error)
     }
 
     if (completion && completion?.content) {
