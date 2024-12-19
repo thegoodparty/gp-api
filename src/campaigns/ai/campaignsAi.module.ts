@@ -4,13 +4,13 @@ import { CampaignsAiController } from './campaignsAi.controller'
 import { ContentModule } from 'src/content/content.module'
 import { AiModule } from 'src/ai/ai.module'
 import { CampaignsModule } from '../campaigns.module'
-import { QueueModule } from 'src/queue/queue.module'
+import { QueueProducerModule } from 'src/queue/producer/producer.module'
 
 @Module({
   imports: [
     ContentModule,
     AiModule,
-    forwardRef(() => QueueModule),
+    QueueProducerModule,
     forwardRef(() => CampaignsModule),
   ],
   controllers: [CampaignsAiController],

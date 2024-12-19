@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
-import { QueueMessage } from './queue.types'
+import { QueueMessage } from '../queue.types'
 import { CampaignsAiService } from 'src/campaigns/ai/campaignsAi.service'
 
 @Injectable()

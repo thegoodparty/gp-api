@@ -11,7 +11,7 @@ import {
 import { AiService } from 'src/ai/ai.service'
 import { AiChatMessage } from 'src/ai/ai.types'
 import { SlackService } from 'src/shared/services/slack.service'
-import { EnqueueService } from 'src/queue/enqueue.service'
+import { EnqueueService } from 'src/queue/producer/enqueue.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 
 @Injectable()
