@@ -8,6 +8,6 @@ import { CampaignPlanVersionsService } from './services/campaignPlanVersions.ser
   imports: [forwardRef(() => CampaignsAiModule)],
   controllers: [CampaignsController],
   providers: [CampaignsService, CampaignPlanVersionsService],
-  exports: [CampaignsService, CampaignPlanVersionsService],
+  exports: [CampaignsService],
 })
 export class CampaignsModule {}

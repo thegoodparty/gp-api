@@ -2,11 +2,14 @@ import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import { QueueMessage } from './queue.types'
+import { CampaignsAiService } from 'src/campaigns/ai/campaignsAi.service'
 
 @Injectable()
 export class ConsumerService {
   private readonly logger = new Logger(ConsumerService.name)
-  constructor() {}
+
+  constructor(private campaignsAiService: CampaignsAiService) {}
+
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
     const shouldRequeue = await this.handleMessageAndMaybeRequeue(message)
@@ -39,12 +42,12 @@ export class ConsumerService {
     }
     const queueMessage: QueueMessage = JSON.parse(body)
 
-    console.log('processing queue message type ', queueMessage.type)
+    this.logger.log('processing queue message type ', queueMessage.type)
 
     switch (queueMessage.type) {
       case 'generateAiContent':
         this.logger.log('received generateAiContent message')
-        //   await handleGenerateAiContent(queueMessage.data)
+        await this.campaignsAiService.handleGenerateAiContent(queueMessage.data)
         break
       case 'pathToVictory':
         this.logger.log('received pathToVictory message')

@@ -1,45 +1,37 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common'
-import { Prisma, User } from '@prisma/client'
+import { Injectable, Logger } from '@nestjs/common'
+import { Campaign } from '@prisma/client'
 import { CampaignsService } from '../services/campaigns.service'
-import { RenameAiContentSchema } from './schemas/RenameAiContent.schema'
 import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/content.service'
 import {
   AiContentGenerationStatus,
-  AiContentInputValues,
-  AiContentVersion,
   CampaignAiContent,
-  CampaignDetails,
   GenerationStatus,
-  CampaignPlanVersionData,
 } from '../campaigns.types'
-import { positionsToStr, againstToStr, replaceAll } from './util/prompt.util'
 import { AiService } from 'src/ai/ai.service'
 import { AiChatMessage } from 'src/ai/ai.types'
-import { CampaignPlanVersionsService } from '../services/campaignPlanVersions.service'
+import { SlackService } from 'src/shared/services/slack.service'
+import { EnqueueService } from 'src/queue/enqueue.service'
+import { camelToSentence } from 'src/shared/util/strings.util'
 
 @Injectable()
 export class CampaignsAiService {
+  private readonly logger = new Logger(CampaignsAiService.name)
+
   constructor(
     private campaignsService: CampaignsService,
-    private campaignPlanVersionsService: CampaignPlanVersionsService,
     private contentService: ContentService,
     private aiService: AiService,
+    private slack: SlackService,
+    private queue: EnqueueService,
   ) {}
 
+  /** function to kickoff ai content generation and enqueue a message to run later */
   async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
     const { key, regenerate, editMode, chat, inputValues } = inputs
 
-    // TODO: integrate with sqs implementation
-    // await sails.helpers.queue.consumer()
-
     const { slug, id } = campaign
-    const aiContent = (campaign.aiContent ?? {}) as CampaignAiContent
+    const aiContent = campaign.aiContent as CampaignAiContent
 
     if (!aiContent.generationStatus) {
       aiContent.generationStatus = {}
@@ -89,19 +81,19 @@ export class CampaignsAiService {
         user: true,
       },
     )
-    prompt = await this.promptReplace(prompt, campaignWithRelations)
+    prompt = await this.aiService.promptReplace(prompt, campaignWithRelations)
     if (!prompt || prompt === '') {
-      // await sails.helpers.slack.errorLoggerHelper('empty prompt replace', {
-      //   cmsPrompt: cmsPrompts[keyNoDigits],
-      //   promptAfterReplace: prompt,
-      //   campaignObj,
-      // })
-      throw new NotFoundException('No prompt found')
+      await this.slack.errorLoggerHelper('empty prompt replace', {
+        cmsPrompt: cmsPrompts[keyNoDigits],
+        promptAfterReplace: prompt,
+        campaign,
+      })
+      throw new Error('No prompt found')
     }
-    // await sails.helpers.slack.aiLoggerHelper('prompt', {
-    //   cmsPrompt: cmsPrompts[keyNoDigits],
-    //   promptAfterReplace: prompt,
-    // })
+    await this.slack.aiLoggerHelper('prompt', {
+      cmsPrompt: cmsPrompts[keyNoDigits],
+      promptAfterReplace: prompt,
+    })
 
     if (!aiContent.generationStatus[key]) {
       aiContent.generationStatus[key] = {} as AiContentGenerationStatus
@@ -113,32 +105,28 @@ export class CampaignsAiService {
     aiContent.generationStatus[key].inputValues = inputValues
     aiContent.generationStatus[key].createdAt = new Date().valueOf()
 
-    // await sails.helpers.slack.slackHelper(
-    //   {
-    //     title: 'Debugging generationStatus',
-    //     body: JSON.stringify(aiContent.generationStatus),
-    //   },
-    //   'dev',
-    // )
+    await this.slack.slackHelper(
+      {
+        title: 'Debugging generationStatus',
+        body: JSON.stringify(aiContent.generationStatus),
+      },
+      'dev',
+    )
 
     try {
       await this.campaignsService.update(campaign.id, {
         aiContent,
       })
     } catch (e) {
-      // await sails.helpers.slack.errorLoggerHelper(
-      //   'Error updating generationStatus',
-      //   {
-      //     aiContent,
-      //     key,
-      //     id,
-      //     success,
-      //   },
-      // )
+      await this.slack.errorLoggerHelper('Error updating generationStatus', {
+        aiContent,
+        key,
+        id,
+        success: false,
+      })
       throw e
     }
 
-    // TODO: enqueue message using SQS queue stuff!!!
     const queueMessage = {
       type: 'generateAiContent',
       data: {
@@ -147,12 +135,8 @@ export class CampaignsAiService {
         regenerate,
       },
     }
-
-    // await sails.helpers.queue.enqueue(queueMessage)
-    // await sails.helpers.slack.aiLoggerHelper('Enqueued AI prompt', queueMessage)
-
-    // why do we call the consumer twice ?
-    // await sails.helpers.queue.consumer()
+    await this.queue.sendMessage(queueMessage)
+    await this.slack.aiLoggerHelper('Enqueued AI prompt', queueMessage)
 
     return {
       status: GenerationStatus.processing,
@@ -161,40 +145,7 @@ export class CampaignsAiService {
     }
   }
 
-  async updateContentName(campaign: Campaign, inputs: RenameAiContentSchema) {
-    const { key, name } = inputs
-
-    const { aiContent } = campaign
-
-    if (!aiContent?.[key]) {
-      throw new BadRequestException('Invalid document key')
-    }
-
-    aiContent[key]['name'] = name
-
-    return this.campaignsService.update(campaign.id, {
-      aiContent,
-    })
-  }
-
-  async deleteContent(campaign: Campaign, aiContentKey: string) {
-    const aiContent = campaign.aiContent as CampaignAiContent
-
-    if (!aiContent || !aiContent[aiContentKey]) {
-      // nothing to delete
-      throw new NotFoundException('Content not found')
-    }
-
-    delete aiContent[aiContentKey]
-    delete aiContent.generationStatus?.[aiContentKey]
-
-    await this.campaignsService.update(campaign.id, {
-      aiContent,
-    })
-
-    return true
-  }
-
+  /** Function used to take a queued message and generate ai content */
   async handleGenerateAiContent(message: {
     slug: string
     key: string
@@ -208,18 +159,16 @@ export class CampaignsAiService {
       aiContent.generationStatus?.[key] || {}
 
     if (!aiContent || !prompt) {
-      // await sails.helpers.slack.slackHelper(
-      //   {
-      //     title: 'Missing prompt',
-      //     body: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${
-      //       campaign?.id
-      //     }. message: ${JSON.stringify(message)}`,
-      //   },
-      //   'dev',
-      // )
-      throw new InternalServerErrorException(
-        `error generating ai content. slug: ${slug}, key: ${key}`,
+      await this.slack.slackHelper(
+        {
+          title: 'Missing prompt',
+          body: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${
+            campaign?.id
+          }. message: ${JSON.stringify(message)}`,
+        },
+        'dev',
       )
+      throw new Error(`error generating ai content. slug: ${slug}, key: ${key}`)
     }
 
     const chat = existingChat || []
@@ -231,10 +180,7 @@ export class CampaignsAiService {
     let generateError = false
 
     try {
-      // await sails.helpers.slack.aiLoggerHelper(
-      //   'handling campaign from queue',
-      //   message,
-      // )
+      await this.slack.aiLoggerHelper('handling campaign from queue', message)
 
       let maxTokens = 2000
       if (existingChat && existingChat.length > 0) {
@@ -251,10 +197,10 @@ export class CampaignsAiService {
       chatResponse = completion.content
       const totalTokens = completion.tokens
 
-      // await sails.helpers.slack.aiLoggerHelper(
-      //   `[ ${slug} - ${key} ] Generation Complete. Tokens Used:`,
-      //   totalTokens,
-      // )
+      await this.slack.aiLoggerHelper(
+        `[ ${slug} - ${key} ] Generation Complete. Tokens Used:`,
+        totalTokens,
+      )
 
       // TODO: figure out if this second load necessary?
       campaign = (await this.campaignsService.findOne({ slug })) || campaign
@@ -279,11 +225,11 @@ export class CampaignsAiService {
           content: chatResponse,
         }
 
-        console.log('saving campaign version', key)
-        console.log('inputValues', inputValues)
-        console.log('oldVersion', oldVersion)
+        this.logger.log('saving campaign version', key)
+        this.logger.log('inputValues', inputValues)
+        this.logger.log('oldVersion', oldVersion)
 
-        await this.saveCampaignVersion({
+        await this.campaignsService.saveCampaignPlanVersion({
           aiContent,
           key,
           campaignId: campaign.id,
@@ -305,45 +251,40 @@ export class CampaignsAiService {
           aiContent.generationStatus[key] = {} as AiContentGenerationStatus
         }
 
-        aiContent.generationStatus[key].status = 'completed'
+        aiContent.generationStatus[key].status = GenerationStatus.completed
 
         await this.campaignsService.update(campaign.id, { aiContent })
 
-        // await sails.helpers.slack.aiLoggerHelper(
-        //   `updated campaign with ai. chatResponse: key: ${key}`,
-        //   chatResponse,
-        // )
+        await this.slack.aiLoggerHelper(
+          `updated campaign with ai. chatResponse: key: ${key}`,
+          chatResponse,
+        )
       }
     } catch (e: any) {
-      console.log('error at consumer', e)
-      console.log('messages', messages)
+      this.logger.error('error at consumer', e)
+      this.logger.error('messages', messages)
       generateError = true
 
       if (e.data) {
-        // TODO: uncomment slack logging when implemented
-        // await sails.helpers.slack.errorLoggerHelper(
-        //   'error at AI queue consumer (with msg): ',
-        //   e.data.error,
-        // )
-        // await sails.helpers.slack.aiLoggerHelper(
-        //   'error at AI queue consumer (with msg): ',
-        //   e.data.error,
-        // )
-        console.log('error', e.data?.error)
+        await this.slack.errorLoggerHelper(
+          'error at AI queue consumer (with msg): ',
+          e.data.error,
+        )
+        await this.slack.aiLoggerHelper(
+          'error at AI queue consumer (with msg): ',
+          e.data.error,
+        )
+        this.logger.error('error', e.data?.error)
       } else {
-        // TODO: uncomment slack logging when implemented
-        // await sails.helpers.slack.errorLoggerHelper(
-        //   'error at AI queue consumer. Queue Message: ',
-        //   message,
-        // )
-        // await sails.helpers.slack.errorLoggerHelper(
-        //   'error at AI queue consumer debug: ',
-        //   e,
-        // )
-        // await sails.helpers.slack.aiLoggerHelper(
-        //   'error at AI queue consumer debug: ',
-        //   e,
-        // )
+        await this.slack.errorLoggerHelper(
+          'error at AI queue consumer. Queue Message: ',
+          message,
+        )
+        await this.slack.errorLoggerHelper(
+          'error at AI queue consumer debug: ',
+          e,
+        )
+        await this.slack.aiLoggerHelper('error at AI queue consumer debug: ', e)
       }
     }
 
@@ -363,502 +304,40 @@ export class CampaignsAiService {
           ? aiContent.campaignPlanAttempts[key] + 1
           : 1
 
-        // await sails.helpers.slack.aiLoggerHelper(
-        //   'Current Attempts:',
-        //   aiContent.campaignPlanAttempts[key],
-        // )
+        await this.slack.aiLoggerHelper(
+          'Current Attempts:',
+          aiContent.campaignPlanAttempts[key],
+        )
 
         // After 3 attempts, we give up.
         if (
           aiContent.generationStatus?.[key]?.status &&
-          aiContent.generationStatus[key].status !== 'completed' &&
+          aiContent.generationStatus[key].status !==
+            GenerationStatus.completed &&
           aiContent.campaignPlanAttempts[key] >= 3
         ) {
-          // await sails.helpers.slack.aiLoggerHelper(
-          //   'Deleting generationStatus for key',
-          //   key,
-          // )
+          await this.slack.aiLoggerHelper(
+            'Deleting generationStatus for key',
+            key,
+          )
           delete aiContent.generationStatus[key]
         }
         await this.campaignsService.update(campaign.id, { aiContent })
       } catch (e) {
-        // await sails.helpers.slack.aiLoggerHelper(
-        //   'Error at consumer updating campaign with ai.',
-        //   key,
-        //   e,
-        // )
-        // await sails.helpers.slack.errorLoggerHelper(
-        //   'Error at consumer updating campaign with ai.',
-        //   key,
-        //   e,
-        // )
-        console.log('error at consumer', e)
+        await this.slack.aiLoggerHelper(
+          'Error at consumer updating campaign with ai.',
+          key,
+          e,
+        )
+        await this.slack.errorLoggerHelper(
+          'Error at consumer updating campaign with ai.',
+          key,
+          e,
+        )
+        this.logger.error('error at consumer', e)
       }
       // throw an Error so that the message goes back to the queue or the DLQ.
-      throw new InternalServerErrorException(
-        `error generating ai content. slug: ${slug}, key: ${key}`,
-      )
+      throw new Error(`error generating ai content. slug: ${slug}, key: ${key}`)
     }
   }
-
-  private async saveCampaignVersion(inputs: {
-    aiContent: CampaignAiContent
-    key: string
-    campaignId: number
-    inputValues?: AiContentInputValues | AiContentInputValues[]
-    regenerate: boolean
-    oldVersion: { date: Date; text: string }
-  }) {
-    const { aiContent, key, campaignId, inputValues, oldVersion, regenerate } =
-      inputs
-
-    // we determine language by examining inputValues and tag it on the version.
-    let language = 'English'
-    if (Array.isArray(inputValues) && inputValues.length > 0) {
-      inputValues.forEach((inputValue) => {
-        if (inputValue?.language) {
-          language = inputValue.language as string
-        }
-      })
-    }
-
-    const newVersion = {
-      date: new Date().toString(),
-      text: aiContent[key].content,
-      // if new inputValues are specified we use those
-      // otherwise we use the inputValues from the prior generation.
-      inputValues:
-        Array.isArray(inputValues) && inputValues.length > 0
-          ? inputValues
-          : aiContent[key]?.inputValues,
-      language: language,
-    }
-
-    const existingVersions =
-      await this.campaignPlanVersionsService.findByCampaignId(campaignId)
-
-    let versions = {}
-    if (existingVersions) {
-      versions = existingVersions?.data as CampaignPlanVersionData
-    }
-
-    let foundKey = false
-    if (!versions[key]) {
-      versions[key] = []
-    } else {
-      foundKey = true
-    }
-
-    // determine if we should update the current version or add a new one.
-    // if regenerate is true, we should always add a new version.
-    // if regenerate is false and its been less than 5 minutes since the last generation
-    // we should update the existing version.
-
-    let updateExistingVersion = false
-    if (regenerate === false && foundKey === true && versions[key].length > 0) {
-      const lastVersion = versions[key][0] as AiContentVersion
-      const lastVersionDate = new Date(lastVersion?.date || 0)
-      const now = new Date()
-      const diff = now.getTime() - lastVersionDate.getTime()
-      if (diff < 300000) {
-        updateExistingVersion = true
-      }
-    }
-
-    if (updateExistingVersion === true) {
-      for (let i = 0; i < versions[key].length; i++) {
-        const version = versions[key][i]
-        if (
-          JSON.stringify(version.inputValues) === JSON.stringify(inputValues)
-        ) {
-          // this version already exists. lets update it.
-          versions[key][i].text = newVersion.text
-          versions[key][i].date = new Date().toString()
-          break
-        }
-      }
-    }
-
-    if (!foundKey && oldVersion) {
-      console.log(`no key found for ${key} yet we have oldVersion`)
-      // here, we determine if we need to save an older version of the content.
-      // because in the past we didn't create a Content version for every new generation.
-      // otherwise if they translate they won't have the old version to go back to.
-      versions[key].push(oldVersion)
-    }
-
-    if (updateExistingVersion === false) {
-      console.log('adding new version')
-      // add new version to the top of the list.
-      const length = versions[key].unshift(newVersion)
-      if (length > 10) {
-        versions[key].length = 10
-      }
-    }
-
-    if (existingVersions) {
-      await this.campaignPlanVersionsService.update(campaignId, {
-        data: versions,
-      })
-    } else {
-      await this.campaignPlanVersionsService.create({
-        campaignId: campaignId,
-        data: versions,
-      })
-    }
-
-    return true
-  }
-
-  private async promptReplace(
-    prompt: string,
-    campaign: Prisma.CampaignGetPayload<{
-      include: {
-        pathToVictory: true
-        campaignPositions: {
-          include: {
-            topIssue: true
-            position: true
-          }
-        }
-        campaignUpdateHistory: true
-        user: true
-      }
-    }>,
-  ) {
-    try {
-      let newPrompt = prompt
-
-      const campaignPositions = campaign.campaignPositions
-      const user = campaign.user as User
-
-      const name = user.name || `${user.firstName} ${user.lastName}`
-      const details = (campaign.details || {}) as CampaignDetails
-
-      const positionsStr = positionsToStr(
-        campaignPositions,
-        details.customIssues,
-      )
-      let party =
-        details.party === 'Other' ? details.otherParty : details?.party
-      if (party === 'Independent') {
-        party = 'Independent / non-partisan'
-      }
-      const office =
-        details.office === 'Other' ? details.otherOffice : details?.office
-
-      const replaceArr = [
-        {
-          find: 'name',
-          replace: name,
-        },
-        {
-          find: 'zip',
-          replace: details.zip,
-        },
-        {
-          find: 'website',
-          replace: details.website,
-        },
-        {
-          find: 'party',
-          replace: party,
-        },
-        {
-          find: 'state',
-          replace: details.state,
-        },
-        {
-          find: 'primaryElectionDate',
-          replace: details.primaryElectionDate,
-        },
-        {
-          find: 'district',
-          replace: details.district,
-        },
-        {
-          find: 'office',
-          replace: `${office}${
-            details.district ? ` in ${details.district}` : ''
-          }`,
-        },
-        {
-          find: 'positions',
-          replace: positionsStr,
-        },
-        {
-          find: 'pastExperience',
-          replace:
-            typeof details.pastExperience === 'string'
-              ? details.pastExperience
-              : JSON.stringify(details.pastExperience || {}),
-        },
-        {
-          find: 'occupation',
-          replace: details.occupation,
-        },
-        {
-          find: 'funFact',
-          replace: details.funFact,
-        },
-        {
-          find: 'campaignCommittee',
-          replace: details.campaignCommittee || 'unknown',
-        },
-      ]
-      const againstStr = againstToStr(details.runningAgainst)
-      replaceArr.push(
-        {
-          find: 'runningAgainst',
-          replace: againstStr,
-        },
-        {
-          find: 'electionDate',
-          replace: details.electionDate,
-        },
-        {
-          find: 'statementName',
-          replace: details.statementName,
-        },
-      )
-
-      const pathToVictory = campaign.pathToVictory
-
-      if (pathToVictory) {
-        const {
-          projectedTurnout,
-          winNumber,
-          republicans,
-          democrats,
-          indies,
-          averageTurnout,
-          allAvailVoters,
-          availVotersTo35,
-          women,
-          men,
-          africanAmerican,
-          white,
-          asian,
-          hispanic,
-          voteGoal,
-          voterProjection,
-          totalRegisteredVoters,
-          budgetLow,
-          budgetHigh,
-        } = pathToVictory.data as Record<string, any> // TODO: better type here!!
-        replaceArr.push(
-          {
-            find: 'pathToVictory',
-            replace: JSON.stringify(pathToVictory.data),
-          },
-          {
-            find: 'projectedTurnout',
-            replace: projectedTurnout,
-          },
-          {
-            find: 'totalRegisteredVoters',
-            replace: totalRegisteredVoters,
-          },
-          {
-            find: 'winNumber',
-            replace: winNumber,
-          },
-          {
-            find: 'republicans',
-            replace: republicans,
-          },
-          {
-            find: 'democrats',
-            replace: democrats,
-          },
-          {
-            find: 'indies',
-            replace: indies,
-          },
-          {
-            find: 'averageTurnout',
-            replace: averageTurnout,
-          },
-          {
-            find: 'allAvailVoters',
-            replace: allAvailVoters,
-          },
-          {
-            find: 'availVotersTo35',
-            replace: availVotersTo35,
-          },
-          {
-            find: 'women',
-            replace: women,
-          },
-          {
-            find: 'men',
-            replace: men,
-          },
-          {
-            find: 'africanAmerican',
-            replace: africanAmerican,
-          },
-          {
-            find: 'white',
-            replace: white,
-          },
-          {
-            find: 'asian',
-            replace: asian,
-          },
-          {
-            find: 'hispanic',
-            replace: hispanic,
-          },
-          {
-            find: 'voteGoal',
-            replace: voteGoal,
-          },
-          {
-            find: 'voterProjection',
-            replace: voterProjection,
-          },
-          {
-            find: 'budgetLow',
-            replace: budgetLow,
-          },
-          {
-            find: 'budgetHigh',
-            replace: budgetHigh,
-          },
-        )
-      }
-
-      if (newPrompt.includes('[[updateHistory]]')) {
-        const updateHistoryObjects = campaign.campaignUpdateHistory
-
-        const twoWeeksAgo = new Date()
-        const thisWeek = new Date()
-        thisWeek.setDate(thisWeek.getDate() - 7)
-        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
-
-        const updateHistory = {
-          allTime: {
-            total: 0,
-            doorKnocking: 0,
-            digitalAds: 0,
-            calls: 0,
-            yardSigns: 0,
-            events: 0,
-            text: 0,
-            directMail: 0,
-          },
-          thisWeek: {
-            total: 0,
-            doorKnocking: 0,
-            digitalAds: 0,
-            calls: 0,
-            yardSigns: 0,
-            events: 0,
-            text: 0,
-            directMail: 0,
-          },
-          lastWeek: {
-            total: 0,
-            doorKnocking: 0,
-            digitalAds: 0,
-            calls: 0,
-            yardSigns: 0,
-            events: 0,
-            text: 0,
-            directMail: 0,
-          },
-        }
-
-        if (updateHistoryObjects) {
-          for (const update of updateHistoryObjects) {
-            updateHistory.allTime[update.type] += update.quantity
-            updateHistory.allTime.total += update.quantity
-            if (update.createdAt > thisWeek) {
-              updateHistory.thisWeek[update.type] += update.quantity
-              updateHistory.thisWeek.total += update.quantity
-            }
-            if (update.createdAt > twoWeeksAgo && update.createdAt < thisWeek) {
-              updateHistory.lastWeek[update.type] += update.quantity
-              updateHistory.lastWeek.total += update.quantity
-            }
-          }
-        }
-        replaceArr.push({
-          find: 'updateHistory',
-          replace: JSON.stringify(updateHistory),
-        })
-      }
-
-      if (campaign.aiContent) {
-        const {
-          aboutMe,
-          communicationStrategy,
-          messageBox,
-          mobilizing,
-          policyPlatform,
-          slogan,
-          why,
-        } = campaign.aiContent as CampaignAiContent
-        replaceArr.push(
-          {
-            find: 'slogan',
-            replace: slogan?.content,
-          },
-          {
-            find: 'why',
-            replace: why?.content,
-          },
-          {
-            find: 'about',
-            replace: aboutMe?.content,
-          },
-          {
-            find: 'myPolicies',
-            replace: policyPlatform?.content,
-          },
-          {
-            find: 'commStart',
-            replace: communicationStrategy?.content,
-          },
-          {
-            find: 'mobilizing',
-            replace: mobilizing?.content,
-          },
-          {
-            find: 'positioning',
-            replace: messageBox?.content,
-          },
-        )
-      }
-
-      replaceArr.forEach((item) => {
-        try {
-          newPrompt = replaceAll(
-            newPrompt,
-            item.find,
-            item.replace ? item.replace.toString().trim() : '',
-          )
-        } catch (e) {
-          console.log('error at prompt replace', e)
-        }
-      })
-
-      newPrompt += `\n
-        
-      `
-
-      return newPrompt
-    } catch (e) {
-      console.log('Error in helpers/ai/promptReplace', e)
-      //TODO: surface relevant error here
-      return ''
-    }
-  }
-}
-
-const camelToSentence = (text) => {
-  const result = text.replace(/([A-Z])/g, ' $1')
-  return result.charAt(0).toUpperCase() + result.slice(1)
 }

@@ -17,6 +17,7 @@ import { JwtAuthGuard } from './authentication/guards/JwtAuth.guard'
 import { AdminModule } from './admin/admin.module'
 import { QueueModule } from './queue/queue.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
+import { SharedModule } from './shared/shared.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { TopIssuesModule } from './topIssues/topIssues.module'
     TopIssuesModule,
     AdminModule,
     QueueModule,
+    SharedModule,
   ],
   controllers: [AppController],
   providers: [
