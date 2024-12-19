@@ -14,8 +14,9 @@ import { UsersModule } from './users/users.module'
 import { RacesModule } from './races/races.module'
 import { JwtAuthStrategy } from './authentication/auth-strategies/JwtAuth.strategy'
 import { JwtAuthGuard } from './authentication/guards/JwtAuth.guard'
-import { TopIssuesModule } from './topIssues/topIssues.module'
 import { AdminModule } from './admin/admin.module'
+import { QueueModule } from './queue/queue.module'
+import { TopIssuesModule } from './topIssues/topIssues.module'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AdminModule } from './admin/admin.module'
     RacesModule,
     TopIssuesModule,
     AdminModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [
