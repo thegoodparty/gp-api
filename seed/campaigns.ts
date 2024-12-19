@@ -3,8 +3,7 @@ import { campaignFactory } from './factories/campaign.factory'
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { userFactory } from './factories/user.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
-import { buildSlug } from 'src/shared/util/slug.util'
-import { getFullName } from 'src/users/util/users.util'
+import { genSalt, genSaltSync, hash, hashSync } from 'bcrypt'
 
 const NUM_CAMPAIGNS = 20
 const NUM_UPDATE_HISTORY = 3
@@ -25,10 +24,7 @@ export default async function seedCampaigns(prisma: PrismaClient) {
       user = userFactory()
       fakeUsers.push(user)
     }
-    const camp = campaignFactory({
-      userId: user.id,
-      slug: buildSlug(getFullName(user)),
-    })
+    const camp = campaignFactory({ userId: user.id })
 
     campaignIds.push(camp.id)
     fakeCampaigns.push(camp)

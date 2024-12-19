@@ -7,22 +7,20 @@ enum LevelType {
 
 model Race {
   id             Int           @id @default(autoincrement())
-  ballotId       String        @unique @map("ballot_id")
-  ballotHashId   String?       @map("ballot_hash_id")
-  hashId         String        @unique @map("hash_id")
-  positionSlug   String        @map("position_slug")
+  ballotId       String        @unique
+  ballotHashId   String?
+  hashId         String        @unique
+  positionSlug   String
   state          String        @db.Char(2)
-  electionDate   DateTime?     @map("election_date")
+  electionDate   DateTime?
   level          LevelType
-  subAreaName    String        @map("sub_area_name")
-  subAreaValue   String        @map("sub_area_value")
+  subAreaName    String
+  subAreaValue   String
   data           Json          @default("{}") @db.JsonB
   county         County?       @relation(fields: [countyId], references: [id])
-  countyId       Int?          @map("county_id")
+  countyId       Int?
   municipality   Municipality? @relation(fields: [municipalityId], references: [id])
-  municipalityId Int?          @map("municipality_id")
-
-  @@map("race")
+  municipalityId Int?
 }
 
 model County {
@@ -33,8 +31,6 @@ model County {
   data           Json?          @default("{}") @db.JsonB
   municipalities Municipality[]
   races          Race[]
-
-  @@map("county")
 }
 
 enum MunicipalityType {
@@ -52,8 +48,6 @@ model Municipality {
   state    String           @db.Char(2)
   data     Json?            @default("{}") @db.JsonB
   county   County?          @relation(fields: [countyId], references: [id])
-  countyId Int?             @map("county_id")
+  countyId Int?
   races    Race[]
-
-  @@map("municipality")
 }

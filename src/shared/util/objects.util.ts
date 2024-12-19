@@ -9,11 +9,6 @@ export function flip(obj: Record<any, any>): Record<any, any> {
   return ret
 }
 
-/** helper to check if a value is an object */
-export function isObject(value: unknown): value is object {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 /** Deep merge two objects */
 export function deepMerge(obj1: object, obj2: object) {
   const result = { ...obj1 } // Create a new object to avoid modifying the originals

@@ -33,10 +33,10 @@ export class CampaignsController {
     return this.campaignsService.findAll(query)
   }
 
-  @Get('mine')
-  findUserCampaign(@ReqUser() user: User) {
-    return this.campaignsService.findByUser(user.id, { pathToVictory: true })
-  }
+  // @Get('mine')
+  // async findUserCampaign() {
+  // TODO: query campaign for current user
+  // }
 
   @UseGuards(CampaignOwnersOrAdminGuard)
   @Get(':id')
@@ -73,7 +73,7 @@ export class CampaignsController {
     @Body() body: UpdateCampaignSchema,
   ) {
     // TODO get campaign from req user
-    const updateResp = await this.campaignsService.updateJsonFields(id, body)
+    const updateResp = await this.campaignsService.update(id, body)
 
     if (updateResp === false) throw new NotFoundException()
     return updateResp

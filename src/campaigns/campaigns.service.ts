@@ -6,6 +6,7 @@ import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
+import { Campaign } from './campaigns.types'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -49,29 +50,25 @@ export class CampaignsService {
     // }).populate('user');
     // campaigns = attachTeamMembers(campaigns, campaignVolunteersMapping)
 
-    return campaigns
+    return campaigns as Campaign[]
   }
 
-  findOne<T extends Prisma.CampaignInclude>(
+  findOne(
     where: Prisma.CampaignWhereInput,
-    include: T = {
+    include: Prisma.CampaignInclude = {
       pathToVictory: true,
-    } as any, // TODO: figure out how to properly type this default instead of using any
+    },
   ) {
     return this.prismaService.campaign.findFirst({
       where,
       include,
-    }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+    }) as Promise<Campaign>
   }
 
-  findByUser<T extends Prisma.CampaignInclude>(
-    userId: Prisma.CampaignWhereInput['userId'],
-    include?: T,
-  ) {
+  findByUser(userId: Prisma.CampaignWhereInput['userId']) {
     return this.prismaService.campaign.findFirstOrThrow({
       where: { userId },
-      include,
-    }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+    }) as Promise<Campaign>
   }
 
   async create(campaignData: CreateCampaignSchema, user: User) {
@@ -111,14 +108,10 @@ export class CampaignsService {
     // await claimExistingCampaignRequests(user, newCampaign)
     // await createCrmUser(user.firstName, user.lastName, user.email)
 
-    return newCampaign
+    return newCampaign as Campaign
   }
 
-  async update(id: number, data: Prisma.CampaignUpdateArgs['data']) {
-    return this.prismaService.campaign.update({ where: { id }, data })
-  }
-
-  async updateJsonFields(id: number, body: UpdateCampaignSchema) {
+  async update(id: number, body: UpdateCampaignSchema) {
     const { data, details, pathToVictory } = body
 
     return this.prismaService.$transaction(async (tx) => {
@@ -173,7 +166,7 @@ export class CampaignsService {
         where: { id: campaign.id },
         data: updateData,
         include: { pathToVictory: true },
-      })
+      }) as Promise<Campaign>
     })
   }
 }
