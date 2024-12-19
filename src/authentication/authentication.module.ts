@@ -10,6 +10,7 @@ import { RolesGuard } from './guards/Roles.guard'
 import { LocalStrategy } from './auth-strategies/local.strategy'
 import { EmailModule } from 'src/email/email.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
+import { SocialLoginStrategy } from './auth-strategies/SocialLogin.strategy'
 
 const JWT_EXPIRATION = '1y'
 
@@ -24,6 +25,7 @@ if (!process.env.AUTH_SECRET) {
   providers: [
     AuthenticationService,
     LocalStrategy,
+    SocialLoginStrategy,
     JwtAuthStrategy,
     {
       provide: APP_GUARD,

@@ -49,6 +49,14 @@ export class UsersController {
   }
 
   @UseGuards(UserOwnerOrAdminGuard)
+  @Get('me')
+  async findMe(@ReqUser() user: User) {
+    return ReadUserOutputSchema.parse(
+      await this.usersService.findUser({ id: user.id }),
+    )
+  }
+
+  @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
   @HttpCode(204)
   async delete(@Param('id') id: string) {
