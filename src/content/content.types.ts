@@ -164,6 +164,7 @@ type BlogArticleBanner = {
 }
 
 export type BlogArticleContentRaw = ContentRaw<{
+  type: 'blogArticle';
   data: {
     body: Block | Inline
     author: BlogArticleAuthorRaw
@@ -233,6 +234,43 @@ export type BlogArticleTag = {
 }
 
 export type BlogArticlesTagsMap = Map<string, BlogArticleTag>
+
+export type BlogSectionRaw = {
+  id: string;
+  type: 'blogSection'
+  sys: {
+    id: string;
+  }
+  data: {
+    slug: string;
+    order: number;
+    title: string;
+    subtitle: string;
+  }
+}
+
+export type BlogSections = {
+  fields: {
+    title: string;
+    subtitle: string;
+    slug: string;
+    order: number;
+  }
+  id: string;
+  slug: string;
+  tags: [];
+  articles: BlogArticleHighlight[];
+  order: number
+}
+
+type BlogArticleHighlight = {
+  title: string;
+  id: string;
+  mainImage: ImageClean;
+  publishDate: string;
+  slug: string;
+  summary: string;
+}
 
 export type ContentMedia = {
   url: string

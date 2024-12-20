@@ -16,6 +16,7 @@ import { goodPartyTeamMembersTransformer } from './transformers/goodPartyTeamMem
 import { termsOfServiceTransformer } from './transformers/termsOfServiceTransformer'
 import { redirectsTransformer } from './transformers/redirectsTransformer'
 import { blogHomeTransformer } from './transformers/blogHomeTransformer'
+import { blogSectionsTransformer } from './transformers/blogSectionsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -25,6 +26,7 @@ export enum InferredContentTypes {
   aiChatPrompts = 'aiChatPrompts',
   articleCategories = 'articleCategories',
   candidateTestimonials = 'candidateTestimonials',
+  blogSections = 'blogSections'
 }
 
 export const CONTENT_TYPE_MAP: {
@@ -74,7 +76,15 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.blogHome, 
     transformer: blogHomeTransformer
   },
-  blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
+  blogSection: { 
+    name: ContentType.blogSection, 
+    transformer: noOpTransformer, // No transformation needed
+  },
+  blogSections: {
+    name: InferredContentTypes.blogSections,
+    transformer: blogSectionsTransformer,
+    inferredFrom: [ContentType.blogSection, ContentType.blogArticle]
+  },
   candidateContentPrompts: {
     name: InferredContentTypes.candidateContentPrompts,
     transformer: candidateContentPromptsTransformer,
