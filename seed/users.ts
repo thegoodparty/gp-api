@@ -25,7 +25,6 @@ const FIXED_USERS: Partial<User>[] = [
   ADMIN_USER,
   SALES_USER,
   {
-    id: 1,
     firstName: 'Homer',
     lastName: 'Simpson',
     email: 'HomerSimpson@gmail.com',

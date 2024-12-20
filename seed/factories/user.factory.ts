@@ -11,7 +11,6 @@ export const userFactory = generateFactory<User>(() => {
   const lastName = faker.person.lastName()
   const name = `${firstName} ${lastName}`
   return {
-    id: faker.number.int({ max: 2147483647 }),
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
     firstName,

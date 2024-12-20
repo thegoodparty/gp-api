@@ -48,6 +48,13 @@ export class UsersController {
     return ReadUserOutputSchema.parse(dbUser)
   }
 
+  @Get('me')
+  async findMe(@ReqUser() user: User) {
+    return ReadUserOutputSchema.parse(
+      await this.usersService.findUser({ id: user.id }),
+    )
+  }
+
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
   @HttpCode(204)

@@ -22,7 +22,7 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
   ): Promise<User> {
     const { email: validatedEmail, password: validatedPassword } =
       LoginPayloadSchema.parse({ email, password })
-    return this.authenticationService.validateUser(
+    return this.authenticationService.validateUserByEmailAndPassword(
       validatedEmail,
       validatedPassword,
     )
