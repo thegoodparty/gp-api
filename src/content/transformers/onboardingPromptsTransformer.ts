@@ -1,14 +1,13 @@
 import {
   Transformer,
   OnboardingPromptsAugmented,
-  OnboardingPromptsRaw
-} from '../content.types';
+  OnboardingPromptsRaw,
+} from '../content.types'
 
 export const onboardingPromptsTransformer: Transformer<
   OnboardingPromptsRaw,
   OnboardingPromptsAugmented
-> = (prompts: OnboardingPromptsRaw[]): OnboardingPromptsAugmented[] => {
-  return prompts.map((prompt) => ({
-    ...prompt.data
+> = (prompts: OnboardingPromptsRaw[]): OnboardingPromptsAugmented[] =>
+  prompts.map((prompt) => ({
+    ...prompt.data,
   }))
-}

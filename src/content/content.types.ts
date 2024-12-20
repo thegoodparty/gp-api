@@ -18,28 +18,28 @@ export interface ImageRaw {
 }
 
 export type AIContentTemplateRaw = {
-  createdAt: Date,
-  updatedAt: Date,
-  id: string,
-  type: string,
+  createdAt: Date
+  updatedAt: Date
+  id: string
+  type: string
   data: {
-    name: string,
-    content: string,
+    name: string
+    content: string
     category: {
       fields: {
-        order: number,
-        title: string,
+        order: number
+        title: string
       }
-    },
+    }
     requiresAdditionalQuestions: boolean
   }
 }
 
 export type AIChatPrompt = {
-  createdAt: Date,
-  updatedAt: Date,
-  id: string,
-  type: string,
+  createdAt: Date
+  updatedAt: Date
+  id: string
+  type: string
   data: AIChatPromptContents
 }
 
@@ -48,44 +48,44 @@ export type AIChatPrompts = {
 }
 
 export type AIChatPromptContents = {
-  name: string;
-  systemPrompt: string;
-  initialPrompt: string;
-  candidateJson: object;
+  name: string
+  systemPrompt: string
+  initialPrompt: string
+  candidateJson: object
 }
 
 export type AIChatPromptContentsWithId = AIChatPromptContents & {
-  id: number;
+  id: number
 }
 
 export type AIContentTemplateAugmented = {
-  id: string;
-  name: string;
-  content: string;
+  id: string
+  name: string
+  content: string
   category: {
-    title: string;
-    order: number;
-  };
-  requiresAdditionalQuestions: boolean;
+    title: string
+    order: number
+  }
+  requiresAdditionalQuestions: boolean
 }
 
 export type CandidateContentPrompts = {
-  [key: string]: string; // Multiple entries of key: templateName, value: templateBody (names I made up)
+  [key: string]: string // Multiple entries of key: templateName, value: templateBody (names I made up)
 }
 
 export type ContentPromptsQuestions = {
-  [key: string]: boolean; // Multiple entries of key: templateName, value: boolean
+  [key: string]: boolean // Multiple entries of key: templateName, value: boolean
 }
 
 export type AIContentCategories = {
-  name: string;
-  templates: AIContentCategoriesTemplateEntry[];
-  order: number;
+  name: string
+  templates: AIContentCategoriesTemplateEntry[]
+  order: number
 }
 
 export type AIContentCategoriesTemplateEntry = {
-  key: string;
-  name: string;
+  key: string
+  name: string
 }
 
 export type BlogArticleAuthorFieldsRaw = {
@@ -198,9 +198,11 @@ export type ContentMedia = {
   }
 }
 
-export type ContentRaw<T extends object = {}> = Content & { data: object } & T
+export type ContentRaw<T extends object = object> = Content & {
+  data: object
+} & T
 
-export type ContentAugmented<T extends object = {}> = T
+export type ContentAugmented<T extends object = object> = T
 
 export type FaqArticleCategoryRaw = {
   sys: {
@@ -213,35 +215,35 @@ export type FaqArticleCategoryRaw = {
 }
 
 export type OnboardingPromptsAugmented = {
-  slogan: string;
-  why: string;
-  aboutMe: string;
-  policyPlatform: string;
-  communicationsStrategy: string;
-  messageBox: string;
-  pathToVictory: string;
-  mobilizing: string;
-  getOutTheVote: string;
-  operationalPlan: string;
-  timeline: string;
-  searchForOffice: string;
+  slogan: string
+  why: string
+  aboutMe: string
+  policyPlatform: string
+  communicationsStrategy: string
+  messageBox: string
+  pathToVictory: string
+  mobilizing: string
+  getOutTheVote: string
+  operationalPlan: string
+  timeline: string
+  searchForOffice: string
 }
 
 export type OnboardingPromptsRaw = {
-  createdAt: Date;
-  updatedAt: Date;
-  id: number;
-  type: string;
+  createdAt: Date
+  updatedAt: Date
+  id: number
+  type: string
   data: OnboardingPromptsAugmented
 }
 
 export type PromptInputFieldsRaw = {
-  createdAt: Date,
-  updatedAt: Date,
-  id: number,
-  type: string,
+  createdAt: Date
+  updatedAt: Date
+  id: number
+  type: string
   data: {
-    fieldId: string;
+    fieldId: string
     contentInput: ContentInput[]
   }
 }
@@ -251,14 +253,13 @@ export type ContentInput = {
 }
 
 export type PromptInputQuestion = {
-  title: string;
-  helperText: string;
+  title: string
+  helperText: string
 }
 
 export type PromptInputFieldsAugmented = {
   [key: string]: PromptInputQuestion[]
 }
-
 
 type FaqArticleContentRawData = {
   data: {

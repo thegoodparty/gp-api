@@ -26,20 +26,18 @@ const CALLS = 8
 @Injectable()
 export class ContentfulService {
   async getAllEntries() {
-    const allEntryCollections: EntryCollection<EntrySkeletonType>[] = [];
+    const allEntryCollections: EntryCollection<EntrySkeletonType>[] = []
     for (let i = 0; i < CALLS; i++) {
       const entryCollection = await contentfulClient.getEntries({
         limit: LIMIT,
         include: 5,
         skip: i * LIMIT,
-      });
-      allEntryCollections.push(entryCollection);
+      })
+      allEntryCollections.push(entryCollection)
     }
-    const allEntries = allEntryCollections.reduce((acc, entryCollection) => {
+    return allEntryCollections.reduce((acc, entryCollection) => {
       return [...acc, ...entryCollection.items]
     }, [] as Entry[])
-
-    return allEntries;
   }
 
   async getSync(): Promise<{
@@ -52,10 +50,8 @@ export class ContentfulService {
       })
     nextSyncToken = newToken as string
 
-    const allEntries = await this.getAllEntries();
-
     return {
-      allEntries: allEntries,
+      allEntries: await this.getAllEntries(),
       deletedEntries,
     }
   }
@@ -64,4 +60,3 @@ export class ContentfulService {
     return await contentfulClient.getEntry(id)
   }
 }
-

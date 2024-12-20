@@ -1,22 +1,17 @@
-import {
-  Transformer,
-  AIChatPrompt,
-  AIChatPrompts,
-} from '../content.types';
+import { Transformer, AIChatPrompt, AIChatPrompts } from '../content.types'
 
 export const aiChatPromptsTransformer: Transformer<
   AIChatPrompt,
   AIChatPrompts
 > = (prompts: AIChatPrompt[]): AIChatPrompts[] => {
-  const aiChatPrompts = {};
+  const aiChatPrompts = {}
 
-  for (let i = 0; i < prompts.length; i++) {
-    const prompt = prompts[i];
-    const { name } = prompt.data;
+  for (const prompt of prompts) {
+    const { name } = prompt.data
     aiChatPrompts[name] = {
       ...prompt.data,
-      id: prompt.id
+      id: prompt.id,
     }
   }
-  return [aiChatPrompts];
+  return [aiChatPrompts]
 }
