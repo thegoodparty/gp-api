@@ -3,7 +3,6 @@ import { faker } from '@faker-js/faker'
 import { STATE_CODES } from '../../src/shared/constants/states'
 import { LEVELS } from '../../src/shared/constants/governmentLevels'
 import { generateFactory } from './generate'
-import { GenerationStatus } from 'src/campaigns/campaigns.types'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.past()
