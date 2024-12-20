@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import { QueueMessage } from '../queue.types'
-import { CampaignsAiService } from 'src/campaigns/ai/campaignsAi.service'
+import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 
 @Injectable()
 export class ConsumerService {
   private readonly logger = new Logger(ConsumerService.name)
 
-  constructor(private campaignsAiService: CampaignsAiService) {}
+  constructor(private aiContentService: AiContentService) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
@@ -47,7 +47,7 @@ export class ConsumerService {
     switch (queueMessage.type) {
       case 'generateAiContent':
         this.logger.log('received generateAiContent message')
-        await this.campaignsAiService.handleGenerateAiContent(queueMessage.data)
+        await this.aiContentService.handleGenerateAiContent(queueMessage.data)
         break
       case 'pathToVictory':
         this.logger.log('received pathToVictory message')
