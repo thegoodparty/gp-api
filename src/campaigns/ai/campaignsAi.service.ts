@@ -215,7 +215,7 @@ export class CampaignsAiService {
             date: new Date().toString(),
             text: oldVersionData.content,
           }
-        } catch (e) {
+        } catch (_e) {
           // dont warn because this is expected to fail sometimes.
           // console.log('error getting old version', e);
         }
