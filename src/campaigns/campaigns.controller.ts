@@ -32,7 +32,7 @@ export class CampaignsController {
     return this.campaignsService.findAll(query)
   }
 
-  @Get('user') // campaign/get.js
+  @Get('mine') // campaign/get.js
   @UseCampaign()
   async findOne(@ReqCampaign() campaign: Campaign) {
     return campaign
@@ -58,7 +58,7 @@ export class CampaignsController {
     return await this.campaignsService.create(user)
   }
 
-  @Put('user') // campaign/update.js
+  @Put('mine') // campaign/update.js
   @UseCampaign({ continueIfNotFound: true })
   async update(
     @ReqUser() user: User,

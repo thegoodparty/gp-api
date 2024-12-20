@@ -1,5 +1,5 @@
 import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common'
-import { UserCampaignGuard } from '../guards/UserCampaign.guard'
+import { UseCampaignGuard } from '../guards/UseCampaign.guard'
 import { Prisma } from '@prisma/client'
 
 export const REQUIRE_CAMPAIGN_META_KEY = 'requireCampaignDecorator'
@@ -17,6 +17,6 @@ export type RequireCamapaignMetadata = {
 export const UseCampaign = (args: RequireCamapaignMetadata = {}) => {
   return applyDecorators(
     SetMetadata(REQUIRE_CAMPAIGN_META_KEY, args),
-    UseGuards(UserCampaignGuard),
+    UseGuards(UseCampaignGuard),
   )
 }

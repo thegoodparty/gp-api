@@ -15,10 +15,10 @@ import {
 @Injectable()
 /**
  * Restrict an endpoint to require user to have a campaign
- * Do not need to apply this directly, use the "@RequireCampaign" decorator
+ * Do not need to apply this directly, use the "@UseCampaign" decorator
  * */
-export class UserCampaignGuard implements CanActivate {
-  private readonly logger = new Logger(UserCampaignGuard.name)
+export class UseCampaignGuard implements CanActivate {
+  private readonly logger = new Logger(UseCampaignGuard.name)
 
   constructor(
     private campaignsService: CampaignsService,
