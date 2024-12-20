@@ -55,7 +55,7 @@ export type AIChatPromptContents = {
 }
 
 export type AIChatPromptContentsWithId = AIChatPromptContents & {
-  id: number
+  id: string
 }
 
 export type AIContentTemplateAugmented = {
