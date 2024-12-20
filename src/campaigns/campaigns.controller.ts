@@ -17,8 +17,8 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Campaign, User, UserRole } from '@prisma/client'
 import { Roles } from '../authentication/decorators/Roles.decorator'
-import { UserCampaign } from './decorators/UserCampaign.decorator'
-import { RequireCampaign } from './decorators/RequireCampaign.decorator'
+import { ReqCampaign } from './decorators/ReqCampaign.decorator'
+import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 
 @Controller('campaigns')
@@ -27,14 +27,14 @@ export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
   @Roles(UserRole.admin)
-  @Get('list') // campaign/list.js
+  @Get() // campaign/list.js
   findAll(@Query() query: CampaignListSchema) {
     return this.campaignsService.findAll(query)
   }
 
-  @Get() // campaign/get.js
-  @RequireCampaign()
-  async findOne(@UserCampaign() campaign: Campaign) {
+  @Get('user') // campaign/get.js
+  @UseCampaign()
+  async findOne(@ReqCampaign() campaign: Campaign) {
     if (!campaign) {
       // guard should prevent this from happening
       throw new NotFoundException()
@@ -63,11 +63,11 @@ export class CampaignsController {
     return await this.campaignsService.create(user)
   }
 
-  @Put() // campaign/update.js
-  @RequireCampaign({ overrideRoles: [UserRole.admin, UserRole.sales] })
+  @Put('user') // campaign/update.js
+  @UseCampaign({ continueIfNotFound: true })
   async update(
     @ReqUser() user: User,
-    @UserCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: Campaign,
     @Body() { slug, ...body }: UpdateCampaignSchema,
   ) {
     if (

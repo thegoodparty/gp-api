@@ -3,18 +3,14 @@ import {
   CanActivate,
   Logger,
   ExecutionContext,
-  UnauthorizedException,
-  InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common'
-// import { UserRole } from '@prisma/client'
 import { Reflector } from '@nestjs/core'
 import { CampaignsService } from '../services/campaigns.service'
-import { Prisma, UserRole } from '@prisma/client'
-import { userHasRole } from 'src/users/util/users.util'
 import {
   REQUIRE_CAMPAIGN_META_KEY,
   RequireCamapaignMetadata,
-} from '../decorators/RequireCampaign.decorator'
+} from '../decorators/UseCampaign.decorator'
 
 @Injectable()
 /**
@@ -32,7 +28,7 @@ export class UserCampaignGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest()
 
-    const { overrideRoles, include: campaignInclude } =
+    const { continueIfNotFound, include: campaignInclude } =
       this.reflector.getAllAndOverride<RequireCamapaignMetadata>(
         REQUIRE_CAMPAIGN_META_KEY,
         [context.getHandler(), context.getClass()],
@@ -48,12 +44,12 @@ export class UserCampaignGuard implements CanActivate {
       // store on request to access with @UserCampaign decorator
       request.campaign = campaign
       return true
-    } else if (overrideRoles && userHasRole(request.user, overrideRoles)) {
-      // allow user with matching role to continue, handler function should manage loading necessary campaign
+    } else if (continueIfNotFound === true) {
+      // if continueIfNotFound, allow request handler to continue
       return true
     }
 
     this.logger.log('User has no campaign')
-    throw new UnauthorizedException()
+    throw new NotFoundException()
   }
 }

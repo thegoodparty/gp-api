@@ -21,11 +21,11 @@ import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
 import { CampaignsService } from '../services/campaigns.service'
 import { CampaignAiContent } from '../campaigns.types'
-import { UserCampaign } from '../decorators/UserCampaign.decorator'
-import { RequireCampaign } from '../decorators/RequireCampaign.decorator'
+import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
+import { UseCampaign } from '../decorators/UseCampaign.decorator'
 
 @Controller('campaigns/ai')
-@RequireCampaign()
+@UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class CampaignsAiController {
   private readonly logger = new Logger(CampaignsAiController.name)
@@ -38,7 +38,7 @@ export class CampaignsAiController {
   @Post() // campaign/ai/create.js
   async create(
     @Res({ passthrough: true }) res: FastifyReply,
-    @UserCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: Campaign,
     @Body() body: CreateAiContentSchema,
   ) {
     try {
@@ -66,7 +66,7 @@ export class CampaignsAiController {
   @Put('rename') // campaign/ai/rename.js
   @HttpCode(HttpStatus.OK)
   async rename(
-    @UserCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: Campaign,
     @Body() { key, name }: RenameAiContentSchema,
   ) {
     const { aiContent } = campaign
@@ -84,7 +84,7 @@ export class CampaignsAiController {
 
   @Delete(':key') // campaign/ai/delete.js
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@UserCampaign() campaign: Campaign, @Param('key') key: string) {
+  async delete(@ReqCampaign() campaign: Campaign, @Param('key') key: string) {
     const aiContent = campaign.aiContent as CampaignAiContent
 
     if (!aiContent?.[key]) {
