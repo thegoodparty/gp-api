@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
+  NotImplementedException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
@@ -55,6 +57,9 @@ export class AuthenticationService {
     token: string,
     email: string,
   ) => {
+    throw new NotImplementedException(
+      'Facebook token validation not implemented',
+    )
     return ''
   }
 
@@ -106,6 +111,9 @@ export class AuthenticationService {
     { socialToken, socialPic, email }: SocialAuthPayload,
     socialProvider: SocialProvider,
   ) {
+    if (!this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider]) {
+      throw new BadRequestException('Invalid social provider')
+    }
     const user = await this.usersService.findUser({
       email: await this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider](
         socialToken,
