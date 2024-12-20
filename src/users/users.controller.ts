@@ -48,7 +48,6 @@ export class UsersController {
     return ReadUserOutputSchema.parse(dbUser)
   }
 
-  @UseGuards(UserOwnerOrAdminGuard)
   @Get('me')
   async findMe(@ReqUser() user: User) {
     return ReadUserOutputSchema.parse(

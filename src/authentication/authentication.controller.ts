@@ -60,9 +60,7 @@ export class AuthenticationController {
 
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
   @Post('social-login/:socialProvider')
-  async socialLogin(
-    @Request() { user }: RequestWithUser,
-  ): Promise<LoginResult> {
+  async socialLogin(@ReqUser() user: User): Promise<LoginResult> {
     return {
       user: ReadUserOutputSchema.parse(user),
       token: this.authenticationService.generateAuthToken({
