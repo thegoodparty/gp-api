@@ -37,7 +37,8 @@ $ npm install
 - Run the following command to create the database tables:
 
 ```bash
-$ npx prisma migrate dev
+$ npx prisma generate --schema=./api/prisma/schema/schema.prisma
+$ npx prisma migrate dev  --schema=./api/prisma/schema/schema.prisma
 ```
 
 ## Compile and run the project
@@ -59,16 +60,18 @@ $ npm run start:prod
 - Visit http://localhost:3000/api-json to get the JSON openApi representation of swagger config
 
 ## Development
+
 ### Testing
+
 You can run the tests in the Postman desktop app or you can run them using the Postman CLI in a terminal:
+
 - Install the Postman CLI tool: https://learning.postman.com/docs/postman-cli/postman-cli-installation/#system-requirements
 - Generate a Postman API key: https://learning.postman.com/docs/developer/postman-api/authentication/#generate-a-postman-api-key
 - Login to Postman CLI: `postman login --with-api-key [API_KEY]`
 - Get the IDs of the collection you want to test, and the environment you want to test with from Postman: https://learning.postman.com/docs/postman-cli/postman-cli-options/#signing-in-and-out:~:text=Then%20select%20the%20information%20icon
 - Run a collection: `postman run [collection_id] --environment [environment_id]`
-  
-(This will eventually be automated to run in a npm/npx script to automatically fetch the collection and environment keys for you)
 
+(This will eventually be automated to run in a npm/npx script to automatically fetch the collection and environment keys for you)
 
 ## Deployment
 

@@ -1,5 +1,5 @@
-import { z } from 'zod'
 import { generateRandomString } from '../../shared/util/strings.util'
+import { genSalt, hash } from 'bcrypt'
 
 export const MIN_PASS_LENGTH = 8
 export const MAX_PASS_LENGTH = 64
@@ -28,10 +28,10 @@ export const generateRandomPassword = (
   return randString
 }
 
-export const passwordSchema = z
-  .string()
-  .min(8, { message: 'Password must be at least 8 characters long' })
-  .regex(/[a-zA-Z]/, {
-    message: 'Password must contain at least one letter',
-  })
-  .regex(/\d/, { message: 'Password must contain at least one number' })
+/** function to trim and hash password string
+ * @example
+ * const hashed = hashPassword('TextPassword123')
+ */
+export const hashPassword = async (password: string) => {
+  return await hash(password.trim(), await genSalt())
+}

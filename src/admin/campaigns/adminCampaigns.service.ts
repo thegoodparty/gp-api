@@ -12,7 +12,7 @@ import {
 } from '@prisma/client/runtime/library'
 import { findSlug } from '../../shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Prisma } from '@prisma/client'
+import { Prisma, UserRole } from '@prisma/client'
 import { generateRandomPassword } from '../../users/util/passwords.util'
 
 @Injectable()
@@ -37,30 +37,19 @@ export class AdminCampaignsService {
     }
 
     // create new user
-    let user
-    try {
-      user = await this.prismaService.user.create({
-        data: {
-          firstName,
-          lastName,
-          name: `${firstName} ${lastName}`,
-          email,
-          password: generateRandomPassword(),
-          zip,
-          phone,
-          metaData: {},
-          role: 'campaign',
-        },
-      })
-    } catch (error) {
-      console.log(error)
-
-      if (error instanceof PrismaClientValidationError) {
-        throw new BadRequestException('User creation failed - ' + error.name)
-      }
-
-      throw error
-    }
+    const user = await this.prismaService.user.create({
+      data: {
+        firstName,
+        lastName,
+        name: `${firstName} ${lastName}`,
+        email,
+        password: generateRandomPassword(),
+        zip,
+        phone,
+        metaData: {},
+        roles: [UserRole.candidate],
+      },
+    })
 
     // find slug
     const slug = await findSlug(this.prismaService, `${firstName} ${lastName}`)
@@ -112,47 +101,20 @@ export class AdminCampaignsService {
       attributes.tier = tier
     }
 
-    try {
-      const updatedCampaign = await this.prismaService.campaign.update({
-        where: { id },
-        data: attributes,
-      })
+    const updatedCampaign = await this.prismaService.campaign.update({
+      where: { id },
+      data: attributes,
+    })
 
-      //TODO: reimplment
-      // await sails.helpers.crm.updateCampaign(updatedCampaign);
+    //TODO: reimplment
+    // await sails.helpers.crm.updateCampaign(updatedCampaign);
 
-      return updatedCampaign
-    } catch (error) {
-      console.log(error)
-
-      if (error instanceof PrismaClientValidationError) {
-        throw new BadRequestException(
-          'Failed to update campaign - ' + error.name,
-        )
-      }
-
-      throw error
-    }
+    return updatedCampaign
   }
 
   async delete(id: number) {
-    try {
-      await this.prismaService.campaign.delete({ where: { id } })
-      return true
-    } catch (error) {
-      console.log(error)
-
-      if (error instanceof PrismaClientKnownRequestError) {
-        if (error.code === 'P2025')
-          throw new NotFoundException('Campaign not found')
-
-        throw new BadRequestException(
-          'Failed to update campaign - ' + (error as any).name,
-        )
-      }
-
-      throw error
-    }
+    await this.prismaService.campaign.delete({ where: { id } })
+    return true
   }
 }
 
