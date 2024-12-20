@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
-import { CreateCampaignSchema } from '../schemas/createCampaign.schema'
 import { Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
@@ -94,18 +93,18 @@ export class CampaignsService {
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
   ) {
-    return this.prismaService.campaign.findFirstOrThrow({
+    return this.prismaService.campaign.findFirst({
       where: { userId },
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
-  async create(campaignData: CreateCampaignSchema, user: User) {
+  async create(user: User) {
     const slug = await findSlug(this.prismaService, getFullName(user))
 
     const newCampaign = await this.prismaService.campaign.create({
       data: {
-        ...campaignData,
+        slug,
         isActive: false,
         userId: user.id,
         details: {
@@ -129,7 +128,7 @@ export class CampaignsService {
     return this.prismaService.campaign.update({ where: { id }, data })
   }
 
-  async updateJsonFields(id: number, body: UpdateCampaignSchema) {
+  async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
     const { data, details, pathToVictory } = body
 
     return this.prismaService.$transaction(async (tx) => {

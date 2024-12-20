@@ -27,11 +27,16 @@ const CANDIDATE_USER = {
   roles: [UserRole.candidate],
 }
 
+const USER_W_NO_CAMPAIGN = {
+  email: 'visitor@fightclub.org',
+  password: hashPasswordSync('tellMeAllAboutFightClub123'),
+}
 // define some user objects here for non random seeds
 const FIXED_USERS: Partial<User>[] = [
   ADMIN_USER,
   SALES_USER,
   CANDIDATE_USER,
+  USER_W_NO_CAMPAIGN,
   {
     id: 1,
     firstName: 'Homer',
@@ -47,7 +52,10 @@ export default async function seedUsers(prisma: PrismaClient) {
     fakeUsers[i] = userFactory(FIXED_USERS[i])
   }
 
-  const { count } = await prisma.user.createMany({ data: fakeUsers })
+  const users = await prisma.user.createManyAndReturn({ data: fakeUsers })
 
-  console.log(`Created ${count} users`)
+  console.log(`Created ${users.length} users`)
+
+  // Filter out users to not create campaigns for them with seedCampaigns
+  return users.filter((u) => u.email !== USER_W_NO_CAMPAIGN.email)
 }

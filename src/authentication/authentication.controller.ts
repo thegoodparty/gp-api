@@ -25,7 +25,7 @@ import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
 import { Roles } from './decorators/Roles.decorator'
 import { User, UserRole } from '@prisma/client'
 import { ReqUser } from './decorators/ReqUser.decorator'
-import { userHasRole } from 'src/users/util/roles.util'
+import { userHasRole } from 'src/users/util/users.util'
 import { FastifyReply } from 'fastify'
 import { CampaignData } from 'src/campaigns/campaigns.types'
 

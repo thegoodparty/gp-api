@@ -3,6 +3,7 @@ import { faker } from '@faker-js/faker'
 import { STATE_CODES } from '../../src/shared/constants/states'
 import { LEVELS } from '../../src/shared/constants/governmentLevels'
 import { generateFactory } from './generate'
+import { GenerationStatus } from 'src/campaigns/campaigns.types'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.past()
@@ -29,6 +30,15 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         .split('T')[0],
     },
     aiContent: {
+      generationStatus: {
+        launchSocialMediaCopy: {
+          prompt:
+            "I'm going to provide you with background information and then ask you a question....",
+          status: 'completed',
+          createdAt: faker.date.past().valueOf(),
+          existingChat: [],
+        },
+      },
       launchSocialMediaCopy: {
         name: 'Launch Social Media Copy',
         content:

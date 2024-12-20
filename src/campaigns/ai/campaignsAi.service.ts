@@ -114,6 +114,7 @@ export class CampaignsAiService {
     )
 
     try {
+      this.logger.log(aiContent)
       await this.campaignsService.update(campaign.id, {
         aiContent,
       })

@@ -8,8 +8,8 @@ const prisma = new PrismaClient()
 
 async function main() {
   await seedRaces(prisma)
-  await seedUsers(prisma)
-  const campaignIds = await seedCampaigns(prisma)
+  const users = await seedUsers(prisma)
+  const campaignIds = await seedCampaigns(prisma, users)
   await seedTopIssues(prisma, campaignIds)
 }
 
