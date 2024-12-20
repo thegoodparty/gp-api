@@ -3,7 +3,7 @@ import {
   AIContentTemplateRaw,
   AIContentCategories,
 } from '../content.types'
-import camelCase from 'just-camel-case'
+import { camelCase } from 'es-toolkit/string'
 
 // AIContentCategories are grouped by the title found under each AIContentTemplateRaw's data.category.fields
 // MPX: Several AIContentTemplateRaw's are used to make each 'AIContentCategories' object

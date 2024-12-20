@@ -4,7 +4,7 @@ import {
   AIContentTemplateRaw,
   ContentPromptsQuestions,
 } from '../content.types'
-import camelCase from 'just-camel-case'
+import { camelCase } from 'es-toolkit/string'
 
 const logger = new Logger('ContentPromptsQuestionsTransformer')
 
