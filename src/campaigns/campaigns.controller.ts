@@ -35,11 +35,6 @@ export class CampaignsController {
   @Get('user') // campaign/get.js
   @UseCampaign()
   async findOne(@ReqCampaign() campaign: Campaign) {
-    if (!campaign) {
-      // guard should prevent this from happening
-      throw new NotFoundException()
-    }
-
     return campaign
   }
 
