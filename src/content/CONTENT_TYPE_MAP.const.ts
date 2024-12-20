@@ -4,9 +4,19 @@ import { faqArticlesTransformer } from './transformers/faqArticlesTransformer'
 import { blogArticlesTransformer } from './transformers/blogArticlesTransformer'
 import { articleTagsTransformer } from './transformers/articleTagsTransformer'
 import { glossaryItemsTransformer } from './transformers/glossaryItemsTransformer'
+import { candidateContentPromptsTransformer } from './transformers/candidateContentPromptsTransformer'
+import { contentPromptsQuestionsTransformer } from './transformers/contentPromptsQuestionsTransformer'
+import { aiContentCategoriesTransformer } from './transformers/aiContentCategoriesTransformer'
+import { aiChatPromptsTransformer } from './transformers/aiChatPromptTransformer'
+import { onboardingPromptsTransformer } from './transformers/onboardingPromptsTransformer'
+import { promptInputFieldsTransformer } from './transformers/promptInputFieldsTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
+  candidateContentPrompts = 'candidateContentPrompts',
+  contentPromptsQuestions = 'contentPromptsQuestions',
+  aiContentCategories = 'aiContentCategories',
+  aiChatPrompts = 'aiChatPrompts',
 }
 
 export const CONTENT_TYPE_MAP: {
@@ -19,6 +29,16 @@ export const CONTENT_TYPE_MAP: {
   aiChatPrompt: {
     name: ContentType.aiChatPrompt,
     transformer: noOpTransformer,
+  },
+  aiChatPrompts: {
+    name: InferredContentTypes.aiChatPrompts,
+    transformer: aiChatPromptsTransformer,
+    inferredFrom: ContentType.aiChatPrompt,
+  },
+  aiContentCategories: {
+    name: InferredContentTypes.aiContentCategories,
+    transformer: aiContentCategoriesTransformer,
+    inferredFrom: ContentType.aiContentTemplate,
   },
   aiContentTemplate: {
     name: ContentType.aiContentTemplate,
@@ -39,9 +59,19 @@ export const CONTENT_TYPE_MAP: {
   },
   blogHome: { name: ContentType.blogHome, transformer: noOpTransformer },
   blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
+  candidateContentPrompts: {
+    name: InferredContentTypes.candidateContentPrompts,
+    transformer: candidateContentPromptsTransformer,
+    inferredFrom: ContentType.aiContentTemplate,
+  },
   candidateTestimonial: {
     name: ContentType.candidateTestimonial,
     transformer: noOpTransformer,
+  },
+  contentPromptsQuestions: {
+    name: InferredContentTypes.contentPromptsQuestions,
+    transformer: contentPromptsQuestionsTransformer,
+    inferredFrom: ContentType.aiContentTemplate,
   },
   election: { name: ContentType.election, transformer: noOpTransformer },
   faqArticle: {
@@ -59,13 +89,13 @@ export const CONTENT_TYPE_MAP: {
   },
   onboardingPrompts: {
     name: ContentType.onboardingPrompts,
-    transformer: noOpTransformer,
+    transformer: onboardingPromptsTransformer,
   },
   pledge: { name: ContentType.pledge, transformer: noOpTransformer },
   privacyPage: { name: ContentType.privacyPage, transformer: noOpTransformer },
   promptInputFields: {
     name: ContentType.promptInputFields,
-    transformer: noOpTransformer,
+    transformer: promptInputFieldsTransformer,
   },
   redirects: { name: ContentType.redirects, transformer: noOpTransformer },
   teamMember: { name: ContentType.teamMember, transformer: noOpTransformer },

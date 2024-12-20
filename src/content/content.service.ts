@@ -39,7 +39,6 @@ export class ContentService {
   async findByType(type: ContentType | InferredContentTypes) {
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
-
     const entries = await this.prisma.content.findMany({
       where: {
         type: queryType,
@@ -118,8 +117,6 @@ export class ContentService {
             },
           })
         }
-
-        console.log(`deletedEntryIds =>`, deletedEntryIds)
 
         await tx.content.deleteMany({
           where: {
