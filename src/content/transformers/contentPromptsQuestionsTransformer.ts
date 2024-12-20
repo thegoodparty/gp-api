@@ -14,8 +14,11 @@ export const contentPromptsQuestionsTransformer: Transformer<
 > = (templates: AIContentTemplateRaw[]): ContentPromptsQuestions[] => {
   const result = templates.reduce<ContentPromptsQuestions>((acc, template) => {
     if (template.data.name && template.data.requiresAdditionalQuestions) {
-      acc[camelCase(template.data.name)] =
-        template.data.requiresAdditionalQuestions
+      return {
+        ...acc,
+        [camelCase(template.data.name)]:
+          template.data.requiresAdditionalQuestions,
+      }
     } else {
       logger.warn(
         'template.data.name and/or template.data.requiresAdditionalQuestions not found',

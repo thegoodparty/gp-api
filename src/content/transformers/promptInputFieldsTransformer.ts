@@ -14,8 +14,10 @@ export const promptInputFieldsTransformer: Transformer<
       title: fields.title,
       helperText: fields.helperText,
     }))
-    acc[key] = entry
-    return acc
+    return {
+      ...acc,
+      [key]: entry,
+    }
   }, {})
 
   return [promptInputFields]

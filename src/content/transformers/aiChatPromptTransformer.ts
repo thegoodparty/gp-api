@@ -6,10 +6,12 @@ export const aiChatPromptsTransformer: Transformer<
 > = (prompts: AIChatPrompt[]): AIChatPrompts[] => [
   prompts.reduce((acc, prompt) => {
     const { name } = prompt.data
-    acc[name] = {
-      ...prompt.data,
-      id: prompt.id,
+    return {
+      ...acc,
+      [name]: {
+        ...prompt.data,
+        id: prompt.id,
+      },
     }
-    return acc
   }, {} as AIChatPrompts),
 ]

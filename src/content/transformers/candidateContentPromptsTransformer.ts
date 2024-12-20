@@ -14,7 +14,10 @@ export const candidateContentPromptsTransformer: Transformer<
 > = (templates: AIContentTemplateRaw[]): CandidateContentPrompts[] => {
   const result = templates.reduce<CandidateContentPrompts>((acc, template) => {
     if (template.data.name && template.data.content) {
-      acc[camelCase(template.data.name)] = template.data.content
+      return {
+        ...acc,
+        [camelCase(template.data.name)]: template.data.content,
+      }
     } else {
       logger.warn(
         'template.data.name and/or template.data.content not found',
