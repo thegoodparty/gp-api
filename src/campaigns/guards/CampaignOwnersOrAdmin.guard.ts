@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
-import { CampaignsService } from '../campaigns.service'
+import { CampaignsService } from '../services/campaigns.service'
 
 // TODO: I'm not a fan of this. But I've spent way too much time on it for now.
 //  I'd prefer to have a more idiomatic way of composing Guards to accomplish this. But this works for now.

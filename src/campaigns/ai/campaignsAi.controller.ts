@@ -4,6 +4,9 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -11,59 +14,89 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { CampaignsAiService } from './campaignsAi.service'
-import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { RenameAiContentSchema } from './schemas/RenameAiContent.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { User } from '@prisma/client'
+import { Campaign } from '@prisma/client'
 import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
-import { CampaignsService } from '../campaigns.service'
+import { CampaignsService } from '../services/campaigns.service'
+import { CampaignAiContent } from '../campaigns.types'
+import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
+import { UseCampaign } from '../decorators/UseCampaign.decorator'
 
 @Controller('campaigns/ai')
+@UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class CampaignsAiController {
+  private readonly logger = new Logger(CampaignsAiController.name)
+
   constructor(
     private campaignsAiService: CampaignsAiService,
     private campaignsService: CampaignsService,
   ) {}
 
-  @Post()
+  @Post() // campaign/ai/create.js
   async create(
     @Res({ passthrough: true }) res: FastifyReply,
-    @ReqUser() { id: userId }: User,
+    @ReqCampaign() campaign: Campaign,
     @Body() body: CreateAiContentSchema,
   ) {
-    const campaign = await this.loadCampaign(userId)
-    const result = await this.campaignsAiService.createContent(campaign, body)
+    try {
+      const result = await this.campaignsAiService.createContent(campaign, body)
 
-    if (result.created) {
-      res.statusCode = HttpStatus.CREATED
-    } else {
-      res.statusCode = HttpStatus.OK
+      if (result.created) {
+        res.statusCode = HttpStatus.CREATED
+      } else {
+        res.statusCode = HttpStatus.OK
+      }
+
+      return result
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error(e)
+        throw new InternalServerErrorException('Failed to create content', {
+          cause: e,
+        })
+      }
+
+      throw e
     }
-
-    return result
   }
 
-  @Put('rename')
+  @Put('rename') // campaign/ai/rename.js
   @HttpCode(HttpStatus.OK)
   async rename(
-    @ReqUser() { id: userId }: User,
-    @Body() body: RenameAiContentSchema,
+    @ReqCampaign() campaign: Campaign,
+    @Body() { key, name }: RenameAiContentSchema,
   ) {
-    const campaign = await this.loadCampaign(userId)
-    return this.campaignsAiService.updateContentName(campaign, body)
+    const { aiContent } = campaign
+
+    if (!aiContent?.[key]) {
+      throw new NotFoundException(`Content with key: ${key} not found`)
+    }
+
+    aiContent[key]['name'] = name
+
+    return this.campaignsService.update(campaign.id, {
+      aiContent,
+    })
   }
 
-  @Delete(':key')
+  @Delete(':key') // campaign/ai/delete.js
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@ReqUser() { id: userId }: User, @Param('key') key: string) {
-    const campaign = await this.loadCampaign(userId)
-    return this.campaignsAiService.deleteContent(campaign, key)
-  }
+  async delete(@ReqCampaign() campaign: Campaign, @Param('key') key: string) {
+    const aiContent = campaign.aiContent as CampaignAiContent
 
-  private loadCampaign(userId: number) {
-    // TODO: use a decorator to inject needed campaign for user instead of this findByUser everywhere
-    return this.campaignsService.findByUser(userId)
+    if (!aiContent?.[key]) {
+      // nothing to delete
+      throw new NotFoundException('Content not found')
+    }
+
+    delete aiContent[key]
+    delete aiContent.generationStatus?.[key]
+
+    return this.campaignsService.update(campaign.id, {
+      aiContent,
+    })
   }
 }

@@ -22,12 +22,12 @@ import { Roles } from '../../authentication/decorators/Roles.decorator'
 export class AdminCampaignsController {
   constructor(private readonly adminCampaignsService: AdminCampaignsService) {}
 
-  @Post()
+  @Post() // campaign/admin-create.js
   create(@Body() body: AdminCreateCampaignSchema) {
     return this.adminCampaignsService.create(body)
   }
 
-  @Put(':id')
+  @Put(':id') // campaign/admin-update.js
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AdminUpdateCampaignSchema,
@@ -35,7 +35,7 @@ export class AdminCampaignsController {
     return this.adminCampaignsService.update(id, body)
   }
 
-  @Delete(':id')
+  @Delete(':id') // campaign/admin-delete.js
   @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.adminCampaignsService.delete(id)
