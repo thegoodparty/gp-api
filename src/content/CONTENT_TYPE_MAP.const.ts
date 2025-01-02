@@ -17,6 +17,7 @@ import { termsOfServiceTransformer } from './transformers/termsOfServiceTransfor
 import { redirectsTransformer } from './transformers/redirectsTransformer'
 import { blogHomeTransformer } from './transformers/blogHomeTransformer'
 import { blogSectionsTransformer } from './transformers/blogSectionsTransformer'
+import { pledgeTransformer } from './transformers/pledgeTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -128,7 +129,10 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.onboardingPrompts,
     transformer: onboardingPromptsTransformer,
   },
-  pledge: { name: ContentType.pledge, transformer: noOpTransformer },
+  pledge: {
+    name: ContentType.pledge,
+    transformer: pledgeTransformer,
+  },
   privacyPage: { name: ContentType.privacyPage, transformer: noOpTransformer },
   promptInputFields: {
     name: ContentType.promptInputFields,

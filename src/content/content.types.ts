@@ -465,3 +465,13 @@ export type TermsOfServiceRaw = {
 export type TermsOfServiceAugmented = {
   [key: string]: string
 }
+
+export type PledgeRaw = {
+  data: {
+    [key: string]: string
+  }
+}
+
+export type PledgeAugmented = {
+  [key: string]: string
+}
