@@ -17,6 +17,7 @@ import { JwtAuthGuard } from './authentication/guards/JwtAuth.guard'
 import { AdminModule } from './admin/admin.module'
 import { QueueModule } from './queue/queue.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
+import { GraphqlModule } from './graphql/graphql.module'
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { TopIssuesModule } from './topIssues/topIssues.module'
     TopIssuesModule,
     AdminModule,
     QueueModule,
+    GraphqlModule,
   ],
   controllers: [AppController],
   providers: [

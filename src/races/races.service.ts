@@ -1,16 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { GraphqlService } from 'src/graphql/graphql.service'
 import slugify from 'slugify'
 import { startOfYear, addYears, format } from 'date-fns'
 import { County, Municipality } from '@prisma/client'
 import { NormalizedRace, Race, RaceData, RaceQuery } from './races.types'
-import { getRaceById } from './util/getRace.util'
-import { getElectionDates } from './util/getElectionDates.util'
+import {
+  COUNTY_PROMPT,
+  CITY_PROMPT,
+  TOWN_PROMPT,
+  TOWNSHIP_PROMPT,
+  VILLAGE_PROMPT,
+} from './constants/prompts.consts'
 
 @Injectable()
 export class RacesService {
   private readonly logger = new Logger(RacesService.name)
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private graphQLService: GraphqlService,
+  ) {}
 
   async findRaces(
     state?: string,
@@ -312,22 +321,17 @@ export class RacesService {
     // "township"
     // "village"
 
-    try {
-      level = level.toLowerCase()
-      if (
-        level &&
-        level !== 'federal' &&
-        level !== 'state' &&
-        level !== 'county' &&
-        level !== 'city'
-      ) {
-        level = 'city'
-      }
-      return level
-    } catch (e) {
-      this.logger.log('error at get-race-level', e)
-      return level
+    level = level.toLowerCase()
+    if (
+      level &&
+      level !== 'federal' &&
+      level !== 'state' &&
+      level !== 'county' &&
+      level !== 'city'
+    ) {
+      level = 'city'
     }
+    return level
   }
 
   private async resolveMtfcc(geoId: string, mtfcc: string) {
@@ -393,9 +397,9 @@ export class RacesService {
 
     let race: any
     try {
-      race = await getRaceById(raceId)
+      race = await this.getRaceById(raceId)
     } catch (e) {
-      logger.log(slug, 'error getting race details', e)
+      logger.error(slug, 'error getting race details', e)
       return
     }
     logger.log(slug, 'got ballotReady Race')
@@ -417,7 +421,7 @@ export class RacesService {
       geoId = race?.position.geoId
       tier = race?.position.tier
     } catch (e) {
-      logger.log(slug, 'error getting election date', e)
+      logger.error(slug, 'error getting election date', e)
     }
     if (!electionDate) {
       return
@@ -427,13 +431,13 @@ export class RacesService {
     try {
       electionLevel = this.getRaceLevel(level)
     } catch (e) {
-      logger.log(slug, 'error getting election level', e)
+      logger.error(slug, 'error getting election level', e)
     }
     logger.log(slug, 'electionLevel', electionLevel)
 
     const officeName = race?.position?.name
     if (!officeName) {
-      logger.log(slug, 'error getting office name')
+      logger.error(slug, 'error getting office name')
       return
     }
 
@@ -570,7 +574,7 @@ export class RacesService {
       // }
 
       if ((!priorElectionDates || priorElectionDates.length === 0) && zip) {
-        priorElectionDates = await getElectionDates(
+        priorElectionDates = await this.getElectionDates(
           slug,
           officeName,
           zip,
@@ -598,232 +602,224 @@ export class RacesService {
   }
 
   private async extractLocationAi(office: string, level: string) {
-    try {
-      level = level.toLowerCase()
+    level = level.toLowerCase()
 
-      if (level === 'local' || level === 'regional') {
-        // if the level is local or regional, we need to refine the level
-        if (office.includes('Village')) {
-          level = 'village'
-        } else if (office.includes('Township')) {
-          level = 'township'
-        } else if (office.includes('Town')) {
-          level = 'town'
-        } else if (
-          office.includes('City') ||
-          office.includes('Municipal') ||
-          office.includes('Borough')
-        ) {
-          level = 'city'
-        } else if (office.includes('County') || office.includes('Parish')) {
-          level = 'county'
-        } else {
-          // default to city if we can't determine the local level
-          level = 'city'
-        }
-      }
-
-      const countyPrompt = `
-      You are a helpful political assistant whose job is to extract a county from an office name. You will return a json in your response and nothing else. You must use your knowledge of where the Office is located to answer the question instead of regurgitating a string from the input. 
-      Example Input: "Los Angeles School Board District 15 - CA"
-      Example Output:
-      {
-           "county": "Los Angeles"
-      }
-      Example Input: "Sonoma County USD Education Board - CA"
-      Example Output: 
-      {
-           "county": "Sonoma"
-      }
-      Example Input: "US Senate - CA"
-      Example Output: {
-      }
-      Example Input: "Pretty Water Elementary School Board - OK"
-      Example Output:
-      {
-           "county": "Creek County"
-      }        
-      `
-      const cityPrompt = `You are a helpful political assistant whose job is to extract a city from an office name. You will return a json in your response and nothing else. You must use your knowledge of where the Office is located to answer the question instead of regurgitating a string from the input. 
-      Example Input: "Los Angeles School Board District 15 - CA"
-      Example Output:
-      {
-           "city": "Los Angeles",
-           "county": "Los Angeles"
-      }
-      Example Input: "San Clemente Education Board - CA"
-      Example Output: 
-      {
-           "city": "San Clemente",
-           "county": "Orange County"
-      }
-      Example Input: "US Senate - CA"
-      Example Output: {
-      }
-      Example Input: "Pretty Water Elementary School Board - OK"
-      Example Output:
-      {
-           "city": "Sapulpa",
-           "county": "Creek County"
-      }
-      `
-      const townPrompt = `You are a helpful political assistant whose job is to extract a Town from an office name. You will return a json in your response and nothing else. You must use your knowledge of where the Office is located to answer the question instead of regurgitating a string from the input.
-      Example Input: "Los Angeles School Board District 15 - CA"
-      Example Output:
-      {
-      }
-      Example Input: "Elkin Town Council - NC"
-      Example Output:
-      {
-           "town": "Elkin Town",
-           "county": "Surry County"
-      }
-      Example Input: "US Senate - CA"
-      Example Output: {
-      }
-      Example Input: "Erath Town Mayor - LA"
-      Example Output:
-      {
-           "town": "Erath Town",
-           "county": "Vermilion Parish"
-      }
-      `
-      const townshipPrompt = `You are a helpful political assistant whose job is to extract a Township from an office name. You will return a json in your response and nothing else. You must use your knowledge of where the Office is located to answer the question instead of regurgitating a string from the input.
-      Example Input: "Los Angeles School Board District 15 - CA"
-      Example Output:
-      {
-      }
-      Example Input: "Bloomfield Township Trustee - MI"
-      Example Output:
-      {
-           "township": "Bloomfield Township",
-           "county": "Oakland County"
-      }
-      Example Input: "US Senate - CA"
-      Example Output: {
-      }
-      Example Input: "Burlington Township Mayor - NJ"
-      Example Output:
-      {
-           "township": "Burlington Township",
-           "county": "Burlington County"
-      }
-      `
-      const villagePrompt = `You are a helpful political assistant whose job is to extract a Village from an office name. You will return a json in your response and nothing else. You must use your knowledge of where the Office is located to answer the question instead of regurgitating a string from the input.
-      Example Input: "Los Angeles School Board District 15 - CA"
-      Example Output:
-      {
-      }
-      Example Input: "Pawling Village Mayor - New York"
-      Example Output:
-      {
-            "village": "Pawling Village",
-            "county": "Dutchess County"
-      }
-      Example Input: "US Senate - CA"
-      Example Output: {
-      }
-      Example Input: "Maine Village Board Chair - Wisconsin"
-      Example Output:
-      {
-           "village": "Maine Village",
-           "county": "Marathon County"
-      }
-      `
-
-      const tool: any = {
-        type: 'function',
-        function: {
-          name: 'extractLocation',
-          description: 'Extract the location from the office name.',
-          parameters: {
-            type: 'object',
-            properties: {},
-          },
-        },
-      }
-      let systemPrompt
-      if (level === 'county') {
-        systemPrompt = countyPrompt
-      } else if (level === 'city') {
-        systemPrompt = cityPrompt
-        tool.function.parameters.properties.city = {
-          type: 'string',
-          description: 'The city name.',
-        }
-      } else if (level === 'town') {
-        systemPrompt = townPrompt
-        tool.function.parameters.properties.town = {
-          type: 'string',
-          description: 'The town name.',
-        }
-      } else if (level === 'township') {
-        systemPrompt = townshipPrompt
-        tool.function.parameters.properties.township = {
-          type: 'string',
-          description: 'The township name.',
-        }
-      } else if (level === 'village') {
-        systemPrompt = villagePrompt
-        tool.function.parameters.properties.village = {
-          type: 'string',
-          description: 'The village name.',
-        }
+    if (level === 'local' || level === 'regional') {
+      // if the level is local or regional, we need to refine the level
+      if (office.includes('Village')) {
+        level = 'village'
+      } else if (office.includes('Township')) {
+        level = 'township'
+      } else if (office.includes('Town')) {
+        level = 'town'
+      } else if (
+        office.includes('City') ||
+        office.includes('Municipal') ||
+        office.includes('Borough')
+      ) {
+        level = 'city'
+      } else if (office.includes('County') || office.includes('Parish')) {
+        level = 'county'
       } else {
-        return false
+        // default to city if we can't determine the local level
+        level = 'city'
       }
+    }
 
-      // we always try to get the county name
-      tool.function.parameters.properties.county = {
+    const tool: any = {
+      type: 'function',
+      function: {
+        name: 'extractLocation',
+        description: 'Extract the location from the office name.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    }
+    let systemPrompt
+    if (level === 'county') {
+      systemPrompt = COUNTY_PROMPT
+    } else if (level === 'city') {
+      systemPrompt = CITY_PROMPT
+      tool.function.parameters.properties.city = {
         type: 'string',
-        description: 'The county name.',
+        description: 'The city name.',
       }
-
-      const messages = [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: `Input: "${office}"
-          Output:`,
-        },
-      ]
-
-      const toolChoice: any = {
-        type: 'function',
-        function: { name: 'extractLocation' },
+    } else if (level === 'town') {
+      systemPrompt = TOWN_PROMPT
+      tool.function.parameters.properties.town = {
+        type: 'string',
+        description: 'The town name.',
       }
-
-      let completion
-      // todo: once the ai service is up, we can use this code
-      // const completion = await getChatToolCompletion(
-      //   messages,
-      //   0.1,
-      //   0.1,
-      //   tool,
-      //   toolChoice,
-      // )
-
-      this.logger.log(
-        `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
-      )
-
-      // console.log('completion', completion);
-      const content = completion?.content
-      let decodedContent: any = {}
-      try {
-        decodedContent = JSON.parse(content)
-        decodedContent.level = level
-      } catch (e) {
-        console.log('error at extract-location-ai helper', e)
+    } else if (level === 'township') {
+      systemPrompt = TOWNSHIP_PROMPT
+      tool.function.parameters.properties.township = {
+        type: 'string',
+        description: 'The township name.',
       }
-      console.log('extract ai location response', decodedContent)
-      return decodedContent
-    } catch (e) {
-      console.log('error at extract-location-ai helper', e)
+    } else if (level === 'village') {
+      systemPrompt = VILLAGE_PROMPT
+      tool.function.parameters.properties.village = {
+        type: 'string',
+        description: 'The village name.',
+      }
+    } else {
       return false
     }
+
+    // we always try to get the county name
+    tool.function.parameters.properties.county = {
+      type: 'string',
+      description: 'The county name.',
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt,
+      },
+      {
+        role: 'user',
+        content: `Input: "${office}"
+          Output:`,
+      },
+    ]
+
+    const toolChoice: any = {
+      type: 'function',
+      function: { name: 'extractLocation' },
+    }
+
+    let completion
+    // todo: once the ai service is up, we can use this code
+    // const completion = await getChatToolCompletion(
+    //   messages,
+    //   0.1,
+    //   0.1,
+    //   tool,
+    //   toolChoice,
+    // )
+
+    this.logger.log(
+      `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
+    )
+
+    // console.log('completion', completion);
+    const content = completion?.content
+    let decodedContent: any = {}
+    try {
+      decodedContent = JSON.parse(content)
+      decodedContent.level = level
+    } catch (e) {
+      console.log('error at extract-location-ai helper', e)
+    }
+    console.log('extract ai location response', decodedContent)
+    return decodedContent
+  }
+
+  private async getElectionDates(
+    slug: string,
+    officeName: string,
+    zip: string,
+    level: string,
+  ) {
+    const electionDates: string[] = []
+    const logger = new Logger('getElectionDates')
+    try {
+      // get todays date in format YYYY-MM-DD
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = (today.getMonth() + 1).toString().padStart(2, '0')
+      const day = today.getDate().toString().padStart(2, '0')
+      const dateToday = `${year}-${month}-${day}`
+
+      const query = `
+            query {
+                races(
+                    location: { zip: "${zip}" }
+                    filterBy: { electionDay: { gt: "2006-01-01", lt: "${dateToday}" }, level: ${level} }
+                ) {
+                    edges {
+                        node {
+                            position {    
+                                name
+                            }
+                            election {
+                                electionDay
+                            }
+                        }
+                    }
+                }
+            }`
+
+      const { races } = await this.graphQLService.fetchGraphql(query)
+      logger.log(slug, 'getElectionDates graphql result', races)
+      const results = races?.edges || []
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]
+        const { position, election } = result.node
+        if (position?.name && election?.electionDay) {
+          if (position.name.toLowerCase() === officeName.toLowerCase()) {
+            if (!electionDates.includes(election.electionDay)) {
+              electionDates.push(election.electionDay)
+            }
+          }
+        }
+      }
+      logger.log(slug, 'electionDates', electionDates)
+
+      return electionDates
+    } catch (e) {
+      logger.error(slug, 'error at getElectionDates', e)
+      return []
+    }
+  }
+
+  private async getRaceById(raceId: string) {
+    const query = `
+          query Node {
+            node(id: "${raceId}") {
+                ... on Race {
+                    databaseId
+                    isPartisan
+                    isPrimary
+                    election {
+                        electionDay
+                        name
+                        state
+                    }
+                    position {
+                        id
+                        description
+                        judicial
+                        level
+                        name
+                        partisanType
+                        staggeredTerm
+                        state
+                        subAreaName
+                        subAreaValue
+                        tier
+                        mtfcc
+                        geoId
+                        electionFrequencies {
+                            frequency
+                        }
+                        hasPrimary
+                        normalizedPosition {
+                          name
+                      }
+                    }
+                    filingPeriods {
+                        endOn
+                        startOn
+                    }
+                }
+            }
+        }
+        `
+    const { node } = await this.graphQLService.fetchGraphql(query)
+    return node
   }
 }
