@@ -28,7 +28,24 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         .toISOString()
         .split('T')[0],
     },
-    aiContent: {},
+    aiContent: {
+      generationStatus: {
+        launchSocialMediaCopy: {
+          prompt:
+            "I'm going to provide you with background information and then ask you a question....",
+          status: 'completed',
+          createdAt: faker.date.past().valueOf(),
+          existingChat: [],
+        },
+      },
+      launchSocialMediaCopy: {
+        name: 'Launch Social Media Copy',
+        content:
+          '<p>📢 Exciting News! 📢 I am thrilled to announce my candidacy for the US Senate as an Independent candidate!</p>',
+        updatedAt: faker.date.past().valueOf(),
+        inputValues: {},
+      },
+    },
     vendorTsData: {},
   }
 })

@@ -1,20 +1,22 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, User } from '@prisma/client'
 import { campaignFactory } from './factories/campaign.factory'
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { userFactory } from './factories/user.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
-import { genSalt, genSaltSync, hash, hashSync } from 'bcrypt'
+import { buildSlug } from 'src/shared/util/slug.util'
+import { getFullName } from 'src/users/util/users.util'
 
 const NUM_CAMPAIGNS = 20
 const NUM_UPDATE_HISTORY = 3
 
-export default async function seedCampaigns(prisma: PrismaClient) {
+export default async function seedCampaigns(
+  prisma: PrismaClient,
+  existingUsers: User[],
+) {
   const fakeUsers: any[] = []
   const fakeCampaigns: any[] = []
   const fakeP2Vs: any[] = []
   const fakeUpdateHistory: any[] = []
-
-  const existingUsers = await prisma.user.findMany({ take: NUM_CAMPAIGNS })
 
   const campaignIds: number[] = []
 
@@ -24,7 +26,10 @@ export default async function seedCampaigns(prisma: PrismaClient) {
       user = userFactory()
       fakeUsers.push(user)
     }
-    const camp = campaignFactory({ userId: user.id })
+    const camp = campaignFactory({
+      userId: user.id,
+      slug: buildSlug(getFullName(user)),
+    })
 
     campaignIds.push(camp.id)
     fakeCampaigns.push(camp)

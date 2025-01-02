@@ -1,5 +1,5 @@
 import { generateRandomString } from '../../shared/util/strings.util'
-import { genSalt, hash } from 'bcrypt'
+import { genSalt, genSaltSync, hash, hashSync } from 'bcrypt'
 
 export const MIN_PASS_LENGTH = 8
 export const MAX_PASS_LENGTH = 64
@@ -30,8 +30,16 @@ export const generateRandomPassword = (
 
 /** function to trim and hash password string
  * @example
- * const hashed = hashPassword('TextPassword123')
+ * const hashed = await hashPassword('TextPassword123')
  */
 export const hashPassword = async (password: string) => {
   return await hash(password.trim(), await genSalt())
+}
+
+/** function to trim and hash password string synchronously
+ * @example
+ * const hashed = hashPasswordSync('TextPassword123')
+ */
+export const hashPasswordSync = (password: string) => {
+  return hashSync(password.trim(), genSaltSync())
 }

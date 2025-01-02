@@ -26,6 +26,7 @@ model Campaign {
   userId                Int?                    @map("user_id")
   topIssues             TopIssue[]
   campaignPositions     CampaignPosition[]
+  campaignPlanVersion   CampaignPlanVersion?
 
   @@index([slug])
   @@map("campaign")
