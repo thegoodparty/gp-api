@@ -7,6 +7,7 @@ export interface ImageRaw {
     file: {
       url: string
       details?: {
+        size?: number
         image?: {
           width: number
           height: number
@@ -15,6 +16,15 @@ export interface ImageRaw {
     }
     title?: string
   }
+}
+
+export interface ImageClean {
+  url: string
+  alt?: string
+  size?: {
+    width: number
+    height: number
+  } | null
 }
 
 export type AIContentTemplateRaw = {
@@ -69,6 +79,15 @@ export type AIContentTemplateAugmented = {
   requiresAdditionalQuestions: boolean
 }
 
+type ArticleFaq = {
+  sys: {
+    id: string
+  }
+  fields: {
+    title: string
+  }
+}
+
 export type CandidateContentPrompts = {
   [key: string]: string // Multiple entries of key: templateName, value: templateBody (names I made up)
 }
@@ -81,6 +100,31 @@ export type AIContentCategories = {
   name: string
   templates: AIContentCategoriesTemplateEntry[]
   order: number
+}
+
+export type ArticleCategories = {
+  fields: {
+    name: string
+    order: number
+  }
+  id: string | null
+  name: string
+  articles: ArticleFields[]
+  order: number
+}
+
+type ArticleFields = {
+  title: string
+  id: string
+}
+
+export type ArticleCategoryRaw = {
+  id: string
+  type: 'articleCategory'
+  data: {
+    name: string
+    order: 1
+  }
 }
 
 export type AIContentCategoriesTemplateEntry = {
@@ -119,6 +163,7 @@ type BlogArticleBanner = {
 }
 
 export type BlogArticleContentRaw = ContentRaw<{
+  type: 'blogArticle'
   data: {
     body: Block | Inline
     author: BlogArticleAuthorRaw
@@ -189,6 +234,43 @@ export type BlogArticleTag = {
 
 export type BlogArticlesTagsMap = Map<string, BlogArticleTag>
 
+export type BlogSectionRaw = {
+  id: string
+  type: 'blogSection'
+  sys: {
+    id: string
+  }
+  data: {
+    slug: string
+    order: number
+    title: string
+    subtitle: string
+  }
+}
+
+export type BlogSections = {
+  fields: {
+    title: string
+    subtitle: string
+    slug: string
+    order: number
+  }
+  id: string
+  slug: string
+  tags: []
+  articles: BlogArticleHighlight[]
+  order: number
+}
+
+type BlogArticleHighlight = {
+  title: string
+  id: string
+  mainImage: ImageClean
+  publishDate: string
+  slug: string
+  summary: string
+}
+
 export type ContentMedia = {
   url: string
   alt: string
@@ -198,11 +280,39 @@ export type ContentMedia = {
   }
 }
 
+export type BlogHomeRaw = {
+  data: {
+    topTags: BlogArticleTagRaw[]
+    articleFaqs: ArticleFaq[]
+  }
+}
+
+export type BlogHomeAugmented = {
+  tags: BlogArticleTag[]
+  faqs: FaqBasic[]
+}
+
 export type ContentRaw<T extends object = object> = Content & {
   data: object
 } & T
 
 export type ContentAugmented<T extends object = object> = T
+
+export type CandidateTestimonialAugmented = {
+  name: string
+  office: string
+  image: ImageClean
+  testimonial: string
+}
+
+export type CandidateTestimonalRaw = {
+  data: {
+    name: string
+    image: ImageRaw
+    office: string
+    testimonial: string
+  }
+}
 
 export type FaqArticleCategoryRaw = {
   sys: {
@@ -212,6 +322,11 @@ export type FaqArticleCategoryRaw = {
     name: string
     order?: number
   }
+}
+
+type FaqBasic = {
+  title: string
+  id: string
 }
 
 export type OnboardingPromptsAugmented = {
@@ -262,7 +377,10 @@ export type PromptInputFieldsAugmented = {
 }
 
 type FaqArticleContentRawData = {
+  type: 'faqArticle'
+  id: string
   data: {
+    title: string
     category?: FaqArticleCategoryRaw[]
   }
 }
@@ -297,3 +415,53 @@ export type GlossaryItemAugmented = ContentAugmented<
   }
 > &
   FieldsType
+
+export type GoodPartyTeamMembersRaw = {
+  data: {
+    name: string
+    members: TeamMember[]
+  }
+}
+
+export type TeamMember = {
+  sys: {
+    id: string
+  }
+  fields: {
+    role: string
+    fullName: string
+    goodPhoto: ImageRaw
+    partyRole: string
+    partyPhoto: ImageRaw
+  }
+}
+
+export type GoodPartyTeamMembersAugmented = {
+  fullName: string
+  role: string
+  goodPhoto: ImageClean
+  partyPhoto: ImageClean
+  partyRole: string
+  id: string
+}
+
+export type RedirectsRaw = {
+  data: {
+    pathname: string
+    redirectUrl: string
+  }
+}
+
+export type RedirectsAugmented = {
+  [key: string]: string // Key is the pathname, value is the redirectUrl
+}
+
+export type TermsOfServiceRaw = {
+  data: {
+    [key: string]: string
+  }
+}
+
+export type TermsOfServiceAugmented = {
+  [key: string]: string
+}

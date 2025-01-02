@@ -30,7 +30,7 @@ export class ContentfulService {
     for (let i = 0; i < CALLS; i++) {
       const entryCollection = await contentfulClient.getEntries({
         limit: LIMIT,
-        include: 5,
+        include: 10,
         skip: i * LIMIT,
       })
       allEntryCollections.push(entryCollection)
@@ -50,13 +50,11 @@ export class ContentfulService {
       })
     nextSyncToken = newToken as string
 
+    const allEntries = await this.getAllEntries()
+
     return {
-      allEntries: await this.getAllEntries(),
+      allEntries: allEntries,
       deletedEntries,
     }
-  }
-
-  async getEntry(id: string) {
-    return await contentfulClient.getEntry(id)
   }
 }
