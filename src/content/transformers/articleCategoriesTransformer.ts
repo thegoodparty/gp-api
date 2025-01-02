@@ -1,113 +1,82 @@
-import { 
+import {
   FaqArticleContentRaw,
   ArticleCategories,
   Transformer,
   ArticleCategoryRaw,
 } from '../content.types'
 
-//mappedResponse.articleCategories.sort(compareArticleCategories);
-
 export const articleCategoriesTransformer: Transformer<
-FaqArticleContentRaw,
+  FaqArticleContentRaw,
   ArticleCategories
-> = (inputs: (FaqArticleContentRaw | ArticleCategoryRaw)[]): ArticleCategories[] => {
-  const articleCategories: ArticleCategories[] = [];
+> = (
+  inputs: (FaqArticleContentRaw | ArticleCategoryRaw)[],
+): ArticleCategories[] => {
+  const articleCategories: ArticleCategories[] = []
   for (const input of inputs) {
     if (input.type === 'faqArticle') {
-      const categoryFields = input.data.category?.[0]?.fields ?? null;
-      const foundCategory = articleCategories.find(category => category.fields.name === categoryFields?.name);
+      const categoryFields = input.data.category?.[0]?.fields ?? null
+      const foundCategory = articleCategories.find(
+        (category) => category.fields.name === categoryFields?.name,
+      )
 
       if (categoryFields && !foundCategory) {
         articleCategories.push({
           fields: {
             name: categoryFields.name,
-            order: categoryFields.order || 9999
+            order: categoryFields.order || 9999,
           },
           name: categoryFields.name,
           id: null,
-          articles: [{
-            title: input.data.title,
-            id: input.id,
-          }],
-          order: categoryFields.order || 9999
-        } as ArticleCategories) 
+          articles: [
+            {
+              title: input.data.title,
+              id: input.id,
+            },
+          ],
+          order: categoryFields.order || 9999,
+        } as ArticleCategories)
       } else if (categoryFields && foundCategory) {
         foundCategory.articles.push({
           title: input.data.title,
-          id: input.id
-        });
+          id: input.id,
+        })
       }
     } else if (input.type === 'articleCategory') {
-      const categoryName = input.data.name;
-      const foundCategory = articleCategories.find(category => category.fields.name === categoryName);
+      const categoryName = input.data.name
+      const foundCategory = articleCategories.find(
+        (category) => category.fields.name === categoryName,
+      )
 
       if (!foundCategory && categoryName) {
         articleCategories.push({
           fields: {
             name: categoryName,
-            order: input.data.order
+            order: input.data.order,
           },
           name: categoryName,
           id: input.id,
           articles: [],
-          order: input.data.order
-      });
+          order: input.data.order,
+        })
       } else if (foundCategory && categoryName && !foundCategory.id) {
-        foundCategory.id = input.id;
+        foundCategory.id = input.id
       }
     }
   }
 
-  articleCategories.sort(compareArticleCategories);
+  articleCategories.sort(compareArticleCategories)
 
-  return articleCategories;
-
-  // return [
-  //   {
-  //     fields: {
-  //       name: 'string',
-  //       order: 1,
-  //   },
-  //   id: 'string',
-  //   name: 'string',
-  //   articles: [
-  //     {
-  //       title: 'string',
-  //       id: 'string',
-  //     }
-  //   ],
-  //   order: 1
-  // }]
+  return articleCategories
 }
 
 function compareArticleCategories(a, b) {
-  const orderA = a.fields.order || 9999;
-  const orderB = b.fields.order || 9999;
+  const orderA = a.fields.order || 9999
+  const orderB = b.fields.order || 9999
   if (orderA > orderB) {
-    return 1;
+    return 1
   }
   if (orderA < orderB) {
-    return -1;
+    return -1
   }
-  return 0;
+  return 0
 }
-
-// Input:  {
-//   createdAt: 2024-12-12T20:50:16.964Z,
-//   updatedAt: 2024-12-16T15:41:21.854Z,
-//   id: '4CrRDuyTqip7XK7DdK4tq7',
-//   type: 'articleCategory',
-//   data: { name: 'How GoodParty.org Works', order: 1 }
-// }
-// Input:  {
-//   createdAt: 2024-12-12T20:50:17.570Z,
-//   updatedAt: 2024-12-16T15:41:22.327Z,
-//   id: '579kihjyIPloNaEw02rniq',
-//   type: 'faqArticle',
-//   data: {
-//     title: 'Meet the Team',
-//     category: [ [Object] ],
-//     articleBody: { data: {}, content: [Array], nodeType: 'document' }
-//   }
-// }
-
