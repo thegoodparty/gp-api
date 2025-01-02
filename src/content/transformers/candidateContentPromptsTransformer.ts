@@ -1,12 +1,12 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common'
 import {
   Transformer,
   AIContentTemplateRaw,
-  CandidateContentPrompts
-} from '../content.types';
-import { camelCase } from 'lodash';
+  CandidateContentPrompts,
+} from '../content.types'
+import { camelCase } from 'es-toolkit/string'
 
-const logger = new Logger('CandidateContentPromptsTransformer');
+const logger = new Logger('CandidateContentPromptsTransformer')
 
 export const candidateContentPromptsTransformer: Transformer<
   AIContentTemplateRaw,
@@ -14,13 +14,18 @@ export const candidateContentPromptsTransformer: Transformer<
 > = (templates: AIContentTemplateRaw[]): CandidateContentPrompts[] => {
   const result = templates.reduce<CandidateContentPrompts>((acc, template) => {
     if (template.data.name && template.data.content) {
-      const name = camelCase(template.data.name);
-      acc[name] = template.data.content;
+      return {
+        ...acc,
+        [camelCase(template.data.name)]: template.data.content,
+      }
     } else {
-      logger.warn('template.data.name and/or template.data.content not found', template);
+      logger.warn(
+        'template.data.name and/or template.data.content not found',
+        template,
+      )
     }
-    return acc;
-  }, {});
+    return acc
+  }, {})
 
-  return [result];
-};
+  return [result]
+}

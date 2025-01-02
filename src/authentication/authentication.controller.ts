@@ -28,6 +28,7 @@ import { ReqUser } from './decorators/ReqUser.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 import { FastifyReply } from 'fastify'
 import { CampaignData } from 'src/campaigns/campaigns.types'
+import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
 
 @PublicAccess()
 @Controller('authentication')
@@ -49,6 +50,18 @@ export class AuthenticationController {
   @UseGuards(AuthGuard('local'))
   @Post('login')
   async login(@Request() { user }: RequestWithUser): Promise<LoginResult> {
+    return {
+      user: ReadUserOutputSchema.parse(user),
+      token: this.authenticationService.generateAuthToken({
+        email: user.email,
+        sub: user.id,
+      }),
+    }
+  }
+
+  @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
+  @Post('social-login/:socialProvider')
+  async socialLogin(@ReqUser() user: User): Promise<LoginResult> {
     return {
       user: ReadUserOutputSchema.parse(user),
       token: this.authenticationService.generateAuthToken({

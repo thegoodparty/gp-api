@@ -1,6 +1,9 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
+  NotImplementedException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
@@ -10,11 +13,62 @@ import { LoginPayload } from './schemas/LoginPayload.schema'
 import { compare } from 'bcrypt'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { nanoid } from 'nanoid'
+import {
+  SocialAuthPayload,
+  SocialProvider,
+  SocialTokenValidator,
+} from './authentication.types'
+import { OAuth2Client, TokenInfo } from 'google-auth-library'
+
+const googleOAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
 const PASSWORD_RESET_TOKEN_TTL = '1h'
 
 @Injectable()
 export class AuthenticationService {
+  logger = new Logger(AuthenticationService.name)
+
+  // TODO: Move social token validators to separate SocialTokenValidationService
+  private googleTokenValidator: SocialTokenValidator = async (
+    socialToken: string,
+    email: string,
+  ) => {
+    const lowercaseEmail = email.toLowerCase()
+    let tokenInfo: TokenInfo | null = null
+
+    try {
+      tokenInfo = await googleOAuthClient.getTokenInfo(socialToken)
+    } catch (e) {
+      const msg = 'Failed to validate social token'
+      this.logger.warn(msg, e)
+      throw new UnauthorizedException(msg)
+    }
+
+    if (tokenInfo?.email?.toLowerCase() !== lowercaseEmail) {
+      const msg = 'Email in token does not match email in request'
+      this.logger.warn(msg)
+      throw new UnauthorizedException(msg)
+    }
+    return lowercaseEmail
+  }
+
+  // TODO: https://goodparty.atlassian.net/browse/WEB-3421
+  private facebookTokenValidator: SocialTokenValidator = async (
+    token: string,
+    email: string,
+  ) => {
+    throw new NotImplementedException(
+      'Facebook token validation not implemented',
+    )
+    return ''
+  }
+
+  private SOCIAL_MEDIA_VALIDATORS_MAP: { [socialProvider in SocialProvider] } =
+    {
+      [SocialProvider.GOOGLE]: this.googleTokenValidator,
+      [SocialProvider.FACEBOOK]: this.facebookTokenValidator,
+    }
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
@@ -32,7 +86,7 @@ export class AuthenticationService {
     }
   }
 
-  async validateUser(
+  async validateUserByEmailAndPassword(
     email: LoginPayload['email'],
     password: LoginPayload['password'],
   ) {
@@ -51,6 +105,35 @@ export class AuthenticationService {
       throw new UnauthorizedException('Invalid password')
     }
     return user
+  }
+
+  async socialUserValidation(
+    { socialToken, socialPic, email }: SocialAuthPayload,
+    socialProvider: SocialProvider,
+  ) {
+    if (!this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider]) {
+      throw new BadRequestException('Invalid social provider')
+    }
+    const user = await this.usersService.findUser({
+      email: await this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider](
+        socialToken,
+        email,
+      ),
+    })
+
+    if (!user) {
+      const msg = 'User not found by email'
+      throw new UnauthorizedException(msg)
+    }
+
+    return this.usersService.updateUser(
+      {
+        id: user.id,
+      },
+      {
+        avatar: socialPic || '',
+      },
+    )
   }
 
   async updatePasswordWithToken(

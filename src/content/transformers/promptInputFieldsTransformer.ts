@@ -2,26 +2,23 @@ import {
   Transformer,
   PromptInputFieldsAugmented,
   PromptInputFieldsRaw,
-  PromptInputQuestion
-} from '../content.types';
+} from '../content.types'
 
 export const promptInputFieldsTransformer: Transformer<
   PromptInputFieldsRaw,
   PromptInputFieldsAugmented
 > = (prompts: PromptInputFieldsRaw[]): PromptInputFieldsAugmented[] => {
-  const promptInputFields = {};
-  for (const prompt of prompts) {
-    const entry: PromptInputQuestion[] = [];
-    const key = prompt.data.fieldId;
-    for (const input of prompt.data.contentInput) {
-      const { title, helperText } = input.fields;
-      entry.push({
-        title,
-        helperText
-      })
+  const promptInputFields = prompts.reduce((acc, prompt) => {
+    const key = prompt.data.fieldId
+    const entry = prompt.data.contentInput.map(({ fields }) => ({
+      title: fields.title,
+      helperText: fields.helperText,
+    }))
+    return {
+      ...acc,
+      [key]: entry,
     }
-    promptInputFields[key] = entry;
-  }
+  }, {})
 
-  return [promptInputFields];
+  return [promptInputFields]
 }

@@ -16,7 +16,7 @@ export enum InferredContentTypes {
   candidateContentPrompts = 'candidateContentPrompts',
   contentPromptsQuestions = 'contentPromptsQuestions',
   aiContentCategories = 'aiContentCategories',
-  aiChatPrompts = 'aiChatPrompts'
+  aiChatPrompts = 'aiChatPrompts',
 }
 
 export const CONTENT_TYPE_MAP: {
@@ -33,14 +33,14 @@ export const CONTENT_TYPE_MAP: {
   aiChatPrompts: {
     name: InferredContentTypes.aiChatPrompts,
     transformer: aiChatPromptsTransformer,
-    inferredFrom: ContentType.aiChatPrompt
+    inferredFrom: ContentType.aiChatPrompt,
   },
   aiContentCategories: {
     name: InferredContentTypes.aiContentCategories,
     transformer: aiContentCategoriesTransformer,
-    inferredFrom: ContentType.aiContentTemplate
+    inferredFrom: ContentType.aiContentTemplate,
   },
-  aiContentTemplate: { 
+  aiContentTemplate: {
     name: ContentType.aiContentTemplate,
     transformer: noOpTransformer,
   },
@@ -62,8 +62,7 @@ export const CONTENT_TYPE_MAP: {
   candidateContentPrompts: {
     name: InferredContentTypes.candidateContentPrompts,
     transformer: candidateContentPromptsTransformer,
-    //transformer: noOpTransformer,
-    inferredFrom: ContentType.aiContentTemplate
+    inferredFrom: ContentType.aiContentTemplate,
   },
   candidateTestimonial: {
     name: ContentType.candidateTestimonial,
@@ -72,8 +71,7 @@ export const CONTENT_TYPE_MAP: {
   contentPromptsQuestions: {
     name: InferredContentTypes.contentPromptsQuestions,
     transformer: contentPromptsQuestionsTransformer,
-    //transformer: noOpTransformer,
-    inferredFrom: ContentType.aiContentTemplate
+    inferredFrom: ContentType.aiContentTemplate,
   },
   election: { name: ContentType.election, transformer: noOpTransformer },
   faqArticle: {
