@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common'
 import { SqsModule } from '@ssut/nestjs-sqs'
-import { EnqueueService } from './enqueue.service'
 import { ConsumerService } from './consumer.service'
-import { QueueController } from './queue.controller'
-import { queueConfig } from './queue.config'
+import { queueConfig } from '../queue.config'
+import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
 
 @Module({
   imports: [
@@ -15,9 +14,8 @@ import { queueConfig } from './queue.config'
         },
       ],
     }),
+    CampaignsAiModule,
   ],
-  controllers: [QueueController],
-  providers: [ConsumerService, EnqueueService],
-  exports: [EnqueueService],
+  providers: [ConsumerService],
 })
-export class QueueModule {}
+export class QueueConsumerModule {}

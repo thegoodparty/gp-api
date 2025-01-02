@@ -25,17 +25,16 @@ const CALLS = 8
 
 @Injectable()
 export class ContentfulService {
-  async getAllEntries(): Promise<Entry[]> {
+  async getAllEntries() {
     const allEntryCollections: EntryCollection<EntrySkeletonType>[] = []
-
     for (let i = 0; i < CALLS; i++) {
       const entryCollection = await contentfulClient.getEntries({
         limit: LIMIT,
+        include: 5,
         skip: i * LIMIT,
       })
       allEntryCollections.push(entryCollection)
     }
-
     return allEntryCollections.reduce((acc, entryCollection) => {
       return [...acc, ...entryCollection.items]
     }, [] as Entry[])

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
-import { queueConfig } from './queue.config'
+import { queueConfig } from '../queue.config'
 
 const config: SQSClientConfig = {
   region: process.env.AWS_REGION || '',

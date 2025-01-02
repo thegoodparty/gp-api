@@ -13,6 +13,7 @@ model User {
   firstName             String?                 @default("") @map("first_name")
   lastName              String?                 @default("") @map("last_name")
   name                  String?
+  avatar                String?
   password              String
   email                 String                  @unique
   phone                 String?

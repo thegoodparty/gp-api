@@ -1,0 +1,8 @@
+model CampaignPlanVersion {
+  id         Int      @id @default(autoincrement())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId Int      @unique @map("campaign_id")
+  data       Json     @default("{}") @db.JsonB
+
+  @@map("campaign_plan_version")
+}
