@@ -445,6 +445,26 @@ export type GoodPartyTeamMembersAugmented = {
   id: string
 }
 
+export type PledgeRaw = {
+  data: {
+    [key: string]: string
+  }
+}
+
+export type PledgeAugmented = {
+  [key: string]: string
+}
+
+export type PrivacyPageRaw = {
+  data: {
+    [key: string]: string
+  }
+}
+
+export type PrivacyPageAugmented = {
+  [key: string]: string
+}
+
 export type RedirectsRaw = {
   data: {
     pathname: string
@@ -463,15 +483,5 @@ export type TermsOfServiceRaw = {
 }
 
 export type TermsOfServiceAugmented = {
-  [key: string]: string
-}
-
-export type PledgeRaw = {
-  data: {
-    [key: string]: string
-  }
-}
-
-export type PledgeAugmented = {
   [key: string]: string
 }

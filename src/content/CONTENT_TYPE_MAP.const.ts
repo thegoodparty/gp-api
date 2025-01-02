@@ -18,6 +18,7 @@ import { redirectsTransformer } from './transformers/redirectsTransformer'
 import { blogHomeTransformer } from './transformers/blogHomeTransformer'
 import { blogSectionsTransformer } from './transformers/blogSectionsTransformer'
 import { pledgeTransformer } from './transformers/pledgeTransformer'
+import { privacyPageTransformer } from './transformers/privacyPageTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -133,7 +134,10 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.pledge,
     transformer: pledgeTransformer,
   },
-  privacyPage: { name: ContentType.privacyPage, transformer: noOpTransformer },
+  privacyPage: {
+    name: ContentType.privacyPage,
+    transformer: privacyPageTransformer,
+  },
   promptInputFields: {
     name: ContentType.promptInputFields,
     transformer: promptInputFieldsTransformer,
