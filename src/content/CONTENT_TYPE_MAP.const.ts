@@ -116,7 +116,7 @@ export const CONTENT_TYPE_MAP: {
   },
   faqOrder: {
     name: ContentType.faqOrder,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No longer supported
   },
   glossaryItem: {
     name: ContentType.glossaryItem,
@@ -142,7 +142,10 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.promptInputFields,
     transformer: promptInputFieldsTransformer,
   },
-  redirects: { name: ContentType.redirects, transformer: redirectsTransformer },
+  redirects: {
+    name: ContentType.redirects,
+    transformer: redirectsTransformer,
+  },
   teamMember: { name: ContentType.teamMember, transformer: noOpTransformer }, // Not supported
   teamMilestone: {
     name: ContentType.teamMilestone,

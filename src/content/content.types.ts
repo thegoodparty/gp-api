@@ -165,6 +165,7 @@ type BlogArticleBanner = {
 export type BlogArticleContentRaw = ContentRaw<{
   type: 'blogArticle'
   data: {
+    title: string
     body: Block | Inline
     author: BlogArticleAuthorRaw
     banner: BlogArticleBannerRaw
@@ -173,6 +174,9 @@ export type BlogArticleContentRaw = ContentRaw<{
     section: BlogArticleSectionRaw
     relatedArticles: BlogArticleRelatedArticleRaw[]
     references: BlogArticleReferenceRaw[]
+    publishDate: string
+    slug: string
+    summary: string
   }
 }>
 

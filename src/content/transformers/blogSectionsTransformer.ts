@@ -1,60 +1,46 @@
-import { ImportTemplate } from '@hubspot/api-client/lib/codegen/crm/imports';
 import {
   BlogArticleContentRaw,
   BlogSectionRaw,
+  Transformer,
   BlogSections,
-  Transformer
 } from '../content.types'
-import { articleCategoriesTransformer } from './articleCategoriesTransformer';
-type Bogus = {
-  [key: string]: string
-}
+import { transformContentMedia } from '../util/transformContentMedia.util'
 
 export const blogSectionsTransformer: Transformer<
   BlogSectionRaw,
-  Bogus
-> = (sectionOrArticle: (BlogSectionRaw | BlogArticleContentRaw)[]): Bogus[] => {
-  printNestedObjects(sectionOrArticle);
-  const sectionsById = {};
+  BlogSections
+> = (
+  sectionOrArticle: (BlogSectionRaw | BlogArticleContentRaw)[],
+): BlogSections[] => {
+  // Sort so that all blogSections can be handled first
+  sectionOrArticle.sort((a, b) => {
+    if (a.type < b.type) return 1
+    if (a.type > b.type) return -1
+    return 0
+  })
+
+  const sectionsById = {}
   for (const item of sectionOrArticle) {
     if (item.type === 'blogSection') {
-      sectionsById[item.id] = { ...item, article:[] };
+      sectionsById[item.id] = {
+        fields: item.data,
+        id: item.id,
+        articles: [],
+      }
     } else if (item.type === 'blogArticle') {
-      //if (item.data.section && sectionsById[item.data.section])
-    }
-  }
-
-  return [{
-    hello: 'wow'
-  }]
-
-  // return [{
-  //   fields: {
-  //     title: 'string',
-  //     subtitle: 'string;',
-  //     slug: 'string;',
-  //     order: 1,
-  //   },
-  //   id: 'string;',
-  //   slug: 'string;',
-  //   tags: [],
-  //   articles: BlogArticleHighlight[]
-  //   order: 1,
-  // }]
-}
-
-function printNestedObjects(obj: Record<string, any>, path: string[] = []): void {
-  // Iterate over each key in the object
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      const value = obj[key];
-      const currentPath = [...path, key];
-
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        // If the value is an object, print it and recurse
-        console.log(`Path: ${currentPath.join('.')}, Object:`, value);
-        printNestedObjects(value, currentPath);
+      console.log(item)
+      if (item.data.section && sectionsById[item.data.section.sys.id]) {
+        sectionsById[item.data.section.sys.id].articles.push({
+          title: item.data.title,
+          id: item.id,
+          mainImage: transformContentMedia(item.data?.mainImage),
+          publishDate: item.data?.publishDate,
+          slug: item.data?.slug,
+          summary: item.data?.summary,
+        })
       }
     }
   }
+
+  return Object.values(sectionsById)
 }
