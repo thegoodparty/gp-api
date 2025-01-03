@@ -3,6 +3,8 @@ import {
   BlogSectionRaw,
   Transformer,
   BlogSections,
+  TYPE_BLOG_ARTICLE,
+  TYPE_BLOG_SECTION,
 } from '../content.types'
 import { transformContentMedia } from '../util/transformContentMedia.util'
 
@@ -14,13 +16,13 @@ export const blogSectionsTransformer: Transformer<
 ): BlogSections[] => {
   const sectionsById = {}
   for (const item of sectionOrArticle) {
-    if (item.type === 'blogSection') {
+    if (item.type === TYPE_BLOG_SECTION) {
       sectionsById[item.id] = {
         fields: item.data,
         id: item.id,
         articles: [],
       }
-    } else if (item.type === 'blogArticle') {
+    } else if (item.type === TYPE_BLOG_ARTICLE) {
       const sectionId = item.data.section?.sys?.id
       if (sectionId) {
         // Lazy initalization for optimization

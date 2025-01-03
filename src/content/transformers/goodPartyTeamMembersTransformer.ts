@@ -12,7 +12,6 @@ export const goodPartyTeamMembersTransformer: Transformer<
   teamMembersRaw: GoodPartyTeamMembersRaw[],
 ): GoodPartyTeamMembersAugmented[] => {
   const { members: teamMembers } = teamMembersRaw[0].data
-  console.log('teamMembersRaw: ', teamMembersRaw[0].data)
   return teamMembers.map((member) => ({
     ...member.fields,
     id: member.sys.id,

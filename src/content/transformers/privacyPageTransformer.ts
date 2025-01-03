@@ -7,6 +7,4 @@ import {
 export const privacyPageTransformer: Transformer<
   PrivacyPageRaw,
   PrivacyPageAugmented
-> = (pages: PrivacyPageRaw[]): PrivacyPageAugmented[] => {
-  return [{ ...pages[0].data }]
-}
+> = (pages: PrivacyPageRaw[]): PrivacyPageAugmented[] => [{ ...pages[0].data }]

@@ -50,10 +50,8 @@ export class ContentfulService {
       })
     nextSyncToken = newToken as string
 
-    const allEntries = await this.getAllEntries()
-
     return {
-      allEntries: allEntries,
+      allEntries: await this.getAllEntries(),
       deletedEntries,
     }
   }

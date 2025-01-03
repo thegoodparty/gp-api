@@ -3,6 +3,8 @@ import {
   ArticleCategories,
   Transformer,
   ArticleCategoryRaw,
+  TYPE_ARTICLE_CATEGORY,
+  TYPE_FAQ_ARTICLE,
 } from '../content.types'
 
 export const articleCategoriesTransformer: Transformer<
@@ -13,7 +15,7 @@ export const articleCategoriesTransformer: Transformer<
 ): ArticleCategories[] => {
   const articleCategories: ArticleCategories[] = []
   for (const input of inputs) {
-    if (input.type === 'faqArticle') {
+    if (input.type === TYPE_FAQ_ARTICLE) {
       const categoryFields = input.data.category?.[0]?.fields ?? null
       const foundCategory = articleCategories.find(
         (category) => category.fields.name === categoryFields?.name,
@@ -41,7 +43,7 @@ export const articleCategoriesTransformer: Transformer<
           id: input.id,
         })
       }
-    } else if (input.type === 'articleCategory') {
+    } else if (input.type === TYPE_ARTICLE_CATEGORY) {
       const categoryName = input.data.name
       const foundCategory = articleCategories.find(
         (category) => category.fields.name === categoryName,

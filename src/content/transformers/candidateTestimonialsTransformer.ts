@@ -12,7 +12,7 @@ export const candidateTestimonialsTransformer: Transformer<
 > = (
   testimonials: CandidateTestimonalRaw[],
 ): CandidateTestimonialAugmented[] => {
-  const testimonialsAugmented = testimonials.map((testimonial) => {
+  return testimonials.map((testimonial) => {
     const image = extractMediaFile(testimonial.data.image)
 
     if (!image) {
@@ -25,6 +25,4 @@ export const candidateTestimonialsTransformer: Transformer<
       image: image,
     }
   })
-
-  return testimonialsAugmented
 }

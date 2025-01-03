@@ -2,6 +2,9 @@ import { Block, Inline } from '@contentful/rich-text-types'
 import { EntrySys, FieldsType } from 'contentful'
 import { Content } from '@prisma/client'
 
+export const TYPE_FAQ_ARTICLE = 'faqArticle'
+export const TYPE_ARTICLE_CATEGORY = 'articleCategory'
+
 export interface ImageRaw {
   fields: {
     file: {
