@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
-import { User } from '@prisma/client'
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL } = process.env
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
@@ -17,10 +16,10 @@ export class StripeService {
     return price
   }
 
-  async createCheckoutSession(user: User) {
+  async createCheckoutSession(userId: number) {
     const session = await this.stripe.checkout.sessions.create({
       metadata: {
-        userId: user.id,
+        userId,
       },
       billing_address_collection: 'auto',
       line_items: [
@@ -38,5 +37,12 @@ export class StripeService {
 
     const { url: redirectUrl, id: checkoutSessionId } = session
     return { redirectUrl, checkoutSessionId }
+  }
+
+  async createPortalSession(customerId: string) {
+    return await this.stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${WEBAPP_ROOT_URL}/profile`,
+    })
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Post } from '@nestjs/common'
+import { BadRequestException, Controller, Post } from '@nestjs/common'
 import { StripeService } from '../stripe/stripe.service'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
 import { Prisma, User } from '@prisma/client'
@@ -13,9 +13,8 @@ export class PurchaseController {
 
   @Post('checkout-session')
   async createCheckoutSession(@ReqUser() user: User) {
-    // Create a checkout session
     const { redirectUrl, checkoutSessionId } =
-      await this.stripeService.createCheckoutSession(user)
+      await this.stripeService.createCheckoutSession(user.id)
     const currentUserMetaData = (user.metaData as Prisma.JsonObject) || {}
 
     await this.usersService.updateUser(
@@ -30,6 +29,18 @@ export class PurchaseController {
       },
     )
 
+    return { redirectUrl }
+  }
+
+  @Post('portal-session')
+  async createPortalSession(@ReqUser() user: User) {
+    const { metaData } = user
+    const { customerId } = metaData || {}
+    if (!customerId) {
+      throw new BadRequestException('User does not have a customerId')
+    }
+    const { url: redirectUrl } =
+      await this.stripeService.createPortalSession(customerId)
     return { redirectUrl }
   }
 }
