@@ -10,6 +10,7 @@ import {
   Campaign,
   CampaignDataContent,
   CampaignDetailsContent,
+  CleanCampaign,
   isRecord,
 } from './campaigns.types'
 import { any, string } from 'zod'
@@ -267,37 +268,41 @@ export class CampaignsService {
     let count = 0
 
     for (const campaign of campaigns) {
-      const { didWin } = campaign
+      const { didWin, slug } = campaign
       const details = campaign.details as CampaignDetailsContent
       const data = campaign.data as CampaignDataContent
 
       if (
         !details?.zip ||
         didWin === false ||
-        !isRecord(details.geoLocation) ||
         !details?.geoLocation?.lng ||
         details?.geoLocationFailed
       ) {
+        if (slug === 'tego sol victoria caelum vestrum') {
+          console.log('Failed first check')
+        }
         continue
       }
       const isProd = false // Change this later
 
       if (isProd) {
-        if (
-          !isRecord(data.hubSpotUpdates) ||
-          typeof data.hubSpotUpdates.verified_candidates !== 'string' ||
-          data?.hubSpotUpdates?.verified_candidates !== 'Yes'
-        ) {
+        if (data?.hubSpotUpdates?.verified_candidates !== 'Yes') {
+          if (slug === 'tego sol victoria caelum vestrum') {
+            console.log('Failed second check')
+          }
           continue
         }
       }
 
       if (didWin == null) {
-        if (typeof details.electionDate !== 'string') {
+        if (!details.electionDate) {
           continue
         }
         const electionDate = new Date(details.electionDate)
         if (electionDate < lastWeek) {
+          if (slug === 'tego sol victoria caelum vestrum') {
+            console.log('Failed fourth check')
+          }
           continue
         }
       }
@@ -306,6 +311,211 @@ export class CampaignsService {
     }
 
     return { count }
+  }
+
+  async listMap(
+    party?: string,
+    state?: string,
+    level?: string,
+    results?: string,
+    office?: string,
+    name?: string,
+    forceReCalc?: string,
+  ): CleanCampaign[] {
+    // Logic for checking appbase?
+
+    const andConditions: any = []
+
+    if (party) {
+      andConditions.push({
+        details: {
+          path: ['party'],
+          contains: party.toLowerCase(),
+        },
+      })
+    }
+
+    if (state) {
+      andConditions.push({
+        details: {
+          path: ['state'],
+          equals: state,
+        },
+      })
+    }
+
+    if (level) {
+      andConditions.push({
+        details: {
+          path: ['ballotLevel'],
+          equals: level,
+        },
+      })
+    }
+
+    if (results) {
+      andConditions.push({
+        OR: [
+          { didWin: true },
+          {
+            data: {
+              path: ['hubSpotUpdates', 'election_results'],
+              equals: 'Won General',
+            },
+          },
+        ],
+      })
+    }
+
+    if (office) {
+      andConditions.push({
+        OR: [
+          {
+            details: {
+              path: ['normalizedOffice'],
+              equals: office,
+            },
+          },
+          {
+            details: {
+              path: ['office'],
+              equals: office,
+            },
+          },
+          {
+            details: {
+              path: ['otherOffice'],
+              equals: office,
+            },
+          },
+        ],
+      })
+    }
+
+    const isProd = false
+
+    if (isProd) {
+      andConditions.push({
+        data: {
+          path: ['hubSpotUpdates', 'verified_candidates'],
+          equals: 'Yes',
+        },
+      })
+    }
+
+    const where: Prisma.CampaignWhereInput = {
+      userId: {
+        not: null,
+      },
+      isDemo: false,
+      isActive: true,
+      AND: andConditions,
+    }
+
+    const campaigns = await this.prismaService.campaign.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+      },
+    })
+
+    const cleanCampaigns: CleanCampaign[] = []
+    const lastWeek = new Date()
+    lastWeek.setDate(lastWeek.getDate() - 7)
+
+    for (const campaign of campaigns) {
+      const { didWin, slug } = campaign
+      const details = campaign.details as CampaignDetailsContent
+      const data = campaign.data as CampaignDataContent
+
+      if (!details?.zip || didWin === false) {
+        continue
+      }
+
+      const {
+        otherOffice,
+        office,
+        state,
+        ballotLevel,
+        zip,
+        party,
+        raceId,
+        noNormalizedOffice,
+        county,
+        city,
+      } = details || {}
+
+      const electionDate = details.electionDate as string
+
+      const resolvedOffice = (otherOffice as string) || (office as string)
+      if (name) {
+        const fullName =
+          `${campaign?.user?.firstName} ${campaign?.user?.lastName}`.toLowerCase()
+        if (!fullName.includes(name.toLowerCase())) {
+          continue
+        }
+      }
+      const hubSpotOffice = data?.hubSpotUpdates?.office_type
+      let normalizedOffice = hubSpotOffice || details?.normalizedOffice
+
+      if (!normalizedOffice && raceId && !noNormalizedOffice) {
+        const race = await this.prismaService.ballotRace.findFirst({
+          where: { ballotHashId: raceId },
+        })
+        normalizedOffice = race?.data?.normalized_position_name
+        if (normalizedOffice) {
+          await this.prismaService.campaign.update({
+            where: { slug },
+            data: { details: { ...details, normalizedOffice } },
+          })
+        } else {
+          await this.prismaService.campaign.update({
+            where: { slug },
+            data: { details: { ...details, noNormalizedOffice: true } },
+          })
+        }
+      }
+
+      const cleanCampaign = {
+        slug,
+        id: slug,
+        didWin,
+        office: resolvedOffice,
+        state,
+        ballotLevel,
+        zip,
+        party,
+        firstName: campaign.user?.firstName,
+        lastName: campaign.user?.lastName,
+        avatar: campaign.user?.avatar || false,
+        electionDate,
+        county,
+        city,
+        normalizedOffice: normalizedOffice || resolvedOffice,
+      }
+
+      if (didWin === null) {
+        const date = new Date(electionDate)
+        if (date < lastWeek) {
+          continue
+        }
+      }
+
+      const position = await handleGeoLocation(campaign, forceReCalc)
+      if (!position) {
+        continue
+      } else {
+        cleanCampaign.position = position
+      }
+
+      cleanCampaigns.push(cleanCampaign)
+    }
   }
 }
 
