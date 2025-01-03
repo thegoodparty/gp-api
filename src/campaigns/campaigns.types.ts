@@ -16,3 +16,9 @@ export type Campaign = PrismaCampaign & {
   data?: CampaignDataContent
   details?: CampaignDetailsContent
 }
+
+export function isRecord<T extends object>(
+  value: unknown,
+): value is Record<string, T> {
+  return typeof value === 'object' && value !== null
+}

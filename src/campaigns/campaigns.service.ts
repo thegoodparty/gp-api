@@ -6,7 +6,13 @@ import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
-import { Campaign } from './campaigns.types'
+import {
+  Campaign,
+  CampaignDataContent,
+  CampaignDetailsContent,
+  isRecord,
+} from './campaigns.types'
+import { any, string } from 'zod'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -168,6 +174,138 @@ export class CampaignsService {
         include: { pathToVictory: true },
       }) as Promise<Campaign>
     })
+  }
+
+  async listMapCount(
+    state?: string,
+    results?: boolean,
+  ): Promise<{ count: number }> {
+    // Config to check APP_BASE ?
+
+    // let whereClauses = `WHERE c."user_id" IS NOT NULL AND c."isDemo" = false AND c."isActive" = true`
+
+    // if (state) {
+    //   whereClauses += ` AND c.details->>'state' = '${state}`
+    // }
+
+    // if (results) {
+    //   whereClauses += ` AND (c."didWin" = true OR c.data->'hubSpotUpdates'->>'election_results' = 'Won General')`
+    // }
+
+    // const rawQuery = `
+    //   SELECT
+    //       c."slug",
+    //       c."details",
+    //       c."didWin",
+    //       c."data",
+    //       u."firstName",
+    //       u."lastName",
+    //       u."avatar"
+    //     FROM "campaign" c
+    //     JOIN "user" u ON c."user" = u.id
+    //     ${whereClauses};
+    //   `
+
+    // const campaigns = await this.prismaService.$queryRawUnsafe<
+    //   {
+    //     slug: string
+    //     details: any
+    //     didWin: boolean | null
+    //     data: any
+    //     firstName: string
+    //     lastName: string
+    //     avatar: string
+    //   }[]
+    // >(rawQuery)
+
+    const whereClause: Prisma.CampaignWhereInput = {
+      userId: { not: null },
+      isDemo: false,
+      isActive: true,
+      ...(state
+        ? {
+            details: {
+              path: ['state'],
+              equals: state,
+            },
+          }
+        : {}),
+      ...(results
+        ? {
+            OR: [
+              { didWin: true },
+              {
+                data: {
+                  path: ['hubSpotUpdates', 'election_results'],
+                  equals: 'Won General',
+                },
+              },
+            ],
+          }
+        : {}),
+    }
+
+    const campaigns = await this.prismaService.campaign.findMany({
+      where: whereClause,
+      select: {
+        slug: true,
+        details: true,
+        didWin: true,
+        data: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+      },
+    })
+
+    const lastWeek = new Date()
+    lastWeek.setDate(lastWeek.getDate() - 7)
+    let count = 0
+
+    for (const campaign of campaigns) {
+      const { didWin } = campaign
+      const details = campaign.details as CampaignDetailsContent
+      const data = campaign.data as CampaignDataContent
+
+      if (
+        !details?.zip ||
+        didWin === false ||
+        !isRecord(details.geoLocation) ||
+        !details?.geoLocation?.lng ||
+        details?.geoLocationFailed
+      ) {
+        continue
+      }
+      const isProd = false // Change this later
+
+      if (isProd) {
+        if (
+          !isRecord(data.hubSpotUpdates) ||
+          typeof data.hubSpotUpdates.verified_candidates !== 'string' ||
+          data?.hubSpotUpdates?.verified_candidates !== 'Yes'
+        ) {
+          continue
+        }
+      }
+
+      if (didWin == null) {
+        if (typeof details.electionDate !== 'string') {
+          continue
+        }
+        const electionDate = new Date(details.electionDate)
+        if (electionDate < lastWeek) {
+          continue
+        }
+      }
+
+      count++
+    }
+
+    return { count }
   }
 }
 

@@ -78,4 +78,9 @@ export class CampaignsController {
     if (updateResp === false) throw new NotFoundException()
     return updateResp
   }
+
+  @Get('list-map-count')
+  async listMapCount(): Promise<{ count: number }> {
+    return await this.campaignsService.listMapCount()
+  }
 }
