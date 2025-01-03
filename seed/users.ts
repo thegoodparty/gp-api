@@ -4,6 +4,8 @@ import { hashPasswordSync } from 'src/users/util/passwords.util'
 
 const NUM_USERS = 20
 
+const ADMIN_STRIPE_CUSTOMER_ID = 'cus_RWKP2JnywRA590'
+
 const ADMIN_FIRST_NAME = 'Tyler'
 const ADMIN_LAST_NAME = 'Durden'
 const ADMIN_USER = {
@@ -13,6 +15,9 @@ const ADMIN_USER = {
   lastName: ADMIN_LAST_NAME,
   name: `${ADMIN_FIRST_NAME} ${ADMIN_LAST_NAME}`,
   roles: [UserRole.admin],
+  metaData: {
+    customerId: ADMIN_STRIPE_CUSTOMER_ID,
+  },
 }
 
 const SALES_USER = {

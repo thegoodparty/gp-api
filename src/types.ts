@@ -7,6 +7,6 @@ declare global {
     type UserMetaData = {
       customerId?: string
       checkoutSessionId?: string
-    }
+    } | null
   }
 }

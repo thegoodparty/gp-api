@@ -13,7 +13,6 @@ export class PurchaseController {
 
   @Post('checkout-session')
   async createCheckoutSession(@ReqUser() user: User) {
-    // Create a checkout session
     const { redirectUrl, checkoutSessionId } =
       await this.stripeService.createCheckoutSession(user.id)
     const currentUserMetaData = (user.metaData as Prisma.JsonObject) || {}
@@ -40,9 +39,8 @@ export class PurchaseController {
     if (!customerId) {
       throw new BadRequestException('User does not have a customerId')
     }
-    const { url: redirectUrl } = await this.stripeService.createPortalSession(
-      customerId as string,
-    )
+    const { url: redirectUrl } =
+      await this.stripeService.createPortalSession(customerId)
     return { redirectUrl }
   }
 }
