@@ -4,6 +4,10 @@ generator client {
   previewFeatures = ["prismaSchemaFolder"]
 }
 
+generator json {
+  provider = "prisma-json-types-generator"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
