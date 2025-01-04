@@ -105,3 +105,15 @@ export type RaceQuery = {
   municipalityId?: number
   countyId?: number
 }
+
+export type GeoData = {
+  name: string
+  type: string
+  city?: string
+  county?: string
+  state?: string
+  township?: string
+  town?: string
+  village?: string
+  borough?: string
+}

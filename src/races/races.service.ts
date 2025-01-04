@@ -4,7 +4,13 @@ import { GraphqlService } from 'src/graphql/graphql.service'
 import slugify from 'slugify'
 import { startOfYear, addYears, format } from 'date-fns'
 import { County, Municipality } from '@prisma/client'
-import { NormalizedRace, Race, RaceData, RaceQuery } from './races.types'
+import {
+  GeoData,
+  NormalizedRace,
+  Race,
+  RaceData,
+  RaceQuery,
+} from './races.types'
 import {
   COUNTY_PROMPT,
   CITY_PROMPT,
@@ -12,6 +18,7 @@ import {
   TOWNSHIP_PROMPT,
   VILLAGE_PROMPT,
 } from './constants/prompts.consts'
+import { MTFCC_TYPES, GEO_TYPES } from './constants/geo.consts'
 
 @Injectable()
 export class RacesService {
@@ -335,7 +342,7 @@ export class RacesService {
   }
 
   private async resolveMtfcc(geoId: string, mtfcc: string) {
-    let geoData: any
+    let geoData: GeoData | undefined
     // geoId is a string that an start with 0, so we need remove that 0
     if (geoId) {
       geoId = parseInt(geoId, 10).toString()
@@ -355,27 +362,23 @@ export class RacesService {
 
         // todo: this can be improved for county recognition
         // and other types of entities (school board, etc)
-
-        // if (census.mtfccType !== 'State or Equivalent Feature') {
-        //   geoData.city = census.name;
-        // }
-        if (census.mtfccType === 'Incorporated Place') {
+        if (census.mtfccType === MTFCC_TYPES.CITY) {
           geoData.city = census.name
-        } else if (census.mtfccType === 'County or Equivalent Feature') {
+        } else if (census.mtfccType === MTFCC_TYPES.COUNTY) {
           // todo: strip County from name.
           geoData.county = census.name
-        } else if (census.mtfccType === 'State or Equivalent Feature') {
+        } else if (census.mtfccType === MTFCC_TYPES.STATE) {
           geoData.state = census.name
-        } else if (census.mtfccType === 'County Subdivision') {
-          if (census.name.toLowerCase().includes('township')) {
+        } else if (census.mtfccType === MTFCC_TYPES.COUNTY_SUBDIVISION) {
+          if (census.name.toLowerCase().includes(GEO_TYPES.TOWNSHIP)) {
             geoData.township = census.name
-          } else if (census.name.toLowerCase().includes('town')) {
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.TOWN)) {
             geoData.town = census.name
-          } else if (census.name.toLowerCase().includes('city')) {
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.CITY)) {
             geoData.city = census.name
-          } else if (census.name.toLowerCase().includes('village')) {
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.VILLAGE)) {
             geoData.village = census.name
-          } else if (census.name.toLowerCase().includes('borough')) {
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.BOROUGH)) {
             geoData.borough = census.name
           }
         }
@@ -384,25 +387,25 @@ export class RacesService {
     return geoData
   }
 
+  // todo: split this function into smaller functions
   private async getRaceDetails(
     raceId: string,
     slug: string,
     zip: string,
     findElectionDates = true,
   ) {
-    const logger = new Logger('getRaceDetails')
     const data: any = {}
 
-    logger.log(slug, 'getting race from ballotReady api...')
+    this.logger.log(slug, 'getting race from ballotReady api...')
 
     let race: any
     try {
       race = await this.getRaceById(raceId)
     } catch (e) {
-      logger.error(slug, 'error getting race details', e)
+      this.logger.error(slug, 'error getting race details', e)
       return
     }
-    logger.log(slug, 'got ballotReady Race')
+    this.logger.log(slug, 'got ballotReady Race')
 
     let electionDate: string | undefined // the date of the election
     let termLength = 4
@@ -421,7 +424,7 @@ export class RacesService {
       geoId = race?.position.geoId
       tier = race?.position.tier
     } catch (e) {
-      logger.error(slug, 'error getting election date', e)
+      this.logger.error(slug, 'error getting election date', e)
     }
     if (!electionDate) {
       return
@@ -431,13 +434,13 @@ export class RacesService {
     try {
       electionLevel = this.getRaceLevel(level)
     } catch (e) {
-      logger.error(slug, 'error getting election level', e)
+      this.logger.error(slug, 'error getting election level', e)
     }
-    logger.log(slug, 'electionLevel', electionLevel)
+    this.logger.log(slug, 'electionLevel', electionLevel)
 
     const officeName = race?.position?.name
     if (!officeName) {
-      logger.error(slug, 'error getting office name')
+      this.logger.error(slug, 'error getting office name')
       return
     }
 
@@ -459,10 +462,10 @@ export class RacesService {
     if (level !== 'state' && level !== 'federal') {
       // We use the mtfcc and geoId to get the city and county
       // and a more accurate electionLevel
-      logger.log(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
+      this.logger.log(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
         const geoData: any = await this.resolveMtfcc(mtfcc, geoId)
-        logger.log(slug, 'geoData', geoData)
+        this.logger.log(slug, 'geoData', geoData)
         if (geoData?.city) {
           city = geoData.city
           if (electionLevel !== 'city') {
@@ -518,7 +521,7 @@ export class RacesService {
         (electionLevel === 'city' && !city) ||
         (electionLevel === 'county' && !county)
       ) {
-        logger.log(
+        this.logger.log(
           slug,
           'could not find location from mtfcc. getting location from AI',
         )
@@ -528,7 +531,7 @@ export class RacesService {
           officeName + ' - ' + electionState,
           level,
         )
-        logger.log(slug, 'locationResp', locationResp)
+        this.logger.log(slug, 'locationResp', locationResp)
       }
 
       if (locationResp?.level) {
@@ -547,10 +550,10 @@ export class RacesService {
     }
 
     if (county) {
-      logger.log(slug, 'Found county', county)
+      this.logger.log(slug, 'Found county', county)
     }
     if (city) {
-      logger.log(slug, 'Found city', city)
+      this.logger.log(slug, 'Found city', city)
     }
 
     let priorElectionDates: string[] = []
@@ -580,7 +583,6 @@ export class RacesService {
           zip,
           race?.position?.level,
         )
-        logger.log(`priorElectionDates from zip ${zip}`, priorElectionDates)
       }
     }
 
@@ -725,7 +727,6 @@ export class RacesService {
     level: string,
   ) {
     const electionDates: string[] = []
-    const logger = new Logger('getElectionDates')
     try {
       // get todays date in format YYYY-MM-DD
       const today = new Date()
@@ -754,7 +755,7 @@ export class RacesService {
             }`
 
       const { races } = await this.graphQLService.fetchGraphql(query)
-      logger.log(slug, 'getElectionDates graphql result', races)
+      this.logger.log(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {
         const result = results[i]
@@ -767,11 +768,11 @@ export class RacesService {
           }
         }
       }
-      logger.log(slug, 'electionDates', electionDates)
+      this.logger.log(slug, 'electionDates', electionDates)
 
       return electionDates
     } catch (e) {
-      logger.error(slug, 'error at getElectionDates', e)
+      this.logger.error(slug, 'error at getElectionDates', e)
       return []
     }
   }
