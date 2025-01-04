@@ -13,7 +13,6 @@ export default async function seedCampaigns(
   prisma: PrismaClient,
   existingUsers: User[],
 ) {
-  const fakeUsers: any[] = []
   const fakeCampaigns: any[] = []
   const fakeP2Vs: any[] = []
   const fakeUpdateHistory: any[] = []
@@ -23,33 +22,34 @@ export default async function seedCampaigns(
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
     let user = existingUsers[i]
     if (!user) {
-      user = userFactory()
-      fakeUsers.push(user)
+      user = await prisma.user.create({
+        data: userFactory(),
+      })
     }
-    const camp = campaignFactory({
+    const campaign = campaignFactory({
       userId: user.id,
       slug: buildSlug(getFullName(user)),
     })
 
-    campaignIds.push(camp.id)
-    fakeCampaigns.push(camp)
-    fakeP2Vs.push(pathToVictoryFactory({ campaignId: camp.id }))
+    campaignIds.push(campaign.id)
+    fakeCampaigns.push(campaign)
+    fakeP2Vs.push(pathToVictoryFactory({ campaignId: campaign.id }))
 
     for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
       fakeUpdateHistory.push(
         campaignUpdateHistoryFactory({
-          campaignId: camp.id,
+          campaignId: campaign.id,
           userId: user.id,
         }),
       )
     }
   }
 
-  await prisma.user.createMany({ data: fakeUsers })
   const { count } = await prisma.campaign.createMany({ data: fakeCampaigns })
   await prisma.pathToVictory.createMany({
     data: fakeP2Vs,
   })
+
   await prisma.campaignUpdateHistory.createMany({ data: fakeUpdateHistory })
 
   console.log(`Created ${count} campaigns`)

@@ -19,6 +19,7 @@ import { QueueConsumerModule } from './queue/consumer/consumer.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
 import { SharedModule } from './shared/shared.module'
 import { GraphqlModule } from './graphql/graphql.module'
+import { PaymentsModule } from './payments/payments.module'
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { GraphqlModule } from './graphql/graphql.module'
     QueueConsumerModule,
     SharedModule,
     GraphqlModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
