@@ -1,14 +1,32 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { GraphqlService } from 'src/graphql/graphql.service'
 import slugify from 'slugify'
 import { startOfYear, addYears, format } from 'date-fns'
-
 import { County, Municipality } from '@prisma/client'
-import { NormalizedRace, Race, RaceData, RaceQuery } from './races.types'
+import {
+  GeoData,
+  NormalizedRace,
+  Race,
+  RaceData,
+  RaceQuery,
+} from './races.types'
+import {
+  COUNTY_PROMPT,
+  CITY_PROMPT,
+  TOWN_PROMPT,
+  TOWNSHIP_PROMPT,
+  VILLAGE_PROMPT,
+} from './constants/prompts.consts'
+import { MTFCC_TYPES, GEO_TYPES } from './constants/geo.consts'
 
 @Injectable()
 export class RacesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(RacesService.name)
+  constructor(
+    private prisma: PrismaService,
+    private graphQLService: GraphqlService,
+  ) {}
 
   async findRaces(
     state?: string,
@@ -263,7 +281,7 @@ export class RacesService {
   ): NormalizedRace[] {
     const uniqueRaces = new Map<string, NormalizedRace>()
 
-    for (let race of races) {
+    for (const race of races) {
       if (!race.positionSlug || !uniqueRaces.has(race.positionSlug)) {
         const { data, positionSlug, ...withoutData } = race
         const {
@@ -293,5 +311,516 @@ export class RacesService {
     }
 
     return [...uniqueRaces.values()]
+  }
+
+  private getRaceLevel(level: string) {
+    // this helper just simplifies level to city/state/county/federal.
+    // it is used in p2v.
+    // from this larger list:
+    // "level"
+    // "city"
+    // "county"
+    // "federal"
+    // "local"
+    // "regional"
+    // "state"
+    // "town"
+    // "township"
+    // "village"
+
+    level = level.toLowerCase()
+    if (
+      level &&
+      level !== 'federal' &&
+      level !== 'state' &&
+      level !== 'county' &&
+      level !== 'city'
+    ) {
+      level = 'city'
+    }
+    return level
+  }
+
+  private async resolveMtfcc(geoId: string, mtfcc: string) {
+    let geoData: GeoData | undefined
+    // geoId is a string that an start with 0, so we need remove that 0
+    if (geoId) {
+      geoId = parseInt(geoId, 10).toString()
+    }
+    if (mtfcc && geoId) {
+      const census = await this.prisma.censusEntity.findFirst({
+        where: {
+          geoId,
+          mtfcc,
+        },
+      })
+      if (census) {
+        geoData = {
+          name: census.name,
+          type: census.mtfccType,
+        }
+
+        // todo: this can be improved for county recognition
+        // and other types of entities (school board, etc)
+        if (census.mtfccType === MTFCC_TYPES.CITY) {
+          geoData.city = census.name
+        } else if (census.mtfccType === MTFCC_TYPES.COUNTY) {
+          // todo: strip County from name.
+          geoData.county = census.name
+        } else if (census.mtfccType === MTFCC_TYPES.STATE) {
+          geoData.state = census.name
+        } else if (census.mtfccType === MTFCC_TYPES.COUNTY_SUBDIVISION) {
+          if (census.name.toLowerCase().includes(GEO_TYPES.TOWNSHIP)) {
+            geoData.township = census.name
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.TOWN)) {
+            geoData.town = census.name
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.CITY)) {
+            geoData.city = census.name
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.VILLAGE)) {
+            geoData.village = census.name
+          } else if (census.name.toLowerCase().includes(GEO_TYPES.BOROUGH)) {
+            geoData.borough = census.name
+          }
+        }
+      }
+    }
+    return geoData
+  }
+
+  // todo: split this function into smaller functions
+  private async getRaceDetails(
+    raceId: string,
+    slug: string,
+    zip: string,
+    findElectionDates = true,
+  ) {
+    const data: any = {}
+
+    this.logger.log(slug, 'getting race from ballotReady api...')
+
+    let race: any
+    try {
+      race = await this.getRaceById(raceId)
+    } catch (e) {
+      this.logger.error(slug, 'error getting race details', e)
+      return
+    }
+    this.logger.log(slug, 'got ballotReady Race')
+
+    let electionDate: string | undefined // the date of the election
+    let termLength = 4
+    let level = 'city'
+    let positionId: string | undefined
+    let mtfcc: string | undefined
+    let geoId: string | undefined
+    let tier: string | undefined
+
+    try {
+      electionDate = race?.election?.electionDay
+      termLength = race?.position?.electionFrequencies[0].frequency[0]
+      level = race?.position?.level.toLowerCase()
+      positionId = race?.position.id
+      mtfcc = race?.position.mtfcc
+      geoId = race?.position.geoId
+      tier = race?.position.tier
+    } catch (e) {
+      this.logger.error(slug, 'error getting election date', e)
+    }
+    if (!electionDate) {
+      return
+    }
+
+    let electionLevel = 'city'
+    try {
+      electionLevel = this.getRaceLevel(level)
+    } catch (e) {
+      this.logger.error(slug, 'error getting election level', e)
+    }
+    this.logger.log(slug, 'electionLevel', electionLevel)
+
+    const officeName = race?.position?.name
+    if (!officeName) {
+      this.logger.error(slug, 'error getting office name')
+      return
+    }
+
+    const partisanType = race?.position?.partisanType
+    const subAreaName =
+      race?.position?.subAreaName && race.position.subAreaName !== 'null'
+        ? race.position.subAreaName
+        : undefined
+    const subAreaValue =
+      race?.position?.subAreaValue && race.position.subAreaValue !== 'null'
+        ? race.position.subAreaValue
+        : undefined
+    const electionState = race?.election?.state
+
+    let locationResp: any
+    let county: string | undefined
+    let city: string | undefined
+
+    if (level !== 'state' && level !== 'federal') {
+      // We use the mtfcc and geoId to get the city and county
+      // and a more accurate electionLevel
+      this.logger.log(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
+      if (mtfcc && geoId) {
+        const geoData: any = await this.resolveMtfcc(mtfcc, geoId)
+        this.logger.log(slug, 'geoData', geoData)
+        if (geoData?.city) {
+          city = geoData.city
+          if (electionLevel !== 'city') {
+            electionLevel = 'city'
+          }
+        }
+        if (geoData?.county) {
+          if (electionLevel !== 'county') {
+            county = geoData.county
+            electionLevel = 'county'
+          }
+        }
+        if (geoData?.state) {
+          if (electionLevel !== 'state') {
+            electionLevel = 'state'
+          }
+        }
+        // TODO: electionLevel='local' could cause issues upstream
+        // so we are leaving electionLevel as city for now.
+        if (geoData?.township) {
+          city = geoData.township
+          // electionLevel = 'local';
+          electionLevel = 'city'
+        }
+        if (geoData?.town) {
+          city = geoData.town
+          // electionLevel = 'local';
+          electionLevel = 'city'
+        }
+        if (geoData?.village) {
+          city = geoData.village
+          // electionLevel = 'local';
+          electionLevel = 'city'
+        }
+        if (geoData?.borough) {
+          city = geoData.borough
+          // electionLevel = 'local';
+          electionLevel = 'city'
+        }
+      }
+
+      if (city && city !== '') {
+        city = city.replace(/ CCD$/, '')
+        city = city.replace(/ City$/, '')
+        // Note: we don't remove Town/Township/Village/Borough
+        // because we want to keep that info for ai column matching.
+      }
+      if (county && county !== '') {
+        county = county.replace(/ County$/, '')
+      }
+
+      if (
+        (electionLevel === 'city' && !city) ||
+        (electionLevel === 'county' && !county)
+      ) {
+        this.logger.log(
+          slug,
+          'could not find location from mtfcc. getting location from AI',
+        )
+
+        // If we couldn't get city/county with mtfcc/geo then use the AI.
+        locationResp = await this.extractLocationAi(
+          officeName + ' - ' + electionState,
+          level,
+        )
+        this.logger.log(slug, 'locationResp', locationResp)
+      }
+
+      if (locationResp?.level) {
+        if (locationResp.level === 'county') {
+          county = locationResp.county
+        } else {
+          if (
+            locationResp.county &&
+            locationResp.hasOwnProperty(locationResp.level)
+          ) {
+            city = locationResp[locationResp.level]
+            county = locationResp.county
+          }
+        }
+      }
+    }
+
+    if (county) {
+      this.logger.log(slug, 'Found county', county)
+    }
+    if (city) {
+      this.logger.log(slug, 'Found city', city)
+    }
+
+    let priorElectionDates: string[] = []
+    if (partisanType !== 'partisan' && findElectionDates) {
+      // todo: restore this code once we have Position / BallotPosition
+      // if (positionId) {
+      //   const ballotPosition = await BallotPosition.findOne({
+      //     ballotHashId: positionId.toString(),
+      //   })
+      //   if (ballotPosition && ballotPosition?.ballotId) {
+      //     const ballotPositionId = ballotPosition?.ballotId
+      //     priorElectionDates = await getElectionDatesPosition(
+      //       slug,
+      //       ballotPositionId,
+      //     )
+      //     logger.log(
+      //       `priorElectionDates from PositionId ${ballotPositionId} `,
+      //       priorElectionDates,
+      //     )
+      //   }
+      // }
+
+      if ((!priorElectionDates || priorElectionDates.length === 0) && zip) {
+        priorElectionDates = await this.getElectionDates(
+          slug,
+          officeName,
+          zip,
+          race?.position?.level,
+        )
+      }
+    }
+
+    data.slug = slug
+    data.officeName = officeName
+    data.electionDate = electionDate
+    data.electionTerm = termLength
+    data.electionLevel = electionLevel
+    data.electionState = electionState
+    data.electionCounty = county
+    data.electionMunicipality = city
+    data.subAreaName = subAreaName
+    data.subAreaValue = subAreaValue
+    data.partisanType = partisanType
+    data.priorElectionDates = priorElectionDates
+    data.positionId = positionId
+    data.tier = tier
+    return data
+  }
+
+  private async extractLocationAi(office: string, level: string) {
+    level = level.toLowerCase()
+
+    if (level === 'local' || level === 'regional') {
+      // if the level is local or regional, we need to refine the level
+      if (office.includes('Village')) {
+        level = 'village'
+      } else if (office.includes('Township')) {
+        level = 'township'
+      } else if (office.includes('Town')) {
+        level = 'town'
+      } else if (
+        office.includes('City') ||
+        office.includes('Municipal') ||
+        office.includes('Borough')
+      ) {
+        level = 'city'
+      } else if (office.includes('County') || office.includes('Parish')) {
+        level = 'county'
+      } else {
+        // default to city if we can't determine the local level
+        level = 'city'
+      }
+    }
+
+    const tool: any = {
+      type: 'function',
+      function: {
+        name: 'extractLocation',
+        description: 'Extract the location from the office name.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
+    }
+    let systemPrompt
+    if (level === 'county') {
+      systemPrompt = COUNTY_PROMPT
+    } else if (level === 'city') {
+      systemPrompt = CITY_PROMPT
+      tool.function.parameters.properties.city = {
+        type: 'string',
+        description: 'The city name.',
+      }
+    } else if (level === 'town') {
+      systemPrompt = TOWN_PROMPT
+      tool.function.parameters.properties.town = {
+        type: 'string',
+        description: 'The town name.',
+      }
+    } else if (level === 'township') {
+      systemPrompt = TOWNSHIP_PROMPT
+      tool.function.parameters.properties.township = {
+        type: 'string',
+        description: 'The township name.',
+      }
+    } else if (level === 'village') {
+      systemPrompt = VILLAGE_PROMPT
+      tool.function.parameters.properties.village = {
+        type: 'string',
+        description: 'The village name.',
+      }
+    } else {
+      return false
+    }
+
+    // we always try to get the county name
+    tool.function.parameters.properties.county = {
+      type: 'string',
+      description: 'The county name.',
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt,
+      },
+      {
+        role: 'user',
+        content: `Input: "${office}"
+          Output:`,
+      },
+    ]
+
+    const toolChoice: any = {
+      type: 'function',
+      function: { name: 'extractLocation' },
+    }
+
+    let completion
+    // todo: once the ai service is up, we can use this code
+    // const completion = await getChatToolCompletion(
+    //   messages,
+    //   0.1,
+    //   0.1,
+    //   tool,
+    //   toolChoice,
+    // )
+
+    this.logger.log(
+      `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
+    )
+
+    // console.log('completion', completion);
+    const content = completion?.content
+    let decodedContent: any = {}
+    try {
+      decodedContent = JSON.parse(content)
+      decodedContent.level = level
+    } catch (e) {
+      console.log('error at extract-location-ai helper', e)
+    }
+    console.log('extract ai location response', decodedContent)
+    return decodedContent
+  }
+
+  private async getElectionDates(
+    slug: string,
+    officeName: string,
+    zip: string,
+    level: string,
+  ) {
+    const electionDates: string[] = []
+    try {
+      // get todays date in format YYYY-MM-DD
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = (today.getMonth() + 1).toString().padStart(2, '0')
+      const day = today.getDate().toString().padStart(2, '0')
+      const dateToday = `${year}-${month}-${day}`
+
+      const query = `
+            query {
+                races(
+                    location: { zip: "${zip}" }
+                    filterBy: { electionDay: { gt: "2006-01-01", lt: "${dateToday}" }, level: ${level} }
+                ) {
+                    edges {
+                        node {
+                            position {    
+                                name
+                            }
+                            election {
+                                electionDay
+                            }
+                        }
+                    }
+                }
+            }`
+
+      const { races } = await this.graphQLService.fetchGraphql(query)
+      this.logger.log(slug, 'getElectionDates graphql result', races)
+      const results = races?.edges || []
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]
+        const { position, election } = result.node
+        if (position?.name && election?.electionDay) {
+          if (position.name.toLowerCase() === officeName.toLowerCase()) {
+            if (!electionDates.includes(election.electionDay)) {
+              electionDates.push(election.electionDay)
+            }
+          }
+        }
+      }
+      this.logger.log(slug, 'electionDates', electionDates)
+
+      return electionDates
+    } catch (e) {
+      this.logger.error(slug, 'error at getElectionDates', e)
+      return []
+    }
+  }
+
+  private async getRaceById(raceId: string) {
+    const query = `
+          query Node {
+            node(id: "${raceId}") {
+                ... on Race {
+                    databaseId
+                    isPartisan
+                    isPrimary
+                    election {
+                        electionDay
+                        name
+                        state
+                    }
+                    position {
+                        id
+                        description
+                        judicial
+                        level
+                        name
+                        partisanType
+                        staggeredTerm
+                        state
+                        subAreaName
+                        subAreaValue
+                        tier
+                        mtfcc
+                        geoId
+                        electionFrequencies {
+                            frequency
+                        }
+                        hasPrimary
+                        normalizedPosition {
+                          name
+                      }
+                    }
+                    filingPeriods {
+                        endOn
+                        startOn
+                    }
+                }
+            }
+        }
+        `
+    const { node } = await this.graphQLService.fetchGraphql(query)
+    return node
   }
 }
