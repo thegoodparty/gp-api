@@ -28,6 +28,7 @@ model Campaign {
   topIssues             TopIssue[]
   campaignPositions     CampaignPosition[]
   campaignPlanVersion   CampaignPlanVersion?
+  aiChats               AiChat[]
 
   @@index([slug])
   @@map("campaign")

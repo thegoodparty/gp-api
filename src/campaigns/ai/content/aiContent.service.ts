@@ -1,22 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
-import { CampaignsService } from '../services/campaigns.service'
-import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
+import { CampaignsService } from '../../services/campaigns.service'
+import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/content.service'
 import {
   AiContentGenerationStatus,
   CampaignAiContent,
   GenerationStatus,
-} from '../campaigns.types'
+} from '../../campaigns.types'
 import { AiService } from 'src/ai/ai.service'
-import { AiChatMessage } from 'src/ai/ai.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { EnqueueService } from 'src/queue/producer/enqueue.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
+import { AiChatMessage } from '../chat/aiChat.types'
 
 @Injectable()
-export class CampaignsAiService {
-  private readonly logger = new Logger(CampaignsAiService.name)
+export class AiContentService {
+  private readonly logger = new Logger(AiContentService.name)
 
   constructor(
     private campaignsService: CampaignsService,

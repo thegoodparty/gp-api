@@ -13,25 +13,25 @@ import {
   Res,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignsAiService } from './campaignsAi.service'
-import { RenameAiContentSchema } from './schemas/RenameAiContent.schema'
+import { AiContentService } from './aiContent.service'
+import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { Campaign } from '@prisma/client'
-import { CreateAiContentSchema } from './schemas/CreateAiContent.schema'
+import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
-import { CampaignsService } from '../services/campaigns.service'
-import { CampaignAiContent } from '../campaigns.types'
-import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
-import { UseCampaign } from '../decorators/UseCampaign.decorator'
+import { CampaignsService } from '../../services/campaigns.service'
+import { CampaignAiContent } from '../../campaigns.types'
+import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
+import { UseCampaign } from '../../decorators/UseCampaign.decorator'
 
 @Controller('campaigns/ai')
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
-export class CampaignsAiController {
-  private readonly logger = new Logger(CampaignsAiController.name)
+export class AiContentController {
+  private readonly logger = new Logger(AiContentController.name)
 
   constructor(
-    private campaignsAiService: CampaignsAiService,
+    private aiContentService: AiContentService,
     private campaignsService: CampaignsService,
   ) {}
 
@@ -42,7 +42,7 @@ export class CampaignsAiController {
     @Body() body: CreateAiContentSchema,
   ) {
     try {
-      const result = await this.campaignsAiService.createContent(campaign, body)
+      const result = await this.aiContentService.createContent(campaign, body)
 
       if (result.created) {
         res.statusCode = HttpStatus.CREATED

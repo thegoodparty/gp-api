@@ -10,6 +10,8 @@ export class CreateAiContentSchema extends createZodDto(
     inputValues: z
       .record(z.string(), z.union([z.string(), z.boolean(), z.number()]))
       .optional(),
-    chat: z.array(z.record(z.string(), z.string())).optional(),
+    chat: z
+      .array(z.record(z.string(), z.union([z.string(), z.number()])))
+      .optional(),
   }),
 ) {}

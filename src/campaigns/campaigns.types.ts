@@ -1,4 +1,4 @@
-import { AiChatMessage } from 'src/ai/ai.types'
+import { AiChatMessage } from './ai/chat/aiChat.types'
 
 export type CampaignPlanVersionData = Record<string, AiContentVersion[]>
 

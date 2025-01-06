@@ -1,7 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai'
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
 import { Injectable, Logger } from '@nestjs/common'
-import { AiChatMessage } from './ai.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Prisma, User } from '@prisma/client'
 import { getFullName } from 'src/users/util/users.util'
@@ -10,10 +9,37 @@ import {
   CampaignAiContent,
 } from 'src/campaigns/campaigns.types'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
+import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 
 const TOGETHER_AI_KEY = process.env.TOGETHER_AI_KEY
 const OPEN_AI_KEY = process.env.OPEN_AI_KEY
 const AI_MODELS = process.env.AI_MODELS || ''
+
+export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
+  include: {
+    pathToVictory: true
+    campaignPositions: {
+      include: {
+        topIssue: true
+        position: true
+      }
+    }
+    campaignUpdateHistory: true
+    user: true
+  }
+}>
+
+type GetAssistantCompletionArgs = {
+  systemPrompt: string
+  candidateContext: string
+  assistantId: string
+  threadId: string
+  message: AiChatMessage
+  messageId: string
+  existingMessages?: AiChatMessage[]
+  temperature?: number
+  topP?: number
+}
 
 @Injectable()
 export class AiService {
@@ -109,7 +135,9 @@ export class AiService {
 
       return {
         content,
-        tokens: completion?.response_metadata?.tokenUsage?.totalTokens || 0,
+        tokens:
+          (completion?.response_metadata?.tokenUsage?.totalTokens as number) ||
+          0,
       }
     } else {
       return {
@@ -119,23 +147,87 @@ export class AiService {
     }
   }
 
-  /** function to replace placeholder tokens in ai content prompt */
-  async promptReplace(
-    prompt: string,
-    campaign: Prisma.CampaignGetPayload<{
-      include: {
-        pathToVictory: true
-        campaignPositions: {
-          include: {
-            topIssue: true
-            position: true
-          }
-        }
-        campaignUpdateHistory: true
-        user: true
+  async getAssistantCompletion({
+    systemPrompt,
+    candidateContext,
+    assistantId,
+    threadId,
+    message,
+    messageId,
+    existingMessages,
+    temperature = 0.7,
+    topP = 0.1,
+  }: GetAssistantCompletionArgs) {
+    try {
+      if (!assistantId || !systemPrompt) {
+        this.logger.log('missing assistantId or systemPrompt')
+        this.logger.log('assistantId', assistantId)
+        this.logger.log('systemPrompt', systemPrompt)
+        return
       }
-    }>,
-  ) {
+
+      if (!threadId) {
+        this.logger.log('missing threadId')
+        return
+      }
+
+      this.logger.log(`running assistant ${assistantId} on thread ${threadId}`)
+
+      let messages: AiChatMessage[] = []
+      messages.push({
+        content: systemPrompt + '\n' + candidateContext,
+        role: 'system',
+        createdAt: new Date().valueOf(),
+        id: crypto.randomUUID(),
+      })
+
+      if (existingMessages) {
+        messages.push(...existingMessages)
+      }
+
+      if (messageId) {
+        this.logger.log('deleting message', messageId)
+        messages = messages.filter((m) => m.id !== messageId)
+      } else {
+        messages.push({
+          content: message.content,
+          role: 'user',
+          createdAt: new Date().valueOf(),
+          id: crypto.randomUUID(),
+        })
+      }
+
+      this.logger.log('messages', messages)
+
+      const result = await this.llmChatCompletion(
+        messages,
+        500,
+        temperature,
+        topP,
+      )
+
+      return {
+        content: result?.content,
+        threadId,
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        createdAt: new Date().valueOf(),
+        usage: result?.tokens,
+      }
+    } catch (error) {
+      this.logger.log('error', error)
+      await this.slack.message(
+        {
+          title: 'Error in AI',
+          body: `Error in getAssistantCompletion. Error: ${error}`,
+        },
+        'dev',
+      )
+    }
+    return
+  }
+  /** function to replace placeholder tokens in ai content prompt */
+  async promptReplace(prompt: string, campaign: PromptReplaceCampaign) {
     try {
       let newPrompt = prompt
 

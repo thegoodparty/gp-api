@@ -1,4 +1,4 @@
-import { PrismaClient, User } from '@prisma/client'
+import { Prisma, PrismaClient, User } from '@prisma/client'
 import { campaignFactory } from './factories/campaign.factory'
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { userFactory } from './factories/user.factory'
@@ -22,8 +22,13 @@ export default async function seedCampaigns(
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
     let user = existingUsers[i]
     if (!user) {
+      const userData = userFactory()
       user = await prisma.user.create({
-        data: userFactory(),
+        data: {
+          ...userData,
+          metaData:
+            userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
+        },
       })
     }
     const campaign = campaignFactory({

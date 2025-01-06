@@ -57,3 +57,14 @@ model Municipality {
 
   @@map("municipality")
 }
+
+model CensusEntity {
+  id        Int    @id @default(autoincrement())
+  mtfcc     String
+  mtfccType String @map("mtfcc_type")
+  geoId     String @map("geo_id")
+  name      String
+  state     String
+
+  @@map("census_entity")
+}

@@ -24,6 +24,7 @@ model User {
   campaignUpdateHistory CampaignUpdateHistory[]
   campaigns             Campaign[]
   passwordResetToken    String?                 @map("password_reset_token")
+  aiChats               AiChat[]
 
   @@map("user")
 }
