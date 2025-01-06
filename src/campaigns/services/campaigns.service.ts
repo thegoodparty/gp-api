@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
-import { Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { findSlug } from 'src/shared/util/slug.util'
@@ -13,7 +13,14 @@ import {
   AiContentInputValues,
   AiContentVersion,
   CampaignPlanVersionData,
+  CampaignData,
+  CampaignDetails,
+  CampaignLaunchStatus,
+  OnboardingStep,
 } from '../campaigns.types'
+import { EmailService } from 'src/email/email.service'
+
+const APP_BASE = process.env.CORS_ORIGIN as string
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -37,8 +44,9 @@ export class CampaignsService {
   private readonly logger = new Logger(CampaignsService.name)
 
   constructor(
-    private prismaService: PrismaService,
+    private prisma: PrismaService,
     private planVersionService: CampaignPlanVersionsService,
+    private emailService: EmailService,
   ) {}
 
   async findAll(
@@ -54,7 +62,7 @@ export class CampaignsService {
       args.where = buildCampaignListFilters(query)
     }
 
-    const campaigns = await this.prismaService.campaign.findMany(args)
+    const campaigns = await this.prisma.campaign.findMany(args)
 
     // TODO: still need this?
     // const campaignVolunteersMapping = await CampaignVolunteer.find({
@@ -71,7 +79,7 @@ export class CampaignsService {
       pathToVictory: true,
     } as any, // TODO: figure out how to properly type this default instead of using any
   ) {
-    return this.prismaService.campaign.findFirst({
+    return this.prisma.campaign.findFirst({
       where,
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
@@ -83,7 +91,7 @@ export class CampaignsService {
       pathToVictory: true,
     },
   ) {
-    return this.prismaService.campaign.findFirstOrThrow({
+    return this.prisma.campaign.findFirstOrThrow({
       where,
       include,
     })
@@ -93,16 +101,16 @@ export class CampaignsService {
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
   ) {
-    return this.prismaService.campaign.findFirst({
+    return this.prisma.campaign.findFirst({
       where: { userId },
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
   async create(user: User) {
-    const slug = await findSlug(this.prismaService, getFullName(user))
+    const slug = await findSlug(this.prisma, getFullName(user))
 
-    const newCampaign = await this.prismaService.campaign.create({
+    const newCampaign = await this.prisma.campaign.create({
       data: {
         slug,
         isActive: false,
@@ -118,20 +126,19 @@ export class CampaignsService {
     })
 
     // TODO:
-    // await claimExistingCampaignRequests(user, newCampaign)
     // await createCrmUser(user.firstName, user.lastName, user.email)
 
     return newCampaign
   }
 
   async update(id: number, data: Prisma.CampaignUpdateArgs['data']) {
-    return this.prismaService.campaign.update({ where: { id }, data })
+    return this.prisma.campaign.update({ where: { id }, data })
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
     const { data, details, pathToVictory } = body
 
-    return this.prismaService.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       const campaign = await tx.campaign.findFirst({
         where: { id },
         include: { pathToVictory: true },
@@ -185,6 +192,47 @@ export class CampaignsService {
         include: { pathToVictory: true },
       })
     })
+  }
+
+  async launch(user: User, campaign: Campaign) {
+    const campaignData = campaign.data as CampaignData
+
+    if (
+      campaign.isActive ||
+      campaignData.launchStatus === CampaignLaunchStatus.launched
+    ) {
+      this.logger.log('Campaign already launched, skipping launch')
+      return true
+    }
+
+    // check if the user has office or otherOffice
+    const details = campaign.details as CampaignDetails
+    if (
+      (!details.office || details.office === '') &&
+      (!details.otherOffice || details.otherOffice === '')
+    ) {
+      throw new BadRequestException('Cannot launch campaign, Office not set')
+    }
+
+    const updated = await this.prisma.campaign.update({
+      where: { id: campaign.id },
+      data: {
+        isActive: true,
+        data: {
+          ...campaignData,
+          launchStatus: CampaignLaunchStatus.launched,
+          currentStep: OnboardingStep.complete,
+        },
+      },
+    })
+
+    // TODO: reimplement
+    // await sails.helpers.crm.updateCampaign(updated)
+    // await sails.helpers.fullstory.customAttr(updated.id)
+
+    await this.sendCampaignLaunchEmail(user)
+
+    return true
   }
 
   async saveCampaignPlanVersion(inputs: {
@@ -297,38 +345,24 @@ export class CampaignsService {
 
     return true
   }
+
+  private async sendCampaignLaunchEmail(user: User) {
+    try {
+      await this.emailService.sendTemplateEmail({
+        to: user.email,
+        subject: 'Full Suite of AI Campaign Tools Now Available',
+        // TODO: template is misspelled in Mailgun as well, must change there first.
+        template: 'campagin-launch',
+        variables: {
+          name: getFullName(user),
+          link: `${APP_BASE}/dashboard`,
+        },
+      })
+    } catch (e) {
+      this.logger.error('Error sending campaign launch email', e)
+    }
+  }
 }
-
-// async function claimExistingCampaignRequests(user, campaign) {
-//   const campaignRequests = await CampaignRequest.find({
-//     candidateEmail: user.email,
-//   }).populate('user')
-
-//   if (campaignRequests?.length) {
-//     for (const campaignRequest of campaignRequests) {
-//       const { user } = campaignRequest
-
-//       await CampaignRequest.updateOne({
-//         id: campaignRequest.id,
-//       }).set({
-//         campaign: campaign.id,
-//       })
-
-//       await Notification.create({
-//         isRead: false,
-//         data: {
-//           type: 'campaignRequest',
-//           title: `${await sails.helpers.user.name(
-//             user,
-//           )} has requested to manage your campaign`,
-//           subTitle: 'You have a request!',
-//           link: '/dashboard/team',
-//         },
-//         user: user.id,
-//       })
-//     }
-//   }
-// }
 
 // async function updatePathToVictory(campaign, columnKey, value) {
 //   try {
