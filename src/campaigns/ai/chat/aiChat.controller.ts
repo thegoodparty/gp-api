@@ -22,7 +22,6 @@ import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiChatService } from './aiChat.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { PromptReplaceCampaign } from 'src/ai/ai.service'
-import { AiChatData } from './aiChat.types'
 
 @Controller('campaigns/ai/chat')
 @UsePipes(ZodValidationPipe)
@@ -34,13 +33,13 @@ export class AiChatController {
     private slack: SlackService,
   ) {}
 
-  @Get() // campaign/ai/chat/list.js
+  @Get()
   async list(@ReqUser() { id: userId }: User) {
     const aiChats = await this.aiChatService.findAll(userId)
 
     const chats: { threadId: string; updatedAt: Date; name: string }[] = []
     for (const chat of aiChats) {
-      const chatData = chat.data as AiChatData
+      const chatData = chat.data
       chats.push({
         threadId: chat.threadId as string,
         updatedAt: chat.updatedAt,
@@ -51,13 +50,13 @@ export class AiChatController {
     return { chats }
   }
 
-  @Get(':threadId') // campaign/ai/chat/get.js
+  @Get(':threadId')
   async get(
     @ReqUser() { id: userId }: User,
     @Param('threadId') threadId: string,
   ) {
     const aiChat = await this.aiChatService.findOneOrThrow(threadId, userId)
-    const chatData = aiChat.data as AiChatData
+    const chatData = aiChat.data
 
     return {
       chat: chatData.messages,
@@ -65,7 +64,7 @@ export class AiChatController {
     }
   }
 
-  @Post() // campaign/ai/chat/create.js
+  @Post()
   @UseCampaign({
     include: {
       pathToVictory: true,
@@ -96,7 +95,7 @@ export class AiChatController {
     }
   }
 
-  @Put(':threadId') // campaign/ai/chat/update.js
+  @Put(':threadId')
   @UseCampaign({
     include: {
       pathToVictory: true,
@@ -128,7 +127,7 @@ export class AiChatController {
     }
   }
 
-  @Delete(':threadId') // campaign/ai/chat/delete.js
+  @Delete(':threadId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(
     @ReqUser() { id: userId }: User,
@@ -142,7 +141,7 @@ export class AiChatController {
     }
   }
 
-  @Post(':threadId/feedback') // campaign/ai/chat/feedback.js
+  @Post(':threadId/feedback')
   @HttpCode(HttpStatus.NO_CONTENT)
   async feedback(
     @ReqUser() user: User,

@@ -4,10 +4,11 @@ import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { ContentService } from 'src/content/content.service'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
-import { AiChatData, AiChatMessage } from './aiChat.types'
+import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { SlackService } from 'src/shared/services/slack.service'
 import { User } from '@prisma/client'
+import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
 
@@ -137,7 +138,7 @@ export class AiChatService {
         userId: campaign.user?.id,
       },
     })
-    const messages = (aiChat.data as AiChatData).messages
+    const messages = aiChat.data.messages
 
     const { candidateJson, systemPrompt } =
       await this.contentService.getChatSystemPrompt()
@@ -190,7 +191,7 @@ export class AiChatService {
         where: { id: aiChat.id },
         data: {
           data: {
-            ...(aiChat.data as AiChatData),
+            ...aiChat.data,
             messages: [...messages, chatMessage, chatResponse],
           },
         },
@@ -222,7 +223,7 @@ export class AiChatService {
         userId: user.id,
       },
     })
-    const chatData = aiChat.data as AiChatData
+    const chatData = aiChat.data
 
     await this.prisma.aiChat.update({
       where: { id: aiChat.id },
@@ -250,137 +251,5 @@ export class AiChatService {
     await this.slack.message(slackBlocks, 'user-feedback', false)
 
     return true
-  }
-}
-function buildSlackBlocks(
-  type,
-  email,
-  threadId,
-  userMessage,
-  userPrompt,
-  lastThreadMessage,
-) {
-  const title = `${
-    type.charAt(0).toUpperCase() + type.slice(1)
-  } feedback on AI Chat thread`
-
-  return {
-    blocks: [
-      {
-        type: 'header',
-        text: {
-          type: 'plain_text',
-          text: `💬 ${title}`,
-          emoji: true,
-        },
-      },
-      {
-        type: 'rich_text',
-        elements: [
-          {
-            type: 'rich_text_list',
-            style: 'bullet',
-            elements: [
-              {
-                type: 'rich_text_section',
-                elements: [
-                  {
-                    type: 'text',
-                    text: 'User: ',
-                    style: {
-                      bold: true,
-                    },
-                  },
-                  {
-                    type: 'text',
-                    text: String(email),
-                  },
-                ],
-              },
-              userMessage
-                ? {
-                    type: 'rich_text_section',
-                    elements: [
-                      {
-                        type: 'text',
-                        text: 'Message: ',
-                        style: {
-                          bold: true,
-                        },
-                      },
-                      {
-                        type: 'text',
-                        text: String(userMessage),
-                      },
-                    ],
-                  }
-                : undefined,
-              {
-                type: 'rich_text_section',
-                elements: [
-                  {
-                    type: 'text',
-                    text: 'Thread ID: ',
-                    style: {
-                      bold: true,
-                    },
-                  },
-                  {
-                    type: 'text',
-                    text: String(threadId),
-                  },
-                ],
-              },
-              {
-                type: 'rich_text_section',
-                elements: [
-                  {
-                    type: 'text',
-                    text: 'User Prompt: ',
-                    style: {
-                      bold: true,
-                    },
-                  },
-                  {
-                    type: 'text',
-                    text: String(userPrompt),
-                  },
-                ],
-              },
-            ].filter((elem) => elem !== undefined),
-          },
-          {
-            type: 'rich_text_section',
-            elements: [
-              {
-                type: 'text',
-                text: '\n\n',
-              },
-            ],
-          },
-          {
-            type: 'rich_text_section',
-            elements: [
-              {
-                type: 'text',
-                text: ' Last Message on Thread:',
-                style: {
-                  bold: true,
-                },
-              },
-            ],
-          },
-          {
-            type: 'rich_text_preformatted',
-            elements: [
-              {
-                type: 'text',
-                text: lastThreadMessage,
-              },
-            ],
-          },
-        ],
-      },
-    ],
   }
 }

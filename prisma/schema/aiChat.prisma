@@ -8,6 +8,7 @@ model AiChat {
   userId     Int       @map("user_id")
   campaign   Campaign? @relation(fields: [campaignId], references: [id])
   campaignId Int?      @map("campaign_id")
+  /// [AiChatData]
   data       Json      @default("{}") @db.JsonB
 
   @@index([threadId])
