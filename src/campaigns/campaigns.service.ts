@@ -13,7 +13,6 @@ import {
   CleanCampaign,
 } from './campaigns.types'
 import { zipToLatLng } from './util/zipToLatLng'
-import { number } from 'zod'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -404,9 +403,7 @@ export class CampaignsService {
     }
 
     const where: Prisma.CampaignWhereInput = {
-      userId: {
-        not: null,
-      },
+      userId: { not: null },
       isDemo: false,
       isActive: true,
       AND: andConditions,
@@ -430,7 +427,7 @@ export class CampaignsService {
     lastWeek.setDate(lastWeek.getDate() - 7)
 
     for (const campaign of campaigns) {
-      const { didWin, slug } = campaign
+      const { didWin, slug, user } = campaign
       const details = campaign.details as CampaignDetailsContent
       const data = campaign.data as CampaignDataContent
 
@@ -455,14 +452,15 @@ export class CampaignsService {
 
       const resolvedOffice = (otherOffice as string) || (office as string)
       if (name) {
-        const fullName =
-          `${campaign?.user?.firstName} ${campaign?.user?.lastName}`.toLowerCase()
-        if (!fullName.includes(name.toLowerCase())) {
-          continue
-        }
+        const fullName = [user?.firstName ?? '', user?.lastName ?? '']
+          .join(' ')
+          .trim()
+          .toLowerCase()
+        if (!fullName.includes(name.toLowerCase())) continue
       }
-      const hubSpotOffice = data?.hubSpotUpdates?.office_type
-      let normalizedOffice = hubSpotOffice || details?.normalizedOffice
+
+      let normalizedOffice =
+        data?.hubSpotUpdates?.office_type || details?.normalizedOffice
 
       if (!normalizedOffice && raceId && !noNormalizedOffice) {
         const race = await this.prismaService.race.findFirst({
@@ -488,21 +486,21 @@ export class CampaignsService {
         }
       }
 
-      const cleanCampaign = {
+      const cleanCampaign: CleanCampaign = {
         slug,
         id: slug,
         didWin,
         office: resolvedOffice,
-        state,
-        ballotLevel,
-        zip,
-        party,
-        firstName: campaign.user?.firstName,
-        lastName: campaign.user?.lastName,
+        state: state || null,
+        ballotLevel: ballotLevel || null,
+        zip: zip || null,
+        party: party || null,
+        firstName: campaign.user?.firstName || '',
+        lastName: campaign.user?.lastName || '',
         avatar: campaign.user?.avatar || false,
         electionDate,
-        county,
-        city,
+        county: county || null,
+        city: city || null,
         normalizedOffice: normalizedOffice || resolvedOffice,
       }
 
@@ -513,15 +511,15 @@ export class CampaignsService {
         }
       }
 
-      const position = await handleGeoLocation(
+      const globalPosition = await handleGeoLocation(
         campaign as Campaign,
         forceReCalc,
         this.prismaService,
       )
-      if (!position) {
+      if (!globalPosition) {
         continue
       } else {
-        cleanCampaign.position = position
+        cleanCampaign.globalPosition = globalPosition
       }
 
       cleanCampaigns.push(cleanCampaign)
@@ -533,12 +531,12 @@ async function handleGeoLocation(
   campaign: Campaign,
   forceReCalc: boolean | undefined,
   prismaService: PrismaService,
-) {
+): Promise<{ lat: number; lng: number } | null> {
   const details = campaign.details as CampaignDetailsContent
   const { geoLocationFailed, geoLocation } = details || {}
 
   if (!forceReCalc && geoLocationFailed) {
-    return false
+    return null
   }
 
   if (forceReCalc || !geoLocation?.lng) {
@@ -555,15 +553,15 @@ async function handleGeoLocation(
           },
         },
       })
-      return false
+      return null
     }
     return { lng: geoLocation.lng, lat: geoLocation.lat }
-  } else {
+  } else if (geoLocation?.lng && geoLocation?.lat) {
     return {
-      lng: campaign.details.geoLocation?.lng,
-      lat: campaign.details.geoLocation?.lat,
+      lng: geoLocation?.lng,
+      lat: geoLocation?.lat,
     }
-  }
+  } else return null
 }
 
 async function calculateGeoLocation(

@@ -17,15 +17,18 @@ export type CampaignDataContent = NestedRecords & {
 
 export type CampaignDetailsContent = NestedRecords & {
   geoLocation?: {
-    lng?: string
-    lat?: string
+    lng?: number
+    lat?: number
   }
-  geoLocationFailed?: string
+  geoLocationFailed?: boolean
   zip?: string
   electionDate?: string
   party?: string
   state?: string
   ballotLevel?: string
+  city: string | null
+  county: string | null
+  normalizedOffice?: string | null
 }
 
 export type Campaign = PrismaCampaign & {
@@ -53,7 +56,8 @@ export interface CleanCampaign {
   lastName: string
   avatar: string | boolean
   electionDate: string | null
-  county?: string
-  city?: string
-  normalizedOffice?: string
+  county: string | null
+  city: string | null
+  normalizedOffice?: string | null
+  globalPosition?: { lng: number; lat: number }
 }
