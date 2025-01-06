@@ -126,10 +126,6 @@ export class AiChatController {
         this.logger.error('*** error*** :', e.data.error)
       }
 
-      if (e instanceof PrismaClientKnownRequestError && e.code === 'P2025') {
-        throw new NotFoundException('AI Chat not found', { cause: e })
-      }
-
       throw e
     }
   }
