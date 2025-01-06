@@ -10,6 +10,15 @@ import { aiContentCategoriesTransformer } from './transformers/aiContentCategori
 import { aiChatPromptsTransformer } from './transformers/aiChatPromptTransformer'
 import { onboardingPromptsTransformer } from './transformers/onboardingPromptsTransformer'
 import { promptInputFieldsTransformer } from './transformers/promptInputFieldsTransformer'
+import { candidateTestimonialsTransformer } from './transformers/candidateTestimonialsTransformer'
+import { articleCategoriesTransformer } from './transformers/articleCategoriesTransformer'
+import { goodPartyTeamMembersTransformer } from './transformers/goodPartyTeamMembersTransformer'
+import { termsOfServiceTransformer } from './transformers/termsOfServiceTransformer'
+import { redirectsTransformer } from './transformers/redirectsTransformer'
+import { blogHomeTransformer } from './transformers/blogHomeTransformer'
+import { blogSectionsTransformer } from './transformers/blogSectionsTransformer'
+import { pledgeTransformer } from './transformers/pledgeTransformer'
+import { privacyPageTransformer } from './transformers/privacyPageTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -17,18 +26,21 @@ export enum InferredContentTypes {
   contentPromptsQuestions = 'contentPromptsQuestions',
   aiContentCategories = 'aiContentCategories',
   aiChatPrompts = 'aiChatPrompts',
+  articleCategories = 'articleCategories',
+  candidateTestimonials = 'candidateTestimonials',
+  blogSections = 'blogSections',
 }
 
 export const CONTENT_TYPE_MAP: {
   [key in ContentType | InferredContentTypes]: {
     name: ContentType | InferredContentTypes
     transformer: any
-    inferredFrom?: ContentType
+    inferredFrom?: ContentType | ContentType[]
   }
 } = {
   aiChatPrompt: {
     name: ContentType.aiChatPrompt,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
   },
   aiChatPrompts: {
     name: InferredContentTypes.aiChatPrompts,
@@ -42,11 +54,16 @@ export const CONTENT_TYPE_MAP: {
   },
   aiContentTemplate: {
     name: ContentType.aiContentTemplate,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
   },
   articleCategory: {
     name: ContentType.articleCategory,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
+  },
+  articleCategories: {
+    name: InferredContentTypes.articleCategories,
+    transformer: articleCategoriesTransformer,
+    inferredFrom: [ContentType.articleCategory, ContentType.faqArticle],
   },
   articleTag: {
     name: InferredContentTypes.articleTag,
@@ -57,8 +74,19 @@ export const CONTENT_TYPE_MAP: {
     name: ContentType.blogArticle,
     transformer: blogArticlesTransformer,
   },
-  blogHome: { name: ContentType.blogHome, transformer: noOpTransformer },
-  blogSection: { name: ContentType.blogSection, transformer: noOpTransformer },
+  blogHome: {
+    name: ContentType.blogHome,
+    transformer: blogHomeTransformer,
+  },
+  blogSection: {
+    name: ContentType.blogSection,
+    transformer: noOpTransformer, // No transformation needed
+  },
+  blogSections: {
+    name: InferredContentTypes.blogSections,
+    transformer: blogSectionsTransformer,
+    inferredFrom: [ContentType.blogSection, ContentType.blogArticle],
+  },
   candidateContentPrompts: {
     name: InferredContentTypes.candidateContentPrompts,
     transformer: candidateContentPromptsTransformer,
@@ -66,45 +94,65 @@ export const CONTENT_TYPE_MAP: {
   },
   candidateTestimonial: {
     name: ContentType.candidateTestimonial,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // No transformation needed
+  },
+  candidateTestimonials: {
+    name: InferredContentTypes.candidateTestimonials,
+    transformer: candidateTestimonialsTransformer,
+    inferredFrom: ContentType.candidateTestimonial,
   },
   contentPromptsQuestions: {
     name: InferredContentTypes.contentPromptsQuestions,
     transformer: contentPromptsQuestionsTransformer,
     inferredFrom: ContentType.aiContentTemplate,
   },
-  election: { name: ContentType.election, transformer: noOpTransformer },
+  election: {
+    name: ContentType.election,
+    transformer: noOpTransformer, // Previously supported
+  },
   faqArticle: {
     name: ContentType.faqArticle,
     transformer: faqArticlesTransformer,
   },
-  faqOrder: { name: ContentType.faqOrder, transformer: noOpTransformer },
+  faqOrder: {
+    name: ContentType.faqOrder,
+    transformer: noOpTransformer, // No longer supported
+  },
   glossaryItem: {
     name: ContentType.glossaryItem,
     transformer: glossaryItemsTransformer,
   },
   goodPartyTeamMembers: {
     name: ContentType.goodPartyTeamMembers,
-    transformer: noOpTransformer,
+    transformer: goodPartyTeamMembersTransformer,
   },
   onboardingPrompts: {
     name: ContentType.onboardingPrompts,
     transformer: onboardingPromptsTransformer,
   },
-  pledge: { name: ContentType.pledge, transformer: noOpTransformer },
-  privacyPage: { name: ContentType.privacyPage, transformer: noOpTransformer },
+  pledge: {
+    name: ContentType.pledge,
+    transformer: pledgeTransformer,
+  },
+  privacyPage: {
+    name: ContentType.privacyPage,
+    transformer: privacyPageTransformer,
+  },
   promptInputFields: {
     name: ContentType.promptInputFields,
     transformer: promptInputFieldsTransformer,
   },
-  redirects: { name: ContentType.redirects, transformer: noOpTransformer },
-  teamMember: { name: ContentType.teamMember, transformer: noOpTransformer },
+  redirects: {
+    name: ContentType.redirects,
+    transformer: redirectsTransformer,
+  },
+  teamMember: { name: ContentType.teamMember, transformer: noOpTransformer }, // Not supported
   teamMilestone: {
     name: ContentType.teamMilestone,
-    transformer: noOpTransformer,
+    transformer: noOpTransformer, // Previously supported
   },
   termsOfService: {
     name: ContentType.termsOfService,
-    transformer: noOpTransformer,
+    transformer: termsOfServiceTransformer,
   },
 }
