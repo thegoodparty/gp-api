@@ -34,12 +34,22 @@ export type AiContentData = {
   inputValues?: AiContentInputValues
 }
 
+export enum CampaignLaunchStatus {
+  launched = 'launched',
+}
+
+export enum OnboardingStep {
+  complete = 'onboarding-complete',
+}
+
 export type CampaignAiContent = Record<string, AiContentData> & {
   generationStatus?: Record<string, AiContentGenerationStatus>
   campaignPlanAttempts?: Record<string, number>
 }
 export type CampaignData = Record<string, any> & {
   createdBy?: 'admin' | string
+  launchStatus?: CampaignLaunchStatus
+  currentStep?: OnboardingStep
 }
 export type CampaignDetails = Record<string, any> & {
   customIssues?: Record<'title' | 'position', string>[]
