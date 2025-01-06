@@ -5,7 +5,6 @@ import { GraphQLClient } from 'graphql-request'
 @Module({
   controllers: [],
   providers: [GraphqlService, GraphQLClient],
-  imports: [],
   exports: [GraphqlService],
 })
 export class GraphqlModule {}
