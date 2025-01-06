@@ -1,11 +1,18 @@
-import { Controller, Post } from '@nestjs/common'
+import { Controller, Post, RawBody, Headers } from '@nestjs/common'
+import { PublicAccess } from '../../authentication/decorators/PublicAccess.decorator'
 
 @Controller('payments')
 export class PaymentsController {
   constructor() {}
 
   @Post('events')
-  async handleStripeEvent() {
+  @PublicAccess()
+  async handleStripeEvent(
+    @RawBody() rawBody: Buffer,
+    @Headers() headers: Record<string, string>,
+  ) {
+    console.log(`headers =>`, headers)
+    return 'ok'
     // Handle Stripe events here
   }
 }

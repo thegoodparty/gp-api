@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
-const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL } = process.env
+const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
+  process.env
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
@@ -44,5 +45,13 @@ export class StripeService {
       customer: customerId,
       return_url: `${WEBAPP_ROOT_URL}/profile`,
     })
+  }
+
+  async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
+    return this.stripe.webhooks.constructEvent(
+      rawBody,
+      stripeSignature,
+      STRIPE_WEBSOCKET_SECRET as string,
+    )
   }
 }
