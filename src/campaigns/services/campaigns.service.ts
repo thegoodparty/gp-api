@@ -353,7 +353,8 @@ export class CampaignsService {
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Full Suite of AI Campaign Tools Now Available',
-        template: 'campaign-launch', // misspelled in Mailgun as well. Don't fix.
+        // TODO: template is misspelled in Mailgun as well, must change there first.
+        template: 'campagin-launch',
         variables: {
           name: getFullName(user),
           link: `${APP_BASE}/dashboard`,
