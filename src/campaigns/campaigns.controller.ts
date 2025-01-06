@@ -1,8 +1,12 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -20,11 +24,17 @@ import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { userHasRole } from 'src/users/util/users.util'
+import { SlackService } from 'src/shared/services/slack.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
 export class CampaignsController {
-  constructor(private readonly campaignsService: CampaignsService) {}
+  private readonly logger = new Logger(CampaignsController.name)
+
+  constructor(
+    private readonly campaignsService: CampaignsService,
+    private slack: SlackService,
+  ) {}
 
   @Roles(UserRole.admin)
   @Get() // campaign/list.js
@@ -77,5 +87,25 @@ export class CampaignsController {
     if (!campaign) throw new NotFoundException()
 
     return this.campaignsService.updateJsonFields(campaign.id, body)
+  }
+
+  @Post('launch') // campaign/launch.js
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
+    try {
+      return await this.campaignsService.launch(user, campaign)
+    } catch (e) {
+      this.logger.error('Error at campaign launch', e)
+      await this.slack.errorMessage('Error at campaign launch', e)
+
+      if (e instanceof Error) {
+        throw new BadRequestException(
+          'Cannot launch campaign without an Office',
+        )
+      }
+
+      throw e
+    }
   }
 }
