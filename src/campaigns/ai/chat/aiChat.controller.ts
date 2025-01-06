@@ -6,7 +6,6 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
-  NotFoundException,
   Param,
   Post,
   Put,
@@ -23,7 +22,6 @@ import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiChatService } from './aiChat.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { PromptReplaceCampaign } from 'src/ai/ai.service'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { AiChatData } from './aiChat.types'
 
 @Controller('campaigns/ai/chat')
