@@ -18,6 +18,7 @@ export type CampaignDataContent = NestedRecords & {
 export type CampaignDetailsContent = NestedRecords & {
   geoLocation?: {
     lng?: string
+    lat?: string
   }
   geoLocationFailed?: string
   zip?: string

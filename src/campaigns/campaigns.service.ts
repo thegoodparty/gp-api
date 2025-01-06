@@ -11,9 +11,9 @@ import {
   CampaignDataContent,
   CampaignDetailsContent,
   CleanCampaign,
-  isRecord,
 } from './campaigns.types'
-import { any, string } from 'zod'
+import { zipToLatLng } from './util/zipToLatLng'
+import { number } from 'zod'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -320,8 +320,8 @@ export class CampaignsService {
     results?: string,
     office?: string,
     name?: string,
-    forceReCalc?: string,
-  ): CleanCampaign[] {
+    forceReCalc?: boolean,
+  ): Promise<CleanCampaign[]> {
     // Logic for checking appbase?
 
     const andConditions: any = []
@@ -465,10 +465,16 @@ export class CampaignsService {
       let normalizedOffice = hubSpotOffice || details?.normalizedOffice
 
       if (!normalizedOffice && raceId && !noNormalizedOffice) {
-        const race = await this.prismaService.ballotRace.findFirst({
+        const race = await this.prismaService.race.findFirst({
           where: { ballotHashId: raceId },
         })
-        normalizedOffice = race?.data?.normalized_position_name
+        if (
+          typeof race?.data === 'object' &&
+          !Array.isArray(race?.data) &&
+          typeof race?.data?.normalized_position_name === 'string' // Come back to this hot mess
+        ) {
+          normalizedOffice = race?.data?.normalized_position_name
+        }
         if (normalizedOffice) {
           await this.prismaService.campaign.update({
             where: { slug },
@@ -507,7 +513,11 @@ export class CampaignsService {
         }
       }
 
-      const position = await handleGeoLocation(campaign, forceReCalc)
+      const position = await handleGeoLocation(
+        campaign as Campaign,
+        forceReCalc,
+        this.prismaService,
+      )
       if (!position) {
         continue
       } else {
@@ -517,6 +527,77 @@ export class CampaignsService {
       cleanCampaigns.push(cleanCampaign)
     }
   }
+}
+
+async function handleGeoLocation(
+  campaign: Campaign,
+  forceReCalc: boolean | undefined,
+  prismaService: PrismaService,
+) {
+  const details = campaign.details as CampaignDetailsContent
+  const { geoLocationFailed, geoLocation } = details || {}
+
+  if (!forceReCalc && geoLocationFailed) {
+    return false
+  }
+
+  if (forceReCalc || !geoLocation?.lng) {
+    const geoLocation = await calculateGeoLocation(campaign, prismaService)
+    if (!geoLocation) {
+      await prismaService.campaign.update({
+        where: {
+          slug: campaign.slug,
+        },
+        data: {
+          details: {
+            ...details,
+            geoLocationFailed: true,
+          },
+        },
+      })
+      return false
+    }
+    return { lng: geoLocation.lng, lat: geoLocation.lat }
+  } else {
+    return {
+      lng: campaign.details.geoLocation?.lng,
+      lat: campaign.details.geoLocation?.lat,
+    }
+  }
+}
+
+async function calculateGeoLocation(
+  campaign: Campaign,
+  prismaService: PrismaService,
+): Promise<{ lat: number; lng: number; geoHash: string } | null> {
+  if (!campaign.details?.zip || !campaign.details?.state) {
+    return null
+  }
+  const globalCoords = await zipToLatLng(
+    campaign.details?.zip,
+    campaign.details?.state,
+  )
+  if (globalCoords == null) {
+    return null
+  }
+  const { lat, lng, geoHash } = globalCoords
+  await prismaService.campaign.update({
+    where: {
+      slug: campaign.slug,
+    },
+    data: {
+      details: {
+        ...(campaign.details as CampaignDetailsContent),
+        geoLocationFailed: false,
+        geoLocation: {
+          geoHash,
+          lat,
+          lng,
+        },
+      },
+    },
+  })
+  return { lng, lat, geoHash }
 }
 
 // async function claimExistingCampaignRequests(user, campaign) {
