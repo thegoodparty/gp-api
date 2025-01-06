@@ -96,7 +96,7 @@ export class AiChatService {
     if (completion && completion?.content) {
       const chatResponse: AiChatMessage = {
         role: 'assistant',
-        id: completion.messageId,
+        id: completion.id,
         content: completion.content,
         createdAt: completion.createdAt,
         usage: completion.usage,
@@ -180,7 +180,7 @@ export class AiChatService {
     if (completion && completion.content) {
       chatResponse = {
         role: 'assistant',
-        id: completion.messageId,
+        id: completion.id,
         content: completion.content,
         createdAt: completion.createdAt,
         usage: completion.usage,

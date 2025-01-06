@@ -173,12 +173,12 @@ export class AiService {
 
       this.logger.log(`running assistant ${assistantId} on thread ${threadId}`)
 
-      let messages: any = []
+      let messages: AiChatMessage[] = []
       messages.push({
         content: systemPrompt + '\n' + candidateContext,
         role: 'system',
         createdAt: new Date().valueOf(),
-        messageId: crypto.randomUUID(),
+        id: crypto.randomUUID(),
       })
 
       if (existingMessages) {
@@ -187,13 +187,13 @@ export class AiService {
 
       if (messageId) {
         this.logger.log('deleting message', messageId)
-        messages = messages.filter((m) => m.messageId !== messageId)
+        messages = messages.filter((m) => m.id !== messageId)
       } else {
         messages.push({
           content: message.content,
           role: 'user',
           createdAt: new Date().valueOf(),
-          messageId: crypto.randomUUID(),
+          id: crypto.randomUUID(),
         })
       }
 
@@ -209,7 +209,7 @@ export class AiService {
       return {
         content: result?.content,
         threadId,
-        messageId: crypto.randomUUID(),
+        id: crypto.randomUUID(),
         role: 'assistant',
         createdAt: new Date().valueOf(),
         usage: result?.tokens,
