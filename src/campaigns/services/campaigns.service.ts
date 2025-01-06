@@ -350,7 +350,6 @@ export class CampaignsService {
 
   private async sendCampaignLaunchEmail(user: User) {
     try {
-      this.logger.warn('SENDING EMAIL')
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Full Suite of AI Campaign Tools Now Available',
