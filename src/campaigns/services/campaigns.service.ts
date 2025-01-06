@@ -228,7 +228,6 @@ export class CampaignsService {
     })
 
     // TODO: reimplement
-    // await sails.helpers.campaign.linkCandidateCampaign(campaign.id)
     // await sails.helpers.crm.updateCampaign(updated)
     // await sails.helpers.fullstory.customAttr(updated.id)
 
