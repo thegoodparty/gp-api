@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
@@ -126,7 +126,6 @@ export class CampaignsService {
     })
 
     // TODO:
-    // await claimExistingCampaignRequests(user, newCampaign)
     // await createCrmUser(user.firstName, user.lastName, user.email)
 
     return newCampaign
@@ -212,7 +211,7 @@ export class CampaignsService {
       (!details.office || details.office === '') &&
       (!details.otherOffice || details.otherOffice === '')
     ) {
-      throw new Error('Cannot launch campaign, Office not set')
+      throw new BadRequestException('Cannot launch campaign, Office not set')
     }
 
     const updated = await this.prisma.campaign.update({
@@ -364,37 +363,6 @@ export class CampaignsService {
     }
   }
 }
-
-// async function claimExistingCampaignRequests(user, campaign) {
-//   const campaignRequests = await CampaignRequest.find({
-//     candidateEmail: user.email,
-//   }).populate('user')
-
-//   if (campaignRequests?.length) {
-//     for (const campaignRequest of campaignRequests) {
-//       const { user } = campaignRequest
-
-//       await CampaignRequest.updateOne({
-//         id: campaignRequest.id,
-//       }).set({
-//         campaign: campaign.id,
-//       })
-
-//       await Notification.create({
-//         isRead: false,
-//         data: {
-//           type: 'campaignRequest',
-//           title: `${await sails.helpers.user.name(
-//             user,
-//           )} has requested to manage your campaign`,
-//           subTitle: 'You have a request!',
-//           link: '/dashboard/team',
-//         },
-//         user: user.id,
-//       })
-//     }
-//   }
-// }
 
 // async function updatePathToVictory(campaign, columnKey, value) {
 //   try {

@@ -99,12 +99,6 @@ export class CampaignsController {
       this.logger.error('Error at campaign launch', e)
       await this.slack.errorMessage('Error at campaign launch', e)
 
-      if (e instanceof Error) {
-        throw new BadRequestException(
-          'Cannot launch campaign without an Office',
-        )
-      }
-
       throw e
     }
   }
