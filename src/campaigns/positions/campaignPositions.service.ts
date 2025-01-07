@@ -8,7 +8,7 @@ export class CampaignPositionsService {
   private readonly logger = new Logger(CampaignPositionsService.name)
   constructor(private prisma: PrismaService) {}
 
-  findByCampaign(campaignId: number) {
+  findByCampaignId(campaignId: number) {
     return this.prisma.campaignPosition.findFirstOrThrow({
       where: {
         campaignId,

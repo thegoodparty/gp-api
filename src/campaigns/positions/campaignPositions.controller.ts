@@ -31,7 +31,7 @@ export class CampaignPositionsController {
 
   @Get()
   findByCampaign(@Param('id', ParseIntPipe) id: number) {
-    return this.campaignPositionsService.findByCampaign(id)
+    return this.campaignPositionsService.findByCampaignId(id)
   }
 
   @Post()
