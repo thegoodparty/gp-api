@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common'
 import { RacesService } from './races.service'
 import { RacesController } from './races.controller'
-import { PrismaModule } from 'src/prisma/prisma.module'
+import { GraphqlModule } from 'src/graphql/graphql.module'
 
 @Module({
   controllers: [RacesController],
   providers: [RacesService],
-  imports: [PrismaModule],
+  imports: [GraphqlModule],
 })
 export class RacesModule {}

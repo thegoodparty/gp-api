@@ -1,55 +1,54 @@
 import {
-  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
   NotFoundException,
   Param,
-  ParseIntPipe,
   Post,
   Put,
   Query,
-  UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignsService } from './campaigns.service'
+import { CampaignsService } from './services/campaigns.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
-import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
-import { CampaignOwnersOrAdminGuard } from './guards/CampaignOwnersOrAdmin.guard'
+import { Campaign, User, UserRole } from '@prisma/client'
 import { Roles } from '../authentication/decorators/Roles.decorator'
+import { ReqCampaign } from './decorators/ReqCampaign.decorator'
+import { UseCampaign } from './decorators/UseCampaign.decorator'
+import { userHasRole } from 'src/users/util/users.util'
+import { SlackService } from 'src/shared/services/slack.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
 export class CampaignsController {
-  constructor(private readonly campaignsService: CampaignsService) {}
+  private readonly logger = new Logger(CampaignsController.name)
 
-  @Roles('admin')
-  @Get()
+  constructor(
+    private readonly campaignsService: CampaignsService,
+    private slack: SlackService,
+  ) {}
+
+  @Roles(UserRole.admin)
+  @Get() // campaign/list.js
   findAll(@Query() query: CampaignListSchema) {
     return this.campaignsService.findAll(query)
   }
 
-  // @Get('mine')
-  // async findUserCampaign() {
-  // TODO: query campaign for current user
-  // }
-
-  @UseGuards(CampaignOwnersOrAdminGuard)
-  @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    const campaign = await this.campaignsService.findOne({ id })
-
-    if (!campaign) throw new NotFoundException()
-
+  @Get('mine') // campaign/get.js
+  @UseCampaign()
+  async findOne(@ReqCampaign() campaign: Campaign) {
     return campaign
   }
 
   @Get('slug/:slug')
-  @Roles('admin')
+  @Roles(UserRole.admin) // campaign/find-by-slug.js
   async findBySlug(@Param('slug') slug: string) {
     const campaign = await this.campaignsService.findOne({ slug })
 
@@ -58,25 +57,49 @@ export class CampaignsController {
     return campaign
   }
 
-  @Post()
-  async create(
-    @ReqUser() user: User,
-    @Body() campaignData: CreateCampaignSchema,
-  ) {
-    return await this.campaignsService.create(campaignData, user)
+  @Post() // campaign/create.js
+  async create(@ReqUser() user: User) {
+    // see if the user already has campaign
+    const existing = await this.campaignsService.findByUser(user.id)
+    if (existing) {
+      throw new ConflictException('User campaign already exists.')
+    }
+    return await this.campaignsService.create(user)
   }
 
-  @Put(':id')
-  @UseGuards(CampaignOwnersOrAdminGuard)
+  @Put('mine') // campaign/update.js
+  @UseCampaign({ continueIfNotFound: true })
   async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateCampaignSchema,
+    @ReqUser() user: User,
+    @ReqCampaign() campaign: Campaign,
+    @Body() { slug, ...body }: UpdateCampaignSchema,
   ) {
-    // TODO get campaign from req user
-    const updateResp = await this.campaignsService.update(id, body)
+    if (
+      typeof slug === 'string' &&
+      campaign?.slug !== slug &&
+      userHasRole(user, [UserRole.admin, UserRole.sales])
+    ) {
+      // if user has Admin or Sales role, allow loading campaign by slug param
+      campaign = await this.campaignsService.findOne({ slug })
+    }
 
-    if (updateResp === false) throw new NotFoundException()
-    return updateResp
+    if (!campaign) throw new NotFoundException()
+
+    return this.campaignsService.updateJsonFields(campaign.id, body)
+  }
+
+  @Post('launch') // campaign/launch.js
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
+    try {
+      return await this.campaignsService.launch(user, campaign)
+    } catch (e) {
+      this.logger.error('Error at campaign launch', e)
+      await this.slack.errorMessage('Error at campaign launch', e)
+
+      throw e
+    }
   }
 
   @Get('list-map-count')

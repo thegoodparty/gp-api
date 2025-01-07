@@ -17,6 +17,7 @@ model Campaign {
   dateVerified          DateTime?               @map("date_verified")
   tier                  CampaignTier?
   data                  Json                    @default("{}") @db.JsonB
+  /// [CampaignDetails]
   details               Json                    @default("{}") @db.JsonB
   aiContent             Json                    @default("{}") @map("ai_content") @db.JsonB
   vendorTsData          Json                    @default("{}") @map("vendor_ts_data") @db.JsonB
@@ -26,6 +27,8 @@ model Campaign {
   userId                Int?                    @map("user_id")
   topIssues             TopIssue[]
   campaignPositions     CampaignPosition[]
+  campaignPlanVersion   CampaignPlanVersion?
+  aiChats               AiChat[]
 
   @@index([slug])
   @@map("campaign")

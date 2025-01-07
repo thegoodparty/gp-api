@@ -15,8 +15,11 @@ import { RacesModule } from './races/races.module'
 import { JwtAuthStrategy } from './authentication/auth-strategies/JwtAuth.strategy'
 import { JwtAuthGuard } from './authentication/guards/JwtAuth.guard'
 import { AdminModule } from './admin/admin.module'
-import { QueueModule } from './queue/queue.module'
+import { QueueConsumerModule } from './queue/consumer/consumer.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
+import { SharedModule } from './shared/shared.module'
+import { GraphqlModule } from './graphql/graphql.module'
+import { PaymentsModule } from './payments/payments.module'
 
 @Module({
   imports: [
@@ -32,7 +35,10 @@ import { TopIssuesModule } from './topIssues/topIssues.module'
     RacesModule,
     TopIssuesModule,
     AdminModule,
-    QueueModule,
+    QueueConsumerModule,
+    SharedModule,
+    GraphqlModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
