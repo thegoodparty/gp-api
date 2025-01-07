@@ -7,7 +7,6 @@ import { generateFactory } from './generate'
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.past()
   return {
-    id: faker.number.int({ max: 2147483647 }),
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
     slug: faker.lorem.words(5),

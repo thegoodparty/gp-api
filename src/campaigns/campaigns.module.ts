@@ -4,11 +4,17 @@ import { CampaignsService } from './services/campaigns.service'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { EmailModule } from 'src/email/email.module'
+import { CampaignPositionsController } from './positions/campaignPositions.controller'
+import { CampaignPositionsService } from './positions/campaignPositions.service'
 
 @Module({
   imports: [EmailModule, forwardRef(() => CampaignsAiModule)],
-  controllers: [CampaignsController],
-  providers: [CampaignsService, CampaignPlanVersionsService],
+  controllers: [CampaignsController, CampaignPositionsController],
+  providers: [
+    CampaignsService,
+    CampaignPlanVersionsService,
+    CampaignPositionsService,
+  ],
   exports: [CampaignsService],
 })
 export class CampaignsModule {}
