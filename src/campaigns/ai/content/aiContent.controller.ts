@@ -20,7 +20,6 @@ import { Campaign } from '@prisma/client'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
 import { CampaignsService } from '../../services/campaigns.service'
-import { CampaignAiContent } from '../../campaigns.types'
 import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../decorators/UseCampaign.decorator'
 
@@ -85,7 +84,7 @@ export class AiContentController {
   @Delete(':key') // campaign/ai/delete.js
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@ReqCampaign() campaign: Campaign, @Param('key') key: string) {
-    const aiContent = campaign.aiContent as CampaignAiContent
+    const aiContent = campaign.aiContent
 
     if (!aiContent?.[key]) {
       // nothing to delete

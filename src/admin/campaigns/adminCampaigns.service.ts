@@ -1,19 +1,11 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common'
+import { ConflictException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientValidationError,
-} from '@prisma/client/runtime/library'
 import { findSlug } from '../../shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Prisma, UserRole } from '@prisma/client'
 import { generateRandomPassword } from '../../users/util/passwords.util'
+import { OnboardingStep } from 'src/campaigns/campaigns.types'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -55,7 +47,7 @@ export class AdminCampaignsService {
     const slug = await findSlug(this.prismaService, `${firstName} ${lastName}`)
     const data = {
       slug,
-      currentStep: 'onboarding-complete',
+      currentStep: OnboardingStep.complete,
       party,
       otherParty,
       createdBy: 'admin',

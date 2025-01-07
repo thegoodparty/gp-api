@@ -6,9 +6,10 @@ import { CampaignPlanVersionsService } from './services/campaignPlanVersions.ser
 import { EmailModule } from 'src/email/email.module'
 import { CampaignPositionsController } from './positions/campaignPositions.controller'
 import { CampaignPositionsService } from './positions/campaignPositions.service'
+import { UsersModule } from 'src/users/users.module'
 
 @Module({
-  imports: [EmailModule, forwardRef(() => CampaignsAiModule)],
+  imports: [EmailModule, UsersModule, forwardRef(() => CampaignsAiModule)],
   controllers: [CampaignsController, CampaignPositionsController],
   providers: [
     CampaignsService,

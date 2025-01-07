@@ -3,16 +3,13 @@ import { Campaign } from '@prisma/client'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/content.service'
-import {
-  AiContentGenerationStatus,
-  CampaignAiContent,
-  GenerationStatus,
-} from '../../campaigns.types'
+
 import { AiService } from 'src/ai/ai.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { EnqueueService } from 'src/queue/producer/enqueue.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
+import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 
 @Injectable()
 export class AiContentService {
@@ -31,7 +28,7 @@ export class AiContentService {
     const { key, regenerate, editMode, chat, inputValues } = inputs
 
     const { slug, id } = campaign
-    const aiContent = campaign.aiContent as CampaignAiContent
+    const aiContent = campaign.aiContent
 
     if (!aiContent.generationStatus) {
       aiContent.generationStatus = {}
@@ -155,7 +152,7 @@ export class AiContentService {
     const { slug, key, regenerate } = message
 
     let campaign = await this.campaignsService.findOneOrThrow({ slug })
-    let aiContent = campaign.aiContent as CampaignAiContent
+    let aiContent = campaign.aiContent
     const { prompt, existingChat, inputValues } =
       aiContent.generationStatus?.[key] || {}
 
@@ -205,7 +202,7 @@ export class AiContentService {
 
       // TODO: figure out if this second load necessary?
       campaign = (await this.campaignsService.findOne({ slug })) || campaign
-      aiContent = campaign.aiContent as CampaignAiContent
+      aiContent = campaign.aiContent
       let oldVersion
       if (chatResponse && chatResponse !== '') {
         try {

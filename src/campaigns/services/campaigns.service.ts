@@ -9,16 +9,15 @@ import { findSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import {
-  CampaignAiContent,
-  AiContentInputValues,
-  AiContentVersion,
+  PlanVersion,
   CampaignPlanVersionData,
-  CampaignData,
-  CampaignDetails,
   CampaignLaunchStatus,
   OnboardingStep,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
+import { SlackService } from 'src/shared/services/slack.service'
+import { UsersService } from 'src/users/users.service'
+import { AiContentInputValues } from '../ai/content/aiContent.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -46,7 +45,9 @@ export class CampaignsService {
   constructor(
     private prisma: PrismaService,
     private planVersionService: CampaignPlanVersionsService,
+    private usersService: UsersService,
     private emailService: EmailService,
+    private slack: SlackService,
   ) {}
 
   async findAll(
@@ -120,7 +121,7 @@ export class CampaignsService {
         },
         data: {
           slug,
-          currentStep: 'registration',
+          currentStep: OnboardingStep.registration,
         },
       },
     })
@@ -195,7 +196,7 @@ export class CampaignsService {
   }
 
   async launch(user: User, campaign: Campaign) {
-    const campaignData = campaign.data as CampaignData
+    const campaignData = campaign.data
 
     if (
       campaign.isActive ||
@@ -206,7 +207,7 @@ export class CampaignsService {
     }
 
     // check if the user has office or otherOffice
-    const details = campaign.details as CampaignDetails
+    const details = campaign.details
     if (
       (!details.office || details.office === '') &&
       (!details.otherOffice || details.otherOffice === '')
@@ -236,7 +237,7 @@ export class CampaignsService {
   }
 
   async saveCampaignPlanVersion(inputs: {
-    aiContent: CampaignAiContent
+    aiContent: PrismaJson.CampaignAiContent
     key: string
     campaignId: number
     inputValues?: AiContentInputValues | AiContentInputValues[]
@@ -258,7 +259,7 @@ export class CampaignsService {
 
     const newVersion = {
       date: new Date().toString(),
-      text: aiContent[key].content,
+      text: aiContent[key]?.content,
       // if new inputValues are specified we use those
       // otherwise we use the inputValues from the prior generation.
       inputValues:
@@ -292,7 +293,7 @@ export class CampaignsService {
 
     let updateExistingVersion = false
     if (regenerate === false && foundKey === true && versions[key].length > 0) {
-      const lastVersion = versions[key][0] as AiContentVersion
+      const lastVersion = versions[key][0] as PlanVersion
       const lastVersionDate = new Date(lastVersion?.date || 0)
       const now = new Date()
       const diff = now.getTime() - lastVersionDate.getTime()

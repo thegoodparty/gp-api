@@ -3,10 +3,11 @@ import { faker } from '@faker-js/faker'
 import { STATE_CODES } from '../../src/shared/constants/states'
 import { LEVELS } from '../../src/shared/constants/governmentLevels'
 import { generateFactory } from './generate'
+import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.past()
-  return {
+  const campaign: Omit<Campaign, 'id' | 'userId'> = {
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
     slug: faker.lorem.words(5),
@@ -14,8 +15,8 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     isVerified: faker.datatype.boolean(0.5),
     isPro: faker.datatype.boolean(0.5),
     isDemo: faker.datatype.boolean(0.1),
-    didWin: undefined,
-    dateVerified: undefined,
+    didWin: null,
+    dateVerified: null,
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
     data: {},
     details: {
@@ -28,15 +29,6 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         .split('T')[0],
     },
     aiContent: {
-      generationStatus: {
-        launchSocialMediaCopy: {
-          prompt:
-            "I'm going to provide you with background information and then ask you a question....",
-          status: 'completed',
-          createdAt: faker.date.past().valueOf(),
-          existingChat: [],
-        },
-      },
       launchSocialMediaCopy: {
         name: 'Launch Social Media Copy',
         content:
@@ -47,4 +39,18 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     },
     vendorTsData: {},
   }
+
+  // NOTE: putting this in the object literal above gives a TS error on the generationStatus key
+  // see campaign.jsonTypes.ts for aiContent type definition
+  campaign.aiContent['generationStatus'] = {
+    launchSocialMediaCopy: {
+      prompt:
+        "I'm going to provide you with background information and then ask you a question....",
+      status: GenerationStatus.completed,
+      createdAt: faker.date.past().valueOf(),
+      existingChat: undefined,
+    },
+  }
+
+  return campaign
 })
