@@ -48,6 +48,15 @@ export class CampaignsController {
     return campaign
   }
 
+  @Get('mine/status')
+  @UseCampaign({ continueIfNotFound: true })
+  async getUserCampaignStatus(
+    @ReqUser() user: User,
+    @ReqCampaign() campaign?: Campaign,
+  ) {
+    return this.campaignsService.getStatus(user, campaign)
+  }
+
   @Get('slug/:slug')
   @Roles(UserRole.admin)
   async findBySlug(@Param('slug') slug: string) {

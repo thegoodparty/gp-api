@@ -13,6 +13,7 @@ import {
   CampaignPlanVersionData,
   CampaignLaunchStatus,
   OnboardingStep,
+  CampaignStatus,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { SlackService } from 'src/shared/services/slack.service'
@@ -64,12 +65,6 @@ export class CampaignsService {
     }
 
     const campaigns = await this.prisma.campaign.findMany(args)
-
-    // TODO: still need this?
-    // const campaignVolunteersMapping = await CampaignVolunteer.find({
-    //   campaign: campaigns.map((campaign) => campaign.id),
-    // }).populate('user');
-    // campaigns = attachTeamMembers(campaigns, campaignVolunteersMapping)
 
     return campaigns
   }
@@ -193,6 +188,63 @@ export class CampaignsService {
         include: { pathToVictory: true },
       })
     })
+  }
+
+  async getStatus(user: User, campaign?: Campaign) {
+    const timestamp = new Date().getTime()
+
+    await this.usersService.updateUser(
+      { id: user.id },
+      {
+        metaData: {
+          ...user.metaData,
+          lastVisited: timestamp,
+        },
+      },
+    )
+
+    if (!campaign) {
+      let step = 'account-type'
+      if (user.metaData?.accountType === 'browsing') {
+        step = 'browsing'
+      }
+      return {
+        status: false,
+        step,
+      }
+    }
+
+    const { data, details, slug, id } = campaign
+
+    await this.prisma.campaign.update({
+      where: { id },
+      data: {
+        data: { ...data, lastVisited: timestamp },
+      },
+    })
+
+    if (campaign.isActive) {
+      return {
+        status: CampaignStatus.candidate,
+        slug,
+      }
+    }
+    let step = 1
+    if (details?.office) {
+      step = 2
+    }
+    if (details?.party || details?.otherParty) {
+      step = 3
+    }
+    if (details?.pledged) {
+      step = 4
+    }
+
+    return {
+      status: CampaignStatus.onboarding,
+      slug,
+      step,
+    }
   }
 
   async launch(user: User, campaign: Campaign) {
@@ -519,28 +571,3 @@ function buildCampaignListFilters({
 
   return where
 }
-
-// TODO: still need this?
-// function attachTeamMembers(campaigns, campaignVolunteersMapping) {
-//   const teamMembersMap = campaignVolunteersMapping.reduce(
-//     (members, { user, campaign, role }) => {
-//       const teamMember = {
-//         ...user,
-//         role,
-//       }
-
-//       return {
-//         ...members,
-//         [campaign]: members[campaign]
-//           ? [...members[campaign], teamMember]
-//           : [teamMember],
-//       }
-//     },
-//     {},
-//   )
-
-//   return campaigns.map((campaign) => ({
-//     ...campaign,
-//     teamMembers: teamMembersMap[campaign.id] || [],
-//   }))
-// }

@@ -6,8 +6,14 @@ export type PlanVersion = {
   language?: string
 }
 
+// TODO: campaign launchStatus and status could be combined into one status field
 export enum CampaignLaunchStatus {
   launched = 'launched',
+}
+
+export enum CampaignStatus {
+  candidate = 'candidate',
+  onboarding = 'onboarding',
 }
 
 export enum OnboardingStep {
