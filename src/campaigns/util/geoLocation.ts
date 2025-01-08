@@ -1,13 +1,12 @@
-import { Campaign } from '@prisma/client'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { zipToLatLng } from './zipToLatLng'
 
 export async function handleGeoLocation(
-  campaign: Campaign,
+  slug: string,
+  details: PrismaJson.CampaignDetails,
   forceReCalc: boolean | undefined,
   prismaService: PrismaService,
 ): Promise<{ lat: number; lng: number } | null> {
-  const details = campaign.details
   const { geoLocationFailed, geoLocation } = details || {}
 
   if (!forceReCalc && geoLocationFailed) {
@@ -15,11 +14,11 @@ export async function handleGeoLocation(
   }
 
   if (forceReCalc || !geoLocation?.lng) {
-    const geoLocation = await calculateGeoLocation(campaign, prismaService)
+    const geoLocation = await calculateGeoLocation(slug, details, prismaService)
     if (!geoLocation) {
       await prismaService.campaign.update({
         where: {
-          slug: campaign.slug,
+          slug,
         },
         data: {
           details: {
@@ -40,27 +39,23 @@ export async function handleGeoLocation(
 }
 
 export async function calculateGeoLocation(
-  campaign: Campaign,
+  slug: string,
+  details: PrismaJson.CampaignDetails,
   prismaService: PrismaService,
 ): Promise<{ lat: number; lng: number; geoHash: string } | null> {
-  if (!campaign.details?.zip || !campaign.details?.state) {
-    return null
-  }
-  const globalCoords = await zipToLatLng(
-    campaign.details?.zip,
-    campaign.details?.state,
-  )
-  if (globalCoords == null) {
-    return null
-  }
+  if (!details?.zip || !details?.state) return null
+
+  const globalCoords = await zipToLatLng(details?.zip, details?.state)
+  if (globalCoords == null) return null
+
   const { lat, lng, geoHash } = globalCoords
   await prismaService.campaign.update({
     where: {
-      slug: campaign.slug,
+      slug: slug,
     },
     data: {
       details: {
-        ...campaign.details,
+        ...details,
         geoLocationFailed: false,
         geoLocation: {
           geoHash,

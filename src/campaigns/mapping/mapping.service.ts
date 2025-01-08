@@ -54,23 +54,6 @@ export class MappingService {
       isActive: true,
       AND: combinedAndConditions,
     }
-
-    const campaigns = await this.prisma.campaign.findMany({
-      where,
-      select: {
-        slug: true,
-        details: true,
-        didWin: true,
-        data: true,
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
-            avatar: true,
-          },
-        },
-      },
-    })
     const count = await this.prisma.campaign.count({
       where,
     })
@@ -155,8 +138,6 @@ export class MappingService {
       },
     })
 
-    const raceCache: Record<string, RaceData | null> = {}
-
     const updates: Prisma.CampaignUpdateArgs[] = []
 
     const campaignUpdates: CampaignUpdate[] = []
@@ -170,20 +151,6 @@ export class MappingService {
         // Test this
         continue
       }
-
-      // const {
-      //   otherOffice,
-      //   office,
-      //   state,
-      //   ballotLevel,
-      //   zip,
-      //   party,
-      //   raceId,
-      //   noNormalizedOffice,
-      //   county,
-      //   city,
-      // } = details || {}
-
       const electionDate = details.electionDate as string
 
       const resolvedOffice =
@@ -192,25 +159,26 @@ export class MappingService {
       let normalizedOffice =
         data?.hubSpotUpdates?.office_type || details?.normalizedOffice
 
-      if (!normalizedOffice && raceId && !noNormalizedOffice) {
+      if (!normalizedOffice && details.raceId && !details.noNormalizedOffice) {
         const race = await this.prisma.race.findFirst({
-          where: { ballotHashId: raceId },
+          where: { ballotHashId: details.raceId },
         })
         if (race) {
           const raceData = race.data as RaceData
-          normalizedOffice = raceData.normalized_position_name
+          normalizedOffice = raceData?.normalized_position_name
         }
+
+        const updateData: Prisma.CampaignUpdateInput = {}
         if (normalizedOffice) {
-          await this.prisma.campaign.update({
-            where: { slug },
-            data: { details: { ...details, normalizedOffice } },
-          })
+          updateData.details = { ...details, normalizedOffice }
         } else {
-          await this.prisma.campaign.update({
-            where: { slug },
-            data: { details: { ...details, noNormalizedOffice: true } },
-          })
+          updateData.details = { ...details, noNormalizedOffice: true }
         }
+
+        updates.push({
+          where: { slug },
+          data: updateData,
+        })
       }
 
       const campaignUpdate: CampaignUpdate = {
@@ -219,20 +187,21 @@ export class MappingService {
         didWin,
         office: resolvedOffice,
         state: state || null,
-        ballotLevel: ballotLevel || null,
-        zip: zip || null,
+        ballotLevel: details.ballotLevel || null,
+        zip: details.zip || null,
         party: party || null,
         firstName: campaign.user?.firstName || '',
         lastName: campaign.user?.lastName || '',
         avatar: campaign.user?.avatar || false,
         electionDate,
-        county: county || null,
-        city: city || null,
+        county: details.county || null,
+        city: details.city || null,
         normalizedOffice: normalizedOffice || resolvedOffice,
       }
 
       const globalPosition = await handleGeoLocation(
-        campaign as Campaign,
+        slug,
+        details,
         forceReCalc,
         this.prisma,
       )
@@ -244,6 +213,13 @@ export class MappingService {
 
       campaignUpdates.push(campaignUpdate)
     }
+
+    if (updates.length > 0) {
+      await Promise.all(
+        updates.map((update) => this.prisma.campaign.update(update)),
+      )
+    }
+
     return campaignUpdates
   }
 }
