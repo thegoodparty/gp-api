@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Logger,
   NotFoundException,
   Param,
@@ -57,7 +58,7 @@ export class UsersController {
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id') id: string) {
     try {
       return await this.usersService.deleteUser(parseInt(id))

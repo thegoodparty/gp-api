@@ -30,6 +30,9 @@ const bootstrap = async () => {
           }
         : {}),
     }),
+    {
+      rawBody: true,
+    },
   )
   app.setGlobalPrefix('v1')
 
