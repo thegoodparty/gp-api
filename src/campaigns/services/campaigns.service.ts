@@ -17,11 +17,8 @@ import {
   CampaignDetails,
   CampaignLaunchStatus,
   OnboardingStep,
-  CampaignUpdate,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
-import { zipToLatLng } from '../util/zipToLatLng'
-import { RaceData } from 'src/races/races.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 

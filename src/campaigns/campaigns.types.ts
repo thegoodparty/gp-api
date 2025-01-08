@@ -88,7 +88,7 @@ export function isRecord<T extends object>(
   return typeof value === 'object' && value !== null
 }
 
-export interface CampaignUpdate {
+export interface CleanCampaign {
   slug: string
   id: string
   didWin: boolean | null

@@ -20,12 +20,8 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
     data: {
       hubSpotUpdates: {
-        election_results: faker.helpers.arrayElement([
-          'Won General',
-          'Won Primary',
-          'Lost',
-        ]),
-        verified_candidates: faker.helpers.arrayElement(['Yes']),
+        election_results: faker.lorem.word(),
+        verified_candidates: faker.helpers.arrayElement(['Yes', 'No']),
         office_type: faker.lorem.text(),
       },
     },
@@ -39,17 +35,9 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         .toISOString()
         .split('T')[0],
       geoLocation: {},
-      party: faker.helpers.arrayElement([
-        'Libertarian',
-        'Communist',
-        'Socialist',
-      ]),
-      level: faker.helpers.arrayElement(['City', 'County', 'State']),
-      office: faker.helpers.arrayElement([
-        'Councilman',
-        'President',
-        'Governor',
-      ]),
+      party: faker.lorem.word(),
+      level: faker.lorem.word(),
+      office: faker.lorem.word(),
     },
     aiContent: {
       generationStatus: {

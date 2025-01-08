@@ -25,8 +25,10 @@ const counties = [
   'San Joaquin',
 ]
 
+let countyCount = 0
 export const countyFactory = generateFactory<County>(() => {
-  const county = getRandomElementFromArray(counties)
+  const county = counties[countyCount]
+  countyCount++
   return {
     id: faker.number.int({ max: 2147483647 }),
     slug: `ca/${slugify(county, { lower: true })}`,

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { CampaignUpdate, sevenDaysAgo } from '../campaigns.types'
+import { CleanCampaign, sevenDaysAgo } from '../campaigns.types'
 import { RaceData } from 'src/races/races.types'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { Prisma, Campaign } from '@prisma/client'
@@ -72,7 +72,7 @@ export class MappingService {
     office?: string,
     name?: string,
     forceReCalc?: boolean,
-  ): Promise<CampaignUpdate[]> {
+  ): Promise<CleanCampaign[]> {
     const baseAndConditions = buildMapFilters({
       party,
       state,
@@ -135,7 +135,7 @@ export class MappingService {
 
     const updates: Prisma.CampaignUpdateArgs[] = []
 
-    const campaignUpdates: CampaignUpdate[] = []
+    const cleanCampaigns: CleanCampaign[] = []
 
     for (const campaign of campaigns) {
       const { didWin, slug } = campaign
@@ -177,7 +177,7 @@ export class MappingService {
         })
       }
 
-      const campaignUpdate: CampaignUpdate = {
+      const cleanCampaign: CleanCampaign = {
         slug,
         id: slug,
         didWin,
@@ -204,10 +204,10 @@ export class MappingService {
       if (!globalPosition) {
         continue
       } else {
-        campaignUpdate.globalPosition = globalPosition
+        cleanCampaign.globalPosition = globalPosition
       }
 
-      campaignUpdates.push(campaignUpdate)
+      cleanCampaigns.push(cleanCampaign)
     }
 
     if (updates.length > 0) {
@@ -216,6 +216,6 @@ export class MappingService {
       )
     }
 
-    return campaignUpdates
+    return cleanCampaigns
   }
 }

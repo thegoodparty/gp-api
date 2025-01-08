@@ -8,12 +8,18 @@ import {
   Delete,
 } from '@nestjs/common'
 import { MappingService } from './mapping.service'
+import { CleanCampaign } from '../campaigns.types'
 
 @Controller('campaigns/mapping')
 export class MappingController {
   constructor(private readonly mappingService: MappingService) {}
-  @Get()
+  @Get('count')
   mapCount(): Promise<{ count: number }> {
-    this.mappingService.listMapCount()
+    return this.mappingService.listMapCount()
+  }
+
+  @Get('map')
+  map(): Promise<CleanCampaign[]> {
+    return this.mappingService.listMap()
   }
 }
