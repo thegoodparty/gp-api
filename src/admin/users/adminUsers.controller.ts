@@ -54,9 +54,7 @@ export class AdminUsersController {
 
   @Post()
   create(@Body() body: AdminCreateUserSchema) {
-    return this.usersService.createUser({
-      ...body,
-    })
+    return this.usersService.createUser(body)
   }
 
   @Delete(':id')
