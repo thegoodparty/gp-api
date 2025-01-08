@@ -4,21 +4,24 @@ import { Prisma, User } from '@prisma/client'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
-
-// CreateUserInputDto but with password optional
-type CreateUserInputPwOptional = Omit<CreateUserInputDto, 'password'> &
-  Partial<Pick<CreateUserInputDto, 'password'>>
+import { WithOptional } from 'src/shared/types/utility.types'
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  getAllUsers() {
-    return this.prisma.user.findMany()
+  findAllUsers(where?: Prisma.UserWhereInput) {
+    return this.prisma.user.findMany({ where })
   }
 
-  findUser(where: Prisma.UserWhereUniqueInput): Promise<User | null> {
+  findUser(where: Prisma.UserWhereUniqueInput) {
     return this.prisma.user.findUnique({
+      where,
+    })
+  }
+
+  findUserOrThrow(where: Prisma.UserWhereUniqueInput) {
+    return this.prisma.user.findUniqueOrThrow({
       where,
     })
   }
@@ -63,7 +66,9 @@ export class UsersService {
     })
   }
 
-  async createUser(userData: CreateUserInputPwOptional): Promise<User> {
+  async createUser(
+    userData: WithOptional<CreateUserInputDto, 'password' | 'phone'>,
+  ): Promise<User> {
     const { password, firstName, lastName, email, zip, phone, name } = userData
 
     const hashedPassword = await hashPassword(
@@ -85,7 +90,7 @@ export class UsersService {
     } = trimMany({
       firstName,
       lastName,
-      phone,
+      ...(phone ? { phone } : {}),
       ...(zip ? { zip } : {}),
     })
 

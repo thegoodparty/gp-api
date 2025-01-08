@@ -203,6 +203,10 @@ export class CampaignsService {
     return this.prisma.campaign.delete({ where: { id } })
   }
 
+  deleteAll(where: Prisma.CampaignWhereInput) {
+    return this.prisma.campaign.deleteMany({ where })
+  }
+
   async launch(user: User, campaign: Campaign) {
     const campaignData = campaign.data as CampaignData
 
