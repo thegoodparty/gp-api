@@ -65,6 +65,7 @@ export enum CampaignLaunchStatus {
 
 export enum OnboardingStep {
   complete = 'onboarding-complete',
+  registration = 'registration',
 }
 
 export type CampaignAiContent = Record<string, AiContentData> & {
@@ -87,7 +88,7 @@ export function isRecord<T extends object>(
   return typeof value === 'object' && value !== null
 }
 
-export interface CleanCampaign {
+export interface CampaignUpdate {
   slug: string
   id: string
   didWin: boolean | null
