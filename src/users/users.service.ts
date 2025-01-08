@@ -5,6 +5,10 @@ import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 
+// CreateUserInputDto but with password optional
+type CreateUserInputPwOptional = Omit<CreateUserInputDto, 'password'> &
+  Partial<Pick<CreateUserInputDto, 'password'>>
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -59,16 +63,8 @@ export class UsersService {
     })
   }
 
-  async createUser(userData: CreateUserInputDto): Promise<User> {
-    const {
-      password = '',
-      firstName,
-      lastName,
-      email,
-      zip,
-      phone,
-      name,
-    } = userData
+  async createUser(userData: CreateUserInputPwOptional): Promise<User> {
+    const { password, firstName, lastName, email, zip, phone, name } = userData
 
     const hashedPassword = await hashPassword(
       password ?? generateRandomPassword(),
@@ -97,7 +93,7 @@ export class UsersService {
       data: {
         ...userData,
         ...trimmed,
-        ...(hashedPassword ? { password: hashedPassword } : {}),
+        password: hashedPassword,
         name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
       },
     })

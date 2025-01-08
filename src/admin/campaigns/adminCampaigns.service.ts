@@ -1,58 +1,40 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
+import { Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientValidationError,
-} from '@prisma/client/runtime/library'
-import { findSlug } from '../../shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Prisma, UserRole } from '@prisma/client'
-import { generateRandomPassword } from '../../users/util/passwords.util'
+import { Prisma } from '@prisma/client'
+import { EmailService } from 'src/email/email.service'
+import { getFullName } from 'src/users/util/users.util'
+import { EmailTemplates } from 'src/email/email.types'
+import { UsersService } from 'src/users/users.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { AdminP2VService } from '../services/adminP2V.service'
+import { CampaignData } from 'src/campaigns/campaigns.types'
+
+const APP_BASE = process.env.CORS_ORIGIN as string
 
 @Injectable()
 export class AdminCampaignsService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(
+    private emailService: EmailService,
+    private usersService: UsersService,
+    private campaignsService: CampaignsService,
+    private adminP2VService: AdminP2VService,
+  ) {}
 
   async create(body: AdminCreateCampaignSchema) {
     const { firstName, lastName, email, zip, phone, party, otherParty } = body
 
-    // check if user with email exists first
-    const exists = await this.prismaService.user.count({
-      where: {
-        email: {
-          equals: email,
-          mode: 'insensitive',
-        },
-      },
-    })
-
-    if (exists > 0) {
-      throw new ConflictException('Email already in use')
-    }
-
     // create new user
-    const user = await this.prismaService.user.create({
-      data: {
-        firstName,
-        lastName,
-        name: `${firstName} ${lastName}`,
-        email,
-        password: generateRandomPassword(),
-        zip,
-        phone,
-        metaData: {},
-        roles: [UserRole.candidate],
-      },
+    const user = await this.usersService.createUser({
+      firstName,
+      lastName,
+      email,
+      zip,
+      phone,
     })
 
     // find slug
-    const slug = await findSlug(this.prismaService, `${firstName} ${lastName}`)
+    const slug = await this.campaignsService.findSlug(user)
     const data = {
       slug,
       currentStep: 'onboarding-complete',
@@ -62,22 +44,19 @@ export class AdminCampaignsService {
     }
 
     // create new campaign
-    const newCampaign = await this.prismaService.campaign.create({
-      data: {
-        slug,
-        data,
-        isActive: true,
-        userId: user.id,
-        details: {
-          zip: user.zip,
-          knowRun: 'yes',
-          pledged: true,
-        },
+    const newCampaign = await this.campaignsService.create({
+      slug,
+      data,
+      isActive: true,
+      userId: user.id,
+      details: {
+        zip: user.zip,
+        knowRun: 'yes',
+        pledged: true,
       },
     })
 
-    // TODO: reimplement these
-    // await claimExistingCampaignRequests(user, newCampaign)
+    // TODO: reimplement
     // await createCrmUser(firstName, lastName, email)
 
     return newCampaign
@@ -101,10 +80,7 @@ export class AdminCampaignsService {
       attributes.tier = tier
     }
 
-    const updatedCampaign = await this.prismaService.campaign.update({
-      where: { id },
-      data: attributes,
-    })
+    const updatedCampaign = await this.campaignsService.update(id, attributes)
 
     //TODO: reimplment
     // await sails.helpers.crm.updateCampaign(updatedCampaign);
@@ -112,39 +88,37 @@ export class AdminCampaignsService {
     return updatedCampaign
   }
 
-  async delete(id: number) {
-    await this.prismaService.campaign.delete({ where: { id } })
+  async sendVictoryEmail(id: number) {
+    const campaign = await this.campaignsService.findOneOrThrow(
+      { id },
+      { user: true, pathToVictory: true },
+    )
+    const { pathToVictory, user } = campaign
+
+    if (!pathToVictory) {
+      throw new Error('Path to Victory is not set.')
+    }
+    if (!user) {
+      throw new Error('Campaign has no user')
+    }
+
+    await this.adminP2VService.completeP2V(user.id, pathToVictory)
+
+    if ((campaign?.data as CampaignData)?.createdBy !== 'admin') {
+      const variables = {
+        name: getFullName(user),
+        link: `${APP_BASE}/dashboard`,
+      }
+
+      await this.emailService.sendTemplateEmail({
+        to: user.email,
+        subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
+        template: EmailTemplates.candidateVictoryReady,
+        variables,
+        from: 'jared@goodparty.org',
+      })
+    }
+
     return true
   }
 }
-
-// async function claimExistingCampaignRequests(user, campaign) {
-//   const campaignRequests = await CampaignRequest.find({
-//     candidateEmail: user.email,
-//   }).populate('user')
-
-//   if (campaignRequests?.length) {
-//     for (const campaignRequest of campaignRequests) {
-//       const { user } = campaignRequest
-
-//       await CampaignRequest.updateOne({
-//         id: campaignRequest.id,
-//       }).set({
-//         campaign: campaign.id,
-//       })
-
-//       await Notification.create({
-//         isRead: false,
-//         data: {
-//           type: 'campaignRequest',
-//           title: `${await sails.helpers.user.name(
-//             user,
-//           )} has requested to manage your campaign`,
-//           subTitle: 'You have a request!',
-//           link: '/dashboard/team',
-//         },
-//         user: user.id,
-//       })
-//     }
-//   }
-// }
