@@ -101,9 +101,4 @@ export class CampaignsController {
       throw e
     }
   }
-
-  @Get('list-map-count')
-  async listMapCount(): Promise<{ count: number }> {
-    return await this.campaignsService.listMapCount()
-  }
 }

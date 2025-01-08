@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common'
-import { CampaignUpdate } from '../campaigns.types'
+import { CampaignUpdate, sevenDaysAgo } from '../campaigns.types'
 import { RaceData } from 'src/races/races.types'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { Prisma, Campaign } from '@prisma/client'
 import { handleGeoLocation } from '../util/geoLocation'
 import { buildMapFilters } from '../util/buildMapFilters'
+
+const APP_BASE = process.env.CORS_ORIGIN as string
+const isProd = APP_BASE === 'https://goodparty.org'
 
 @Injectable()
 export class MappingService {
@@ -14,7 +17,7 @@ export class MappingService {
     state?: string,
     results?: boolean,
   ): Promise<{ count: number }> {
-    const baseAndConditions = buildMapFilters({ state, results })
+    const baseAndConditions = buildMapFilters({ state, results, isProd })
 
     const additionalAndConditions: Prisma.CampaignWhereInput[] = [
       {
@@ -36,7 +39,7 @@ export class MappingService {
             didWin: null,
             details: {
               path: ['electionDate'],
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+              gte: sevenDaysAgo,
             },
           },
         ],
@@ -57,13 +60,6 @@ export class MappingService {
     const count = await this.prisma.campaign.count({
       where,
     })
-    //const isProd = false // Change this later
-
-    // if (isProd) {
-    //   if (data?.hubSpotUpdates?.verified_candidates !== 'Yes') {
-    //     continue
-    //   }
-    // }
 
     return { count }
   }
@@ -77,14 +73,13 @@ export class MappingService {
     name?: string,
     forceReCalc?: boolean,
   ): Promise<CampaignUpdate[]> {
-    // Logic for checking appbase?
-
     const baseAndConditions = buildMapFilters({
       party,
       state,
       level,
       results,
       office,
+      isProd,
     })
 
     const additionalFilters: Prisma.CampaignWhereInput = {
@@ -94,7 +89,7 @@ export class MappingService {
           didWin: null,
           details: {
             path: ['electionDate'],
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            gte: sevenDaysAgo,
           },
         },
       ],
@@ -143,12 +138,13 @@ export class MappingService {
     const campaignUpdates: CampaignUpdate[] = []
 
     for (const campaign of campaigns) {
-      const { didWin, slug, user } = campaign
+      const { didWin, slug } = campaign
       const details = campaign.details
       const data = campaign.data
 
       if (!details?.zip || didWin === false || details?.geoLocationFailed) {
         // Test this
+        console.log('Failed first joint check')
         continue
       }
       const electionDate = details.electionDate as string

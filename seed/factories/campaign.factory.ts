@@ -15,18 +15,41 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     isVerified: faker.datatype.boolean(0.5),
     isPro: faker.datatype.boolean(0.5),
     isDemo: faker.datatype.boolean(0.1),
-    didWin: undefined,
+    didWin: faker.datatype.boolean(0.5),
     dateVerified: undefined,
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
-    data: {},
+    data: {
+      hubSpotUpdates: {
+        election_results: faker.helpers.arrayElement([
+          'Won General',
+          'Won Primary',
+          'Lost',
+        ]),
+        verified_candidates: faker.helpers.arrayElement(['Yes']),
+        office_type: faker.lorem.text(),
+      },
+    },
     details: {
       state: faker.helpers.arrayElement(STATE_CODES),
+      zip: faker.location.zipCode(),
       ballotLevel: faker.helpers.arrayElement(LEVELS),
       electionDate: electionDate.toISOString().split('T')[0],
       primaryElectionDate: faker.date
         .past({ refDate: electionDate })
         .toISOString()
         .split('T')[0],
+      geoLocation: {},
+      party: faker.helpers.arrayElement([
+        'Libertarian',
+        'Communist',
+        'Socialist',
+      ]),
+      level: faker.helpers.arrayElement(['City', 'County', 'State']),
+      office: faker.helpers.arrayElement([
+        'Councilman',
+        'President',
+        'Governor',
+      ]),
     },
     aiContent: {
       generationStatus: {

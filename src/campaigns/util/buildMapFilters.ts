@@ -84,17 +84,13 @@ export function buildMapFilters(
     })
   }
 
-  if (name) {
-    where.user = {
-      AND: [
-        {
-          OR: [
-            { firstName: { contains: name, mode: 'insensitive' } },
-            { lastName: { contains: name, mode: 'insensitive' } },
-          ],
-        },
-      ],
-    }
+  if (isProd) {
+    andConditions.push({
+      data: {
+        path: ['hubSpotUpdates', 'verified_candidates'],
+        equals: 'Yes',
+      },
+    })
   }
 
   // Exclude campaigns without ZIP and where didWin is false
