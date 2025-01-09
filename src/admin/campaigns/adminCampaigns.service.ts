@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Prisma } from '@prisma/client'
@@ -96,10 +96,10 @@ export class AdminCampaignsService {
     const { pathToVictory, user } = campaign
 
     if (!pathToVictory) {
-      throw new Error('Path to Victory is not set.')
+      throw new BadRequestException('Path to Victory is not set.')
     }
     if (!user) {
-      throw new Error('Campaign has no user')
+      throw new BadRequestException('Campaign has no user')
     }
 
     await this.adminP2VService.completeP2V(user.id, pathToVictory)
