@@ -6,8 +6,7 @@ import {
   Post,
 } from '@nestjs/common'
 import { VoterFileService } from './voterFile.service'
-import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { Campaign, Prisma, User } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 
