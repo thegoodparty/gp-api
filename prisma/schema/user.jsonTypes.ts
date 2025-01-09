@@ -5,6 +5,8 @@ declare global {
     export type UserMetaData = {
       customerId?: string
       checkoutSessionId?: string
+      accountType?: string
+      lastVisited?: number
     } | null
   }
 }

@@ -27,7 +27,6 @@ import { User, UserRole } from '@prisma/client'
 import { ReqUser } from './decorators/ReqUser.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 import { FastifyReply } from 'fastify'
-import { CampaignData } from 'src/campaigns/campaigns.types'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
 
 @PublicAccess()
@@ -125,7 +124,7 @@ export class AuthenticationController {
       // to automatically login after the password change
       const campaign = await this.campaignsService.findByUser(user.id)
 
-      if ((campaign.data as CampaignData).createdBy !== 'admin') {
+      if (campaign.data.createdBy !== 'admin') {
         // don't login just return
         return userOut
       }

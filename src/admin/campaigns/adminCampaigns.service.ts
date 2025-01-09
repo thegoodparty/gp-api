@@ -8,7 +8,7 @@ import { EmailTemplates } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
-import { CampaignData } from 'src/campaigns/campaigns.types'
+import { OnboardingStep } from 'src/campaigns/campaigns.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -37,7 +37,7 @@ export class AdminCampaignsService {
     const slug = await this.campaignsService.findSlug(user)
     const data = {
       slug,
-      currentStep: 'onboarding-complete',
+      currentStep: OnboardingStep.complete,
       party,
       otherParty,
       createdBy: 'admin',
@@ -104,7 +104,7 @@ export class AdminCampaignsService {
 
     await this.adminP2VService.completeP2V(user.id, pathToVictory)
 
-    if ((campaign?.data as CampaignData)?.createdBy !== 'admin') {
+    if (campaign?.data?.createdBy !== 'admin') {
       const variables = {
         name: getFullName(user),
         link: `${APP_BASE}/dashboard`,

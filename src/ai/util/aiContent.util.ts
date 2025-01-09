@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client'
-import { CampaignDetails } from 'src/campaigns/campaigns.types'
 
 type CampaignPositionWithRelations = Prisma.CampaignPositionGetPayload<{
   include: { topIssue: true; position: true }
@@ -7,7 +6,7 @@ type CampaignPositionWithRelations = Prisma.CampaignPositionGetPayload<{
 
 export function positionsToStr(
   campaignPositions: CampaignPositionWithRelations[],
-  customIssues?: CampaignDetails['customIssues'],
+  customIssues?: PrismaJson.CampaignDetails['customIssues'],
 ) {
   if (!campaignPositions && !customIssues) {
     return ''
@@ -36,7 +35,7 @@ export function replaceAll(string: string, search: string, replace: string) {
 }
 
 export function againstToStr(
-  runningAgainst: CampaignDetails['runningAgainst'],
+  runningAgainst: PrismaJson.CampaignDetails['runningAgainst'],
 ) {
   if (!runningAgainst) {
     return ''
