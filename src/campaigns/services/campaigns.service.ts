@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
-import { Campaign, Prisma, User } from '@prisma/client'
+import { Campaign, PathToVictory, Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { buildSlug } from 'src/shared/util/slug.util'
@@ -19,7 +19,8 @@ import {
   OnboardingStep,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
-import { EmailTemplates } from 'src/email/email.types'
+import { EmailTemplateNames } from 'src/email/email.types'
+import { SlackService } from '../../shared/services/slack.service'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -48,6 +49,7 @@ export class CampaignsService {
     private prisma: PrismaService,
     private planVersionService: CampaignPlanVersionsService,
     private emailService: EmailService,
+    private slackService: SlackService,
   ) {}
 
   async findAll(
@@ -402,7 +404,7 @@ export class CampaignsService {
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Full Suite of AI Campaign Tools Now Available',
-        template: EmailTemplates.campaignLaunch,
+        template: EmailTemplateNames.campaignLaunch,
         variables: {
           name: getFullName(user),
           link: `${APP_BASE}/dashboard`,
@@ -410,6 +412,56 @@ export class CampaignsService {
       })
     } catch (e) {
       this.logger.error('Error sending campaign launch email', e)
+    }
+  }
+
+  async canDownloadVoterFile(
+    campaign: Campaign,
+    pathToVictory?: PathToVictory | null,
+  ) {
+    const electionTypeRequired =
+      campaign.details.ballotLevel &&
+      campaign.details.ballotLevel !== 'FEDERAL' &&
+      campaign.details.ballotLevel !== 'STATE'
+
+    const canDownload = !(
+      electionTypeRequired &&
+      (!pathToVictory?.data?.electionType ||
+        !pathToVictory?.data?.electionLocation)
+    )
+
+    !canDownload &&
+      this.logger.log(`Campaign is not eligible for download: ${campaign.id}`)
+
+    return canDownload
+  }
+
+  async doVoterDownloadCheck(campaignId: number, user: User) {
+    const campaign = await this.findOne(
+      { id: campaignId },
+      { pathToVictory: true },
+    )
+    const canDownload = !campaign
+      ? false
+      : await this.canDownloadVoterFile(
+          campaign as Campaign,
+          campaign?.pathToVictory,
+        )
+    if (!canDownload) {
+      // alert Jared and Rob.
+      const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
+      await this.slackService.message(
+        {
+          title: 'Path To Victory',
+          body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
+          visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
+          ${alertSlackMessage}
+          `,
+        },
+        // TODO: implement appEnvironment service
+        // appEnvironment === PRODUCTION_ENV ? 'politics' :
+        'dev',
+      )
     }
   }
 }

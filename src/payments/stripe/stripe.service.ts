@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
-import { StripeCheckoutSessionMetadata } from '../payments.types'
 
-const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
-  process.env
+const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL } = process.env
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
@@ -25,7 +23,7 @@ export class StripeService {
     const session = await this.stripe.checkout.sessions.create({
       metadata: {
         userId,
-      } as StripeCheckoutSessionMetadata,
+      },
       billing_address_collection: 'auto',
       line_items: [
         {

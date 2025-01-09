@@ -43,7 +43,7 @@ export class PaymentsController {
       throw new BadRequestException('Failed to parse Stripe event')
     }
 
-    this.logger.log(`processing event.type => ${event.type}`)
+    this.logger.debug(`processing event.type => ${event.type}`, event)
     try {
       await this.stripeEvents.handleEvent(event)
     } catch (e) {

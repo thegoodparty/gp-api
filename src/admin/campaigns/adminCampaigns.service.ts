@@ -4,7 +4,7 @@ import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { getFullName } from 'src/users/util/users.util'
-import { EmailTemplates } from 'src/email/email.types'
+import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
@@ -113,7 +113,7 @@ export class AdminCampaignsService {
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-        template: EmailTemplates.candidateVictoryReady,
+        template: EmailTemplateNames.candidateVictoryReady,
         variables,
         from: 'jared@goodparty.org',
       })

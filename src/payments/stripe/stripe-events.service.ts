@@ -1,6 +1,8 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
+  Logger,
   NotImplementedException,
 } from '@nestjs/common'
 import { StripeSingleton } from './stripe.service'
@@ -17,28 +19,23 @@ import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/users.service'
 import { SlackService } from '../../shared/services/slack.service'
 import { Campaign, User } from '@prisma/client'
+import { DateFormats, formatDate } from '../../shared/util/date.util'
+import { getFullName } from '../../users/util/users.util'
+import { EmailService } from '../../email/email.service'
+import { EmailTemplateNames } from '../../email/email.types'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
 @Injectable()
 export class StripeEventsService {
+  private readonly logger = new Logger(StripeEventsService.name)
   private stripe = StripeSingleton
-  private readonly webhookHandlers = {
-    [WebhookEventType.CheckoutSessionCompleted]:
-      this.checkoutSessionCompletedHandler,
-    [WebhookEventType.CheckoutSessionExpired]: checkoutSessionExpiredHandler,
-    [WebhookEventType.CustomerSubscriptionDeleted]:
-      customerSubscriptionDeletedHandler,
-    [WebhookEventType.CustomerSubscriptionUpdated]:
-      customerSubscriptionUpdatedHandler,
-    [WebhookEventType.CustomerSubscriptionResumed]:
-      customerSubscriptionResumedHandler,
-  }
 
   constructor(
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
     private readonly slackService: SlackService,
+    private readonly emailService: EmailService,
   ) {}
 
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
@@ -50,9 +47,19 @@ export class StripeEventsService {
   }
 
   async handleEvent(event: Stripe.Event) {
-    if (!this.webhookHandlers[event.type]) {
-      throw new NotImplementedException('event type not supported')
+    switch (event.type) {
+      case WebhookEventType.CheckoutSessionCompleted:
+        return await this.checkoutSessionCompletedHandler(event)
+      case WebhookEventType.CheckoutSessionExpired:
+        return await checkoutSessionExpiredHandler(event)
+      case WebhookEventType.CustomerSubscriptionDeleted:
+        return await customerSubscriptionDeletedHandler(event)
+      case WebhookEventType.CustomerSubscriptionUpdated:
+        return await customerSubscriptionUpdatedHandler(event)
+      case WebhookEventType.CustomerSubscriptionResumed:
+        return await customerSubscriptionResumedHandler(event)
     }
+    throw new NotImplementedException('event type not supported')
   }
 
   async checkoutSessionCompletedHandler(
@@ -61,16 +68,18 @@ export class StripeEventsService {
     const session = event.data.object
     const { customer: customerId, subscription: subscriptionId } = session
     if (!customerId) {
-      throw 'No customerId found in checkout session'
+      throw new BadGatewayException('No customerId found in checkout session')
     }
 
-    const { userId } = session.metadata
+    const { userId } = session.metadata ? session.metadata : {}
     if (!userId) {
-      throw 'No userId found in checkout session metadata'
+      throw new BadGatewayException(
+        'No userId found in checkout session metadata',
+      )
     }
 
     const user = await this.usersService.findUser({
-      id: userId,
+      id: parseInt(userId),
     })
 
     if (!user) {
@@ -98,8 +107,8 @@ export class StripeEventsService {
       }),
       this.campaignsService.setIsPro(campaignId),
       this.sendProSignUpSlackMessage(user, campaign),
-      sendProConfirmationEmail(user, campaign),
-      doVoterDownloadCheck(campaign),
+      this.sendProConfirmationEmail(user, campaign),
+      this.campaignsService.doVoterDownloadCheck(campaign.id, user),
     ])
   }
 
@@ -142,31 +151,26 @@ export class StripeEventsService {
     const { details: campaignDetails } = campaign
     const { electionDate: ISO8601DateString } = campaignDetails
 
-    const formattedCurrentDate = getFormattedDateString(new Date())
+    const formattedCurrentDate = formatDate(new Date(), DateFormats.isoDate)
     const electionDate =
-      ISO8601DateString &&
-      formatUSDateString(
-        convertISO8601DateStringToUSDateString(ISO8601DateString),
-      )
+      ISO8601DateString && formatDate(ISO8601DateString, DateFormats.usDate)
 
     const emailVars = {
-      userFullName: await sails.helpers.user.name(user),
+      userFullName: getFullName(user),
       startDate: formattedCurrentDate,
       ...(electionDate ? { electionDate } : {}),
     }
 
     try {
-      await sails.helpers.mailgun.mailgunTemplateSender(
-        user.email,
-        `Welcome to Pro! Let's Empower Your Campaign Together`,
-        'pro-confirmation',
-        emailVars,
-      )
+      await this.emailService.sendTemplateEmail({
+        to: user.email,
+        subject: `Welcome to Pro! Let's Empower Your Campaign Together`,
+        template: EmailTemplateNames.proConfirmation,
+        variables: emailVars,
+      })
     } catch (e) {
-      await sails.helpers.slack.errorLoggerHelper(
-        'Error sending pro confirmation email',
-        e,
-      )
+      this.logger.error('Error sending pro confirmation email', e)
+      throw e
     }
   }
 }

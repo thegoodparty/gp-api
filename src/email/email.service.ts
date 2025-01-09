@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getSetPasswordEmailContent,
@@ -6,7 +6,7 @@ import {
   getRecoverPasswordEmailContent,
 } from './util/content.util'
 import { User, UserRole } from '@prisma/client'
-import { EmailTemplates } from './email.types'
+import { EmailTemplateNames } from './email.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -20,7 +20,7 @@ type SendEmailInput = {
 type SendTemplateEmailInput = {
   to: string
   subject: string
-  template: string
+  template: EmailTemplateNames
   variables?: object
   from?: string
   cc?: string
@@ -100,7 +100,7 @@ export class EmailService {
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: EmailTemplates.blank,
+      template: EmailTemplateNames.blank,
       variables,
     })
   }
@@ -119,10 +119,13 @@ export class EmailService {
           )
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
-          throw error // Rethrow if not rate limit error
+          throw new BadGatewayException(
+            'error communicating w/ mail service: ',
+            error,
+          )
         }
       }
     }
-    throw new Error('Exceeded maximum retry attempts')
+    throw new BadGatewayException('Exceeded maximum retry attempts')
   }
 }

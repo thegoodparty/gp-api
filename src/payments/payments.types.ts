@@ -1,14 +1,14 @@
 import Stripe from 'stripe'
 
-export interface StripeCheckoutSessionMetadata extends Stripe.MetadataParam {
-  userId: number
-}
+// export interface StripeCheckoutSessionMetadata extends Stripe.MetadataParam {
+//   userId?: number
+// }
 
 export type StripeCheckoutSessionCompletedEventWithMetadata =
   Stripe.CheckoutSessionCompletedEvent & {
     data: {
       object: {
-        metadata: StripeCheckoutSessionMetadata
+        metadata: Stripe.Metadata | null //StripeCheckoutSessionMetadata | null
       }
     }
   }
