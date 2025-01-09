@@ -6,7 +6,6 @@ import {
   NotImplementedException,
 } from '@nestjs/common'
 import { StripeSingleton } from './stripe.service'
-import { checkoutSessionExpiredHandler } from '../eventHandlers/checkoutSessionExpiredHandler'
 import { customerSubscriptionDeletedHandler } from '../eventHandlers/customerSubscriptionDeletedHandler'
 import { customerSubscriptionUpdatedHandler } from '../eventHandlers/customerSubscriptionUpdatedHandler'
 import { customerSubscriptionResumedHandler } from '../eventHandlers/customerSubscriptionResumedHandler'
@@ -51,7 +50,7 @@ export class StripeEventsService {
       case WebhookEventType.CheckoutSessionCompleted:
         return await this.checkoutSessionCompletedHandler(event)
       case WebhookEventType.CheckoutSessionExpired:
-        return await checkoutSessionExpiredHandler(event)
+        return await this.checkoutSessionExpiredHandler(event)
       case WebhookEventType.CustomerSubscriptionDeleted:
         return await customerSubscriptionDeletedHandler(event)
       case WebhookEventType.CustomerSubscriptionUpdated:
@@ -110,6 +109,22 @@ export class StripeEventsService {
       this.sendProConfirmationEmail(user, campaign),
       this.campaignsService.doVoterDownloadCheck(campaign.id, user),
     ])
+  }
+
+  async checkoutSessionExpiredHandler(
+    event: Stripe.CheckoutSessionExpiredEvent,
+  ): Promise<void> {
+    const session = event.data.object
+    const { userId } = session.metadata ? session.metadata : {}
+    if (!userId) {
+      throw 'No userId found in expired checkout session metadata'
+    }
+
+    const user = await this.usersService.findUser({ id: parseInt(userId) })
+    if (!user) {
+      throw 'No user found with given expired checkout session userId'
+    }
+    await this.usersService.patchUserMetaData(user, { checkoutSessionId: null })
   }
 
   async sendProSignUpSlackMessage(user: User, campaign: Campaign) {

@@ -1,17 +1,18 @@
 import Stripe from 'stripe'
 
-// export interface StripeCheckoutSessionMetadata extends Stripe.MetadataParam {
-//   userId?: number
-// }
-
-export type StripeCheckoutSessionCompletedEventWithMetadata =
-  Stripe.CheckoutSessionCompletedEvent & {
-    data: {
-      object: {
-        metadata: Stripe.Metadata | null //StripeCheckoutSessionMetadata | null
-      }
+export type StripeEventWithMetaData = Stripe.Event & {
+  data: {
+    object: {
+      metadata: Stripe.Metadata | null
     }
   }
+}
+
+export type StripeCheckoutSessionCompletedEventWithMetadata =
+  Stripe.CheckoutSessionCompletedEvent & StripeEventWithMetaData
+
+export type StripeCheckoutSessionExpiredEventWithMetadata =
+  Stripe.CheckoutSessionExpiredEvent & StripeEventWithMetaData
 
 export enum WebhookEventType {
   CheckoutSessionCompleted = 'checkout.session.completed',
