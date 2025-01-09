@@ -74,7 +74,7 @@ export class CampaignsController {
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return await this.campaignsService.create(user)
+    return await this.campaignsService.createForUser(user)
   }
 
   @Put('mine')

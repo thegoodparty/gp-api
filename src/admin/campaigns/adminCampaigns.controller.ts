@@ -15,19 +15,23 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Roles } from '../../authentication/decorators/Roles.decorator'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
 @Controller('admin/campaigns')
 @Roles('admin')
 @UsePipes(ZodValidationPipe)
 export class AdminCampaignsController {
-  constructor(private readonly adminCampaignsService: AdminCampaignsService) {}
+  constructor(
+    private readonly adminCampaignsService: AdminCampaignsService,
+    private readonly campaignsService: CampaignsService,
+  ) {}
 
-  @Post() // campaign/admin-create.js
+  @Post()
   create(@Body() body: AdminCreateCampaignSchema) {
     return this.adminCampaignsService.create(body)
   }
 
-  @Put(':id') // campaign/admin-update.js
+  @Put(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AdminUpdateCampaignSchema,
@@ -35,9 +39,15 @@ export class AdminCampaignsController {
     return this.adminCampaignsService.update(id, body)
   }
 
-  @Delete(':id') // campaign/admin-delete.js
+  @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
-    return this.adminCampaignsService.delete(id)
+    return this.campaignsService.delete(id)
+  }
+
+  @Post(':id/send-victory-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  sendVictoryEmail(@Param('id', ParseIntPipe) id: number) {
+    return this.adminCampaignsService.sendVictoryEmail(id)
   }
 }
