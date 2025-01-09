@@ -1,9 +1,7 @@
 import { PathToVictory } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
-
-// TODO: need a schema enum for these?
-const P2V_STATUS = ['Waiting', 'Complete', 'Failed']
+import { P2VStatus } from 'src/races/types/pathToVictory.types'
 
 export const pathToVictoryFactory = generateFactory<PathToVictory>(() => ({
   id: faker.number.int({ max: 2147483647 }),
@@ -11,7 +9,7 @@ export const pathToVictoryFactory = generateFactory<PathToVictory>(() => ({
   updatedAt: faker.date.anytime(),
   campaignId: faker.number.int(),
   data: {
-    p2vStatus: faker.helpers.arrayElement(P2V_STATUS),
+    p2vStatus: faker.helpers.enumValue(P2VStatus),
     // copy/pasted values below
     men: '6988',
     asian: 0,
