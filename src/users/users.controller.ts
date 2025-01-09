@@ -1,13 +1,12 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Logger,
   NotFoundException,
   Param,
-  Post,
   UseGuards,
 } from '@nestjs/common'
 import { UsersService } from './users.service'
@@ -15,22 +14,12 @@ import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { User } from '@prisma/client'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
-import { Roles } from '../authentication/decorators/Roles.decorator'
-import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
-import { generateRandomPassword } from './util/passwords.util'
 
 @Controller('users')
 export class UsersController {
   private readonly logger = new Logger(UsersController.name)
 
   constructor(private usersService: UsersService) {}
-
-  @Roles('admin')
-  @Post()
-  async create(@Body() userData: CreateUserInputDto) {
-    const password = userData.password || generateRandomPassword()
-    return await this.usersService.createUser({ ...userData, password })
-  }
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Get(':id')
@@ -57,7 +46,7 @@ export class UsersController {
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id') id: string) {
     try {
       return await this.usersService.deleteUser(parseInt(id))
