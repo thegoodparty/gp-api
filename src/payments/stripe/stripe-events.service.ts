@@ -100,7 +100,7 @@ export class StripeEventsService {
         checkoutSessionId: null,
       }),
       this.campaignsService.patchCampaignDetails(campaignId, {
-        subscriptionId,
+        subscriptionId: subscriptionId as string,
       }),
       this.campaignsService.update(campaignId, {
         isPro: true,

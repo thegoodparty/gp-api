@@ -4,10 +4,6 @@ import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Prisma, User } from '@prisma/client'
 import { getFullName } from 'src/users/util/users.util'
-import {
-  CampaignDetails,
-  CampaignAiContent,
-} from 'src/campaigns/campaigns.types'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 
@@ -235,7 +231,7 @@ export class AiService {
       const user = campaign.user as User
 
       const name = getFullName(user)
-      const details = (campaign.details || {}) as CampaignDetails
+      const details = campaign.details
 
       const positionsStr = positionsToStr(
         campaignPositions,
@@ -249,7 +245,10 @@ export class AiService {
       const office =
         details.office === 'Other' ? details.otherOffice : details?.office
 
-      const replaceArr = [
+      const replaceArr: {
+        find: string
+        replace: string | boolean | number | undefined | null
+      }[] = [
         {
           find: 'name',
           replace: name,
@@ -502,7 +501,7 @@ export class AiService {
           policyPlatform,
           slogan,
           why,
-        } = campaign.aiContent as CampaignAiContent
+        } = campaign.aiContent
         replaceArr.push(
           {
             find: 'slogan',

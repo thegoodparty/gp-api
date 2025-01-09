@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable } from '@nestjs/common'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getSetPasswordEmailContent,
@@ -28,6 +28,7 @@ type SendTemplateEmailInput = {
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name)
   constructor(private mailgun: MailgunService) {}
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
@@ -114,7 +115,7 @@ export class EmailService {
           // Rate limit exceeded
           const retryAfter =
             parseInt(error.response.headers['retry-after'], 10) || 1 // Retry-After header is in seconds
-          console.warn(
+          this.logger.warn(
             `Rate limit exceeded. Retrying after ${retryAfter} seconds...`,
           )
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
