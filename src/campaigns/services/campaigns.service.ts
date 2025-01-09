@@ -194,6 +194,24 @@ export class CampaignsService {
     })
   }
 
+  async patchCampaignDetails(campaignId: number, details: CampaignDetails) {
+    const currentCampaign = await this.findOne({ id: campaignId })
+    const { details: currentDetails } = currentCampaign
+
+    const updatedDetails = deepMerge(currentDetails, details)
+
+    return this.update(campaignId, { details: updatedDetails })
+  }
+
+  async setIsPro(campaignId: number, isPro: boolean = true) {
+    await Promise.allSettled([
+      this.update(campaignId, { isPro }),
+      this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
+    ])
+    // TODO: Implement CRM updates
+    // await sails.helpers.crm.updateCampaign(campaign);
+  }
+
   async launch(user: User, campaign: Campaign) {
     const campaignData = campaign.data as CampaignData
 

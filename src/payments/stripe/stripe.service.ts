@@ -1,14 +1,18 @@
 import { Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
+import { StripeCheckoutSessionMetadata } from '../payments.types'
+
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
   process.env
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 
+export const StripeSingleton = new Stripe(STRIPE_SECRET_KEY as string)
+
 @Injectable()
 export class StripeService {
-  private stripe = new Stripe(STRIPE_SECRET_KEY as string)
+  private stripe = StripeSingleton
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
@@ -21,7 +25,7 @@ export class StripeService {
     const session = await this.stripe.checkout.sessions.create({
       metadata: {
         userId,
-      },
+      } as StripeCheckoutSessionMetadata,
       billing_address_collection: 'auto',
       line_items: [
         {
@@ -45,13 +49,5 @@ export class StripeService {
       customer: customerId,
       return_url: `${WEBAPP_ROOT_URL}/profile`,
     })
-  }
-
-  async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
-    return this.stripe.webhooks.constructEvent(
-      rawBody,
-      stripeSignature,
-      STRIPE_WEBSOCKET_SECRET as string,
-    )
   }
 }

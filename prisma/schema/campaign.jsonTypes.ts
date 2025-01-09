@@ -12,6 +12,9 @@ declare global {
       zip?: User['zip']
       knowRun?: 'yes' | null
       pledged?: boolean
+      isProUpdatedAt?: number // TODO: make this an ISO dateTime string
+      office?: string
+      otherOffice?: string
     }
   }
 }

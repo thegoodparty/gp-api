@@ -113,6 +113,22 @@ export class UsersService {
     })
   }
 
+  async patchUserMetaData(user: User, newMetaData: PrismaJson.UserMetaData) {
+    const currentUser = await this.findUser({ id: user.id })
+    const currentMetaData = currentUser?.metaData
+    return this.updateUser(
+      {
+        id: user.id,
+      },
+      {
+        metaData: {
+          ...currentMetaData,
+          ...newMetaData,
+        },
+      },
+    )
+  }
+
   async deleteUser(id: number) {
     return this.prisma.user.delete({
       where: {
