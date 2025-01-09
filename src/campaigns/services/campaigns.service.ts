@@ -5,7 +5,7 @@ import { CampaignListSchema } from '../schemas/campaignList.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
-import { findSlug } from 'src/shared/util/slug.util'
+import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import {
@@ -19,6 +19,7 @@ import {
   OnboardingStep,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
+import { EmailTemplates } from 'src/email/email.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -107,8 +108,12 @@ export class CampaignsService {
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
-  async create(user: User) {
-    const slug = await findSlug(this.prisma, getFullName(user))
+  async create(data: Prisma.CampaignCreateArgs['data']) {
+    return this.prisma.campaign.create({ data })
+  }
+
+  async createForUser(user: User) {
+    const slug = await this.findSlug(user)
 
     const newCampaign = await this.prisma.campaign.create({
       data: {
@@ -212,6 +217,14 @@ export class CampaignsService {
     // await sails.helpers.crm.updateCampaign(campaign);
   }
 
+  delete(id: number) {
+    return this.prisma.campaign.delete({ where: { id } })
+  }
+
+  deleteAll(where: Prisma.CampaignWhereInput) {
+    return this.prisma.campaign.deleteMany({ where })
+  }
+
   async launch(user: User, campaign: Campaign) {
     const campaignData = campaign.data as CampaignData
 
@@ -251,6 +264,26 @@ export class CampaignsService {
     await this.sendCampaignLaunchEmail(user)
 
     return true
+  }
+
+  async findSlug(user: User, suffix?: string) {
+    const name = getFullName(user)
+    const MAX_TRIES = 100
+    const slug = buildSlug(name, suffix)
+    const exists = await this.prisma.campaign.findUnique({ where: { slug } })
+    if (!exists) {
+      return slug
+    }
+
+    for (let i = 1; i < MAX_TRIES; i++) {
+      const slug = buildSlug(`${name}${i}`, suffix)
+      const exists = await this.prisma.campaign.findUnique({ where: { slug } })
+      if (!exists) {
+        return slug
+      }
+    }
+
+    return slug as never // should not happen
   }
 
   async saveCampaignPlanVersion(inputs: {
@@ -369,8 +402,7 @@ export class CampaignsService {
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Full Suite of AI Campaign Tools Now Available',
-        // TODO: template is misspelled in Mailgun as well, must change there first.
-        template: 'campagin-launch',
+        template: EmailTemplates.campaignLaunch,
         variables: {
           name: getFullName(user),
           link: `${APP_BASE}/dashboard`,
