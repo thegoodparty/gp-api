@@ -5,10 +5,9 @@ import {
   getRecoverPasswordEmailContent,
   getSetPasswordEmailContent,
 } from './util/content.util'
-import { Campaign, User, UserRole } from '@prisma/client'
+import { User, UserRole } from '@prisma/client'
 import { EmailTemplateNames } from './email.types'
 import { getFullName } from '../users/util/users.util'
-import { format } from 'date-fns'
 import { DateFormats, formatDate } from '../shared/util/date.util'
 
 const APP_BASE = process.env.CORS_ORIGIN as string

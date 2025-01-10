@@ -4,7 +4,6 @@ export enum EmailTemplateNames {
   campaignLaunch = 'campagin-launch',
   blank = 'blank-email',
   proConfirmation = 'pro-confirmation',
-  blankEmail = 'blank-email',
   volunteerInvitation = 'volunteer-invitation',
   weeklyGoals = 'weekly-goals',
   weeklyContent = 'weekly-content',

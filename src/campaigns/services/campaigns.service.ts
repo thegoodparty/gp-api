@@ -320,7 +320,7 @@ export class CampaignsService {
       throw new BadRequestException('Cannot launch campaign, Office not set')
     }
 
-    const updated = await this.prisma.campaign.update({
+    await this.prisma.campaign.update({
       where: { id: campaign.id },
       data: {
         isActive: true,
