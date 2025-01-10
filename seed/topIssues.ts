@@ -1,6 +1,4 @@
 import { PrismaClient } from '@prisma/client'
-import { campaignFactory } from './factories/campaign.factory'
-import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { topIssueFactory } from './factories/topIssue.factory'
 import { positionFactory } from './factories/position.factory'
 import { campaignPositionFactory } from './factories/campaignPosition.factory'

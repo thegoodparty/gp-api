@@ -1,42 +1,46 @@
-import { County } from '@prisma/client'
+import { Municipality } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import slugify from 'slugify'
-import { generateFactory } from '../../../seed/factories/generate'
+import { generateFactory } from './generate'
 import {
-  getRandomElementFromArray,
   getRandomInt,
   getRandomPercentage,
-} from '../../../src/shared/util/numbers.util'
+  getRandomElementFromArray,
+} from 'src/shared/util/numbers.util'
 
-const counties = [
-  'San Diego',
-  'Orange',
-  'Riverside',
-  'San Bernardino',
-  'Santa Clara',
-  'Alameda',
-  'Sacramento',
-  'Contra Costa',
-  'Fresno',
-  'Kern',
-  'San Francisco',
-  'Ventura',
-  'San Mateo',
-  'San Joaquin',
+const cities = [
+  'Glendale',
+  'Santa Clarita',
+  'Torrance',
+  'Palmdale',
+  'Burbank',
+  'West Covina',
+  'Pasadena',
+  'Inglewood',
+  'Compton',
+  'Carson',
+  'Santa Monica',
+  'Hawthorne',
+  'Lakewood',
+  'Bellflower',
+  'Lynwood',
+  'Redondo Beach',
+  'Pico Rivera',
+  'Montebello',
 ]
 
-let countyCount = 0
-export const countyFactory = generateFactory<County>(() => {
-  const county = counties[countyCount]
-  countyCount++
+export const municipalityFactory = generateFactory<Municipality>(() => {
+  const city = getRandomElementFromArray(cities)
   return {
     id: faker.number.int({ max: 2147483647 }),
-    slug: `ca/${slugify(county, { lower: true })}`,
-    name: county,
+    slug: `ca/los-angeles/${slugify(city, { lower: true })}`,
+    name: city,
     state: 'CA',
+    type: 'city',
     data: {
-      county,
-      county_full: `${county} County`,
+      city,
+      county_full: `${city} County`,
+      county_name: 'Los Angeles',
       state_id: 'CA',
       state_name: 'California',
       city_largest: 'Los Angeles',
