@@ -40,6 +40,17 @@ export class UsersService {
     return this.findUser({ id: campaign.userId })
   }
 
+  async findByCustomerId(customerId: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        metaData: {
+          path: ['customerId'],
+          equals: customerId,
+        },
+      },
+    })
+  }
+
   findUserByResetToken(email: string, token: string) {
     return this.prisma.user.findFirstOrThrow({
       where: {

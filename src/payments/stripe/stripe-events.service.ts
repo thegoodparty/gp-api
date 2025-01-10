@@ -7,7 +7,6 @@ import {
   NotImplementedException,
 } from '@nestjs/common'
 import { StripeSingleton } from './stripe.service'
-import { customerSubscriptionResumedHandler } from '../eventHandlers/customerSubscriptionResumedHandler'
 import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
@@ -52,9 +51,41 @@ export class StripeEventsService {
       case WebhookEventType.CustomerSubscriptionUpdated:
         return await this.customerSubscriptionUpdatedHandler(event)
       case WebhookEventType.CustomerSubscriptionResumed:
-        return await customerSubscriptionResumedHandler(event)
+        return await this.customerSubscriptionResumedHandler(event)
     }
     throw new NotImplementedException('event type not supported')
+  }
+
+  async customerSubscriptionResumedHandler(
+    event: Stripe.CustomerSubscriptionResumedEvent,
+  ) {
+    const subscription = event.data.object
+    const { customer: customerId, id: subscriptionId } = subscription
+    if (!customerId) {
+      throw new BadRequestException('No customerId found in subscription')
+    }
+
+    const user = await this.usersService.findByCustomerId(customerId as string)
+    if (!user) {
+      throw new BadGatewayException(
+        'No user found with given subscription customerId',
+      )
+    }
+    const campaign = await this.campaignsService.findByUser(user.id)
+    if (!campaign) {
+      throw 'No campaign found with given subscriptionId'
+    }
+    const { id: campaignId } = campaign
+
+    await Promise.allSettled([
+      this.campaignsService.patchCampaignDetails(campaignId, {
+        subscriptionId: subscriptionId as string,
+      }),
+      this.campaignsService.setIsPro(campaignId),
+      this.sendProSubscriptionResumedSlackMessage(user, campaign),
+      this.sendProConfirmationEmail(user, campaign),
+      this.campaignsService.doVoterDownloadCheck(campaignId, user),
+    ])
   }
 
   async customerSubscriptionUpdatedHandler(
@@ -213,6 +244,18 @@ export class StripeEventsService {
         }, running for '${otherOffice || office}' and campaign slug \`${
           campaign.slug
         }\` ended their pro subscription!`,
+      },
+      // TODO: implement appEnvironment service
+      // appEnvironment === PRODUCTION_ENV ? 'politics' :
+      'dev',
+    )
+  }
+
+  async sendProSubscriptionResumedSlackMessage(user: User, campaign: Campaign) {
+    await this.slackService.message(
+      {
+        title: 'Pro Plan Resumed',
+        body: `PRO PLAN RESUMED: \`${getFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
       // TODO: implement appEnvironment service
       // appEnvironment === PRODUCTION_ENV ? 'politics' :
