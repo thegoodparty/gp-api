@@ -105,6 +105,15 @@ export class CampaignsService {
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
+  async findBySubscriptionId(subscriptionId: string) {
+    return await this.findOne({
+      details: {
+        path: ['subscriptionId'],
+        equals: subscriptionId,
+      },
+    })
+  }
+
   async create(data: Prisma.CampaignCreateArgs['data']) {
     return this.prisma.campaign.create({ data })
   }

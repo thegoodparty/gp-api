@@ -7,7 +7,6 @@ import {
   NotImplementedException,
 } from '@nestjs/common'
 import { StripeSingleton } from './stripe.service'
-import { customerSubscriptionUpdatedHandler } from '../eventHandlers/customerSubscriptionUpdatedHandler'
 import { customerSubscriptionResumedHandler } from '../eventHandlers/customerSubscriptionResumedHandler'
 import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
@@ -51,11 +50,47 @@ export class StripeEventsService {
       case WebhookEventType.CustomerSubscriptionDeleted:
         return await this.customerSubscriptionDeletedHandler(event)
       case WebhookEventType.CustomerSubscriptionUpdated:
-        return await customerSubscriptionUpdatedHandler(event)
+        return await this.customerSubscriptionUpdatedHandler(event)
       case WebhookEventType.CustomerSubscriptionResumed:
         return await customerSubscriptionResumedHandler(event)
     }
     throw new NotImplementedException('event type not supported')
+  }
+
+  async customerSubscriptionUpdatedHandler(
+    event: Stripe.CustomerSubscriptionUpdatedEvent,
+  ): Promise<void> {
+    const subscription = event.data.object
+    const {
+      id: subscriptionId,
+      canceled_at: canceledAt,
+      cancel_at: cancelAt,
+    } = subscription
+    if (!subscriptionId) {
+      throw new BadRequestException('No subscriptionId found in subscription')
+    }
+
+    const campaign =
+      await this.campaignsService.findBySubscriptionId(subscriptionId)
+    if (!campaign) {
+      throw new BadGatewayException('No campaign found with given subscription')
+    }
+
+    const user = (await this.usersService.findByCampaign(campaign)) as User
+
+    const { details } = campaign
+    const isCancellationRequest = canceledAt && !details.subscriptionCanceledAt
+
+    await this.campaignsService.patchCampaignDetails(campaign.id, {
+      subscriptionCanceledAt: canceledAt,
+      subscriptionCancelAt: cancelAt,
+    })
+
+    isCancellationRequest &&
+      (await this.emailService.sendCancellationRequestConfirmationEmail(
+        user,
+        formatDate(new Date((cancelAt as number) * 1000), DateFormats.usDate),
+      ))
   }
 
   async checkoutSessionCompletedHandler(
@@ -133,12 +168,8 @@ export class StripeEventsService {
       throw 'No subscriptionId found in subscription'
     }
 
-    const campaign = await this.campaignsService.findOne({
-      details: {
-        path: ['subscriptionId'],
-        equals: 'sub_1QfVpH1taBPnTqn4LF1PL5D3', // subscriptionId,
-      },
-    })
+    const campaign =
+      await this.campaignsService.findBySubscriptionId(subscriptionId)
 
     if (!campaign) {
       throw new BadGatewayException(

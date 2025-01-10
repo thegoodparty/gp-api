@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
@@ -34,6 +34,10 @@ export class UsersService {
     return this.prisma.user.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
     })
+  }
+
+  async findByCampaign(campaign: Campaign) {
+    return this.findUser({ id: campaign.userId })
   }
 
   findUserByResetToken(email: string, token: string) {

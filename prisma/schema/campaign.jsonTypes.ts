@@ -36,6 +36,8 @@ declare global {
       statementName?: string
       subscriptionId?: string
       endOfElectionSubscriptionCanceled?: boolean
+      subscriptionCanceledAt?: number | null
+      subscriptionCancelAt?: number | null
     }
 
     export type CampaignData = {

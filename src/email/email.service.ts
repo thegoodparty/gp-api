@@ -5,10 +5,11 @@ import {
   getRecoverPasswordEmailContent,
   getSetPasswordEmailContent,
 } from './util/content.util'
-import { User, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '@prisma/client'
 import { EmailTemplateNames } from './email.types'
 import { getFullName } from '../users/util/users.util'
 import { format } from 'date-fns'
+import { DateFormats, formatDate } from '../shared/util/date.util'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -116,7 +117,22 @@ export class EmailService {
       template: EmailTemplateNames.endOfProSubscription,
       variables: {
         userFullName: getFullName(user),
-        todayDateString: format(today, 'DD MMMM, YYYY'),
+        todayDateString: formatDate(today, DateFormats.usDate),
+      },
+    })
+  }
+
+  async sendCancellationRequestConfirmationEmail(
+    user: User,
+    subscriptionEndDate: string,
+  ) {
+    await this.sendTemplateEmail({
+      to: user.email,
+      subject: `Your Cancellation Request Has Been Processed – Pro Access Until ${subscriptionEndDate}`,
+      template: EmailTemplateNames.subscriptionCancellationConfirmation,
+      variables: {
+        userFullName: getFullName(user),
+        subscriptionEndDate,
       },
     })
   }
