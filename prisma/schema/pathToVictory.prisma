@@ -4,7 +4,8 @@ model PathToVictory {
   updatedAt  DateTime @updatedAt @map("updated_at")
   campaign   Campaign @relation(fields: [campaignId], references: [id])
   campaignId Int      @unique @map("campaign_id")
-  data       Json     @db.JsonB
+  /// [PathToVictoryData]
+  data       Json     @default("{}") @db.JsonB
 
   @@index([campaignId])
   @@map("path_to_victory")

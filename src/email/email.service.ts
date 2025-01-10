@@ -6,6 +6,7 @@ import {
   getRecoverPasswordEmailContent,
 } from './util/content.util'
 import { User, UserRole } from '@prisma/client'
+import { EmailTemplates } from './email.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -99,7 +100,7 @@ export class EmailService {
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: 'blank-email',
+      template: EmailTemplates.blank,
       variables,
     })
   }

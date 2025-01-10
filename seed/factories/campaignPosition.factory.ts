@@ -1,4 +1,4 @@
-import { TopIssue, Position, CampaignPosition } from '@prisma/client'
+import { CampaignPosition } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 

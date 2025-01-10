@@ -36,19 +36,28 @@ export class CampaignsController {
   ) {}
 
   @Roles(UserRole.admin)
-  @Get() // campaign/list.js
+  @Get()
   findAll(@Query() query: CampaignListSchema) {
     return this.campaignsService.findAll(query)
   }
 
-  @Get('mine') // campaign/get.js
+  @Get('mine')
   @UseCampaign()
-  async findOne(@ReqCampaign() campaign: Campaign) {
+  async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
   }
 
+  @Get('mine/status')
+  @UseCampaign({ continueIfNotFound: true })
+  async getUserCampaignStatus(
+    @ReqUser() user: User,
+    @ReqCampaign() campaign?: Campaign,
+  ) {
+    return this.campaignsService.getStatus(user, campaign)
+  }
+
   @Get('slug/:slug')
-  @Roles(UserRole.admin) // campaign/find-by-slug.js
+  @Roles(UserRole.admin)
   async findBySlug(@Param('slug') slug: string) {
     const campaign = await this.campaignsService.findOne({ slug })
 
@@ -57,17 +66,17 @@ export class CampaignsController {
     return campaign
   }
 
-  @Post() // campaign/create.js
+  @Post()
   async create(@ReqUser() user: User) {
     // see if the user already has campaign
     const existing = await this.campaignsService.findByUser(user.id)
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return await this.campaignsService.create(user)
+    return await this.campaignsService.createForUser(user)
   }
 
-  @Put('mine') // campaign/update.js
+  @Put('mine')
   @UseCampaign({ continueIfNotFound: true })
   async update(
     @ReqUser() user: User,
@@ -88,7 +97,7 @@ export class CampaignsController {
     return this.campaignsService.updateJsonFields(campaign.id, body)
   }
 
-  @Post('launch') // campaign/launch.js
+  @Post('launch')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)
   async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {

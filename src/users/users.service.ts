@@ -4,17 +4,24 @@ import { Prisma, User } from '@prisma/client'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
+import { WithOptional } from 'src/shared/types/utility.types'
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  getAllUsers() {
-    return this.prisma.user.findMany()
+  findAllUsers(where?: Prisma.UserWhereInput) {
+    return this.prisma.user.findMany({ where })
   }
 
-  findUser(where: Prisma.UserWhereUniqueInput): Promise<User | null> {
+  findUser(where: Prisma.UserWhereUniqueInput) {
     return this.prisma.user.findUnique({
+      where,
+    })
+  }
+
+  findUserOrThrow(where: Prisma.UserWhereUniqueInput) {
+    return this.prisma.user.findUniqueOrThrow({
       where,
     })
   }
@@ -59,16 +66,10 @@ export class UsersService {
     })
   }
 
-  async createUser(userData: CreateUserInputDto): Promise<User> {
-    const {
-      password = '',
-      firstName,
-      lastName,
-      email,
-      zip,
-      phone,
-      name,
-    } = userData
+  async createUser(
+    userData: WithOptional<CreateUserInputDto, 'password' | 'phone'>,
+  ): Promise<User> {
+    const { password, firstName, lastName, email, zip, phone, name } = userData
 
     const hashedPassword = await hashPassword(
       password ?? generateRandomPassword(),
@@ -89,7 +90,7 @@ export class UsersService {
     } = trimMany({
       firstName,
       lastName,
-      phone,
+      ...(phone ? { phone } : {}),
       ...(zip ? { zip } : {}),
     })
 
@@ -97,7 +98,7 @@ export class UsersService {
       data: {
         ...userData,
         ...trimmed,
-        ...(hashedPassword ? { password: hashedPassword } : {}),
+        password: hashedPassword,
         name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
       },
     })

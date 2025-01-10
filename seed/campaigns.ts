@@ -18,7 +18,6 @@ export default async function seedCampaigns(
   prisma: PrismaClient,
   existingUsers: User[],
 ) {
-  const fakeCampaigns: any[] = []
   const fakeP2Vs: any[] = []
   const fakeUpdateHistory: any[] = []
 
@@ -37,19 +36,27 @@ export default async function seedCampaigns(
       })
     }
 
-    const campaign = campaignFactory({
+    const campaignData = campaignFactory({
       userId: user.id,
       ...fixedCampaign,
     })
 
-    campaignIds.push(campaign.id)
-    fakeCampaigns.push(campaign)
-    fakeP2Vs.push(pathToVictoryFactory({ campaignId: campaign.id }))
+    const createdCampaign = await prisma.campaign.create({
+      data: campaignData,
+    })
+
+    campaignIds.push(createdCampaign.id)
+
+    await prisma.pathToVictory.create({
+      data: pathToVictoryFactory({
+        campaignId: createdCampaign.id,
+      }),
+    })
 
     for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
       fakeUpdateHistory.push(
         campaignUpdateHistoryFactory({
-          campaignId: campaign.id,
+          campaignId: createdCampaign.id,
           userId: user.id,
         }),
       )
@@ -67,13 +74,14 @@ export default async function seedCampaigns(
         },
       })
     }
-    const campaign = campaignFactory({
-      userId: user.id,
-      slug: buildSlug(getFullName(user)),
+    const campaign = await prisma.campaign.create({
+      data: campaignFactory({
+        userId: user.id,
+        slug: buildSlug(getFullName(user)),
+      }),
     })
 
     campaignIds.push(campaign.id)
-    fakeCampaigns.push(campaign)
     fakeP2Vs.push(pathToVictoryFactory({ campaignId: campaign.id }))
 
     for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
@@ -85,14 +93,10 @@ export default async function seedCampaigns(
       )
     }
   }
-  const { count } = await prisma.campaign.createMany({ data: fakeCampaigns })
-  await prisma.pathToVictory.createMany({
-    data: fakeP2Vs,
-  })
-
+  await prisma.pathToVictory.createMany({ data: fakeP2Vs })
   await prisma.campaignUpdateHistory.createMany({ data: fakeUpdateHistory })
 
-  console.log(`Created ${count} campaigns`)
+  console.log(`Created ${campaignIds.length} campaigns`)
 
   return campaignIds
 }
