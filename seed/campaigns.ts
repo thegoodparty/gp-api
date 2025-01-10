@@ -39,7 +39,7 @@ export default async function seedCampaigns(
 
     const campaign = campaignFactory({
       userId: user.id,
-      ...fixedCampaign, // Merge the fixed campaign's properties
+      ...fixedCampaign,
     })
 
     campaignIds.push(campaign.id)
@@ -85,8 +85,6 @@ export default async function seedCampaigns(
       )
     }
   }
-  console.log(fakeCampaigns)
-  console.log('Length of fakeCampaigns: ', fakeCampaigns.length)
   const { count } = await prisma.campaign.createMany({ data: fakeCampaigns })
   await prisma.pathToVictory.createMany({
     data: fakeP2Vs,

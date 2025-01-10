@@ -13,7 +13,6 @@ export class MappingController {
 
   @Get('map')
   map(@Query() query: MapDto): Promise<CleanCampaign[]> {
-    console.log('Query: ', query)
     return this.mappingService.listMap(
       query.party,
       query.state,

@@ -31,8 +31,7 @@ export const countyFactory = generateFactory<County>(() => {
   countyCount++
   return {
     id: faker.number.int({ max: 2147483647 }),
-    //slug: `ca/${slugify(county, { lower: true })}`,
-    slug: faker.lorem.slug(),
+    slug: `ca/${slugify(county, { lower: true })}`,
     name: county,
     state: 'CA',
     data: {

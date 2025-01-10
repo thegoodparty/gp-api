@@ -14,31 +14,6 @@ export type AiContentInputValues = Record<
   string | boolean | number | undefined
 >
 
-export type CampaignDataContent = {
-  createdBy?: 'admin' | string
-  hubSpotUpdates?: {
-    verified_candidates?: string
-    election_results?: string
-    office_type?: string
-  }
-}
-
-export type CampaignDetailsContent = {
-  geoLocation?: {
-    lng?: number
-    lat?: number
-  }
-  geoLocationFailed?: boolean
-  zip?: string
-  electionDate?: string
-  party?: string
-  state?: string
-  ballotLevel?: string
-  city: string | null
-  county: string | null
-  normalizedOffice?: string | null
-}
-
 export enum GenerationStatus {
   processing = 'processing',
   completed = 'completed',
@@ -82,12 +57,6 @@ export type CampaignDetails = Record<string, any> & {
   runningAgainst?: Record<'name' | 'party' | 'description', string>[]
 }
 
-export function isRecord<T extends object>(
-  value: unknown,
-): value is Record<string, T> {
-  return typeof value === 'object' && value !== null
-}
-
 export interface CleanCampaign {
   slug: string
   id: string
@@ -106,7 +75,3 @@ export interface CleanCampaign {
   normalizedOffice?: string | null
   globalPosition?: { lng: number; lat: number }
 }
-
-export const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  .toISOString()
-  .split('T')[0] // 'YYYY-MM-DD'
