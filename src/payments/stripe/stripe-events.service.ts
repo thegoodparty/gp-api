@@ -2,17 +2,14 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotImplementedException,
 } from '@nestjs/common'
 import { StripeSingleton } from './stripe.service'
-import { customerSubscriptionDeletedHandler } from '../eventHandlers/customerSubscriptionDeletedHandler'
 import { customerSubscriptionUpdatedHandler } from '../eventHandlers/customerSubscriptionUpdatedHandler'
 import { customerSubscriptionResumedHandler } from '../eventHandlers/customerSubscriptionResumedHandler'
-import {
-  StripeCheckoutSessionCompletedEventWithMetadata,
-  WebhookEventType,
-} from '../payments.types'
+import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/users.service'
@@ -52,7 +49,7 @@ export class StripeEventsService {
       case WebhookEventType.CheckoutSessionExpired:
         return await this.checkoutSessionExpiredHandler(event)
       case WebhookEventType.CustomerSubscriptionDeleted:
-        return await customerSubscriptionDeletedHandler(event)
+        return await this.customerSubscriptionDeletedHandler(event)
       case WebhookEventType.CustomerSubscriptionUpdated:
         return await customerSubscriptionUpdatedHandler(event)
       case WebhookEventType.CustomerSubscriptionResumed:
@@ -62,7 +59,7 @@ export class StripeEventsService {
   }
 
   async checkoutSessionCompletedHandler(
-    event: StripeCheckoutSessionCompletedEventWithMetadata,
+    event: Stripe.CheckoutSessionCompletedEvent,
   ): Promise<void> {
     const session = event.data.object
     const { customer: customerId, subscription: subscriptionId } = session
@@ -125,6 +122,71 @@ export class StripeEventsService {
       throw 'No user found with given expired checkout session userId'
     }
     await this.usersService.patchUserMetaData(user, { checkoutSessionId: null })
+  }
+
+  async customerSubscriptionDeletedHandler(
+    event: Stripe.CustomerSubscriptionDeletedEvent,
+  ): Promise<void> {
+    const subscription = event.data.object
+    const { id: subscriptionId } = subscription
+    if (!subscriptionId) {
+      throw 'No subscriptionId found in subscription'
+    }
+
+    const campaign = await this.campaignsService.findOne({
+      details: {
+        path: ['subscriptionId'],
+        equals: 'sub_1QfVpH1taBPnTqn4LF1PL5D3', // subscriptionId,
+      },
+    })
+
+    if (!campaign) {
+      throw new BadGatewayException(
+        `No campaign found with given subscriptionId => ${subscriptionId}`,
+      )
+    }
+
+    const user = await this.usersService.findUser({
+      id: campaign.userId as number,
+    })
+    if (!user) {
+      throw new InternalServerErrorException(
+        `No user found with given campaign user id => ${campaign.userId}`,
+      )
+    }
+    const { metaData } = user
+    if (metaData?.isDeleted) {
+      this.logger.log('User is already deleted')
+      return
+    }
+
+    await this.campaignsService.persistCampaignProCancellation(campaign)
+    await this.sendProCancellationSlackMessage(user, campaign)
+
+    await this.emailService.sendProSubscriptionEndingEmail(user)
+  }
+
+  async sendProCancellationSlackMessage(user: User, campaign: Campaign) {
+    const { details = {} } = campaign || {}
+    if (details.endOfElectionSubscriptionCanceled) {
+      return // don't send Slack message if subscription was canceled at end of election
+    }
+    const { office, otherOffice } = details
+    const fullName = getFullName(user)
+
+    await this.slackService.message(
+      {
+        title: 'Pro Plan Cancellation',
+        body: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
+          user.email
+        }, running for '${otherOffice || office}' and campaign slug \`${
+          campaign.slug
+        }\` ended their pro subscription!`,
+      },
+      // TODO: implement appEnvironment service
+      // appEnvironment === PRODUCTION_ENV ? 'politics' :
+      'dev',
+    )
   }
 
   async sendProSignUpSlackMessage(user: User, campaign: Campaign) {

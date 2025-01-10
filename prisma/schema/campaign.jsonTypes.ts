@@ -35,6 +35,7 @@ declare global {
       campaignCommittee?: string
       statementName?: string
       subscriptionId?: string
+      endOfElectionSubscriptionCanceled?: boolean
     }
 
     export type CampaignData = {

@@ -1,12 +1,14 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
-  getSetPasswordEmailContent,
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
+  getSetPasswordEmailContent,
 } from './util/content.util'
 import { User, UserRole } from '@prisma/client'
 import { EmailTemplateNames } from './email.types'
+import { getFullName } from '../users/util/users.util'
+import { format } from 'date-fns'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -103,6 +105,19 @@ export class EmailService {
       subject,
       template: EmailTemplateNames.blank,
       variables,
+    })
+  }
+
+  async sendProSubscriptionEndingEmail(user: User) {
+    const today = new Date()
+    await this.sendTemplateEmail({
+      to: user.email,
+      subject: `Your Pro Subscription is Ending Today`,
+      template: EmailTemplateNames.endOfProSubscription,
+      variables: {
+        userFullName: getFullName(user),
+        todayDateString: format(today, 'DD MMMM, YYYY'),
+      },
     })
   }
 

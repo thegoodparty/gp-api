@@ -7,6 +7,7 @@ declare global {
       checkoutSessionId?: string | null
       accountType?: string
       lastVisited?: number
+      isDeleted?: boolean
     } | null
   }
 }

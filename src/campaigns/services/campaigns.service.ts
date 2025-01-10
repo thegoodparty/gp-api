@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
 import { Campaign, PathToVictory, Prisma, User } from '@prisma/client'
-import { deepMerge } from 'src/shared/util/objects.util'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
@@ -14,6 +14,7 @@ import {
   CampaignLaunchStatus,
   OnboardingStep,
   CampaignStatus,
+  CampaignWhereInputWithJsonFields,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
@@ -49,11 +50,7 @@ export class CampaignsService {
     private planVersionService: CampaignPlanVersionsService,
     private usersService: UsersService,
     private emailService: EmailService,
-    // <<<<<<< HEAD
     private slackService: SlackService,
-    // =======
-    //     private slack: SlackService,
-    // >>>>>>> origin/develop
   ) {}
 
   async findAll(
@@ -75,7 +72,7 @@ export class CampaignsService {
   }
 
   findOne<T extends Prisma.CampaignInclude>(
-    where: Prisma.CampaignWhereInput,
+    where: CampaignWhereInputWithJsonFields,
     include: T = {
       pathToVictory: true,
     } as any, // TODO: figure out how to properly type this default instead of using any
@@ -87,7 +84,7 @@ export class CampaignsService {
   }
 
   findOneOrThrow(
-    where: Prisma.CampaignWhereInput,
+    where: CampaignWhereInputWithJsonFields,
     include: Prisma.CampaignInclude = {
       pathToVictory: true,
     },
@@ -199,10 +196,9 @@ export class CampaignsService {
     })
   }
 
-  // <<<<<<< HEAD
   async patchCampaignDetails(
     campaignId: number,
-    details: PrismaJson.CampaignDetails,
+    details: Partial<PrismaJson.CampaignDetails>,
   ) {
     const currentCampaign = await this.findOne({ id: campaignId })
     const { details: currentDetails } = currentCampaign
@@ -210,6 +206,15 @@ export class CampaignsService {
     const updatedDetails = deepMerge(currentDetails, details)
 
     return this.update(campaignId, { details: updatedDetails })
+  }
+
+  async persistCampaignProCancellation(campaign: Campaign) {
+    await this.updateJsonFields(campaign.id, {
+      details: {
+        subscriptionId: null,
+      },
+    })
+    await this.setIsPro(campaign.id, false)
   }
 
   async setIsPro(campaignId: number, isPro: boolean = true) {
@@ -282,7 +287,7 @@ export class CampaignsService {
     return this.prisma.campaign.delete({ where: { id } })
   }
 
-  deleteAll(where: Prisma.CampaignWhereInput) {
+  deleteAll(where: CampaignWhereInputWithJsonFields) {
     return this.prisma.campaign.deleteMany({ where })
   }
 
@@ -608,9 +613,9 @@ function buildCampaignListFilters({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}: CampaignListSchema): Prisma.CampaignWhereInput {
+}: CampaignListSchema): CampaignWhereInputWithJsonFields {
   // base query
-  const where: Prisma.CampaignWhereInput = {
+  const where: CampaignWhereInputWithJsonFields = {
     NOT: {
       user: null,
     },
@@ -618,7 +623,7 @@ function buildCampaignListFilters({
   }
 
   // store AND array in var for easy push access
-  const AND = where.AND as Prisma.CampaignWhereInput[]
+  const AND = where.AND as CampaignWhereInputWithJsonFields[]
 
   if (id) AND.push({ id })
   if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
