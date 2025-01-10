@@ -16,7 +16,6 @@ export async function handleGeoLocation(
   if (forceReCalc || !geoLocation?.lng) {
     const geoLocation = await calculateGeoLocation(slug, details, prismaService)
     if (!geoLocation) {
-      console.log('Geolocation failed')
       await prismaService.campaign.update({
         where: {
           slug,

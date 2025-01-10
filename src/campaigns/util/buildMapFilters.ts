@@ -28,8 +28,6 @@ export function buildMapFilters(
 
   if (partyFilter) {
     // Prisma doesn't support case-insensitive searching inside JSON
-    console.log('Pushing party and condition')
-    console.log(partyFilter)
     const partyCondition = createJsonOrConditionString(partyFilter, ['party'])
     if (partyCondition) {
       andConditions.push(partyCondition)
@@ -37,8 +35,6 @@ export function buildMapFilters(
   }
 
   if (stateFilter) {
-    console.log('Pushing state and conditions')
-    console.log('State: ', stateFilter)
     const stateCondition = createJsonOrConditionString(stateFilter, ['state'])
     if (stateCondition) {
       andConditions.push(stateCondition)

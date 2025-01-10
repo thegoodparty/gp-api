@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { CleanCampaign, sevenDaysAgo } from '../campaigns.types'
 import { RaceData } from 'src/races/races.types'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { Prisma, Campaign } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { handleGeoLocation } from '../util/geoLocation'
 import { buildMapFilters } from '../util/buildMapFilters'
 
