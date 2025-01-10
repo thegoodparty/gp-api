@@ -22,7 +22,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
       hubSpotUpdates: {
         election_results: faker.lorem.word(),
         verified_candidates: faker.helpers.arrayElement(['Yes', 'No']),
-        office_type: faker.lorem.text(),
+        office_type: faker.lorem.word(),
       },
     },
     details: {

@@ -1,4 +1,4 @@
-import { ngeohash } from 'ngeohash'
+import * as ngeohash from 'ngeohash'
 
 const googleApiKey = process.env.GOOGLE_API_KEY
 
@@ -29,7 +29,11 @@ export async function zipToLatLng(
     return null
   } else {
     const data = (await response.json()) as GeocodeLocation
-    const location = data.results[0].geometry.location
+    const location = data?.results[0]?.geometry?.location
+    if (!location) {
+      console.log('Response: ', data)
+      return null
+    }
     const geoHash = ngeohash.encode(location.lat, location.lng, 8)
     return { lat: location.lat, lng: location.lng, geoHash: geoHash }
   }

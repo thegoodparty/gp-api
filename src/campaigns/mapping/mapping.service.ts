@@ -14,10 +14,14 @@ export class MappingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listMapCount(
-    state?: string,
-    results?: boolean,
+    stateFilter?: string,
+    resultsFilter?: boolean,
   ): Promise<{ count: number }> {
-    const baseAndConditions = buildMapFilters({ state, results, isProd })
+    const baseAndConditions = buildMapFilters({
+      stateFilter,
+      resultsFilter,
+      isProd,
+    })
 
     const additionalAndConditions: Prisma.CampaignWhereInput[] = [
       {
@@ -65,20 +69,20 @@ export class MappingService {
   }
 
   async listMap(
-    party?: string,
-    state?: string,
-    level?: string,
-    results?: boolean,
-    office?: string,
-    name?: string,
+    partyFilter?: string,
+    stateFilter?: string,
+    levelFilter?: string,
+    resultsFilter?: boolean,
+    officeFilter?: string,
+    nameFilter?: string,
     forceReCalc?: boolean,
   ): Promise<CleanCampaign[]> {
     const baseAndConditions = buildMapFilters({
-      party,
-      state,
-      level,
-      results,
-      office,
+      partyFilter,
+      stateFilter,
+      levelFilter,
+      resultsFilter,
+      officeFilter,
       isProd,
     })
 
@@ -107,13 +111,13 @@ export class MappingService {
       AND: combinedAndConditions,
     }
 
-    if (name) {
+    if (nameFilter) {
       where.user = {
         AND: [
           {
             OR: [
-              { firstName: { contains: name, mode: 'insensitive' } },
-              { lastName: { contains: name, mode: 'insensitive' } },
+              { firstName: { contains: nameFilter, mode: 'insensitive' } },
+              { lastName: { contains: nameFilter, mode: 'insensitive' } },
             ],
           },
         ],
@@ -142,15 +146,10 @@ export class MappingService {
       const details = campaign.details
       const data = campaign.data
 
-      if (!details?.zip || didWin === false || details?.geoLocationFailed) {
-        // Test this
-        console.log('Failed first joint check')
-        continue
-      }
       const electionDate = details.electionDate as string
 
       const resolvedOffice =
-        (details.otherOffice as string) || (office as string)
+        (details.otherOffice as string) || (details.office as string)
 
       let normalizedOffice =
         data?.hubSpotUpdates?.office_type || details?.normalizedOffice
@@ -182,10 +181,10 @@ export class MappingService {
         id: slug,
         didWin,
         office: resolvedOffice,
-        state: state || null,
+        state: details.state || null,
         ballotLevel: details.ballotLevel || null,
         zip: details.zip || null,
-        party: party || null,
+        party: details.party || null,
         firstName: campaign.user?.firstName || '',
         lastName: campaign.user?.lastName || '',
         avatar: campaign.user?.avatar || false,

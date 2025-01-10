@@ -1,12 +1,13 @@
 import { Prisma } from '@prisma/client'
+import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
 
 interface FilterParams {
-  party?: string
-  state?: string
-  level?: string
-  results?: boolean
-  office?: string
-  name?: string
+  partyFilter?: string
+  stateFilter?: string
+  levelFilter?: string
+  resultsFilter?: boolean
+  officeFilter?: string
+  nameFilter?: string
   forceReCalc?: boolean
   isProd?: boolean
 }
@@ -14,38 +15,46 @@ interface FilterParams {
 export function buildMapFilters(
   params: FilterParams,
 ): Prisma.CampaignWhereInput[] {
-  const { party, state, level, results, office, isProd = false } = params
+  const {
+    partyFilter,
+    stateFilter,
+    levelFilter,
+    resultsFilter,
+    officeFilter,
+    isProd = false,
+  } = params
 
   const andConditions: Prisma.CampaignWhereInput[] = []
 
-  if (party) {
-    andConditions.push({
-      details: {
-        path: ['party'],
-        string_contains: party.toLowerCase(),
-      },
-    })
+  if (partyFilter) {
+    // Prisma doesn't support case-insensitive searching inside JSON
+    console.log('Pushing party and condition')
+    console.log(partyFilter)
+    const partyCondition = createJsonOrConditionString(partyFilter, ['party'])
+    if (partyCondition) {
+      andConditions.push(partyCondition)
+    }
   }
 
-  if (state) {
-    andConditions.push({
-      details: {
-        path: ['state'],
-        equals: state,
-      },
-    })
+  if (stateFilter) {
+    console.log('Pushing state and conditions')
+    console.log('State: ', stateFilter)
+    const stateCondition = createJsonOrConditionString(stateFilter, ['state'])
+    if (stateCondition) {
+      andConditions.push(stateCondition)
+    }
   }
 
-  if (level) {
-    andConditions.push({
-      details: {
-        path: ['ballotLevel'],
-        equals: level,
-      },
-    })
+  if (levelFilter) {
+    const levelCondition = createJsonOrConditionString(levelFilter, [
+      'ballotLevel',
+    ])
+    if (levelCondition) {
+      andConditions.push(levelCondition)
+    }
   }
 
-  if (results) {
+  if (resultsFilter) {
     andConditions.push({
       OR: [
         { didWin: true },
@@ -59,29 +68,15 @@ export function buildMapFilters(
     })
   }
 
-  if (office) {
-    andConditions.push({
-      OR: [
-        {
-          details: {
-            path: ['normalizedOffice'],
-            equals: office,
-          },
-        },
-        {
-          details: {
-            path: ['office'],
-            equals: office,
-          },
-        },
-        {
-          details: {
-            path: ['otherOffice'],
-            equals: office,
-          },
-        },
-      ],
-    })
+  if (officeFilter) {
+    const officeCondition = createJsonOrConditionString(officeFilter, [
+      ['normalizedOffice'],
+      ['office'],
+      ['otherOffice'],
+    ])
+    if (officeCondition) {
+      andConditions.push(officeCondition)
+    }
   }
 
   if (isProd) {
@@ -105,13 +100,49 @@ export function buildMapFilters(
   })
 
   if (isProd) {
-    andConditions.push({
-      data: {
-        path: ['hubSpotUpdates', 'verified_candidates'],
-        equals: 'Yes',
-      },
-    })
+    const isProdCondition = createJsonOrConditionString('Yes', [
+      'hubSpotUpdates',
+      'verified_candidates',
+    ])
+    if (isProdCondition) {
+      andConditions.push(isProdCondition)
+    }
   }
 
   return andConditions
+}
+
+function createJsonOrConditionString(
+  filter: string,
+  paths: string[] | string[][],
+): Prisma.CampaignWhereInput | null {
+  if (!filter) return null
+
+  const filterUpper = capitalizeFirstLetter(filter).trim()
+  const filterLower = filter.toLowerCase().trim()
+
+  const normalizedPaths = Array.isArray(paths[0])
+    ? (paths as string[][])
+    : [paths as string[]]
+
+  const orConditions = normalizedPaths
+    .map((path) => [
+      {
+        details: {
+          path: path,
+          string_contains: filterUpper,
+        },
+      },
+      {
+        details: {
+          path: path,
+          string_contains: filterLower,
+        },
+      },
+    ])
+    .flat()
+
+  return {
+    OR: orConditions,
+  }
 }

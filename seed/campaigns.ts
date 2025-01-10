@@ -5,8 +5,9 @@ import { userFactory } from './factories/user.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
-import { fixedCampaigns } from 'seed/fixedCampaigns'
 import { Campaign } from '@prisma/client'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const fixedCampaigns = require('./fixedCampaigns.json')
 
 const NUM_CAMPAIGNS = 40
 const NUM_UPDATE_HISTORY = 3
