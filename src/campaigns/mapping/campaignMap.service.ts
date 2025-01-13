@@ -171,7 +171,7 @@ export class CampaignMapService {
 
       const cleanCampaign: CleanCampaign = {
         slug,
-        id: campaign.id, // Is this a mistake in the original code?
+        id: campaign.id, // Still not sure if this is ok
         didWin,
         office: resolvedOffice,
         state: details.state || null,
