@@ -182,12 +182,16 @@ export class StripeEventsService {
     const session = event.data.object
     const { userId } = session.metadata ? session.metadata : {}
     if (!userId) {
-      throw 'No userId found in expired checkout session metadata'
+      throw new BadRequestException(
+        'No userId found in expired checkout session metadata',
+      )
     }
 
     const user = await this.usersService.findUser({ id: parseInt(userId) })
     if (!user) {
-      throw 'No user found with given expired checkout session userId'
+      throw new BadGatewayException(
+        'No user found with given expired checkout session userId',
+      )
     }
     await this.usersService.patchUserMetaData(user, { checkoutSessionId: null })
   }
