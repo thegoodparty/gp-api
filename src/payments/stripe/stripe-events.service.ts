@@ -166,9 +166,6 @@ export class StripeEventsService {
       this.campaignsService.patchCampaignDetails(campaignId, {
         subscriptionId: subscriptionId as string,
       }),
-      this.campaignsService.update(campaignId, {
-        isPro: true,
-      }),
       this.campaignsService.setIsPro(campaignId),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
