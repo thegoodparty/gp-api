@@ -22,8 +22,3 @@ export enum OnboardingStep {
   complete = 'onboarding-complete',
   registration = 'registration',
 }
-
-export type CampaignWhereInputWithJsonFields = Prisma.CampaignWhereInput & {
-  details?: PrismaJson.CampaignDetails
-  data?: PrismaJson.CampaignData
-}

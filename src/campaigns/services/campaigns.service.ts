@@ -14,7 +14,6 @@ import {
   CampaignLaunchStatus,
   OnboardingStep,
   CampaignStatus,
-  CampaignWhereInputWithJsonFields,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
@@ -72,7 +71,7 @@ export class CampaignsService {
   }
 
   findOne<T extends Prisma.CampaignInclude>(
-    where: CampaignWhereInputWithJsonFields,
+    where: Prisma.CampaignWhereInput,
     include: T = {
       pathToVictory: true,
     } as any, // TODO: figure out how to properly type this default instead of using any
@@ -84,7 +83,7 @@ export class CampaignsService {
   }
 
   findOneOrThrow(
-    where: CampaignWhereInputWithJsonFields,
+    where: Prisma.CampaignWhereInput,
     include: Prisma.CampaignInclude = {
       pathToVictory: true,
     },
@@ -296,7 +295,7 @@ export class CampaignsService {
     return this.prisma.campaign.delete({ where: { id } })
   }
 
-  deleteAll(where: CampaignWhereInputWithJsonFields) {
+  deleteAll(where: Prisma.CampaignWhereInput) {
     return this.prisma.campaign.deleteMany({ where })
   }
 
@@ -622,9 +621,9 @@ function buildCampaignListFilters({
   generalElectionDateStart,
   generalElectionDateEnd,
   p2vStatus,
-}: CampaignListSchema): CampaignWhereInputWithJsonFields {
+}: CampaignListSchema): Prisma.CampaignWhereInput {
   // base query
-  const where: CampaignWhereInputWithJsonFields = {
+  const where: Prisma.CampaignWhereInput = {
     NOT: {
       user: null,
     },
@@ -632,7 +631,7 @@ function buildCampaignListFilters({
   }
 
   // store AND array in var for easy push access
-  const AND = where.AND as CampaignWhereInputWithJsonFields[]
+  const AND = where.AND as Prisma.CampaignWhereInput[]
 
   if (id) AND.push({ id })
   if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
