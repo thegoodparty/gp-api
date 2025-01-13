@@ -73,7 +73,9 @@ export class StripeEventsService {
     }
     const campaign = await this.campaignsService.findByUser(user.id)
     if (!campaign) {
-      throw 'No campaign found with given subscriptionId'
+      throw new BadGatewayException(
+        'No campaign found associated with given customerId',
+      )
     }
     const { id: campaignId } = campaign
 
