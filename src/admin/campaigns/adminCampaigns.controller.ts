@@ -42,7 +42,7 @@ export class AdminCampaignsController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
-    return this.campaignsService.delete(id)
+    return this.campaignsService.delete({ where: { id } })
   }
 
   @Post(':id/send-victory-email')

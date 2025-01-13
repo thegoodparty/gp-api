@@ -21,3 +21,12 @@ export function isState(stateLength: 'long' | 'short' = 'short') {
     { message: 'Must be a valid state' },
   )
 }
+
+export const stringToBoolean = () =>
+  z
+    .string()
+    .regex(/^(true|false)$/)
+    .optional()
+    .transform((val) =>
+      val === 'true' ? true : val === 'false' ? false : undefined,
+    )

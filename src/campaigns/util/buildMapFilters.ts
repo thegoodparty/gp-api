@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
+import { isProd } from '../mapping/campaignMap.service'
 
 interface FilterParams {
   partyFilter?: string
@@ -9,20 +10,13 @@ interface FilterParams {
   officeFilter?: string
   nameFilter?: string
   forceReCalc?: boolean
-  isProd?: boolean
 }
 
 export function buildMapFilters(
   params: FilterParams,
 ): Prisma.CampaignWhereInput[] {
-  const {
-    partyFilter,
-    stateFilter,
-    levelFilter,
-    resultsFilter,
-    officeFilter,
-    isProd = false,
-  } = params
+  const { partyFilter, stateFilter, levelFilter, resultsFilter, officeFilter } =
+    params
 
   const andConditions: Prisma.CampaignWhereInput[] = []
 

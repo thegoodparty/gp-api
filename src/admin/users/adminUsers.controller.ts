@@ -62,7 +62,7 @@ export class AdminUsersController {
   async delete(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.findUserOrThrow({ id })
 
-    await this.campaignsService.deleteAll({ userId: user.id })
+    await this.campaignsService.deleteAll({ where: { userId: user.id } })
     await this.usersService.deleteUser(user.id)
 
     return true

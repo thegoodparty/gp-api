@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Prisma } from '@prisma/client'
+import { Campaign, Prisma, PrismaClient } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { getFullName } from 'src/users/util/users.util'
 import { EmailTemplates } from 'src/email/email.types'
@@ -11,6 +11,10 @@ import { AdminP2VService } from '../services/adminP2V.service'
 import { OnboardingStep } from 'src/campaigns/campaigns.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
+
+type CampaignWithRelations = Prisma.CampaignGetPayload<{
+  include: { pathToVictory: true; user: true }
+}>
 
 @Injectable()
 export class AdminCampaignsService {
@@ -45,14 +49,16 @@ export class AdminCampaignsService {
 
     // create new campaign
     const newCampaign = await this.campaignsService.create({
-      slug,
-      data,
-      isActive: true,
-      userId: user.id,
-      details: {
-        zip: user.zip,
-        knowRun: 'yes',
-        pledged: true,
+      data: {
+        slug,
+        data,
+        isActive: true,
+        userId: user.id,
+        details: {
+          zip: user.zip,
+          knowRun: 'yes',
+          pledged: true,
+        },
       },
     })
 
@@ -80,7 +86,10 @@ export class AdminCampaignsService {
       attributes.tier = tier
     }
 
-    const updatedCampaign = await this.campaignsService.update(id, attributes)
+    const updatedCampaign = await this.campaignsService.update({
+      where: { id },
+      data: attributes,
+    })
 
     //TODO: reimplment
     // await sails.helpers.crm.updateCampaign(updatedCampaign);
@@ -89,10 +98,15 @@ export class AdminCampaignsService {
   }
 
   async sendVictoryEmail(id: number) {
-    const campaign = await this.campaignsService.findOneOrThrow(
-      { id },
-      { user: true, pathToVictory: true },
-    )
+    // const campaign = await this.campaignsService.findOneOrThrow(
+    //   { id },
+    //   { user: true, pathToVictory: true },
+    // )
+    const campaign = (await this.campaignsService.findFirstOrThrow({
+      where: { id },
+      include: { user: true, pathToVictory: true },
+    })) as CampaignWithRelations
+
     const { pathToVictory, user } = campaign
 
     if (!pathToVictory) {

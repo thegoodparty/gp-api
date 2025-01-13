@@ -13,12 +13,15 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignsService } from './services/campaigns.service'
+import {
+  CampaignsService,
+  buildCampaignListFilters,
+} from './services/campaigns.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Campaign, User, UserRole } from '@prisma/client'
+import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
@@ -38,7 +41,27 @@ export class CampaignsController {
   @Roles(UserRole.admin)
   @Get()
   findAll(@Query() query: CampaignListSchema) {
-    return this.campaignsService.findAll(query)
+    let where: Prisma.CampaignWhereInput = {}
+    if (Object.values(query).some((value) => !!value)) {
+      where = buildCampaignListFilters(query)
+    }
+    const include = {
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          phone: true,
+          email: true,
+          metaData: true,
+        },
+      },
+      pathToVictory: {
+        select: {
+          data: true,
+        },
+      },
+    }
+    return this.campaignsService.findAll({ where, include })
   }
 
   @Get('mine')
@@ -59,7 +82,7 @@ export class CampaignsController {
   @Get('slug/:slug')
   @Roles(UserRole.admin)
   async findBySlug(@Param('slug') slug: string) {
-    const campaign = await this.campaignsService.findOne({ slug })
+    const campaign = await this.campaignsService.findFirst({ where: { slug } })
 
     if (!campaign) throw new NotFoundException()
 
@@ -89,7 +112,9 @@ export class CampaignsController {
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
       // if user has Admin or Sales role, allow loading campaign by slug param
-      campaign = await this.campaignsService.findOne({ slug })
+      campaign = await this.campaignsService.findFirstOrThrow({
+        where: { slug },
+      })
     }
 
     if (!campaign) throw new NotFoundException()

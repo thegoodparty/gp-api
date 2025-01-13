@@ -52,48 +52,40 @@ export class CampaignsService {
     private slack: SlackService,
   ) {}
 
-  async findAll(
-    query: CampaignListSchema,
-    include: Prisma.CampaignInclude = DEFAULT_FIND_ALL_INCLUDE,
-  ) {
-    const args: Prisma.CampaignFindManyArgs = {
-      include,
-    }
-
-    // if any filters are present, build where query object
-    if (Object.values(query).some((value) => !!value)) {
-      args.where = buildCampaignListFilters(query)
-    }
-
-    const campaigns = await this.prisma.campaign.findMany(args)
-
-    return campaigns
+  count(args: Prisma.CampaignCountArgs) {
+    return this.prisma.campaign.count(args)
   }
 
-  findOne<T extends Prisma.CampaignInclude>(
-    where: Prisma.CampaignWhereInput,
-    include: T = {
-      pathToVictory: true,
-    } as any, // TODO: figure out how to properly type this default instead of using any
-  ) {
-    return this.prisma.campaign.findFirst({
-      where,
-      include,
-    }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+  findAll(args: Prisma.CampaignFindManyArgs) {
+    return this.prisma.campaign.findMany(args)
   }
 
-  findOneOrThrow(
-    where: Prisma.CampaignWhereInput,
-    include: Prisma.CampaignInclude = {
-      pathToVictory: true,
-    },
-  ) {
-    return this.prisma.campaign.findFirstOrThrow({
-      where,
-      include,
-    })
+  // findOne<T extends Prisma.CampaignInclude>(
+  //   where: Prisma.CampaignWhereInput,
+  //   include: T = {
+  //     pathToVictory: true,
+  //   } as any, // TODO: figure out how to properly type this default instead of using any
+  // ) {
+  //   return this.prisma.campaign.findFirst({
+  //     where,
+  //     include,
+  //   }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+  // }
+
+  findFirst(args: Prisma.CampaignFindFirstArgs) {
+    // if (!args.include) {
+    //   args.include = {}
+    // }
+    // args.include[pathToVictory] = true
+    return this.prisma.campaign.findFirst(args)
   }
 
+  // TODO: Include path to victory here or everywhere else?
+  findFirstOrThrow(args: Prisma.CampaignFindFirstOrThrowArgs) {
+    return this.prisma.campaign.findFirstOrThrow(args)
+  }
+
+  // Likely not needed, easier to use findFirst with a where: { userId }
   findByUser<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
@@ -104,8 +96,8 @@ export class CampaignsService {
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
-  async create(data: Prisma.CampaignCreateArgs['data']) {
-    return this.prisma.campaign.create({ data })
+  async create(args: Prisma.CampaignCreateArgs) {
+    return this.prisma.campaign.create(args)
   }
 
   async createForUser(user: User) {
@@ -132,8 +124,8 @@ export class CampaignsService {
     return newCampaign
   }
 
-  async update(id: number, data: Prisma.CampaignUpdateArgs['data']) {
-    return this.prisma.campaign.update({ where: { id }, data })
+  async update(args: Prisma.CampaignUpdateArgs) {
+    return this.prisma.campaign.update(args)
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
@@ -252,12 +244,12 @@ export class CampaignsService {
     }
   }
 
-  delete(id: number) {
-    return this.prisma.campaign.delete({ where: { id } })
+  delete(args: Prisma.CampaignDeleteArgs) {
+    return this.prisma.campaign.delete(args)
   }
 
-  deleteAll(where: Prisma.CampaignWhereInput) {
-    return this.prisma.campaign.deleteMany({ where })
+  deleteAll(args: Prisma.CampaignDeleteManyArgs) {
+    return this.prisma.campaign.deleteMany(args)
   }
 
   async launch(user: User, campaign: Campaign) {
@@ -520,7 +512,7 @@ export class CampaignsService {
 //   }
 // }
 
-function buildCampaignListFilters({
+export function buildCampaignListFilters({
   id,
   state,
   slug,

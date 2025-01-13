@@ -57,7 +57,7 @@ declare global {
       launchStatus?: CampaignLaunchStatus
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
-      party?: string //TODO: enumerate all parties we want to allow?
+      party?: string
       otherParty?: string
       office?: string
       otherOffice?: string

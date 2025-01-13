@@ -11,8 +11,8 @@ export class CampaignOwnerOrAdminGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const { user, params } = context.switchToHttp().getRequest()
     const { id: campaignId } = params
-    const campaign = await this.campaignService.findOne({
-      id: parseInt(campaignId),
+    const campaign = await this.campaignService.findFirst({
+      where: { id: parseInt(campaignId) },
     })
     return user.id === campaign?.userId || user.roles.includes(UserRole.admin)
   }

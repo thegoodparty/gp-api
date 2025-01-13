@@ -21,22 +21,3 @@ export enum CampaignStatus {
   candidate = 'candidate',
   onboarding = 'onboarding',
 }
-
-export interface CleanCampaign {
-  slug: string
-  id: string
-  didWin: boolean | null
-  office: string | null
-  state: string | null
-  ballotLevel: string | null
-  zip: string | null
-  party: string | null
-  firstName: string
-  lastName: string
-  avatar: string | boolean
-  electionDate: string | null
-  county: string | null
-  city: string | null
-  normalizedOffice?: string | null
-  globalPosition?: { lng: number; lat: number }
-}

@@ -1,30 +1,31 @@
 import { Injectable } from '@nestjs/common'
-import { CleanCampaign } from '../campaigns.types'
+import { CleanCampaign } from './campaignMap.types'
 import { RaceData } from 'src/races/races.types'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { Prisma } from '@prisma/client'
 import { handleGeoLocation } from '../util/geoLocation'
 import { buildMapFilters } from '../util/buildMapFilters'
-import { sevenDaysAgo } from 'src/shared/util/dates.util'
+import { CampaignsService } from '../services/campaigns.service'
+import { subDays } from 'date-fns'
 
-const APP_BASE = process.env.CORS_ORIGIN as string
-const isProd = APP_BASE === 'https://goodparty.org'
+export const isProd = false // TODO: Centrally locate this logic
 
 @Injectable()
-export class MappingService {
-  constructor(private readonly prisma: PrismaService) {}
+export class CampaignMapService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly campaignsService: CampaignsService,
+  ) {}
 
-  async listMapCount(
+  async listMapCampaignsCount(
     stateFilter?: string,
     resultsFilter?: boolean,
   ): Promise<{ count: number }> {
-    const baseAndConditions = buildMapFilters({
-      stateFilter,
-      resultsFilter,
-      isProd,
-    })
-
-    const additionalAndConditions: Prisma.CampaignWhereInput[] = [
+    const combinedAndConditions: Prisma.CampaignWhereInput[] = [
+      ...buildMapFilters({
+        stateFilter,
+        resultsFilter,
+      }),
       {
         details: {
           path: ['geoLocation', 'lng'],
@@ -44,16 +45,11 @@ export class MappingService {
             didWin: null,
             details: {
               path: ['electionDate'],
-              gte: sevenDaysAgo,
+              gte: subDays(new Date(), 7),
             },
           },
         ],
       },
-    ]
-
-    const combinedAndConditions: Prisma.CampaignWhereInput[] = [
-      ...baseAndConditions,
-      ...additionalAndConditions,
     ]
 
     const where: Prisma.CampaignWhereInput = {
@@ -62,14 +58,15 @@ export class MappingService {
       isActive: true,
       AND: combinedAndConditions,
     }
-    const count = await this.prisma.campaign.count({
-      where,
-    })
 
-    return { count }
+    return {
+      count: await this.campaignsService.count({
+        where,
+      }),
+    }
   }
 
-  async listMap(
+  async listMapCampaigns(
     partyFilter?: string,
     stateFilter?: string,
     levelFilter?: string,
@@ -78,31 +75,26 @@ export class MappingService {
     nameFilter?: string,
     forceReCalc?: boolean,
   ): Promise<CleanCampaign[]> {
-    const baseAndConditions = buildMapFilters({
-      partyFilter,
-      stateFilter,
-      levelFilter,
-      resultsFilter,
-      officeFilter,
-      isProd,
-    })
-
-    const additionalFilters: Prisma.CampaignWhereInput = {
-      OR: [
-        { didWin: true },
-        {
-          didWin: null,
-          details: {
-            path: ['electionDate'],
-            gte: sevenDaysAgo,
-          },
-        },
-      ],
-    }
-
     const combinedAndConditions: Prisma.CampaignWhereInput[] = [
-      ...baseAndConditions,
-      additionalFilters,
+      ...buildMapFilters({
+        partyFilter,
+        stateFilter,
+        levelFilter,
+        resultsFilter,
+        officeFilter,
+      }),
+      {
+        OR: [
+          { didWin: true },
+          {
+            didWin: null,
+            details: {
+              path: ['electionDate'],
+              gte: subDays(new Date(), 7),
+            },
+          },
+        ],
+      },
     ]
 
     const where: Prisma.CampaignWhereInput = {
@@ -179,7 +171,7 @@ export class MappingService {
 
       const cleanCampaign: CleanCampaign = {
         slug,
-        id: slug,
+        id: campaign.id, // Is this a mistake in the original code?
         didWin,
         office: resolvedOffice,
         state: details.state || null,
@@ -212,7 +204,7 @@ export class MappingService {
 
     if (updates.length > 0) {
       await Promise.all(
-        updates.map((update) => this.prisma.campaign.update(update)),
+        updates.map((update) => this.campaignsService.update(update)),
       )
     }
 
