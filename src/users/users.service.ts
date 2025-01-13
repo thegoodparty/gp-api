@@ -5,26 +5,22 @@ import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
-import {
-  UserWhereInputWithJsonFields,
-  UserWhereUniqueInputWithJsonFields,
-} from './users.types'
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  findAllUsers(where?: UserWhereInputWithJsonFields) {
+  findAllUsers(where?: Prisma.UserWhereInput) {
     return this.prisma.user.findMany({ where })
   }
 
-  findUser(where: UserWhereUniqueInputWithJsonFields) {
+  findUser(where: Prisma.UserWhereUniqueInput) {
     return this.prisma.user.findUnique({
       where,
     })
   }
 
-  findUserOrThrow(where: UserWhereUniqueInputWithJsonFields) {
+  findUserOrThrow(where: Prisma.UserWhereUniqueInput) {
     return this.prisma.user.findUniqueOrThrow({
       where,
     })
@@ -124,7 +120,7 @@ export class UsersService {
   }
 
   async updateUser(
-    where: UserWhereUniqueInputWithJsonFields,
+    where: Prisma.UserWhereUniqueInput,
     data: Prisma.UserUpdateInput,
   ) {
     return this.prisma.user.update({
