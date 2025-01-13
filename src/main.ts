@@ -1,5 +1,5 @@
 import './configrc'
-import { HttpAdapterHost, NestFactory } from '@nestjs/core'
+import { NestFactory } from '@nestjs/core'
 import {
   FastifyAdapter,
   NestFastifyApplication,
@@ -30,6 +30,9 @@ const bootstrap = async () => {
           }
         : {}),
     }),
+    {
+      rawBody: true,
+    },
   )
   app.setGlobalPrefix('v1')
 

@@ -4,9 +4,10 @@ declare global {
   export namespace PrismaJson {
     export type UserMetaData = {
       customerId?: string
-      checkoutSessionId?: string
+      checkoutSessionId?: string | null
       accountType?: string
       lastVisited?: number
+      isDeleted?: boolean
     } | null
   }
 }

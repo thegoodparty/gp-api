@@ -1,5 +1,5 @@
-import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
-import { DeclareService } from './declare.service';
+import { Controller, Get } from '@nestjs/common'
+import { DeclareService } from './declare.service'
 
 @Controller('declare')
 export class DeclareController {
@@ -7,6 +7,6 @@ export class DeclareController {
 
   @Get('list')
   async listDeclarations() {
-    return await this.declareService.getDeclarations();
+    return await this.declareService.getDeclarations()
   }
 }

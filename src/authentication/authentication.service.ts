@@ -54,8 +54,8 @@ export class AuthenticationService {
 
   // TODO: https://goodparty.atlassian.net/browse/WEB-3421
   private facebookTokenValidator: SocialTokenValidator = async (
-    token: string,
-    email: string,
+    _token: string,
+    _email: string,
   ) => {
     throw new NotImplementedException(
       'Facebook token validation not implemented',

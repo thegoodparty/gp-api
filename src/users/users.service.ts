@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
@@ -29,6 +29,21 @@ export class UsersService {
   findUserByEmail(email: string) {
     return this.prisma.user.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
+    })
+  }
+
+  async findByCampaign(campaign: Campaign) {
+    return this.findUser({ id: campaign.userId })
+  }
+
+  async findByCustomerId(customerId: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        metaData: {
+          path: ['customerId'],
+          equals: customerId,
+        },
+      },
     })
   }
 
@@ -112,6 +127,22 @@ export class UsersService {
       where,
       data,
     })
+  }
+
+  async patchUserMetaData(user: User, newMetaData: PrismaJson.UserMetaData) {
+    const currentUser = await this.findUser({ id: user.id })
+    const currentMetaData = currentUser?.metaData
+    return this.updateUser(
+      {
+        id: user.id,
+      },
+      {
+        metaData: {
+          ...currentMetaData,
+          ...newMetaData,
+        },
+      },
+    )
   }
 
   async deleteUser(id: number) {

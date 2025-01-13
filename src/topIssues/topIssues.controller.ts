@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Post,
@@ -45,7 +46,7 @@ export class TopIssuesController {
   }
 
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async deleteTopIssue(@Param('id', ParseIntPipe) id: number) {
     await this.topIssuesService.delete(id)
   }

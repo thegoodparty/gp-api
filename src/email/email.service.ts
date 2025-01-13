@@ -1,12 +1,14 @@
-import { Injectable } from '@nestjs/common'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
-  getSetPasswordEmailContent,
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
+  getSetPasswordEmailContent,
 } from './util/content.util'
 import { User, UserRole } from '@prisma/client'
-import { EmailTemplates } from './email.types'
+import { EmailTemplateNames } from './email.types'
+import { getFullName } from '../users/util/users.util'
+import { DateFormats, formatDate } from '../shared/util/date.util'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -20,7 +22,7 @@ type SendEmailInput = {
 type SendTemplateEmailInput = {
   to: string
   subject: string
-  template: string
+  template: EmailTemplateNames
   variables?: object
   from?: string
   cc?: string
@@ -28,6 +30,7 @@ type SendTemplateEmailInput = {
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name)
   constructor(private mailgun: MailgunService) {}
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
@@ -100,8 +103,36 @@ export class EmailService {
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: EmailTemplates.blank,
+      template: EmailTemplateNames.blank,
       variables,
+    })
+  }
+
+  async sendProSubscriptionEndingEmail(user: User) {
+    const today = new Date()
+    await this.sendTemplateEmail({
+      to: user.email,
+      subject: `Your Pro Subscription is Ending Today`,
+      template: EmailTemplateNames.endOfProSubscription,
+      variables: {
+        userFullName: getFullName(user),
+        todayDateString: formatDate(today, DateFormats.usDate),
+      },
+    })
+  }
+
+  async sendCancellationRequestConfirmationEmail(
+    user: User,
+    subscriptionEndDate: string,
+  ) {
+    await this.sendTemplateEmail({
+      to: user.email,
+      subject: `Your Cancellation Request Has Been Processed – Pro Access Until ${subscriptionEndDate}`,
+      template: EmailTemplateNames.subscriptionCancellationConfirmation,
+      variables: {
+        userFullName: getFullName(user),
+        subscriptionEndDate,
+      },
     })
   }
 
@@ -114,15 +145,18 @@ export class EmailService {
           // Rate limit exceeded
           const retryAfter =
             parseInt(error.response.headers['retry-after'], 10) || 1 // Retry-After header is in seconds
-          console.warn(
+          this.logger.warn(
             `Rate limit exceeded. Retrying after ${retryAfter} seconds...`,
           )
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
-          throw error // Rethrow if not rate limit error
+          throw new BadGatewayException(
+            'error communicating w/ mail service: ',
+            error,
+          )
         }
       }
     }
-    throw new Error('Exceeded maximum retry attempts')
+    throw new BadGatewayException('Exceeded maximum retry attempts')
   }
 }

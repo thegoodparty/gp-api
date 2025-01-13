@@ -2,8 +2,8 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
-import { Campaign, Prisma, User } from '@prisma/client'
-import { deepMerge } from 'src/shared/util/objects.util'
+import { Campaign, PathToVictory, Prisma, User } from '@prisma/client'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
@@ -16,10 +16,10 @@ import {
   CampaignStatus,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
-import { SlackService } from 'src/shared/services/slack.service'
+import { EmailTemplateNames } from 'src/email/email.types'
+import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-import { EmailTemplates } from 'src/email/email.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -49,7 +49,7 @@ export class CampaignsService {
     private planVersionService: CampaignPlanVersionsService,
     private usersService: UsersService,
     private emailService: EmailService,
-    private slack: SlackService,
+    private slackService: SlackService,
   ) {}
 
   async findAll(
@@ -102,6 +102,15 @@ export class CampaignsService {
       where: { userId },
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+  }
+
+  async findBySubscriptionId(subscriptionId: string) {
+    return await this.findOne({
+      details: {
+        path: ['subscriptionId'],
+        equals: subscriptionId,
+      },
+    })
   }
 
   async create(data: Prisma.CampaignCreateArgs['data']) {
@@ -195,6 +204,36 @@ export class CampaignsService {
     })
   }
 
+  async patchCampaignDetails(
+    campaignId: number,
+    details: Partial<PrismaJson.CampaignDetails>,
+  ) {
+    const currentCampaign = await this.findOne({ id: campaignId })
+    const { details: currentDetails } = currentCampaign
+
+    const updatedDetails = deepMerge(currentDetails, details)
+
+    return this.update(campaignId, { details: updatedDetails })
+  }
+
+  async persistCampaignProCancellation(campaign: Campaign) {
+    await this.updateJsonFields(campaign.id, {
+      details: {
+        subscriptionId: null,
+      },
+    })
+    await this.setIsPro(campaign.id, false)
+  }
+
+  async setIsPro(campaignId: number, isPro: boolean = true) {
+    await Promise.allSettled([
+      this.update(campaignId, { isPro }),
+      this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
+    ])
+    // TODO: Implement CRM updates
+    // await sails.helpers.crm.updateCampaign(campaign);
+  }
+
   async getStatus(user: User, campaign?: Campaign) {
     const timestamp = new Date().getTime()
 
@@ -280,7 +319,7 @@ export class CampaignsService {
       throw new BadRequestException('Cannot launch campaign, Office not set')
     }
 
-    const updated = await this.prisma.campaign.update({
+    await this.prisma.campaign.update({
       where: { id: campaign.id },
       data: {
         isActive: true,
@@ -437,7 +476,7 @@ export class CampaignsService {
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Full Suite of AI Campaign Tools Now Available',
-        template: EmailTemplates.campaignLaunch,
+        template: EmailTemplateNames.campaignLaunch,
         variables: {
           name: getFullName(user),
           link: `${APP_BASE}/dashboard`,
@@ -445,6 +484,56 @@ export class CampaignsService {
       })
     } catch (e) {
       this.logger.error('Error sending campaign launch email', e)
+    }
+  }
+
+  async canDownloadVoterFile(
+    campaign: Campaign,
+    pathToVictory?: PathToVictory | null,
+  ) {
+    const electionTypeRequired =
+      campaign.details.ballotLevel &&
+      campaign.details.ballotLevel !== 'FEDERAL' &&
+      campaign.details.ballotLevel !== 'STATE'
+
+    const canDownload = !(
+      electionTypeRequired &&
+      (!pathToVictory?.data?.electionType ||
+        !pathToVictory?.data?.electionLocation)
+    )
+
+    !canDownload &&
+      this.logger.log(`Campaign is not eligible for download: ${campaign.id}`)
+
+    return canDownload
+  }
+
+  async doVoterDownloadCheck(campaignId: number, user: User) {
+    const campaign = await this.findOne(
+      { id: campaignId },
+      { pathToVictory: true },
+    )
+    const canDownload = !campaign
+      ? false
+      : await this.canDownloadVoterFile(
+          campaign as Campaign,
+          campaign?.pathToVictory,
+        )
+    if (!canDownload) {
+      // alert Jared and Rob.
+      const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
+      await this.slackService.message(
+        {
+          title: 'Path To Victory',
+          body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
+          visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
+          ${alertSlackMessage}
+          `,
+        },
+        // TODO: implement appEnvironment service
+        // appEnvironment === PRODUCTION_ENV ? 'politics' :
+        'dev',
+      )
     }
   }
 }

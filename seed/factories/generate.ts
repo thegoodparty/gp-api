@@ -1,4 +1,4 @@
-import { deepMerge } from '../../src/shared/util/objects.util'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
 
 /**
  * Helper to make a factory function that merges a default generator with a custom props object

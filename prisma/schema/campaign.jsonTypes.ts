@@ -20,6 +20,7 @@ declare global {
       zip?: User['zip']
       knowRun?: 'yes' | null
       pledged?: boolean
+      isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
       party?: string //TODO: enumerate all parties we want to allow?
@@ -33,6 +34,10 @@ declare global {
       funFact?: string
       campaignCommittee?: string
       statementName?: string
+      subscriptionId?: string
+      endOfElectionSubscriptionCanceled?: boolean
+      subscriptionCanceledAt?: number | null
+      subscriptionCancelAt?: number | null
     }
 
     export type CampaignData = {
