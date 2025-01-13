@@ -40,7 +40,7 @@ export class VoterFileController {
   @UseCampaign({ include: { pathToVictory: true }, continueIfNotFound: true })
   canDownload(
     @ReqCampaign()
-    campaign: Prisma.CampaignGetPayload<{ include: { pathToVictory: true } }>,
+    campaign?: Prisma.CampaignGetPayload<{ include: { pathToVictory: true } }>,
   ) {
     return this.voterFileService.canDownload(campaign)
   }
