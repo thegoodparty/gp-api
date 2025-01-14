@@ -9,8 +9,7 @@ import { UsersService } from 'src/users/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
 import { OnboardingStep } from 'src/campaigns/campaigns.types'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
+import { APP_BASE } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class AdminCampaignsService {

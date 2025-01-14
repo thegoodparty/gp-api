@@ -9,8 +9,7 @@ import { User, UserRole } from '@prisma/client'
 import { EmailTemplateNames } from './email.types'
 import { getFullName } from '../users/util/users.util'
 import { DateFormats, formatDate } from '../shared/util/date.util'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
+import { APP_BASE } from 'src/shared/util/appEnvironment.util'
 
 type SendEmailInput = {
   to: string

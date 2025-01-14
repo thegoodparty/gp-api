@@ -18,6 +18,7 @@ import { getFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
 import { VoterFileService } from 'src/voterData/voterFile/voterFile.service'
+import { isProd } from 'src/shared/util/appEnvironment.util'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
@@ -254,9 +255,7 @@ export class StripeEventsService {
           campaign.slug
         }\` ended their pro subscription!`,
       },
-      // TODO: implement appEnvironment service
-      // appEnvironment === PRODUCTION_ENV ? 'politics' :
-      'dev',
+      isProd() ? 'politics' : 'dev',
     )
   }
 
@@ -266,9 +265,7 @@ export class StripeEventsService {
         title: 'Pro Plan Resumed',
         body: `PRO PLAN RESUMED: \`${getFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
-      // TODO: implement appEnvironment service
-      // appEnvironment === PRODUCTION_ENV ? 'politics' :
-      'dev',
+      isProd() ? 'politics' : 'dev',
     )
   }
 
@@ -301,9 +298,7 @@ export class StripeEventsService {
           }
         `,
       },
-      // TODO: implement appEnvironment service
-      // appEnvironment === PRODUCTION_ENV ? 'politics' : 'dev',
-      'dev',
+      isProd() ? 'politics' : 'dev',
     )
   }
 

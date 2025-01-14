@@ -4,8 +4,11 @@ import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { CHANNEL_TO_TYPE_MAP } from './voterFile.types'
 import { typeToQuery } from './util/voterFile.util'
 import { VoterDataService } from '../voterData.service'
-import { User } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import { SlackService } from 'src/shared/services/slack.service'
+import { isProd } from 'src/shared/util/appEnvironment.util'
+import { buildSlackBlocks } from './util/slack.util'
+import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 
 @Injectable()
 export class VoterFileService {
@@ -68,6 +71,42 @@ export class VoterFileService {
     return this.voterDataService.csvStream(query)
   }
 
+  async helpMessage(
+    user: User,
+    campaign: Campaign,
+    { type, message }: HelpMessageSchema,
+  ) {
+    const { firstName, lastName, email, phone } = user
+    const { details, tier } = campaign
+
+    // TODO: reimplement
+    // const crmCompany = await sails.helpers.crm.getCompany(campaign)
+    // const assignedPa = await getCrmCompanyOwnerName(crmCompany, true)
+
+    const candidateOffice =
+      details.office?.toLowerCase().trim() === 'other'
+        ? details.otherOffice
+        : details.office
+
+    const slackBlocks = buildSlackBlocks({
+      name: `${firstName} ${lastName}`,
+      email,
+      phone,
+      office: candidateOffice,
+      state: details.state,
+      tier,
+      type,
+      message,
+      // TODO: reimplement
+      // assignedPa,
+      // crmCompanyId: crmCompany?.id,
+    })
+
+    await this.slack.message(slackBlocks, isProd() ? 'politics' : 'dev', false)
+
+    return true
+  }
+
   canDownload(campaign?: CampaignWith<'pathToVictory'>) {
     if (!campaign) return false
 
@@ -109,9 +148,7 @@ export class VoterFileService {
           ${alertSlackMessage}
           `,
         },
-        // TODO: implement appEnvironment service
-        // appEnvironment === PRODUCTION_ENV ? 'politics' :
-        'dev',
+        isProd() ? 'politics' : 'dev',
       )
     }
   }

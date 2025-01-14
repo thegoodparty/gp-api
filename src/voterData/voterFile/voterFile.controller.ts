@@ -1,6 +1,9 @@
 import {
+  Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Logger,
   NotImplementedException,
   Post,
@@ -15,6 +18,9 @@ import { CanDownloadVoterFileGuard } from './guards/canDownloadVoterFile.guard'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
+import { Campaign, User } from '@prisma/client'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 
 @Controller('voter-data/voter-file')
 @UsePipes(ZodValidationPipe)
@@ -46,8 +52,15 @@ export class VoterFileController {
   }
 
   @Post('help-message')
-  helpMessage() {
-    throw new NotImplementedException()
+  @UseCampaign()
+  @UseGuards(CanDownloadVoterFileGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  helpMessage(
+    @ReqUser() user: User,
+    @ReqCampaign() campaign: Campaign,
+    @Body() body: HelpMessageSchema,
+  ) {
+    return this.voterFileService.helpMessage(user, campaign, body)
   }
 
   @Get('can-download')

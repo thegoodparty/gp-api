@@ -20,8 +20,7 @@ import { EmailTemplateNames } from 'src/email/email.types'
 import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
+import { APP_BASE } from 'src/shared/util/appEnvironment.util'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
