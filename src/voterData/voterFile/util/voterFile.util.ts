@@ -130,14 +130,6 @@ export function typeToQuery(
     "Mailing_Addresses_ZipPlus4", 
     "Mailing_Families_HHCount"`
 
-    // unique households
-    // whereClause += ` AND "Mailing_Families_FamilyID" IN (
-    //   SELECT "Mailing_Families_FamilyID"
-    //   FROM public."Voter${state}"
-    //   GROUP BY "Mailing_Families_FamilyID"
-    //   HAVING COUNT(*) = 1
-    // )`;
-
     nestedWhereClause = 'a'
     if (whereClause !== '') {
       whereClause += ' AND '
