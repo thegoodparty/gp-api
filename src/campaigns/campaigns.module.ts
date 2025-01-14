@@ -9,6 +9,7 @@ import { EmailModule } from 'src/email/email.module'
 import { CampaignPositionsController } from './positions/campaignPositions.controller'
 import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { UsersModule } from 'src/users/users.module'
+import { GeocodingService } from './services/geocoding.service'
 
 @Module({
   imports: [EmailModule, UsersModule, forwardRef(() => CampaignsAiModule)],
@@ -22,6 +23,7 @@ import { UsersModule } from 'src/users/users.module'
     CampaignPlanVersionsService,
     CampaignPositionsService,
     CampaignMapService,
+    GeocodingService,
   ],
   exports: [CampaignsService],
 })

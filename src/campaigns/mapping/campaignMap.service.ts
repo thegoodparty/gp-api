@@ -3,10 +3,10 @@ import { CleanCampaign } from './campaignMap.types'
 import { RaceData } from 'src/races/races.types'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { Prisma } from '@prisma/client'
-import { handleGeoLocation } from '../util/geoLocation'
 import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
 import { subDays } from 'date-fns'
+import { GeocodingService } from '../services/geocoding.service'
 
 export const isProd = false // TODO: Centrally locate this logic
 
@@ -15,6 +15,7 @@ export class CampaignMapService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly campaignsService: CampaignsService,
+    private readonly geocodingService: GeocodingService,
   ) {}
 
   async listMapCampaignsCount(
@@ -187,11 +188,10 @@ export class CampaignMapService {
         normalizedOffice: normalizedOffice || resolvedOffice,
       }
 
-      const globalPosition = await handleGeoLocation(
+      const globalPosition = await this.geocodingService.handleGeoLocation(
         slug,
         details,
         forceReCalc,
-        this.prisma,
       )
       if (!globalPosition) {
         continue

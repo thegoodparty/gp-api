@@ -158,6 +158,7 @@ export class AiContentService {
 
     let campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
+      include: { pathToVictory: true },
     })
     let aiContent = campaign.aiContent
     const { prompt, existingChat, inputValues } =
@@ -209,7 +210,10 @@ export class AiContentService {
 
       // TODO: figure out if this second load necessary?
       campaign =
-        (await this.campaignsService.findFirst({ where: { slug } })) || campaign
+        (await this.campaignsService.findFirst({
+          where: { slug },
+          include: { pathToVictory: true },
+        })) || campaign
       aiContent = campaign.aiContent
       let oldVersion
       if (chatResponse && chatResponse !== '') {
