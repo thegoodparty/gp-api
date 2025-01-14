@@ -64,21 +64,6 @@ export class AiContentService {
     const keyNoDigits = key.replace(/\d+/g, '') // we allow multiple keys like key1, key2
     let prompt = cmsPrompts[keyNoDigits] as string
 
-    // const campaignWithRelations = await this.campaignsService.findOne(
-    //   { id: campaign.id },
-    //   {
-    //     pathToVictory: true,
-    //     campaignPositions: {
-    //       include: {
-    //         topIssue: true,
-    //         position: true,
-    //       },
-    //     },
-    //     campaignUpdateHistory: true,
-    //     user: true,
-    //   },
-    // )
-
     const campaignWithRelations = (await this.campaignsService.findFirst({
       where: { id: campaign.id },
       include: {
@@ -171,7 +156,6 @@ export class AiContentService {
   }) {
     const { slug, key, regenerate } = message
 
-    //let campaign = await this.campaignsService.findOneOrThrow({ slug })
     let campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
     })

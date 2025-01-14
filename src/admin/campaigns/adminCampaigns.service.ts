@@ -98,10 +98,6 @@ export class AdminCampaignsService {
   }
 
   async sendVictoryEmail(id: number) {
-    // const campaign = await this.campaignsService.findOneOrThrow(
-    //   { id },
-    //   { user: true, pathToVictory: true },
-    // )
     const campaign = (await this.campaignsService.findFirstOrThrow({
       where: { id },
       include: { user: true, pathToVictory: true },

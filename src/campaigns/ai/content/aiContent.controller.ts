@@ -76,9 +76,6 @@ export class AiContentController {
 
     aiContent[key]['name'] = name
 
-    // return this.campaignsService.update(campaign.id, {
-    //   aiContent,
-    // })
     return this.campaignsService.update({
       where: { id: campaign.id },
       data: { aiContent },

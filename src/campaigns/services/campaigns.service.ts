@@ -60,23 +60,7 @@ export class CampaignsService {
     return this.prisma.campaign.findMany(args)
   }
 
-  // findOne<T extends Prisma.CampaignInclude>(
-  //   where: Prisma.CampaignWhereInput,
-  //   include: T = {
-  //     pathToVictory: true,
-  //   } as any, // TODO: figure out how to properly type this default instead of using any
-  // ) {
-  //   return this.prisma.campaign.findFirst({
-  //     where,
-  //     include,
-  //   }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
-  // }
-
   findFirst(args: Prisma.CampaignFindFirstArgs) {
-    // if (!args.include) {
-    //   args.include = {}
-    // }
-    // args.include[pathToVictory] = true
     return this.prisma.campaign.findFirst(args)
   }
 
