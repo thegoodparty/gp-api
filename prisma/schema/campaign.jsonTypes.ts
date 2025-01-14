@@ -7,6 +7,7 @@ import {
   CampaignLaunchStatus,
   OnboardingStep,
 } from 'src/campaigns/campaigns.types'
+import { CustomVoterFile } from 'src/voterData/voterFile/voterFile.types'
 
 export {}
 
@@ -46,6 +47,7 @@ declare global {
       currentStep?: OnboardingStep
       slug?: string
       lastVisited?: number
+      customVoterFiles?: CustomVoterFile[]
     }
 
     export type CampaignAiContent = {
