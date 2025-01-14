@@ -25,9 +25,9 @@ export function typeToQuery(
     // value is like "IN##CLARK##CLARK CNTY COMM DIST 1" we need just CLARK CNTY COMM DIST 1
     let cleanValue = extractLocation(l2ColumnValue, fixColumns)
     if (fixColumns) {
-      console.log('before fix columns:', l2ColumnName)
+      logger.debug('before fix columns:', l2ColumnName)
       l2ColumnName = fixCityCountyColumns(l2ColumnName)
-      console.log('after fix columns:', l2ColumnName)
+      logger.debug('after fix columns:', l2ColumnName)
     }
     whereClause += `("${l2ColumnName}" = '${cleanValue}' OR "${l2ColumnName}" = '${cleanValue} (EST.)') `
   }
@@ -138,8 +138,6 @@ export function typeToQuery(
     //   HAVING COUNT(*) = 1
     // )`;
 
-    // measure performance after index is added
-
     nestedWhereClause = 'a'
     if (whereClause !== '') {
       whereClause += ' AND '
@@ -162,14 +160,6 @@ export function typeToQuery(
   }
 
   if (customFilters?.filters && customFilters.filters.length > 0) {
-    /*
-     custom filter format:
-     {
-      channel: "Door Knocking"
-      filters: ['audience_superVoters', 'audience_likelyVoters', 'party_independent', 'age_18-25', 'age_25-35']
-      purpose: "GOTV"
-  }
-    */
     whereClause += customFiltersToQuery(customFilters.filters)
   }
 
@@ -185,26 +175,22 @@ export function typeToQuery(
 }
 
 function extractLocation(input: string, fixColumns?: boolean) {
-  logger.log(
+  logger.debug(
     `Extracting location from: ${input} ${
       fixColumns ? '- with fixColumns' : ''
     }`,
   )
-  // Remove any trailing '##' from the input string
   const extracted = input.replace(/##$/, '')
 
-  // Split the string by '##', take the last element, and remove ' (EST.)' if present
-  // if fixColumns is true, we want to use the second element
   const res = extracted
     ?.split('##')
     ?.at(fixColumns ? 1 : -1)
     ?.replace(' (EST.)', '')
-  logger.log('Extracted:', res)
+  logger.debug('Extracted:', res)
   return res
 }
 
 function fixCityCountyColumns(value: string) {
-  // if value starts with CITY_ return CITY
   if (value.startsWith('City_')) {
     return 'City'
   }
