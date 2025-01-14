@@ -57,10 +57,6 @@ declare global {
       launchStatus?: CampaignLaunchStatus
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
-      party?: string
-      otherParty?: string
-      office?: string
-      otherOffice?: string
       website?: string
       district?: string
       pastExperience?: string
