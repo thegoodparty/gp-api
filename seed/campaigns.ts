@@ -6,12 +6,14 @@ import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { Campaign } from '@prisma/client'
-import fixedCampaigns from './fixedCampaigns.json'
+// eslint-disable-next-line
+const fixedCampaigns = require('./fixedCampaigns.json') // ESModule style import doesn't correctly recognize it as an array
 
 const NUM_CAMPAIGNS = 40
 const NUM_UPDATE_HISTORY = 3
-
-const FIXED_CAMPAIGNS: Partial<Campaign>[] = fixedCampaigns
+console.log('fixedCampaigns isArray: ', Array.isArray(fixedCampaigns))
+const FIXED_CAMPAIGNS: Partial<Campaign>[] =
+  fixedCampaigns as Partial<Campaign>[]
 
 export default async function seedCampaigns(
   prisma: PrismaClient,

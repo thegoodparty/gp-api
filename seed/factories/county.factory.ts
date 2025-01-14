@@ -23,7 +23,6 @@ const counties = [
 
 let countyCount = 0
 export const countyFactory = generateFactory<County>(() => {
-  //const county = counties[countyCount]
   const county =
     countyCount < counties.length ? counties[countyCount] : faker.lorem.word()
   countyCount++
