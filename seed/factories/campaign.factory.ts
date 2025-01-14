@@ -4,6 +4,7 @@ import { STATE_CODES } from '../../src/shared/constants/states'
 import { LEVELS } from '../../src/shared/constants/governmentLevels'
 import { generateFactory } from './generate'
 import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
+import { STATES } from 'api/dist/src/shared/constants/states'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.past()
@@ -26,7 +27,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
       },
     },
     details: {
-      state: faker.helpers.arrayElement(STATE_CODES),
+      state: faker.helpers.arrayElement(STATES),
       zip: faker.location.zipCode(),
       ballotLevel: faker.helpers.arrayElement(LEVELS),
       electionDate: electionDate.toISOString().split('T')[0],

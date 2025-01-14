@@ -36,7 +36,9 @@ export default async function seedCampaigns(
 
     campaignIds.push(createdCampaign.id)
     fakeP2Vs.push(pathToVictoryFactory({ campaignId: createdCampaign.id }))
-    fakeUpdateHistory.push(createCampaignUpdateHistory(createdCampaign, user))
+    fakeUpdateHistory.push(
+      ...createCampaignUpdateHistory(createdCampaign, user),
+    )
   }
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
     const user = await handleUserCreation(prisma, existingUsers)
@@ -49,7 +51,7 @@ export default async function seedCampaigns(
 
     campaignIds.push(campaign.id)
     fakeP2Vs.push(pathToVictoryFactory({ campaignId: campaign.id }))
-    fakeUpdateHistory.push(createCampaignUpdateHistory(campaign, user))
+    fakeUpdateHistory.push(...createCampaignUpdateHistory(campaign, user))
   }
 
   await prisma.pathToVictory.createMany({ data: fakeP2Vs })
