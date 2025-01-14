@@ -124,7 +124,7 @@ export class AuthenticationController {
       // to automatically login after the password change
       const campaign = await this.campaignsService.findByUser(user.id)
 
-      if (campaign.data.createdBy !== 'admin') {
+      if (campaign?.data.createdBy !== 'admin') {
         // don't login just return
         return userOut
       }

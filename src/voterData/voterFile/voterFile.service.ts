@@ -1,15 +1,69 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
+import { CHANNEL_TO_TYPE_MAP } from './voterFile.types'
+import { typeToQuery } from './util/voterFile.util'
+import { VoterDataService } from '../voterData.service'
+import { User } from '@prisma/client'
+import { SlackService } from 'src/shared/services/slack.service'
 
 @Injectable()
 export class VoterFileService {
   private readonly logger = new Logger(VoterFileService.name)
 
-  constructor() {}
+  constructor(
+    private readonly voterDataService: VoterDataService,
+    private readonly slack: SlackService,
+  ) {}
 
-  canDownload(
-    campaign?: Prisma.CampaignGetPayload<{ include: { pathToVictory: true } }>,
+  async getCsv(
+    campaign: CampaignWith<'pathToVictory'>,
+    { type, countOnly, customFilters }: GetVoterFileSchema,
   ) {
+    const resolvedType =
+      type === 'custom' && customFilters
+        ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
+        : type
+
+    const countQuery = typeToQuery(resolvedType, campaign, customFilters, true)
+    this.logger.log('Count Query:', countQuery)
+    let withFixColumns = false
+    const sqlResponse = await this.voterDataService.query(countQuery)
+    const count = parseInt(sqlResponse.rows[0].count)
+    if (count === 0) {
+      // is it a string?.
+      withFixColumns = true
+    }
+    if (countOnly && count !== 0) {
+      return count
+    }
+    if (countOnly && count === 0) {
+      const countQuery = typeToQuery(
+        resolvedType,
+        campaign,
+        customFilters,
+        true,
+        true,
+      )
+      const sqlResponse = await this.voterDataService.query(countQuery)
+      const count = parseInt(sqlResponse.rows[0].count)
+      return count
+    }
+
+    this.logger.log('count', sqlResponse.rows[0].count)
+
+    const query = typeToQuery(
+      resolvedType,
+      campaign,
+      customFilters,
+      false,
+      withFixColumns,
+    )
+    this.logger.log('Constructed Query:', query)
+    return this.voterDataService.csvStream(query)
+  }
+
+  canDownload(campaign?: CampaignWith<'pathToVictory'>) {
     if (!campaign) return false
 
     let electionTypeRequired = true
@@ -31,6 +85,29 @@ export class VoterFileService {
       return false
     } else {
       return true
+    }
+  }
+
+  async doVoterDownloadCheck(
+    campaign: CampaignWith<'pathToVictory'>,
+    user: User,
+  ) {
+    const canDownload = !campaign ? false : await this.canDownload(campaign)
+    if (!canDownload) {
+      // alert Jared and Rob.
+      const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
+      await this.slack.message(
+        {
+          title: 'Path To Victory',
+          body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
+          visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
+          ${alertSlackMessage}
+          `,
+        },
+        // TODO: implement appEnvironment service
+        // appEnvironment === PRODUCTION_ENV ? 'politics' :
+        'dev',
+      )
     }
   }
 }

@@ -17,6 +17,7 @@ import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
+import { VoterFileService } from 'src/voterData/voterFile/voterFile.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
@@ -30,6 +31,7 @@ export class StripeEventsService {
     private readonly campaignsService: CampaignsService,
     private readonly slackService: SlackService,
     private readonly emailService: EmailService,
+    private readonly voterFileService: VoterFileService,
   ) {}
 
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
@@ -71,7 +73,9 @@ export class StripeEventsService {
         'No user found with given subscription customerId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id)
+    const campaign = await this.campaignsService.findByUser(user.id, {
+      pathToVictory: true,
+    })
     if (!campaign) {
       throw new BadGatewayException(
         'No campaign found associated with given customerId',
@@ -86,7 +90,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.campaignsService.doVoterDownloadCheck(campaignId, user),
+      this.voterFileService.doVoterDownloadCheck(campaign, user),
     ])
   }
 
@@ -151,7 +155,9 @@ export class StripeEventsService {
         'No user found with given checkout session userId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id)
+    const campaign = await this.campaignsService.findByUser(user.id, {
+      pathToVictory: true,
+    })
     if (!campaign) {
       throw new BadRequestException('No campaign found for user')
     }
@@ -169,7 +175,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.campaignsService.doVoterDownloadCheck(campaign.id, user),
+      this.voterFileService.doVoterDownloadCheck(campaign, user),
     ])
   }
 

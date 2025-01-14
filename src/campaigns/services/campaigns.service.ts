@@ -486,56 +486,6 @@ export class CampaignsService {
       this.logger.error('Error sending campaign launch email', e)
     }
   }
-
-  async canDownloadVoterFile(
-    campaign: Campaign,
-    pathToVictory?: PathToVictory | null,
-  ) {
-    const electionTypeRequired =
-      campaign.details.ballotLevel &&
-      campaign.details.ballotLevel !== 'FEDERAL' &&
-      campaign.details.ballotLevel !== 'STATE'
-
-    const canDownload = !(
-      electionTypeRequired &&
-      (!pathToVictory?.data?.electionType ||
-        !pathToVictory?.data?.electionLocation)
-    )
-
-    !canDownload &&
-      this.logger.log(`Campaign is not eligible for download: ${campaign.id}`)
-
-    return canDownload
-  }
-
-  async doVoterDownloadCheck(campaignId: number, user: User) {
-    const campaign = await this.findOne(
-      { id: campaignId },
-      { pathToVictory: true },
-    )
-    const canDownload = !campaign
-      ? false
-      : await this.canDownloadVoterFile(
-          campaign as Campaign,
-          campaign?.pathToVictory,
-        )
-    if (!canDownload) {
-      // alert Jared and Rob.
-      const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
-      await this.slackService.message(
-        {
-          title: 'Path To Victory',
-          body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
-          visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
-          ${alertSlackMessage}
-          `,
-        },
-        // TODO: implement appEnvironment service
-        // appEnvironment === PRODUCTION_ENV ? 'politics' :
-        'dev',
-      )
-    }
-  }
 }
 
 // async function updatePathToVictory(campaign, columnKey, value) {
