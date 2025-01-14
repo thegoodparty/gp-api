@@ -7,11 +7,10 @@ import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { Campaign } from '@prisma/client'
 // eslint-disable-next-line
-const fixedCampaigns = require('./fixedCampaigns.json') // ESModule style import doesn't correctly recognize it as an array
+const fixedCampaigns = require('./fixedCampaigns.json') // Normal import doesn't correctly recognize it as an array
 
 const NUM_CAMPAIGNS = 40
 const NUM_UPDATE_HISTORY = 3
-console.log('fixedCampaigns isArray: ', Array.isArray(fixedCampaigns))
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =
   fixedCampaigns as Partial<Campaign>[]
 
@@ -25,18 +24,7 @@ export default async function seedCampaigns(
   const campaignIds: number[] = []
 
   for (const fixedCampaign of FIXED_CAMPAIGNS) {
-    let user = existingUsers.shift()
-    if (!user) {
-      const userData = userFactory()
-      user = await prisma.user.create({
-        data: {
-          ...userData,
-          metaData:
-            userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
-        },
-      })
-    }
-
+    const user = await handleUserCreation(prisma, existingUsers)
     const campaignData = campaignFactory({
       userId: user.id,
       ...fixedCampaign,
@@ -47,34 +35,11 @@ export default async function seedCampaigns(
     })
 
     campaignIds.push(createdCampaign.id)
-
-    await prisma.pathToVictory.create({
-      data: pathToVictoryFactory({
-        campaignId: createdCampaign.id,
-      }),
-    })
-
-    for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
-      fakeUpdateHistory.push(
-        campaignUpdateHistoryFactory({
-          campaignId: createdCampaign.id,
-          userId: user.id,
-        }),
-      )
-    }
+    fakeP2Vs.push(pathToVictoryFactory({ campaignId: createdCampaign.id }))
+    fakeUpdateHistory.push(createCampaignUpdateHistory(createdCampaign, user))
   }
   for (let i = 0; i < NUM_CAMPAIGNS; i++) {
-    let user = existingUsers[i]
-    if (!user) {
-      const userData = userFactory()
-      user = await prisma.user.create({
-        data: {
-          ...userData,
-          metaData:
-            userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
-        },
-      })
-    }
+    const user = await handleUserCreation(prisma, existingUsers)
     const campaign = await prisma.campaign.create({
       data: campaignFactory({
         userId: user.id,
@@ -84,20 +49,44 @@ export default async function seedCampaigns(
 
     campaignIds.push(campaign.id)
     fakeP2Vs.push(pathToVictoryFactory({ campaignId: campaign.id }))
-
-    for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
-      fakeUpdateHistory.push(
-        campaignUpdateHistoryFactory({
-          campaignId: campaign.id,
-          userId: user.id,
-        }),
-      )
-    }
+    fakeUpdateHistory.push(createCampaignUpdateHistory(campaign, user))
   }
+
   await prisma.pathToVictory.createMany({ data: fakeP2Vs })
   await prisma.campaignUpdateHistory.createMany({ data: fakeUpdateHistory })
 
   console.log(`Created ${campaignIds.length} campaigns`)
 
   return campaignIds
+}
+
+async function handleUserCreation(
+  prisma: PrismaClient,
+  existingUsers: User[],
+): Promise<User> {
+  let user = existingUsers.shift()
+  if (!user) {
+    const userData = userFactory()
+    user = await prisma.user.create({
+      data: {
+        ...userData,
+        metaData:
+          userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
+      },
+    })
+  }
+  return user
+}
+
+function createCampaignUpdateHistory(campaign: Campaign, user: User) {
+  const fakeUpdateHistory: any[] = []
+  for (let j = 0; j < NUM_UPDATE_HISTORY; j++) {
+    fakeUpdateHistory.push(
+      campaignUpdateHistoryFactory({
+        campaignId: campaign.id,
+        userId: user.id,
+      }),
+    )
+  }
+  return fakeUpdateHistory
 }
