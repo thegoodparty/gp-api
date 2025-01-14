@@ -20,6 +20,7 @@ import { TopIssuesModule } from './topIssues/topIssues.module'
 import { SharedModule } from './shared/shared.module'
 import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
+import { VotersModule } from './voters/voters.module'
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { PaymentsModule } from './payments/payments.module'
     SharedModule,
     GraphqlModule,
     PaymentsModule,
+    VotersModule,
   ],
   controllers: [AppController],
   providers: [

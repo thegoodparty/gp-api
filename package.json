@@ -55,6 +55,7 @@
     "google-auth-library": "^9.15.0",
     "graphql-request": "^7.1.2",
     "jsonwebtoken": "^9.0.2",
+    "lodash": "^4.17.21",
     "mailgun.js": "^10.2.4",
     "nanoid": "^3.3.8",
     "nestjs-zod": "^4.2.0",
