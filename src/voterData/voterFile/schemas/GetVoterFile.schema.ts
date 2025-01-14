@@ -10,7 +10,7 @@ import {
 const CustomFiltersSchema = z.object({
   channel: z.enum(CUSTOM_CHANNELS),
   purpose: z.enum(CUSTOM_PURPOSES),
-  filters: z.array(z.enum(CUSTOM_FILTERS)), // TODO: validate for specific filter keys
+  filters: z.array(z.enum(CUSTOM_FILTERS)),
 })
 
 export class GetVoterFileSchema extends createZodDto(
