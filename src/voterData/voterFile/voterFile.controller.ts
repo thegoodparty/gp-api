@@ -37,7 +37,7 @@ export class VoterFileController {
 
   @Get('wake-up')
   wakeUp() {
-    throw new NotImplementedException()
+    return this.voterFileService.wakeUp()
   }
 
   @Post('schedule')

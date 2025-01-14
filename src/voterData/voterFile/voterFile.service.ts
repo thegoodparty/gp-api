@@ -63,6 +63,11 @@ export class VoterFileService {
     return this.voterDataService.csvStream(query)
   }
 
+  wakeUp() {
+    const query = `SELECT "LALVOTERID" FROM public."VoterCA" where "LALVOTERID" = 'LALCA3184219' limit 1`
+    return this.voterDataService.csvStream(query)
+  }
+
   canDownload(campaign?: CampaignWith<'pathToVictory'>) {
     if (!campaign) return false
 
