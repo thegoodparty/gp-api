@@ -1,34 +1,38 @@
-import { Injectable, Logger, StreamableFile } from '@nestjs/common'
-import { Client as PostgresClient } from 'pg'
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  StreamableFile,
+} from '@nestjs/common'
+import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
-import { PassThrough, Transform } from 'stream'
+import { Transform } from 'stream'
 import { HEADER_MAPPING } from './constants/headerMapping.const'
 import { SlackService } from 'src/shared/services/slack.service'
 
 const VOTER_DATASTORE = process.env.VOTER_DATASTORE as string
 
 @Injectable()
-export class VoterDataService {
+export class VoterDataService implements OnModuleDestroy {
   private readonly logger = new Logger(VoterDataService.name)
+  private readonly pool: Pool
 
-  constructor(private readonly slack: SlackService) {}
-
-  async query(queryString: string) {
-    const client = new PostgresClient({
+  constructor(private readonly slack: SlackService) {
+    this.pool = new Pool({
       connectionString: VOTER_DATASTORE,
     })
-    await client.connect()
-    const result = await client.query(queryString)
-    await client.end()
+  }
 
-    return result
+  onModuleDestroy() {
+    this.pool.end()
+  }
+
+  async query(queryString: string) {
+    return this.pool.query(queryString)
   }
 
   async csvStream(queryString: string, fileName: string = 'people') {
-    const client = new PostgresClient({
-      connectionString: VOTER_DATASTORE,
-    })
-    await client.connect()
+    const client = await this.pool.connect()
 
     // Define the mapping of old headers to new headers
     let isFirstChunk = true
@@ -47,28 +51,19 @@ export class VoterDataService {
       },
     })
 
-    const stream = client.query(
-      copyTo(`COPY(${queryString}) TO STDOUT WITH CSV HEADER`),
-    )
-    const passThrough = new PassThrough()
+    const stream = client
+      .query(copyTo(`COPY(${queryString}) TO STDOUT WITH CSV HEADER`))
+      .pipe(transformHeaders)
+      .on('error', async (err) => {
+        this.logger.error('Error in stream:', err)
+        await this.slack.errorMessage('Error in stream:', err)
+        throw err
+      })
+      .on('end', async () => {
+        client.release()
+      })
 
-    stream.on('error', async (err) => {
-      this.logger.error('Error in stream:', err)
-      await this.slack.errorMessage('Error in stream:', err)
-      throw err
-    })
-
-    passThrough.on('end', async () => {
-      await client.end()
-    })
-
-    passThrough.on('error', async (err) => {
-      this.logger.error('Error in PassThrough stream:', err)
-      await this.slack.errorMessage('Error in PassThrough stream', err)
-      throw err
-    })
-
-    return new StreamableFile(stream.pipe(transformHeaders).pipe(passThrough), {
+    return new StreamableFile(stream, {
       type: 'text/csv',
       disposition: `attachment; filename="${fileName}.csv"`,
     })
