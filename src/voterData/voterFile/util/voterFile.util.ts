@@ -11,7 +11,7 @@ const logger = new Logger('Voter File Utils')
 export function typeToQuery(
   type: VoterFileType,
   campaign: CampaignWith<'pathToVictory'>,
-  customFilters?: Partial<CustomVoterFile>,
+  customFilters?: Pick<CustomVoterFile, 'channel' | 'filters' | 'purpose'>,
   justCount?: boolean,
   fixColumns?: boolean,
 ) {
