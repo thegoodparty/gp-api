@@ -14,7 +14,6 @@ export enum CampaignLaunchStatus {
 export enum OnboardingStep {
   complete = 'onboarding-complete',
   registration = 'registration',
-  onboarding = 'onboarding',
 }
 
 export enum CampaignStatus {

@@ -20,5 +20,6 @@
     "noFallthroughCasesInSwitch": false,
     "lib": ["esnext"],
     "resolveJsonModule": true,
+    "esModuleInterop": true
   }
 }

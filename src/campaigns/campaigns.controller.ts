@@ -13,10 +13,7 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import {
-  CampaignsService,
-  buildCampaignListFilters,
-} from './services/campaigns.service'
+import { CampaignsService } from './services/campaigns.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -27,6 +24,7 @@ import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/shared/services/slack.service'
+import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -82,7 +80,10 @@ export class CampaignsController {
   @Get('slug/:slug')
   @Roles(UserRole.admin)
   async findBySlug(@Param('slug') slug: string) {
-    const campaign = await this.campaignsService.findFirst({ where: { slug } })
+    const campaign = await this.campaignsService.findFirst({
+      where: { slug },
+      include: { pathToVictory: true },
+    })
 
     if (!campaign) throw new NotFoundException()
 
@@ -116,8 +117,6 @@ export class CampaignsController {
         where: { slug },
       })
     }
-
-    if (!campaign) throw new NotFoundException()
 
     return this.campaignsService.updateJsonFields(campaign.id, body)
   }

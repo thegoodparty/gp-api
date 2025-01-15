@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
-import { isProd } from '../mapping/campaignMap.service'
+import { isProd } from '../map/campaignMap.service'
 
 interface FilterParams {
   partyFilter?: string

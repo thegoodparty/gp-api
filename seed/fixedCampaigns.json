@@ -1,7 +1,7 @@
 [
   {
     "details": {
-      "state": "California",
+      "state": "CA",
       "zip": "90001",
       "ballotLevel": "State",
       "electionDate": "2024-11-05",
@@ -24,7 +24,7 @@
   },
   {
     "details": {
-      "state": "Texas",
+      "state": "TX",
       "zip": "73301",
       "ballotLevel": "State",
       "electionDate": "2024-11-05",
@@ -47,7 +47,7 @@
   },
   {
     "details": {
-      "state": "New York",
+      "state": "NY",
       "zip": "10001",
       "ballotLevel": "City",
       "electionDate": "2024-11-05",
@@ -70,7 +70,7 @@
   },
   {
     "details": {
-      "state": "Florida",
+      "state": "FL",
       "zip": "33101",
       "ballotLevel": "City",
       "electionDate": "2024-11-05",
@@ -93,7 +93,7 @@
   },
   {
     "details": {
-      "state": "Ohio",
+      "state": "OH",
       "zip": "44101",
       "ballotLevel": "County",
       "electionDate": "2024-11-05",
@@ -116,7 +116,7 @@
   },
   {
     "details": {
-      "state": "Illinois",
+      "state": "IL",
       "zip": "60601",
       "ballotLevel": "State",
       "electionDate": "2024-11-05",
@@ -139,7 +139,7 @@
   },
   {
     "details": {
-      "state": "Pennsylvania",
+      "state": "PA",
       "zip": "19101",
       "ballotLevel": "County",
       "electionDate": "2024-11-05",
@@ -163,7 +163,7 @@
   {
     
     "details": {
-      "state": "Arizona",
+      "state": "AZ",
       "zip": "85001",
       "ballotLevel": "State",
       "electionDate": "2024-11-05",
@@ -186,7 +186,7 @@
   },
   {
     "details": {
-      "state": "Michigan",
+      "state": "MI",
       "zip": "48201",
       "ballotLevel": "County",
       "electionDate": "2024-11-05",
@@ -209,7 +209,7 @@
   },
   {
     "details": {
-      "state": "Georgia",
+      "state": "GA",
       "zip": "30301",
       "ballotLevel": "City",
       "electionDate": "2024-11-05",

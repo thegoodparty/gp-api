@@ -6,7 +6,7 @@ import { Logger } from '@nestjs/common'
 export class GraphqlService {
   private readonly logger = new Logger(GraphqlService.name)
   constructor(private readonly graphQLClient: GraphQLClient) {}
-
+  // TODO: Type the params and return value
   async fetchGraphql(query: any, variables?: any) {
     let data: any
 

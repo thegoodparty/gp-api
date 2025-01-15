@@ -1,10 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
-import { CampaignListSchema } from '../schemas/campaignList.schema'
 import { Campaign, Prisma, Race, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
-import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
@@ -495,87 +493,3 @@ export class CampaignsService {
 //     await sails.helpers.slack.errorLoggerHelper('Error at updateViability', e)
 //   }
 // }
-
-export function buildCampaignListFilters({
-  id,
-  state,
-  slug,
-  email,
-  level,
-  primaryElectionDateStart,
-  primaryElectionDateEnd,
-  campaignStatus,
-  generalElectionDateStart,
-  generalElectionDateEnd,
-  p2vStatus,
-}: CampaignListSchema): Prisma.CampaignWhereInput {
-  // base query
-  const where: Prisma.CampaignWhereInput = {
-    NOT: {
-      user: null,
-    },
-    AND: [],
-  }
-
-  // store AND array in var for easy push access
-  const AND = where.AND as Prisma.CampaignWhereInput[]
-
-  if (id) AND.push({ id })
-  if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
-  if (email) {
-    AND.push({
-      user: {
-        email: {
-          equals: email,
-          mode: 'insensitive',
-        },
-      },
-    })
-  }
-  if (state) AND.push(caseInsensitiveCompare('details', ['state'], state))
-  if (level) AND.push(caseInsensitiveCompare('details', ['ballotLevel'], level))
-  if (campaignStatus) {
-    AND.push({
-      isActive: campaignStatus === 'active',
-    })
-  }
-  if (p2vStatus) {
-    AND.push({
-      pathToVictory: caseInsensitiveCompare('data', ['p2vStatus'], p2vStatus),
-    })
-  }
-  if (generalElectionDateStart) {
-    AND.push({
-      details: {
-        path: ['electionDate'],
-        gte: generalElectionDateStart,
-      },
-    })
-  }
-  if (generalElectionDateEnd) {
-    AND.push({
-      details: {
-        path: ['electionDate'],
-        lte: generalElectionDateEnd,
-      },
-    })
-  }
-  if (primaryElectionDateStart) {
-    AND.push({
-      details: {
-        path: ['primaryElectionDate'],
-        gte: primaryElectionDateStart,
-      },
-    })
-  }
-  if (primaryElectionDateEnd) {
-    AND.push({
-      details: {
-        path: ['primaryElectionDate'],
-        lte: primaryElectionDateEnd,
-      },
-    })
-  }
-
-  return where
-}

@@ -47,23 +47,14 @@ declare global {
     }
     export type CampaignData = {
       createdBy?: 'admin' | string
+      slug?: string
       hubSpotUpdates?: {
         verified_candidates?: string
         election_results?: string
         office_type?: string
       }
-      slug?: string | null
       currentStep?: OnboardingStep
       launchStatus?: CampaignLaunchStatus
-      customIssues?: Record<'title' | 'position', string>[]
-      runningAgainst?: Record<'name' | 'party' | 'description', string>[]
-      website?: string
-      district?: string
-      pastExperience?: string
-      occupation?: string
-      funFact?: string
-      campaignCommittee?: string
-      statementName?: string
       lastVisited?: number
     }
 

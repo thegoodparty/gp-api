@@ -1,7 +1,6 @@
 import { Campaign } from '@prisma/client'
 
-export interface CleanCampaign
-  extends Pick<Campaign, 'id' | 'slug' | 'didWin'> {
+export interface MapCampaign extends Pick<Campaign, 'id' | 'slug' | 'didWin'> {
   office?: string | null
   state?: string | null
   ballotLevel?: string | null

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { CleanCampaign } from './campaignMap.types'
+import { MapCampaign } from './campaignMap.types'
 import { RaceData } from 'src/races/races.types'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { Prisma } from '@prisma/client'
@@ -21,7 +21,7 @@ export class CampaignMapService {
   async listMapCampaignsCount(
     stateFilter?: string,
     resultsFilter?: boolean,
-  ): Promise<{ count: number }> {
+  ): Promise<number> {
     const combinedAndConditions: Prisma.CampaignWhereInput[] = [
       ...buildMapFilters({
         stateFilter,
@@ -60,11 +60,7 @@ export class CampaignMapService {
       AND: combinedAndConditions,
     }
 
-    return {
-      count: await this.campaignsService.count({
-        where,
-      }),
-    }
+    return await this.campaignsService.count({ where })
   }
 
   async listMapCampaigns(
@@ -75,7 +71,7 @@ export class CampaignMapService {
     officeFilter?: string,
     nameFilter?: string,
     forceReCalc?: boolean,
-  ): Promise<CleanCampaign[]> {
+  ): Promise<MapCampaign[]> {
     const combinedAndConditions: Prisma.CampaignWhereInput[] = [
       ...buildMapFilters({
         partyFilter,
@@ -133,7 +129,7 @@ export class CampaignMapService {
 
     const updates: Prisma.CampaignUpdateArgs[] = []
 
-    const cleanCampaigns: CleanCampaign[] = []
+    const mapCampaigns: MapCampaign[] = []
 
     for (const campaign of campaigns) {
       const { didWin, slug } = campaign
@@ -149,6 +145,7 @@ export class CampaignMapService {
         data?.hubSpotUpdates?.office_type || details?.normalizedOffice
 
       if (!normalizedOffice && details.raceId && !details.noNormalizedOffice) {
+        // TODO: Change this to use raceService once raceService has been refactored
         const race = await this.prisma.race.findFirst({
           where: { ballotHashId: details.raceId },
         })
@@ -170,7 +167,7 @@ export class CampaignMapService {
         })
       }
 
-      const cleanCampaign: CleanCampaign = {
+      const mapCampaign: MapCampaign = {
         slug,
         id: campaign.id, // Still not sure if this is ok
         didWin,
@@ -196,10 +193,10 @@ export class CampaignMapService {
       if (!globalPosition) {
         continue
       } else {
-        cleanCampaign.globalPosition = globalPosition
+        mapCampaign.globalPosition = globalPosition
       }
 
-      cleanCampaigns.push(cleanCampaign)
+      mapCampaigns.push(mapCampaign)
     }
 
     if (updates.length > 0) {
@@ -208,6 +205,6 @@ export class CampaignMapService {
       )
     }
 
-    return cleanCampaigns
+    return mapCampaigns
   }
 }

@@ -7,12 +7,12 @@ import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { Campaign } from '@prisma/client'
 // eslint-disable-next-line
-const fixedCampaigns = require('./fixedCampaigns.json') // Normal import doesn't correctly recognize it as an array
-
+//const fixedCampaigns = require('./fixedCampaigns.json') // Normal import doesn't correctly recognize it as an array
+import fixedCampaigns from './fixedCampaigns.json'
+console.dir(fixedCampaigns, { colors: true, depth: 4 })
 const NUM_CAMPAIGNS = 40
 const NUM_UPDATE_HISTORY = 3
-const FIXED_CAMPAIGNS: Partial<Campaign>[] =
-  fixedCampaigns as Partial<Campaign>[]
+const FIXED_CAMPAIGNS: Partial<Campaign>[] = fixedCampaigns
 
 export default async function seedCampaigns(
   prisma: PrismaClient,
