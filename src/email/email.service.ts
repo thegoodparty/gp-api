@@ -83,27 +83,22 @@ export class EmailService {
   }
 
   async sendSetPasswordEmail(user: User) {
-    const { firstName, lastName, email, roles, passwordResetToken } = user
+    const { firstName,  email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
       `${APP_BASE}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
-      content: getSetPasswordEmailContent(
-        firstName as string,
-        lastName as string,
-        link,
-        roles,
-      ),
+      name: firstName,
+      link,
+      
     }
-    const subject = roles.includes(UserRole.sales)
-      ? "You've been added to the GoodParty.org Admin"
-      : 'Welcome to GoodParty.org! Set Up Your Account and Access Your Campaign Tools'
+    const subject = 'Access your free campaign resources!'
 
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: EmailTemplateNames.blank,
+      template: EmailTemplateNames.setPassword,
       variables,
     })
   }
