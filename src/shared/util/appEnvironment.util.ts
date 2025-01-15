@@ -8,9 +8,7 @@ const CURRENT_ENV = process.env.NODE_ENV
 
 export const WEBAPP_ROOT = process.env.WEBAPP_ROOT_URL as string
 
-export function isProd() {
-  return isEnvironment(AppEnv.PROD)
-}
+export const IS_PROD = isEnvironment(AppEnv.PROD)
 
 function isEnvironment(env: AppEnv) {
   return CURRENT_ENV === env

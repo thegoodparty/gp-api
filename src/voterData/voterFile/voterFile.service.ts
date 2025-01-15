@@ -6,7 +6,7 @@ import { typeToQuery } from './util/voterFile.util'
 import { VoterDataService } from '../voterData.service'
 import { Campaign, User } from '@prisma/client'
 import { SlackService } from 'src/shared/services/slack.service'
-import { isProd } from 'src/shared/util/appEnvironment.util'
+import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { buildSlackBlocks } from './util/slack.util'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 
@@ -101,7 +101,7 @@ export class VoterFileService {
       // crmCompanyId: crmCompany?.id,
     })
 
-    await this.slack.message(slackBlocks, isProd() ? 'politics' : 'dev', false)
+    await this.slack.message(slackBlocks, IS_PROD ? 'politics' : 'dev', false)
 
     return true
   }
@@ -147,7 +147,7 @@ export class VoterFileService {
           ${alertSlackMessage}
           `,
         },
-        isProd() ? 'politics' : 'dev',
+        IS_PROD ? 'politics' : 'dev',
       )
     }
   }
