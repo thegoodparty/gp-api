@@ -93,7 +93,7 @@ export class EmailService {
       link,
       
     }
-    const subject = 'Access your free campaign resources!'
+    const subject = 'GoodParty.org: Access your free campaign resources!'
 
     return await this.sendTemplateEmail({
       to: email,
