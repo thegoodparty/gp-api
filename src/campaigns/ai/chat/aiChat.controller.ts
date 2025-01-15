@@ -86,7 +86,10 @@ export class AiChatController {
       return await this.aiChatService.create(campaign, body)
     } catch (e: any) {
       this.logger.error('Error generating AI chat', e)
-      await this.slack.errorMessage('Error generating AI chat', e)
+      await this.slack.errorMessage({
+        message: 'Error generating AI chat',
+        error: e,
+      })
       if (e.data && e.data.error) {
         this.logger.error('*** error*** :', e.data.error)
       }
@@ -118,7 +121,10 @@ export class AiChatController {
       return await this.aiChatService.update(threadId, campaign, body)
     } catch (e: any) {
       this.logger.error('Error generating AI chat', e)
-      await this.slack.errorMessage('Error generating AI chat', e)
+      await this.slack.errorMessage({
+        message: 'Error generating AI chat',
+        error: e,
+      })
       if (e.data && e.data.error) {
         this.logger.error('*** error*** :', e.data.error)
       }
@@ -152,7 +158,10 @@ export class AiChatController {
       return await this.aiChatService.feedback(user, threadId, body)
     } catch (e: any) {
       this.logger.error('Error giving AI chat feedback', e)
-      await this.slack.errorMessage('Error generating AI chat', e)
+      await this.slack.errorMessage({
+        message: 'Error generating AI chat',
+        error: e,
+      })
       if (e.data && e.data.error) {
         this.logger.log('*** error*** :', e.data.error)
       }

@@ -20,6 +20,7 @@ import { TopIssuesModule } from './topIssues/topIssues.module'
 import { SharedModule } from './shared/shared.module'
 import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
+import { ErrorLoggerModule } from './error-logger/error-logger.module'
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { PaymentsModule } from './payments/payments.module'
     SharedModule,
     GraphqlModule,
     PaymentsModule,
+    ErrorLoggerModule,
   ],
   controllers: [AppController],
   providers: [

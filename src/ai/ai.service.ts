@@ -6,6 +6,7 @@ import { Prisma, User } from '@prisma/client'
 import { getFullName } from 'src/users/util/users.util'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
+import { SlackChannel } from '../shared/services/slackService.types'
 
 const TOGETHER_AI_KEY = process.env.TOGETHER_AI_KEY
 const OPEN_AI_KEY = process.env.OPEN_AI_KEY
@@ -56,7 +57,7 @@ export class AiService {
           title: 'Error',
           body: `AI Models are not configured. Please specify AI models.`,
         },
-        'dev',
+        SlackChannel.botDev,
       )
     }
 
@@ -119,7 +120,10 @@ export class AiService {
       this.logger.error('Error in utils/ai/llmChatCompletion', error)
       this.logger.error('error response', error?.response)
 
-      await this.slack.errorMessage('Error in AI completion (raw)', error)
+      await this.slack.errorMessage({
+        message: 'Error in AI completion (raw)',
+        error,
+      })
     }
 
     if (completion && completion?.content) {
@@ -217,7 +221,7 @@ export class AiService {
           title: 'Error in AI',
           body: `Error in getAssistantCompletion. Error: ${error}`,
         },
-        'dev',
+        SlackChannel.botDev,
       )
     }
     return

@@ -17,6 +17,7 @@ import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
+import { SlackChannel } from '../../shared/services/slackService.types'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
@@ -250,7 +251,7 @@ export class StripeEventsService {
       },
       // TODO: implement appEnvironment service
       // appEnvironment === PRODUCTION_ENV ? 'politics' :
-      'dev',
+      SlackChannel.botDev,
     )
   }
 
@@ -262,7 +263,7 @@ export class StripeEventsService {
       },
       // TODO: implement appEnvironment service
       // appEnvironment === PRODUCTION_ENV ? 'politics' :
-      'dev',
+      SlackChannel.botDev,
     )
   }
 
@@ -297,7 +298,7 @@ export class StripeEventsService {
       },
       // TODO: implement appEnvironment service
       // appEnvironment === PRODUCTION_ENV ? 'politics' : 'dev',
-      'dev',
+      SlackChannel.botDev,
     )
   }
 

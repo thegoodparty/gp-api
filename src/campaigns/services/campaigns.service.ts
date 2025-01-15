@@ -9,17 +9,18 @@ import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import {
-  PlanVersion,
-  CampaignPlanVersionData,
   CampaignLaunchStatus,
-  OnboardingStep,
+  CampaignPlanVersionData,
   CampaignStatus,
+  OnboardingStep,
+  PlanVersion,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
 import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
+import { SlackChannel } from '../../shared/services/slackService.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
 
@@ -532,7 +533,7 @@ export class CampaignsService {
         },
         // TODO: implement appEnvironment service
         // appEnvironment === PRODUCTION_ENV ? 'politics' :
-        'dev',
+        SlackChannel.botDev,
       )
     }
   }

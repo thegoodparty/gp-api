@@ -1,5 +1,3 @@
-import { Prisma } from '@prisma/client'
-
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 
 export type PlanVersion = {
