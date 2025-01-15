@@ -21,6 +21,7 @@ import { SharedModule } from './shared/shared.module'
 import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
 import { ErrorLoggerModule } from './error-logger/error-logger.module'
+import { VoterDataModule } from './voterData/voterData.module'
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ErrorLoggerModule } from './error-logger/error-logger.module'
     GraphqlModule,
     PaymentsModule,
     ErrorLoggerModule,
+    VoterDataModule,
   ],
   controllers: [AppController],
   providers: [

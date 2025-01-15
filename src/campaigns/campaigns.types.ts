@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client'
+
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 
 export type PlanVersion = {
@@ -20,3 +22,6 @@ export enum OnboardingStep {
   complete = 'onboarding-complete',
   registration = 'registration',
 }
+
+export type CampaignWith<T extends keyof Prisma.CampaignInclude> =
+  Prisma.CampaignGetPayload<{ include: { [field in T]: true } }>

@@ -11,4 +11,5 @@ export enum EmailTemplateNames {
   endOfProSubscription = 'end-of-pro-subscription',
   dayAfterPrimary = 'day-after-primary',
   subscriptionCancellationConfirmation = 'subscription-cancellation-confirmation',
+  setPassword = 'set-password',
 }
