@@ -10,17 +10,20 @@ import {
   Param,
   Put,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common'
 import { UsersService } from './users.service'
 import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { User } from '@prisma/client'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
-import { GenerateSignedUploadUrlArgs } from './users.types'
 import { AwsService } from '../aws/aws.service'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
 
 @Controller('users')
+@UsePipes(ZodValidationPipe)
 export class UsersController {
   private readonly logger = new Logger(UsersController.name)
 
@@ -49,6 +52,30 @@ export class UsersController {
   async findMe(@ReqUser() user: User) {
     return ReadUserOutputSchema.parse(
       await this.usersService.findUser({ id: user.id }),
+    )
+  }
+
+  @Get('me/meta')
+  getMetadata(@ReqUser() { metaData }: User) {
+    this.logger.log(metaData)
+    return metaData
+  }
+
+  @Put('me/meta')
+  updateMetadata(
+    @ReqUser() user: User,
+    @Body() { meta: inputMetadata }: UpdateMetadataSchema,
+  ) {
+    const { metaData } = user
+
+    return this.usersService.updateUser(
+      { id: user.id },
+      {
+        metaData: {
+          ...metaData,
+          ...inputMetadata,
+        },
+      },
     )
   }
 
