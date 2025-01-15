@@ -29,12 +29,11 @@ export class VoterFileService {
         : type
 
     const countQuery = typeToQuery(resolvedType, campaign, customFilters, true)
-    this.logger.log('Count Query:', countQuery)
+    this.logger.debug('Count Query:', countQuery)
     let withFixColumns = false
     const sqlResponse = await this.voterDataService.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
     if (count === 0) {
-      // is it a string?.
       withFixColumns = true
     }
     if (countOnly && count !== 0) {
@@ -53,7 +52,7 @@ export class VoterFileService {
       return count
     }
 
-    this.logger.log('count', sqlResponse.rows[0].count)
+    this.logger.debug('count', sqlResponse.rows[0].count)
 
     const query = typeToQuery(
       resolvedType,
@@ -62,7 +61,7 @@ export class VoterFileService {
       false,
       withFixColumns,
     )
-    this.logger.log('Constructed Query:', query)
+    this.logger.debug('Constructed Query:', query)
     return this.voterDataService.csvStream(query)
   }
 
