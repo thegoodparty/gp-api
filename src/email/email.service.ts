@@ -98,7 +98,7 @@ export class EmailService {
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: EmailTemplateNames.blank,
+      template: EmailTemplateNames.setPassword,
       variables,
     })
   }
