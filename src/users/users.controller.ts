@@ -57,7 +57,6 @@ export class UsersController {
 
   @Get('me/meta')
   getMetadata(@ReqUser() { metaData }: User) {
-    this.logger.log(metaData)
     return metaData
   }
 
