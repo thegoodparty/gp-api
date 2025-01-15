@@ -343,11 +343,9 @@ export class AiContentService {
         }
         await this.campaignsService.update(campaign.id, { aiContent })
       } catch (e) {
-        await this.slack.formattedMessage({
-          title: 'AI Logs',
+        await this.slack.aiMessage({
           message: `Error at consumer updating campaign with ai. key: ${key}`,
           error: e,
-          channel: SlackChannel.botAi,
         })
         await this.slack.errorMessage({
           message: `Error at consumer updating campaign with ai. key: ${key}`,
