@@ -11,6 +11,7 @@ import {
   SlackMessageType,
 } from './slackService.types'
 import { lastValueFrom } from 'rxjs'
+import { MimeTypes, Headers } from '../constants/httpConstants'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
@@ -44,7 +45,7 @@ export class SlackService {
           message,
           {
             headers: {
-              'Content-Type': 'application/json',
+              [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
             },
           },
         ),

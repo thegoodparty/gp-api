@@ -1,6 +1,7 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
 import { firstValueFrom } from 'rxjs'
+import { Headers, MimeTypes } from '../shared/constants/httpConstants'
 
 const API_BASE = 'https://api.ashbyhq.com/jobPosting'
 const ASHBY_KEY = process.env.ASHBY_KEY
@@ -27,11 +28,11 @@ export class JobsService {
     const response = await firstValueFrom(
       this.httpService.post(url, params, {
         headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Basic ${Buffer.from(ASHBY_KEY + ':').toString(
-            'base64',
-          )}`,
+          [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
+          [Headers.ACCEPT]: MimeTypes.APPLICATION_JSON,
+          [Headers.AUTHORIZATION]: `Basic ${Buffer.from(
+            ASHBY_KEY + ':',
+          ).toString('base64')}`,
         },
       }),
     )
