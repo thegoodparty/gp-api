@@ -10,7 +10,7 @@ const ENV_DOMAINS = {
   [AppEnv.QA]: 'https://qa.goodparty.org',
 } as const
 
-export const APP_BASE = process.env.CORS_ORIGIN as string
+export const APP_BASE = process.env.WEBAPP_ROOT_URL as string
 
 export function isProd() {
   return isEnvironment(AppEnv.PROD)
