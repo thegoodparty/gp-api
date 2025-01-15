@@ -70,6 +70,7 @@ export function buildMapFilters(
   }
 
   if (isProd) {
+    // TODO: Update with this https://goodparty.atlassian.net/browse/WEB-3487
     andConditions.push({
       data: {
         path: ['hubSpotUpdates', 'verified_candidates'],
