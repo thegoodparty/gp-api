@@ -1,21 +1,17 @@
 enum AppEnv {
-  PROD,
-  DEV,
-  QA,
+  PROD = 'production',
+  DEV = 'development',
+  QA = 'qa',
+  LOCAL = 'local',
 }
+const CURRENT_ENV = process.env.NODE_ENV
 
-const ENV_DOMAINS = {
-  [AppEnv.PROD]: 'https://goodparty.org',
-  [AppEnv.DEV]: 'https://dev.goodparty.org',
-  [AppEnv.QA]: 'https://qa.goodparty.org',
-} as const
-
-export const APP_BASE = process.env.WEBAPP_ROOT_URL as string
+export const WEBAPP_ROOT = process.env.WEBAPP_ROOT_URL as string
 
 export function isProd() {
   return isEnvironment(AppEnv.PROD)
 }
 
 function isEnvironment(env: AppEnv) {
-  return APP_BASE === ENV_DOMAINS[env]
+  return CURRENT_ENV === env
 }

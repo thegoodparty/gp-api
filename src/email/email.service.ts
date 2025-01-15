@@ -3,13 +3,12 @@ import { EmailData, MailgunService } from './mailgun.service'
 import {
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
-  getSetPasswordEmailContent,
 } from './util/content.util'
-import { User, UserRole } from '@prisma/client'
+import { User } from '@prisma/client'
 import { EmailTemplateNames } from './email.types'
 import { getFullName } from '../users/util/users.util'
 import { DateFormats, formatDate } from '../shared/util/date.util'
-import { APP_BASE } from 'src/shared/util/appEnvironment.util'
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 type SendEmailInput = {
   to: string
@@ -56,7 +55,7 @@ export class EmailService {
       subject,
       template,
       variables: {
-        appBase: APP_BASE,
+        appBase: WEBAPP_ROOT,
         ...variables,
       },
     }
@@ -72,7 +71,7 @@ export class EmailService {
     const { firstName, lastName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${APP_BASE}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${WEBAPP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
     const subject = 'Reset your password - The Good Party'
@@ -82,15 +81,14 @@ export class EmailService {
   }
 
   async sendSetPasswordEmail(user: User) {
-    const { firstName,  email, passwordResetToken } = user
+    const { firstName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${APP_BASE}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${WEBAPP_ROOT}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
       name: firstName,
       link,
-      
     }
     const subject = 'Access your free campaign resources!'
 

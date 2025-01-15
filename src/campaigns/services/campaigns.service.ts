@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
-import { Campaign, PathToVictory, Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { buildSlug } from 'src/shared/util/slug.util'
@@ -20,7 +20,7 @@ import { EmailTemplateNames } from 'src/email/email.types'
 import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-import { APP_BASE } from 'src/shared/util/appEnvironment.util'
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 const DEFAULT_FIND_ALL_INCLUDE = {
   user: {
@@ -478,7 +478,7 @@ export class CampaignsService {
         template: EmailTemplateNames.campaignLaunch,
         variables: {
           name: getFullName(user),
-          link: `${APP_BASE}/dashboard`,
+          link: `${WEBAPP_ROOT}/dashboard`,
         },
       })
     } catch (e) {
