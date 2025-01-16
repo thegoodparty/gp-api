@@ -56,7 +56,10 @@ export class VoterDataService implements OnModuleDestroy {
       .pipe(transformHeaders)
       .on('error', async (err) => {
         this.logger.error('Error in stream:', err)
-        await this.slack.errorMessage('Error in stream:', err)
+        await this.slack.errorMessage({
+          message: 'Error in stream:',
+          error: err,
+        })
         throw err
       })
       .on('end', async () => {

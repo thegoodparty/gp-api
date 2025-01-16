@@ -9,6 +9,7 @@ import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { SlackService } from 'src/shared/services/slack.service'
 import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
+import { SlackChannel } from '../../../shared/services/slackService.types'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
 
@@ -248,7 +249,7 @@ export class AiChatService {
       chatData.messages[lastMsgIndex]?.content,
     )
 
-    await this.slack.message(slackBlocks, 'user-feedback', false)
+    await this.slack.message(slackBlocks, SlackChannel.userFeedback)
 
     return true
   }

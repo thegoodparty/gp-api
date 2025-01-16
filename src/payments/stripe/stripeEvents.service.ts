@@ -17,6 +17,7 @@ import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
+import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileService } from 'src/voterData/voterFile/voterFile.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
@@ -248,24 +249,22 @@ export class StripeEventsService {
 
     await this.slackService.message(
       {
-        title: 'Pro Plan Cancellation',
         body: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
           user.email
         }, running for '${otherOffice || office}' and campaign slug \`${
           campaign.slug
         }\` ended their pro subscription!`,
       },
-      IS_PROD ? 'politics' : 'dev',
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 
   async sendProSubscriptionResumedSlackMessage(user: User, campaign: Campaign) {
     await this.slackService.message(
       {
-        title: 'Pro Plan Resumed',
         body: `PRO PLAN RESUMED: \`${getFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
-      IS_PROD ? 'politics' : 'dev',
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 
@@ -278,7 +277,6 @@ export class StripeEventsService {
 
     await this.slackService.message(
       {
-        title: 'New Pro User!',
         body: `PRO PLAN SIGN UP!!! :gp:
           Name: ${name}
           Email: ${user.email}
@@ -298,7 +296,7 @@ export class StripeEventsService {
           }
         `,
       },
-      IS_PROD ? 'politics' : 'dev',
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 

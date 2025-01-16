@@ -7,11 +7,11 @@ import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import {
-  PlanVersion,
-  CampaignPlanVersionData,
   CampaignLaunchStatus,
-  OnboardingStep,
+  CampaignPlanVersionData,
   CampaignStatus,
+  OnboardingStep,
+  PlanVersion,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
