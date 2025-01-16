@@ -319,9 +319,8 @@ export class AiContentService {
           ? aiContent.campaignPlanAttempts[key] + 1
           : 1
 
-        await this.slack.formattedMessage({
+        await this.slack.aiMessage({
           message: `Current Attempts: ${aiContent.campaignPlanAttempts[key]}`,
-          channel: SlackChannel.botAi,
         })
 
         // After 3 attempts, we give up.
@@ -331,9 +330,8 @@ export class AiContentService {
             GenerationStatus.completed &&
           aiContent.campaignPlanAttempts[key] >= 3
         ) {
-          await this.slack.formattedMessage({
+          await this.slack.aiMessage({
             message: `Deleting generationStatus for key: ${key}`,
-            channel: SlackChannel.botAi,
           })
           delete aiContent.generationStatus[key]
         }
