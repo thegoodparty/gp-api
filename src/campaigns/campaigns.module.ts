@@ -10,10 +10,15 @@ import { CampaignPositionsController } from './positions/campaignPositions.contr
 import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { UsersModule } from 'src/users/users.module'
 import { GeocodingService } from './services/geocoding.service'
-import { RacesService } from 'src/races/races.service'
+import { RacesModule } from 'src/races/races.module'
 
 @Module({
-  imports: [EmailModule, UsersModule, forwardRef(() => CampaignsAiModule)],
+  imports: [
+    EmailModule,
+    UsersModule,
+    RacesModule,
+    forwardRef(() => CampaignsAiModule),
+  ],
   controllers: [
     CampaignsController,
     CampaignPositionsController,
@@ -25,7 +30,6 @@ import { RacesService } from 'src/races/races.service'
     CampaignPositionsService,
     CampaignMapService,
     GeocodingService,
-    RacesService,
   ],
   exports: [CampaignsService],
 })
