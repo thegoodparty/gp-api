@@ -10,6 +10,7 @@ import {
   SlackChannel,
   SlackMessage,
   SlackMessageType,
+  VanitySlackMethodArgs,
 } from './slackService.types'
 import { lastValueFrom } from 'rxjs'
 import { Headers, MimeTypes } from 'http-constants-ts'
@@ -20,6 +21,8 @@ if (!SLACK_APP_ID) {
   throw new Error('Missing SLACK_APP_ID config')
 }
 
+// TODO: Replace w/ this: https://tools.slack.dev/node-slack-sdk/web-api 🤦‍♂️
+//  or better yet, this: https://www.npmjs.com/package/nestjs-slack
 @Injectable()
 export class SlackService {
   private readonly logger = new Logger(SlackService.name)
@@ -57,7 +60,7 @@ export class SlackService {
     }
   }
 
-  async errorMessage({ message, error }) {
+  async errorMessage({ message, error }: VanitySlackMethodArgs) {
     return await this.formattedMessage({
       message,
       error,
@@ -65,7 +68,7 @@ export class SlackService {
     })
   }
 
-  async aiMessage({ message, error }) {
+  async aiMessage({ message, error }: VanitySlackMethodArgs) {
     return this.formattedMessage({
       message,
       error,

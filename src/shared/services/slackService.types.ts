@@ -39,3 +39,8 @@ export type FormattedSlackMessageArgs = {
   error?: unknown
   channel: SlackChannel
 }
+
+export type VanitySlackMethodArgs = Pick<
+  FormattedSlackMessageArgs,
+  'message' | 'error'
+>
