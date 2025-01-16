@@ -86,9 +86,9 @@ async function createCampaignAndUser(
   fakeUpdateHistory: CampaignUpdateHistory[]
 }> {
   const user = await handleUserCreation(prisma, existingUsers)
-  let campaign
+  let campaign: Campaign
   if (fixedData) {
-    campaign = prisma.campaign.create({
+    campaign = await prisma.campaign.create({
       data: campaignFactory({
         userId: user.id,
         slug: buildSlug(getFullName(user)),
@@ -96,7 +96,7 @@ async function createCampaignAndUser(
       }),
     })
   } else {
-    campaign = prisma.campaign.create({
+    campaign = await prisma.campaign.create({
       data: campaignFactory({
         userId: user.id,
         slug: buildSlug(getFullName(user)),

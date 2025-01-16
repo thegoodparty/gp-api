@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { GraphqlService } from 'src/graphql/graphql.service'
 import slugify from 'slugify'
@@ -25,7 +25,7 @@ export class RacesService {
   private readonly logger = new Logger(RacesService.name)
   constructor(
     private prisma: PrismaService,
-    private graphQLService: GraphqlService,
+    @Optional() private graphQLService: GraphqlService,
   ) {}
 
   async findRaces(

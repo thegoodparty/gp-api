@@ -29,10 +29,12 @@ export function buildMapFilters(
   }
 
   if (stateFilter) {
-    const stateCondition = createJsonOrConditionString(stateFilter, ['state'])
-    if (stateCondition) {
-      andConditions.push(stateCondition)
-    }
+      andConditions.push({
+      details: {
+        path: ['state'],
+        string_contains: stateFilter
+      }
+    })
   }
 
   if (levelFilter) {

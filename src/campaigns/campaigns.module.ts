@@ -10,9 +10,14 @@ import { CampaignPositionsController } from './positions/campaignPositions.contr
 import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { UsersModule } from 'src/users/users.module'
 import { GeocodingService } from './services/geocoding.service'
+import { RacesModule } from 'src/races/races.module'
+import { RacesService } from 'src/races/races.service'
+import { GraphqlModule } from 'src/graphql/graphql.module'
+import { GraphqlService } from 'src/graphql/graphql.service'
 
 @Module({
-  imports: [EmailModule, UsersModule, forwardRef(() => CampaignsAiModule)],
+  imports: [EmailModule, UsersModule, RacesModule, forwardRef(() => CampaignsAiModule)],
+  //imports: [EmailModule, UsersModule, forwardRef(() => CampaignsAiModule)],
   controllers: [
     CampaignsController,
     CampaignPositionsController,
@@ -24,6 +29,7 @@ import { GeocodingService } from './services/geocoding.service'
     CampaignPositionsService,
     CampaignMapService,
     GeocodingService,
+    RacesService,
   ],
   exports: [CampaignsService],
 })
