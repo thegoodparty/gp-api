@@ -28,8 +28,14 @@ export type SlackMessageBlock = {
   style?: string | { bold: boolean }
   emoji?: boolean
 }
+
 export type SlackMessage = {
-  title?: string
   body?: string
   blocks?: SlackMessageBlock[]
+}
+
+export type FormattedSlackMessageArgs = {
+  message: string
+  error?: unknown
+  channel: SlackChannel
 }

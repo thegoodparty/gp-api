@@ -6,12 +6,13 @@ import {
 import { HttpService } from '@nestjs/axios'
 import { SLACK_CHANNEL_IDS } from './slackService.config'
 import {
+  FormattedSlackMessageArgs,
   SlackChannel,
   SlackMessage,
   SlackMessageType,
 } from './slackService.types'
 import { lastValueFrom } from 'rxjs'
-import { MimeTypes, Headers } from 'http-constants-ts'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
@@ -58,7 +59,6 @@ export class SlackService {
 
   async errorMessage({ message, error }) {
     return await this.formattedMessage({
-      title: 'Error',
       message,
       error,
       channel: SlackChannel.botDev,
@@ -67,7 +67,6 @@ export class SlackService {
 
   async aiMessage({ message, error }) {
     return this.formattedMessage({
-      title: 'AI Error',
       message,
       error,
       channel: SlackChannel.botAi,
@@ -75,19 +74,12 @@ export class SlackService {
   }
 
   async formattedMessage({
-    title,
     message,
     error,
     channel,
-  }: {
-    title: string
-    message: string
-    error?: unknown
-    channel: SlackChannel
-  }) {
+  }: FormattedSlackMessageArgs) {
     return await this.message(
       {
-        title,
         blocks: [
           {
             type: SlackMessageType.SECTION,

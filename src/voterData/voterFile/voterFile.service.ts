@@ -145,7 +145,6 @@ export class VoterFileService {
       const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
       await this.slack.message(
         {
-          title: 'Path To Victory',
           body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
           visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
           ${alertSlackMessage}

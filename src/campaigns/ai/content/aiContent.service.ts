@@ -111,7 +111,6 @@ export class AiContentService {
 
     await this.slack.message(
       {
-        title: 'Debugging generationStatus',
         body: JSON.stringify(aiContent.generationStatus),
       },
       SlackChannel.botDev,
@@ -172,7 +171,6 @@ export class AiContentService {
     if (!aiContent || !prompt) {
       await this.slack.message(
         {
-          title: 'Missing prompt',
           body: `Missing prompt for ai content generation. slug: ${slug}, key: ${key}, regenerate: ${regenerate}. campaignId: ${
             campaign?.id
           }. message: ${JSON.stringify(message)}`,
@@ -322,7 +320,6 @@ export class AiContentService {
           : 1
 
         await this.slack.formattedMessage({
-          title: 'AI Logs',
           message: `Current Attempts: ${aiContent.campaignPlanAttempts[key]}`,
           channel: SlackChannel.botAi,
         })
@@ -335,7 +332,6 @@ export class AiContentService {
           aiContent.campaignPlanAttempts[key] >= 3
         ) {
           await this.slack.formattedMessage({
-            title: 'AI Logs',
             message: `Deleting generationStatus for key: ${key}`,
             channel: SlackChannel.botAi,
           })

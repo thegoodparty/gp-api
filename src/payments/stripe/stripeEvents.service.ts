@@ -249,7 +249,6 @@ export class StripeEventsService {
 
     await this.slackService.message(
       {
-        title: 'Pro Plan Cancellation',
         body: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
           user.email
         }, running for '${otherOffice || office}' and campaign slug \`${
@@ -263,7 +262,6 @@ export class StripeEventsService {
   async sendProSubscriptionResumedSlackMessage(user: User, campaign: Campaign) {
     await this.slackService.message(
       {
-        title: 'Pro Plan Resumed',
         body: `PRO PLAN RESUMED: \`${getFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
@@ -279,7 +277,6 @@ export class StripeEventsService {
 
     await this.slackService.message(
       {
-        title: 'New Pro User!',
         body: `PRO PLAN SIGN UP!!! :gp:
           Name: ${name}
           Email: ${user.email}

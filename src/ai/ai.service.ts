@@ -54,7 +54,6 @@ export class AiService {
     if (models.length === 0) {
       await this.slack.message(
         {
-          title: 'Error',
           body: `AI Models are not configured. Please specify AI models.`,
         },
         SlackChannel.botDev,
@@ -218,7 +217,6 @@ export class AiService {
       this.logger.log('error', error)
       await this.slack.message(
         {
-          title: 'Error in AI',
           body: `Error in getAssistantCompletion. Error: ${error}`,
         },
         SlackChannel.botDev,
