@@ -29,11 +29,11 @@ export function buildMapFilters(
   }
 
   if (stateFilter) {
-      andConditions.push({
+    andConditions.push({
       details: {
         path: ['state'],
-        string_contains: stateFilter
-      }
+        string_contains: stateFilter,
+      },
     })
   }
 
