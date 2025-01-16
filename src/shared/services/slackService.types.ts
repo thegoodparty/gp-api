@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client'
+
 export const enum SlackChannel {
   botDev = 'bot-dev',
   botPathToVictory = 'bot-path-to-victory',
@@ -36,7 +38,7 @@ export type SlackMessage = {
 
 export type FormattedSlackMessageArgs = {
   message: string
-  error?: unknown
+  error?: any // due to this value being sent directly into JSON.stringify with is an any type
   channel: SlackChannel
 }
 
