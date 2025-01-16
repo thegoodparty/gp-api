@@ -12,6 +12,7 @@ import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { Campaign } from '@prisma/client'
 import fixedCampaigns from './fixedCampaigns.json'
+import 'prisma/schema/pathToVictory.jsonTypes'
 const NUM_GENERATED_CAMPAIGNS = 40
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] = fixedCampaigns
@@ -67,7 +68,7 @@ export default async function seedCampaigns(
     }
   }
 
-  await prisma.pathToVictory.createMany({ data: fakeP2Vs })
+  //await prisma.pathToVictory.createMany({ data: fakeP2Vs })
   await prisma.campaignUpdateHistory.createMany({ data: fakeUpdateHistory })
 
   console.log(`Created ${campaignIds.length} campaigns`)

@@ -170,7 +170,7 @@ export class CampaignMapService {
 
       const mapCampaign: MapCampaign = {
         slug,
-        id: campaign.id, // Still not sure if this is ok
+        id: campaign.id,
         didWin,
         office: resolvedOffice,
         state: details.state || null,
