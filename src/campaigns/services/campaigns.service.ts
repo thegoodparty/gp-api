@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
-import { Campaign, Prisma, Race, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { deepMerge } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
@@ -20,23 +20,6 @@ import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { EmailTemplates } from 'src/email/email.types'
 
 const APP_BASE = process.env.CORS_ORIGIN as string
-
-const DEFAULT_FIND_ALL_INCLUDE = {
-  user: {
-    select: {
-      firstName: true,
-      lastName: true,
-      phone: true,
-      email: true,
-      metaData: true,
-    },
-  },
-  pathToVictory: {
-    select: {
-      data: true,
-    },
-  },
-} as const
 
 @Injectable()
 export class CampaignsService {
