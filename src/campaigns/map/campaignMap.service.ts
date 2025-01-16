@@ -7,6 +7,7 @@ import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
 import { subDays } from 'date-fns'
 import { GeocodingService } from '../services/geocoding.service'
+import { RacesService } from 'src/races/races.service'
 
 export const isProd = false // TODO: Centrally locate this logic
 
@@ -16,6 +17,7 @@ export class CampaignMapService {
     private readonly prisma: PrismaService,
     private readonly campaignsService: CampaignsService,
     private readonly geocodingService: GeocodingService,
+    private readonly racesService: RacesService,
   ) {}
 
   async listMapCampaignsCount(
@@ -145,8 +147,7 @@ export class CampaignMapService {
         data?.hubSpotUpdates?.office_type || details?.normalizedOffice
 
       if (!normalizedOffice && details.raceId && !details.noNormalizedOffice) {
-        // TODO: Change this to use raceService once raceService has been refactored
-        const race = await this.prisma.race.findFirst({
+        const race = await this.racesService.findFirst({
           where: { ballotHashId: details.raceId },
         })
         if (race) {

@@ -56,6 +56,7 @@ declare global {
       currentStep?: OnboardingStep
       launchStatus?: CampaignLaunchStatus
       lastVisited?: number
+      claimProfile?: string
     }
 
     export type CampaignAiContent = {
