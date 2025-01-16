@@ -7,6 +7,6 @@ import { GraphqlModule } from 'src/graphql/graphql.module'
   controllers: [RacesController],
   providers: [RacesService],
   imports: [GraphqlModule],
-  exports: [RacesModule]
+  exports: [RacesService],
 })
 export class RacesModule {}

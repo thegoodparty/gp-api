@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
@@ -35,7 +40,8 @@ export class CampaignsService {
   count(args: Prisma.CampaignCountArgs) {
     return this.prisma.campaign.count(args)
   }
-
+  // TODO: Figure out an explicit return type that doesn't require
+  // the return value to be cast to make included properties recognized by TS
   findAll(args: Prisma.CampaignFindManyArgs) {
     return this.prisma.campaign.findMany(args)
   }
@@ -45,7 +51,9 @@ export class CampaignsService {
   }
 
   // TODO: Include path to victory here or everywhere else?
-  findFirstOrThrow(args: Prisma.CampaignFindFirstOrThrowArgs) {
+  findFirstOrThrow(
+    args: Prisma.CampaignFindFirstOrThrowArgs,
+  ): Prisma.PrismaPromise<Prisma.CampaignGetPayload<typeof args>> {
     return this.prisma.campaign.findFirstOrThrow(args)
   }
 
@@ -64,11 +72,13 @@ export class CampaignsService {
     return this.prisma.campaign.create(args)
   }
   async findBySubscriptionId(subscriptionId: string) {
-    return await this.findFirst({ where: {
-      details: {
-        path: ['subscriptionId'],
-        equals: subscriptionId,
-      }},
+    return await this.findFirst({
+      where: {
+        details: {
+          path: ['subscriptionId'],
+          equals: subscriptionId,
+        },
+      },
     })
   }
 
@@ -165,15 +175,17 @@ export class CampaignsService {
   ) {
     const currentCampaign = await this.findFirst({ where: { id: campaignId } })
     if (!currentCampaign?.details) {
-      throw new InternalServerErrorException(`Campaign ${campaignId} has no details JSON`)
+      throw new InternalServerErrorException(
+        `Campaign ${campaignId} has no details JSON`,
+      )
     }
     const { details: currentDetails } = currentCampaign
 
     const updatedDetails = deepMerge(currentDetails, details)
 
     return this.update({
-      where: { id: campaignId }, 
-      data: { details: updatedDetails }
+      where: { id: campaignId },
+      data: { details: updatedDetails },
     })
   }
 
@@ -188,7 +200,7 @@ export class CampaignsService {
 
   async setIsPro(campaignId: number, isPro: boolean = true) {
     await Promise.allSettled([
-      this.update({where: { id: campaignId }, data: { isPro }}),
+      this.update({ where: { id: campaignId }, data: { isPro } }),
       this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
     ])
     // TODO: Implement CRM updates

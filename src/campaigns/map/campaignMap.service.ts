@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { MapCampaign } from './campaignMap.types'
 import { RaceData } from 'src/races/races.types'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { Prisma } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
 import { subDays } from 'date-fns'
@@ -10,6 +10,10 @@ import { GeocodingService } from '../services/geocoding.service'
 import { RacesService } from 'src/races/races.service'
 
 export const isProd = false // TODO: Centrally locate this logic
+
+type CampaignWithUser = Campaign & {
+  user: Pick<User, 'firstName' | 'lastName' | 'avatar'>
+}
 
 @Injectable()
 export class CampaignMapService {
@@ -116,7 +120,7 @@ export class CampaignMapService {
       }
     }
 
-    const campaigns = await this.prisma.campaign.findMany({
+    const campaigns = (await this.campaignsService.findAll({
       where,
       include: {
         user: {
@@ -127,7 +131,7 @@ export class CampaignMapService {
           },
         },
       },
-    })
+    })) as CampaignWithUser[]
 
     const updates: Prisma.CampaignUpdateArgs[] = []
 

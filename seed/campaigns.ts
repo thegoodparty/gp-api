@@ -47,12 +47,8 @@ export default async function seedCampaigns(
 
   for (let i = 0; i < loopLength; i++) {
     if (i < FIXED_CAMPAIGNS.length) {
-      const creationData = await createCampaignAndUser(
-        existingUsers,
-        prisma,
-        FIXED_CAMPAIGNS[i],
-      )
-      const { campaignId, fakeP2V, fakeUpdateHistory } = creationData
+      const { campaignId, fakeP2V, fakeUpdateHistory } =
+        await createCampaignAndUser(existingUsers, prisma, FIXED_CAMPAIGNS[i])
 
       campaignIds.push(campaignId)
       fakeP2Vs.push(fakeP2V)
@@ -68,8 +64,8 @@ export default async function seedCampaigns(
     }
   }
 
-  //await prisma.pathToVictory.createMany({ data: fakeP2Vs })
   await prisma.campaignUpdateHistory.createMany({ data: fakeUpdateHistory })
+  await prisma.pathToVictory.createMany({ data: fakeP2Vs })
 
   console.log(`Created ${campaignIds.length} campaigns`)
 
@@ -86,23 +82,13 @@ async function createCampaignAndUser(
   fakeUpdateHistory: CampaignUpdateHistory[]
 }> {
   const user = await handleUserCreation(prisma, existingUsers)
-  let campaign: Campaign
-  if (fixedData) {
-    campaign = await prisma.campaign.create({
-      data: campaignFactory({
-        userId: user.id,
-        slug: buildSlug(getFullName(user)),
-        ...fixedData,
-      }),
-    })
-  } else {
-    campaign = await prisma.campaign.create({
-      data: campaignFactory({
-        userId: user.id,
-        slug: buildSlug(getFullName(user)),
-      }),
-    })
-  }
+  const campaign: Campaign = await prisma.campaign.create({
+    data: campaignFactory({
+      userId: user.id,
+      slug: buildSlug(getFullName(user)),
+      ...(fixedData || {}),
+    }),
+  })
 
   return {
     campaignId: campaign.id,
