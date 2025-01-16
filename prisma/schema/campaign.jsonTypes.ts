@@ -12,6 +12,7 @@ export {}
 
 declare global {
   export namespace PrismaJson {
+    // Take care not to duplicate a field on both details and data
     export type CampaignDetails = {
       state?: string
       ballotLevel?: string
@@ -45,6 +46,7 @@ declare global {
       campaignCommittee?: string
       statementName?: string
     }
+    // Take care not to duplicate a field on both details and data
     export type CampaignData = {
       createdBy?: 'admin' | string
       slug?: string
