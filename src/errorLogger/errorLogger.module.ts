@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { ErrorLoggerController } from './error-logger.controller'
+import { ErrorLoggerController } from './errorLogger.controller'
 
 @Module({
   controllers: [ErrorLoggerController],
