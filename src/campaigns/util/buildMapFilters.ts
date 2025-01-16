@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
-import { isProd } from '../map/campaignMap.service'
+import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
 interface FilterParams {
   partyFilter?: string
@@ -71,8 +71,7 @@ export function buildMapFilters(
     }
   }
 
-  if (isProd) {
-    // TODO: Update with this https://goodparty.atlassian.net/browse/WEB-3487
+  if (IS_PROD) {
     andConditions.push({
       data: {
         path: ['hubSpotUpdates', 'verified_candidates'],
@@ -92,7 +91,7 @@ export function buildMapFilters(
     },
   })
 
-  if (isProd) {
+  if (IS_PROD) {
     const isProdCondition = createJsonOrConditionString('Yes', [
       'hubSpotUpdates',
       'verified_candidates',

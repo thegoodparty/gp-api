@@ -9,8 +9,6 @@ import { subDays } from 'date-fns'
 import { GeocodingService } from '../services/geocoding.service'
 import { RacesService } from 'src/races/races.service'
 
-export const isProd = false // TODO: Centrally locate this logic
-
 type CampaignWithUser = Campaign & {
   user: Pick<User, 'firstName' | 'lastName' | 'avatar'>
 }
