@@ -1,8 +1,8 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { deepMerge } from 'src/shared/util/objects.util'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
@@ -14,12 +14,11 @@ import {
   CampaignStatus,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
-import { SlackService } from 'src/shared/services/slack.service'
+import { EmailTemplateNames } from 'src/email/email.types'
+import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-import { EmailTemplates } from 'src/email/email.types'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class CampaignsService {
@@ -30,7 +29,7 @@ export class CampaignsService {
     private planVersionService: CampaignPlanVersionsService,
     private usersService: UsersService,
     private emailService: EmailService,
-    private slack: SlackService,
+    private slackService: SlackService,
   ) {}
 
   count(args: Prisma.CampaignCountArgs) {
@@ -63,6 +62,14 @@ export class CampaignsService {
 
   async create(args: Prisma.CampaignCreateArgs) {
     return this.prisma.campaign.create(args)
+  }
+  async findBySubscriptionId(subscriptionId: string) {
+    return await this.findFirst({ where: {
+      details: {
+        path: ['subscriptionId'],
+        equals: subscriptionId,
+      }},
+    })
   }
 
   async createForUser(user: User) {
@@ -152,6 +159,42 @@ export class CampaignsService {
     })
   }
 
+  async patchCampaignDetails(
+    campaignId: number,
+    details: Partial<PrismaJson.CampaignDetails>,
+  ) {
+    const currentCampaign = await this.findFirst({ where: { id: campaignId } })
+    if (!currentCampaign?.details) {
+      throw new InternalServerErrorException(`Campaign ${campaignId} has no details JSON`)
+    }
+    const { details: currentDetails } = currentCampaign
+
+    const updatedDetails = deepMerge(currentDetails, details)
+
+    return this.update({
+      where: { id: campaignId }, 
+      data: { details: updatedDetails }
+    })
+  }
+
+  async persistCampaignProCancellation(campaign: Campaign) {
+    await this.updateJsonFields(campaign.id, {
+      details: {
+        subscriptionId: null,
+      },
+    })
+    await this.setIsPro(campaign.id, false)
+  }
+
+  async setIsPro(campaignId: number, isPro: boolean = true) {
+    await Promise.allSettled([
+      this.update({where: { id: campaignId }, data: { isPro }}),
+      this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
+    ])
+    // TODO: Implement CRM updates
+    // await sails.helpers.crm.updateCampaign(campaign);
+  }
+
   async getStatus(user: User, campaign?: Campaign) {
     const timestamp = new Date().getTime()
 
@@ -237,7 +280,7 @@ export class CampaignsService {
       throw new BadRequestException('Cannot launch campaign, Office not set')
     }
 
-    const updated = await this.prisma.campaign.update({
+    await this.prisma.campaign.update({
       where: { id: campaign.id },
       data: {
         isActive: true,
@@ -394,10 +437,10 @@ export class CampaignsService {
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Full Suite of AI Campaign Tools Now Available',
-        template: EmailTemplates.campaignLaunch,
+        template: EmailTemplateNames.campaignLaunch,
         variables: {
           name: getFullName(user),
-          link: `${APP_BASE}/dashboard`,
+          link: `${WEBAPP_ROOT}/dashboard`,
         },
       })
     } catch (e) {

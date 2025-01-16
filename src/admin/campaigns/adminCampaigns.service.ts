@@ -4,13 +4,12 @@ import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma, PrismaClient } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { getFullName } from 'src/users/util/users.util'
-import { EmailTemplates } from 'src/email/email.types'
+import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
 import { OnboardingStep } from 'src/campaigns/campaigns.types'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 type CampaignWithRelations = Prisma.CampaignGetPayload<{
   include: { pathToVictory: true; user: true }
@@ -117,13 +116,13 @@ export class AdminCampaignsService {
     if (campaign?.data?.createdBy !== 'admin') {
       const variables = {
         name: getFullName(user),
-        link: `${APP_BASE}/dashboard`,
+        link: `${WEBAPP_ROOT}/dashboard`,
       }
 
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-        template: EmailTemplates.candidateVictoryReady,
+        template: EmailTemplateNames.candidateVictoryReady,
         variables,
         from: 'jared@goodparty.org',
       })

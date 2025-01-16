@@ -7,6 +7,7 @@ import {
   CampaignLaunchStatus,
   OnboardingStep,
 } from 'src/campaigns/campaigns.types'
+import { CustomVoterFile } from 'src/voterData/voterFile/voterFile.types'
 
 export {}
 
@@ -21,6 +22,7 @@ declare global {
       zip?: User['zip']
       knowRun?: 'yes' | null
       pledged?: boolean
+      isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
       geoLocation?: {
@@ -45,6 +47,10 @@ declare global {
       funFact?: string
       campaignCommittee?: string
       statementName?: string
+      subscriptionId?: string
+      endOfElectionSubscriptionCanceled?: boolean
+      subscriptionCanceledAt?: number | null
+      subscriptionCancelAt?: number | null
     }
     // Take care not to duplicate a field on both details and data
     export type CampaignData = {
@@ -59,6 +65,7 @@ declare global {
       launchStatus?: CampaignLaunchStatus
       lastVisited?: number
       claimProfile?: string
+      customVoterFiles?: CustomVoterFile[]
     }
 
     export type CampaignAiContent = {

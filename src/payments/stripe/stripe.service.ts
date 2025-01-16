@@ -1,13 +1,16 @@
 import { Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
+
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL } = process.env
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 
+export const StripeSingleton = new Stripe(STRIPE_SECRET_KEY as string)
+
 @Injectable()
 export class StripeService {
-  private stripe = new Stripe(STRIPE_SECRET_KEY as string)
+  private stripe = StripeSingleton
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(

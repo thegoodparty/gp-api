@@ -1,14 +1,14 @@
-import { Injectable } from '@nestjs/common'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
-  getSetPasswordEmailContent,
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
 } from './util/content.util'
-import { User, UserRole } from '@prisma/client'
-import { EmailTemplates } from './email.types'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
+import { User } from '@prisma/client'
+import { EmailTemplateNames } from './email.types'
+import { getFullName } from '../users/util/users.util'
+import { DateFormats, formatDate } from '../shared/util/date.util'
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 type SendEmailInput = {
   to: string
@@ -20,7 +20,7 @@ type SendEmailInput = {
 type SendTemplateEmailInput = {
   to: string
   subject: string
-  template: string
+  template: EmailTemplateNames
   variables?: object
   from?: string
   cc?: string
@@ -28,6 +28,7 @@ type SendTemplateEmailInput = {
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name)
   constructor(private mailgun: MailgunService) {}
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
@@ -54,7 +55,7 @@ export class EmailService {
       subject,
       template,
       variables: {
-        appBase: APP_BASE,
+        appBase: WEBAPP_ROOT,
         ...variables,
       },
     }
@@ -70,7 +71,7 @@ export class EmailService {
     const { firstName, lastName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${APP_BASE}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${WEBAPP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
     const subject = 'Reset your password - The Good Party'
@@ -80,28 +81,50 @@ export class EmailService {
   }
 
   async sendSetPasswordEmail(user: User) {
-    const { firstName, lastName, email, roles, passwordResetToken } = user
+    const { firstName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${APP_BASE}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${WEBAPP_ROOT}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
-      content: getSetPasswordEmailContent(
-        firstName as string,
-        lastName as string,
-        link,
-        roles,
-      ),
+      name: firstName,
+      link,
     }
-    const subject = roles.includes(UserRole.sales)
-      ? "You've been added to the GoodParty.org Admin"
-      : 'Welcome to GoodParty.org! Set Up Your Account and Access Your Campaign Tools'
+    const subject = 'GoodParty.org: Access your free campaign resources!'
 
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: EmailTemplates.blank,
+      template: EmailTemplateNames.setPassword,
       variables,
+    })
+  }
+
+  async sendProSubscriptionEndingEmail(user: User) {
+    const today = new Date()
+    await this.sendTemplateEmail({
+      to: user.email,
+      subject: `Your Pro Subscription is Ending Today`,
+      template: EmailTemplateNames.endOfProSubscription,
+      variables: {
+        userFullName: getFullName(user),
+        todayDateString: formatDate(today, DateFormats.usDate),
+      },
+    })
+  }
+
+  async sendCancellationRequestConfirmationEmail(
+    user: User,
+    subscriptionEndDate: string,
+  ) {
+    await this.sendTemplateEmail({
+      to: user.email,
+      subject: `Your Cancellation Request Has Been Processed – Pro Access Until ${subscriptionEndDate}`,
+      template: EmailTemplateNames.subscriptionCancellationConfirmation,
+      variables: {
+        userFullName: getFullName(user),
+        subscriptionEndDate,
+      },
     })
   }
 
@@ -114,15 +137,18 @@ export class EmailService {
           // Rate limit exceeded
           const retryAfter =
             parseInt(error.response.headers['retry-after'], 10) || 1 // Retry-After header is in seconds
-          console.warn(
+          this.logger.warn(
             `Rate limit exceeded. Retrying after ${retryAfter} seconds...`,
           )
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
-          throw error // Rethrow if not rate limit error
+          throw new BadGatewayException(
+            'error communicating w/ mail service: ',
+            error,
+          )
         }
       }
     }
-    throw new Error('Exceeded maximum retry attempts')
+    throw new BadGatewayException('Exceeded maximum retry attempts')
   }
 }

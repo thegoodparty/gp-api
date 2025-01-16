@@ -8,6 +8,8 @@ declare global {
       p2vStatus?: P2VStatus
       p2vCompleteDate?: string
       completedBy?: number
+      electionType?: string
+      electionLocation?: string
     }
   }
 }
