@@ -1,3 +1,8 @@
+import {
+  SlackMessageBlock,
+  SlackMessageType,
+} from '../../../../shared/services/slackService.types'
+
 export function buildSlackBlocks(
   type,
   email,
@@ -5,7 +10,7 @@ export function buildSlackBlocks(
   userMessage,
   userPrompt,
   lastThreadMessage,
-) {
+): { blocks: SlackMessageBlock[] } {
   const title = `${
     type.charAt(0).toUpperCase() + type.slice(1)
   } feedback on AI Chat thread`
@@ -13,82 +18,82 @@ export function buildSlackBlocks(
   return {
     blocks: [
       {
-        type: 'header',
+        type: SlackMessageType.HEADER,
         text: {
-          type: 'plain_text',
+          type: SlackMessageType.PLAIN_TEXT,
           text: `💬 ${title}`,
           emoji: true,
         },
       },
       {
-        type: 'rich_text',
+        type: SlackMessageType.RICH_TEXT,
         elements: [
           {
-            type: 'rich_text_list',
+            type: SlackMessageType.RICH_TEXT_LIST,
             style: 'bullet',
             elements: [
               {
-                type: 'rich_text_section',
+                type: SlackMessageType.RICH_TEXT_SECTION,
                 elements: [
                   {
-                    type: 'text',
+                    type: SlackMessageType.TEXT,
                     text: 'User: ',
                     style: {
                       bold: true,
                     },
                   },
                   {
-                    type: 'text',
+                    type: SlackMessageType.TEXT,
                     text: String(email),
                   },
                 ],
               },
               userMessage
                 ? {
-                    type: 'rich_text_section',
+                    type: SlackMessageType.RICH_TEXT_SECTION,
                     elements: [
                       {
-                        type: 'text',
+                        type: SlackMessageType.TEXT,
                         text: 'Message: ',
                         style: {
                           bold: true,
                         },
                       },
                       {
-                        type: 'text',
+                        type: SlackMessageType.TEXT,
                         text: String(userMessage),
                       },
                     ],
                   }
                 : undefined,
               {
-                type: 'rich_text_section',
+                type: SlackMessageType.RICH_TEXT_SECTION,
                 elements: [
                   {
-                    type: 'text',
+                    type: SlackMessageType.TEXT,
                     text: 'Thread ID: ',
                     style: {
                       bold: true,
                     },
                   },
                   {
-                    type: 'text',
+                    type: SlackMessageType.TEXT,
                     text: String(threadId),
                   },
                 ],
               },
               {
-                type: 'rich_text_section',
+                type: SlackMessageType.RICH_TEXT_SECTION,
                 elements: [
                   {
-                    type: 'text',
+                    type: SlackMessageType.TEXT,
                     text: 'User Prompt: ',
                     style: {
                       bold: true,
                     },
                   },
                   {
-                    type: 'text',
+                    type: SlackMessageType.TEXT,
                     text: String(userPrompt),
                   },
                 ],
@@ -96,19 +101,19 @@ export function buildSlackBlocks(
             ].filter((elem) => elem !== undefined),
           },
           {
-            type: 'rich_text_section',
+            type: SlackMessageType.RICH_TEXT_SECTION,
             elements: [
               {
-                type: 'text',
+                type: SlackMessageType.TEXT,
                 text: '\n\n',
               },
             ],
           },
           {
-            type: 'rich_text_section',
+            type: SlackMessageType.RICH_TEXT_SECTION,
             elements: [
               {
-                type: 'text',
+                type: SlackMessageType.TEXT,
                 text: ' Last Message on Thread:',
                 style: {
                   bold: true,
@@ -117,10 +122,10 @@ export function buildSlackBlocks(
             ],
           },
           {
-            type: 'rich_text_preformatted',
+            type: SlackMessageType.RICH_TEXT_SECTION,
             elements: [
               {
-                type: 'text',
+                type: SlackMessageType.TEXT,
                 text: lastThreadMessage,
               },
             ],

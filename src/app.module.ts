@@ -20,6 +20,7 @@ import { TopIssuesModule } from './topIssues/topIssues.module'
 import { SharedModule } from './shared/shared.module'
 import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
+import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { VoterDataModule } from './voterData/voterData.module'
 
 @Module({
@@ -40,6 +41,7 @@ import { VoterDataModule } from './voterData/voterData.module'
     SharedModule,
     GraphqlModule,
     PaymentsModule,
+    ErrorLoggerModule,
     VoterDataModule,
   ],
   controllers: [AppController],

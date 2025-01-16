@@ -9,6 +9,7 @@ import { SlackService } from 'src/shared/services/slack.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { buildSlackBlocks } from './util/slack.util'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
+import { SlackChannel } from '../../shared/services/slackService.types'
 
 @Injectable()
 export class VoterFileService {
@@ -101,7 +102,10 @@ export class VoterFileService {
       // crmCompanyId: crmCompany?.id,
     })
 
-    await this.slack.message(slackBlocks, IS_PROD ? 'politics' : 'dev', false)
+    await this.slack.message(
+      slackBlocks,
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+    )
 
     return true
   }
@@ -141,13 +145,12 @@ export class VoterFileService {
       const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
       await this.slack.message(
         {
-          title: 'Path To Victory',
           body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
           visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
           ${alertSlackMessage}
           `,
         },
-        IS_PROD ? 'politics' : 'dev',
+        IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
       )
     }
   }
