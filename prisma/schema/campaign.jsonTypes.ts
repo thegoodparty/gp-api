@@ -52,7 +52,9 @@ declare global {
       subscriptionCanceledAt?: number | null
       subscriptionCancelAt?: number | null
     }
-    // Take care not to duplicate a field on both details and data
+    // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
+    //  No reason to have both.
+    //  Take care not to duplicate a field on both details and data, for now
     export type CampaignData = {
       createdBy?: 'admin' | string
       slug?: string
