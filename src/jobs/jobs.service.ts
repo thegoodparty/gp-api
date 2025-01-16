@@ -1,7 +1,7 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
 import { firstValueFrom } from 'rxjs'
-import { Headers, MimeTypes } from '../shared/constants/httpConstants'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 const API_BASE = 'https://api.ashbyhq.com/jobPosting'
 const ASHBY_KEY = process.env.ASHBY_KEY
