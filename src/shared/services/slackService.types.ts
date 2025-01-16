@@ -1,5 +1,3 @@
-import { Prisma } from '@prisma/client'
-
 export const enum SlackChannel {
   botDev = 'bot-dev',
   botPathToVictory = 'bot-path-to-victory',
