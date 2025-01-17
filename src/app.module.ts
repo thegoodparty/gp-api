@@ -23,6 +23,7 @@ import { PaymentsModule } from './payments/payments.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { VoterDataModule } from './voterData/voterData.module'
 import { AwsModule } from './aws/aws.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { AwsModule } from './aws/aws.module';
     ErrorLoggerModule,
     VoterDataModule,
     AwsModule,
+    IntegrationsModule,
   ],
   controllers: [AppController],
   providers: [

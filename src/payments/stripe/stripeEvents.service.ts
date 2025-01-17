@@ -167,7 +167,7 @@ export class StripeEventsService {
     const { id: campaignId } = campaign
 
     await Promise.allSettled([
-      this.usersService.patchUserMetaData(user, {
+      this.usersService.patchUserMetaData(user.id, {
         customerId: customerId as string,
         checkoutSessionId: null,
       }),
@@ -192,13 +192,9 @@ export class StripeEventsService {
       )
     }
 
-    const user = await this.usersService.findUser({ id: parseInt(userId) })
-    if (!user) {
-      throw new BadGatewayException(
-        'No user found with given expired checkout session userId',
-      )
-    }
-    await this.usersService.patchUserMetaData(user, { checkoutSessionId: null })
+    await this.usersService.patchUserMetaData(parseInt(userId), {
+      checkoutSessionId: null,
+    })
   }
 
   async customerSubscriptionDeletedHandler(

@@ -8,6 +8,7 @@ declare global {
       accountType?: string
       lastVisited?: number
       isDeleted?: boolean
+      fsUserId?: string
     } | null
   }
 }
