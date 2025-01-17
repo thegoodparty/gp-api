@@ -13,6 +13,7 @@ export {}
 
 declare global {
   export namespace PrismaJson {
+    // Take care not to duplicate a field on both details and data
     export type CampaignDetails = {
       state?: string
       ballotLevel?: string
@@ -24,12 +25,23 @@ declare global {
       isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
       runningAgainst?: Record<'name' | 'party' | 'description', string>[]
-      party?: string //TODO: enumerate all parties we want to allow?
-      otherParty?: string
-      office?: string
+      geoLocation?: {
+        geoHash?: string
+        lng?: number
+        lat?: number
+      }
+      geoLocationFailed?: boolean
+      city?: string | null
+      county?: string | null
+      normalizedOffice?: string | null
       otherOffice?: string
-      website?: string
+      office?: string
+      party?: string
+      otherParty?: string
       district?: string
+      raceId?: string
+      noNormalizedOffice?: boolean
+      website?: string
       pastExperience?: string
       occupation?: string
       funFact?: string
@@ -40,13 +52,21 @@ declare global {
       subscriptionCanceledAt?: number | null
       subscriptionCancelAt?: number | null
     }
-
+    // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
+    //  No reason to have both.
+    //  Take care not to duplicate a field on both details and data, for now
     export type CampaignData = {
       createdBy?: 'admin' | string
-      launchStatus?: CampaignLaunchStatus
-      currentStep?: OnboardingStep
       slug?: string
+      hubSpotUpdates?: {
+        verified_candidates?: string
+        election_results?: string
+        office_type?: string
+      }
+      currentStep?: OnboardingStep
+      launchStatus?: CampaignLaunchStatus
       lastVisited?: number
+      claimProfile?: string
       customVoterFiles?: CustomVoterFile[]
     }
 

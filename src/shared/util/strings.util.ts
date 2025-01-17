@@ -36,3 +36,9 @@ export function camelToSentence(text) {
   const result = text.replace(/([A-Z])/g, ' $1')
   return result.charAt(0).toUpperCase() + result.slice(1)
 }
+
+export function capitalizeFirstLetter(str: string): string {
+  if (!str || str.length < 2) return str
+
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+}

@@ -13,15 +13,14 @@ export enum CampaignLaunchStatus {
   launched = 'launched',
 }
 
-export enum CampaignStatus {
-  candidate = 'candidate',
-  onboarding = 'onboarding',
-}
-
 export enum OnboardingStep {
   complete = 'onboarding-complete',
   registration = 'registration',
 }
 
+export enum CampaignStatus {
+  candidate = 'candidate',
+  onboarding = 'onboarding',
+}
 export type CampaignWith<T extends keyof Prisma.CampaignInclude> =
   Prisma.CampaignGetPayload<{ include: { [field in T]: true } }>

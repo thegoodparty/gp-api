@@ -18,6 +18,8 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "lib": ["esnext"]
+    "lib": ["esnext"],
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   }
 }
