@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -7,6 +8,7 @@ import {
   Logger,
   NotFoundException,
   Param,
+  Put,
   UseGuards,
 } from '@nestjs/common'
 import { UsersService } from './users.service'
@@ -14,12 +16,18 @@ import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { User } from '@prisma/client'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
+import { GenerateSignedUploadUrlArgs } from './users.types'
+import { AwsService } from '../aws/aws.service'
+import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
 
 @Controller('users')
 export class UsersController {
   private readonly logger = new Logger(UsersController.name)
 
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private readonly aws: AwsService,
+  ) {}
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Get(':id')
@@ -59,5 +67,10 @@ export class UsersController {
         `request to delete user that does not exist, w/ id: ${id}`,
       )
     }
+  }
+
+  @Put('files/generate-signed-upload-url')
+  async generateSignedUploadUrl(@Body() args: GenerateSignedUploadUrlArgsDto) {
+    return { signedUploadUrl: await this.aws.generateSignedUploadUrl(args) }
   }
 }
