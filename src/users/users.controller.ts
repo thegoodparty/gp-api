@@ -27,6 +27,7 @@ import { FilesService } from 'src/files/files.service'
 import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
+import { MimeTypes } from 'http-constants-ts'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
@@ -75,7 +76,16 @@ export class UsersController {
   }
 
   @Post('me/upload-image')
-  @UseInterceptors(FilesInterceptor('file', { mode: 'stream' }))
+  @UseInterceptors(
+    FilesInterceptor('file', {
+      mode: 'stream',
+      mimeTypes: [
+        MimeTypes.IMAGE_JPEG,
+        MimeTypes.IMAGE_GIF,
+        MimeTypes.IMAGE_PNG,
+      ],
+    }),
+  )
   async uploadImage(@ReqUser() user: User, @ReqFile() file?: FileUpload) {
     if (!file) {
       throw new BadRequestException('No file found')

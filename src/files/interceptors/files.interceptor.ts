@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   CallHandler,
   Logger,
+  BadRequestException,
 } from '@nestjs/common'
 import { FastifyRequest } from 'fastify'
 import { FileUpload } from '../files.types'
@@ -24,6 +25,8 @@ type FilesInterceptorOpts = {
   numFiles?: number
   /** Maximum file size to allow, an error will be thrown if files are larger. */
   sizeLimit?: number
+  /** Array of mimetypes to accept, an error will be thrown if any files do not match. */
+  mimeTypes?: string[]
 }
 
 /**
@@ -44,7 +47,12 @@ type FilesInterceptorOpts = {
  */
 export function FilesInterceptor(
   key: string = 'file',
-  { mode = 'buffer', numFiles, sizeLimit }: FilesInterceptorOpts = {},
+  {
+    mode = 'buffer',
+    numFiles,
+    sizeLimit,
+    mimeTypes,
+  }: FilesInterceptorOpts = {},
 ) {
   return class MixinInterceptor implements NestInterceptor {
     logger = new Logger(FilesInterceptor.name)
@@ -66,9 +74,18 @@ export function FilesInterceptor(
 
       for await (const part of parts) {
         if (part.type === 'file') {
+          // Check that submitted file is using expected field name
+          // or if bodyOnly mode, ignore any files
           if (key !== part.fieldname || mode === 'bodyOnly') {
             part.file.resume()
             continue
+          }
+
+          // validate that file's mimetype is one of the accepted types if specified
+          if (mimeTypes && !mimeTypes?.includes(part.mimetype)) {
+            throw new BadRequestException(
+              `Invalid file type. Must be one of: ${mimeTypes?.join(', ')}`,
+            )
           }
 
           let data: FileUpload['data']
@@ -85,6 +102,7 @@ export function FilesInterceptor(
             ...omit(part, ['file', 'toBuffer', 'type', 'fields']),
           })
         } else {
+          // set multipart fields directly on request body
           req.body[part.fieldname] = part.value
         }
       }
