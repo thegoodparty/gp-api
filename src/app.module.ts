@@ -22,7 +22,7 @@ import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { VoterDataModule } from './voterData/voterData.module'
-import { AwsModule } from './aws/aws.module';
+import { FilesModule } from './files/files.module'
 
 @Module({
   imports: [
@@ -44,7 +44,7 @@ import { AwsModule } from './aws/aws.module';
     PaymentsModule,
     ErrorLoggerModule,
     VoterDataModule,
-    AwsModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [

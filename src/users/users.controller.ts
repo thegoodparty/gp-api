@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,8 +9,10 @@ import {
   Logger,
   NotFoundException,
   Param,
+  Post,
   Put,
   UseGuards,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { UsersService } from './users.service'
@@ -17,10 +20,13 @@ import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { User } from '@prisma/client'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
-import { AwsService } from '../aws/aws.service'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
+import { FilesService } from 'src/files/files.service'
+import { FileUpload } from 'src/files/files.types'
+import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
+import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
@@ -29,7 +35,7 @@ export class UsersController {
 
   constructor(
     private usersService: UsersService,
-    private readonly aws: AwsService,
+    private readonly filesService: FilesService,
   ) {}
 
   @UseGuards(UserOwnerOrAdminGuard)
@@ -78,6 +84,21 @@ export class UsersController {
     )
   }
 
+  @Post('me/upload-image')
+  @UseInterceptors(FilesInterceptor('file', { mode: 'stream' }))
+  async uploadImage(@ReqUser() user: User, @ReqFile() file?: FileUpload) {
+    if (!file) {
+      throw new BadRequestException('No file found')
+    }
+
+    const avatar = await this.filesService.uploadFile(file, 'uploads')
+    const updatedUser = await this.usersService.updateUser(
+      { id: user.id },
+      { avatar },
+    )
+    return ReadUserOutputSchema.parse(updatedUser)
+  }
+
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -97,6 +118,8 @@ export class UsersController {
 
   @Put('files/generate-signed-upload-url')
   async generateSignedUploadUrl(@Body() args: GenerateSignedUploadUrlArgsDto) {
-    return { signedUploadUrl: await this.aws.generateSignedUploadUrl(args) }
+    return {
+      signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
+    }
   }
 }

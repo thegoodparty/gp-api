@@ -7,11 +7,11 @@ import {
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
+import multipart from '@fastify/multipart'
 import { AppModule } from './app.module'
 import { Logger } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
-import type { FastifyCookieOptions } from '@fastify/cookie'
 import cookie from '@fastify/cookie'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
 
@@ -45,20 +45,30 @@ const bootstrap = async () => {
   const document = SwaggerModule.createDocument(app, swaggerConfig)
   SwaggerModule.setup('api', app, document)
 
-  await app.register(helmet as any)
+  await app.register(helmet)
 
-  await app.register(cors as any, {
+  await app.register(cors, {
     origin: process.env.CORS_ORIGIN || '*',
   })
 
-  await app.register(fastifyStatic as any, {
+  await app.register(fastifyStatic, {
     root: join(__dirname, '..', 'public'),
     prefix: '/public/',
   })
 
   await app.register(cookie, {
     secret: process.env.AUTH_SECRET,
-  } as FastifyCookieOptions)
+  })
+
+  await app.register(multipart, {
+    limits: {
+      // global default limits, can be overidden at handler level
+      fields: 100, // Max number of non-file fields
+      fileSize: 10_000_000, // For multipart forms, the max file size in bytes
+      files: 1, // Max number of file fields
+      parts: 100, // For multipart forms, the max number of parts (fields + files)
+    },
+  })
 
   app.useGlobalFilters(new PrismaExceptionFilter())
 
