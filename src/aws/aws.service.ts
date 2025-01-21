@@ -1,24 +1,37 @@
-import { Injectable } from '@nestjs/common'
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { Injectable, Logger } from '@nestjs/common'
+import {
+  ObjectCannedACL,
+  PutObjectCommand,
+  PutObjectCommandInput,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { GenerateSignedUploadUrlArgs } from '../users/users.types'
+import { Upload } from '@aws-sdk/lib-storage'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
+
+export type UploadOptions = {
+  accessControl?: ObjectCannedACL
+  cacheControl?: string // Cache-Control header value
+}
 
 const {
-  AWS_ACCESS_KEY_ID: accessKeyId,
-  AWS_SECRET_ACCESS_KEY: secretAccessKey,
+  AWS_S3_KEY: accessKeyId,
+  AWS_S3_SECRET: secretAccessKey,
   AWS_REGION: region = 'us-west-2',
 } = process.env
 
 if (!accessKeyId) {
-  throw new Error('AWS_ACCESS_KEY_ID is required')
+  throw new Error('AWS_S3_KEY is required')
 }
 if (!secretAccessKey) {
-  throw new Error('AWS_SECRET_ACCESS_KEY is required')
+  throw new Error('AWS_S3_SECRET is required')
 }
 
 @Injectable()
 export class AwsService {
+  private readonly logger = new Logger(AwsService.name)
   private readonly s3Client: S3Client
+
   constructor() {
     this.s3Client = new S3Client({
       region,
@@ -29,27 +42,47 @@ export class AwsService {
     })
   }
 
-  async getSignedS3Url(bucketPath: string, filePath: string, fileType: string) {
+  async uploadFile(
+    fileObject: PutObjectCommandInput['Body'],
+    bucket: string,
+    fileName: string,
+    fileType: string,
+    options?: UploadOptions,
+  ) {
+    const filePath = `${bucket}/${fileName}`
+
+    try {
+      const upload = new Upload({
+        client: this.s3Client,
+        params: {
+          Bucket: ASSET_DOMAIN,
+          Key: filePath,
+          Body: fileObject,
+          ContentType: fileType,
+          ACL: options?.accessControl,
+          CacheControl: options?.cacheControl,
+        },
+      })
+      await upload.done()
+
+      return `https://${ASSET_DOMAIN}/${filePath}`
+    } catch (e) {
+      this.logger.error('Error uploading file to S3:', e)
+      throw e
+    }
+  }
+
+  async getSignedS3Url(bucket: string, fileName: string, fileType: string) {
+    const filePath = `${bucket}/${fileName}`
+
     return await getSignedUrl(
       this.s3Client,
       new PutObjectCommand({
-        Bucket: bucketPath,
+        Bucket: ASSET_DOMAIN,
         Key: filePath,
         ContentType: fileType,
       }),
       { expiresIn: 3600 },
     )
-  }
-
-  async generateSignedUploadUrl({
-    bucket,
-    fileName,
-    fileType,
-  }: GenerateSignedUploadUrlArgs) {
-    const bucketPath = bucket.includes('/') ? bucket.split('/')[0] : bucket
-    const filePath = bucket.includes('/')
-      ? `${bucket.split('/')[1]}/${fileName}`
-      : fileName
-    return await this.getSignedS3Url(bucketPath, filePath, fileType)
   }
 }
