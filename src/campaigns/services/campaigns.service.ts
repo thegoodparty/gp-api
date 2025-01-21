@@ -23,7 +23,7 @@ import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-import { FullStoryService } from '../../integrations/fullStory/fullStory.service'
+import { FullStoryService } from '../../fullStory/fullStory.service'
 
 @Injectable()
 export class CampaignsService {

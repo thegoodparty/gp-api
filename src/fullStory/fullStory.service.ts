@@ -1,18 +1,18 @@
-import { HttpStatus, Injectable } from '@nestjs/common'
+import { forwardRef, HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom, Observable } from 'rxjs'
 import axios, { AxiosResponse } from 'axios'
 import { User } from '@prisma/client'
-import { IS_PROD } from '../../shared/util/appEnvironment.util'
-import { UsersService } from '../../users/users.service'
-import { DateFormats, formatDate } from '../../shared/util/date.util'
-import { PrimaryElectionResult } from '../../campaigns/campaigns.types'
+import { IS_PROD } from '../shared/util/appEnvironment.util'
+import { UsersService } from '../users/users.service'
+import { DateFormats, formatDate } from '../shared/util/date.util'
+import { PrimaryElectionResult } from '../campaigns/campaigns.types'
 import {
   calculateVoterGoalsCount,
   generateAiContentTrackingFlags,
-} from '../util/tracking.util'
-import { CampaignsService } from '../../campaigns/services/campaigns.service'
+} from './util/tracking.util'
+import { CampaignsService } from '../campaigns/services/campaigns.service'
 import { FullStoryUserResponse } from './fullStory.types'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
@@ -38,6 +38,7 @@ export class FullStoryService {
   }
   constructor(
     private readonly users: UsersService,
+    @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: CampaignsService,
     private readonly httpService: HttpService,
   ) {}

@@ -22,9 +22,9 @@ import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { VoterDataModule } from './voterData/voterData.module'
-// import { IntegrationsModule } from './integrations/integrations.module'
+import { FullStoryModule } from './fullStory/fullStory.module'
 import { FilesModule } from './files/files.module'
-// import { AwsModule } from './aws/aws.module';
+import { AwsModule } from './aws/aws.module'
 
 @Module({
   imports: [
@@ -46,9 +46,9 @@ import { FilesModule } from './files/files.module'
     PaymentsModule,
     ErrorLoggerModule,
     VoterDataModule,
-    // IntegrationsModule,
+    FullStoryModule,
     FilesModule,
-    // AwsModule,
+    AwsModule,
   ],
   controllers: [AppController],
   providers: [
