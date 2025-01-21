@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
 import { FilesService } from './files.service'
-import { AwsModule } from 'src/aws/aws.module'
+import { IntegrationsModule } from '../integrations/integrations.module'
 
 @Module({
-  imports: [AwsModule],
+  imports: [IntegrationsModule],
   providers: [FilesService],
   exports: [FilesService],
 })
