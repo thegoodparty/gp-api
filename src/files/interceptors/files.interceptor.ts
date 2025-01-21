@@ -32,6 +32,15 @@ type FilesInterceptorOpts = {
  * and can be accessed with '@ReqFile' or '@ReqFiles' param decorators
  * @param key The key on the body to look for files. Files found on other keys will be ignored.
  * @param {FilesInterceptorOpts} options Options for the interceptor
+ * @example
+ * \@Post('upload/documents')
+ * \@UseInterceptors(FilesInterceptor('files', { numFiles: 2, sizeLimit: 1_000_000 }))
+ * uploadDocuments(@ReqFiles() documents?: FileUpload[]) {
+ *   if(documents) {
+ *     // parser found files uploaded with `files` field name
+ *   }
+ * }
+ *
  */
 export function FilesInterceptor(
   key: string = 'file',
