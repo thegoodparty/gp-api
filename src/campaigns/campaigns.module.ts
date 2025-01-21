@@ -19,7 +19,7 @@ import { IntegrationsModule } from '../integrations/integrations.module'
     UsersModule,
     RacesModule,
     forwardRef(() => CampaignsAiModule),
-    IntegrationsModule,
+    forwardRef(() => IntegrationsModule),
   ],
   controllers: [
     CampaignsController,

@@ -13,6 +13,7 @@ import {
   generateAiContentTrackingFlags,
 } from '../util/tracking.util'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
+import { FullStoryUserResponse } from './fullStory.types'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
@@ -25,14 +26,6 @@ const FULLSTORY_ROOT_USERS_URL = 'https://org.fullstory.com/api/v2/users'
 type CRMCompanyProperties = {
   primary_election_result: PrimaryElectionResult
   election_results: string
-}
-
-interface FullStoryUserResponse {
-  data: {
-    results: {
-      id: string
-    }[]
-  }
 }
 
 @Injectable()

@@ -3,7 +3,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { AwsService } from 'src/integrations/aws/aws.service'
+import { AwsService } from 'src/aws/aws.service'
 import { CacheControls } from 'http-constants-ts'
 import { FileUpload, GenerateSignedUploadUrlArgs } from './files.types'
 

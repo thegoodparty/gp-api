@@ -20,7 +20,6 @@ import {
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
-import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
@@ -35,7 +34,6 @@ export class CampaignsService {
     private planVersionService: CampaignPlanVersionsService,
     private usersService: UsersService,
     private emailService: EmailService,
-    private slackService: SlackService,
     private fullstoryService: FullStoryService,
   ) {}
 
