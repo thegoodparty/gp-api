@@ -23,7 +23,7 @@ export function typeToQuery(
 
   if (l2ColumnName && l2ColumnValue) {
     // value is like "IN##CLARK##CLARK CNTY COMM DIST 1" we need just CLARK CNTY COMM DIST 1
-    let cleanValue = extractLocation(l2ColumnValue, fixColumns)
+    const cleanValue = extractLocation(l2ColumnValue, fixColumns)
     if (fixColumns) {
       logger.debug('before fix columns:', l2ColumnName)
       l2ColumnName = fixCityCountyColumns(l2ColumnName)

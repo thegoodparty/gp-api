@@ -1,5 +1,3 @@
-import { UserRole } from '@prisma/client'
-
 export function getRecoverPasswordEmailContent(name: string, link: string) {
   return `<table border="0" cellpadding="0" cellspacing="0" height="100%" width="100%">
               <tbody>
@@ -53,7 +51,6 @@ export function getRecoverPasswordEmailContent(name: string, link: string) {
             </table>
             `
 }
-
 
 export function getBasicEmailContent(msg = '', subject = '') {
   return `
