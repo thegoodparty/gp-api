@@ -61,27 +61,17 @@ export class UsersController {
     )
   }
 
-  @Get('me/meta')
+  @Get('me/metadata')
   getMetadata(@ReqUser() { metaData }: User) {
     return metaData
   }
 
-  @Put('me/meta')
+  @Put('me/metadata')
   updateMetadata(
     @ReqUser() user: User,
-    @Body() { meta: inputMetadata }: UpdateMetadataSchema,
+    @Body() { meta }: UpdateMetadataSchema,
   ) {
-    const { metaData } = user
-
-    return this.usersService.updateUser(
-      { id: user.id },
-      {
-        metaData: {
-          ...metaData,
-          ...inputMetadata,
-        },
-      },
-    )
+    return this.usersService.patchUserMetaData(user, meta)
   }
 
   @Post('me/upload-image')

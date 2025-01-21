@@ -9,7 +9,7 @@ export const ReadUserOutputSchema = z.intersection(
   z.object({
     id: z.number(),
     email: ReadEmailSchema,
-    avatar: z.string().optional(),
+    avatar: z.string().nullable().optional(),
   }),
 )
 
