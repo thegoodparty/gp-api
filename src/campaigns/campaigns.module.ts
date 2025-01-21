@@ -11,6 +11,7 @@ import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { UsersModule } from 'src/users/users.module'
 import { GeocodingService } from './services/geocoding.service'
 import { RacesModule } from 'src/races/races.module'
+import { IntegrationsModule } from '../integrations/integrations.module'
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { RacesModule } from 'src/races/races.module'
     UsersModule,
     RacesModule,
     forwardRef(() => CampaignsAiModule),
+    IntegrationsModule,
   ],
   controllers: [
     CampaignsController,

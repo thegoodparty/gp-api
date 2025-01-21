@@ -24,6 +24,7 @@ import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { FullStoryService } from '../../integrations/fullStory/fullStory.service'
 
 @Injectable()
 export class CampaignsService {
@@ -35,6 +36,7 @@ export class CampaignsService {
     private usersService: UsersService,
     private emailService: EmailService,
     private slackService: SlackService,
+    private fullstoryService: FullStoryService,
   ) {}
 
   count(args: Prisma.CampaignCountArgs) {
@@ -72,7 +74,7 @@ export class CampaignsService {
     return this.prisma.campaign.create(args)
   }
   async findBySubscriptionId(subscriptionId: string) {
-    return await this.findFirst({
+    return this.findFirst({
       where: {
         details: {
           path: ['subscriptionId'],
@@ -107,6 +109,11 @@ export class CampaignsService {
   }
 
   async update(args: Prisma.CampaignUpdateArgs) {
+    const user = await this.usersService.findUser(
+      args.where as Prisma.UserWhereUniqueInput,
+    )
+
+    user && (await this.fullstoryService.trackUser(user.id))
     return this.prisma.campaign.update(args)
   }
 
@@ -155,11 +162,9 @@ export class CampaignsService {
       //   sails.helpers.log(campaign.slug, 'error updating crm', e)
       // }
 
-      // try {
-      //   await sails.helpers.fullstory.customAttr(user.id)
-      // } catch (e) {
-      //   sails.helpers.log(campaign.slug, 'error updating fullstory', e)
-      // }
+      const user = await this.usersService.findUser({ id: campaign.userId })
+
+      user && (await this.fullstoryService.trackUser(user.id))
 
       return tx.campaign.update({
         where: { id: campaign.id },

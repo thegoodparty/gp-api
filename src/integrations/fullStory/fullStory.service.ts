@@ -1,11 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { Headers, MimeTypes } from 'http-constants-ts'
-import { CreateUserInputDto } from '../../users/schemas/CreateUserInput.schema'
 import { lastValueFrom, Observable } from 'rxjs'
 import axios, { AxiosResponse } from 'axios'
 import { User } from '@prisma/client'
-import { IS_DEV } from '../../shared/util/appEnvironment.util'
+import { IS_PROD } from '../../shared/util/appEnvironment.util'
 import { UsersService } from '../../users/users.service'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { PrimaryElectionResult } from '../../campaigns/campaigns.types'
@@ -13,16 +12,20 @@ import {
   calculateVoterGoalsCount,
   generateAiContentTrackingFlags,
 } from '../util/tracking.util'
-import { TrackUserArgs } from './fullStory.types'
+import { CampaignsService } from '../../campaigns/services/campaigns.service'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
 
-const { FULLSTORY_API_KEY } = process.env
+const { FULLSTORY_API_KEY, ENABLE_FULLSTORY } = process.env
 
 const FULLSTORY_ROOT_USERS_URL = 'https://org.fullstory.com/api/v2/users'
 
-type FullStoryUserProperties = Partial<CreateUserInputDto>
+// TODO: Move these to the CRM module when implemented
+type CRMCompanyProperties = {
+  primary_election_result: PrimaryElectionResult
+  election_results: string
+}
 
 interface FullStoryUserResponse {
   data: {
@@ -42,10 +45,12 @@ export class FullStoryService {
   }
   constructor(
     private readonly users: UsersService,
+    private readonly campaigns: CampaignsService,
     private readonly httpService: HttpService,
   ) {}
 
-  private readonly disabled = !FULLSTORY_API_KEY || IS_DEV
+  private readonly disabled =
+    !ENABLE_FULLSTORY && (!FULLSTORY_API_KEY || !IS_PROD)
 
   async getFullStoryUserId({ id: userId, firstName, lastName }: User) {
     if (this.disabled) {
@@ -68,7 +73,7 @@ export class FullStoryService {
         (error.response as AxiosResponse) &&
         error.response?.status === HttpStatus.NOT_FOUND
       ) {
-        // Tracking for the given user doesn't exist, create it
+        // Tracking for when the given user doesn't exist, create it
         const createResponse = await lastValueFrom(
           this.httpService.post(
             FULLSTORY_ROOT_USERS_URL,
@@ -88,10 +93,16 @@ export class FullStoryService {
     }
   }
 
-  async trackUser({ user, campaign, pathToVictory }: TrackUserArgs) {
-    if (this.disabled) {
+  async trackUser(userId: number) {
+    const user = await this.users.findUser({ id: userId })
+    if (this.disabled || !user) {
       return
     }
+
+    const campaign = await this.campaigns.findByUser(user.id, {
+      pathToVictory: true,
+    })
+    const { pathToVictory } = campaign
 
     const { slug, isActive, details, data, isVerified, isPro, aiContent } =
       campaign || {}
@@ -170,9 +181,4 @@ export class FullStoryService {
       this.axiosConfig,
     )
   }
-}
-
-type CRMCompanyProperties = {
-  primary_election_result: PrimaryElectionResult
-  election_results: string
 }
