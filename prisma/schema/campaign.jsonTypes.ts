@@ -6,6 +6,7 @@ import {
 import {
   CampaignLaunchStatus,
   OnboardingStep,
+  VoterGoals,
 } from 'src/campaigns/campaigns.types'
 import { CustomVoterFile } from 'src/voterData/voterFile/voterFile.types'
 
@@ -51,6 +52,8 @@ declare global {
       endOfElectionSubscriptionCanceled?: boolean
       subscriptionCanceledAt?: number | null
       subscriptionCancelAt?: number | null
+      filingPeriodsStart?: string
+      filingPeriodsEnd?: string
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
     //  No reason to have both.
@@ -68,6 +71,7 @@ declare global {
       lastVisited?: number
       claimProfile?: string
       customVoterFiles?: CustomVoterFile[]
+      reportedVoterGoals?: VoterGoals
     }
 
     export type CampaignAiContent = {

@@ -24,3 +24,21 @@ export enum CampaignStatus {
 }
 export type CampaignWith<T extends keyof Prisma.CampaignInclude> =
   Prisma.CampaignGetPayload<{ include: { [field in T]: true } }>
+
+export type VoterGoals = {
+  doorKnocking?: number
+  calls?: number
+  digital?: number
+  directMail?: number
+  digitalAds?: number
+  text?: number
+  events?: number
+  yardSigns?: number
+}
+
+export enum PrimaryElectionResult {
+  WON = 'Won Primary',
+  LOST = 'Lost Primary',
+  WITHDREW = 'Withdrew',
+  NOT_ON_BALLOT = 'Not on Ballot',
+}
