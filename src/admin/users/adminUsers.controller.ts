@@ -75,7 +75,6 @@ export class AdminUsersController {
       throw new BadRequestException('Invalid user')
     }
 
-    // get a valid token for impersonateUser
     const token = await this.authService.generateAuthToken({
       email: user.email,
       sub: user.id,
