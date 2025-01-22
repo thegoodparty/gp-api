@@ -280,6 +280,11 @@ type BlogArticleHighlight = {
   summary: string
 }
 
+export type BlogArticleTitle = {
+  title: string
+  slug: string
+}
+
 export type ContentMedia = {
   url: string
   alt: string

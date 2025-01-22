@@ -72,6 +72,7 @@ declare global {
       claimProfile?: string
       customVoterFiles?: CustomVoterFile[]
       reportedVoterGoals?: VoterGoals
+      textCampaignCount?: number
     }
 
     export type CampaignAiContent = {
