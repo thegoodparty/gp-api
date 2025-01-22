@@ -9,7 +9,10 @@ import * as sanitizeHtml from 'sanitize-html'
 import { IS_PROD, WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { VOTER_FILE_ROUTE } from './voterFile/voterFile.controller'
 import { FilesService } from 'src/files/files.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
+import {
+  SlackChannel,
+  SlackMessageType,
+} from 'src/shared/services/slackService.types'
 
 @Injectable()
 export class VoterOutreachService {
@@ -75,17 +78,17 @@ export class VoterOutreachService {
         }
 
         return {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: `${key}: `,
               style: {
                 bold: true,
               },
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: value ? '✅ Yes' : '❌ No',
             },
           ],

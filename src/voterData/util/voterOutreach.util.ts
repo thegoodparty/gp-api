@@ -1,4 +1,7 @@
-import { SlackMessageBlock } from 'src/shared/services/slackService.types'
+import {
+  SlackMessageBlock,
+  SlackMessageType,
+} from 'src/shared/services/slackService.types'
 
 export function buildSlackBlocks({
   name,
@@ -20,25 +23,25 @@ export function buildSlackBlocks({
 }) {
   const blocks = [
     {
-      type: 'header',
+      type: SlackMessageType.HEADER,
       text: {
-        type: 'plain_text',
+        type: SlackMessageType.PLAIN_TEXT,
         text: '🚨 Campaign Schedule Request 🚨',
         emoji: true,
       },
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'emoji',
+              type: SlackMessageType.EMOJI,
               name: 'gp',
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: ' Candidate/User:',
               style: {
                 bold: true,
@@ -47,53 +50,53 @@ export function buildSlackBlocks({
           ],
         },
         {
-          type: 'rich_text_list',
+          type: SlackMessageType.RICH_TEXT_LIST,
           style: 'bullet',
           elements: [
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Name: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: String(name),
                 },
               ],
             },
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Email: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: String(email),
                 },
               ],
             },
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Phone: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: String(phone),
                 },
               ],
@@ -103,20 +106,20 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'divider',
+      type: SlackMessageType.DIVIDER,
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'emoji',
+              type: SlackMessageType.EMOJI,
               name: 'zap',
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: ' Campaign Details:',
               style: {
                 bold: true,
@@ -125,37 +128,37 @@ export function buildSlackBlocks({
           ],
         },
         {
-          type: 'rich_text_list',
+          type: SlackMessageType.RICH_TEXT_LIST,
           style: 'bullet',
           elements: [
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Campaign Type: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: String(type),
                 },
               ],
             },
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Budget: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: '$' + Number(budget).toLocaleString(),
                 },
               ],
@@ -163,50 +166,50 @@ export function buildSlackBlocks({
             // eslint-disable-next-line eqeqeq
             voicemail != undefined
               ? {
-                  type: 'rich_text_section',
+                  type: SlackMessageType.RICH_TEXT_SECTION,
                   elements: [
                     {
-                      type: 'text',
+                      type: SlackMessageType.TEXT,
                       text: 'Voicemail: ',
                       style: {
                         bold: true,
                       },
                     },
                     {
-                      type: 'text',
+                      type: SlackMessageType.TEXT,
                       text: voicemail ? 'Yes' : 'No',
                     },
                   ],
                 }
               : undefined,
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Scheduled Date: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: String(date),
                 },
               ],
             },
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Script Key: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: String(script),
                 },
               ],
@@ -217,20 +220,20 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'divider',
+      type: SlackMessageType.DIVIDER,
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'emoji',
+              type: SlackMessageType.EMOJI,
               name: 'eyes',
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: ' Assigned Political Advisor (PA):',
               style: {
                 bold: true,
@@ -241,9 +244,9 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'section',
+      type: SlackMessageType.SECTION,
       text: {
-        type: 'mrkdwn',
+        type: SlackMessageType.MRKDWN,
         text: `${assignedPa || 'None Assigned'}\n${
           crmCompanyId
             ? `https://app.hubspot.com/contacts/21589597/record/0-2/${crmCompanyId}`
@@ -252,17 +255,17 @@ export function buildSlackBlocks({
       },
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'emoji',
+              type: SlackMessageType.EMOJI,
               name: 'lock',
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: ' Voter File Download Link\n',
               style: {
                 bold: true,
@@ -275,7 +278,7 @@ export function buildSlackBlocks({
                   url: String(voterFileUrl),
                 }
               : {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Error: Not provided or invalid',
                   style: {
                     bold: true,
@@ -286,20 +289,20 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'divider',
+      type: SlackMessageType.DIVIDER,
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'emoji',
+              type: SlackMessageType.EMOJI,
               name: 'scroll',
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: ' AI-Generated Script:',
               style: {
                 bold: true,
@@ -308,10 +311,10 @@ export function buildSlackBlocks({
           ],
         },
         {
-          type: 'rich_text_preformatted',
+          type: SlackMessageType.RICH_TEXT_PREFORMATTED,
           elements: [
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: String(messagingScript),
             },
           ],
@@ -319,20 +322,20 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'divider',
+      type: SlackMessageType.DIVIDER,
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'emoji',
+              type: SlackMessageType.EMOJI,
               name: 'speech_balloon',
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: ' Message From User:\n',
               style: {
                 bold: true,
@@ -341,10 +344,10 @@ export function buildSlackBlocks({
           ],
         },
         {
-          type: 'rich_text_quote',
+          type: SlackMessageType.RICH_TEXT_QUOTE,
           elements: [
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: String(message),
             },
           ],
@@ -352,17 +355,17 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_section',
+          type: SlackMessageType.RICH_TEXT_SECTION,
           elements: [
             {
-              type: 'emoji',
+              type: SlackMessageType.EMOJI,
               name: 'busts_in_silhouette',
             },
             {
-              type: 'text',
+              type: SlackMessageType.TEXT,
               text: ' Audience Selection:',
               style: {
                 bold: true,
@@ -373,25 +376,25 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'rich_text',
+      type: SlackMessageType.RICH_TEXT,
       elements: [
         {
-          type: 'rich_text_list',
+          type: SlackMessageType.RICH_TEXT_LIST,
           style: 'bullet',
           elements: [
             ...formattedAudience,
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: 'Audience Request: ',
                   style: {
                     bold: true,
                   },
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: audienceRequest ? String(audienceRequest) : 'N/A',
                 },
               ],
@@ -401,21 +404,21 @@ export function buildSlackBlocks({
       ],
     },
     {
-      type: 'divider',
+      type: SlackMessageType.DIVIDER,
     },
     imageUrl
       ? {
-          type: 'rich_text',
+          type: SlackMessageType.RICH_TEXT,
           elements: [
             {
-              type: 'rich_text_section',
+              type: SlackMessageType.RICH_TEXT_SECTION,
               elements: [
                 {
-                  type: 'emoji',
+                  type: SlackMessageType.EMOJI,
                   name: 'floppy_disk',
                 },
                 {
-                  type: 'text',
+                  type: SlackMessageType.TEXT,
                   text: ' Image File:',
                   style: {
                     bold: true,
@@ -428,9 +431,9 @@ export function buildSlackBlocks({
       : undefined,
     imageUrl
       ? {
-          type: 'section',
+          type: SlackMessageType.SECTION,
           text: {
-            type: 'mrkdwn',
+            type: SlackMessageType.MRKDWN,
             text: String(imageUrl),
           },
         }
