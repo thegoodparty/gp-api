@@ -75,77 +75,76 @@ export class ContentController {
     }
   }
 
-  @Get('blog-articles-by-section/:sectionSlug?')
-  async findBlogArticlesBySection(@Param('sectionSlug') sectionSlug?: string) {
-    if (sectionSlug) {
-      const sections: BlogSection[] = await this.contentService.findByType(
-        InferredContentTypes.blogSections,
-      )
-      if (!sections) {
-        throw new InternalServerErrorException(
-          "Blog sections couldn't be pulled",
-        )
-      }
-      const results: BlogSection[] = []
-      let sectionIndex = 0
-      let hero
-      for (let i = 0; i < sections.length; i++) {
-        const section = sections[i]
-        if (section.fields.slug === sectionSlug) {
-          sectionIndex = i
-
-          if (!section.articles) continue
-          section.articles.sort(
-            (a, b) =>
-              new Date(b.publishDate).getTime() -
-              new Date(a.publishDate).getTime(),
-          )
-          const { id, title, mainImage, publishDate, slug, summary } =
-            section.articles[0] // Based on previous sorting, this should be the newest article
-          hero = { id, title, mainImage, publishDate, slug, summary }
-          section.articles = section.articles.slice(1)
-          results.push(section)
-        } else {
-          delete section.articles
-          results.push(section)
-        }
-      }
-      return { sections: results, hero: hero, sectionIndex }
-    } else {
-      const sections: BlogSection[] = await this.contentService.findByType(
-        InferredContentTypes.blogSections,
-      )
-      const heroObj: BlogArticleAugmented[] =
-        await this.contentService.findByType(
-          ContentType.blogArticle,
-          { id: 'desc' },
-          1,
-        )
-      if (!sections || !heroObj) {
-        throw new InternalServerErrorException(
-          'blogSection or blogArticle could not be found',
-        )
-      }
-      const { id, title, mainImage, publishDate, slug, summary } = heroObj[0]
-      const hero: Hero = { id, title, mainImage, publishDate, slug, summary }
-
-      const result: BlogSection[] = []
-      let sectionIndex = 0
-      for (let i = 0; i < sections.length; i++) {
-        sectionIndex = i
-        const section = sections[i]
-        if (!section.articles || section.articles.length < 5) continue
-        section.slug = section.fields.slug
-        if (section.articles[0].id === hero.id) {
-          section.articles = section.articles.slice(1, 4)
-          hero.section = { fields: { title: section.fields.title } }
-        } else {
-          section.articles = section.articles.slice(0, 3)
-        }
-        result.push(section)
-      }
-      result.sort((a, b) => a.fields.order - b.fields.order)
-      return { sections: result, hero, sectionIndex }
+  @Get('blog-articles-by-section/:sectionSlug')
+  async findBlogArticlesBySection(@Param('sectionSlug') sectionSlug: string) {
+    const sections: BlogSection[] = await this.contentService.findByType(
+      InferredContentTypes.blogSections,
+    )
+    if (!sections) {
+      throw new InternalServerErrorException("Blog sections couldn't be pulled")
     }
+    const results: BlogSection[] = []
+    let sectionIndex = 0
+    let hero
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i]
+      if (section.fields.slug === sectionSlug) {
+        sectionIndex = i
+
+        if (!section.articles) continue
+        section.articles.sort(
+          (a, b) =>
+            new Date(b.publishDate).getTime() -
+            new Date(a.publishDate).getTime(),
+        )
+        const { id, title, mainImage, publishDate, slug, summary } =
+          section.articles[0] // Based on previous sorting, this should be the newest article
+        hero = { id, title, mainImage, publishDate, slug, summary }
+        section.articles = section.articles.slice(1)
+        results.push(section)
+      } else {
+        delete section.articles
+        results.push(section)
+      }
+    }
+    return { sections: results, hero: hero, sectionIndex }
+  }
+
+  @Get('blog-articles-by-section')
+  async listBlogArticlesBySection() {
+    const sections: BlogSection[] = await this.contentService.findByType(
+      InferredContentTypes.blogSections,
+    )
+    const heroObj: BlogArticleAugmented[] =
+      await this.contentService.findByType(
+        ContentType.blogArticle,
+        { id: 'desc' },
+        1,
+      )
+    if (!sections || !heroObj) {
+      throw new InternalServerErrorException(
+        'blogSection or blogArticle could not be found',
+      )
+    }
+    const { id, title, mainImage, publishDate, slug, summary } = heroObj[0]
+    const hero: Hero = { id, title, mainImage, publishDate, slug, summary }
+
+    const result: BlogSection[] = []
+    let sectionIndex = 0
+    for (let i = 0; i < sections.length; i++) {
+      sectionIndex = i
+      const section = sections[i]
+      if (!section.articles || section.articles.length < 5) continue
+      section.slug = section.fields.slug
+      if (section.articles[0].id === hero.id) {
+        section.articles = section.articles.slice(1, 4)
+        hero.section = { fields: { title: section.fields.title } }
+      } else {
+        section.articles = section.articles.slice(0, 3)
+      }
+      result.push(section)
+    }
+    result.sort((a, b) => a.fields.order - b.fields.order)
+    return { sections: result, hero, sectionIndex }
   }
 }
