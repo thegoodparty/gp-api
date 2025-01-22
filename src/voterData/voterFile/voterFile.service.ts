@@ -25,7 +25,7 @@ export class VoterFileService {
     { type, countOnly, customFilters }: GetVoterFileSchema,
   ) {
     const resolvedType =
-      type === 'custom' && customFilters
+      type === 'custom' && customFilters?.channel
         ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
         : type
 

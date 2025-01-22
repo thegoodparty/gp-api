@@ -14,11 +14,13 @@ export enum SlackMessageType {
   RICH_TEXT_SECTION = 'rich_text_section',
   RICH_TEXT_LIST = 'rich_text_list',
   RICH_TEXT_QUOTE = 'rich_text_quote',
+  RICH_TEXT_PREFORMATTED = 'rich_text_preformatted',
   SECTION = 'section',
   PLAIN_TEXT = 'plain_text',
   MRKDWN = 'mrkdwn',
   EMOJI = 'emoji',
   TEXT = 'text',
+  DIVIDER = 'divider',
 }
 
 export type SlackMessageBlock = {
