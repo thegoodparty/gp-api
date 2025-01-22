@@ -19,6 +19,7 @@ import { blogHomeTransformer } from './transformers/blogHomeTransformer'
 import { blogSectionsTransformer } from './transformers/blogSectionsTransformer'
 import { pledgeTransformer } from './transformers/pledgeTransformer'
 import { privacyPageTransformer } from './transformers/privacyPageTransformer'
+import { blogArticleTitlesTransformer } from './transformers/blogArticleTitlesTransformer'
 
 export enum InferredContentTypes {
   articleTag = 'articleTag',
@@ -29,6 +30,7 @@ export enum InferredContentTypes {
   articleCategories = 'articleCategories',
   candidateTestimonials = 'candidateTestimonials',
   blogSections = 'blogSections',
+  blogArticleTitles = 'blogArticleTitles',
 }
 
 export const CONTENT_TYPE_MAP: {
@@ -73,6 +75,11 @@ export const CONTENT_TYPE_MAP: {
   blogArticle: {
     name: ContentType.blogArticle,
     transformer: blogArticlesTransformer,
+  },
+  blogArticleTitles: {
+    name: InferredContentTypes.blogArticleTitles,
+    transformer: blogArticleTitlesTransformer,
+    inferredFrom: ContentType.blogArticle,
   },
   blogHome: {
     name: ContentType.blogHome,
