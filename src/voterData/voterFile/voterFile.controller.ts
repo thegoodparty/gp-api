@@ -27,6 +27,7 @@ import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampai
 import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { VoterOutreachService } from '../voterOutreach.service'
+import { MimeTypes } from 'http-constants-ts'
 
 export const VOTER_FILE_ROUTE = 'voter-data/voter-file'
 
@@ -61,7 +62,15 @@ export class VoterFileController {
   @Post('schedule')
   @UseCampaign()
   @UseGuards(CanDownloadVoterFileGuard)
-  @UseInterceptors(FilesInterceptor('image'))
+  @UseInterceptors(
+    FilesInterceptor('image', {
+      mimeTypes: [
+        MimeTypes.IMAGE_JPEG,
+        MimeTypes.IMAGE_GIF,
+        MimeTypes.IMAGE_PNG,
+      ],
+    }),
+  )
   scheduleOutreachCampaign(
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
