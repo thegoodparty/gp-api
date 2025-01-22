@@ -225,6 +225,12 @@ export class FullStoryService {
     resultCounts: SyncTrackingResultCounts,
     campaign: CampaignWith<'pathToVictory'>,
   ) {
+    if (campaign.data?.hubSpotUpdates) {
+      return {
+        ...resultCounts,
+        skipped: resultCounts.skipped + 1,
+      }
+    }
     try {
       const user = await this.users.findUser({ id: campaign.userId })
       await limiter.schedule(() =>
@@ -236,12 +242,17 @@ export class FullStoryService {
           ),
         ),
       )
-      resultCounts.updated++
+      return {
+        ...resultCounts,
+        updated: resultCounts.updated + 1,
+      }
     } catch (error) {
       this.logger.error(`Failed to track campaign ${campaign.id}`, error)
-      resultCounts.failed++
+      return {
+        ...resultCounts,
+        failed: resultCounts.failed + 1,
+      }
     }
-    return resultCounts
   }
 
   async trackCampaigns(campaigns: CampaignWith<'pathToVictory'>[]) {
