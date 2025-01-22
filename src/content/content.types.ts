@@ -257,7 +257,7 @@ export type BlogSectionRaw = {
   }
 }
 
-export type BlogSections = {
+export type BlogSection = {
   fields: {
     title: string
     subtitle: string
@@ -267,7 +267,7 @@ export type BlogSections = {
   id: string
   slug: string
   tags: []
-  articles: BlogArticleHighlight[]
+  articles: BlogArticleHighlight[] | undefined
   order: number
 }
 
@@ -434,6 +434,22 @@ export type GoodPartyTeamMembersRaw = {
   data: {
     name: string
     members: TeamMember[]
+  }
+}
+
+export type Hero = {
+  id: string
+  title: string
+  mainImage: ContentMedia
+  publishDate: string
+  slug: string
+  summary: string
+  section?: HeroSection
+}
+
+type HeroSection = {
+  fields: {
+    title: string
   }
 }
 

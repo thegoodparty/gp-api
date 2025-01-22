@@ -2,7 +2,7 @@ import {
   BlogArticleContentRaw,
   BlogSectionRaw,
   Transformer,
-  BlogSections,
+  BlogSection,
   TYPE_BLOG_ARTICLE,
   TYPE_BLOG_SECTION,
 } from '../content.types'
@@ -10,10 +10,10 @@ import { transformContentMedia } from '../util/transformContentMedia.util'
 
 export const blogSectionsTransformer: Transformer<
   BlogSectionRaw | BlogArticleContentRaw,
-  BlogSections
+  BlogSection
 > = (
   sectionOrArticle: (BlogSectionRaw | BlogArticleContentRaw)[],
-): BlogSections[] => {
+): BlogSection[] => {
   const sectionsById = {}
   for (const item of sectionOrArticle) {
     if (item.type === TYPE_BLOG_SECTION) {
