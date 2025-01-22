@@ -58,7 +58,7 @@ type CustomPurpose = (typeof CUSTOM_PURPOSES)[number]
 // TODO: store this in DB table? (currently in campaign.data)
 export type CustomVoterFile = {
   name: string
-  channel: CustomChannel
+  channel?: CustomChannel
   purpose?: CustomPurpose
   filters: CustomFilter[]
   createdAt: string

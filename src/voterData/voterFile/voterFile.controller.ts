@@ -1,14 +1,15 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
   Logger,
-  NotImplementedException,
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { VoterFileService } from './voterFile.service'
@@ -21,13 +22,23 @@ import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { Campaign, User } from '@prisma/client'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
+import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
+import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
+import { FileUpload } from 'src/files/files.types'
+import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
+import { VoterOutreachService } from '../voterOutreach.service'
 
-@Controller('voter-data/voter-file')
+export const VOTER_FILE_ROUTE = 'voter-data/voter-file'
+
+@Controller(VOTER_FILE_ROUTE)
 @UsePipes(ZodValidationPipe)
 export class VoterFileController {
   private readonly logger = new Logger(VoterFileController.name)
 
-  constructor(private readonly voterFileService: VoterFileService) {}
+  constructor(
+    private readonly voterFileService: VoterFileService,
+    private readonly voterOutreachService: VoterOutreachService,
+  ) {}
 
   @Get()
   @UseCampaign({
@@ -46,9 +57,25 @@ export class VoterFileController {
     return this.voterFileService.wakeUp()
   }
 
+  // TODO: this should maybe live alongside future campaign planning feature
   @Post('schedule')
-  schedule() {
-    throw new NotImplementedException()
+  @UseCampaign()
+  @UseGuards(CanDownloadVoterFileGuard)
+  @UseInterceptors(FilesInterceptor('image'))
+  scheduleOutreachCampaign(
+    @ReqUser() user: User,
+    @ReqCampaign() campaign: Campaign,
+    @Body() body: ScheduleOutreachCampaignSchema,
+    @ReqFile() image?: FileUpload,
+  ) {
+    if (!image) throw new BadRequestException('No image file provided')
+
+    return this.voterOutreachService.scheduleOutreachCampaign(
+      user,
+      campaign,
+      body,
+      image,
+    )
   }
 
   @Post('help-message')
