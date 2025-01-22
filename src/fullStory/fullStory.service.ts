@@ -33,9 +33,8 @@ import Bottleneck from 'bottleneck'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
-
 const { FULLSTORY_API_KEY, ENABLE_FULLSTORY } = process.env
-
+const enableFullStory = ENABLE_FULLSTORY === 'true'
 const FULLSTORY_ROOT_USERS_URL = 'https://api.fullstory.com/v2/users'
 
 // TODO: Move these to the CRM module when implemented
@@ -65,15 +64,15 @@ export class FullStoryService {
       [AUTHORIZATION]: `Basic ${FULLSTORY_API_KEY}`,
     },
   }
+  private readonly disabled =
+    !enableFullStory && (!FULLSTORY_API_KEY || !IS_PROD)
+
   constructor(
     private readonly users: UsersService,
     @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: CampaignsService,
     private readonly httpService: HttpService,
   ) {}
-
-  private readonly disabled =
-    !ENABLE_FULLSTORY && (!FULLSTORY_API_KEY || !IS_PROD)
 
   private getTrackingProperties(
     campaign: Campaign,
@@ -197,6 +196,11 @@ export class FullStoryService {
     user: User,
     properties: TrackingProperties,
   ) {
+    this.logger.debug(`this.disabled: ${this.disabled}`)
+    if (this.disabled) {
+      this.logger.warn(`FullStory is disabled`)
+      return
+    }
     const fullStoryUserId = await this.getFullStoryUserId(user)
     if (!fullStoryUserId) {
       throw new BadGatewayException('Could not resolve FullStory user ID')
@@ -256,10 +260,7 @@ export class FullStoryService {
 
   async trackByUserId(userId: number) {
     const user = await this.users.findUser({ id: userId })
-    this.logger.debug(`this.disabled: ${this.disabled}`)
-
-    if (this.disabled || !user) {
-      this.logger.warn(`FullStory is disabled`)
+    if (!user) {
       return
     }
 
