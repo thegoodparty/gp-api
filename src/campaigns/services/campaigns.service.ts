@@ -42,7 +42,7 @@ export class CampaignsService {
   }
   // TODO: Figure out an explicit return type that doesn't require
   // the return value to be cast to make included properties recognized by TS
-  findAll(args: Prisma.CampaignFindManyArgs) {
+  findAll(args?: Prisma.CampaignFindManyArgs) {
     return this.prisma.campaign.findMany(args)
   }
 
@@ -111,7 +111,7 @@ export class CampaignsService {
       args.where as Prisma.UserWhereUniqueInput,
     )
 
-    user && (await this.fullstoryService.trackUser(user.id))
+    user && (await this.fullstoryService.trackByUserId(user.id))
     return this.prisma.campaign.update(args)
   }
 
@@ -162,7 +162,7 @@ export class CampaignsService {
 
       const user = await this.usersService.findUser({ id: campaign.userId })
 
-      user && (await this.fullstoryService.trackUser(user.id))
+      user && (await this.fullstoryService.trackByUserId(user.id))
 
       return tx.campaign.update({
         where: { id: campaign.id },

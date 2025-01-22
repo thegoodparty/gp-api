@@ -2,16 +2,24 @@ import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common'
 import { FullStoryService } from './fullStory.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
+import { CampaignWith } from '../campaigns/campaigns.types'
+import { CampaignsService } from '../campaigns/services/campaigns.service'
 
 @Controller('integrations')
 export class FullStoryController {
-  constructor(private readonly fullstory: FullStoryService) {}
+  constructor(
+    private readonly fullstory: FullStoryService,
+    private readonly campaigns: CampaignsService,
+  ) {}
 
   @Get('fullstory-sync')
   @HttpCode(HttpStatus.ACCEPTED)
-  async syncFullStoryUsers(@ReqUser() user: User) {
-    // No await here, we don't need to wait for this to finish to just respond with a 202
-    this.fullstory.trackUser(user.id)
-    return 'FullStory users synced'
+  async syncFullStoryUsers() {
+    // No need for await here to return immediately
+    this.fullstory.trackCampaigns(
+      (await this.campaigns.findAll({
+        include: { pathToVictory: true },
+      })) as CampaignWith<'pathToVictory'>[],
+    )
   }
 }
