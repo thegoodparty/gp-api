@@ -1,4 +1,11 @@
-import { forwardRef, HttpStatus, Inject, Injectable } from '@nestjs/common'
+import {
+  BadGatewayException,
+  forwardRef,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom, Observable } from 'rxjs'
@@ -20,7 +27,7 @@ const { APPLICATION_JSON } = MimeTypes
 
 const { FULLSTORY_API_KEY, ENABLE_FULLSTORY } = process.env
 
-const FULLSTORY_ROOT_USERS_URL = 'https://org.fullstory.com/api/v2/users'
+const FULLSTORY_ROOT_USERS_URL = 'https://api.fullstory.com/v2/users'
 
 // TODO: Move these to the CRM module when implemented
 type CRMCompanyProperties = {
@@ -30,6 +37,7 @@ type CRMCompanyProperties = {
 
 @Injectable()
 export class FullStoryService {
+  private readonly logger = new Logger(FullStoryService.name)
   private readonly axiosConfig = {
     headers: {
       [CONTENT_TYPE]: APPLICATION_JSON,
@@ -47,7 +55,9 @@ export class FullStoryService {
     !ENABLE_FULLSTORY && (!FULLSTORY_API_KEY || !IS_PROD)
 
   async getFullStoryUserId({ id: userId, firstName, lastName }: User) {
+    this.logger.debug(`this.disabled: ${this.disabled}`)
     if (this.disabled) {
+      this.logger.warn(`FullStory is disabled`)
       return
     }
     try {
@@ -78,9 +88,7 @@ export class FullStoryService {
             this.axiosConfig,
           ),
         )
-        const fsUserId = createResponse.data.id
-        await this.users.patchUserMetaData(userId, { fsUserId })
-        return fsUserId
+        return createResponse.data.id
       } else {
         throw error
       }
@@ -89,7 +97,10 @@ export class FullStoryService {
 
   async trackUser(userId: number) {
     const user = await this.users.findUser({ id: userId })
+    this.logger.debug(`this.disabled: ${this.disabled}`)
+
     if (this.disabled || !user) {
+      this.logger.warn(`FullStory is disabled`)
       return
     }
 
@@ -169,10 +180,31 @@ export class FullStoryService {
       ...generateAiContentTrackingFlags(aiContent),
     }
 
-    return this.httpService.post(
-      `${FULLSTORY_ROOT_USERS_URL}/${await this.getFullStoryUserId(user)}`,
-      { properties },
-      this.axiosConfig,
+    // No await here. Fire and forget to avoid blocking the request
+    this.makeTrackingRequest(user, properties)
+  }
+
+  private async makeTrackingRequest(
+    user: User,
+    properties: Record<string, any>,
+  ) {
+    const fullStoryUserId = await this.getFullStoryUserId(user)
+    if (!fullStoryUserId) {
+      throw new BadGatewayException('Could not resolve FullStory user ID')
+    }
+    if (user.metaData?.fsUserId !== fullStoryUserId) {
+      this.users.patchUserMetaData(user.id, { fsUserId: fullStoryUserId })
+    }
+    const url = `${FULLSTORY_ROOT_USERS_URL}/${fullStoryUserId}`
+    this.logger.debug('Fullstory tracking url: ', url)
+    this.logger.debug('Fullstory tracking properties: ', properties)
+    const result = await lastValueFrom(
+      this.httpService.post(url, { properties }, this.axiosConfig),
+    )
+    const { status, statusText, data } = result
+    this.logger.debug(
+      `Fullstory tracking result: ${status} ${statusText}`,
+      data,
     )
   }
 }
