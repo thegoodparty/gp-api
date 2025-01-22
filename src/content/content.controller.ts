@@ -112,7 +112,6 @@ export class ContentController {
       }
       return { sections: results, hero: hero, sectionIndex }
     } else {
-      console.log('No param found, entering else')
       const sections: BlogSection[] = await this.contentService.findByType(
         InferredContentTypes.blogSections,
       )
@@ -135,7 +134,6 @@ export class ContentController {
       for (let i = 0; i < sections.length; i++) {
         sectionIndex = i
         const section = sections[i]
-        console.log('Entering loop')
         if (!section.articles || section.articles.length < 5) continue
         section.slug = section.fields.slug
         if (section.articles[0].id === hero.id) {
