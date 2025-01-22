@@ -64,6 +64,7 @@ export class VoterFileController {
   @UseGuards(CanDownloadVoterFileGuard)
   @UseInterceptors(
     FilesInterceptor('image', {
+      mode: 'stream',
       mimeTypes: [
         MimeTypes.IMAGE_JPEG,
         MimeTypes.IMAGE_GIF,
