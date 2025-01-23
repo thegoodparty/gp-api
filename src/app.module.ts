@@ -18,13 +18,9 @@ import { AdminModule } from './admin/admin.module'
 import { QueueConsumerModule } from './queue/consumer/consumer.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
 import { SharedModule } from './shared/shared.module'
-import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { VoterDataModule } from './voterData/voterData.module'
-import { FullStoryModule } from './fullStory/fullStory.module'
-import { FilesModule } from './files/files.module'
-import { AwsModule } from './aws/aws.module'
 
 @Module({
   imports: [
@@ -42,13 +38,9 @@ import { AwsModule } from './aws/aws.module'
     AdminModule,
     QueueConsumerModule,
     SharedModule,
-    GraphqlModule,
     PaymentsModule,
     ErrorLoggerModule,
     VoterDataModule,
-    FullStoryModule,
-    FilesModule,
-    AwsModule,
   ],
   controllers: [AppController],
   providers: [
