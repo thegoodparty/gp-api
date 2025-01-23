@@ -107,12 +107,10 @@ export class CampaignsService {
   }
 
   async update(args: Prisma.CampaignUpdateArgs) {
-    const user = await this.usersService.findUser(
-      args.where as Prisma.UserWhereUniqueInput,
-    )
-
-    user && (await this.fullstoryService.trackByUserId(user.id))
-    return this.prisma.campaign.update(args)
+    const campaign = await this.prisma.campaign.update(args)
+    campaign?.userId &&
+      (await this.fullstoryService.trackByUserId(campaign.userId))
+    return campaign
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
@@ -160,9 +158,8 @@ export class CampaignsService {
       //   sails.helpers.log(campaign.slug, 'error updating crm', e)
       // }
 
-      const user = await this.usersService.findUser({ id: campaign.userId })
-
-      user && (await this.fullstoryService.trackByUserId(user.id))
+      campaign.userId &&
+        (await this.fullstoryService.trackByUserId(campaign.userId))
 
       return tx.campaign.update({
         where: { id: campaign.id },
