@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { MapCampaign } from './campaignMap.types'
 import { RaceData } from 'src/races/races.types'
-import { PrismaService } from 'src/prisma/prisma.service'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
@@ -16,7 +15,6 @@ type CampaignWithUser = Campaign & {
 @Injectable()
 export class CampaignMapService {
   constructor(
-    private readonly prisma: PrismaService,
     private readonly campaignsService: CampaignsService,
     private readonly geocodingService: GeocodingService,
     private readonly racesService: RacesService,

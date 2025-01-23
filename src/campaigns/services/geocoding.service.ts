@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { CampaignsService } from './campaigns.service'
 import * as ngeohash from 'ngeohash'
 
@@ -18,7 +18,6 @@ interface GeocodeLocation {
 
 @Injectable()
 export class GeocodingService {
-  private readonly logger = new Logger(GeocodingService.name)
   constructor(private readonly campaignsService: CampaignsService) {}
 
   async handleGeoLocation(

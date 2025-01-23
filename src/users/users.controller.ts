@@ -72,7 +72,7 @@ export class UsersController {
     @ReqUser() user: User,
     @Body() { meta }: UpdateMetadataSchema,
   ) {
-    return this.usersService.patchUserMetaData(user, meta)
+    return this.usersService.patchUserMetaData(user.id, meta)
   }
 
   @Post('me/upload-image')
