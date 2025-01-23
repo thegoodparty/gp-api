@@ -68,8 +68,8 @@ export class FullStoryService {
     !enableFullStory && (!FULLSTORY_API_KEY || !IS_PROD)
 
   constructor(
+    @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
-    @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: CampaignsService,
     private readonly httpService: HttpService,
   ) {}
@@ -269,7 +269,7 @@ export class FullStoryService {
     return resultCounts
   }
 
-  async trackByUserId(userId: number) {
+  async trackUserById(userId: number) {
     const user = await this.users.findUser({ id: userId })
     if (!user) {
       return

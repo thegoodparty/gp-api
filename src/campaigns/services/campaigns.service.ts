@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -23,7 +25,6 @@ import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-import { FullStoryService } from '../../fullStory/fullStory.service'
 
 @Injectable()
 export class CampaignsService {
@@ -32,9 +33,9 @@ export class CampaignsService {
   constructor(
     private prisma: PrismaService,
     private planVersionService: CampaignPlanVersionsService,
+    @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
     private emailService: EmailService,
-    private fullstoryService: FullStoryService,
   ) {}
 
   count(args: Prisma.CampaignCountArgs) {
@@ -108,8 +109,7 @@ export class CampaignsService {
 
   async update(args: Prisma.CampaignUpdateArgs) {
     const campaign = await this.prisma.campaign.update(args)
-    campaign?.userId &&
-      (await this.fullstoryService.trackByUserId(campaign.userId))
+    campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
     return campaign
   }
 
@@ -159,7 +159,7 @@ export class CampaignsService {
       // }
 
       campaign.userId &&
-        (await this.fullstoryService.trackByUserId(campaign.userId))
+        (await this.usersService.trackUserById(campaign.userId))
 
       return tx.campaign.update({
         where: { id: campaign.id },

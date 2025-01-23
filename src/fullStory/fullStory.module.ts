@@ -8,7 +8,7 @@ import { FullStoryController } from './fullStory.controller'
 @Module({
   providers: [FullStoryService],
   exports: [FullStoryService],
-  imports: [UsersModule, forwardRef(() => CampaignsModule), HttpModule],
+  imports: [forwardRef(() => UsersModule), CampaignsModule, HttpModule],
   controllers: [FullStoryController],
 })
 export class FullStoryModule {}

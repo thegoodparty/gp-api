@@ -1,7 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common'
 import { CampaignsController } from './campaigns.controller'
 import { CampaignsService } from './services/campaigns.service'
-import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { CampaignMapController } from './map/campaignMap.controller'
 import { CampaignMapService } from './map/campaignMap.service'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
@@ -11,16 +10,9 @@ import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { UsersModule } from 'src/users/users.module'
 import { GeocodingService } from './services/geocoding.service'
 import { RacesModule } from 'src/races/races.module'
-import { FullStoryModule } from '../fullStory/fullStory.module'
 
 @Module({
-  imports: [
-    EmailModule,
-    UsersModule,
-    RacesModule,
-    forwardRef(() => CampaignsAiModule),
-    FullStoryModule,
-  ],
+  imports: [EmailModule, forwardRef(() => UsersModule), RacesModule],
   controllers: [
     CampaignsController,
     CampaignPositionsController,

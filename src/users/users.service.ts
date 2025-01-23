@@ -5,10 +5,14 @@ import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
+import { FullStoryService } from '../fullStory/fullStory.service'
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly fullstory: FullStoryService,
+  ) {}
 
   findAllUsers(where?: Prisma.UserWhereInput) {
     return this.prisma.user.findMany({ where })
@@ -154,5 +158,9 @@ export class UsersService {
         id,
       },
     })
+  }
+
+  trackUserById(userId: number) {
+    return this.fullstory.trackUserById(userId)
   }
 }

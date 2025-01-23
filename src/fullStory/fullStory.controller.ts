@@ -1,7 +1,5 @@
 import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common'
 import { FullStoryService } from './fullStory.service'
-import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
 import { CampaignWith } from '../campaigns/campaigns.types'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
 
