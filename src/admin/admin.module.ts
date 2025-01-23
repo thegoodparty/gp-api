@@ -6,9 +6,10 @@ import { UsersModule } from 'src/users/users.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { AdminP2VService } from './services/adminP2V.service'
 import { AdminUsersController } from './users/adminUsers.controller'
+import { AuthenticationModule } from 'src/authentication/authentication.module'
 
 @Module({
-  imports: [EmailModule, UsersModule, CampaignsModule],
+  imports: [EmailModule, UsersModule, CampaignsModule, AuthenticationModule],
   controllers: [AdminCampaignsController, AdminUsersController],
   providers: [AdminCampaignsService, AdminP2VService],
 })
