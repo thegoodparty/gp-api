@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -22,13 +23,13 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 @UsePipes(ZodValidationPipe)
 export class AdminCampaignsController {
   constructor(
-    private readonly adminCampaignsService: AdminCampaignsService,
-    private readonly campaignsService: CampaignsService,
+    private readonly adminCampaigns: AdminCampaignsService,
+    private readonly campaigns: CampaignsService,
   ) {}
 
   @Post()
   create(@Body() body: AdminCreateCampaignSchema) {
-    return this.adminCampaignsService.create(body)
+    return this.adminCampaigns.create(body)
   }
 
   @Put(':id')
@@ -36,18 +37,23 @@ export class AdminCampaignsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AdminUpdateCampaignSchema,
   ) {
-    return this.adminCampaignsService.update(id, body)
+    return this.adminCampaigns.update(id, body)
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id', ParseIntPipe) id: number) {
-    return this.campaignsService.delete({ where: { id } })
+    return this.campaigns.delete({ where: { id } })
   }
 
   @Post(':id/send-victory-email')
   @HttpCode(HttpStatus.NO_CONTENT)
   sendVictoryEmail(@Param('id', ParseIntPipe) id: number) {
-    return this.adminCampaignsService.sendVictoryEmail(id)
+    return this.adminCampaigns.sendVictoryEmail(id)
+  }
+
+  @Get('pro-no-voter-file')
+  proCampaignsWithNoVoterFile() {
+    return this.adminCampaigns.proNoVoterFile()
   }
 }

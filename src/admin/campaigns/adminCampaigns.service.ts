@@ -1,34 +1,32 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Campaign, Prisma, PrismaClient } from '@prisma/client'
+import { Campaign, Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { getFullName } from 'src/users/util/users.util'
 import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
-import { OnboardingStep } from 'src/campaigns/campaigns.types'
+import { CampaignWith, OnboardingStep } from 'src/campaigns/campaigns.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-
-type CampaignWithRelations = Prisma.CampaignGetPayload<{
-  include: { pathToVictory: true; user: true }
-}>
+import { VoterFileService } from 'src/voterData/voterFile/voterFile.service'
 
 @Injectable()
 export class AdminCampaignsService {
   constructor(
-    private emailService: EmailService,
-    private usersService: UsersService,
-    private campaignsService: CampaignsService,
-    private adminP2VService: AdminP2VService,
+    private readonly email: EmailService,
+    private readonly users: UsersService,
+    private readonly campaigns: CampaignsService,
+    private readonly adminP2V: AdminP2VService,
+    private readonly voterFile: VoterFileService,
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
     const { firstName, lastName, email, zip, phone, party, otherParty } = body
 
     // create new user
-    const user = await this.usersService.createUser({
+    const user = await this.users.createUser({
       firstName,
       lastName,
       email,
@@ -37,7 +35,7 @@ export class AdminCampaignsService {
     })
 
     // find slug
-    const slug = await this.campaignsService.findSlug(user)
+    const slug = await this.campaigns.findSlug(user)
     const data = {
       slug,
       currentStep: OnboardingStep.complete,
@@ -47,7 +45,7 @@ export class AdminCampaignsService {
     }
 
     // create new campaign
-    const newCampaign = await this.campaignsService.create({
+    const newCampaign = await this.campaigns.create({
       data: {
         slug,
         data,
@@ -85,7 +83,7 @@ export class AdminCampaignsService {
       attributes.tier = tier
     }
 
-    const updatedCampaign = await this.campaignsService.update({
+    const updatedCampaign = await this.campaigns.update({
       where: { id },
       data: attributes,
     })
@@ -96,11 +94,39 @@ export class AdminCampaignsService {
     return updatedCampaign
   }
 
+  async proNoVoterFile() {
+    const campaigns = (await this.campaigns.findAll({
+      where: {
+        NOT: {
+          userId: undefined,
+        },
+        isPro: true,
+      },
+      include: {
+        pathToVictory: true,
+      },
+    })) as CampaignWith<'pathToVictory'>[]
+
+    const noVoterFile: Campaign[] = []
+
+    // TODO: this check could probably be integrated into the above query
+    for (const campaign of campaigns) {
+      const canDownload = await this.voterFile.canDownload(
+        campaign as CampaignWith<'pathToVictory'>,
+      )
+      if (!canDownload) {
+        noVoterFile.push(campaign)
+      }
+    }
+
+    return noVoterFile
+  }
+
   async sendVictoryEmail(id: number) {
-    const campaign = (await this.campaignsService.findFirstOrThrow({
+    const campaign = (await this.campaigns.findFirstOrThrow({
       where: { id },
       include: { user: true, pathToVictory: true },
-    })) as CampaignWithRelations
+    })) as CampaignWith<'pathToVictory' | 'user'>
 
     const { pathToVictory, user } = campaign
 
@@ -111,7 +137,7 @@ export class AdminCampaignsService {
       throw new BadRequestException('Campaign has no user')
     }
 
-    await this.adminP2VService.completeP2V(user.id, pathToVictory)
+    await this.adminP2V.completeP2V(user.id, pathToVictory)
 
     if (campaign?.data?.createdBy !== 'admin') {
       const variables = {
@@ -119,7 +145,7 @@ export class AdminCampaignsService {
         link: `${WEBAPP_ROOT}/dashboard`,
       }
 
-      await this.emailService.sendTemplateEmail({
+      await this.email.sendTemplateEmail({
         to: user.email,
         subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
         template: EmailTemplateNames.candidateVictoryReady,
