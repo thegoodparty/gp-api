@@ -255,7 +255,10 @@ export class FullStoryService {
     }
   }
 
-  async trackCampaigns(campaigns: CampaignWith<'pathToVictory'>[]) {
+  async trackCampaigns() {
+    const campaigns = await this.campaigns.findAll({
+      include: { pathToVictory: true },
+    })
     const resultCounts = await reduceAsync(
       campaigns,
       {
