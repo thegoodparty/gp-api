@@ -11,7 +11,7 @@ export class CampaignUpdateHistoryService extends BasePrismaService<'campaignUpd
   }
 
   create(campaign: Campaign, { type, quantity }: CreateUpdateHistorySchema) {
-    return this.client.create({
+    return this.model.create({
       data: {
         type,
         quantity,
@@ -45,6 +45,6 @@ export class CampaignUpdateHistoryService extends BasePrismaService<'campaignUpd
       })
     }
 
-    return this.client.delete({ where: { id } })
+    return this.model.delete({ where: { id } })
   }
 }

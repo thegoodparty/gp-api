@@ -32,21 +32,21 @@ export abstract class BasePrismaService<T extends PrismaModelNames>
   implements OnModuleInit
 {
   @Inject(PrismaService)
-  private readonly prisma!: PrismaService
+  private readonly _prisma!: PrismaService
 
   protected readonly logger = new Logger(this.constructor.name)
 
   protected constructor(protected readonly modelName: T) {}
 
-  protected get client(): PrismaClient[T] {
+  protected get model(): PrismaClient[T] {
     // allows child class to use only their specified model
-    return this.prisma[this.modelName]
+    return this._prisma[this.modelName]
   }
 
   onModuleInit() {
     // make PASSTHROUGH_METHODS directly available on child class as public methods
     for (const method of PASSTHROUGH_METHODS) {
-      this[method] = this.client[method].bind(this.client)
+      this[method] = this.model[method].bind(this.model)
     }
   }
 }
