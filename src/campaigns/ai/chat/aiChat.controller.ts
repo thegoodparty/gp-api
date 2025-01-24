@@ -35,7 +35,7 @@ export class AiChatController {
 
   @Get()
   async list(@ReqUser() { id: userId }: User) {
-    const aiChats = await this.aiChatService.findAll(userId)
+    const aiChats = await this.aiChatService.findMany({ where: { userId } })
 
     const chats: { threadId: string; updatedAt: Date; name: string }[] = []
     for (const chat of aiChats) {
@@ -55,7 +55,9 @@ export class AiChatController {
     @ReqUser() { id: userId }: User,
     @Param('threadId') threadId: string,
   ) {
-    const aiChat = await this.aiChatService.findOneOrThrow(threadId, userId)
+    const aiChat = await this.aiChatService.findUniqueOrThrow({
+      where: { threadId, userId },
+    })
     const chatData = aiChat.data
 
     return {

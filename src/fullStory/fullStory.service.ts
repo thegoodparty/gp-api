@@ -256,7 +256,7 @@ export class FullStoryService {
   }
 
   async trackCampaigns() {
-    const campaigns = await this.campaigns.findAll({
+    const campaigns = await this.campaigns.findMany({
       include: { pathToVictory: true },
     })
     const resultCounts = await reduceAsync(

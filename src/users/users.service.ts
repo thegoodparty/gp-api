@@ -1,37 +1,26 @@
 import { ConflictException, Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
 import { FullStoryService } from '../fullStory/fullStory.service'
+import { BasePrismaService } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class UsersService {
-  constructor(
-    private prisma: PrismaService,
-    private readonly fullstory: FullStoryService,
-  ) {}
-
-  findAllUsers(where?: Prisma.UserWhereInput) {
-    return this.prisma.user.findMany({ where })
+export class UsersService extends BasePrismaService<'user'> {
+  constructor(private readonly fullstory: FullStoryService) {
+    super('user')
   }
 
   findUser(where: Prisma.UserWhereUniqueInput) {
-    return this.prisma.user.findUnique({
-      where,
-    })
-  }
-
-  findUserOrThrow(where: Prisma.UserWhereUniqueInput) {
-    return this.prisma.user.findUniqueOrThrow({
+    return this.findUnique({
       where,
     })
   }
 
   findUserByEmail(email: string) {
-    return this.prisma.user.findFirst({
+    return this.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
     })
   }
@@ -41,7 +30,7 @@ export class UsersService {
   }
 
   async findByCustomerId(customerId: string) {
-    return this.prisma.user.findFirst({
+    return this.findFirst({
       where: {
         metaData: {
           path: ['customerId'],
@@ -52,7 +41,7 @@ export class UsersService {
   }
 
   findUserByResetToken(email: string, token: string) {
-    return this.prisma.user.findFirstOrThrow({
+    return this.findFirstOrThrow({
       where: {
         email: { equals: email, mode: 'insensitive' },
         passwordResetToken: token,
@@ -65,7 +54,7 @@ export class UsersService {
     password: string,
     clearResetToken?: boolean,
   ) {
-    return this.prisma.user.update({
+    return this.model.update({
       where: { id: userId },
       data: {
         // hash password
@@ -77,7 +66,7 @@ export class UsersService {
   }
 
   setResetToken(userId: number, passwordResetToken: string) {
-    return this.prisma.user.update({
+    return this.model.update({
       where: { id: userId },
       data: {
         passwordResetToken,
@@ -113,7 +102,7 @@ export class UsersService {
       ...(zip ? { zip } : {}),
     })
 
-    return this.prisma.user.create({
+    return this.model.create({
       data: {
         ...userData,
         ...trimmed,
@@ -127,7 +116,7 @@ export class UsersService {
     where: Prisma.UserWhereUniqueInput,
     data: Prisma.UserUpdateInput,
   ) {
-    return this.prisma.user.update({
+    return this.model.update({
       where,
       data,
     })
@@ -153,7 +142,7 @@ export class UsersService {
   }
 
   async deleteUser(id: number) {
-    return this.prisma.user.delete({
+    return this.model.delete({
       where: {
         id,
       },

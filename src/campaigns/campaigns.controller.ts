@@ -59,7 +59,7 @@ export class CampaignsController {
         },
       },
     }
-    return this.campaignsService.findAll({ where, include })
+    return this.campaignsService.findMany({ where, include })
   }
 
   @Get('mine')

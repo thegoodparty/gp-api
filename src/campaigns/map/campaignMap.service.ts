@@ -6,7 +6,7 @@ import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
 import { subDays } from 'date-fns'
 import { GeocodingService } from '../services/geocoding.service'
-import { RacesService } from 'src/races/races.service'
+import { RacesService } from 'src/races/services/races.service'
 
 type CampaignWithUser = Campaign & {
   user: Pick<User, 'firstName' | 'lastName' | 'avatar'>
@@ -116,7 +116,7 @@ export class CampaignMapService {
       }
     }
 
-    const campaigns = (await this.campaignsService.findAll({
+    const campaigns = (await this.campaignsService.findMany({
       where,
       include: {
         user: {
