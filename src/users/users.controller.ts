@@ -11,6 +11,7 @@ import {
   Param,
   Post,
   Put,
+  UnauthorizedException,
   UseGuards,
   UseInterceptors,
   UsePipes,
@@ -28,6 +29,8 @@ import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
+import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
+import { AuthenticationService } from '../authentication/authentication.service'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
@@ -37,6 +40,7 @@ export class UsersController {
   constructor(
     private usersService: UsersService,
     private readonly filesService: FilesService,
+    private readonly authenticationService: AuthenticationService,
   ) {}
 
   @UseGuards(UserOwnerOrAdminGuard)
@@ -121,5 +125,29 @@ export class UsersController {
     return {
       signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
     }
+  }
+
+  @UseGuards(UserOwnerOrAdminGuard)
+  @Put('/:id/password')
+  async updatePassword(
+    @Body() body: UpdatePasswordSchemaDto,
+    @ReqUser() user: User,
+  ) {
+    const { hasPassword, password } = user
+    const { newPassword, oldPassword } = body
+    if (hasPassword && !oldPassword) {
+      throw new BadRequestException('oldPassword is required')
+    }
+    if (oldPassword) {
+      const passwordValidated =
+        await this.authenticationService.validatePassword(
+          oldPassword,
+          password || '',
+        )
+      if (!passwordValidated) {
+        throw new UnauthorizedException('Invalid password')
+      }
+    }
+    return this.usersService.updatePassword(user.id, newPassword)
   }
 }

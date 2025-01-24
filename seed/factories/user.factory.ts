@@ -18,6 +18,7 @@ export const userFactory = generateFactory<User>(() => {
     name,
     email: faker.internet.email().toLowerCase(),
     password: generateRandomPassword(),
+    hasPassword: true,
     phone: faker.string.numeric({ length: 10, allowLeadingZeros: false }),
     zip: faker.location.zipCode(),
     roles: [faker.helpers.arrayElement(seedRoles)],
