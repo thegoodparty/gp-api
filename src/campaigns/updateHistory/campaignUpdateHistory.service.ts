@@ -1,0 +1,50 @@
+import { Injectable } from '@nestjs/common'
+import { CampaignsService } from '../services/campaigns.service'
+import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
+import { Campaign } from '@prisma/client'
+
+@Injectable()
+export class CampaignUpdateHistoryService extends BasePrismaService<'campaignUpdateHistory'> {
+  constructor(private readonly campaigns: CampaignsService) {
+    super('campaignUpdateHistory')
+  }
+
+  create(campaign: Campaign, { type, quantity }: CreateUpdateHistorySchema) {
+    return this.client.create({
+      data: {
+        type,
+        quantity,
+        campaignId: campaign.id,
+        userId: campaign.userId,
+      },
+    })
+  }
+
+  async delete(id: number) {
+    const existing = await this.findFirstOrThrow({
+      where: { id },
+      include: { campaign: true },
+    })
+
+    const { campaign } = existing
+    const { data } = campaign
+    const { reportedVoterGoals } = data
+    const existingType = existing.type
+
+    if (reportedVoterGoals?.[existingType] && existing.quantity) {
+      reportedVoterGoals[existingType] -= existing.quantity
+
+      data.reportedVoterGoals = { ...reportedVoterGoals }
+
+      await this.campaigns.update({
+        where: { id: campaign.id },
+        data: {
+          data,
+        },
+      })
+    }
+
+    return this.client.delete({ where: { id } })
+  }
+}
