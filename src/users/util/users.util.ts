@@ -16,3 +16,7 @@ export function userHasRole(user: User, roleOrRoles: UserRole | UserRole[]) {
 
   return userRoles.includes(roleOrRoles)
 }
+
+export function isAdmin(user: User) {
+  return userHasRole(user, UserRole.admin)
+}

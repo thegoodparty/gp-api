@@ -47,24 +47,29 @@ export default async function seedCampaigns(
 
   for (let i = 0; i < loopLength; i++) {
     if (i < FIXED_CAMPAIGNS.length) {
-      const { campaignId, fakeP2V, fakeUpdateHistory } =
-        await createCampaignAndUser(existingUsers, prisma, FIXED_CAMPAIGNS[i])
+      const { campaignId, p2V, updateHistory } = await createCampaignAndUser(
+        existingUsers,
+        prisma,
+        FIXED_CAMPAIGNS[i],
+      )
 
       campaignIds.push(campaignId)
-      fakeP2Vs.push(fakeP2V)
-      fakeUpdateHistory.push(...fakeUpdateHistory)
+      fakeP2Vs.push(p2V)
+      fakeUpdateHistory.push(...updateHistory)
     }
     if (i < NUM_GENERATED_CAMPAIGNS) {
       const creationData = await createCampaignAndUser(existingUsers, prisma)
-      const { campaignId, fakeP2V, fakeUpdateHistory } = creationData
+      const { campaignId, p2V, updateHistory } = creationData
 
       campaignIds.push(campaignId)
-      fakeP2Vs.push(fakeP2V)
-      fakeUpdateHistory.push(...fakeUpdateHistory)
+      fakeP2Vs.push(p2V)
+      fakeUpdateHistory.push(...updateHistory)
     }
   }
 
-  await prisma.campaignUpdateHistory.createMany({ data: fakeUpdateHistory })
+  await prisma.campaignUpdateHistory.createMany({
+    data: fakeUpdateHistory,
+  })
   await prisma.pathToVictory.createMany({ data: fakeP2Vs })
 
   console.log(`Created ${campaignIds.length} campaigns`)
@@ -78,8 +83,8 @@ async function createCampaignAndUser(
   fixedData?: Partial<Campaign>,
 ): Promise<{
   campaignId: number
-  fakeP2V: FakeP2V
-  fakeUpdateHistory: CampaignUpdateHistory[]
+  p2V: FakeP2V
+  updateHistory: CampaignUpdateHistory[]
 }> {
   const user = await handleUserCreation(prisma, existingUsers)
   const campaign: Campaign = await prisma.campaign.create({
@@ -92,8 +97,8 @@ async function createCampaignAndUser(
 
   return {
     campaignId: campaign.id,
-    fakeP2V: pathToVictoryFactory({ campaignId: campaign.id }),
-    fakeUpdateHistory: createCampaignUpdateHistory(campaign, user),
+    p2V: pathToVictoryFactory({ campaignId: campaign.id }),
+    updateHistory: createCampaignUpdateHistory(campaign, user),
   }
 }
 

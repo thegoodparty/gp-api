@@ -47,8 +47,14 @@ export const pathToVictoryFactory = generateFactory<PathToVictory>(() => ({
   campaignId: faker.number.int(),
   data: {
     p2vStatus: faker.helpers.enumValue(P2VStatus),
-    electionType: faker.helpers.arrayElement(ELECTION_TYPES),
-    electionLocation: faker.helpers.arrayElement(ELECTION_LOCATIONS),
+    electionType: faker.helpers.maybe(
+      () => faker.helpers.arrayElement(ELECTION_TYPES),
+      { probability: 0.2 }, // to have some P2Vs without electionType set
+    ),
+    electionLocation: faker.helpers.maybe(
+      () => faker.helpers.arrayElement(ELECTION_LOCATIONS),
+      { probability: 0.2 }, // to have some P2Vs without electionLocation set
+    ),
     // copy/pasted values below
     men: '6988',
     asian: 0,
