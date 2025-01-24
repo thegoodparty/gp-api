@@ -18,11 +18,8 @@ import { AdminModule } from './admin/admin.module'
 import { QueueConsumerModule } from './queue/consumer/consumer.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
 import { SharedModule } from './shared/shared.module'
-import { GraphqlModule } from './graphql/graphql.module'
 import { PaymentsModule } from './payments/payments.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
-import { VoterDataModule } from './voterData/voterData.module'
-import { FilesModule } from './files/files.module'
 
 @Module({
   imports: [
@@ -40,11 +37,8 @@ import { FilesModule } from './files/files.module'
     AdminModule,
     QueueConsumerModule,
     SharedModule,
-    GraphqlModule,
     PaymentsModule,
     ErrorLoggerModule,
-    VoterDataModule,
-    FilesModule,
   ],
   controllers: [AppController],
   providers: [

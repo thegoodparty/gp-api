@@ -75,6 +75,12 @@ export class AwsService {
   async getSignedS3Url(bucket: string, fileName: string, fileType: string) {
     const filePath = `${bucket}/${fileName}`
 
+    this.logger.debug(`Getting signed URL for ${filePath}`, {
+      Bucket: ASSET_DOMAIN,
+      Key: filePath,
+      ContentType: fileType,
+    })
+
     return await getSignedUrl(
       this.s3Client,
       new PutObjectCommand({

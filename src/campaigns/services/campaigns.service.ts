@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -20,7 +22,6 @@ import {
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
-import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
@@ -32,9 +33,9 @@ export class CampaignsService {
   constructor(
     private prisma: PrismaService,
     private planVersionService: CampaignPlanVersionsService,
+    @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
     private emailService: EmailService,
-    private slackService: SlackService,
   ) {}
 
   count(args: Prisma.CampaignCountArgs) {
@@ -42,7 +43,7 @@ export class CampaignsService {
   }
   // TODO: Figure out an explicit return type that doesn't require
   // the return value to be cast to make included properties recognized by TS
-  findAll(args: Prisma.CampaignFindManyArgs) {
+  findAll(args?: Prisma.CampaignFindManyArgs) {
     return this.prisma.campaign.findMany(args)
   }
 
@@ -72,7 +73,7 @@ export class CampaignsService {
     return this.prisma.campaign.create(args)
   }
   async findBySubscriptionId(subscriptionId: string) {
-    return await this.findFirst({
+    return this.findFirst({
       where: {
         details: {
           path: ['subscriptionId'],
@@ -107,7 +108,9 @@ export class CampaignsService {
   }
 
   async update(args: Prisma.CampaignUpdateArgs) {
-    return this.prisma.campaign.update(args)
+    const campaign = await this.prisma.campaign.update(args)
+    campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
+    return campaign
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
@@ -155,11 +158,8 @@ export class CampaignsService {
       //   sails.helpers.log(campaign.slug, 'error updating crm', e)
       // }
 
-      // try {
-      //   await sails.helpers.fullstory.customAttr(user.id)
-      // } catch (e) {
-      //   sails.helpers.log(campaign.slug, 'error updating fullstory', e)
-      // }
+      campaign.userId &&
+        (await this.usersService.trackUserById(campaign.userId))
 
       return tx.campaign.update({
         where: { id: campaign.id },

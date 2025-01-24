@@ -10,6 +10,7 @@ declare global {
       completedBy?: number
       electionType?: string
       electionLocation?: string
+      voterContactGoal?: number
     }
   }
 }

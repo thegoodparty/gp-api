@@ -1,11 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { CreateCampaignPositionSchema } from './schemas/CreateCampaignPosition.schema'
 import { UpdateCampaignPositionSchema } from './schemas/UpdateCampaignPosition.schema'
 
 @Injectable()
 export class CampaignPositionsService {
-  private readonly logger = new Logger(CampaignPositionsService.name)
   constructor(private prisma: PrismaService) {}
 
   findByCampaignId(campaignId: number) {
