@@ -118,6 +118,8 @@ export class CampaignsController {
       })
     }
 
+    if (!campaign) throw new NotFoundException('Campaign not found')
+
     return this.campaignsService.updateJsonFields(campaign.id, body)
   }
 
