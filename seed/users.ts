@@ -11,6 +11,7 @@ const ADMIN_LAST_NAME = 'Durden'
 const ADMIN_USER = {
   email: 'tyler@fightclub.org',
   password: hashPasswordSync('no1TalksAboutFightClub'),
+  hasPassword: true,
   firstName: ADMIN_FIRST_NAME,
   lastName: ADMIN_LAST_NAME,
   name: `${ADMIN_FIRST_NAME} ${ADMIN_LAST_NAME}`,
@@ -23,18 +24,21 @@ const ADMIN_USER = {
 const SALES_USER = {
   email: 'sales@fightclub.org',
   password: hashPasswordSync('iDoTalkAboutFightClub1'),
+  hasPassword: true,
   roles: [UserRole.sales],
 }
 
 const CANDIDATE_USER = {
   email: 'candidate@fightclub.org',
   password: hashPasswordSync('makeFightClubGreatAgain123'),
+  hasPassword: true,
   roles: [UserRole.candidate],
 }
 
 const USER_W_NO_CAMPAIGN = {
   email: 'visitor@fightclub.org',
   password: hashPasswordSync('tellMeAllAboutFightClub123'),
+  hasPassword: true,
 }
 // define some user objects here for non random seeds
 const FIXED_USERS: Partial<User>[] = [
@@ -46,6 +50,7 @@ const FIXED_USERS: Partial<User>[] = [
     firstName: 'Homer',
     lastName: 'Simpson',
     email: 'HomerSimpson@gmail.com',
+    hasPassword: false,
   },
 ]
 

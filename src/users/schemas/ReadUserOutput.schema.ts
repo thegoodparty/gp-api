@@ -10,6 +10,7 @@ export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   id: z.number(),
   email: ReadEmailSchema,
   avatar: z.string().nullish(),
+  hasPassword: z.boolean(),
 })
 
 export type ReadUserOutput = z.infer<typeof ReadUserOutputSchema>
