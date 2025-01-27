@@ -26,11 +26,11 @@ export class ContentService extends BasePrismaService<'content'> {
   }
 
   async findAll() {
-    return this.model.findMany()
+    return this.findMany()
   }
 
   async findById(id: string) {
-    return this.model.findUnique({
+    return this.findUnique({
       where: {
         id,
       },
