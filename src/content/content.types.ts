@@ -93,6 +93,13 @@ type ArticleFaq = {
   }
 }
 
+export type ArticleSlugsByTag = {
+  [key: string]: {
+    tagName: string
+    articleSlugs: string[]
+  }
+}
+
 export type CandidateContentPrompts = {
   [key: string]: string // Multiple entries of key: templateName, value: templateBody (names I made up)
 }
@@ -197,6 +204,10 @@ export type BlogArticleAugmented = ContentAugmented<
     relatedArticles?: RelatedArticle[]
     references?: BlogArticleReference[]
     section?: BlogArticleSection
+    slug: string
+    title: string
+    publishDate: string
+    summary: string
   }
 >
 
@@ -279,6 +290,18 @@ type BlogArticleHighlight = {
   slug: string
   summary: string
 }
+
+export type BlogArticlePreview = {
+  title: string
+  mainImage: ImageClean
+  slug: string
+  publishDate: string
+  summary: string
+}
+
+// export type BlogArticlePreviewsByKey = {
+//   [key: string]: BlogArticlePreview
+// }
 
 export type BlogArticleTitle = {
   title: string
