@@ -183,6 +183,11 @@ export class ContentController {
       })
     }
 
+    articlePreviews.sort(
+      (a, b) =>
+        new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime(),
+    )
+
     return {
       articles: articlePreviews,
       tagName: selectedArticleSlugsByTag.tagName,
