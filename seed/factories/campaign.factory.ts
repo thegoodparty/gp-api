@@ -6,7 +6,10 @@ import { generateFactory } from './generate'
 import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
-  const electionDate = faker.date.future()
+  const electionDate = faker.date.between({
+    from: faker.date.past(),
+    to: faker.date.future(),
+  })
   const campaign: Omit<Campaign, 'id' | 'userId'> = {
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
