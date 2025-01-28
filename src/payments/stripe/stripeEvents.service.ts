@@ -18,7 +18,7 @@ import { getFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from '../../shared/services/slackService.types'
-import { VoterFileService } from 'src/voterData/voterFile/voterFile.service'
+import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
