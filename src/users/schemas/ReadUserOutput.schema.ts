@@ -2,14 +2,15 @@ import { CreateUserInputSchema } from './CreateUserInput.schema'
 import { z } from 'zod'
 import { ReadEmailSchema } from './Email.schema'
 
-export const ReadUserOutputSchema = z.intersection(
-  CreateUserInputSchema.omit({
-    password: true,
-  }),
-  z.object({
-    id: z.number(),
-    email: ReadEmailSchema,
-  }),
-)
+export const ReadUserOutputSchema = CreateUserInputSchema.omit({
+  password: true,
+}).extend({
+  zip: CreateUserInputSchema.shape.zip.nullish(),
+  phone: CreateUserInputSchema.shape.phone.nullish(),
+  id: z.number(),
+  email: ReadEmailSchema,
+  avatar: z.string().nullish(),
+  hasPassword: z.boolean(),
+})
 
 export type ReadUserOutput = z.infer<typeof ReadUserOutputSchema>

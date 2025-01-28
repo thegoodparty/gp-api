@@ -93,6 +93,13 @@ type ArticleFaq = {
   }
 }
 
+export type ArticleSlugsByTag = {
+  [key: string]: {
+    tagName: string
+    articleSlugs: string[]
+  }
+}
+
 export type CandidateContentPrompts = {
   [key: string]: string // Multiple entries of key: templateName, value: templateBody (names I made up)
 }
@@ -197,6 +204,10 @@ export type BlogArticleAugmented = ContentAugmented<
     relatedArticles?: RelatedArticle[]
     references?: BlogArticleReference[]
     section?: BlogArticleSection
+    slug: string
+    title: string
+    publishDate: string
+    summary: string
   }
 >
 
@@ -257,7 +268,7 @@ export type BlogSectionRaw = {
   }
 }
 
-export type BlogSections = {
+export type BlogSection = {
   fields: {
     title: string
     subtitle: string
@@ -267,7 +278,7 @@ export type BlogSections = {
   id: string
   slug: string
   tags: []
-  articles: BlogArticleHighlight[]
+  articles: BlogArticleHighlight[] | undefined
   order: number
 }
 
@@ -278,6 +289,19 @@ type BlogArticleHighlight = {
   publishDate: string
   slug: string
   summary: string
+}
+
+export type BlogArticlePreview = {
+  title: string
+  mainImage: ImageClean
+  slug: string
+  publishDate: string
+  summary: string
+}
+
+export type BlogArticleTitle = {
+  title: string
+  slug: string
 }
 
 export type ContentMedia = {
@@ -429,6 +453,22 @@ export type GoodPartyTeamMembersRaw = {
   data: {
     name: string
     members: TeamMember[]
+  }
+}
+
+export type Hero = {
+  id: string
+  title: string
+  mainImage: ContentMedia
+  publishDate: string
+  slug: string
+  summary: string
+  section?: HeroSection
+}
+
+type HeroSection = {
+  fields: {
+    title: string
   }
 }
 

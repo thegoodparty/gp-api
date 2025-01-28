@@ -1,44 +1,30 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
-import { CampaignListSchema } from '../schemas/campaignList.schema'
-import { Campaign, PathToVictory, Prisma, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
-import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import {
-  PlanVersion,
-  CampaignPlanVersionData,
   CampaignLaunchStatus,
-  OnboardingStep,
+  CampaignPlanVersionData,
   CampaignStatus,
+  OnboardingStep,
+  PlanVersion,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
-import { SlackService } from '../../shared/services/slack.service'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
-
-const DEFAULT_FIND_ALL_INCLUDE = {
-  user: {
-    select: {
-      firstName: true,
-      lastName: true,
-      phone: true,
-      email: true,
-      metaData: true,
-    },
-  },
-  pathToVictory: {
-    select: {
-      data: true,
-    },
-  },
-} as const
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class CampaignsService {
@@ -47,53 +33,32 @@ export class CampaignsService {
   constructor(
     private prisma: PrismaService,
     private planVersionService: CampaignPlanVersionsService,
+    @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
     private emailService: EmailService,
-    private slackService: SlackService,
   ) {}
 
-  async findAll(
-    query: CampaignListSchema,
-    include: Prisma.CampaignInclude = DEFAULT_FIND_ALL_INCLUDE,
-  ) {
-    const args: Prisma.CampaignFindManyArgs = {
-      include,
-    }
-
-    // if any filters are present, build where query object
-    if (Object.values(query).some((value) => !!value)) {
-      args.where = buildCampaignListFilters(query)
-    }
-
-    const campaigns = await this.prisma.campaign.findMany(args)
-
-    return campaigns
+  count(args: Prisma.CampaignCountArgs) {
+    return this.prisma.campaign.count(args)
+  }
+  // TODO: Figure out an explicit return type that doesn't require
+  // the return value to be cast to make included properties recognized by TS
+  findAll(args?: Prisma.CampaignFindManyArgs) {
+    return this.prisma.campaign.findMany(args)
   }
 
-  findOne<T extends Prisma.CampaignInclude>(
-    where: Prisma.CampaignWhereInput,
-    include: T = {
-      pathToVictory: true,
-    } as any, // TODO: figure out how to properly type this default instead of using any
-  ) {
-    return this.prisma.campaign.findFirst({
-      where,
-      include,
-    }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+  findFirst(args: Prisma.CampaignFindFirstArgs) {
+    return this.prisma.campaign.findFirst(args)
   }
 
-  findOneOrThrow(
-    where: Prisma.CampaignWhereInput,
-    include: Prisma.CampaignInclude = {
-      pathToVictory: true,
-    },
-  ) {
-    return this.prisma.campaign.findFirstOrThrow({
-      where,
-      include,
-    })
+  // TODO: Include path to victory here or everywhere else?
+  findFirstOrThrow(
+    args: Prisma.CampaignFindFirstOrThrowArgs,
+  ): Prisma.PrismaPromise<Prisma.CampaignGetPayload<typeof args>> {
+    return this.prisma.campaign.findFirstOrThrow(args)
   }
 
+  // Likely not needed, easier to use findFirst with a where: { userId }
   findByUser<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
@@ -104,17 +69,18 @@ export class CampaignsService {
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
+  async create(args: Prisma.CampaignCreateArgs) {
+    return this.prisma.campaign.create(args)
+  }
   async findBySubscriptionId(subscriptionId: string) {
-    return await this.findOne({
-      details: {
-        path: ['subscriptionId'],
-        equals: subscriptionId,
+    return this.findFirst({
+      where: {
+        details: {
+          path: ['subscriptionId'],
+          equals: subscriptionId,
+        },
       },
     })
-  }
-
-  async create(data: Prisma.CampaignCreateArgs['data']) {
-    return this.prisma.campaign.create({ data })
   }
 
   async createForUser(user: User) {
@@ -141,8 +107,10 @@ export class CampaignsService {
     return newCampaign
   }
 
-  async update(id: number, data: Prisma.CampaignUpdateArgs['data']) {
-    return this.prisma.campaign.update({ where: { id }, data })
+  async update(args: Prisma.CampaignUpdateArgs) {
+    const campaign = await this.prisma.campaign.update(args)
+    campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
+    return campaign
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
@@ -190,11 +158,8 @@ export class CampaignsService {
       //   sails.helpers.log(campaign.slug, 'error updating crm', e)
       // }
 
-      // try {
-      //   await sails.helpers.fullstory.customAttr(user.id)
-      // } catch (e) {
-      //   sails.helpers.log(campaign.slug, 'error updating fullstory', e)
-      // }
+      campaign.userId &&
+        (await this.usersService.trackUserById(campaign.userId))
 
       return tx.campaign.update({
         where: { id: campaign.id },
@@ -208,12 +173,20 @@ export class CampaignsService {
     campaignId: number,
     details: Partial<PrismaJson.CampaignDetails>,
   ) {
-    const currentCampaign = await this.findOne({ id: campaignId })
+    const currentCampaign = await this.findFirst({ where: { id: campaignId } })
+    if (!currentCampaign?.details) {
+      throw new InternalServerErrorException(
+        `Campaign ${campaignId} has no details JSON`,
+      )
+    }
     const { details: currentDetails } = currentCampaign
 
     const updatedDetails = deepMerge(currentDetails, details)
 
-    return this.update(campaignId, { details: updatedDetails })
+    return this.update({
+      where: { id: campaignId },
+      data: { details: updatedDetails },
+    })
   }
 
   async persistCampaignProCancellation(campaign: Campaign) {
@@ -227,7 +200,7 @@ export class CampaignsService {
 
   async setIsPro(campaignId: number, isPro: boolean = true) {
     await Promise.allSettled([
-      this.update(campaignId, { isPro }),
+      this.update({ where: { id: campaignId }, data: { isPro } }),
       this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
     ])
     // TODO: Implement CRM updates
@@ -291,12 +264,12 @@ export class CampaignsService {
     }
   }
 
-  delete(id: number) {
-    return this.prisma.campaign.delete({ where: { id } })
+  delete(args: Prisma.CampaignDeleteArgs) {
+    return this.prisma.campaign.delete(args)
   }
 
-  deleteAll(where: Prisma.CampaignWhereInput) {
-    return this.prisma.campaign.deleteMany({ where })
+  deleteAll(args: Prisma.CampaignDeleteManyArgs) {
+    return this.prisma.campaign.deleteMany(args)
   }
 
   async launch(user: User, campaign: Campaign) {
@@ -479,61 +452,11 @@ export class CampaignsService {
         template: EmailTemplateNames.campaignLaunch,
         variables: {
           name: getFullName(user),
-          link: `${APP_BASE}/dashboard`,
+          link: `${WEBAPP_ROOT}/dashboard`,
         },
       })
     } catch (e) {
       this.logger.error('Error sending campaign launch email', e)
-    }
-  }
-
-  async canDownloadVoterFile(
-    campaign: Campaign,
-    pathToVictory?: PathToVictory | null,
-  ) {
-    const electionTypeRequired =
-      campaign.details.ballotLevel &&
-      campaign.details.ballotLevel !== 'FEDERAL' &&
-      campaign.details.ballotLevel !== 'STATE'
-
-    const canDownload = !(
-      electionTypeRequired &&
-      (!pathToVictory?.data?.electionType ||
-        !pathToVictory?.data?.electionLocation)
-    )
-
-    !canDownload &&
-      this.logger.log(`Campaign is not eligible for download: ${campaign.id}`)
-
-    return canDownload
-  }
-
-  async doVoterDownloadCheck(campaignId: number, user: User) {
-    const campaign = await this.findOne(
-      { id: campaignId },
-      { pathToVictory: true },
-    )
-    const canDownload = !campaign
-      ? false
-      : await this.canDownloadVoterFile(
-          campaign as Campaign,
-          campaign?.pathToVictory,
-        )
-    if (!canDownload) {
-      // alert Jared and Rob.
-      const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
-      await this.slackService.message(
-        {
-          title: 'Path To Victory',
-          body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
-          visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
-          ${alertSlackMessage}
-          `,
-        },
-        // TODO: implement appEnvironment service
-        // appEnvironment === PRODUCTION_ENV ? 'politics' :
-        'dev',
-      )
     }
   }
 }
@@ -608,87 +531,3 @@ export class CampaignsService {
 //     await sails.helpers.slack.errorLoggerHelper('Error at updateViability', e)
 //   }
 // }
-
-function buildCampaignListFilters({
-  id,
-  state,
-  slug,
-  email,
-  level,
-  primaryElectionDateStart,
-  primaryElectionDateEnd,
-  campaignStatus,
-  generalElectionDateStart,
-  generalElectionDateEnd,
-  p2vStatus,
-}: CampaignListSchema): Prisma.CampaignWhereInput {
-  // base query
-  const where: Prisma.CampaignWhereInput = {
-    NOT: {
-      user: null,
-    },
-    AND: [],
-  }
-
-  // store AND array in var for easy push access
-  const AND = where.AND as Prisma.CampaignWhereInput[]
-
-  if (id) AND.push({ id })
-  if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
-  if (email) {
-    AND.push({
-      user: {
-        email: {
-          equals: email,
-          mode: 'insensitive',
-        },
-      },
-    })
-  }
-  if (state) AND.push(caseInsensitiveCompare('details', ['state'], state))
-  if (level) AND.push(caseInsensitiveCompare('details', ['ballotLevel'], level))
-  if (campaignStatus) {
-    AND.push({
-      isActive: campaignStatus === 'active',
-    })
-  }
-  if (p2vStatus) {
-    AND.push({
-      pathToVictory: caseInsensitiveCompare('data', ['p2vStatus'], p2vStatus),
-    })
-  }
-  if (generalElectionDateStart) {
-    AND.push({
-      details: {
-        path: ['electionDate'],
-        gte: generalElectionDateStart,
-      },
-    })
-  }
-  if (generalElectionDateEnd) {
-    AND.push({
-      details: {
-        path: ['electionDate'],
-        lte: generalElectionDateEnd,
-      },
-    })
-  }
-  if (primaryElectionDateStart) {
-    AND.push({
-      details: {
-        path: ['primaryElectionDate'],
-        gte: primaryElectionDateStart,
-      },
-    })
-  }
-  if (primaryElectionDateEnd) {
-    AND.push({
-      details: {
-        path: ['primaryElectionDate'],
-        lte: primaryElectionDateEnd,
-      },
-    })
-  }
-
-  return where
-}

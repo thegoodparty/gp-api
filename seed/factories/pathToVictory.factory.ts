@@ -3,6 +3,43 @@ import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 import { P2VStatus } from 'src/races/types/pathToVictory.types'
 
+// some copy/pasted values from the DB
+const ELECTION_TYPES = [
+  'Unified_School_SubDistrict',
+  'Community_College_SubDistrict',
+  'Judicial_Appellate_District',
+  'School_Board_District',
+  'Judicial_District',
+  'Judicial_Superior_Court_District',
+  'Borough',
+  'State_House_District',
+  'State_Senate_District',
+  'County_Commissioner_District',
+  'City_Ward',
+  'Precinct',
+  'Township_Ward',
+  'Election_Commissioner_District',
+  'Town_District',
+  'Hamlet_Community_Area',
+  'Proposed_City_Commissioner_District',
+  'High_School_District',
+  'Unified_School_District',
+  'County_Supervisorial_District',
+]
+const ELECTION_LOCATIONS = [
+  'SC##COLUMBIA CITY##',
+  'NV##017',
+  'MN##LYON',
+  'VT##WASHINGTON-1',
+  'TN##TULLAHOMA CITY##',
+  'NC##APEX TOWN',
+  'IL##MOLINE CITY',
+  'FL##GULFPORT CITY (EST.)##',
+  'OR##WASCO',
+  'IL##WILMETTE SD 39',
+  'PA##BRADFORD CITY##',
+]
+
 export const pathToVictoryFactory = generateFactory<PathToVictory>(() => ({
   id: faker.number.int({ max: 2147483647 }),
   createdAt: new Date(),
@@ -10,6 +47,14 @@ export const pathToVictoryFactory = generateFactory<PathToVictory>(() => ({
   campaignId: faker.number.int(),
   data: {
     p2vStatus: faker.helpers.enumValue(P2VStatus),
+    electionType: faker.helpers.maybe(
+      () => faker.helpers.arrayElement(ELECTION_TYPES),
+      { probability: 0.2 }, // to have some P2Vs without electionType set
+    ),
+    electionLocation: faker.helpers.maybe(
+      () => faker.helpers.arrayElement(ELECTION_LOCATIONS),
+      { probability: 0.2 }, // to have some P2Vs without electionLocation set
+    ),
     // copy/pasted values below
     men: '6988',
     asian: 0,

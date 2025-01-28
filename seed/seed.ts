@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import seedRaces from '../src/races/races.seed'
+import seedRaces from './races.seed'
 import seedCampaigns from './campaigns'
 import seedTopIssues from './topIssues'
 import seedUsers from './users'

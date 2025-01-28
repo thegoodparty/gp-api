@@ -14,7 +14,8 @@ model User {
   lastName              String?                 @default("") @map("last_name")
   name                  String?
   avatar                String?
-  password              String
+  password              String?
+  hasPassword           Boolean                 @default(false) @map("has_password")
   email                 String                  @unique
   phone                 String?
   zip                   String?

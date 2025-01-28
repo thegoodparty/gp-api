@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadGatewayException } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
+import { Headers } from 'http-constants-ts'
 
 const capitalizeString = (s: string) =>
   s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().trim()
@@ -23,7 +24,7 @@ export class DeclareService {
           `${this.hubspotApiUrl}/form-integrations/v1/submissions/forms/${formId}`,
           {
             headers: {
-              Authorization: `Bearer ${hubspotToken}`,
+              [Headers.AUTHORIZATION]: `Bearer ${hubspotToken}`,
             },
           },
         ),

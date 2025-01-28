@@ -17,6 +17,9 @@ import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
+import { SlackChannel } from '../../shared/services/slackService.types'
+import { VoterFileService } from 'src/voterData/voterFile/voterFile.service'
+import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
@@ -30,6 +33,7 @@ export class StripeEventsService {
     private readonly campaignsService: CampaignsService,
     private readonly slackService: SlackService,
     private readonly emailService: EmailService,
+    private readonly voterFileService: VoterFileService,
   ) {}
 
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
@@ -71,7 +75,9 @@ export class StripeEventsService {
         'No user found with given subscription customerId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id)
+    const campaign = await this.campaignsService.findByUser(user.id, {
+      pathToVictory: true,
+    })
     if (!campaign) {
       throw new BadGatewayException(
         'No campaign found associated with given customerId',
@@ -86,7 +92,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.campaignsService.doVoterDownloadCheck(campaignId, user),
+      this.voterFileService.doVoterDownloadCheck(campaign, user),
     ])
   }
 
@@ -151,7 +157,9 @@ export class StripeEventsService {
         'No user found with given checkout session userId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id)
+    const campaign = await this.campaignsService.findByUser(user.id, {
+      pathToVictory: true,
+    })
     if (!campaign) {
       throw new BadRequestException('No campaign found for user')
     }
@@ -159,7 +167,7 @@ export class StripeEventsService {
     const { id: campaignId } = campaign
 
     await Promise.allSettled([
-      this.usersService.patchUserMetaData(user, {
+      this.usersService.patchUserMetaData(user.id, {
         customerId: customerId as string,
         checkoutSessionId: null,
       }),
@@ -169,7 +177,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.campaignsService.doVoterDownloadCheck(campaign.id, user),
+      this.voterFileService.doVoterDownloadCheck(campaign, user),
     ])
   }
 
@@ -184,13 +192,9 @@ export class StripeEventsService {
       )
     }
 
-    const user = await this.usersService.findUser({ id: parseInt(userId) })
-    if (!user) {
-      throw new BadGatewayException(
-        'No user found with given expired checkout session userId',
-      )
-    }
-    await this.usersService.patchUserMetaData(user, { checkoutSessionId: null })
+    await this.usersService.patchUserMetaData(parseInt(userId), {
+      checkoutSessionId: null,
+    })
   }
 
   async customerSubscriptionDeletedHandler(
@@ -241,28 +245,22 @@ export class StripeEventsService {
 
     await this.slackService.message(
       {
-        title: 'Pro Plan Cancellation',
         body: `PRO PLAN CANCELLATION: \`${fullName}\` w/ email ${
           user.email
         }, running for '${otherOffice || office}' and campaign slug \`${
           campaign.slug
         }\` ended their pro subscription!`,
       },
-      // TODO: implement appEnvironment service
-      // appEnvironment === PRODUCTION_ENV ? 'politics' :
-      'dev',
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 
   async sendProSubscriptionResumedSlackMessage(user: User, campaign: Campaign) {
     await this.slackService.message(
       {
-        title: 'Pro Plan Resumed',
         body: `PRO PLAN RESUMED: \`${getFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
-      // TODO: implement appEnvironment service
-      // appEnvironment === PRODUCTION_ENV ? 'politics' :
-      'dev',
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 
@@ -275,7 +273,6 @@ export class StripeEventsService {
 
     await this.slackService.message(
       {
-        title: 'New Pro User!',
         body: `PRO PLAN SIGN UP!!! :gp:
           Name: ${name}
           Email: ${user.email}
@@ -295,9 +292,7 @@ export class StripeEventsService {
           }
         `,
       },
-      // TODO: implement appEnvironment service
-      // appEnvironment === PRODUCTION_ENV ? 'politics' : 'dev',
-      'dev',
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 

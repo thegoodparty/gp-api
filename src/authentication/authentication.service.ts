@@ -86,6 +86,10 @@ export class AuthenticationService {
     }
   }
 
+  async validatePassword(clearTextPassword: string, hashedPassword: string) {
+    return compare(clearTextPassword, hashedPassword)
+  }
+
   async validateUserByEmailAndPassword(
     email: LoginPayload['email'],
     password: LoginPayload['password'],
@@ -96,9 +100,9 @@ export class AuthenticationService {
       throw new UnauthorizedException('User email not found')
     }
 
-    const validPassword = await compare(
-      password as string,
-      user.password as string,
+    const validPassword = await this.validatePassword(
+      password || '',
+      user.password || '',
     )
 
     if (!validPassword) {

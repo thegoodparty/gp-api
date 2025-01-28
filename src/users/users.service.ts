@@ -5,10 +5,14 @@ import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { generateRandomPassword, hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
+import { FullStoryService } from '../fullStory/fullStory.service'
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly fullstory: FullStoryService,
+  ) {}
 
   findAllUsers(where?: Prisma.UserWhereInput) {
     return this.prisma.user.findMany({ where })
@@ -86,9 +90,7 @@ export class UsersService {
   ): Promise<User> {
     const { password, firstName, lastName, email, zip, phone, name } = userData
 
-    const hashedPassword = await hashPassword(
-      password ?? generateRandomPassword(),
-    )
+    const hashedPassword = password ? await hashPassword(password) : null
     const existingUser = await this.findUser({ email })
     if (existingUser) {
       throw new ConflictException('User with this email already exists')
@@ -113,7 +115,8 @@ export class UsersService {
       data: {
         ...userData,
         ...trimmed,
-        password: hashedPassword,
+        ...(hashedPassword ? { password: hashedPassword } : {}),
+        hasPassword: !!hashedPassword,
         name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
       },
     })
@@ -129,12 +132,15 @@ export class UsersService {
     })
   }
 
-  async patchUserMetaData(user: User, newMetaData: PrismaJson.UserMetaData) {
-    const currentUser = await this.findUser({ id: user.id })
+  async patchUserMetaData(
+    userId: number,
+    newMetaData: PrismaJson.UserMetaData,
+  ) {
+    const currentUser = await this.findUser({ id: userId })
     const currentMetaData = currentUser?.metaData
     return this.updateUser(
       {
-        id: user.id,
+        id: userId,
       },
       {
         metaData: {
@@ -151,5 +157,9 @@ export class UsersService {
         id,
       },
     })
+  }
+
+  trackUserById(userId: number) {
+    return this.fullstory.trackUserById(userId)
   }
 }

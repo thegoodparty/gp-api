@@ -3,14 +3,12 @@ import { EmailData, MailgunService } from './mailgun.service'
 import {
   getBasicEmailContent,
   getRecoverPasswordEmailContent,
-  getSetPasswordEmailContent,
 } from './util/content.util'
-import { User, UserRole } from '@prisma/client'
+import { User } from '@prisma/client'
 import { EmailTemplateNames } from './email.types'
 import { getFullName } from '../users/util/users.util'
 import { DateFormats, formatDate } from '../shared/util/date.util'
-
-const APP_BASE = process.env.CORS_ORIGIN as string
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 type SendEmailInput = {
   to: string
@@ -57,7 +55,7 @@ export class EmailService {
       subject,
       template,
       variables: {
-        appBase: APP_BASE,
+        appBase: WEBAPP_ROOT,
         ...variables,
       },
     }
@@ -73,7 +71,7 @@ export class EmailService {
     const { firstName, lastName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${APP_BASE}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${WEBAPP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
     const subject = 'Reset your password - The Good Party'
@@ -83,27 +81,21 @@ export class EmailService {
   }
 
   async sendSetPasswordEmail(user: User) {
-    const { firstName, lastName, email, roles, passwordResetToken } = user
+    const { firstName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${APP_BASE}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${WEBAPP_ROOT}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
-      content: getSetPasswordEmailContent(
-        firstName as string,
-        lastName as string,
-        link,
-        roles,
-      ),
+      name: firstName,
+      link,
     }
-    const subject = roles.includes(UserRole.sales)
-      ? "You've been added to the GoodParty.org Admin"
-      : 'Welcome to GoodParty.org! Set Up Your Account and Access Your Campaign Tools'
+    const subject = 'GoodParty.org: Access your free campaign resources!'
 
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: EmailTemplateNames.blank,
+      template: EmailTemplateNames.setPassword,
       variables,
     })
   }

@@ -8,7 +8,7 @@ export const CreateUserInputSchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
   email: WriteEmailSchema,
-  password: PasswordSchema,
+  password: PasswordSchema.optional(),
   name: z.string().optional(),
   zip: z
     .string()

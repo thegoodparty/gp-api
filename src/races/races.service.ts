@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service'
 import { GraphqlService } from 'src/graphql/graphql.service'
 import slugify from 'slugify'
 import { startOfYear, addYears, format } from 'date-fns'
-import { County, Municipality } from '@prisma/client'
+import { County, Municipality, Prisma } from '@prisma/client'
 import {
   GeoData,
   NormalizedRace,
@@ -100,6 +100,10 @@ export class RacesService {
     race.county = countyRecord
 
     return this.normalizeRace(race, state)
+  }
+
+  async findFirst(args: Prisma.RaceFindFirstArgs) {
+    return await this.prisma.race.findFirst(args)
   }
 
   async byCity(state: string, county: string, city: string) {

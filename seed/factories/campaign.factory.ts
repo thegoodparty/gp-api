@@ -15,18 +15,28 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     isVerified: faker.datatype.boolean(0.5),
     isPro: faker.datatype.boolean(0.5),
     isDemo: faker.datatype.boolean(0.1),
-    didWin: null,
+    didWin: faker.datatype.boolean(0.5),
     dateVerified: null,
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
-    data: {},
+    data: {
+      hubSpotUpdates: {
+        election_results: faker.lorem.word(),
+        verified_candidates: faker.helpers.arrayElement(['Yes', 'No']),
+        office_type: faker.lorem.word(),
+      },
+    },
     details: {
       state: faker.helpers.arrayElement(STATE_CODES),
+      zip: faker.location.zipCode(),
       ballotLevel: faker.helpers.arrayElement(LEVELS),
       electionDate: electionDate.toISOString().split('T')[0],
       primaryElectionDate: faker.date
         .past({ refDate: electionDate })
         .toISOString()
         .split('T')[0],
+      geoLocation: {},
+      party: faker.lorem.word(),
+      office: faker.lorem.word(),
     },
     aiContent: {
       launchSocialMediaCopy: {

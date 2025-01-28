@@ -13,12 +13,32 @@ export enum CampaignLaunchStatus {
   launched = 'launched',
 }
 
+export enum OnboardingStep {
+  complete = 'onboarding-complete',
+  registration = 'registration',
+}
+
 export enum CampaignStatus {
   candidate = 'candidate',
   onboarding = 'onboarding',
 }
+export type CampaignWith<T extends keyof Prisma.CampaignInclude> =
+  Prisma.CampaignGetPayload<{ include: { [field in T]: true } }>
 
-export enum OnboardingStep {
-  complete = 'onboarding-complete',
-  registration = 'registration',
+export type VoterGoals = {
+  doorKnocking?: number
+  calls?: number
+  digital?: number
+  directMail?: number
+  digitalAds?: number
+  text?: number
+  events?: number
+  yardSigns?: number
+}
+
+export enum PrimaryElectionResult {
+  WON = 'Won Primary',
+  LOST = 'Lost Primary',
+  WITHDREW = 'Withdrew',
+  NOT_ON_BALLOT = 'Not on Ballot',
 }
