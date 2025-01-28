@@ -26,7 +26,7 @@ import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
 import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
-import { VoterOutreachService } from '../voterOutreach.service'
+import { VoterOutreachService } from '../services/voterOutreach.service'
 import { MimeTypes } from 'http-constants-ts'
 
 export const VOTER_FILE_ROUTE = 'voter-data/voter-file'
