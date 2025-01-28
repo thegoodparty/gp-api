@@ -165,7 +165,7 @@ export class ContentController {
     }
 
     const blogArticles: BlogArticleAugmented[] =
-      await this.contentService.findByType('blogArticle')
+      await this.contentService.findByType(ContentType.blogArticle)
     const filteredBlogArticles = blogArticles.filter((article) => {
       return selectedArticleSlugsByTag.articleSlugs.includes(article.slug)
     })

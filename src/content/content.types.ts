@@ -299,10 +299,6 @@ export type BlogArticlePreview = {
   summary: string
 }
 
-// export type BlogArticlePreviewsByKey = {
-//   [key: string]: BlogArticlePreview
-// }
-
 export type BlogArticleTitle = {
   title: string
   slug: string
