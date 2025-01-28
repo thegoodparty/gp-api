@@ -8,11 +8,15 @@ import {
   EthnicityCounts,
   VoterHistoryColumn,
 } from '../voters.types'
-import lodash from 'lodash'
 import { Logger } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
+import { AxiosResponse } from 'axios'
+import { cloneDeep } from 'es-toolkit'
 
 const API_BASE = 'https://api.l2datamapping.com/api/v2'
 const L2_DATA_KEY = process.env.L2_DATA_KEY
+
+type L2Column = { type: string; id: string; name: { [key: string]: string } }
 
 @Injectable()
 export class VotersService {
@@ -42,11 +46,11 @@ export class VotersService {
       electionState,
       searchJson,
     )
-    this.logger.log('partisanCounts', partisanCounts)
+    this.logger.debug('partisanCounts', partisanCounts)
 
     if (partisanCounts.total === 0) {
       // don't get electionHistory if we don't have a match.
-      this.logger.log('no partisanCounts found')
+      this.logger.debug('no partisanCounts found')
       return partisanCounts
     }
 
@@ -56,7 +60,7 @@ export class VotersService {
       electionState,
       searchJson,
     )
-    this.logger.log('genderCounts', genderCounts)
+    this.logger.debug('genderCounts', genderCounts)
 
     // sleep for 5 seconds to avoid rate limiting.
     await new Promise((resolve) => setTimeout(resolve, 5000))
@@ -64,7 +68,7 @@ export class VotersService {
       electionState,
       searchJson,
     )
-    this.logger.log('ethnicityCounts', ethnicityCounts)
+    this.logger.debug('ethnicityCounts', ethnicityCounts)
 
     let counts: VoterCounts = {
       ...partisanCounts,
@@ -96,14 +100,14 @@ export class VotersService {
     ) {
       partisanRace = true
     }
-    this.logger.log('partisanRace', partisanRace)
-    let electionDates: any[] | undefined
+    this.logger.debug('partisanRace', partisanRace)
+    let electionDates: string[] | undefined
     if (partisanRace) {
       // update the electionDate to the first Tuesday of November.
       const year = electionDate.split('-')[0]
       const electionDateObj = this.getFirstTuesdayOfNovember(year)
       electionDate = electionDateObj.toISOString().slice(0, 10)
-      this.logger.log('updated electionDate to GE date:', electionDate)
+      this.logger.debug('updated electionDate to GE date:', electionDate)
     } else {
       electionDates = priorElectionDates
     }
@@ -112,16 +116,15 @@ export class VotersService {
     if (electionDates && electionDates.length > 0) {
       for (let y = 0; y < electionDates.length; y++) {
         // if we know the prior election Dates we use those,
-        const columnResults: VoterHistoryColumn | undefined =
-          this.determineHistoryColumn(
-            electionDate,
-            electionState,
-            electionTerm * (y + 1),
-            columns,
-            partisanRace,
-            electionDates[y],
-          )
-        this.logger.log('columnResults', columnResults)
+        const columnResults = this.determineHistoryColumn(
+          electionDate,
+          electionState,
+          electionTerm * (y + 1),
+          columns,
+          partisanRace,
+          electionDates[y],
+        )
+        this.logger.debug('columnResults', columnResults)
         if (columnResults?.column) {
           foundColumns.push(columnResults)
         }
@@ -129,36 +132,35 @@ export class VotersService {
     } else {
       for (let y = 0; y < numberOfElections; y++) {
         // otherwise we have to guess on the prior election dates.
-        const columnResults: VoterHistoryColumn | undefined =
-          this.determineHistoryColumn(
-            electionDate,
-            electionState,
-            electionTerm * (y + 1),
-            columns,
-            partisanRace,
-            undefined,
-          )
-        this.logger.log('columnResults', columnResults)
+        const columnResults = this.determineHistoryColumn(
+          electionDate,
+          electionState,
+          electionTerm * (y + 1),
+          columns,
+          partisanRace,
+          undefined,
+        )
+        this.logger.debug('columnResults', columnResults)
         if (columnResults?.column) {
           foundColumns.push(columnResults)
         }
       }
     }
-    this.logger.log('foundColumns', foundColumns)
+    this.logger.debug('foundColumns', foundColumns)
 
     // get the counts for each of the 3 years.
     const turnoutCounts: number[] = []
     for (const column of foundColumns) {
-      const historyJson = lodash.cloneDeep(searchJson)
+      const historyJson = cloneDeep(searchJson)
       historyJson.filters[column.column] = 1
-      this.logger.log('historyJson', historyJson)
+      this.logger.debug('historyJson', historyJson)
       // sleep for 5 seconds to avoid rate limiting.
       await new Promise((resolve) => setTimeout(resolve, 5000))
       const estimatedCount: number = await this.getEstimatedCounts(
         electionState,
         historyJson,
       )
-      this.logger.log(`estimatedCount ${column.column} `, estimatedCount)
+      this.logger.debug(`estimatedCount ${column.column} `, estimatedCount)
       if (estimatedCount > 0) {
         turnoutCounts.push(estimatedCount)
       }
@@ -166,7 +168,7 @@ export class VotersService {
 
     // update counts with the average and projected turnouts.
     counts = this.getProjectedTurnout(counts, turnoutCounts)
-    // this.logger.log('counts', counts);
+    // this.logger.debug('counts', counts);
 
     return counts
   }
@@ -187,7 +189,7 @@ export class VotersService {
     return november
   }
 
-  private getProjectedTurnout(counts: VoterCounts, turnoutCounts: any) {
+  private getProjectedTurnout(counts: VoterCounts, turnoutCounts: number[]) {
     // Note: l2 lacks data for number of registered voters at a point in time.
     // so we calculate turnout for all prior years based on current registered voters.
     // which is flawed but the best we can do with the current data.
@@ -253,14 +255,17 @@ export class VotersService {
       totalTurnout += count
     }
     const averageTurnout = Math.ceil(totalTurnout / turnoutCounts.length)
-    this.logger.log('averageTurnout', averageTurnout)
+    this.logger.debug('averageTurnout', averageTurnout)
     return averageTurnout
   }
 
   async getColumns(electionState: string) {
-    let columns = []
+    let columns: L2Column[] = []
     const columnsUrl = `${API_BASE}/customer/application/columns/1OSR/VM_${electionState}/?id=1OSR&apikey=${L2_DATA_KEY}`
-    let columnsResponse: any
+    type ExpectedResponse = {
+      columns: L2Column[]
+    }
+    let columnsResponse: { data: ExpectedResponse } | undefined
     try {
       columnsResponse = await firstValueFrom(this.httpService.get(columnsUrl))
     } catch (e) {
@@ -274,7 +279,7 @@ export class VotersService {
 
   async getPartisanCounts(
     electionState: string,
-    searchJson: any,
+    searchJson: Prisma.JsonObject,
   ): Promise<PartisanCounts> {
     const counts: PartisanCounts = {
       total: 0,
@@ -283,18 +288,19 @@ export class VotersService {
       independent: 0,
     }
 
-    const countsJson = lodash.cloneDeep(searchJson)
+    const countsJson = cloneDeep(searchJson)
     countsJson.format = 'counts'
     countsJson.columns = ['Parties_Description']
 
     const searchUrl = `${API_BASE}/records/search/1OSR/VM_${electionState}?id=1OSR&apikey=${L2_DATA_KEY}`
-    let response: any
+    type ExpectedResponse = { __COUNT: number; Parties_Description: string }[]
+    let response: AxiosResponse<ExpectedResponse>
     try {
       response = await firstValueFrom(
-        this.httpService.post(searchUrl, countsJson),
+        this.httpService.post<ExpectedResponse>(searchUrl, countsJson),
       )
     } catch (e) {
-      this.logger.log('error getting counts', e)
+      this.logger.debug('error getting counts', e)
       return counts
     }
     if (!response?.data || !response?.data?.length) {
@@ -316,52 +322,54 @@ export class VotersService {
 
   async getEstimatedCounts(
     electionState: string,
-    searchJson: any,
+    searchJson: Prisma.JsonObject,
   ): Promise<number> {
     const count = 0
     // Note: this endpoint also returns # of households which we don't use.
     // This endpoint could use same query as getPartisanCounts but we use a different endpoint
     // but if we need partisan election counts we can use the same endpoint.
     const searchUrl = `${API_BASE}/records/search/estimate/1OSR/VM_${electionState}?id=1OSR&apikey=${L2_DATA_KEY}`
-    let response: any
-    this.logger.log('searchUrl', searchUrl, searchJson)
+    type ExpectedResponse = { results: { count: number } }
+    let response: AxiosResponse<ExpectedResponse>
+    this.logger.debug('searchUrl', searchUrl, searchJson)
     try {
       response = await firstValueFrom(
-        this.httpService.post(searchUrl, searchJson),
+        this.httpService.post<ExpectedResponse>(searchUrl, searchJson),
       )
     } catch (e) {
-      this.logger.log('error getting counts', e)
+      this.logger.debug('error getting counts', e)
       return count
     }
     if (!response?.data || !response?.data?.results) {
-      this.logger.log('no results found', response?.data)
+      this.logger.debug('no results found', response?.data)
       return count
     }
-    this.logger.log('found results')
+    this.logger.debug('found results')
     return response.data.results?.count || count
   }
 
   async getGenderCounts(
     electionState: string,
-    searchJson: any,
+    searchJson: Prisma.JsonObject,
   ): Promise<GenderCounts> {
     const counts: GenderCounts = {
       women: 0,
       men: 0,
     }
 
-    const countsJson = lodash.cloneDeep(searchJson)
+    const countsJson = cloneDeep(searchJson)
     countsJson.format = 'counts'
     countsJson.columns = ['Voters_Gender']
 
     const searchUrl = `${API_BASE}/records/search/1OSR/VM_${electionState}?id=1OSR&apikey=${L2_DATA_KEY}`
-    let response: any
+    type ExpectedResponse = { __COUNT: number; Voters_Gender: string }[]
+    let response: AxiosResponse<ExpectedResponse>
     try {
       response = await firstValueFrom(
-        this.httpService.post(searchUrl, countsJson),
+        this.httpService.post<ExpectedResponse>(searchUrl, countsJson),
       )
     } catch (e) {
-      this.logger.log('error getting counts', e)
+      this.logger.debug('error getting counts', e)
       return counts
     }
     if (!response?.data || !response?.data?.length) {
@@ -383,7 +391,7 @@ export class VotersService {
 
   async getEthnicityCounts(
     electionState: string,
-    searchJson: any,
+    searchJson: Prisma.JsonObject,
   ): Promise<EthnicityCounts> {
     const counts: EthnicityCounts = {
       white: 0,
@@ -392,18 +400,22 @@ export class VotersService {
       africanAmerican: 0,
     }
 
-    const countsJson = lodash.cloneDeep(searchJson)
+    const countsJson = cloneDeep(searchJson)
     countsJson.format = 'counts'
     countsJson.columns = ['EthnicGroups_EthnicGroup1Desc']
 
     const searchUrl = `${API_BASE}/records/search/1OSR/VM_${electionState}?id=1OSR&apikey=${L2_DATA_KEY}`
-    let response: any
+    type ExpectedResponse = {
+      __COUNT: number
+      EthnicGroups_EthnicGroup1Desc: string
+    }[]
+    let response: AxiosResponse<ExpectedResponse>
     try {
       response = await firstValueFrom(
         this.httpService.post(searchUrl, countsJson),
       )
     } catch (e) {
-      this.logger.log('error getting counts', e)
+      this.logger.debug('error getting counts', e)
       return counts
     }
     if (!response?.data || !response?.data?.length) {
@@ -479,7 +491,7 @@ export class VotersService {
     electionDate: string,
     electionState: string,
     yearOffset: number,
-    columns: any[],
+    columns: L2Column[],
     partisanRace: boolean,
     priorElectionDate?: string,
   ): VoterHistoryColumn | undefined {
