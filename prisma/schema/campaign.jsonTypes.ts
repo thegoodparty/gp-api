@@ -22,6 +22,7 @@ declare global {
       primaryElectionDate?: string
       zip?: User['zip']
       knowRun?: 'yes' | null
+      runForOffice?: 'yes' | 'no' | null
       pledged?: boolean
       isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
