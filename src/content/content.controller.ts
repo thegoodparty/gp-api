@@ -193,4 +193,26 @@ export class ContentController {
       tagName: selectedArticleSlugsByTag.tagName,
     }
   }
+
+  @Get('article-tags')
+  async articleTags() {
+    const articleSlugsByTag: ArticleSlugsByTag = (
+      await this.findByType(InferredContentTypes.articleTag)
+    )[0]
+
+    return Object.entries(articleSlugsByTag)
+      .map(([tagSlug, tagObj]) => ({
+        slug: tagSlug,
+        name: tagObj.tagName,
+      }))
+      .sort((a, b) => {
+        if (a.name < b.name) {
+          return -1
+        }
+        if (a.name > b.name) {
+          return 1
+        }
+        return 0
+      })
+  }
 }
