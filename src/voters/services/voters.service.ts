@@ -7,7 +7,7 @@ import {
   GenderCounts,
   EthnicityCounts,
   VoterHistoryColumn,
-} from './voters.types'
+} from '../voters.types'
 import lodash from 'lodash'
 import { Logger } from '@nestjs/common'
 
@@ -28,7 +28,7 @@ export class VotersService {
     partisanType: string,
     priorElectionDates: string[],
   ): Promise<VoterCounts> {
-    let searchJson = {
+    const searchJson = {
       filters: {},
     }
 
@@ -38,7 +38,7 @@ export class VotersService {
 
     // sleep for 5 seconds to avoid rate limiting.
     await new Promise((resolve) => setTimeout(resolve, 5000))
-    let partisanCounts: PartisanCounts = await this.getPartisanCounts(
+    const partisanCounts: PartisanCounts = await this.getPartisanCounts(
       electionState,
       searchJson,
     )
@@ -52,7 +52,7 @@ export class VotersService {
 
     // sleep for 5 seconds to avoid rate limiting.
     await new Promise((resolve) => setTimeout(resolve, 5000))
-    let genderCounts: GenderCounts = await this.getGenderCounts(
+    const genderCounts: GenderCounts = await this.getGenderCounts(
       electionState,
       searchJson,
     )
@@ -60,7 +60,7 @@ export class VotersService {
 
     // sleep for 5 seconds to avoid rate limiting.
     await new Promise((resolve) => setTimeout(resolve, 5000))
-    let ethnicityCounts: EthnicityCounts = await this.getEthnicityCounts(
+    const ethnicityCounts: EthnicityCounts = await this.getEthnicityCounts(
       electionState,
       searchJson,
     )
@@ -77,9 +77,9 @@ export class VotersService {
 
     // sleep for 5 seconds to avoid rate limiting.
     await new Promise((resolve) => setTimeout(resolve, 5000))
-    let columns = await this.getColumns(electionState)
+    const columns = await this.getColumns(electionState)
 
-    let numberOfElections = 3
+    const numberOfElections = 3
     // if (electionTerm >= 4) {
     //   // for longer terms we only want to look at the last 2 elections. (deprecated)
     //   numberOfElections = 2;
@@ -100,7 +100,7 @@ export class VotersService {
     let electionDates: any[] | undefined
     if (partisanRace) {
       // update the electionDate to the first Tuesday of November.
-      let year = electionDate.split('-')[0]
+      const year = electionDate.split('-')[0]
       const electionDateObj = this.getFirstTuesdayOfNovember(year)
       electionDate = electionDateObj.toISOString().slice(0, 10)
       this.logger.log('updated electionDate to GE date:', electionDate)
@@ -108,11 +108,11 @@ export class VotersService {
       electionDates = priorElectionDates
     }
 
-    let foundColumns: VoterHistoryColumn[] = []
+    const foundColumns: VoterHistoryColumn[] = []
     if (electionDates && electionDates.length > 0) {
       for (let y = 0; y < electionDates.length; y++) {
         // if we know the prior election Dates we use those,
-        let columnResults: VoterHistoryColumn | undefined =
+        const columnResults: VoterHistoryColumn | undefined =
           this.determineHistoryColumn(
             electionDate,
             electionState,
@@ -129,7 +129,7 @@ export class VotersService {
     } else {
       for (let y = 0; y < numberOfElections; y++) {
         // otherwise we have to guess on the prior election dates.
-        let columnResults: VoterHistoryColumn | undefined =
+        const columnResults: VoterHistoryColumn | undefined =
           this.determineHistoryColumn(
             electionDate,
             electionState,
@@ -147,14 +147,14 @@ export class VotersService {
     this.logger.log('foundColumns', foundColumns)
 
     // get the counts for each of the 3 years.
-    let turnoutCounts: number[] = []
+    const turnoutCounts: number[] = []
     for (const column of foundColumns) {
-      let historyJson = lodash.cloneDeep(searchJson)
+      const historyJson = lodash.cloneDeep(searchJson)
       historyJson.filters[column.column] = 1
       this.logger.log('historyJson', historyJson)
       // sleep for 5 seconds to avoid rate limiting.
       await new Promise((resolve) => setTimeout(resolve, 5000))
-      let estimatedCount: number = await this.getEstimatedCounts(
+      const estimatedCount: number = await this.getEstimatedCounts(
         electionState,
         historyJson,
       )
@@ -191,7 +191,7 @@ export class VotersService {
     // Note: l2 lacks data for number of registered voters at a point in time.
     // so we calculate turnout for all prior years based on current registered voters.
     // which is flawed but the best we can do with the current data.
-    let averageTurnout = this.getAverageTurnout(turnoutCounts)
+    const averageTurnout = this.getAverageTurnout(turnoutCounts)
 
     let trajectory = 0
     if (turnoutCounts.length > 1) {
@@ -214,11 +214,11 @@ export class VotersService {
       // turnout is increasing. so we project turnout will be grow by the trajectory.
       // but we include it as part of the averaging formula so as not to overestimate.
       // this may be too conservative and we might need to weight more recent elections more heavily.
-      let nextTurnout = averageTurnout + trajectory
+      const nextTurnout = averageTurnout + trajectory
       turnoutCounts.push(nextTurnout)
       projectedTurnout = this.getAverageTurnout(turnoutCounts)
     } else {
-      let countsTotal = counts?.total || 0
+      const countsTotal = counts?.total || 0
       projectedTurnout = Math.ceil(
         parseFloat(averageTurnoutPercent) * countsTotal,
       )
@@ -252,14 +252,14 @@ export class VotersService {
       // that are too high or too low.
       totalTurnout += count
     }
-    let averageTurnout = Math.ceil(totalTurnout / turnoutCounts.length)
+    const averageTurnout = Math.ceil(totalTurnout / turnoutCounts.length)
     this.logger.log('averageTurnout', averageTurnout)
     return averageTurnout
   }
 
   async getColumns(electionState: string) {
     let columns = []
-    let columnsUrl = `${API_BASE}/customer/application/columns/1OSR/VM_${electionState}/?id=1OSR&apikey=${L2_DATA_KEY}`
+    const columnsUrl = `${API_BASE}/customer/application/columns/1OSR/VM_${electionState}/?id=1OSR&apikey=${L2_DATA_KEY}`
     let columnsResponse: any
     try {
       columnsResponse = await firstValueFrom(this.httpService.get(columnsUrl))
@@ -276,14 +276,14 @@ export class VotersService {
     electionState: string,
     searchJson: any,
   ): Promise<PartisanCounts> {
-    let counts: PartisanCounts = {
+    const counts: PartisanCounts = {
       total: 0,
       democrat: 0,
       republican: 0,
       independent: 0,
     }
 
-    let countsJson = lodash.cloneDeep(searchJson)
+    const countsJson = lodash.cloneDeep(searchJson)
     countsJson.format = 'counts'
     countsJson.columns = ['Parties_Description']
 
@@ -318,7 +318,7 @@ export class VotersService {
     electionState: string,
     searchJson: any,
   ): Promise<number> {
-    let count = 0
+    const count = 0
     // Note: this endpoint also returns # of households which we don't use.
     // This endpoint could use same query as getPartisanCounts but we use a different endpoint
     // but if we need partisan election counts we can use the same endpoint.
@@ -345,12 +345,12 @@ export class VotersService {
     electionState: string,
     searchJson: any,
   ): Promise<GenderCounts> {
-    let counts: GenderCounts = {
+    const counts: GenderCounts = {
       women: 0,
       men: 0,
     }
 
-    let countsJson = lodash.cloneDeep(searchJson)
+    const countsJson = lodash.cloneDeep(searchJson)
     countsJson.format = 'counts'
     countsJson.columns = ['Voters_Gender']
 
@@ -385,14 +385,14 @@ export class VotersService {
     electionState: string,
     searchJson: any,
   ): Promise<EthnicityCounts> {
-    let counts: EthnicityCounts = {
+    const counts: EthnicityCounts = {
       white: 0,
       asian: 0,
       hispanic: 0,
       africanAmerican: 0,
     }
 
-    let countsJson = lodash.cloneDeep(searchJson)
+    const countsJson = lodash.cloneDeep(searchJson)
     countsJson.format = 'counts'
     countsJson.columns = ['EthnicGroups_EthnicGroup1Desc']
 
@@ -451,9 +451,9 @@ export class VotersService {
 
   private getTurnoutDates(electionDate: string, yearOffset: number) {
     // otherwise we have to guess on the prior election dates.
-    let turnoutDateObj = new Date(electionDate)
+    const turnoutDateObj = new Date(electionDate)
     turnoutDateObj.setFullYear(turnoutDateObj.getFullYear() - yearOffset)
-    let turnoutDates: string[] = []
+    const turnoutDates: string[] = []
     turnoutDates.push(
       turnoutDateObj.toISOString().slice(0, 10).replace(/-/g, ''),
     )
@@ -461,8 +461,8 @@ export class VotersService {
     // get 3 calendar days before and after the turnoutDateObj
     // and add them to turnOutDates array.
     for (let i = 1; i < 4; i++) {
-      let turnoutDateObjBefore = new Date(turnoutDateObj)
-      let turnoutDateObjAfter = new Date(turnoutDateObj)
+      const turnoutDateObjBefore = new Date(turnoutDateObj)
+      const turnoutDateObjAfter = new Date(turnoutDateObj)
       turnoutDateObjBefore.setDate(turnoutDateObjBefore.getDate() - i)
       turnoutDateObjAfter.setDate(turnoutDateObjAfter.getDate() + i)
       turnoutDates.push(
@@ -483,12 +483,12 @@ export class VotersService {
     partisanRace: boolean,
     priorElectionDate?: string,
   ): VoterHistoryColumn | undefined {
-    let turnoutDateObj = new Date(electionDate)
+    const turnoutDateObj = new Date(electionDate)
     turnoutDateObj.setFullYear(turnoutDateObj.getFullYear() - yearOffset)
     if (partisanRace) {
       // partisan races are easy we use the General Election
-      let adjustedYear = turnoutDateObj.getFullYear()
-      let electionYear = `EG_${adjustedYear}`
+      const adjustedYear = turnoutDateObj.getFullYear()
+      const electionYear = `EG_${adjustedYear}`
       return {
         column: electionYear,
         type: 'General Election',
@@ -498,7 +498,7 @@ export class VotersService {
     let turnoutDates: string[] = []
     if (priorElectionDate) {
       // we know the exact election date so we do not have to guess.
-      let priorElectionDateObj = new Date(priorElectionDate)
+      const priorElectionDateObj = new Date(priorElectionDate)
       turnoutDates.push(
         priorElectionDateObj.toISOString().slice(0, 10).replace(/-/g, ''),
       )
@@ -533,7 +533,7 @@ export class VotersService {
               continue
             }
             for (let x = 0; x < turnoutDates.length; x++) {
-              let turnoutDate = turnoutDates[x]
+              const turnoutDate = turnoutDates[x]
               // if using turnoutDates (not electionDates)
               // there is no way to know the exact date of the election,
               // we prioritize elections that are closer to the electionDate

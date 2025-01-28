@@ -7,14 +7,14 @@ import {
 import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
 import { Transform } from 'stream'
-import { HEADER_MAPPING } from './constants/headerMapping.const'
+import { HEADER_MAPPING } from '../constants/headerMapping.const'
 import { SlackService } from 'src/shared/services/slack.service'
 
 const VOTER_DATASTORE = process.env.VOTER_DATASTORE as string
 
 @Injectable()
-export class VoterDataService implements OnModuleDestroy {
-  private readonly logger = new Logger(VoterDataService.name)
+export class VoterDatabaseService implements OnModuleDestroy {
+  private readonly logger = new Logger(VoterDatabaseService.name)
   private readonly pool: Pool
 
   constructor(private readonly slack: SlackService) {
