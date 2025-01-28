@@ -3,7 +3,7 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
-import { getFullName } from 'src/users/util/users.util'
+import { getUserFullName } from 'src/users/util/users.util'
 import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -141,7 +141,7 @@ export class AdminCampaignsService {
 
     if (campaign?.data?.createdBy !== 'admin') {
       const variables = {
-        name: getFullName(user),
+        name: getUserFullName(user),
         link: `${WEBAPP_ROOT}/dashboard`,
       }
 

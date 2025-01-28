@@ -51,6 +51,14 @@ export class AiChatService {
     })
   }
 
+  count(userId: number) {
+    return this.prisma.aiChat.count({
+      where: {
+        userId,
+      },
+    })
+  }
+
   async create(
     campaign: PromptReplaceCampaign,
     { message, initial }: CreateAiChatSchema,

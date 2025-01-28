@@ -12,6 +12,11 @@ import { GeocodingService } from './services/geocoding.service'
 import { RacesModule } from 'src/races/races.module'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
+import { PathToVictoryService } from './services/path-to-victory.service/pathToVictory.service'
+import { stateCodeToStateName } from '../shared/util/locales.util'
+const longState = stateCodeToStateName('TN')
+
+console.log(`longState =>`, longState)
 
 @Module({
   imports: [EmailModule, forwardRef(() => UsersModule), RacesModule],
@@ -28,6 +33,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignMapService,
     GeocodingService,
     CampaignUpdateHistoryService,
+    PathToVictoryService,
   ],
   exports: [CampaignsService],
 })

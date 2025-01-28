@@ -14,7 +14,7 @@ import { UsersService } from '../../users/users.service'
 import { SlackService } from '../../shared/services/slack.service'
 import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
-import { getFullName } from '../../users/util/users.util'
+import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from '../../shared/services/slackService.types'
@@ -241,7 +241,7 @@ export class StripeEventsService {
       return // don't send Slack message if subscription was canceled at end of election
     }
     const { office, otherOffice } = details
-    const fullName = getFullName(user)
+    const fullName = getUserFullName(user)
 
     await this.slackService.message(
       {
@@ -258,7 +258,7 @@ export class StripeEventsService {
   async sendProSubscriptionResumedSlackMessage(user: User, campaign: Campaign) {
     await this.slackService.message(
       {
-        body: `PRO PLAN RESUMED: \`${getFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
+        body: `PRO PLAN RESUMED: \`${getUserFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
@@ -305,7 +305,7 @@ export class StripeEventsService {
       ISO8601DateString && formatDate(ISO8601DateString, DateFormats.usDate)
 
     const emailVars = {
-      userFullName: getFullName(user),
+      userFullName: getUserFullName(user),
       startDate: formattedCurrentDate,
       ...(electionDate ? { electionDate } : {}),
     }

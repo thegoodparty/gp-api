@@ -16,7 +16,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
 import { Campaign, User } from '@prisma/client'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { getFullName, isAdmin } from 'src/users/util/users.util'
+import { getUserFullName, isAdmin } from 'src/users/util/users.util'
 import { CampaignUpdateHistoryService } from './campaignUpdateHistory.service'
 import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
@@ -59,7 +59,7 @@ export class CampaignUpdateHistoryController {
     return updateHistory.map((update) => ({
       ...update,
       user: {
-        name: getFullName(user),
+        name: getUserFullName(user),
         avatar: update?.user?.avatar,
       },
     }))

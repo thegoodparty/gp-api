@@ -1,8 +1,13 @@
 import { User, UserRole } from '@prisma/client'
 
-export function getFullName(user: User) {
-  return `${user.firstName} ${user.lastName}`
-}
+export const getUserFullName = (user: User) =>
+  !user
+    ? ''
+    : user.firstName
+      ? `${user.firstName} ${user.lastName}`
+      : user.name
+        ? user.name
+        : ''
 
 /** Helper to check a User's roles against one or many roles */
 export function userHasRole(user: User, roleOrRoles: UserRole | UserRole[]) {

@@ -1,10 +1,11 @@
 import { User } from '@prisma/client'
 import {
-  AiContentGenerationStatus,
   AiContentData,
+  AiContentGenerationStatus,
 } from 'src/campaigns/ai/content/aiContent.types'
 import {
   CampaignLaunchStatus,
+  ElectionLevel,
   OnboardingStep,
   VoterGoals,
 } from 'src/campaigns/campaigns.types'
@@ -41,6 +42,8 @@ declare global {
       otherParty?: string
       district?: string
       raceId?: string
+      level?: ElectionLevel | null
+      runForOffice?: boolean
       noNormalizedOffice?: boolean
       website?: string
       pastExperience?: string
@@ -73,6 +76,8 @@ declare global {
       customVoterFiles?: CustomVoterFile[]
       reportedVoterGoals?: VoterGoals
       textCampaignCount?: number
+      lastStepDate?: string
+      adminUserEmail?: string
     }
 
     export type CampaignAiContent = {

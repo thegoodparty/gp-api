@@ -42,3 +42,10 @@ export enum PrimaryElectionResult {
   WITHDREW = 'Withdrew',
   NOT_ON_BALLOT = 'Not on Ballot',
 }
+
+export enum ElectionLevel {
+  state = 'state',
+  county = 'county',
+  federal = 'federal',
+  city = 'city',
+}
