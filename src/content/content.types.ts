@@ -291,12 +291,21 @@ type BlogArticleHighlight = {
   summary: string
 }
 
-export type BlogArticlePreview = {
+export type BlogArticlePreview1 = {
   title: string
   mainImage: ImageClean
   slug: string
   publishDate: string
   summary: string
+}
+
+export type BlogArticlePreview2 = {
+  // Key is a slug
+  [key: string]: {
+    title: string
+    summary: string
+    slug: string
+  }
 }
 
 export type BlogArticleTitle = {

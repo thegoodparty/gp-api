@@ -19,7 +19,9 @@ import { PublicAccess } from '../authentication/decorators/PublicAccess.decorato
 import {
   ArticleSlugsByTag,
   BlogArticleAugmented,
-  BlogArticlePreview,
+  BlogArticlePreview1,
+  BlogArticlePreview2,
+  BlogArticleTag,
   BlogSection,
   Hero,
 } from './content.types'
@@ -170,7 +172,7 @@ export class ContentController {
       return selectedArticleSlugsByTag.articleSlugs.includes(article.slug)
     })
 
-    const articlePreviews: BlogArticlePreview[] = []
+    const articlePreviews: BlogArticlePreview1[] = []
 
     for (const article of filteredBlogArticles) {
       const { title, mainImage, publishDate, slug, summary } = article
@@ -194,8 +196,36 @@ export class ContentController {
     }
   }
 
+  @Get('blog-articles-by-slug/:slug')
+  async findBlogArticlesBySlug(@Param('slug') slug: string) {
+    const blogArticles: BlogArticleAugmented[] =
+      await this.contentService.findByType(
+        ContentType.blogArticle,
+        undefined,
+        undefined,
+        {
+          data: {
+            path: ['slug'],
+            equals: slug,
+          },
+        },
+      )
+
+    const articles: BlogArticlePreview2 = {}
+
+    for (const article of blogArticles) {
+      articles[article.slug] = {
+        title: article.title,
+        slug: article.slug,
+        summary: article.summary,
+      }
+    }
+
+    return articles
+  }
+
   @Get('article-tags')
-  async articleTags() {
+  async articleTags(): Promise<BlogArticleTag[]> {
     const articleSlugsByTag: ArticleSlugsByTag = (
       await this.findByType(InferredContentTypes.articleTag)
     )[0]

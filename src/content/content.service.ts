@@ -42,6 +42,7 @@ export class ContentService {
     type: ContentType | InferredContentTypes,
     orderBy?: Prisma.ContentOrderByWithRelationInput,
     take?: number,
+    where?: Prisma.ContentWhereInput,
   ) {
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
@@ -51,7 +52,10 @@ export class ContentService {
       : { type: queryType }
 
     const entries = await this.prisma.content.findMany({
-      where: whereCondition,
+      where: {
+        ...whereCondition,
+        ...where,
+      },
       orderBy: orderBy || undefined,
       take: take || undefined,
     })
