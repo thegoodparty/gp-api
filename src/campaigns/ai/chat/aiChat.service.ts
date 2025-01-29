@@ -9,18 +9,18 @@ import { SlackService } from 'src/shared/services/slack.service'
 import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../shared/services/slackService.types'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
 
 @Injectable()
-export class AiChatService extends BasePrismaService<'aiChat'> {
+export class AiChatService extends createPrismaBase(MODELS.AiChat) {
   constructor(
     private aiService: AiService,
     private contentService: ContentService,
     private slack: SlackService,
   ) {
-    super('aiChat')
+    super()
   }
 
   async create(

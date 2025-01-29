@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common'
 import { CampaignsService } from '../services/campaigns.service'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
 import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
 import { Campaign } from '@prisma/client'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class CampaignUpdateHistoryService extends BasePrismaService<'campaignUpdateHistory'> {
+export class CampaignUpdateHistoryService extends createPrismaBase(
+  MODELS.CampaignUpdateHistory,
+) {
   constructor(private readonly campaigns: CampaignsService) {
-    super('campaignUpdateHistory')
+    super()
   }
 
   create(campaign: Campaign, { type, quantity }: CreateUpdateHistorySchema) {

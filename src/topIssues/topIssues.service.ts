@@ -5,12 +5,12 @@ import {
   UpdateTopIssueDto,
 } from './schemas/topIssues.schema'
 import { TopIssue } from '@prisma/client'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class TopIssuesService extends BasePrismaService<'topIssue'> {
+export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
   constructor() {
-    super('topIssue')
+    super()
   }
 
   async create(body: CreateTopIssueDto): Promise<TopIssueOutputDto> {

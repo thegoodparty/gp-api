@@ -1,13 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class CampaignPlanVersionsService extends BasePrismaService<'campaignPlanVersion'> {
-  constructor() {
-    super('campaignPlanVersion')
-  }
-
+export class CampaignPlanVersionsService extends createPrismaBase(
+  MODELS.CampaignPlanVersion,
+) {
   findByCampaignId(campaignId: number) {
     return this.findFirst({
       where: { campaignId },

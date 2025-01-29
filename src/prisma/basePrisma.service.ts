@@ -1,13 +1,17 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
 import { PrismaService } from './prisma.service'
-import {
-  PrismaModelMethods,
-  PrismaClientMethods,
-  PrismaModelNames,
-} from './prisma.types'
+import { Prisma, PrismaClient } from '@prisma/client'
+import { lowerFirst } from 'lodash'
 
-// list of Prisma model methods to make available as public methods on the child class
+export const MODELS = Prisma.ModelName
+
+type ExcludeTypes = `$${string}` | symbol
+type PrismaModels = Exclude<keyof PrismaClient, ExcludeTypes>
+type PrismaMethods = Exclude<keyof PrismaClient[PrismaModels], ExcludeTypes>
+
+// These are methods that should be avaialable as public methods on any prisma model service
+// e.g. this.campaignsService.findMany(...args)
+// this allows to avoid manually redeclaring types when we just want to make a prisma method available directly
 const PASSTHROUGH_MODEL_METHODS = [
   'findMany',
   'findFirst',
@@ -15,81 +19,43 @@ const PASSTHROUGH_MODEL_METHODS = [
   'findUnique',
   'findUniqueOrThrow',
   'count',
-] satisfies PrismaModelMethods[]
+] satisfies PrismaMethods[]
 
-// List of PrismaClient methods to make available to child class
-const ALLOWED_CLIENT_METHODS = [
-  '$transaction',
-  '$queryRaw',
-  // TODO: add any more we might need
-] satisfies PrismaClientMethods[]
+export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
+  const lowerModelName = lowerFirst(modelName)
+  /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+  @Injectable()
+  class BasePrismaService implements OnModuleInit {
+    @Inject()
+    // NOTE: TS won't let me make this private when returning a class def from a function
+    readonly _prisma!: PrismaService
 
-type AllowedClientMethods = (typeof ALLOWED_CLIENT_METHODS)[number]
-type ProxyClient = Pick<PrismaClient, AllowedClientMethods>
+    readonly logger = new Logger(this.constructor.name)
 
-/**
- * Base class for reusable funcitonality across Prisma services
- * @example
- * class CampaignsService extends BasePrismaService<'campaigns'> {
- *   constructor(...injectedStuff) {
- *     super('campaigns')
- *   }
- * }
- */
-@Injectable()
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class BasePrismaService<T extends PrismaModelNames>
-  implements OnModuleInit
-{
-  protected readonly logger = new Logger(this.constructor.name)
-
-  // inject prisma service via param injection, so child does not have direct access
-  @Inject(PrismaService)
-  private readonly _prisma!: PrismaService
-  protected get model(): PrismaClient[T] {
-    return this._prisma[this.modelName]
-  }
-
-  private _proxyClient!: ProxyClient
-  protected get client() {
-    return this._proxyClient
-  }
-
-  // child class specifies prisma model to use
-  protected constructor(protected readonly modelName: T) {}
-
-  onModuleInit() {
-    // Have to do these in onModuleInit, client is not available at constructor
-    // make PASSTHROUGH_MODEL_METHODS directly available on child class as public methods
-    for (const method of PASSTHROUGH_MODEL_METHODS) {
-      this[method] = this.model[method].bind(this.model)
+    get model(): PrismaClient[Uncapitalize<T>] {
+      return this._prisma[lowerModelName]
     }
 
-    this._proxyClient = this.getClientProxy()
+    get client(): PrismaClient {
+      return this._prisma
+    }
+
+    onModuleInit() {
+      // Have to do these in onModuleInit, client is not available at constructor
+      for (const method of PASSTHROUGH_MODEL_METHODS) {
+        this[method] = this.model[method].bind(this.model)
+      }
+    }
   }
 
-  private getClientProxy() {
-    return new Proxy(this._prisma, {
-      get(target, prop, _receiver) {
-        if (typeof prop === 'string' && prop in target) {
-          // Allow only explicitly exposed methods
-          if (ALLOWED_CLIENT_METHODS.includes(prop as AllowedClientMethods)) {
-            // Preserve function binding and type safety
-            const method = target[prop]
-            if (typeof method === 'function') {
-              return method.bind(target)
-            }
-          }
-        }
-        throw new Error(`Access denied to method: ${String(prop)}`)
-      },
-    }) as ProxyClient
-  }
+  // This interface merges with the class type to apply the prisma method types to the class def
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface BasePrismaService
+    extends Pick<
+      PrismaClient[Uncapitalize<T>],
+      (typeof PASSTHROUGH_MODEL_METHODS)[number]
+    > {}
+  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+  return BasePrismaService
 }
-
-// This interface merges with the above class declaration,
-// to make the above PASSTHROUGH_MODEL_METHODS types available
-// actual methods will be added at runtime in onModuleInit
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface BasePrismaService<T extends PrismaModelNames>
-  extends Pick<PrismaClient[T], (typeof PASSTHROUGH_MODEL_METHODS)[number]> {}

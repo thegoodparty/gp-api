@@ -1,16 +1,16 @@
 import { ConflictException, Injectable } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
-import { generateRandomPassword, hashPassword } from './util/passwords.util'
+import { hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
 import { FullStoryService } from '../fullStory/fullStory.service'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class UsersService extends BasePrismaService<'user'> {
+export class UsersService extends createPrismaBase(MODELS.User) {
   constructor(private readonly fullstory: FullStoryService) {
-    super('user')
+    super()
   }
 
   findUser(where: Prisma.UserWhereUniqueInput) {

@@ -18,20 +18,20 @@ import {
   VILLAGE_PROMPT,
 } from '../constants/prompts.consts'
 import { MTFCC_TYPES, GEO_TYPES } from '../constants/geo.consts'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
 import { CountiesService } from './counties.services'
 import { MunicipalitiesService } from './municipalities.services'
 import { CensusEntitiesService } from './censusEntities.services'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class RacesService extends BasePrismaService<'race'> {
+export class RacesService extends createPrismaBase(MODELS.Race) {
   constructor(
     private readonly counties: CountiesService,
     private readonly municipalities: MunicipalitiesService,
     private readonly censusEntities: CensusEntitiesService,
     private readonly graphQLService: GraphqlService,
   ) {
-    super('race')
+    super()
   }
 
   async findRaces(

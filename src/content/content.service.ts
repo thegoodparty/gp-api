@@ -9,7 +9,7 @@ import {
 } from './CONTENT_TYPE_MAP.const'
 import { isObject } from 'src/shared/util/objects.util'
 import { AIChatPromptContents } from './content.types'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 const transformContent = (
   type: ContentType | InferredContentTypes,
@@ -20,9 +20,9 @@ const transformContent = (
 }
 
 @Injectable()
-export class ContentService extends BasePrismaService<'content'> {
+export class ContentService extends createPrismaBase(MODELS.Content) {
   constructor(private contentfulService: ContentfulService) {
-    super('content')
+    super()
   }
 
   async findAll() {

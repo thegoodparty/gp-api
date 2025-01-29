@@ -1,14 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { CreateCampaignPositionSchema } from './schemas/CreateCampaignPosition.schema'
 import { UpdateCampaignPositionSchema } from './schemas/UpdateCampaignPosition.schema'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class CampaignPositionsService extends BasePrismaService<'campaignPosition'> {
-  constructor() {
-    super('campaignPosition')
-  }
-
+export class CampaignPositionsService extends createPrismaBase(
+  MODELS.CampaignPosition,
+) {
   findByCampaignId(campaignId: number) {
     return this.findFirstOrThrow({
       where: {

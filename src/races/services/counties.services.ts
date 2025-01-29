@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class CountiesService extends BasePrismaService<'county'> {
-  constructor() {
-    super('county')
-  }
-}
+export class CountiesService extends createPrismaBase(MODELS.County) {}

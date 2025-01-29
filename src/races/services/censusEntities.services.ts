@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { BasePrismaService } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
 
 @Injectable()
-export class CensusEntitiesService extends BasePrismaService<'censusEntity'> {
-  constructor() {
-    super('censusEntity')
-  }
-}
+export class CensusEntitiesService extends createPrismaBase(
+  MODELS.CensusEntity,
+) {}
