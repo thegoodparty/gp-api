@@ -5,7 +5,7 @@ import {
   UpdateTopIssueDto,
 } from './schemas/topIssues.schema'
 import { TopIssue } from '@prisma/client'
-import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
 export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {

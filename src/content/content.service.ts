@@ -9,7 +9,7 @@ import {
 } from './CONTENT_TYPE_MAP.const'
 import { isObject } from 'src/shared/util/objects.util'
 import { AIChatPromptContents } from './content.types'
-import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const transformContent = (
   type: ContentType | InferredContentTypes,

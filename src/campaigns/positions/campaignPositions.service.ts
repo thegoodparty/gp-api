@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { CreateCampaignPositionSchema } from './schemas/CreateCampaignPosition.schema'
 import { UpdateCampaignPositionSchema } from './schemas/UpdateCampaignPosition.schema'
-import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
 export class CampaignPositionsService extends createPrismaBase(

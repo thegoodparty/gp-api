@@ -23,7 +23,7 @@ import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {

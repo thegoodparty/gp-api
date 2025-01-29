@@ -21,7 +21,7 @@ import { MTFCC_TYPES, GEO_TYPES } from '../constants/geo.consts'
 import { CountiesService } from './counties.services'
 import { MunicipalitiesService } from './municipalities.services'
 import { CensusEntitiesService } from './censusEntities.services'
-import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
 export class RacesService extends createPrismaBase(MODELS.Race) {

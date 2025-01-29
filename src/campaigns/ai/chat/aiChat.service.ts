@@ -9,7 +9,7 @@ import { SlackService } from 'src/shared/services/slack.service'
 import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../shared/services/slackService.types'
-import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
 

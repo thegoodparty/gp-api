@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common'
-import { PrismaService } from './prisma.service'
+import { PrismaService } from '../prisma.service'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { lowerFirst } from 'lodash'
 

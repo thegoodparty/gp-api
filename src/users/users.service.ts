@@ -5,7 +5,7 @@ import { hashPassword } from './util/passwords.util'
 import { trimMany } from '../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
 import { FullStoryService } from '../fullStory/fullStory.service'
-import { createPrismaBase, MODELS } from 'src/prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
 export class UsersService extends createPrismaBase(MODELS.User) {
