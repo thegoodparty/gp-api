@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  forwardRef,
   HttpCode,
   HttpStatus,
+  Inject,
   Post,
   Request,
   Res,
@@ -35,6 +37,7 @@ import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strate
 export class AuthenticationController {
   constructor(
     private authenticationService: AuthenticationService,
+    @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
     private campaignsService: CampaignsService,
     private emailService: EmailService,

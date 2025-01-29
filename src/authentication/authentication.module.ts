@@ -1,4 +1,4 @@
-import { Logger, Module } from '@nestjs/common'
+import { forwardRef, Logger, Module } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
 import { UsersModule } from '../users/users.module'
 import { PassportModule } from '@nestjs/passport'
@@ -33,7 +33,7 @@ if (!process.env.AUTH_SECRET) {
     },
   ],
   imports: [
-    UsersModule,
+    forwardRef(() => UsersModule),
     PassportModule,
     JwtModule.register({
       global: true,

@@ -8,7 +8,7 @@ import {
   OnboardingStep,
   VoterGoals,
 } from 'src/campaigns/campaigns.types'
-import { CustomVoterFile } from 'src/voterData/voterFile/voterFile.types'
+import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
 
 export {}
 

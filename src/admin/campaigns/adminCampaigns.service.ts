@@ -10,7 +10,7 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
 import { CampaignWith, OnboardingStep } from 'src/campaigns/campaigns.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-import { VoterFileService } from 'src/voterData/voterFile/voterFile.service'
+import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
 
 @Injectable()
 export class AdminCampaignsService {

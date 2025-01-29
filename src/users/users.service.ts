@@ -79,9 +79,7 @@ export class UsersService extends BasePrismaService<'user'> {
   ): Promise<User> {
     const { password, firstName, lastName, email, zip, phone, name } = userData
 
-    const hashedPassword = await hashPassword(
-      password ?? generateRandomPassword(),
-    )
+    const hashedPassword = password ? await hashPassword(password) : null
     const existingUser = await this.findUser({ email })
     if (existingUser) {
       throw new ConflictException('User with this email already exists')
@@ -106,7 +104,8 @@ export class UsersService extends BasePrismaService<'user'> {
       data: {
         ...userData,
         ...trimmed,
-        password: hashedPassword,
+        ...(hashedPassword ? { password: hashedPassword } : {}),
+        hasPassword: !!hashedPassword,
         name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
       },
     })

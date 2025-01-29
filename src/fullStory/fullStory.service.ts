@@ -225,12 +225,6 @@ export class FullStoryService {
     resultCounts: SyncTrackingResultCounts,
     campaign: CampaignWith<'pathToVictory'>,
   ) {
-    if (campaign.data?.hubSpotUpdates) {
-      return {
-        ...resultCounts,
-        skipped: resultCounts.skipped + 1,
-      }
-    }
     try {
       const user = await this.users.findUser({ id: campaign.userId })
       await limiter.schedule(() =>
@@ -263,7 +257,6 @@ export class FullStoryService {
       campaigns,
       {
         updated: 0,
-        skipped: 0,
         failed: 0,
       },
       this.multiTrackIterator.bind(this),

@@ -16,7 +16,13 @@ import {
   mapGlossaryItemsToSlug,
 } from './util/glossaryItems.util'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
-import { BlogArticleAugmented, BlogSection, Hero } from './content.types'
+import {
+  ArticleSlugsByTag,
+  BlogArticleAugmented,
+  BlogArticlePreview,
+  BlogSection,
+  Hero,
+} from './content.types'
 
 @Controller('content')
 @PublicAccess()
@@ -146,5 +152,45 @@ export class ContentController {
     }
     result.sort((a, b) => a.fields.order - b.fields.order)
     return { sections: result, hero, sectionIndex }
+  }
+
+  @Get('blog-articles-by-tag/:tag')
+  async findBlogArticlesByTag(@Param('tag') tag: string) {
+    const articleSlugsByTag: ArticleSlugsByTag[] =
+      await this.contentService.findByType(InferredContentTypes.articleTag)
+    const selectedArticleSlugsByTag = articleSlugsByTag[0][tag]
+
+    if (!selectedArticleSlugsByTag) {
+      throw new BadRequestException('Content fetch failed.')
+    }
+
+    const blogArticles: BlogArticleAugmented[] =
+      await this.contentService.findByType(ContentType.blogArticle)
+    const filteredBlogArticles = blogArticles.filter((article) => {
+      return selectedArticleSlugsByTag.articleSlugs.includes(article.slug)
+    })
+
+    const articlePreviews: BlogArticlePreview[] = []
+
+    for (const article of filteredBlogArticles) {
+      const { title, mainImage, publishDate, slug, summary } = article
+      articlePreviews.push({
+        title,
+        mainImage,
+        publishDate,
+        slug,
+        summary,
+      })
+    }
+
+    articlePreviews.sort(
+      (a, b) =>
+        new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime(),
+    )
+
+    return {
+      articles: articlePreviews,
+      tagName: selectedArticleSlugsByTag.tagName,
+    }
   }
 }
