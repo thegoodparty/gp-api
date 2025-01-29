@@ -116,9 +116,7 @@ export class CampaignsController {
       campaign = await this.campaignsService.findFirstOrThrow({
         where: { slug },
       })
-    }
-
-    if (!campaign) throw new NotFoundException('Campaign not found')
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
 
     return this.campaignsService.updateJsonFields(campaign.id, body)
   }
