@@ -7,6 +7,7 @@ import {
   LoginPayloadSchema,
 } from '../schemas/LoginPayload.schema'
 import { User } from '@prisma/client'
+import { ZodValidationException } from 'nestjs-zod'
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
@@ -20,8 +21,14 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     email: LoginPayload['email'],
     password: LoginPayload['password'],
   ): Promise<User> {
-    const { email: validatedEmail, password: validatedPassword } =
-      LoginPayloadSchema.parse({ email, password })
+    const result = LoginPayloadSchema.safeParse({ email, password })
+
+    if (!result.success) {
+      throw new ZodValidationException(result.error)
+    }
+
+    const { email: validatedEmail, password: validatedPassword } = result.data
+
     return this.authenticationService.validateUserByEmailAndPassword(
       validatedEmail,
       validatedPassword,
