@@ -37,8 +37,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     })
   }
 
-  async findByType(options: findByTypeOptions) {
-    const { type, take, orderBy, where } = options
+  async findByType({ type, take, orderBy, where }: findByTypeOptions) {
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
 
