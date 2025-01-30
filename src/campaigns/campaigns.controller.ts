@@ -25,6 +25,7 @@ import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/shared/services/slack.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -32,8 +33,9 @@ export class CampaignsController {
   private readonly logger = new Logger(CampaignsController.name)
 
   constructor(
-    private readonly campaignsService: CampaignsService,
-    private slack: SlackService,
+    private readonly campaigns: CampaignsService,
+    private readonly planVersions: CampaignPlanVersionsService,
+    private readonly slack: SlackService,
   ) {}
 
   @Roles(UserRole.admin)
@@ -59,7 +61,7 @@ export class CampaignsController {
         },
       },
     }
-    return this.campaignsService.findMany({ where, include })
+    return this.campaigns.findMany({ where, include })
   }
 
   @Get('mine')
@@ -74,13 +76,23 @@ export class CampaignsController {
     @ReqUser() user: User,
     @ReqCampaign() campaign?: Campaign,
   ) {
-    return this.campaignsService.getStatus(user, campaign)
+    return this.campaigns.getStatus(user, campaign)
+  }
+
+  @Get('mine/plan-version')
+  @UseCampaign()
+  async getCampaignPlanVersion(@ReqCampaign() campaign: Campaign) {
+    const version = await this.planVersions.findByCampaignId(campaign.id)
+
+    if (!version) throw new NotFoundException('No plan version found')
+
+    return version.data
   }
 
   @Get('slug/:slug')
   @Roles(UserRole.admin)
   async findBySlug(@Param('slug') slug: string) {
-    const campaign = await this.campaignsService.findFirst({
+    const campaign = await this.campaigns.findFirst({
       where: { slug },
       include: { pathToVictory: true },
     })
@@ -93,11 +105,11 @@ export class CampaignsController {
   @Post()
   async create(@ReqUser() user: User) {
     // see if the user already has campaign
-    const existing = await this.campaignsService.findByUser(user.id)
+    const existing = await this.campaigns.findByUser(user.id)
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return await this.campaignsService.createForUser(user)
+    return await this.campaigns.createForUser(user)
   }
 
   @Put('mine')
@@ -113,12 +125,12 @@ export class CampaignsController {
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
       // if user has Admin or Sales role, allow loading campaign by slug param
-      campaign = await this.campaignsService.findFirstOrThrow({
+      campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    return this.campaignsService.updateJsonFields(campaign.id, body)
+    return this.campaigns.updateJsonFields(campaign.id, body)
   }
 
   @Post('launch')
@@ -126,7 +138,7 @@ export class CampaignsController {
   @HttpCode(HttpStatus.OK)
   async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
     try {
-      return await this.campaignsService.launch(user, campaign)
+      return await this.campaigns.launch(user, campaign)
     } catch (e) {
       this.logger.error('Error at campaign launch', e)
       await this.slack.errorMessage({

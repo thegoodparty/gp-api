@@ -56,4 +56,9 @@ export class AdminCampaignsController {
   proCampaignsWithNoVoterFile() {
     return this.adminCampaigns.proNoVoterFile()
   }
+
+  @Get('p2v-stats')
+  p2vStats() {
+    return this.adminCampaigns.p2vStats()
+  }
 }
