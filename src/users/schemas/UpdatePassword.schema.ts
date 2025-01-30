@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { PasswordSchema } from './Password.schema'
+import { PasswordSchema } from 'src/shared/schemas'
 
 export class UpdatePasswordSchemaDto extends createZodDto(
   z
