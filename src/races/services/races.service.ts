@@ -1,32 +1,38 @@
-import { Injectable, Logger } from '@nestjs/common'
-import { PrismaService } from 'src/prisma/prisma.service'
+import { Injectable } from '@nestjs/common'
 import { GraphqlService } from 'src/graphql/graphql.service'
 import slugify from 'slugify'
 import { startOfYear, addYears, format } from 'date-fns'
-import { County, Municipality, Prisma } from '@prisma/client'
+import { County, Municipality } from '@prisma/client'
 import {
   GeoData,
   NormalizedRace,
   Race,
   RaceData,
   RaceQuery,
-} from './races.types'
+} from '../races.types'
 import {
   COUNTY_PROMPT,
   CITY_PROMPT,
   TOWN_PROMPT,
   TOWNSHIP_PROMPT,
   VILLAGE_PROMPT,
-} from './constants/prompts.consts'
-import { MTFCC_TYPES, GEO_TYPES } from './constants/geo.consts'
+} from '../constants/prompts.consts'
+import { MTFCC_TYPES, GEO_TYPES } from '../constants/geo.consts'
+import { CountiesService } from './counties.services'
+import { MunicipalitiesService } from './municipalities.services'
+import { CensusEntitiesService } from './censusEntities.services'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
-export class RacesService {
-  private readonly logger = new Logger(RacesService.name)
+export class RacesService extends createPrismaBase(MODELS.Race) {
   constructor(
-    private prisma: PrismaService,
-    private graphQLService: GraphqlService,
-  ) {}
+    private readonly counties: CountiesService,
+    private readonly municipalities: MunicipalitiesService,
+    private readonly censusEntities: CensusEntitiesService,
+    private readonly graphQLService: GraphqlService,
+  ) {
+    super()
+  }
 
   async findRaces(
     state?: string,
@@ -85,7 +91,7 @@ export class RacesService {
     } else if (countyRecord) {
       query.countyId = countyRecord.id
     }
-    const race = (await this.prisma.race.findFirst({
+    const race = (await this.findFirst({
       where: query,
       orderBy: {
         electionDate: 'asc',
@@ -102,10 +108,6 @@ export class RacesService {
     return this.normalizeRace(race, state)
   }
 
-  async findFirst(args: Prisma.RaceFindFirstArgs) {
-    return await this.prisma.race.findFirst(args)
-  }
-
   async byCity(state: string, county: string, city: string) {
     const countyRecord = await this.getCounty(state, county)
     const municipalityRecord = await this.getMunicipality(state, county, city)
@@ -117,7 +119,7 @@ export class RacesService {
 
     const now = format(new Date(), 'M d, yyyy')
 
-    const races = await this.prisma.race.findMany({
+    const races = await this.findMany({
       where: {
         state: state.toUpperCase(),
         municipalityId: municipalityRecord?.id,
@@ -150,7 +152,7 @@ export class RacesService {
 
     const now = format(new Date(), 'M d, yyyy')
 
-    const races = await this.prisma.race.findMany({
+    const races = await this.findMany({
       where: {
         state: state.toUpperCase(),
         countyId: countyRecord?.id,
@@ -174,7 +176,7 @@ export class RacesService {
 
     const now = format(new Date(), 'M d, yyyy')
 
-    const races = await this.prisma.race.findMany({
+    const races = await this.findMany({
       where: {
         state: state.toUpperCase(),
         level: 'state',
@@ -257,7 +259,7 @@ export class RacesService {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}`
-    return this.prisma.county.findUnique({
+    return this.counties.findUnique({
       where: { slug },
     })
   }
@@ -272,7 +274,7 @@ export class RacesService {
     })}/${slugify(city, {
       lower: true,
     })}`
-    return this.prisma.municipality.findUnique({
+    return this.municipalities.findUnique({
       where: { slug },
     })
   }
@@ -352,7 +354,7 @@ export class RacesService {
       geoId = parseInt(geoId, 10).toString()
     }
     if (mtfcc && geoId) {
-      const census = await this.prisma.censusEntity.findFirst({
+      const census = await this.censusEntities.findFirst({
         where: {
           geoId,
           mtfcc,

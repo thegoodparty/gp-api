@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
-import { ScheduleOutreachCampaignSchema } from './voterFile/schemas/ScheduleOutreachCampaign.schema'
+import { ScheduleOutreachCampaignSchema } from '../voterFile/schemas/ScheduleOutreachCampaign.schema'
 import { Campaign, User } from '@prisma/client'
-import { buildSlackBlocks } from './util/voterOutreach.util'
+import { buildSlackBlocks } from '../util/voterOutreach.util'
 import { FileUpload } from 'src/files/files.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import * as sanitizeHtml from 'sanitize-html'
 import { IS_PROD, WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-import { VOTER_FILE_ROUTE } from './voterFile/voterFile.controller'
+import { VOTER_FILE_ROUTE } from '../voterFile/voterFile.controller'
 import { FilesService } from 'src/files/files.service'
 import {
   SlackChannel,
