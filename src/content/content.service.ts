@@ -9,7 +9,7 @@ import {
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
 import { isObject } from 'src/shared/util/objects.util'
-import { AIChatPromptContents } from './content.types'
+import { AIChatPromptContents, findByTypeOptions } from './content.types'
 
 const transformContent = (
   type: ContentType | InferredContentTypes,
@@ -38,12 +38,8 @@ export class ContentService {
     })
   }
 
-  async findByType(
-    type: ContentType | InferredContentTypes,
-    orderBy?: Prisma.ContentOrderByWithRelationInput,
-    take?: number,
-    where?: Prisma.ContentWhereInput,
-  ) {
+  async findByType(options: findByTypeOptions) {
+    const { type, take, orderBy, where } = options
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
 

@@ -1,11 +1,19 @@
 import { Block, Inline } from '@contentful/rich-text-types'
 import { EntrySys, FieldsType } from 'contentful'
-import { Content } from '@prisma/client'
+import { Content, ContentType, Prisma } from '@prisma/client'
+import { InferredContentTypes } from './CONTENT_TYPE_MAP.const'
 
 export const TYPE_FAQ_ARTICLE = 'faqArticle'
 export const TYPE_ARTICLE_CATEGORY = 'articleCategory'
 export const TYPE_BLOG_SECTION = 'blogSection'
 export const TYPE_BLOG_ARTICLE = 'blogArticle'
+
+export interface findByTypeOptions {
+  type: ContentType | InferredContentTypes
+  orderBy?: Prisma.ContentOrderByWithRelationInput
+  take?: number
+  where?: Prisma.ContentWhereInput
+}
 
 export interface ImageRaw {
   fields: {

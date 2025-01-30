@@ -67,7 +67,7 @@ export class ContentController {
     if (!CONTENT_TYPE_MAP[type]) {
       throw new BadRequestException(`${type} is not a valid content type`)
     }
-    return this.contentService.findByType(type)
+    return this.contentService.findByType({ type })
   }
 
   @Get('sync')
@@ -85,9 +85,9 @@ export class ContentController {
 
   @Get('blog-articles-by-section/:sectionSlug')
   async findBlogArticlesBySection(@Param('sectionSlug') sectionSlug: string) {
-    const sections: BlogSection[] = await this.contentService.findByType(
-      InferredContentTypes.blogSections,
-    )
+    const sections: BlogSection[] = await this.contentService.findByType({
+      type: InferredContentTypes.blogSections,
+    })
     if (!sections) {
       throw new InternalServerErrorException("Blog sections couldn't be pulled")
     }
@@ -120,15 +120,15 @@ export class ContentController {
 
   @Get('blog-articles-by-section')
   async listBlogArticlesBySection() {
-    const sections: BlogSection[] = await this.contentService.findByType(
-      InferredContentTypes.blogSections,
-    )
+    const sections: BlogSection[] = await this.contentService.findByType({
+      type: InferredContentTypes.blogSections,
+    })
     const heroObj: BlogArticleAugmented[] =
-      await this.contentService.findByType(
-        ContentType.blogArticle,
-        { id: 'desc' },
-        1,
-      )
+      await this.contentService.findByType({
+        type: ContentType.blogArticle,
+        orderBy: { id: 'desc' },
+        take: 1,
+      })
     if (!sections || !heroObj) {
       throw new InternalServerErrorException(
         'blogSection or blogArticle could not be found',
@@ -159,7 +159,9 @@ export class ContentController {
   @Get('blog-articles-by-tag/:tag')
   async findBlogArticlesByTag(@Param('tag') tag: string) {
     const articleSlugsByTag: ArticleSlugsByTag[] =
-      await this.contentService.findByType(InferredContentTypes.articleTag)
+      await this.contentService.findByType({
+        type: InferredContentTypes.articleTag,
+      })
     const selectedArticleSlugsByTag = articleSlugsByTag[0][tag]
 
     if (!selectedArticleSlugsByTag) {
@@ -167,7 +169,7 @@ export class ContentController {
     }
 
     const blogArticles: BlogArticleAugmented[] =
-      await this.contentService.findByType(ContentType.blogArticle)
+      await this.contentService.findByType({ type: ContentType.blogArticle })
     const filteredBlogArticles = blogArticles.filter((article) => {
       return selectedArticleSlugsByTag.articleSlugs.includes(article.slug)
     })
@@ -199,17 +201,15 @@ export class ContentController {
   @Get('blog-articles-by-slug/:slug')
   async findBlogArticlesBySlug(@Param('slug') slug: string) {
     const blogArticles: BlogArticleAugmented[] =
-      await this.contentService.findByType(
-        ContentType.blogArticle,
-        undefined,
-        undefined,
-        {
+      await this.contentService.findByType({
+        type: ContentType.blogArticle,
+        where: {
           data: {
             path: ['slug'],
             equals: slug,
           },
         },
-      )
+      })
 
     const articles: BlogArticlePreview2 = {}
 
