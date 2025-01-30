@@ -98,7 +98,7 @@ export class AdminCampaignsService {
   }
 
   async proNoVoterFile() {
-    const campaigns = (await this.campaigns.findAll({
+    const campaigns = (await this.campaigns.findMany({
       where: {
         NOT: {
           userId: undefined,

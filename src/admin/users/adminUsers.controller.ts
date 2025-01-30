@@ -44,7 +44,7 @@ export class AdminUsersController {
   @Get()
   async list(@Query() { dateRange }: AdminUserListSchema) {
     if (!dateRange || dateRange === DateRangeFilter.allTime) {
-      return this.usersService.findAllUsers()
+      return this.usersService.findMany()
     }
     let date = new Date()
     if (dateRange === DateRangeFilter.last12Months) {
@@ -58,7 +58,7 @@ export class AdminUsersController {
       throw new BadRequestException('Invalid date range')
     }
 
-    return this.usersService.findAllUsers({ createdAt: { gt: date } })
+    return this.usersService.findMany({ where: { createdAt: { gt: date } } })
   }
 
   @Post()
@@ -86,7 +86,7 @@ export class AdminUsersController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id', ParseIntPipe) id: number) {
-    const user = await this.usersService.findUserOrThrow({ id })
+    const user = await this.usersService.findUniqueOrThrow({ where: { id } })
 
     await this.campaignsService.deleteAll({ where: { userId: user.id } })
     await this.usersService.deleteUser(user.id)

@@ -61,7 +61,7 @@ export class CampaignsController {
         },
       },
     }
-    return this.campaigns.findAll({ where, include })
+    return this.campaigns.findMany({ where, include })
   }
 
   @Get('mine')
@@ -128,7 +128,7 @@ export class CampaignsController {
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
-    }
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
 
     return this.campaigns.updateJsonFields(campaign.id, body)
   }
