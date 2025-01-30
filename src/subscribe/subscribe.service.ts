@@ -65,6 +65,6 @@ export class SubscribeService {
     // TODO: Write hubspot service including submitForm function
     // await helper submitForm(id, crmFields, page, uri)
 
-    return 'fat'
+    return
   }
 }
