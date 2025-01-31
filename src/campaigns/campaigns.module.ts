@@ -13,9 +13,18 @@ import { RacesModule } from 'src/races/races.module'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
 import { PathToVictoryService } from './services/path-to-victory.service/pathToVictory.service'
+import { AiChatService } from './ai/chat/aiChat.service'
+import { AiModule } from '../ai/ai.module'
+import { ContentModule } from '../content/content.module'
 
 @Module({
-  imports: [EmailModule, forwardRef(() => UsersModule), RacesModule],
+  imports: [
+    EmailModule,
+    forwardRef(() => UsersModule),
+    RacesModule,
+    AiModule,
+    ContentModule,
+  ],
   controllers: [
     CampaignsController,
     CampaignPositionsController,
@@ -30,7 +39,13 @@ import { PathToVictoryService } from './services/path-to-victory.service/pathToV
     GeocodingService,
     CampaignUpdateHistoryService,
     PathToVictoryService,
+    AiChatService,
   ],
-  exports: [CampaignsService],
+  exports: [
+    CampaignsService,
+    AiChatService,
+    PathToVictoryService,
+    CampaignUpdateHistoryService,
+  ],
 })
 export class CampaignsModule {}

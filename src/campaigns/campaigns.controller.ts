@@ -93,7 +93,7 @@ export class CampaignsController {
   @Post()
   async create(@ReqUser() user: User) {
     // see if the user already has campaign
-    const existing = await this.campaignsService.findByUser(user.id)
+    const existing = await this.campaignsService.findByUserId(user.id)
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }

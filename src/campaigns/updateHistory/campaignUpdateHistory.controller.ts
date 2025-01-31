@@ -38,7 +38,7 @@ export class CampaignUpdateHistoryController {
 
     const campaign = slug
       ? await this.campaigns.findFirstOrThrow({ where: { slug } })
-      : await this.campaigns.findByUser(user.id)
+      : await this.campaigns.findByUserId(user.id)
 
     const updateHistory = await this.updateHistory.findMany({
       where: {

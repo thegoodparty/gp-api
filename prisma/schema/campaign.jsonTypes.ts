@@ -78,6 +78,8 @@ declare global {
       textCampaignCount?: number
       lastStepDate?: string
       adminUserEmail?: string
+      hubspotId?: string
+      name?: string
     }
 
     export type CampaignAiContent = {

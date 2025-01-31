@@ -59,7 +59,7 @@ export class CampaignsService {
   }
 
   // Likely not needed, easier to use findFirst with a where: { userId }
-  findByUser<T extends Prisma.CampaignInclude>(
+  findByUserId<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
   ) {

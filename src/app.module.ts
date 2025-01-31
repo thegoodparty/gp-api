@@ -21,6 +21,7 @@ import { SharedModule } from './shared/shared.module'
 import { PaymentsModule } from './payments/payments.module'
 import { VotersModule } from './voters/voters.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
+import { CrmModule } from './crm/crmModule'
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
     PaymentsModule,
     VotersModule,
     ErrorLoggerModule,
+    CrmModule,
   ],
   controllers: [AppController],
   providers: [

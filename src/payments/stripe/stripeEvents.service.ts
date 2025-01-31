@@ -75,7 +75,7 @@ export class StripeEventsService {
         'No user found with given subscription customerId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id, {
+    const campaign = await this.campaignsService.findByUserId(user.id, {
       pathToVictory: true,
     })
     if (!campaign) {
@@ -157,7 +157,7 @@ export class StripeEventsService {
         'No user found with given checkout session userId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id, {
+    const campaign = await this.campaignsService.findByUserId(user.id, {
       pathToVictory: true,
     })
     if (!campaign) {

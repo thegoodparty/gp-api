@@ -35,7 +35,7 @@ export class UseCampaignGuard implements CanActivate {
       )
 
     // load campaign for current user
-    const campaign = await this.campaignsService.findByUser(
+    const campaign = await this.campaignsService.findByUserId(
       request.user.id,
       campaignInclude ?? { pathToVictory: true }, // default to include path to victory
     )

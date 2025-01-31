@@ -271,7 +271,7 @@ export class FullStoryService {
       return
     }
 
-    const campaign = await this.campaigns.findByUser(user.id, {
+    const campaign = await this.campaigns.findByUserId(user.id, {
       pathToVictory: true,
     })
     const { pathToVictory } = campaign

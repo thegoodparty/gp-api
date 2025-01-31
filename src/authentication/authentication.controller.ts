@@ -125,7 +125,7 @@ export class AuthenticationController {
     if (adminCreate) {
       // check if the campaign attached to this user is marked as created by admin
       // to automatically login after the password change
-      const campaign = await this.campaignsService.findByUser(user.id)
+      const campaign = await this.campaignsService.findByUserId(user.id)
 
       if (campaign?.data.createdBy !== 'admin') {
         // don't login just return
