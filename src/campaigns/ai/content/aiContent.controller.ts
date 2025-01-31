@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   InternalServerErrorException,
@@ -10,18 +12,23 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Res,
   UsePipes,
 } from '@nestjs/common'
 import { AiContentService } from './aiContent.service'
 import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { Campaign } from '@prisma/client'
+import { Campaign, UserRole } from '@prisma/client'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
 import { CampaignsService } from '../../services/campaigns.service'
 import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../decorators/UseCampaign.decorator'
+import { GetSystemPromptSchema } from './schemas/GetSystemPrompt.schema'
+import { ContentService } from 'src/content/content.service'
+import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
+import { Roles } from 'src/authentication/decorators/Roles.decorator'
 
 @Controller('campaigns/ai')
 @UseCampaign()
@@ -30,18 +37,20 @@ export class AiContentController {
   private readonly logger = new Logger(AiContentController.name)
 
   constructor(
-    private aiContentService: AiContentService,
-    private campaignsService: CampaignsService,
+    private readonly aiContent: AiContentService,
+    private readonly ai: AiService,
+    private readonly campaigns: CampaignsService,
+    private readonly content: ContentService,
   ) {}
 
-  @Post() // campaign/ai/create.js
+  @Post()
   async create(
     @Res({ passthrough: true }) res: FastifyReply,
     @ReqCampaign() campaign: Campaign,
     @Body() body: CreateAiContentSchema,
   ) {
     try {
-      const result = await this.aiContentService.createContent(campaign, body)
+      const result = await this.aiContent.createContent(campaign, body)
 
       if (result.created) {
         res.statusCode = HttpStatus.CREATED
@@ -62,7 +71,7 @@ export class AiContentController {
     }
   }
 
-  @Put('rename') // campaign/ai/rename.js
+  @Put('rename')
   @HttpCode(HttpStatus.OK)
   async rename(
     @ReqCampaign() campaign: Campaign,
@@ -76,13 +85,13 @@ export class AiContentController {
 
     aiContent[key]['name'] = name
 
-    return this.campaignsService.update({
+    return this.campaigns.update({
       where: { id: campaign.id },
       data: { aiContent },
     })
   }
 
-  @Delete(':key') // campaign/ai/delete.js
+  @Delete(':key')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@ReqCampaign() campaign: Campaign, @Param('key') key: string) {
     const aiContent = campaign.aiContent
@@ -95,9 +104,51 @@ export class AiContentController {
     delete aiContent[key]
     delete aiContent.generationStatus?.[key]
 
-    return this.campaignsService.update({
+    return this.campaigns.update({
       where: { id: campaign.id },
       data: { aiContent },
     })
+  }
+
+  @Get('system-prompt')
+  @Roles(UserRole.admin)
+  async systemPrompt(
+    @Query() { slug, initial = false }: GetSystemPromptSchema,
+  ) {
+    const campaign = (await this.campaigns.findFirst({
+      where: { slug },
+      include: {
+        pathToVictory: true,
+        campaignPositions: {
+          include: {
+            topIssue: true,
+            position: true,
+          },
+        },
+        campaignUpdateHistory: true,
+        user: true,
+      },
+    })) as PromptReplaceCampaign
+
+    if (!campaign) {
+      throw new BadRequestException('No campaign found')
+    }
+
+    const { candidateJson, systemPrompt } =
+      await this.content.getChatSystemPrompt(initial)
+
+    const candidateContext = await this.ai.promptReplace(
+      candidateJson,
+      campaign,
+    )
+
+    if (!candidateContext || !systemPrompt) {
+      throw new NotFoundException('No system prompt')
+    }
+
+    return {
+      candidateContext,
+      systemPrompt,
+    }
   }
 }

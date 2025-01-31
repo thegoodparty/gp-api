@@ -3,7 +3,7 @@ import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { CHANNEL_TO_TYPE_MAP } from './voterFile.types'
 import { typeToQuery } from './util/voterFile.util'
-import { VoterDataService } from '../voterData.service'
+import { VoterDatabaseService } from '../services/voterDatabase.service'
 import { Campaign, User } from '@prisma/client'
 import { SlackService } from 'src/shared/services/slack.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
@@ -16,7 +16,7 @@ export class VoterFileService {
   private readonly logger = new Logger(VoterFileService.name)
 
   constructor(
-    private readonly voterDataService: VoterDataService,
+    private readonly voterDb: VoterDatabaseService,
     private readonly slack: SlackService,
   ) {}
 
@@ -32,7 +32,7 @@ export class VoterFileService {
     const countQuery = typeToQuery(resolvedType, campaign, customFilters, true)
     this.logger.debug('Count Query:', countQuery)
     let withFixColumns = false
-    const sqlResponse = await this.voterDataService.query(countQuery)
+    const sqlResponse = await this.voterDb.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
     if (count === 0) {
       withFixColumns = true
@@ -48,7 +48,7 @@ export class VoterFileService {
         true,
         true,
       )
-      const sqlResponse = await this.voterDataService.query(countQuery)
+      const sqlResponse = await this.voterDb.query(countQuery)
       const count = parseInt(sqlResponse.rows[0].count)
       return count
     }
@@ -63,12 +63,12 @@ export class VoterFileService {
       withFixColumns,
     )
     this.logger.debug('Constructed Query:', query)
-    return this.voterDataService.csvStream(query)
+    return this.voterDb.csvStream(query)
   }
 
   wakeUp() {
     const query = `SELECT "LALVOTERID" FROM public."VoterCA" where "LALVOTERID" = 'LALCA3184219' limit 1`
-    return this.voterDataService.csvStream(query)
+    return this.voterDb.csvStream(query)
   }
 
   async helpMessage(

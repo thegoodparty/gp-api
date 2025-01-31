@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/prisma/prisma.service'
 import { CreateCampaignPositionSchema } from './schemas/CreateCampaignPosition.schema'
 import { UpdateCampaignPositionSchema } from './schemas/UpdateCampaignPosition.schema'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
-export class CampaignPositionsService {
-  constructor(private prisma: PrismaService) {}
-
+export class CampaignPositionsService extends createPrismaBase(
+  MODELS.CampaignPosition,
+) {
   findByCampaignId(campaignId: number) {
-    return this.prisma.campaignPosition.findFirstOrThrow({
+    return this.findFirstOrThrow({
       where: {
         campaignId,
       },
@@ -16,11 +16,11 @@ export class CampaignPositionsService {
   }
 
   create(data: CreateCampaignPositionSchema) {
-    return this.prisma.campaignPosition.create({ data })
+    return this.model.create({ data })
   }
 
   update(id: number, { description, order }: UpdateCampaignPositionSchema) {
-    return this.prisma.campaignPosition.update({
+    return this.model.update({
       where: { id },
       data: {
         description,
@@ -30,6 +30,6 @@ export class CampaignPositionsService {
   }
 
   delete(id: number) {
-    return this.prisma.campaignPosition.delete({ where: { id } })
+    return this.model.delete({ where: { id } })
   }
 }

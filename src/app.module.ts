@@ -19,6 +19,7 @@ import { QueueConsumerModule } from './queue/consumer/consumer.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
 import { SharedModule } from './shared/shared.module'
 import { PaymentsModule } from './payments/payments.module'
+import { VotersModule } from './voters/voters.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { SubscribeModule } from './subscribe/subscribe.module'
 
@@ -39,6 +40,7 @@ import { SubscribeModule } from './subscribe/subscribe.module'
     QueueConsumerModule,
     SharedModule,
     PaymentsModule,
+    VotersModule,
     ErrorLoggerModule,
     SubscribeModule,
   ],

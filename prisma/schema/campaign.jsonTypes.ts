@@ -8,7 +8,7 @@ import {
   OnboardingStep,
   VoterGoals,
 } from 'src/campaigns/campaigns.types'
-import { CustomVoterFile } from 'src/voterData/voterFile/voterFile.types'
+import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
 
 export {}
 
@@ -22,6 +22,7 @@ declare global {
       primaryElectionDate?: string
       zip?: User['zip']
       knowRun?: 'yes' | null
+      runForOffice?: 'yes' | 'no' | null
       pledged?: boolean
       isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
