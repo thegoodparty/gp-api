@@ -4,9 +4,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
-  Logger,
 } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
@@ -25,52 +23,31 @@ import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
-export class CampaignsService {
-  private readonly logger = new Logger(CampaignsService.name)
-
+export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
-    private prisma: PrismaService,
     private planVersionService: CampaignPlanVersionsService,
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
     private emailService: EmailService,
-  ) {}
-
-  count(args: Prisma.CampaignCountArgs) {
-    return this.prisma.campaign.count(args)
-  }
-  // TODO: Figure out an explicit return type that doesn't require
-  // the return value to be cast to make included properties recognized by TS
-  findAll(args?: Prisma.CampaignFindManyArgs) {
-    return this.prisma.campaign.findMany(args)
+  ) {
+    super()
   }
 
-  findFirst(args: Prisma.CampaignFindFirstArgs) {
-    return this.prisma.campaign.findFirst(args)
-  }
-
-  // TODO: Include path to victory here or everywhere else?
-  findFirstOrThrow(
-    args: Prisma.CampaignFindFirstOrThrowArgs,
-  ): Prisma.PrismaPromise<Prisma.CampaignGetPayload<typeof args>> {
-    return this.prisma.campaign.findFirstOrThrow(args)
-  }
-
-  // Likely not needed, easier to use findFirst with a where: { userId }
   findByUserId<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
   ) {
-    return this.prisma.campaign.findFirst({
+    return this.findFirst({
       where: { userId },
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
-    return this.prisma.campaign.create(args)
+    return this.model.create(args)
   }
   async findBySubscriptionId(subscriptionId: string) {
     return this.findFirst({
@@ -86,7 +63,7 @@ export class CampaignsService {
   async createForUser(user: User) {
     const slug = await this.findSlug(user)
 
-    const newCampaign = await this.prisma.campaign.create({
+    const newCampaign = await this.model.create({
       data: {
         slug,
         isActive: false,
@@ -108,7 +85,7 @@ export class CampaignsService {
   }
 
   async update(args: Prisma.CampaignUpdateArgs) {
-    const campaign = await this.prisma.campaign.update(args)
+    const campaign = await this.model.update(args)
     campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
     return campaign
   }
@@ -116,7 +93,7 @@ export class CampaignsService {
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
     const { data, details, pathToVictory } = body
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.client.$transaction(async (tx) => {
       const campaign = await tx.campaign.findFirst({
         where: { id },
         include: { pathToVictory: true },
@@ -233,7 +210,7 @@ export class CampaignsService {
 
     const { data, details, slug, id } = campaign
 
-    await this.prisma.campaign.update({
+    await this.model.update({
       where: { id },
       data: {
         data: { ...data, lastVisited: timestamp },
@@ -265,11 +242,11 @@ export class CampaignsService {
   }
 
   delete(args: Prisma.CampaignDeleteArgs) {
-    return this.prisma.campaign.delete(args)
+    return this.model.delete(args)
   }
 
   deleteAll(args: Prisma.CampaignDeleteManyArgs) {
-    return this.prisma.campaign.deleteMany(args)
+    return this.model.deleteMany(args)
   }
 
   async launch(user: User, campaign: Campaign) {
@@ -292,7 +269,7 @@ export class CampaignsService {
       throw new BadRequestException('Cannot launch campaign, Office not set')
     }
 
-    await this.prisma.campaign.update({
+    await this.model.update({
       where: { id: campaign.id },
       data: {
         isActive: true,
@@ -317,14 +294,14 @@ export class CampaignsService {
     const name = getUserFullName(user)
     const MAX_TRIES = 100
     const slug = buildSlug(name, suffix)
-    const exists = await this.prisma.campaign.findUnique({ where: { slug } })
+    const exists = await this.findUnique({ where: { slug } })
     if (!exists) {
       return slug
     }
 
     for (let i = 1; i < MAX_TRIES; i++) {
       const slug = buildSlug(`${name}${i}`, suffix)
-      const exists = await this.prisma.campaign.findUnique({ where: { slug } })
+      const exists = await this.findUnique({ where: { slug } })
       if (!exists) {
         return slug
       }

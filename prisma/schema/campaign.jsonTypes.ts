@@ -23,6 +23,7 @@ declare global {
       primaryElectionDate?: string
       zip?: User['zip']
       knowRun?: 'yes' | null
+      runForOffice?: 'yes' | 'no' | null
       pledged?: boolean
       isProUpdatedAt?: number // TODO: make this an ISO dateTime string
       customIssues?: Record<'title' | 'position', string>[]
@@ -43,7 +44,6 @@ declare global {
       district?: string
       raceId?: string
       level?: ElectionLevel | null
-      runForOffice?: boolean
       noNormalizedOffice?: boolean
       website?: string
       pastExperience?: string

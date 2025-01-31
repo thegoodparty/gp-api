@@ -116,8 +116,10 @@ export class CrmCampaignsService {
       id: campaignId,
     } = campaign || {}
     const user = (await this.users.findByCampaign(campaign)) || {}
-    const aiChatCount = userId ? await this.aiChat.count(userId) : 0
-    const pathToVictory = await this.pathToVictory.findUnique({
+    const aiChatCount = userId
+      ? await this.aiChat.count({ where: { id: userId } })
+      : 0
+    const pathToVictory = await this.pathToVictory.findFirst({
       where: { campaignId: campaignId },
     })
     const p2vData = pathToVictory!.data

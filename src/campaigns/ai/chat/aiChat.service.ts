@@ -1,8 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { ContentService } from 'src/content/content.service'
-import { PrismaService } from 'src/prisma/prisma.service'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
@@ -10,53 +9,18 @@ import { SlackService } from 'src/shared/services/slack.service'
 import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../shared/services/slackService.types'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
 
 @Injectable()
-export class AiChatService {
-  private readonly logger = new Logger(AiChatService.name)
-
+export class AiChatService extends createPrismaBase(MODELS.AiChat) {
   constructor(
     private aiService: AiService,
     private contentService: ContentService,
-    private prisma: PrismaService,
     private slack: SlackService,
-  ) {}
-
-  findAll(userId: number) {
-    return this.prisma.aiChat.findMany({
-      where: {
-        userId,
-      },
-      orderBy: { updatedAt: 'desc' },
-    })
-  }
-
-  findOne(threadId: string, userId: number) {
-    return this.prisma.aiChat.findFirst({
-      where: {
-        threadId,
-        userId,
-      },
-    })
-  }
-
-  findOneOrThrow(threadId: string, userId: number) {
-    return this.prisma.aiChat.findFirstOrThrow({
-      where: {
-        threadId,
-        userId,
-      },
-    })
-  }
-
-  count(userId: number) {
-    return this.prisma.aiChat.count({
-      where: {
-        userId,
-      },
-    })
+  ) {
+    super()
   }
 
   async create(
@@ -112,7 +76,7 @@ export class AiChatService {
         usage: completion.usage,
       }
 
-      await this.prisma.aiChat.create({
+      await this.model.create({
         data: {
           assistant: LLAMA_AI_ASSISTANT,
           threadId: completion.threadId,
@@ -141,7 +105,7 @@ export class AiChatService {
       throw new Error('Cannot regenerate without threadId')
     }
 
-    const aiChat = await this.prisma.aiChat.findFirstOrThrow({
+    const aiChat = await this.findFirstOrThrow({
       where: {
         threadId,
         userId: campaign.user?.id,
@@ -196,7 +160,7 @@ export class AiChatService {
         usage: completion.usage,
       }
 
-      await this.prisma.aiChat.update({
+      await this.model.update({
         where: { id: aiChat.id },
         data: {
           data: {
@@ -213,7 +177,7 @@ export class AiChatService {
   }
 
   delete(threadId: string, userId: number) {
-    return this.prisma.aiChat.delete({
+    return this.model.delete({
       where: {
         threadId,
         userId,
@@ -226,7 +190,7 @@ export class AiChatService {
     threadId: string,
     { type, message }: AiChatFeedbackSchema,
   ) {
-    const aiChat = await this.prisma.aiChat.findFirstOrThrow({
+    const aiChat = await this.findFirstOrThrow({
       where: {
         threadId,
         userId: user.id,
@@ -234,7 +198,7 @@ export class AiChatService {
     })
     const chatData = aiChat.data
 
-    await this.prisma.aiChat.update({
+    await this.model.update({
       where: { id: aiChat.id },
       data: {
         data: {

@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { BasePrismaService } from '../../../prisma/basePrisma.service'
+import { createPrismaBase, MODELS } from '../../../prisma/util/prisma.util'
 
 @Injectable()
-export class PathToVictoryService extends BasePrismaService<'pathToVictory'> {
-  constructor() {
-    super('pathToVictory')
-  }
-}
+export class PathToVictoryService extends createPrismaBase(
+  MODELS.PathToVictory,
+) {}

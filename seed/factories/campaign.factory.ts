@@ -6,7 +6,10 @@ import { generateFactory } from './generate'
 import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
-  const electionDate = faker.date.past()
+  const electionDate = faker.date.between({
+    from: faker.date.past(),
+    to: faker.date.future(),
+  })
   const campaign: Omit<Campaign, 'id' | 'userId'> = {
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
@@ -37,6 +40,13 @@ export const campaignFactory = generateFactory<Campaign>(() => {
       geoLocation: {},
       party: faker.lorem.word(),
       office: faker.lorem.word(),
+      raceId: faker.string.nanoid(),
+      pledged: faker.datatype.boolean(0.8),
+      knowRun: faker.helpers.maybe(() => 'yes', { probability: 0.6 }),
+      runForOffice: faker.helpers.maybe(
+        () => faker.helpers.arrayElement(['yes', 'no']),
+        { probability: 0.6 },
+      ),
     },
     aiContent: {
       launchSocialMediaCopy: {

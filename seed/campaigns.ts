@@ -13,7 +13,8 @@ import { getUserFullName } from 'src/users/util/users.util'
 import { Campaign } from '@prisma/client'
 import fixedCampaigns from './fixedCampaigns.json'
 import 'prisma/schema/pathToVictory.jsonTypes'
-const NUM_GENERATED_CAMPAIGNS = 40
+import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
+const NUM_GENERATED_CAMPAIGNS = 100
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =
   fixedCampaigns as Partial<Campaign>[]
@@ -94,6 +95,11 @@ async function createCampaignAndUser(
       slug: buildSlug(getUserFullName(user)),
       ...(fixedData || {}),
     }),
+  })
+
+  // create a campaign plan version
+  await prisma.campaignPlanVersion.create({
+    data: campaignPlanVersionFactory({ campaignId: campaign.id }),
   })
 
   return {

@@ -22,6 +22,7 @@ import { PaymentsModule } from './payments/payments.module'
 import { VotersModule } from './voters/voters.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
+import { SubscribeModule } from './subscribe/subscribe.module'
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { CrmModule } from './crm/crmModule'
     VotersModule,
     ErrorLoggerModule,
     CrmModule,
+    SubscribeModule,
   ],
   controllers: [AppController],
   providers: [

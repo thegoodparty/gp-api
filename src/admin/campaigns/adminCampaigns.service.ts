@@ -11,6 +11,9 @@ import { AdminP2VService } from '../services/adminP2V.service'
 import { CampaignWith, OnboardingStep } from 'src/campaigns/campaigns.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
+import { formatDate } from 'date-fns'
+import { P2VStatus } from 'src/races/types/pathToVictory.types'
+import { DateFormats } from 'src/shared/util/date.util'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -95,7 +98,7 @@ export class AdminCampaignsService {
   }
 
   async proNoVoterFile() {
-    const campaigns = (await this.campaigns.findAll({
+    const campaigns = (await this.campaigns.findMany({
       where: {
         NOT: {
           userId: undefined,
@@ -120,6 +123,24 @@ export class AdminCampaignsService {
     }
 
     return noVoterFile
+  }
+
+  async p2vStats() {
+    // get todays date in format yyyy-mm-dd
+    const date = formatDate(new Date(), DateFormats.isoDate)
+
+    const [auto, manual, pending] = await Promise.all([
+      this.getAutoP2V(date),
+      this.getManualP2V(date),
+      this.getPendingP2V(date),
+    ])
+
+    return {
+      auto,
+      manual,
+      pending,
+      total: auto + manual + pending,
+    }
   }
 
   async sendVictoryEmail(id: number) {
@@ -155,5 +176,155 @@ export class AdminCampaignsService {
     }
 
     return true
+  }
+
+  private async getAutoP2V(electionDate: string) {
+    return this.campaigns.count({
+      where: {
+        AND: [
+          {
+            details: {
+              path: ['electionDate'],
+              gt: electionDate,
+            },
+          },
+          {
+            details: {
+              path: ['raceId'],
+              not: Prisma.AnyNull,
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vStatus'],
+                equals: P2VStatus.complete,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vNotNeeded'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['electionType'],
+                not: Prisma.AnyNull,
+              },
+            },
+          },
+        ],
+      },
+    })
+  }
+
+  private async getManualP2V(electionDate: string) {
+    // TODO: switch to checking for data->>'completedBy' IS NULL (comment copied from tgp-api)
+    return this.campaigns.count({
+      where: {
+        AND: [
+          {
+            details: {
+              path: ['electionDate'],
+              gt: electionDate,
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vStatus'],
+                equals: P2VStatus.complete,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vNotNeeded'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['electionType'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+        ],
+      },
+    })
+  }
+
+  private async getPendingP2V(electionDate: string) {
+    return this.campaigns.count({
+      where: {
+        AND: [
+          {
+            details: {
+              path: ['electionDate'],
+              gt: electionDate,
+            },
+          },
+          {
+            details: {
+              path: ['pledged'],
+              equals: true,
+            },
+          },
+          {
+            OR: [
+              {
+                details: {
+                  path: ['knowRun'],
+                  equals: 'yes',
+                },
+              },
+              {
+                details: {
+                  path: ['runForOffice'],
+                  equals: 'yes',
+                },
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                pathToVictory: {
+                  data: {
+                    path: ['p2vStatus'],
+                    equals: P2VStatus.waiting,
+                  },
+                },
+              },
+              {
+                pathToVictory: {
+                  data: {
+                    path: ['p2vStatus'],
+                    equals: Prisma.AnyNull,
+                  },
+                },
+              },
+            ],
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vNotNeeded'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+        ],
+      },
+    })
   }
 }
