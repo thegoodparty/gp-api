@@ -31,6 +31,7 @@ import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
 import { AuthenticationService } from '../authentication/authentication.service'
+import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
@@ -64,6 +65,11 @@ export class UsersController {
     return ReadUserOutputSchema.parse(
       await this.usersService.findUser({ id: user.id }),
     )
+  }
+
+  @Put('me')
+  updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
+    return this.usersService.updateUser({ id: user.id }, body ?? {})
   }
 
   @Get('me/metadata')
@@ -128,7 +134,7 @@ export class UsersController {
   }
 
   @UseGuards(UserOwnerOrAdminGuard)
-  @Put('/:id/password')
+  @Put(':id/password')
   async updatePassword(
     @Body() body: UpdatePasswordSchemaDto,
     @ReqUser() user: User,
