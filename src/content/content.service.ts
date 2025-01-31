@@ -8,7 +8,7 @@ import {
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
 import { isObject } from 'src/shared/util/objects.util'
-import { AIChatPromptContents } from './content.types'
+import { AIChatPromptContents, findByTypeOptions } from './content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const transformContent = (
@@ -37,11 +37,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     })
   }
 
-  async findByType(
-    type: ContentType | InferredContentTypes,
-    orderBy?: Prisma.ContentOrderByWithRelationInput,
-    take?: number,
-  ) {
+  async findByType({ type, take, orderBy, where }: findByTypeOptions) {
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
 
@@ -50,7 +46,10 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       : { type: queryType }
 
     const entries = await this.findMany({
-      where: whereCondition,
+      where: {
+        ...whereCondition,
+        ...where,
+      },
       orderBy: orderBy || undefined,
       take: take || undefined,
     })
