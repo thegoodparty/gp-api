@@ -4,6 +4,7 @@ import { CRMCompanyProperties } from './crm.types'
 import {
   SimplePublicObject,
   SimplePublicObjectInputForCreate,
+  SimplePublicObjectWithAssociations,
 } from '@hubspot/api-client/lib/codegen/crm/deals'
 import {
   ApiException,
@@ -23,6 +24,42 @@ import { AiChatService } from '../campaigns/ai/chat/aiChat.service'
 import { PathToVictoryService } from '../campaigns/services/path-to-victory.service/pathToVictory.service'
 import { CampaignUpdateHistoryService } from '../campaigns/updateHistory/campaignUpdateHistory.service'
 import { VoterFileService } from '../voters/voterFile/voterFile.service'
+import { IS_PROD } from '../shared/util/appEnvironment.util'
+
+export const HUBSPOT_COMPANY_PROPERTIES = [
+  'past_candidate',
+  'incumbent',
+  'candidate_experience_level',
+  'final_viability_rating',
+  'primary_election_result',
+  'election_results',
+  'professional_experience',
+  'p2p_campaigns',
+  'p2p_sent',
+  'confirmed_self_filer',
+  'verified_candidates',
+  'date_verified',
+  'pro_candidate',
+  'filing_deadline',
+  'opponents',
+  'hubspot_owner_id',
+  'office_type',
+]
+
+/// map of emails to slack ids for mentioning users
+const EMAIL_TO_SLACK_ID = {
+  'sanjeev@goodparty.org': 'U07GUGCQ88M',
+  // PA emails
+  'jared@goodparty.org': 'U01AY0VQFPE',
+  'ryan@goodparty.org': 'U06T7RGGHEZ',
+  'kyron.banks@goodparty.org': 'U07JWLYDDUH',
+  'alex.barrio@goodparty.org': 'U0748BRPPJQ',
+  'trey.stradling@goodparty.org': 'U06FPEP4QBZ',
+  'alex.gibson@goodparty.org': 'U079ASLQ9G8',
+  'dllane2012@gmail.com': 'U06U033GHDE',
+  'aaron.soriano@goodparty.org': 'U07QXHVNDEJ',
+  'nate.allen@goodparty.org': 'U07R9RNFTFX',
+}
 
 @Injectable()
 export class CrmCampaignsService {
@@ -38,6 +75,50 @@ export class CrmCampaignsService {
     private readonly slack: SlackService,
     private readonly users: UsersService,
   ) {}
+
+  async getCrmCompanyById(hubspotId: string) {
+    return await this.hubspot.client.crm.companies.basicApi.getById(
+      hubspotId,
+      HUBSPOT_COMPANY_PROPERTIES,
+    )
+  }
+
+  private async getCompanyOwner(companyOwnerId: number) {
+    try {
+      return await this.hubspot.client.crm.owners.ownersApi.getById(
+        companyOwnerId,
+      )
+    } catch (error) {
+      const message = 'hubspot error - get-company-owner'
+      this.logger.error(message, error)
+      this.slack.errorMessage({
+        message,
+        error,
+      })
+    }
+  }
+
+  async getCrmCompanyOwnerName(crmCompany: SimplePublicObjectWithAssociations) {
+    if (!crmCompany?.properties) {
+      this.logger.error('no properties found for crm company')
+      return
+    }
+    let crmCompanyOwnerName = ''
+    try {
+      const crmCompanyOwner = await this.getCompanyOwner(
+        parseInt(crmCompany?.properties?.hubspot_owner_id as string),
+      )
+      const { firstName, lastName, email } = crmCompanyOwner || {}
+      crmCompanyOwnerName = `${firstName ? `${firstName} ` : ''}${
+        lastName ? lastName : ''
+      } - <@${
+        EMAIL_TO_SLACK_ID[IS_PROD && email ? email : 'jared@goodparty.org']
+      }>`
+    } catch (e) {
+      console.error('error getting crm company owner', e)
+    }
+    return crmCompanyOwnerName
+  }
 
   private async createCompany(companyObj: CRMCompanyProperties) {
     let crmCompany: SimplePublicObject | null = null

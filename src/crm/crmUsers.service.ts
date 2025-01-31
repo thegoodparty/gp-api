@@ -1,10 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import { UsersService } from '../users/users.service'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
 import { getMidnightForDate } from '../shared/util/date.util'
 import { HubspotService } from './hubspot.service'
 import { CRMContactProperties } from './crm.types'
+import { HttpService } from '@nestjs/axios'
+import { lastValueFrom } from 'rxjs'
+import { SlackService } from '../shared/services/slack.service'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 @Injectable()
 export class CrmUsersService {
@@ -14,6 +18,8 @@ export class CrmUsersService {
     private readonly hubspot: HubspotService,
     private readonly users: UsersService,
     private readonly campaigns: CampaignsService,
+    private readonly httpService: HttpService,
+    private readonly slack: SlackService,
   ) {}
 
   async calculateCRMContactProperties(
@@ -173,6 +179,39 @@ export class CrmUsersService {
           hubspotId: newCrmContactId,
         }))
       return newCrmContact
+    }
+  }
+
+  async submitCrmForm(
+    formId: string,
+    fields: Record<string, string>,
+    pageName: string,
+    pageUri: string,
+  ) {
+    try {
+      return await lastValueFrom(
+        this.httpService.post(
+          `https://api.hsforms.com/submissions/v3/integration/submit/21589597/${formId}`,
+          {
+            method: 'POST',
+            data: {
+              fields,
+              context: {
+                pageName,
+                pageUri,
+              },
+            },
+            headers: {
+              [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
+              [Headers.ACCEPT]: MimeTypes.APPLICATION_JSON,
+            },
+          },
+        ),
+      )
+    } catch (error) {
+      this.logger.error('hubspot error', error)
+      this.slack.errorMessage({ message: 'Error submitting form', error })
+      throw new BadGatewayException('Error submitting form to HubSpot')
     }
   }
 
