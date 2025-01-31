@@ -126,3 +126,48 @@ export enum OfficeLevel {
   LOCAL = 0,
   DEFAULT = 12,
 }
+
+type FilingPeriod = {
+  startOn: string
+  endOn: string
+}
+
+type Election = {
+  id: string
+  electionDay: string
+  name: string
+  originalElectionDate: string
+  state: string
+  timezone: string
+}
+
+type ElectionFrequency = {
+  frequency: number[]
+}
+
+type Position = {
+  id: string
+  appointed: boolean
+  hasPrimary: boolean
+  partisanType: 'nonpartisan' | 'partisan' // Adjust if needed
+  level: string
+  name: string
+  salary: string | null
+  state: string
+  subAreaName: string
+  subAreaValue: string
+  electionFrequencies: ElectionFrequency[]
+}
+
+type PositionElection = {
+  id: string
+  isPrimary: boolean
+  filingPeriods: FilingPeriod[]
+  election: Election
+  position: Position
+}
+
+export type BallotData = {
+  // Key is the year, len of 4
+  [key: string]: PositionElection[]
+}

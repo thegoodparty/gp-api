@@ -7,13 +7,14 @@ import { getRaceQuery } from '../util/getRaceQuery.util'
 import { GraphqlService } from 'src/graphql/graphql.service'
 import { parseRaces } from '../util/parseRaces.util'
 import { sortRacesGroupedByYear } from '../util/sortRaces.util'
+import { BallotData } from '../types/races.types'
 
 @Injectable()
 export class BallotDataService {
   private readonly logger = new Logger(BallotDataService.name)
   constructor(private readonly graphqlService: GraphqlService) {}
 
-  async getRacesByZipcode(zipcode: string) {
+  async getRacesByZipcode(zipcode: string): Promise<BallotData> {
     if (zipcode.length !== 5) {
       throw new InternalServerErrorException(
         'Zipcodes must be a string 5 digits in length. Received: ',
@@ -28,9 +29,9 @@ export class BallotDataService {
 
       let query = getRaceQuery(zipcode, startCursor)
       let { races } = await this.graphqlService.fetchGraphql(query)
-      console.dir(races, { depth: Infinity })
+      console.dir(races, { depth: 2 })
       let existingPositions = {}
-      let electionsByYear = {}
+      let electionsByYear: BallotData = {}
       let primaryElectionDates = {} // key - positionId, value - electionDay and raceId (primary election date)
       let hasNextPage = false
 
