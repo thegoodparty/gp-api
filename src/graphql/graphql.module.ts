@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { InternalServerErrorException, Module } from '@nestjs/common'
 import { GraphqlService } from './graphql.service'
 import { GraphQLClient } from 'graphql-request'
 
@@ -6,6 +6,11 @@ import { GraphQLClient } from 'graphql-request'
 // we can cross that bridge when we get to it
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
+if (!BALLOT_READY_KEY) {
+  throw new InternalServerErrorException(
+    'Please set BALLOT_READY_KEY in your .env',
+  )
+}
 
 @Module({
   controllers: [],

@@ -5,6 +5,9 @@ import { IMailgunClient } from 'mailgun.js/Interfaces'
 
 const EMAIL_DOMAIN = 'mg.goodparty.org'
 const API_KEY = process.env.MAILGUN_API_KEY as string
+if (!API_KEY) {
+  throw new Error('Please set MAILGUN_API_KEY in your .env')
+}
 
 export type EmailData = MailgunMessageData & {
   variables?: Record<string, string | number | boolean>

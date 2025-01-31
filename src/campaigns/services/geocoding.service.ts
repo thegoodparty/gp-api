@@ -4,6 +4,10 @@ import * as ngeohash from 'ngeohash'
 
 const googleApiKey = process.env.GOOGLE_API_KEY
 
+if (!googleApiKey) {
+  throw new Error('Please set GOOGLE_API_KEY in your .env')
+}
+
 interface GeocodeLocation {
   results: Array<{
     geometry: {

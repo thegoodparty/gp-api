@@ -11,6 +11,15 @@ import { SlackChannel } from '../shared/services/slackService.types'
 const TOGETHER_AI_KEY = process.env.TOGETHER_AI_KEY
 const OPEN_AI_KEY = process.env.OPEN_AI_KEY
 const AI_MODELS = process.env.AI_MODELS || ''
+if (!TOGETHER_AI_KEY) {
+  throw new Error('Please set TOGETHER_AI_KEY in your .env')
+}
+if (!OPEN_AI_KEY) {
+  throw new Error('Please set OPEN_AI_KEY in your .env')
+}
+if (!AI_MODELS) {
+  throw new Error('Please set AI_MODELS in your .env')
+}
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
   include: {

@@ -9,7 +9,7 @@ import {
   Race,
   RaceData,
   RaceQuery,
-} from '../races.types'
+} from '../types/races.types'
 import {
   COUNTY_PROMPT,
   CITY_PROMPT,
