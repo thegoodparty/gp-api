@@ -63,9 +63,9 @@ export class AwsService {
           CacheControl: options?.cacheControl,
         },
       })
-      await upload.done()
+      const response = await upload.done()
 
-      return `https://${ASSET_DOMAIN}/${filePath}`
+      return `https://${ASSET_DOMAIN}/${encodeURIComponent(response.Key || filePath)}`
     } catch (e) {
       this.logger.error('Error uploading file to S3:', e)
       throw e
