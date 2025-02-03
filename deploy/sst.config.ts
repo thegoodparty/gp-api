@@ -1,5 +1,6 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
 import * as aws from '@pulumi/aws'
+import * as pulumi from '@pulumi/pulumi'
 
 export default $config({
   app(input) {
@@ -202,6 +203,76 @@ export default $config({
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineVersion: rdsCluster.engineVersion,
     })
+
+    // Create an IAM Role for CodeBuild
+    const codeBuildRole = new aws.iam.Role('codebuild-service-role', {
+      assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: 'codebuild.amazonaws.com',
+      }),
+      managedPolicyArns: [
+        'arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess',
+        'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser',
+        'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess',
+      ],
+    })
+
+    new aws.iam.RolePolicy('codebuild-logs-policy', {
+      role: codeBuildRole.name,
+      policy: pulumi.output({
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: [
+              'logs:CreateLogGroup',
+              'logs:CreateLogStream',
+              'logs:PutLogEvents',
+            ],
+            Resource: 'arn:aws:logs:*:*:*',
+          },
+        ],
+      }),
+    })
+
+    // todo: codebuild projects for each stage.
+    const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
+      serviceRole: codeBuildRole.arn,
+      environment: {
+        computeType: 'BUILD_GENERAL1_LARGE',
+        image: 'aws/codebuild/standard:6.0',
+        type: 'LINUX_CONTAINER',
+        privilegedMode: true,
+      },
+      source: {
+        type: 'GITHUB',
+        location: 'https://github.com/thegoodparty/gp-api.git',
+        buildspec: pulumi.interpolate`        
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - npm install -g sst
+  build:
+    commands:
+      - echo "Running SST Deploy..."
+      - cd deploy
+      - sst deploy --stage=${process.env.SST_STAGE || 'develop'} --verbose
+      - echo "Waiting for ECS to be stable..."
+      - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-develop-fargateCluster --services gp-api-develop
+      - echo "Done!"
+artifacts:
+  type: NO_ARTIFACTS
+`,
+      },
+      artifacts: {
+        type: 'NO_ARTIFACTS',
+      },
+    })
+
+    // Expose the project name so you can reference it in GitHub Actions
+    pulumi.log.info(`Custom CodeBuild project name: ${codeBuildProject.name}`)
   },
   // todo: deploy the runner into the vpc so it can access the database.
   // sst currently has a bug with this feature as of 3.3.40
