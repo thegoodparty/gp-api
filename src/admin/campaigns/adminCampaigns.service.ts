@@ -14,6 +14,7 @@ import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
 import { formatDate } from 'date-fns'
 import { P2VStatus } from 'src/races/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
+import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -23,6 +24,7 @@ export class AdminCampaignsService {
     private readonly campaigns: CampaignsService,
     private readonly adminP2V: AdminP2VService,
     private readonly voterFile: VoterFileService,
+    private readonly crm: CrmCampaignsService,
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
@@ -62,8 +64,7 @@ export class AdminCampaignsService {
       },
     })
 
-    // TODO: reimplement
-    // await createCrmUser(firstName, lastName, email)
+    this.crm.trackCampaign(newCampaign.id) // TODO: double-check this isn't supposed to be trackUser
 
     return newCampaign
   }
@@ -91,8 +92,7 @@ export class AdminCampaignsService {
       data: attributes,
     })
 
-    //TODO: reimplment
-    // await sails.helpers.crm.updateCampaign(updatedCampaign);
+    this.crm.trackCampaign(updatedCampaign.id)
 
     return updatedCampaign
   }

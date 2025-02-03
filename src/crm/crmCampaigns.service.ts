@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import { getStateNameByStateCode } from 'us-state-codes'
 import { CRMCompanyProperties } from './crm.types'
 import {
@@ -71,8 +71,10 @@ export class CrmCampaignsService {
     private readonly pathToVictory: PathToVictoryService,
     private readonly campaignUpdateHistory: CampaignUpdateHistoryService,
     private readonly voterFile: VoterFileService,
+    @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: CampaignsService,
     private readonly slack: SlackService,
+    @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
   ) {}
 
@@ -98,7 +100,8 @@ export class CrmCampaignsService {
     }
   }
 
-  async getCrmCompanyOwnerName(crmCompany: SimplePublicObjectWithAssociations) {
+  async getCrmCompanyOwnerName(crmCompanyId: string) {
+    const crmCompany = await this.getCrmCompanyById(crmCompanyId)
     if (!crmCompany?.properties) {
       this.logger.error('no properties found for crm company')
       return

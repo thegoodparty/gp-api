@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { CampaignsService } from '../services/campaigns.service'
 import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
 import { Campaign } from '@prisma/client'
@@ -8,7 +8,10 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 export class CampaignUpdateHistoryService extends createPrismaBase(
   MODELS.CampaignUpdateHistory,
 ) {
-  constructor(private readonly campaigns: CampaignsService) {
+  constructor(
+    @Inject(forwardRef(() => CampaignsService))
+    private readonly campaigns: CampaignsService,
+  ) {
     super()
   }
 

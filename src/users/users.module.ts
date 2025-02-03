@@ -4,6 +4,7 @@ import { UsersController } from './users.controller'
 import { FilesModule } from 'src/files/files.module'
 import { FullStoryModule } from '../fullStory/fullStory.module'
 import { AuthenticationModule } from '../authentication/authentication.module'
+import { CrmModule } from '../crm/crmModule'
 
 @Module({
   controllers: [UsersController],
@@ -13,6 +14,7 @@ import { AuthenticationModule } from '../authentication/authentication.module'
     FilesModule,
     FullStoryModule,
     forwardRef(() => AuthenticationModule),
+    CrmModule,
   ],
 })
 export class UsersModule {}

@@ -24,6 +24,7 @@ import { UsersService } from 'src/users/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
@@ -32,6 +33,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
     private emailService: EmailService,
+    @Inject(forwardRef(() => CrmCampaignsService))
+    private readonly crm: CrmCampaignsService,
   ) {
     super()
   }
@@ -78,8 +81,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    // TODO:
-    // await createCrmUser(user.firstName, user.lastName, user.email)
+    this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
@@ -128,15 +130,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         }
       }
 
-      // TODO:
-      // try {
-      //   await sails.helpers.crm.updateCampaign(updated)
-      // } catch (e) {
-      //   sails.helpers.log(campaign.slug, 'error updating crm', e)
-      // }
+      this.crm.trackCampaign(campaign.id)
 
-      campaign.userId &&
-        (await this.usersService.trackUserById(campaign.userId))
+      campaign.userId && this.usersService.trackUserById(campaign.userId)
 
       return tx.campaign.update({
         where: { id: campaign.id },
@@ -180,8 +176,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       this.update({ where: { id: campaignId }, data: { isPro } }),
       this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
     ])
-    // TODO: Implement CRM updates
-    // await sails.helpers.crm.updateCampaign(campaign);
+    this.crm.trackCampaign(campaignId)
   }
 
   async getStatus(user: User, campaign?: Campaign) {
@@ -281,9 +276,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    // TODO: reimplement
-    // await sails.helpers.crm.updateCampaign(updated)
-    // await sails.helpers.fullstory.customAttr(updated.id)
+    this.crm.trackCampaign(campaign.id)
+    this.usersService.trackUserById(campaign.userId)
 
     await this.sendCampaignLaunchEmail(user)
 

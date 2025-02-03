@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { SubscribeEmailSchema } from './subscribeEmail.schema'
+import { CrmUsersService } from '../crm/crmUsers.service'
 
 @Injectable()
 export class SubscribeService {
+  constructor(private readonly crm: CrmUsersService) {}
   async subscribeEmail(body: SubscribeEmailSchema) {
     const {
       email,
@@ -62,8 +64,7 @@ export class SubscribeService {
     }
     const page = pageName || 'homePage'
 
-    // TODO: Write hubspot service including submitForm function
-    // await helper submitForm(id, crmFields, page, uri)
+    this.crm.submitCrmForm(id, crmFields, page, uri)
 
     return
   }

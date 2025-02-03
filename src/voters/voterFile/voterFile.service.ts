@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { CHANNEL_TO_TYPE_MAP } from './voterFile.types'
@@ -10,6 +10,7 @@ import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { buildSlackBlocks } from './util/slack.util'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { SlackChannel } from '../../shared/services/slackService.types'
+import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
 
 @Injectable()
 export class VoterFileService {
@@ -18,6 +19,8 @@ export class VoterFileService {
   constructor(
     private readonly voterDb: VoterDatabaseService,
     private readonly slack: SlackService,
+    @Inject(forwardRef(() => CrmCampaignsService))
+    private readonly crm: CrmCampaignsService,
   ) {}
 
   async getCsv(
@@ -77,11 +80,8 @@ export class VoterFileService {
     { type, message }: HelpMessageSchema,
   ) {
     const { firstName, lastName, email, phone } = user
-    const { details, tier } = campaign
-
-    // TODO: reimplement
-    // const crmCompany = await sails.helpers.crm.getCompany(campaign)
-    // const assignedPa = await getCrmCompanyOwnerName(crmCompany, true)
+    const { details, tier, data } = campaign
+    const { hubspotId: crmCompanyId } = data
 
     const candidateOffice =
       details.office?.toLowerCase().trim() === 'other'
@@ -97,9 +97,10 @@ export class VoterFileService {
       tier,
       type,
       message,
-      // TODO: reimplement
-      // assignedPa,
-      // crmCompanyId: crmCompany?.id,
+      assignedPa: crmCompanyId
+        ? await this.crm.getCrmCompanyOwnerName(crmCompanyId)
+        : '',
+      crmCompanyId,
     })
 
     await this.slack.message(

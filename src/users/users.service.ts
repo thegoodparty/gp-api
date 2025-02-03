@@ -1,4 +1,9 @@
-import { ConflictException, Injectable } from '@nestjs/common'
+import {
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
 import { hashPassword } from './util/passwords.util'
@@ -6,10 +11,17 @@ import { trimMany } from '../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
 import { FullStoryService } from '../fullStory/fullStory.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { CrmUsersService } from '../crm/crmUsers.service'
+
+const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
 @Injectable()
 export class UsersService extends createPrismaBase(MODELS.User) {
-  constructor(private readonly fullstory: FullStoryService) {
+  constructor(
+    private readonly fullstory: FullStoryService,
+    @Inject(forwardRef(() => CrmUsersService))
+    private readonly crm: CrmUsersService,
+  ) {
     super()
   }
 
@@ -85,10 +97,6 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       throw new ConflictException('User with this email already exists')
     }
 
-    // TODO: create/update customer in CRM:
-    // await submitCrmForm(firstName, lastName, email, phone);
-    // await sails.helpers.crm.updateUser(user);
-
     const {
       firstName: firstNameTrimmed,
       lastName: lastNameTrimmed,
@@ -100,7 +108,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       ...(zip ? { zip } : {}),
     })
 
-    return this.model.create({
+    const user = await this.model.create({
       data: {
         ...userData,
         ...trimmed,
@@ -109,6 +117,26 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
       },
     })
+
+    // We have to await this form post to ensure the user is created in CRM
+    //  before we try to update the crm contact with the user id
+    await this.crm.submitCrmForm(
+      REGISTER_USER_CRM_FORM_ID,
+      [
+        { name: 'firstName', value: firstName, objectTypeId: '0-1' },
+        { name: 'lastName', value: lastName, objectTypeId: '0-1' },
+        { name: 'email', value: email, objectTypeId: '0-1' },
+        ...(phone
+          ? [{ name: 'phone', value: phone, objectTypeId: '0-1' }]
+          : []),
+      ],
+      'registerPage',
+      'https://goodparty.org/sign-up',
+    )
+
+    this.crm.trackUserUpdate(user.id)
+
+    return user
   }
 
   async updateUser(

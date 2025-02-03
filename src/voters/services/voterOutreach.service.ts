@@ -13,6 +13,7 @@ import {
   SlackChannel,
   SlackMessageType,
 } from 'src/shared/services/slackService.types'
+import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
 
 @Injectable()
 export class VoterOutreachService {
@@ -22,6 +23,7 @@ export class VoterOutreachService {
     private readonly slack: SlackService,
     private readonly filesService: FilesService,
     private readonly campaignsService: CampaignsService,
+    private readonly crmCampaigns: CrmCampaignsService,
   ) {}
 
   async scheduleOutreachCampaign(
@@ -39,13 +41,8 @@ export class VoterOutreachService {
     imageUpload: FileUpload,
   ) {
     const { firstName, lastName, email, phone } = user
-
-    // TODO: reimplement
-    // const crmCompany = await sails.helpers.crm.getCompany(campaign)
-    // if (!crmCompany) {
-    //   throw new Error(`crmCompany not found for ${campaign}`)
-    // }
-    // const assignedPa = await getCrmCompanyOwnerName(crmCompany, true)
+    const { data } = campaign
+    const { hubspotId: crmCompanyId } = data
 
     const messagingScript: string = campaign.aiContent?.[script]?.content
       ? sanitizeHtml(campaign.aiContent?.[script]?.content, {
@@ -104,9 +101,11 @@ export class VoterOutreachService {
     const slackBlocks = buildSlackBlocks({
       name: `${firstName} ${lastName}`,
       email,
-      phone, // TODO: reimplement assignedPa + crmCompanyId!!!
-      assignedPa: undefined, //assignedPa,
-      crmCompanyId: undefined, // crmCompany?.id,
+      phone,
+      assignedPa: crmCompanyId
+        ? await this.crmCampaigns.getCrmCompanyOwnerName(crmCompanyId)
+        : '',
+      crmCompanyId,
       voterFileUrl,
       type,
       budget,
@@ -136,8 +135,7 @@ export class VoterOutreachService {
       },
     })
 
-    // TODO: reimplement
-    // await sails.helpers.crm.updateCampaign(campaign)
+    this.crmCampaigns.trackCampaign(campaign.id)
 
     return true
   }

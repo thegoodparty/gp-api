@@ -20,6 +20,7 @@ import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
@@ -34,6 +35,7 @@ export class StripeEventsService {
     private readonly slackService: SlackService,
     private readonly emailService: EmailService,
     private readonly voterFileService: VoterFileService,
+    private readonly crm: CrmCampaignsService,
   ) {}
 
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
@@ -265,11 +267,10 @@ export class StripeEventsService {
   }
 
   async sendProSignUpSlackMessage(user: User, campaign: Campaign) {
-    const { details = {} } = campaign || {}
+    const { details = {}, data = {} } = campaign || {}
     const { office, otherOffice, state } = details
+    const { hubspotId } = data
     const name = `${user.firstName}${user.firstName ? ` ${user.lastName}` : ''}`
-    // TODO: get CRM company
-    // const crmCompany = await sails.helpers.crm.getCompany(campaign)
 
     await this.slackService.message(
       {
@@ -280,15 +281,14 @@ export class StripeEventsService {
           State: ${state}
           Office: ${office || otherOffice}
           Assigned PA: ${
-            // TODO: get CRM company owner name
-            // (await getCrmCompanyOwnerName(crmCompany)) ||
-            'None assigned'
+            hubspotId
+              ? await this.crm.getCrmCompanyOwnerName(hubspotId)
+              : 'None assigned'
           }
           ${
-            // TODO: get CRM company URL
-            // crmCompany?.id
-            //   ? `https://app.hubspot.com/contacts/21589597/record/0-2/${crmCompany.id}` :
-            'No CRM company found'
+            hubspotId
+              ? `https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}`
+              : 'No CRM company found'
           }
         `,
       },

@@ -1,4 +1,10 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import { UsersService } from '../users/users.service'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
@@ -9,6 +15,7 @@ import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { SlackService } from '../shared/services/slack.service'
 import { Headers, MimeTypes } from 'http-constants-ts'
+import { AxiosError, isAxiosError } from 'axios'
 
 @Injectable()
 export class CrmUsersService {
@@ -16,7 +23,9 @@ export class CrmUsersService {
 
   constructor(
     private readonly hubspot: HubspotService,
+    @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
+    @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: CampaignsService,
     private readonly httpService: HttpService,
     private readonly slack: SlackService,
@@ -85,8 +94,8 @@ export class CrmUsersService {
     }
   }
 
-  async trackUserLogin(userId: number) {
-    return await this.trackContact(userId, {
+  async trackUserLogin(user: User) {
+    return await this.trackContact(user, {
       last_login: getMidnightForDate(new Date()).toISOString(),
     })
   }
@@ -127,22 +136,17 @@ export class CrmUsersService {
       profile_updated_count: updateCount,
     })
 
-    return await this.trackContact(userId, {
+    return await this.trackContact(user, {
       profile_updated_date: getMidnightForDate(new Date()).toISOString(),
       profile_updated_count: `${updateCount}`,
     })
   }
 
   private async trackContact(
-    userId: number,
+    user: User,
     additionalCrmContactProperties?: Partial<CRMContactProperties>,
   ) {
-    const user = await this.users.findUser({ id: userId })
-    if (!user) {
-      this.logger.error(`No user found for given user id: ${userId}`)
-      return
-    }
-    const { email, metaData } = user
+    const { id: userId, email, metaData } = user
     let { hubspotId: crmContactId } = metaData || {}
 
     const campaign = await this.campaigns.findByUserId(userId)
@@ -184,34 +188,48 @@ export class CrmUsersService {
 
   async submitCrmForm(
     formId: string,
-    fields: Record<string, string>,
+    fields: Record<string, string>[],
     pageName: string,
     pageUri: string,
   ) {
+    const reqUrl = `https://api.hsforms.com/submissions/v3/integration/submit/21589597/${formId}`
+    const reqOptions = {
+      method: 'POST',
+      data: {
+        fields,
+        context: {
+          pageName,
+          pageUri,
+        },
+      },
+      headers: {
+        [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
+        [Headers.ACCEPT]: MimeTypes.APPLICATION_JSON,
+      },
+    }
+    console.log(reqUrl)
+    console.dir(reqOptions, { depth: 3, colors: true })
     try {
-      return await lastValueFrom(
-        this.httpService.post(
-          `https://api.hsforms.com/submissions/v3/integration/submit/21589597/${formId}`,
-          {
-            method: 'POST',
-            data: {
-              fields,
-              context: {
-                pageName,
-                pageUri,
-              },
-            },
-            headers: {
-              [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
-              [Headers.ACCEPT]: MimeTypes.APPLICATION_JSON,
-            },
-          },
-        ),
-      )
+      return await lastValueFrom(this.httpService.post(reqUrl, reqOptions))
     } catch (error) {
-      this.logger.error('hubspot error', error)
+      let message = 'Error submitting form to HubSpot: '
+      if (isAxiosError(error)) {
+        const axiosError = error as AxiosError
+        if (axiosError.response) {
+          console.dir(axiosError.response, { depth: 3, colors: true })
+          message += JSON.stringify(axiosError.response.data)
+          // Handle error response body here
+        } else if (axiosError.request) {
+          message += axiosError.request
+        } else {
+          message += axiosError.message
+        }
+      } else {
+        console.error('Unexpected Error:', error)
+      }
+      this.logger.error('hubspot error', message, error)
       this.slack.errorMessage({ message: 'Error submitting form', error })
-      throw new BadGatewayException('Error submitting form to HubSpot')
+      throw new BadGatewayException(message)
     }
   }
 

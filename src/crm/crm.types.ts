@@ -1,5 +1,12 @@
 import { SimplePublicObjectInput } from '@hubspot/api-client/lib/codegen/crm/companies'
 
+export enum PrimaryElectionResult {
+  WON = 'Won Primary',
+  LOST = 'Lost Primary',
+  WITHDREW = 'Withdrew',
+  NOT_ON_BALLOT = 'Not on Ballot',
+}
+
 export type CRMCompanyProperties = {
   name?: string
   candidate_party?: string
@@ -50,6 +57,8 @@ export type CRMCompanyProperties = {
   seats_available?: string
   automated_score?: string
   partisan_np?: 'Partisan' | 'Nonpartisan'
+  primary_election_result?: PrimaryElectionResult.WON
+  election_results?: 'Won General'
 } & FilteredCRMProperties &
   Partial<SimplePublicObjectInput>
 

@@ -16,6 +16,7 @@ import { PathToVictoryService } from './services/path-to-victory.service/pathToV
 import { AiChatService } from './ai/chat/aiChat.service'
 import { AiModule } from '../ai/ai.module'
 import { ContentModule } from '../content/content.module'
+import { CrmModule } from '../crm/crmModule'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ContentModule } from '../content/content.module'
     RacesModule,
     AiModule,
     ContentModule,
+    forwardRef(() => CrmModule),
   ],
   controllers: [
     CampaignsController,
