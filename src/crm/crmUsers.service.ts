@@ -192,31 +192,31 @@ export class CrmUsersService {
     pageName: string,
     pageUri: string,
   ) {
-    const reqUrl = `https://api.hsforms.com/submissions/v3/integration/submit/21589597/${formId}`
-    const reqOptions = {
-      method: 'POST',
-      data: {
-        fields,
-        context: {
-          pageName,
-          pageUri,
-        },
-      },
-      headers: {
-        [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
-        [Headers.ACCEPT]: MimeTypes.APPLICATION_JSON,
-      },
-    }
-    console.log(reqUrl)
-    console.dir(reqOptions, { depth: 3, colors: true })
     try {
-      return await lastValueFrom(this.httpService.post(reqUrl, reqOptions))
+      return await lastValueFrom(
+        this.httpService.post(
+          `https://api.hsforms.com/submissions/v3/integration/submit/21589597/${formId}`,
+          {
+            fields,
+            context: {
+              pageName,
+              pageUri,
+            },
+          },
+          {
+            method: 'POST',
+            headers: {
+              [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
+              [Headers.ACCEPT]: MimeTypes.APPLICATION_JSON,
+            },
+          },
+        ),
+      )
     } catch (error) {
       let message = 'Error submitting form to HubSpot: '
       if (isAxiosError(error)) {
         const axiosError = error as AxiosError
         if (axiosError.response) {
-          console.dir(axiosError.response, { depth: 3, colors: true })
           message += JSON.stringify(axiosError.response.data)
           // Handle error response body here
         } else if (axiosError.request) {
