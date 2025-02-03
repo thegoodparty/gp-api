@@ -256,8 +256,11 @@ phases:
       - npm install -g sst
   build:
     commands:
-      - echo "Running SST Deploy..."
+      - echo "Listing current files for debugging..."
+      - ls -R
       - cd deploy
+      - echo "Listing deploy files for debugging..."
+      - ls -R
       - sst deploy --stage=${process.env.SST_STAGE || 'develop'} --verbose
       - echo "Waiting for ECS to be stable..."
       - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-develop-fargateCluster --services gp-api-develop
