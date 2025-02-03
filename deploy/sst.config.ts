@@ -258,6 +258,7 @@ phases:
     commands:
       - echo "Listing current files for debugging..."
       - ls -R
+      - echo "Moving to deploy directory..."
       - cd deploy
       - echo "Listing deploy files for debugging..."
       - ls -R
