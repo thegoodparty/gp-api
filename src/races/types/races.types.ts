@@ -167,7 +167,22 @@ type PositionElection = {
   position: Position
 }
 
-export type BallotData = {
+export type RacesByYear = {
   // Key is the year, len of 4
   [key: string]: PositionElection[]
+}
+
+// export type BallotData = {
+//   edges: BallotNode[]
+// }
+
+// type BallotNode = {
+
+// }
+
+type PageInfo = {
+  endCursor: string
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+  startCursor: string
 }
