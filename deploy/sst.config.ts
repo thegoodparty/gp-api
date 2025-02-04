@@ -212,7 +212,8 @@ export default $config({
       managedPolicyArns: [
         'arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess',
         'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser',
-        'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess',
+        'arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess',
+        'arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess',
       ],
     })
 
@@ -235,6 +236,8 @@ export default $config({
     })
 
     // todo: codebuild projects for each stage.
+    // Note: our buildspec is only created when deploy is run since its part of the sst deploy process.
+    // so for any changes to the buildspec, we need to run deploy before running the codebuild project.
     const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
       serviceRole: codeBuildRole.arn,
       environment: {
