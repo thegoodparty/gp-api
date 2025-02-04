@@ -6,6 +6,7 @@ import { UsersModule } from '../users/users.module'
 import { VotersModule } from '../voters/voters.module'
 import { HubspotService } from './hubspot.service'
 import { HttpModule } from '@nestjs/axios'
+import { FullStoryModule } from '../fullStory/fullStory.module'
 
 @Module({
   providers: [CrmUsersService, CrmCampaignsService, HubspotService],
@@ -14,6 +15,7 @@ import { HttpModule } from '@nestjs/axios'
     forwardRef(() => VotersModule),
     forwardRef(() => UsersModule),
     HttpModule,
+    forwardRef(() => FullStoryModule),
   ],
   exports: [CrmUsersService, CrmCampaignsService],
 })

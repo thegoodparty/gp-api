@@ -68,7 +68,7 @@ declare global {
         verified_candidates?: string
         election_results?: string
         office_type?: string
-      }
+      } & Record<string, string>
       currentStep?: OnboardingStep
       launchStatus?: CampaignLaunchStatus
       lastVisited?: number

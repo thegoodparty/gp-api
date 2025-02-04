@@ -23,6 +23,7 @@ import { VotersModule } from './voters/voters.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
+import { CrmController } from './crm/crm.controller';
 
 @Module({
   imports: [
@@ -46,7 +47,7 @@ import { SubscribeModule } from './subscribe/subscribe.module'
     CrmModule,
     SubscribeModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, CrmController],
   providers: [
     AppService,
     {

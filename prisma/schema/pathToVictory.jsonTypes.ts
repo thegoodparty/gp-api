@@ -3,15 +3,15 @@ import { P2VStatus } from 'src/races/types/pathToVictory.types'
 export {}
 
 interface P2VViability {
-  level: string
-  score: number
-  seats: number
-  opponents: number
-  candidates: number
-  isPartisan: boolean
-  isIncumbent: boolean
-  isUncontested: string
-  candidatesPerSeat: number
+  level?: string
+  score?: number
+  seats?: number
+  opponents?: number
+  candidates?: number
+  isPartisan?: boolean
+  isIncumbent?: boolean
+  isUncontested?: string
+  candidatesPerSeat?: number
 }
 
 declare global {

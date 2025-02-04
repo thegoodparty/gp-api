@@ -52,12 +52,26 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async create(args: Prisma.CampaignCreateArgs) {
     return this.model.create(args)
   }
+
+  // TODO: Find a way to make these JSON path lookups type-safe
   async findBySubscriptionId(subscriptionId: string) {
     return this.findFirst({
       where: {
         details: {
           path: ['subscriptionId'],
           equals: subscriptionId,
+        },
+      },
+    })
+  }
+
+  // TODO: Find a way to make these JSON path lookups type-safe
+  async findByHubspotId(hubspotId: string) {
+    return this.findFirst({
+      where: {
+        data: {
+          path: ['hubspotId'],
+          equals: hubspotId,
         },
       },
     })
@@ -108,26 +122,20 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         details: details
           ? deepMerge(campaign.details as object, details)
           : undefined,
-      }
-
-      if (pathToVictory && campaign.pathToVictory) {
-        /// TODO:
-        // if (pathToVictory.hasOwnProperty('viability')) {
-        //   await updateViability(campaign, columnKey2, value)
-        // } else {
-        //   await updatePathToVictory(campaign, columnKey, value)
-        // }
-
-        updateData['pathToVictory'] = {
-          update: {
-            data: {
-              data: deepMerge(
-                campaign.pathToVictory.data as object,
-                pathToVictory,
-              ),
-            },
-          },
-        }
+        ...(pathToVictory
+          ? {
+              pathToVictory: {
+                update: {
+                  data: {
+                    data: deepMerge(
+                      (campaign.pathToVictory?.data as object) || {},
+                      pathToVictory,
+                    ),
+                  },
+                },
+              },
+            }
+          : {}),
       }
 
       this.crm.trackCampaign(campaign.id)

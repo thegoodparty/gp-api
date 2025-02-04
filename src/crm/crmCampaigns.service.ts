@@ -4,7 +4,6 @@ import { CRMCompanyProperties } from './crm.types'
 import {
   SimplePublicObject,
   SimplePublicObjectInputForCreate,
-  SimplePublicObjectWithAssociations,
 } from '@hubspot/api-client/lib/codegen/crm/deals'
 import {
   ApiException,
@@ -25,6 +24,10 @@ import { PathToVictoryService } from '../campaigns/services/path-to-victory.serv
 import { CampaignUpdateHistoryService } from '../campaigns/updateHistory/campaignUpdateHistory.service'
 import { VoterFileService } from '../voters/voterFile/voterFile.service'
 import { IS_PROD } from '../shared/util/appEnvironment.util'
+import { FullStoryService } from '../fullStory/fullStory.service'
+import { pick } from '../shared/util/objects.util'
+import { SLACK_CHANNEL_IDS } from '../shared/services/slackService.config'
+import { SlackChannel } from '../shared/services/slackService.types'
 
 export const HUBSPOT_COMPANY_PROPERTIES = [
   'past_candidate',
@@ -76,6 +79,8 @@ export class CrmCampaignsService {
     private readonly slack: SlackService,
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
+    @Inject(forwardRef(() => FullStoryService))
+    private readonly fullStory: FullStoryService,
   ) {}
 
   async getCrmCompanyById(hubspotId: string) {
@@ -486,5 +491,216 @@ export class CrmCampaignsService {
     }
 
     return crmCompanyId
+  }
+
+  async handleUpdateViability(
+    campaign: Campaign,
+    propertyName: string,
+    propertyValue: string | boolean | number,
+  ) {
+    if (propertyName === 'incumbent') {
+      if (propertyValue === 'Yes') {
+        propertyName = 'isIncumbent'
+        propertyValue = true
+      } else {
+        propertyName = 'isIncumbent'
+        propertyValue = false
+      }
+    }
+    if (propertyName === 'opponents') {
+      propertyName = 'opponents'
+      propertyValue = parseInt(propertyValue as string)
+    }
+
+    const campaignId = campaign.id
+
+    try {
+      const { id: p2vId, data: { viability, ...restData } = {} } =
+        (await this.pathToVictory.findFirst({
+          where: { campaignId },
+        })) || {}
+      this.pathToVictory.model.update({
+        where: { id: p2vId },
+        data: {
+          data: {
+            ...restData,
+            viability: {
+              ...viability,
+              [propertyName]: propertyValue,
+            },
+          },
+        },
+      })
+    } catch (e) {
+      const message = 'error at update viability'
+      this.logger.error(message, e)
+      this.slack.errorMessage({
+        message,
+        error: e,
+      })
+    }
+  }
+
+  async handleUpdateCampaign(
+    campaign: Campaign,
+    propertyName: string,
+    propertyValue: string | boolean | number,
+  ) {
+    const hubSpotUpdates = campaign.data.hubSpotUpdates
+      ? {
+          hubSpotUpdates: campaign.data.hubSpotUpdates,
+          [propertyName]: propertyValue,
+        }
+      : {}
+
+    this.campaigns.update({
+      where: { id: campaign.id },
+      data: {
+        ...(propertyName === 'verified_candidates' && !campaign.isVerified
+          ? { isVerified: propertyValue === 'Yes' }
+          : {}),
+        ...(propertyName === 'pro_candidate' && !campaign.isPro
+          ? { isPro: propertyValue === 'Yes' }
+          : {}),
+      },
+    })
+
+    this.campaigns.updateJsonFields(campaign.id, {
+      data: {
+        ...hubSpotUpdates,
+      },
+    })
+
+    this.fullStory.trackUserById(campaign.userId)
+  }
+
+  async refreshCompanies(campaignId: number) {
+    let updated = 0
+    let failures: number[] = []
+
+    let campaigns: Campaign[]
+
+    if (campaignId) {
+      const campaign = await this.campaigns.findFirst({
+        where: { id: campaignId },
+      })
+      campaigns = campaign ? [campaign] : []
+    } else {
+      campaigns = (await this.campaigns.findMany()).filter(
+        (c: Campaign) => c.data?.hubspotId,
+      )
+    }
+
+    for (let i = 0; i < campaigns.length; i++) {
+      const { id: iCampaignId } = campaigns[i]
+      try {
+        await this.trackCampaign(iCampaignId)
+        updated++
+      } catch (error) {
+        failures.push(iCampaignId)
+        this.logger.error('error updating campaign', error)
+        await this.slack.errorMessage({
+          message: `Error updating campaign ${iCampaignId} in hubspot`,
+          error,
+        })
+      }
+    }
+
+    return {
+      message: 'ok',
+      updated,
+      failures,
+    }
+  }
+
+  async syncCampaign(campaignId: number, resync: boolean = false) {
+    let updated = 0
+
+    const campaigns = campaignId
+      ? [await this.campaigns.findFirst({ where: { id: campaignId } })]
+      : await this.campaigns.findMany()
+
+    for (let i = 0; i < campaigns.length; i++) {
+      const campaign = campaigns[i]
+      try {
+        const { id: campaignId } = campaign!
+        if (campaign?.data?.hubSpotUpdates && !resync) {
+          this.logger.log(`Skipping resync - ${campaignId}`)
+          continue
+        }
+        const { data: campaignData } = campaign || {}
+        const { hubspotId } = campaignData || {}
+        const company = hubspotId
+          ? await this.getCrmCompanyById(hubspotId)
+          : null
+        if (!company) {
+          console.log(`No company found - ${campaignId}`)
+          continue
+        }
+
+        // TODO: verify this does nothing and then kill it
+        // sleep(400)
+
+        this.logger.log(`Syncing - ${campaignId}`)
+
+        const { verified_candidates, pro_candidate, election_results } =
+          company.properties
+
+        const hubSpotUpdates = pick(
+          company.properties,
+          HUBSPOT_COMPANY_PROPERTIES,
+        ) as Record<string, string>
+
+        const updatedCampaign: Partial<Campaign> = {
+          data: campaign?.data,
+        }
+
+        if (
+          String(verified_candidates).toLowerCase() === 'yes' &&
+          !campaign?.isVerified
+        ) {
+          updatedCampaign.isVerified = true
+        }
+
+        if (String(pro_candidate).toLowerCase() === 'yes' && !campaign?.isPro) {
+          updatedCampaign.isPro = true
+        }
+
+        if (
+          String(election_results).toLowerCase() === 'won general' &&
+          !campaign?.didWin
+        ) {
+          updatedCampaign.didWin = true
+        }
+        /* eslint-enable camelcase */
+
+        await this.campaigns.update({
+          where: { id: campaignId },
+          data: updatedCampaign,
+        })
+        await this.campaigns.updateJsonFields(campaignId, {
+          data: {
+            hubSpotUpdates,
+          },
+        })
+        updated++
+      } catch (error) {
+        this.logger.error('error at crm/sync', error)
+        this.slack.errorMessage({
+          message: `error at crm/sync - campaignSlug: ${campaign?.slug}}`,
+          error,
+        })
+      }
+    }
+
+    this.slack.message(
+      { body: `completed crm/sync - updated: ${updated}` },
+      SlackChannel.botDev,
+    )
+
+    return {
+      message: 'ok',
+      updated,
+    }
   }
 }
