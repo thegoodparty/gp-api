@@ -216,6 +216,7 @@ export default $config({
     // Note: our buildspec is only created when deploy is run since its part of the sst deploy process.
     // so for any changes to the buildspec, we need to run deploy before running the codebuild project.
     const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
+      name: `gp-deploy-build-${$app.stage}`,
       serviceRole: codeBuildRole.arn,
       environment: {
         computeType: 'BUILD_GENERAL1_LARGE',
@@ -249,10 +250,10 @@ phases:
 
   build:
     commands:
-      - echo "Deploying SST app"
-      - sst deploy --stage=${process.env.SST_STAGE || 'develop'} --verbose --print-logs
+      - echo "Deploying SST app. stage: ${$app.stage}"
+      - sst deploy --stage=${$app.stage || 'develop'} --verbose --print-logs
       - echo "Waiting for ECS to be stable..."
-      - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-develop-fargateCluster --services gp-api-develop
+      - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-${$app.stage}-fargateCluster --services gp-api-${$app.stage}
       - echo "Done!"
 `,
       },

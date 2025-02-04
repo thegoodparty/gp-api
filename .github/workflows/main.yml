@@ -18,12 +18,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
-      # The codebuild defaults to develop.
-      # todo: We need to pass the branch name or stage to the codebuild project.
+      # Each branch has a different codebuild project.
       - name: Run CodeBuild
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
-          project-name: gp-deploy-build-601adaa
+          project-name: gp-deploy-build-${{ github.ref_name }}
 
       - name: Notify Slack on Success
         if: success()
