@@ -117,3 +117,14 @@ export type GeoData = {
   village?: string
   borough?: string
 }
+export type MunicipalityResponse = Pick<
+  Municipality,
+  'id' | 'slug' | 'name'
+> & {
+  openElections?: number
+  state?: string
+}
+export type ProximityCitiesResponseBody = {
+  cities: MunicipalityResponse[]
+  parsed?: string[]
+}

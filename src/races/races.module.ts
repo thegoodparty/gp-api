@@ -5,11 +5,13 @@ import { GraphqlModule } from 'src/graphql/graphql.module'
 import { MunicipalitiesService } from './services/municipalities.services'
 import { CountiesService } from './services/counties.services'
 import { CensusEntitiesService } from './services/censusEntities.services'
+import { AiModule } from '../ai/ai.module'
 
 @Module({
   controllers: [RacesController],
   providers: [
     RacesService,
+    AiModule,
     MunicipalitiesService,
     CountiesService,
     CensusEntitiesService,
