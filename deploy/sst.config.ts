@@ -204,37 +204,6 @@ export default $config({
       engineVersion: rdsCluster.engineVersion,
     })
 
-    // Create an IAM Role for Github actions
-    const actionsRole = new aws.iam.Role('actions-service-role', {
-      assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: 'codebuild.amazonaws.com',
-      }),
-      managedPolicyArns: [
-        'arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess',
-        'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser',
-        'arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess',
-        'arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess',
-      ],
-    })
-
-    new aws.iam.RolePolicy('actions-logs-policy', {
-      role: actionsRole.name,
-      policy: pulumi.output({
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Action: [
-              'logs:CreateLogGroup',
-              'logs:CreateLogStream',
-              'logs:PutLogEvents',
-            ],
-            Resource: 'arn:aws:logs:*:*:*',
-          },
-        ],
-      }),
-    })
-
     // Create an IAM Role for CodeBuild
     const codeBuildRole = new aws.iam.Role('codebuild-service-role', {
       assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
@@ -290,6 +259,35 @@ phases:
       artifacts: {
         type: 'NO_ARTIFACTS',
       },
+    })
+
+    // Create an IAM Policy for Github actions
+    const actionsPolicy = new aws.iam.Policy('github-actions-policy', {
+      description: 'Limited policy for Github Actions to trigger CodeBuild',
+      policy: pulumi.output({
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: [
+              'codebuild:StartBuild',
+              'codebuild:BatchGetBuilds',
+              'codebuild:ListBuildsForProject',
+            ],
+            Resource: pulumi.interpolate`${codeBuildProject.arn}`,
+          },
+          {
+            Effect: 'Allow',
+            Action: ['codebuild:ListProjects'],
+            Resource: '*',
+          },
+          {
+            Effect: 'Allow',
+            Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
+            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/${codeBuildProject.name}:*`,
+          },
+        ],
+      }),
     })
   },
   // we no longer use autodeploy. we use codebuild.
