@@ -11,14 +11,14 @@
   "license": "ISC",
   "devDependencies": {
     "@tsconfig/node18": "^18.2.4",
-    "@types/aws-lambda": "8.10.146",
-    "@types/node": "^22.10.1",
-    "sst": "^3.3.41",
+    "@types/aws-lambda": "^8.10.147",
+    "@types/node": "^22.13.1",
+    "sst": "^3.7.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@pulumi/aws": "^6.62.0",
-    "dotenv": "^16.4.5"
+    "@pulumi/aws": "^6.67.0",
+    "dotenv": "^16.4.7"
   }
 }

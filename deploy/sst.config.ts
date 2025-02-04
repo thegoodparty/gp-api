@@ -11,7 +11,7 @@ export default $config({
       providers: {
         aws: {
           region: 'us-west-2',
-          version: '6.60.0',
+          version: '6.67.0',
         },
       },
     }
@@ -212,7 +212,8 @@ export default $config({
       managedPolicyArns: [
         'arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess',
         'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser',
-        'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess',
+        'arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess',
+        'arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess',
       ],
     })
 
@@ -235,6 +236,8 @@ export default $config({
     })
 
     // todo: codebuild projects for each stage.
+    // Note: our buildspec is only created when deploy is run since its part of the sst deploy process.
+    // so for any changes to the buildspec, we need to run deploy before running the codebuild project.
     const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
       serviceRole: codeBuildRole.arn,
       environment: {
@@ -254,11 +257,18 @@ phases:
       nodejs: 22
     commands:
       - npm install -g sst
+
+  pre_build:
+    commands:
+      - echo "Moving into deploy folder..."
+      - cd deploy
+      - echo "Installing local dependencies..."
+      - npm ci || npm install
+
   build:
     commands:
-      - echo "Running SST Deploy..."
-      - cd deploy
-      - sst deploy --stage=${process.env.SST_STAGE || 'develop'} --verbose
+      - echo "Deploying SST app"
+      - sst deploy --stage=${process.env.SST_STAGE || 'develop'} --verbose --print-logs
       - echo "Waiting for ECS to be stable..."
       - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-develop-fargateCluster --services gp-api-develop
       - echo "Done!"
@@ -270,12 +280,8 @@ artifacts:
         type: 'NO_ARTIFACTS',
       },
     })
-
-    // Expose the project name so you can reference it in GitHub Actions
-    pulumi.log.info(`Custom CodeBuild project name: ${codeBuildProject.name}`)
   },
-  // todo: deploy the runner into the vpc so it can access the database.
-  // sst currently has a bug with this feature as of 3.3.40
+  // we no longer use autodeploy. we use codebuild.
   // console: {
   //   autodeploy: {
   //     runner: {
