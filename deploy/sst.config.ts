@@ -11,7 +11,7 @@ export default $config({
       providers: {
         aws: {
           region: 'us-west-2',
-          version: '6.60.0',
+          version: '6.67.0',
         },
       },
     }
