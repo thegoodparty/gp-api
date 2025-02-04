@@ -264,7 +264,6 @@ phases:
 
   build:
     commands:
-      - cd deploy
       - echo "Deploying SST app"
       - sst deploy --stage=${process.env.SST_STAGE || 'develop'} --verbose --print-logs
       - echo "Waiting for ECS to be stable..."
