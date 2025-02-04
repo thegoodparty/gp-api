@@ -204,8 +204,8 @@ export default $config({
       engineVersion: rdsCluster.engineVersion,
     })
 
-    // Create an IAM Role for CodeBuild
-    const codeBuildRole = new aws.iam.Role('codebuild-service-role', {
+    // Create an IAM Role for Github actions
+    const actionsRole = new aws.iam.Role('actions-service-role', {
       assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: 'codebuild.amazonaws.com',
       }),
@@ -217,8 +217,8 @@ export default $config({
       ],
     })
 
-    new aws.iam.RolePolicy('codebuild-logs-policy', {
-      role: codeBuildRole.name,
+    new aws.iam.RolePolicy('actions-logs-policy', {
+      role: actionsRole.name,
       policy: pulumi.output({
         Version: '2012-10-17',
         Statement: [
@@ -235,6 +235,14 @@ export default $config({
       }),
     })
 
+    // Create an IAM Role for CodeBuild
+    const codeBuildRole = new aws.iam.Role('codebuild-service-role', {
+      assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: 'codebuild.amazonaws.com',
+      }),
+      managedPolicyArns: ['arn:aws:iam::aws:policy/AdministratorAccess'],
+    })
+
     // todo: codebuild projects for each stage.
     // Note: our buildspec is only created when deploy is run since its part of the sst deploy process.
     // so for any changes to the buildspec, we need to run deploy before running the codebuild project.
@@ -245,6 +253,11 @@ export default $config({
         image: 'aws/codebuild/standard:6.0',
         type: 'LINUX_CONTAINER',
         privilegedMode: true,
+      },
+      vpcConfig: {
+        vpcId: 'vpc-0763fa52c32ebcf6a',
+        subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+        securityGroupIds: ['sg-01de8d67b0f0ec787'],
       },
       source: {
         type: 'GITHUB',
@@ -272,8 +285,6 @@ phases:
       - echo "Waiting for ECS to be stable..."
       - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-develop-fargateCluster --services gp-api-develop
       - echo "Done!"
-artifacts:
-  type: NO_ARTIFACTS
 `,
       },
       artifacts: {
