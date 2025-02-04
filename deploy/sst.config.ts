@@ -278,8 +278,7 @@ artifacts:
       },
     })
   },
-  // todo: deploy the runner into the vpc so it can access the database.
-  // sst currently has a bug with this feature as of 3.3.40
+  // we no longer use autodeploy. we use codebuild.
   // console: {
   //   autodeploy: {
   //     runner: {
