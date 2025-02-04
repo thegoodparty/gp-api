@@ -209,42 +209,25 @@ export default $config({
       assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: 'codebuild.amazonaws.com',
       }),
-      managedPolicyArns: [
-        'arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess',
-        'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser',
-        'arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess',
-        'arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess',
-      ],
-    })
-
-    new aws.iam.RolePolicy('codebuild-logs-policy', {
-      role: codeBuildRole.name,
-      policy: pulumi.output({
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Action: [
-              'logs:CreateLogGroup',
-              'logs:CreateLogStream',
-              'logs:PutLogEvents',
-            ],
-            Resource: 'arn:aws:logs:*:*:*',
-          },
-        ],
-      }),
+      managedPolicyArns: ['arn:aws:iam::aws:policy/AdministratorAccess'],
     })
 
     // todo: codebuild projects for each stage.
     // Note: our buildspec is only created when deploy is run since its part of the sst deploy process.
     // so for any changes to the buildspec, we need to run deploy before running the codebuild project.
     const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
+      name: `gp-deploy-build-${$app.stage}`,
       serviceRole: codeBuildRole.arn,
       environment: {
         computeType: 'BUILD_GENERAL1_LARGE',
         image: 'aws/codebuild/standard:6.0',
         type: 'LINUX_CONTAINER',
         privilegedMode: true,
+      },
+      vpcConfig: {
+        vpcId: 'vpc-0763fa52c32ebcf6a',
+        subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+        securityGroupIds: ['sg-01de8d67b0f0ec787'],
       },
       source: {
         type: 'GITHUB',
@@ -267,18 +250,45 @@ phases:
 
   build:
     commands:
-      - echo "Deploying SST app"
-      - sst deploy --stage=${process.env.SST_STAGE || 'develop'} --verbose --print-logs
+      - echo "Deploying SST app. stage: ${$app.stage}"
+      - sst deploy --stage=${$app.stage || 'develop'} --verbose --print-logs
       - echo "Waiting for ECS to be stable..."
-      - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-develop-fargateCluster --services gp-api-develop
+      - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-${$app.stage}-fargateCluster --services gp-api-${$app.stage}
       - echo "Done!"
-artifacts:
-  type: NO_ARTIFACTS
 `,
       },
       artifacts: {
         type: 'NO_ARTIFACTS',
       },
+    })
+
+    // Create an IAM Policy for Github actions
+    const actionsPolicy = new aws.iam.Policy('github-actions-policy', {
+      description: 'Limited policy for Github Actions to trigger CodeBuild',
+      policy: pulumi.output({
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: [
+              'codebuild:StartBuild',
+              'codebuild:BatchGetBuilds',
+              'codebuild:ListBuildsForProject',
+            ],
+            Resource: pulumi.interpolate`${codeBuildProject.arn}`,
+          },
+          {
+            Effect: 'Allow',
+            Action: ['codebuild:ListProjects'],
+            Resource: '*',
+          },
+          {
+            Effect: 'Allow',
+            Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
+            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/${codeBuildProject.name}:*`,
+          },
+        ],
+      }),
     })
   },
   // we no longer use autodeploy. we use codebuild.
