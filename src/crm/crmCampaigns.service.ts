@@ -275,7 +275,7 @@ export class CrmCampaignsService {
 
     const longState = getStateNameByStateCode(state)
 
-    const proSubscriptionStatus = true // getProSubscriptionStatus(campaign)
+    const proSubscriptionStatus = true
 
     const p2v_status =
       p2vNotNeeded || !p2vStatus

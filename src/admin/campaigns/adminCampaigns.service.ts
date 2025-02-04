@@ -64,7 +64,7 @@ export class AdminCampaignsService {
       },
     })
 
-    this.crm.trackCampaign(newCampaign.id) // TODO: double-check this isn't supposed to be trackUser
+    this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
