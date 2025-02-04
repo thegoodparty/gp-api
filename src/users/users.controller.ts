@@ -88,7 +88,7 @@ export class UsersController {
   @Post('me/upload-image')
   @UseInterceptors(
     FilesInterceptor('file', {
-      mode: 'stream',
+      mode: 'buffer',
       mimeTypes: [
         MimeTypes.IMAGE_JPEG,
         MimeTypes.IMAGE_GIF,
