@@ -254,6 +254,14 @@ phases:
       nodejs: 22
     commands:
       - npm install -g sst
+
+  pre_build:
+    commands:
+      - echo "Moving into deploy folder..."
+      - cd deploy
+      - echo "Installing local dependencies..."
+      - npm ci || npm install
+
   build:
     commands:
       - cd deploy
@@ -270,9 +278,6 @@ artifacts:
         type: 'NO_ARTIFACTS',
       },
     })
-
-    // Expose the project name so you can reference it in GitHub Actions
-    pulumi.log.info(`Custom CodeBuild project name: ${codeBuildProject.name}`)
   },
   // todo: deploy the runner into the vpc so it can access the database.
   // sst currently has a bug with this feature as of 3.3.40
