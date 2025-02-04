@@ -123,7 +123,7 @@ export class CrmCampaignsService {
         EMAIL_TO_SLACK_ID[IS_PROD && email ? email : 'jared@goodparty.org']
       }>`
     } catch (e) {
-      console.error('error getting crm company owner', e)
+      this.logger.error('error getting crm company owner', e)
     }
     return crmCompanyOwnerName
   }
@@ -634,7 +634,7 @@ export class CrmCampaignsService {
           ? await this.getCrmCompanyById(hubspotId)
           : null
         if (!company) {
-          console.log(`No company found - ${campaignId}`)
+          this.logger.error(`No company found - ${campaignId}`)
           continue
         }
 

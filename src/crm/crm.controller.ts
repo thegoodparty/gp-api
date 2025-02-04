@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Logger,
   Param,
   Post,
@@ -31,6 +33,7 @@ export class CrmController {
 
   @Post('hubspot-webhook')
   @PublicAccess()
+  @HttpCode(HttpStatus.OK)
   async hubspotWebhook(@Body() payload: HubspotObjectUpdate[]) {
     if (payload && payload.length > 0) {
       for (let i = 0; i < payload.length; i++) {

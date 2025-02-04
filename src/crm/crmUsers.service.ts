@@ -225,7 +225,7 @@ export class CrmUsersService {
           message += axiosError.message
         }
       } else {
-        console.error('Unexpected Error:', error)
+        this.logger.error('Unexpected Error:', error)
       }
       this.logger.error('hubspot error', message, error)
       this.slack.errorMessage({ message: 'Error submitting form', error })
