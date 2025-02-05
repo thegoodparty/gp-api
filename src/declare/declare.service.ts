@@ -13,7 +13,7 @@ export class DeclareService {
 
   constructor(private readonly httpService: HttpService) {}
 
-  async getDeclarations(): Promise<string> {
+  async getDeclarations() {
     const formId = 'f51c1352-c778-40a8-b589-b911c31e64b1'
     const hubspotToken = process.env.HUBSPOT_TOKEN
 
@@ -59,7 +59,7 @@ export class DeclareService {
       }
     }
 
-    const signatures = Array.from(uniqueSignatures).join(', ')
+    const signatures = Array.from(uniqueSignatures)
 
     return signatures
   }
