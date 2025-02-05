@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import {
   CreateTopIssueDto,
   TopIssueOutputDto,
-  UpdateTopIssueDto,
 } from './schemas/topIssues.schema'
 import { TopIssue } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -23,7 +22,7 @@ export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
     })
   }
 
-  async update(id: number, body: UpdateTopIssueDto): Promise<TopIssue> {
+  async update(id: number, body: CreateTopIssueDto): Promise<TopIssue> {
     const { name, icon } = body
     return await this.model.update({
       where: { id },
