@@ -11,8 +11,8 @@ if (!BALLOT_READY_KEY) {
 }
 
 @Injectable()
-export class GraphqlService {
-  private readonly logger = new Logger(GraphqlService.name)
+export class BallotReadyService {
+  private readonly logger = new Logger(BallotReadyService.name)
   private readonly graphQLClient = new GraphQLClient(API_BASE, {
     headers: {
       authorization: `Bearer ${BALLOT_READY_KEY}`,

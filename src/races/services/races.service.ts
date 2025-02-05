@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { GraphqlService } from 'src/graphql/graphql.service'
 import slugify from 'slugify'
 import { startOfYear, addYears, format } from 'date-fns'
 import { County, Municipality } from '@prisma/client'
@@ -22,6 +21,7 @@ import { CountiesService } from './counties.services'
 import { MunicipalitiesService } from './municipalities.services'
 import { CensusEntitiesService } from './censusEntities.services'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { BallotReadyService } from './ballotReadyservice'
 
 @Injectable()
 export class RacesService extends createPrismaBase(MODELS.Race) {
@@ -29,7 +29,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     private readonly counties: CountiesService,
     private readonly municipalities: MunicipalitiesService,
     private readonly censusEntities: CensusEntitiesService,
-    private readonly graphQLService: GraphqlService,
+    private readonly ballotReadyService: BallotReadyService,
   ) {
     super()
   }
@@ -760,7 +760,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
                 }
             }`
 
-      const { races } = await this.graphQLService.fetchGraphql(query)
+      const { races } = await this.ballotReadyService.fetchGraphql(query)
       this.logger.log(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {
@@ -826,7 +826,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
             }
         }
         `
-    const { node } = await this.graphQLService.fetchGraphql(query)
+    const { node } = await this.ballotReadyService.fetchGraphql(query)
     return node
   }
 }

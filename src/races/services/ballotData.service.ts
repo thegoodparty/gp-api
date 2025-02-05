@@ -4,17 +4,16 @@ import {
   Logger,
 } from '@nestjs/common'
 import { getRaceQuery } from '../util/getRaceQuery.util'
-import { GraphqlService } from 'src/graphql/graphql.service'
 import { parseRaces } from '../util/parseRaces.util'
 import { sortRacesGroupedByYear } from '../util/sortRaces.util'
-import { BallotData } from '../types/races.types'
+import { BallotReadyService } from './ballotReadyservice'
 
 @Injectable()
 export class BallotDataService {
   private readonly logger = new Logger(BallotDataService.name)
-  constructor(private readonly graphqlService: GraphqlService) {}
+  constructor(private readonly ballotReadyService: BallotReadyService) {}
 
-  async getRacesByZipcode(zipcode: string): Promise<BallotData> {
+  async getRacesByZipcode(zipcode: string): Promise<any> {
     if (zipcode.length !== 5) {
       throw new InternalServerErrorException(
         'Zipcodes must be a string 5 digits in length. Received: ',
@@ -28,10 +27,10 @@ export class BallotDataService {
       let startCursor
 
       let query = getRaceQuery(zipcode, startCursor)
-      let { races } = await this.graphqlService.fetchGraphql(query)
+      let { races } = await this.ballotReadyService.fetchGraphql(query)
       console.dir(races, { depth: 2 })
       let existingPositions = {}
-      let electionsByYear: BallotData = {}
+      let electionsByYear = {}
       let primaryElectionDates = {} // key - positionId, value - electionDay and raceId (primary election date)
       let hasNextPage = false
 
@@ -51,7 +50,7 @@ export class BallotDataService {
 
       while (hasNextPage === true) {
         query = getRaceQuery(zipcode, startCursor)
-        const queryResponse = await this.graphqlService.fetchGraphql(query)
+        const queryResponse = await this.ballotReadyService.fetchGraphql(query)
         races = queryResponse?.races
         if (races) {
           const raceResponse = parseRaces(
