@@ -4,7 +4,7 @@ export const getUserFullName = (user: User) =>
   !user
     ? ''
     : user.firstName
-      ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ''}`
+      ? `${user.firstName} ${user.lastName || ''}`.trim()
       : user.name
         ? user.name
         : ''
