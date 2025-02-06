@@ -9,7 +9,7 @@ import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import { AppModule } from './app.module'
-import { Logger, ValidationPipe } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
@@ -71,7 +71,6 @@ const bootstrap = async () => {
     },
   })
 
-  app.useGlobalPipes(new ValidationPipe({ transform: true }))
   app.useGlobalFilters(new PrismaExceptionFilter())
 
   await app.listen(APP_LISTEN_CONFIG)
