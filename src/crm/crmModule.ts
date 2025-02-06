@@ -7,6 +7,7 @@ import { VotersModule } from '../voters/voters.module'
 import { HubspotService } from './hubspot.service'
 import { HttpModule } from '@nestjs/axios'
 import { FullStoryModule } from '../fullStory/fullStory.module'
+import { CrmController } from './crm.controller'
 
 @Module({
   providers: [CrmUsersService, CrmCampaignsService, HubspotService],
@@ -18,5 +19,6 @@ import { FullStoryModule } from '../fullStory/fullStory.module'
     forwardRef(() => FullStoryModule),
   ],
   exports: [CrmUsersService, CrmCampaignsService],
+  controllers: [CrmController],
 })
 export class CrmModule {}
