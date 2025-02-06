@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
-import { getStateNameByStateCode } from 'us-state-codes'
+import usStates from 'states-us'
 import { CRMCompanyProperties } from './crm.types'
 import {
   SimplePublicObject,
@@ -273,7 +273,9 @@ export class CrmCampaignsService {
 
     const resolvedOffice = office === 'Other' ? otherOffice : office
 
-    const longState = getStateNameByStateCode(state)
+    const longState = usStates.find(
+      (usState) => usState.abbreviation === state?.toUpperCase(),
+    )?.name
 
     const proSubscriptionStatus = true
 

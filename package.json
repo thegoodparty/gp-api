@@ -76,8 +76,8 @@
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.14.0",
     "slugify": "^1.6.6",
+    "states-us": "^1.1.1",
     "stripe": "^17.5.0",
-    "us-state-codes": "^1.1.2",
     "validator": "^13.12.0",
     "zod": "^3.23.8"
   },
