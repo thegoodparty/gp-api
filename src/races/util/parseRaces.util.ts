@@ -1,3 +1,4 @@
+//import { RacesByZipcode } from '../types/ballotReadyTypes'
 import { OfficeLevel } from '../types/races.types'
 
 const isPOTUSorVPOTUSNode = ({ position }) =>
@@ -5,6 +6,7 @@ const isPOTUSorVPOTUSNode = ({ position }) =>
   position?.name?.toLowerCase().includes('president')
 
 export function parseRaces(
+  //races: RacesByZipcode['races'],
   races,
   existingPositions,
   electionsByYear,
@@ -20,6 +22,7 @@ export function parseRaces(
     // console.log(`Processing ${name} ${electionYear}`);
 
     if (existingPositions[`${name}|${electionYear}`]) {
+      console.log('Position already exists, skipping...', name, electionYear)
       continue
     }
 

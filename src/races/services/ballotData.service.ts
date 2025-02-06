@@ -25,11 +25,17 @@ export class BallotDataService {
 
       let startCursor
 
-      let { races } = (await this.ballotReadyService.fetchRacesByZipcode(
+      const ballotReadyData = await this.ballotReadyService.fetchRacesByZipcode(
         zipcode,
         startCursor,
-      )) as any
-      console.dir(races, { depth: 2 })
+      )
+      if (!ballotReadyData) {
+        throw new InternalServerErrorException(
+          "Couldn't fetch data from BallotReady",
+        )
+      }
+      let { races } = ballotReadyData
+      console.dir(races, { depth: 3 })
       let existingPositions = {}
       let electionsByYear = {}
       let primaryElectionDates = {} // key - positionId, value - electionDay and raceId (primary election date)
@@ -50,11 +56,15 @@ export class BallotDataService {
       }
 
       while (hasNextPage === true) {
-        const queryResponse =
-          (await this.ballotReadyService.fetchRacesByZipcode(
-            zipcode,
-            startCursor,
-          )) as any
+        const queryResponse = await this.ballotReadyService.fetchRacesByZipcode(
+          zipcode,
+          startCursor,
+        )
+        if (!queryResponse) {
+          throw new InternalServerErrorException(
+            'Could not fetch data from BallotReady',
+          )
+        }
         races = queryResponse?.races
         if (races) {
           const raceResponse = parseRaces(
