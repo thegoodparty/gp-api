@@ -7,7 +7,7 @@ import {
 
 export type RaceData = {
   id?: number
-  race_id: number
+  race_id?: number
   geofence_id?: number
   is_primary?: boolean
   is_runoff?: boolean
@@ -34,7 +34,7 @@ export type RaceData = {
   normalized_position_id?: number
   normalized_position_name?: string
   position_description?: string
-  frequency: number[]
+  frequency?: number[]
   reference_year?: number
   salary?: string
   employment_type?: string
@@ -44,7 +44,7 @@ export type RaceData = {
   filing_requirements?: string
   eligibility_requirements?: string
   partisan_type?: string
-  filing_periods: {
+  filing_periods?: {
     notes?: string | null
     end_on?: string
     start_on?: string
@@ -79,7 +79,7 @@ export interface NormalizedRace
   employmentType?: string
   filingDateStart?: string
   filingDateEnd?: string
-  frequency: number[]
+  frequency?: number[]
   normalizedPositionName?: string
   positionDescription?: string
   // subAreaName?: string

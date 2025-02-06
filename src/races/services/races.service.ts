@@ -121,7 +121,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       {
         role: 'system',
         content:
-          'You help me find close cities, and respond in javascript json format.',
+          'You help me find close cities, and respond in JSON format that is parsable be JSON.parse().',
       },
       {
         role: 'user',
@@ -131,6 +131,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     ]
 
     const completion = await this.ai.llmChatCompletion(messages)
+    console.log(`completion =>`, completion)
 
     const cities = completion.content
     const parsed: string[] = JSON.parse(cities)
@@ -212,7 +213,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
   async byCity(state: string, county: string, city: string) {
     const countyRecord = await this.getCounty(state, county)
     const municipalityRecord = await this.getMunicipality(state, county, city)
-    if (!countyRecord && !municipalityRecord) {
+    if (!countyRecord || !municipalityRecord) {
       throw new BadRequestException('county and city are required')
     }
 
@@ -267,7 +268,6 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         electionDate: 'asc',
       },
     })
-
     return this.deduplicateRaces(races as Race[], state, countyRecord)
   }
 
@@ -333,7 +333,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       filingDateEnd: filing_date_end,
       normalizedPositionName: normalized_position_name,
       positionDescription: position_description,
-      frequency,
+      ...(frequency ? { frequency } : {}),
       subAreaName: race.subAreaName,
       subAreaValue: race.subAreaValue,
       filingOfficeAddress: filing_office_address,
@@ -813,7 +813,6 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
     )
 
-    // console.log('completion', completion);
     const content = completion?.content
     let decodedContent: any = {}
     try {

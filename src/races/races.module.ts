@@ -11,12 +11,11 @@ import { AiModule } from '../ai/ai.module'
   controllers: [RacesController],
   providers: [
     RacesService,
-    AiModule,
     MunicipalitiesService,
     CountiesService,
     CensusEntitiesService,
   ],
-  imports: [GraphqlModule],
+  imports: [GraphqlModule, AiModule],
   exports: [RacesService],
 })
 export class RacesModule {}

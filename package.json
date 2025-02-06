@@ -52,6 +52,8 @@
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
     "bottleneck": "^2.19.5",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
     "contentful": "^11.2.2",
     "date-fns": "^4.1.0",
     "deepmerge-ts": "^7.1.3",

@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common'
+import { Controller, Get, Query, UsePipes } from '@nestjs/common'
 import { RacesService } from './services/races.service'
 import { NormalizedRace, ProximityCitiesResponseBody } from './races.types'
 import {
@@ -8,8 +8,10 @@ import {
   RacesListQueryDto,
 } from './schemas/racesList.schema'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
+import { ZodValidationPipe } from 'nestjs-zod'
 
 @Controller('races')
+@UsePipes(ZodValidationPipe)
 @PublicAccess()
 export class RacesController {
   constructor(private readonly racesService: RacesService) {}
@@ -22,15 +24,14 @@ export class RacesController {
   }
 
   @Get('by-county')
-  @PublicAccess()
   async findRacesByCounty(
     @Query() { state, county }: RacesByCountyQueryDto,
   ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
+    console.log(`county =>`, county)
     return this.racesService.byCounty(state, county)
   }
 
   @Get('by-city')
-  @PublicAccess()
   async findRacesByCity(
     @Query() { state, county, city }: RacesByCityQueryDto,
   ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
@@ -38,7 +39,6 @@ export class RacesController {
   }
 
   @Get('proximity-cities')
-  @PublicAccess()
   async findProximityCities(
     @Query() { state, city }: RacesByCityProximityQueryDto,
   ): Promise<ProximityCitiesResponseBody> {
