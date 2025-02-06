@@ -131,7 +131,6 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     ]
 
     const completion = await this.ai.llmChatCompletion(messages)
-    console.log(`completion =>`, completion)
 
     const cities = completion.content
     const parsed: string[] = JSON.parse(cities)

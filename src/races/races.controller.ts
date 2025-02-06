@@ -27,7 +27,6 @@ export class RacesController {
   async findRacesByCounty(
     @Query() { state, county }: RacesByCountyQueryDto,
   ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
-    console.log(`county =>`, county)
     return this.racesService.byCounty(state, county)
   }
 
