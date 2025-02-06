@@ -344,7 +344,7 @@ export class CrmCampaignsService {
       ...(seats && typeof seats === 'number' && seats > 0
         ? { seats_available: `${seats}` }
         : {}),
-      ...(score && typeof score === 'number' && score > 0
+      ...(typeof score === 'number' && score > 0
         ? { automated_score: `${Math.floor(score > 5 ? 5 : score)}` }
         : {}),
       ...(typeof isPartisan === 'boolean'
