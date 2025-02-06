@@ -12,7 +12,7 @@ import {
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
 import { SlackService } from '../shared/services/slack.service'
-import { CrmCampaignsService } from './crmCampaigns.service'
+import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'
 

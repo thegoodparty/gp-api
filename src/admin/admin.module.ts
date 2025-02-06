@@ -7,18 +7,9 @@ import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { AdminP2VService } from './services/adminP2V.service'
 import { AdminUsersController } from './users/adminUsers.controller'
 import { AuthenticationModule } from 'src/authentication/authentication.module'
-import { VotersModule } from 'src/voters/voters.module'
-import { CrmModule } from '../crm/crmModule'
 
 @Module({
-  imports: [
-    EmailModule,
-    UsersModule,
-    CampaignsModule,
-    AuthenticationModule,
-    VotersModule,
-    CrmModule,
-  ],
+  imports: [EmailModule, UsersModule, CampaignsModule, AuthenticationModule],
   controllers: [AdminCampaignsController, AdminUsersController],
   providers: [AdminCampaignsService, AdminP2VService],
 })

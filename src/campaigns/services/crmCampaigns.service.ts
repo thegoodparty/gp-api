@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import usStates from 'states-us'
-import { CRMCompanyProperties } from './crm.types'
+import { CRMCompanyProperties } from '../../crm/crm.types'
 import {
   SimplePublicObject,
   SimplePublicObjectInputForCreate,
@@ -9,25 +9,24 @@ import {
   ApiException,
   SimplePublicObjectInput,
 } from '@hubspot/api-client/lib/codegen/crm/companies'
-import { HubspotService } from './hubspot.service'
-import { CampaignsService } from '../campaigns/services/campaigns.service'
-import { SlackService } from '../shared/services/slack.service'
+import { HubspotService } from '../../crm/hubspot.service'
+import { CampaignsService } from './campaigns.service'
+import { SlackService } from '../../shared/services/slack.service'
 import { Campaign, User } from '@prisma/client'
-import { getUserFullName } from '../users/util/users.util'
-import { formatDateForCRM, getCrmP2VValues } from './util/cms.util'
-import { CrmUsersService } from '../users/services/crmUsers.service'
-import { UsersService } from '../users/services/users.service'
+import { getUserFullName } from '../../users/util/users.util'
+import { formatDateForCRM, getCrmP2VValues } from '../../crm/util/cms.util'
+import { CrmUsersService } from '../../users/services/crmUsers.service'
+import { UsersService } from '../../users/services/users.service'
 import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4/models/AssociationSpec'
 import { AssociationTypes } from '@hubspot/api-client'
-import { AiChatService } from '../campaigns/ai/chat/aiChat.service'
-import { PathToVictoryService } from '../campaigns/services/pathToVictory.service'
-import { CampaignUpdateHistoryService } from '../campaigns/updateHistory/campaignUpdateHistory.service'
-import { VoterFileService } from '../voters/voterFile/voterFile.service'
-import { IS_PROD } from '../shared/util/appEnvironment.util'
-import { FullStoryService } from '../fullStory/fullStory.service'
-import { pick } from '../shared/util/objects.util'
-import { SLACK_CHANNEL_IDS } from '../shared/services/slackService.config'
-import { SlackChannel } from '../shared/services/slackService.types'
+import { AiChatService } from '../ai/chat/aiChat.service'
+import { PathToVictoryService } from './pathToVictory.service'
+import { CampaignUpdateHistoryService } from '../updateHistory/campaignUpdateHistory.service'
+import { IS_PROD } from '../../shared/util/appEnvironment.util'
+import { FullStoryService } from '../../fullStory/fullStory.service'
+import { pick } from '../../shared/util/objects.util'
+import { SlackChannel } from '../../shared/services/slackService.types'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
 export const HUBSPOT_COMPANY_PROPERTIES = [
   'past_candidate',
@@ -68,19 +67,19 @@ const EMAIL_TO_SLACK_ID = {
 export class CrmCampaignsService {
   private readonly logger = new Logger(this.constructor.name)
   constructor(
+    @Inject(forwardRef(() => CampaignsService))
+    private readonly campaigns: CampaignsService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly users: UsersService,
+    @Inject(forwardRef(() => FullStoryService))
+    private readonly fullStory: FullStoryService,
     private readonly hubspot: HubspotService,
     private readonly crmUsers: CrmUsersService,
     private readonly aiChat: AiChatService,
     private readonly pathToVictory: PathToVictoryService,
     private readonly campaignUpdateHistory: CampaignUpdateHistoryService,
-    private readonly voterFile: VoterFileService,
-    @Inject(forwardRef(() => CampaignsService))
-    private readonly campaigns: CampaignsService,
+    private readonly voterFile: VoterFileDownloadAccessService,
     private readonly slack: SlackService,
-    @Inject(forwardRef(() => UsersService))
-    private readonly users: UsersService,
-    @Inject(forwardRef(() => FullStoryService))
-    private readonly fullStory: FullStoryService,
   ) {}
 
   async getCrmCompanyById(hubspotId: string) {

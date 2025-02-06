@@ -1,5 +1,4 @@
 import { forwardRef, Module } from '@nestjs/common'
-import { CrmCampaignsService } from './crmCampaigns.service'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { UsersModule } from '../users/users.module'
 import { VotersModule } from '../voters/voters.module'
@@ -9,15 +8,15 @@ import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CrmController } from './crm.controller'
 
 @Module({
-  providers: [CrmCampaignsService, HubspotService],
+  providers: [HubspotService],
   imports: [
     forwardRef(() => CampaignsModule),
     forwardRef(() => VotersModule),
     forwardRef(() => UsersModule),
-    HttpModule,
     forwardRef(() => FullStoryModule),
+    HttpModule,
   ],
-  exports: [CrmCampaignsService, HubspotService],
+  exports: [HubspotService],
   controllers: [CrmController],
 })
 export class CrmModule {}

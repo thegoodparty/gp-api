@@ -17,6 +17,8 @@ import { AiChatService } from './ai/chat/aiChat.service'
 import { AiModule } from '../ai/ai.module'
 import { ContentModule } from '../content/content.module'
 import { CrmModule } from '../crm/crmModule'
+import { CrmCampaignsService } from './services/crmCampaigns.service'
+import { FullStoryModule } from '../fullStory/fullStory.module'
 
 @Module({
   imports: [
@@ -26,6 +28,7 @@ import { CrmModule } from '../crm/crmModule'
     AiModule,
     ContentModule,
     forwardRef(() => CrmModule),
+    forwardRef(() => FullStoryModule),
   ],
   controllers: [
     CampaignsController,
@@ -42,12 +45,14 @@ import { CrmModule } from '../crm/crmModule'
     CampaignUpdateHistoryService,
     PathToVictoryService,
     AiChatService,
+    CrmCampaignsService,
   ],
   exports: [
     CampaignsService,
     AiChatService,
     PathToVictoryService,
     CampaignUpdateHistoryService,
+    CrmCampaignsService,
   ],
 })
 export class CampaignsModule {}

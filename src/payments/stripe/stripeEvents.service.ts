@@ -18,9 +18,9 @@ import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from '../../shared/services/slackService.types'
-import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
-import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
@@ -34,8 +34,8 @@ export class StripeEventsService {
     private readonly campaignsService: CampaignsService,
     private readonly slackService: SlackService,
     private readonly emailService: EmailService,
-    private readonly voterFileService: VoterFileService,
     private readonly crm: CrmCampaignsService,
+    private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
   ) {}
 
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
@@ -94,7 +94,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.voterFileService.doVoterDownloadCheck(campaign, user),
+      this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
   }
 
@@ -179,7 +179,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.voterFileService.doVoterDownloadCheck(campaign, user),
+      this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
   }
 

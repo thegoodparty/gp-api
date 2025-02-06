@@ -6,12 +6,10 @@ import { PaymentsController } from './payments.controller'
 import { StripeEventsService } from './stripe/stripeEvents.service'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { EmailModule } from '../email/email.module'
-import { VotersModule } from 'src/voters/voters.module'
-import { CrmModule } from '../crm/crmModule'
 
 @Module({
   providers: [StripeService, StripeEventsService],
   controllers: [PurchaseController, PaymentsController],
-  imports: [UsersModule, CampaignsModule, EmailModule, VotersModule, CrmModule],
+  imports: [UsersModule, CampaignsModule, EmailModule],
 })
 export class PaymentsModule {}

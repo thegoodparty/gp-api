@@ -7,15 +7,9 @@ import { VoterOutreachService } from './services/voterOutreach.service'
 import { FilesModule } from 'src/files/files.module'
 import { VotersService } from './services/voters.service'
 import { HttpModule } from '@nestjs/axios'
-import { CrmModule } from '../crm/crmModule'
 
 @Module({
-  imports: [
-    forwardRef(() => CampaignsModule),
-    FilesModule,
-    HttpModule,
-    forwardRef(() => CrmModule),
-  ],
+  imports: [forwardRef(() => CampaignsModule), FilesModule, HttpModule],
   controllers: [VoterFileController],
   providers: [
     VoterFileService,

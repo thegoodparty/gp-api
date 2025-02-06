@@ -13,7 +13,7 @@ import {
   SlackChannel,
   SlackMessageType,
 } from 'src/shared/services/slackService.types'
-import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 
 @Injectable()
 export class VoterOutreachService {

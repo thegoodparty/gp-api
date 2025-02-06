@@ -24,7 +24,7 @@ import { UsersService } from 'src/users/services/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
+import { CrmCampaignsService } from './crmCampaigns.service'
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {

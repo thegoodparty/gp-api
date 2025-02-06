@@ -1,12 +1,12 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
-import { VoterFileService } from '../voterFile.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { VoterFileDownloadAccessService } from '../../../shared/services/voterFileDownloadAccess.service'
 
 @Injectable()
 export class CanDownloadVoterFileGuard implements CanActivate {
   constructor(
-    private voterFileService: VoterFileService,
     private campaignsService: CampaignsService,
+    private voterFileDownloadAccess: VoterFileDownloadAccessService,
   ) {}
   async canActivate(context: ExecutionContext) {
     const { user } = context.switchToHttp().getRequest()
@@ -15,6 +15,6 @@ export class CanDownloadVoterFileGuard implements CanActivate {
       pathToVictory: true,
     })
 
-    return this.voterFileService.canDownload(campaign)
+    return this.voterFileDownloadAccess.canDownload(campaign)
   }
 }

@@ -10,7 +10,7 @@ import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { buildSlackBlocks } from './util/slack.util'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { SlackChannel } from '../../shared/services/slackService.types'
-import { CrmCampaignsService } from '../../crm/crmCampaigns.service'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 
 @Injectable()
 export class VoterFileService {
@@ -70,7 +70,9 @@ export class VoterFileService {
   }
 
   wakeUp() {
-    const query = `SELECT "LALVOTERID" FROM public."VoterCA" where "LALVOTERID" = 'LALCA3184219' limit 1`
+    const query = `SELECT "LALVOTERID"
+                   FROM public."VoterCA"
+                   where "LALVOTERID" = 'LALCA3184219' limit 1`
     return this.voterDb.csvStream(query)
   }
 
@@ -109,50 +111,5 @@ export class VoterFileService {
     )
 
     return true
-  }
-
-  canDownload(campaign?: CampaignWith<'pathToVictory'>) {
-    if (!campaign) return false
-
-    let electionTypeRequired = true
-    if (
-      campaign.details.ballotLevel &&
-      campaign.details.ballotLevel !== 'FEDERAL' &&
-      campaign.details.ballotLevel !== 'STATE'
-    ) {
-      // not required for state/federal races
-      // so we can fall back to the whole state.
-      electionTypeRequired = false
-    }
-    if (
-      electionTypeRequired &&
-      (!campaign.pathToVictory?.data?.electionType ||
-        !campaign.pathToVictory?.data?.electionLocation)
-    ) {
-      this.logger.log('Campaign is not eligible for download.', campaign.id)
-      return false
-    } else {
-      return true
-    }
-  }
-
-  async doVoterDownloadCheck(
-    campaign: CampaignWith<'pathToVictory'>,
-    user: User,
-  ) {
-    const canDownload = !campaign ? false : await this.canDownload(campaign)
-    if (!canDownload) {
-      // alert Jared and Rob.
-      const alertSlackMessage = `<@U01AY0VQFPE> and <@U03RY5HHYQ5>`
-      await this.slack.message(
-        {
-          body: `Campaign ${campaign.slug} has been upgraded to Pro but the voter file is not available. Email: ${user.email}
-          visit https://goodparty.org/admin/pro-no-voter-file to see all users without L2 data
-          ${alertSlackMessage}
-          `,
-        },
-        IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
-      )
-    }
   }
 }
