@@ -5,6 +5,7 @@ import { GraphqlModule } from 'src/graphql/graphql.module'
 import { MunicipalitiesService } from './services/municipalities.services'
 import { CountiesService } from './services/counties.services'
 import { CensusEntitiesService } from './services/censusEntities.services'
+import { AiModule } from '../ai/ai.module'
 
 @Module({
   controllers: [RacesController],
@@ -14,7 +15,7 @@ import { CensusEntitiesService } from './services/censusEntities.services'
     CountiesService,
     CensusEntitiesService,
   ],
-  imports: [GraphqlModule],
+  imports: [GraphqlModule, AiModule],
   exports: [RacesService],
 })
 export class RacesModule {}
