@@ -13,20 +13,17 @@ import { RacesModule } from 'src/races/races.module'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
-import { AiChatService } from './ai/chat/aiChat.service'
-import { AiModule } from '../ai/ai.module'
-import { ContentModule } from '../content/content.module'
 import { CrmModule } from '../crm/crmModule'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { FullStoryModule } from '../fullStory/fullStory.module'
+import { CampaignsAiModule } from './ai/campaignsAi.module'
 
 @Module({
   imports: [
     EmailModule,
     forwardRef(() => UsersModule),
     RacesModule,
-    AiModule,
-    ContentModule,
+    CampaignsAiModule,
     forwardRef(() => CrmModule),
     forwardRef(() => FullStoryModule),
   ],
@@ -44,12 +41,10 @@ import { FullStoryModule } from '../fullStory/fullStory.module'
     GeocodingService,
     CampaignUpdateHistoryService,
     PathToVictoryService,
-    AiChatService,
     CrmCampaignsService,
   ],
   exports: [
     CampaignsService,
-    AiChatService,
     PathToVictoryService,
     CampaignUpdateHistoryService,
     CrmCampaignsService,

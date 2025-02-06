@@ -7,6 +7,7 @@ import { CampaignsModule } from '../campaigns.module'
 import { QueueProducerModule } from 'src/queue/producer/producer.module'
 import { AiChatController } from './chat/aiChat.controller'
 import { AiChatService } from './chat/aiChat.service'
+import { AiService } from '../../ai/ai.service'
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { AiChatService } from './chat/aiChat.service'
     forwardRef(() => CampaignsModule),
   ],
   controllers: [AiContentController, AiChatController],
-  providers: [AiContentService, AiChatService],
-  exports: [AiContentService],
+  providers: [AiContentService, AiChatService, AiService],
+  exports: [AiContentService, AiChatService],
 })
 export class CampaignsAiModule {}
