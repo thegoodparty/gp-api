@@ -3,7 +3,6 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { getRaceQuery } from '../util/getRaceQuery.util'
 import { parseRaces } from '../util/parseRaces.util'
 import { sortRacesGroupedByYear } from '../util/sortRaces.util'
 import { BallotReadyService } from './ballotReadyservice'
@@ -26,8 +25,10 @@ export class BallotDataService {
 
       let startCursor
 
-      let query = getRaceQuery(zipcode, startCursor)
-      let { races } = await this.ballotReadyService.fetchGraphql(query)
+      let { races } = (await this.ballotReadyService.fetchRacesByZipcode(
+        zipcode,
+        startCursor,
+      )) as any
       console.dir(races, { depth: 2 })
       let existingPositions = {}
       let electionsByYear = {}
@@ -49,8 +50,11 @@ export class BallotDataService {
       }
 
       while (hasNextPage === true) {
-        query = getRaceQuery(zipcode, startCursor)
-        const queryResponse = await this.ballotReadyService.fetchGraphql(query)
+        const queryResponse =
+          (await this.ballotReadyService.fetchRacesByZipcode(
+            zipcode,
+            startCursor,
+          )) as any
         races = queryResponse?.races
         if (races) {
           const raceResponse = parseRaces(

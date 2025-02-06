@@ -22,6 +22,7 @@ import { MunicipalitiesService } from './municipalities.services'
 import { CensusEntitiesService } from './censusEntities.services'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { BallotReadyService } from './ballotReadyservice'
+import { PositionLevel } from 'src/generated/graphql.types'
 
 @Injectable()
 export class RacesService extends createPrismaBase(MODELS.Race) {
@@ -406,7 +407,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
 
     let race: any
     try {
-      race = await this.getRaceById(raceId)
+      race = await this.ballotReadyService.fetchRaceById(raceId)
     } catch (e) {
       this.logger.error(slug, 'error getting race details', e)
       return
@@ -730,37 +731,15 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     slug: string,
     officeName: string,
     zip: string,
-    level: string,
+    level: PositionLevel,
   ) {
     const electionDates: string[] = []
     try {
-      // get todays date in format YYYY-MM-DD
-      const today = new Date()
-      const year = today.getFullYear()
-      const month = (today.getMonth() + 1).toString().padStart(2, '0')
-      const day = today.getDate().toString().padStart(2, '0')
-      const dateToday = `${year}-${month}-${day}`
-
-      const query = `
-            query {
-                races(
-                    location: { zip: "${zip}" }
-                    filterBy: { electionDay: { gt: "2006-01-01", lt: "${dateToday}" }, level: ${level} }
-                ) {
-                    edges {
-                        node {
-                            position {    
-                                name
-                            }
-                            election {
-                                electionDay
-                            }
-                        }
-                    }
-                }
-            }`
-
-      const { races } = await this.ballotReadyService.fetchGraphql(query)
+      const { races } =
+        (await this.ballotReadyService.fetchRacesWithElectionDates(
+          zip,
+          level,
+        )) as any
       this.logger.log(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {
@@ -781,52 +760,5 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       this.logger.error(slug, 'error at getElectionDates', e)
       return []
     }
-  }
-
-  private async getRaceById(raceId: string) {
-    const query = `
-          query Node {
-            node(id: "${raceId}") {
-                ... on Race {
-                    databaseId
-                    isPartisan
-                    isPrimary
-                    election {
-                        electionDay
-                        name
-                        state
-                    }
-                    position {
-                        id
-                        description
-                        judicial
-                        level
-                        name
-                        partisanType
-                        staggeredTerm
-                        state
-                        subAreaName
-                        subAreaValue
-                        tier
-                        mtfcc
-                        geoId
-                        electionFrequencies {
-                            frequency
-                        }
-                        hasPrimary
-                        normalizedPosition {
-                          name
-                      }
-                    }
-                    filingPeriods {
-                        endOn
-                        startOn
-                    }
-                }
-            }
-        }
-        `
-    const { node } = await this.ballotReadyService.fetchGraphql(query)
-    return node
   }
 }

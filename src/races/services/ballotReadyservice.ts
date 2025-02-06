@@ -1,6 +1,8 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { GraphQLClient, gql } from 'graphql-request'
 import { Logger } from '@nestjs/common'
+import { truncateZip } from 'src/shared/util/zipcodes.util'
+import { PositionLevel } from 'src/generated/graphql.types'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -20,18 +22,173 @@ export class BallotReadyService {
     },
   })
   // TODO: Type the params and return value
-  async fetchGraphql(query: any, variables?: any) {
-    let data: any
+  // async fetchGraphql(query: any, variables?: any) {
+  //   let data: any
+
+  //   try {
+  //     const gqlQuery = gql`
+  //       ${query}
+  //     `
+  //     data = await this.graphQLClient.request(gqlQuery, variables || {})
+  //   } catch (e) {
+  //     this.logger.error('error at fetchGraphql', e)
+  //     throw e
+  //   }
+  //   return data
+  //}
+
+  async fetchRaceById(raceId: string) {
+    const query = gql`
+          query Node {
+            node(id: "${raceId}") {
+                ... on Race {
+                    databaseId
+                    isPartisan
+                    isPrimary
+                    election {
+                        electionDay
+                        name
+                        state
+                    }
+                    position {
+                        id
+                        description
+                        judicial
+                        level
+                        name
+                        partisanType
+                        staggeredTerm
+                        state
+                        subAreaName
+                        subAreaValue
+                        tier
+                        mtfcc
+                        geoId
+                        electionFrequencies {
+                            frequency
+                        }
+                        hasPrimary
+                        normalizedPosition {
+                          name
+                      }
+                    }
+                    filingPeriods {
+                        endOn
+                        startOn
+                    }
+                }
+            }
+        }
+        `
 
     try {
-      const gqlQuery = gql`
-        ${query}
-      `
-      data = await this.graphQLClient.request(gqlQuery, variables || {})
-    } catch (e) {
-      this.logger.error('error at fetchGraphql', e)
-      throw e
+      return await this.graphQLClient.request(query)
+    } catch (error) {
+      this.logger.error('Error at fetchRaceById:', error)
+      return null
     }
-    return data
+  }
+
+  async fetchRacesByZipcode(zipcode: string, startCursor: string) {
+    const today = new Date().toISOString().split('T')[0]
+    const nextYear = new Date()
+    nextYear.setFullYear(nextYear.getFullYear() + 4)
+    const nextYearFormatted = nextYear.toISOString().split('T')[0]
+
+    const query = gql`
+    query {
+      races(
+        location: {
+          zip: "${truncateZip(zipcode)}"
+        }
+        filterBy: {
+          electionDay: {
+            gt: "${today}"
+            lt: "${nextYearFormatted}"
+          }
+        }
+        after: ${startCursor ? `"${startCursor}"` : null}
+      ) {
+        edges {
+          node {
+            id
+            isPrimary
+            election {
+              id
+              electionDay
+              name
+              originalElectionDate
+              state
+              timezone
+            }
+            position {
+              id
+              appointed
+              hasPrimary
+              partisanType
+              level
+              name
+              salary
+              state
+              subAreaName
+              subAreaValue
+              electionFrequencies {
+                frequency
+              }
+            }
+            filingPeriods {
+              startOn
+              endOn
+            }
+          }
+        }
+        pageInfo {
+          endCursor
+          hasNextPage
+          hasPreviousPage
+          startCursor
+        }
+      }
+    }
+    `
+    try {
+      return await this.graphQLClient.request(query)
+    } catch (error) {
+      this.logger.error('Error at fetchRacesByZipcode: ', error)
+      return null
+    }
+  }
+
+  async fetchRacesWithElectionDates(
+    zipcode: string,
+    positionLevel: PositionLevel,
+  ) {
+    const today = new Date().toISOString().split('T')[0]
+
+    const query = gql`
+            query {
+                races(
+                    location: { zip: "${zipcode}" }
+                    filterBy: { electionDay: { gt: "2006-01-01", lt: "${today}" }, level: ${positionLevel} }
+                ) {
+                    edges {
+                        node {
+                            position {    
+                                name
+                            }
+                            election {
+                                electionDay
+                            }
+                        }
+                    }
+                }
+            }`
+
+    try {
+      return await this.graphQLClient.request(query)
+    } catch (error) {
+      this.logger.error('Error at fetchRacesWithElectionDates: ', error)
+      return null
+    }
   }
 }
