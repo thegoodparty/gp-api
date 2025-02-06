@@ -50,7 +50,7 @@ export class VoterFileController {
     @ReqCampaign() campaign: CampaignWith<'pathToVictory'>,
     @Query() query: GetVoterFileSchema,
   ) {
-    return this.voterFileService.getCsv(campaign, query)
+    return this.voterFileService.getCsvOrCount(campaign, query)
   }
 
   @Get('wake-up')

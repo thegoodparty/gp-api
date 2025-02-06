@@ -20,7 +20,7 @@ export class VoterFileService {
     private readonly slack: SlackService,
   ) {}
 
-  async getCsv(
+  async getCsvOrCount(
     campaign: CampaignWith<'pathToVictory'>,
     { type, countOnly, customFilters }: GetVoterFileSchema,
   ) {
