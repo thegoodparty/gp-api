@@ -21,19 +21,31 @@ export default async function seedRaces(prisma: PrismaClient) {
     }
 
     for (let j = 0; j < NUM_MUNICIPALITIES_PER_COUNTY; j++) {
-      const municipality = municipalityFactory()
+      const municipality = municipalityFactory({
+        countyId: county.id,
+      })
       if (i === 0 && j === 0) {
         // for testing
         municipality.name = 'Los Angeles'
         municipality.slug = 'ca/los-angeles/los-angeles'
       }
-      municipality.countyId = county.id
       fakeMunicipalities.push(municipality)
 
       for (let k = 0; k < NUM_RACES; k++) {
-        const race = raceFactory()
-        race.municipalityId = municipality.id
-        race.countyId = county.id
+        const race = raceFactory({
+          municipalityId: municipality.id,
+          countyId: county.id,
+          // TODO: We shouldn't have to do this. Quit duplicating data that's already
+          //  on the record.
+          ...(k === NUM_RACES - 1
+            ? {
+                level: 'county',
+                positionSlug: 'county-supervisor',
+                data: { level: 'county', position_name: 'County Supervisor' },
+              }
+            : {}),
+        })
+
         fakeRaces.push(race)
       }
     }
