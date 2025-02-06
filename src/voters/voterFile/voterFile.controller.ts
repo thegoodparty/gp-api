@@ -29,7 +29,7 @@ import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { VoterOutreachService } from '../services/voterOutreach.service'
 import { MimeTypes } from 'http-constants-ts'
 
-export const VOTER_FILE_ROUTE = 'voter-data/voter-file'
+export const VOTER_FILE_ROUTE = 'voters/voter-file'
 
 @Controller(VOTER_FILE_ROUTE)
 @UsePipes(ZodValidationPipe)
