@@ -60,9 +60,9 @@ export class FullStoryService {
     !enableFullStory && (!FULLSTORY_API_KEY || !IS_PROD)
 
   constructor(
+    private readonly campaigns: CampaignsService,
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
-    private readonly campaigns: CampaignsService,
     private readonly httpService: HttpService,
   ) {}
 

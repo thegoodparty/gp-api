@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common'
+import { Global, Module } from '@nestjs/common'
 import { CampaignsController } from './campaigns.controller'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignMapController } from './map/campaignMap.controller'
@@ -7,7 +7,6 @@ import { CampaignPlanVersionsService } from './services/campaignPlanVersions.ser
 import { EmailModule } from 'src/email/email.module'
 import { CampaignPositionsController } from './positions/campaignPositions.controller'
 import { CampaignPositionsService } from './positions/campaignPositions.service'
-import { UsersModule } from 'src/users/users.module'
 import { GeocodingService } from './services/geocoding.service'
 import { RacesModule } from 'src/races/races.module'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
@@ -18,14 +17,14 @@ import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
 
+@Global()
 @Module({
   imports: [
     EmailModule,
-    forwardRef(() => UsersModule),
     RacesModule,
     CampaignsAiModule,
-    forwardRef(() => CrmModule),
-    forwardRef(() => FullStoryModule),
+    CrmModule,
+    FullStoryModule,
   ],
   controllers: [
     CampaignsController,

@@ -18,6 +18,7 @@ const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 @Injectable()
 export class UsersService extends createPrismaBase(MODELS.User) {
   constructor(
+    @Inject(forwardRef(() => FullStoryService))
     private readonly fullstory: FullStoryService,
     @Inject(forwardRef(() => CrmUsersService))
     private readonly crm: CrmUsersService,

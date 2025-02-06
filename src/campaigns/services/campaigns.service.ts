@@ -29,12 +29,12 @@ import { CrmCampaignsService } from './crmCampaigns.service'
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
-    private planVersionService: CampaignPlanVersionsService,
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
-    private emailService: EmailService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
+    private planVersionService: CampaignPlanVersionsService,
+    private emailService: EmailService,
   ) {
     super()
   }
