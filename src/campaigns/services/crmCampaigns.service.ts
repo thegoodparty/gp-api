@@ -329,7 +329,7 @@ export class CrmCampaignsService {
       ...(website ? { website } : {}),
       ...(level ? { ai_office_level: level } : {}),
       ...(ballotLevel ? { office_level: ballotLevel } : {}),
-      ...(runForOffice ? { running: runForOffice ? 'yes' : 'no' } : {}),
+      running: runForOffice ? 'yes' : 'no',
       ...getCrmP2VValues(p2vData),
       win_number: `${winNumber}`,
       voter_data_adoption: canDownloadVoterFile ? 'Unlocked' : 'Locked',
