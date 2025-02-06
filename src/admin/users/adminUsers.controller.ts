@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
-import { UsersService } from 'src/users/users.service'
+import { UsersService } from 'src/users/services/users.service'
 import {
   DateRangeFilter,
   AdminUserListSchema,

@@ -5,13 +5,13 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { CreateUserInputDto } from './schemas/CreateUserInput.schema'
-import { hashPassword } from './util/passwords.util'
-import { trimMany } from '../shared/util/strings.util'
+import { CreateUserInputDto } from '../schemas/CreateUserInput.schema'
+import { hashPassword } from '../util/passwords.util'
+import { trimMany } from '../../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
-import { FullStoryService } from '../fullStory/fullStory.service'
+import { FullStoryService } from '../../fullStory/fullStory.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CrmUsersService } from '../crm/crmUsers.service'
+import { CrmUsersService } from './crmUsers.service'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 

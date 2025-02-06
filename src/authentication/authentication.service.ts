@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
-import { UsersService } from '../users/users.service'
+import { UsersService } from '../users/services/users.service'
 import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
 import { LoginPayload } from './schemas/LoginPayload.schema'
 import { compare } from 'bcrypt'

@@ -1,6 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common'
 import { CrmCampaignsService } from './crmCampaigns.service'
-import { CrmUsersService } from './crmUsers.service'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { UsersModule } from '../users/users.module'
 import { VotersModule } from '../voters/voters.module'
@@ -10,7 +9,7 @@ import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CrmController } from './crm.controller'
 
 @Module({
-  providers: [CrmUsersService, CrmCampaignsService, HubspotService],
+  providers: [CrmCampaignsService, HubspotService],
   imports: [
     forwardRef(() => CampaignsModule),
     forwardRef(() => VotersModule),
@@ -18,7 +17,7 @@ import { CrmController } from './crm.controller'
     HttpModule,
     forwardRef(() => FullStoryModule),
   ],
-  exports: [CrmUsersService, CrmCampaignsService],
+  exports: [CrmCampaignsService, HubspotService],
   controllers: [CrmController],
 })
 export class CrmModule {}

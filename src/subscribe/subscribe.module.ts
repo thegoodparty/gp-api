@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common'
 import { SubscribeService } from './subscribe.service'
 import { SubscribeController } from './subscribe.controller'
-import { CrmModule } from '../crm/crmModule'
+import { UsersModule } from '../users/users.module'
 
 @Module({
-  imports: [CrmModule],
+  imports: [UsersModule],
   controllers: [SubscribeController],
   providers: [SubscribeService],
   exports: [SubscribeService],

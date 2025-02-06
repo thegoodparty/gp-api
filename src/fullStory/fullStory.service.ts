@@ -12,7 +12,7 @@ import { lastValueFrom, Observable } from 'rxjs'
 import axios, { AxiosResponse } from 'axios'
 import { Campaign, PathToVictory, User } from '@prisma/client'
 import { IS_PROD } from '../shared/util/appEnvironment.util'
-import { UsersService } from '../users/users.service'
+import { UsersService } from '../users/services/users.service'
 import { DateFormats, formatDate } from '../shared/util/date.util'
 import { CampaignWith } from '../campaigns/campaigns.types'
 import {
