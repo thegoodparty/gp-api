@@ -1,28 +1,31 @@
-//import { RacesByZipcode } from '../types/ballotReadyTypes'
-import { OfficeLevel } from '../types/races.types'
+import { RacesByZipcode } from '../types/ballotReady.types'
+import { PositionLevel } from 'src/generated/graphql.types'
+import { RacesByYear } from '../types/races.types'
 
 const isPOTUSorVPOTUSNode = ({ position }) =>
-  position?.level === OfficeLevel.FEDERAL &&
+  position?.level === PositionLevel.FEDERAL &&
   position?.name?.toLowerCase().includes('president')
 
 export function parseRaces(
-  //races: RacesByZipcode['races'],
-  races,
-  existingPositions,
-  electionsByYear,
-  primaryElectionDates,
+  races: RacesByZipcode['races'],
+  existingPositions: Set<string>,
+  racesByYear: RacesByYear,
+  primaryElectionDates?,
 ) {
-  for (let i = 0; i < races.edges.length; i++) {
-    const { node } = races.edges[i] || {}
+  if (!races?.edges?.length) return
+
+  for (const edge of races.edges) {
+    const node = edge?.node
+    if (!node || !node.election || !node.position) continue
+
     const { isPrimary } = node || {}
     const { electionDay, name: electionName } = node?.election || {}
-    const { name, hasPrimary, partisanType } = node?.position || {}
+    const { name, hasPrimary } = node?.position || {}
+    if (!electionDay) continue
 
     const electionYear = new Date(electionDay).getFullYear()
-    // console.log(`Processing ${name} ${electionYear}`);
 
-    if (existingPositions[`${name}|${electionYear}`]) {
-      console.log('Position already exists, skipping...', name, electionYear)
+    if (existingPositions.has(`${name}|${electionYear}`)) {
       continue
     }
 
@@ -37,34 +40,42 @@ export function parseRaces(
     ) {
       primaryElectionDates[`${node.position.id}|${electionYear}`] = {
         electionDay,
-        primaryElectionId: node?.election?.id,
+        primaryElectionId: node.election.id,
       }
       continue
     }
-    existingPositions[`${name}|${electionYear}`] = true
+    existingPositions.add(`${name}|${electionYear}`)
 
-    electionsByYear[electionYear]
-      ? electionsByYear[electionYear].push(node)
-      : (electionsByYear[electionYear] = [node])
+    racesByYear[electionYear]
+      ? racesByYear[electionYear].push(node)
+      : (racesByYear[electionYear] = [node])
   }
   // iterate over the races again and save the primary election date to the general election
   // the position id will be the same for both primary and general election
   // is partisanType is 'partisan' we can ignore the primary election date
-  for (let i = 0; i < races.edges.length; i++) {
-    const { node } = races.edges[i] || {}
+  for (const edge of races.edges) {
+    const node = edge?.node
+    if (!node || !node.election || !node.position) continue
+
     const { isPrimary } = node || {}
     const { hasPrimary, id, partisanType } = node?.position || {}
-    if (partisanType === 'partisan') {
-      continue
-    }
-    const { electionDay, name } = node?.election || {}
+    if (partisanType === 'partisan') continue
+    const { electionDay } = node.election
+    if (!electionDay) continue
 
     const electionYear = new Date(electionDay).getFullYear()
-    const primaryElectionDate = primaryElectionDates[`${id}|${electionYear}`]
-    if (id && hasPrimary && !isPrimary && primaryElectionDate) {
-      node.election.primaryElectionDate = primaryElectionDate.electionDay
-      node.election.primaryElectionId = primaryElectionDate.primaryElectionId
+
+    // Only update if this node is a general election with a primary counterpart
+    if (id && hasPrimary && !isPrimary) {
+      const primaryData = primaryElectionDates[`${id}|${electionYear}`]
+      if (primaryData) {
+        node.election = {
+          ...node.election,
+          primaryElectionDate: primaryData.electionDay,
+          primaryElectionId: primaryData.primaryElectionId,
+        }
+      }
     }
   }
-  return { electionsByYear, existingPositions, primaryElectionDates }
+  return { racesByYear, existingPositions, primaryElectionDates }
 }

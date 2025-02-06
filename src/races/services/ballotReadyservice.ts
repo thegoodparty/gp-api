@@ -3,7 +3,7 @@ import { GraphQLClient, gql } from 'graphql-request'
 import { Logger } from '@nestjs/common'
 import { truncateZip } from 'src/shared/util/zipcodes.util'
 import { PositionLevel } from 'src/generated/graphql.types'
-import { RacesByZipcode } from '../types/ballotReadyTypes'
+import { RacesByZipcode } from '../types/ballotReady.types'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -92,7 +92,7 @@ export class BallotReadyService {
 
   async fetchRacesByZipcode(
     zipcode: string,
-    startCursor: string,
+    startCursor?: string | null,
   ): Promise<RacesByZipcode | null> {
     const today = new Date().toISOString().split('T')[0]
     const nextYear = new Date()
