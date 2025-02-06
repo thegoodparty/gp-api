@@ -11,7 +11,7 @@ const logger = new Logger('CandidateContentPromptsTransformer')
 export const candidateContentPromptsTransformer: Transformer<
   AIContentTemplateRaw,
   CandidateContentPrompts
-> = (templates: AIContentTemplateRaw[]): CandidateContentPrompts[] => {
+> = (templates: AIContentTemplateRaw[]): CandidateContentPrompts => {
   const result = templates.reduce<CandidateContentPrompts>((acc, template) => {
     if (template.data.name && template.data.content) {
       return {
@@ -27,5 +27,5 @@ export const candidateContentPromptsTransformer: Transformer<
     return acc
   }, {})
 
-  return [result]
+  return result
 }

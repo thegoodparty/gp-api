@@ -30,11 +30,13 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
   }
 
   async findById(id: string) {
-    return this.findUnique({
+    const content = await this.findUniqueOrThrow({
       where: {
         id,
       },
     })
+
+    return transformContent(content.type, [content])?.[0]
   }
 
   async findByType({ type, take, orderBy, where }: findByTypeOptions) {
