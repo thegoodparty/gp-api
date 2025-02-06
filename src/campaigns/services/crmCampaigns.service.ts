@@ -639,9 +639,6 @@ export class CrmCampaignsService {
           continue
         }
 
-        // TODO: verify this does nothing and then kill it
-        // sleep(400)
-
         this.logger.log(`Syncing - ${campaignId}`)
 
         const { verified_candidates, pro_candidate, election_results } =
