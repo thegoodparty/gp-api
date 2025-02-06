@@ -9,7 +9,7 @@ export const racesListSchema = z
       .transform((val) => val.toUpperCase()),
     county: z.string().optional(),
     city: z.string().optional(),
-    positionSlug: z.string(),
+    positionSlug: z.string().optional(),
     viewAll: z.boolean().optional(),
   })
   .strict()
