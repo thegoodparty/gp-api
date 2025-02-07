@@ -15,9 +15,6 @@ export class BallotDataService {
 
   async getRacesByZipcode(zipcode: string): Promise<RacesByYear> {
     try {
-      // TODO: Is this still needed?
-      // await sails.helpers.queue.consumer();
-
       let startCursor: string | undefined | null
       const existingPositions: Set<string> = new Set()
       const racesByYear: RacesByYear = {}
