@@ -223,6 +223,23 @@ export default $config({
         image: 'aws/codebuild/standard:6.0',
         type: 'LINUX_CONTAINER',
         privilegedMode: true,
+        environmentVariables: [
+          {
+            name: 'STAGE',
+            value: $app.stage,
+            type: 'PLAINTEXT',
+          },
+          {
+            name: 'CLUSTER_NAME',
+            value: `gp-${$app.stage}-fargateCluster`,
+            type: 'PLAINTEXT',
+          },
+          {
+            name: 'SERVICE_NAME',
+            value: `gp-api-${$app.stage}`,
+            type: 'PLAINTEXT',
+          },
+        ],
       },
       vpcConfig: {
         vpcId: 'vpc-0763fa52c32ebcf6a',
@@ -232,30 +249,7 @@ export default $config({
       source: {
         type: 'GITHUB',
         location: 'https://github.com/thegoodparty/gp-api.git',
-        buildspec: pulumi.interpolate`        
-version: 0.2
-phases:
-  install:
-    runtime-versions:
-      nodejs: 22
-    commands:
-      - npm install -g sst
-
-  pre_build:
-    commands:
-      - echo "Moving into deploy folder..."
-      - cd deploy
-      - echo "Installing local dependencies..."
-      - npm ci || npm install
-
-  build:
-    commands:
-      - echo "Deploying SST app. stage: ${$app.stage}"
-      - sst deploy --stage=${$app.stage || 'develop'} --verbose --print-logs
-      - echo "Waiting for ECS to be stable..."
-      - aws ecs wait services-stable --cluster arn:aws:ecs:us-west-2:333022194791:cluster/gp-${$app.stage}-fargateCluster --services gp-api-${$app.stage}
-      - echo "Done!"
-`,
+        buildspec: 'deploy/buildspec.yml',
       },
       artifacts: {
         type: 'NO_ARTIFACTS',

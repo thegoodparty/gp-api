@@ -10,16 +10,17 @@ import { StripeSingleton } from './stripe.service'
 import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
-import { UsersService } from '../../users/users.service'
+import { UsersService } from '../../users/services/users.service'
 import { SlackService } from '../../shared/services/slack.service'
 import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
-import { getFullName } from '../../users/util/users.util'
+import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from '../../shared/services/slackService.types'
-import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 
@@ -33,7 +34,8 @@ export class StripeEventsService {
     private readonly campaignsService: CampaignsService,
     private readonly slackService: SlackService,
     private readonly emailService: EmailService,
-    private readonly voterFileService: VoterFileService,
+    private readonly crm: CrmCampaignsService,
+    private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
   ) {}
 
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
@@ -75,7 +77,7 @@ export class StripeEventsService {
         'No user found with given subscription customerId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id, {
+    const campaign = await this.campaignsService.findByUserId(user.id, {
       pathToVictory: true,
     })
     if (!campaign) {
@@ -92,7 +94,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.voterFileService.doVoterDownloadCheck(campaign, user),
+      this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
   }
 
@@ -157,7 +159,7 @@ export class StripeEventsService {
         'No user found with given checkout session userId',
       )
     }
-    const campaign = await this.campaignsService.findByUser(user.id, {
+    const campaign = await this.campaignsService.findByUserId(user.id, {
       pathToVictory: true,
     })
     if (!campaign) {
@@ -177,7 +179,7 @@ export class StripeEventsService {
       this.campaignsService.setIsPro(campaignId),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
-      this.voterFileService.doVoterDownloadCheck(campaign, user),
+      this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
   }
 
@@ -241,7 +243,7 @@ export class StripeEventsService {
       return // don't send Slack message if subscription was canceled at end of election
     }
     const { office, otherOffice } = details
-    const fullName = getFullName(user)
+    const fullName = getUserFullName(user)
 
     await this.slackService.message(
       {
@@ -258,18 +260,17 @@ export class StripeEventsService {
   async sendProSubscriptionResumedSlackMessage(user: User, campaign: Campaign) {
     await this.slackService.message(
       {
-        body: `PRO PLAN RESUMED: \`${getFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
+        body: `PRO PLAN RESUMED: \`${getUserFullName(user)}\` w/ email ${user.email} and campaign slug \`${campaign.slug}\` RESUMED their pro subscription!`,
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
 
   async sendProSignUpSlackMessage(user: User, campaign: Campaign) {
-    const { details = {} } = campaign || {}
+    const { details = {}, data = {} } = campaign || {}
     const { office, otherOffice, state } = details
+    const { hubspotId } = data
     const name = `${user.firstName}${user.firstName ? ` ${user.lastName}` : ''}`
-    // TODO: get CRM company
-    // const crmCompany = await sails.helpers.crm.getCompany(campaign)
 
     await this.slackService.message(
       {
@@ -280,15 +281,14 @@ export class StripeEventsService {
           State: ${state}
           Office: ${office || otherOffice}
           Assigned PA: ${
-            // TODO: get CRM company owner name
-            // (await getCrmCompanyOwnerName(crmCompany)) ||
-            'None assigned'
+            hubspotId
+              ? await this.crm.getCrmCompanyOwnerName(hubspotId)
+              : 'None assigned'
           }
           ${
-            // TODO: get CRM company URL
-            // crmCompany?.id
-            //   ? `https://app.hubspot.com/contacts/21589597/record/0-2/${crmCompany.id}` :
-            'No CRM company found'
+            hubspotId
+              ? `https://app.hubspot.com/contacts/21589597/record/0-2/${hubspotId}`
+              : 'No CRM company found'
           }
         `,
       },
@@ -305,7 +305,7 @@ export class StripeEventsService {
       ISO8601DateString && formatDate(ISO8601DateString, DateFormats.usDate)
 
     const emailVars = {
-      userFullName: getFullName(user),
+      userFullName: getUserFullName(user),
       startDate: formattedCurrentDate,
       ...(electionDate ? { electionDate } : {}),
     }

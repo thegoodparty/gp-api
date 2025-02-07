@@ -36,9 +36,9 @@ export type VoterGoals = {
   yardSigns?: number
 }
 
-export enum PrimaryElectionResult {
-  WON = 'Won Primary',
-  LOST = 'Lost Primary',
-  WITHDREW = 'Withdrew',
-  NOT_ON_BALLOT = 'Not on Ballot',
+export enum ElectionLevel {
+  state = 'state',
+  county = 'county',
+  federal = 'federal',
+  city = 'city',
 }

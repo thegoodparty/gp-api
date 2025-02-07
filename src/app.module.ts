@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
-import { AppController } from './app.controller'
-import { AppService } from './app.service'
 import { ContentModule } from './content/content.module'
 import { JobsModule } from './jobs/jobs.module'
 import { HealthModule } from './health/health.module'
@@ -21,6 +19,7 @@ import { SharedModule } from './shared/shared.module'
 import { PaymentsModule } from './payments/payments.module'
 import { VotersModule } from './voters/voters.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
+import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
 
 @Module({
@@ -42,11 +41,10 @@ import { SubscribeModule } from './subscribe/subscribe.module'
     PaymentsModule,
     VotersModule,
     ErrorLoggerModule,
+    CrmModule,
     SubscribeModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

@@ -2,7 +2,7 @@ import { BadRequestException, Controller, Post } from '@nestjs/common'
 import { StripeService } from './stripe/stripe.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Prisma, User } from '@prisma/client'
-import { UsersService } from '../users/users.service'
+import { UsersService } from '../users/services/users.service'
 
 @Controller('payments/purchase')
 export class PurchaseController {

@@ -9,7 +9,7 @@ import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { buildSlug } from 'src/shared/util/slug.util'
-import { getFullName } from 'src/users/util/users.util'
+import { getUserFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import {
   CampaignLaunchStatus,
@@ -20,23 +20,26 @@ import {
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateNames } from 'src/email/email.types'
-import { UsersService } from 'src/users/users.service'
+import { UsersService } from 'src/users/services/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { CrmCampaignsService } from './crmCampaigns.service'
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
-    private planVersionService: CampaignPlanVersionsService,
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
+    @Inject(forwardRef(() => CrmCampaignsService))
+    private readonly crm: CrmCampaignsService,
+    private planVersionService: CampaignPlanVersionsService,
     private emailService: EmailService,
   ) {
     super()
   }
 
-  findByUser<T extends Prisma.CampaignInclude>(
+  findByUserId<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
   ) {
@@ -49,12 +52,26 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async create(args: Prisma.CampaignCreateArgs) {
     return this.model.create(args)
   }
+
+  // TODO: Find a way to make these JSON path lookups type-safe
   async findBySubscriptionId(subscriptionId: string) {
     return this.findFirst({
       where: {
         details: {
           path: ['subscriptionId'],
           equals: subscriptionId,
+        },
+      },
+    })
+  }
+
+  // TODO: Find a way to make these JSON path lookups type-safe
+  async findByHubspotId(hubspotId: string) {
+    return this.findFirst({
+      where: {
+        data: {
+          path: ['hubspotId'],
+          equals: hubspotId,
         },
       },
     })
@@ -78,8 +95,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    // TODO:
-    // await createCrmUser(user.firstName, user.lastName, user.email)
+    this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
@@ -106,37 +122,25 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         details: details
           ? deepMerge(campaign.details as object, details)
           : undefined,
+        ...(pathToVictory
+          ? {
+              pathToVictory: {
+                update: {
+                  data: {
+                    data: deepMerge(
+                      (campaign.pathToVictory?.data as object) || {},
+                      pathToVictory,
+                    ),
+                  },
+                },
+              },
+            }
+          : {}),
       }
 
-      if (pathToVictory && campaign.pathToVictory) {
-        /// TODO:
-        // if (pathToVictory.hasOwnProperty('viability')) {
-        //   await updateViability(campaign, columnKey2, value)
-        // } else {
-        //   await updatePathToVictory(campaign, columnKey, value)
-        // }
+      this.crm.trackCampaign(campaign.id)
 
-        updateData['pathToVictory'] = {
-          update: {
-            data: {
-              data: deepMerge(
-                campaign.pathToVictory.data as object,
-                pathToVictory,
-              ),
-            },
-          },
-        }
-      }
-
-      // TODO:
-      // try {
-      //   await sails.helpers.crm.updateCampaign(updated)
-      // } catch (e) {
-      //   sails.helpers.log(campaign.slug, 'error updating crm', e)
-      // }
-
-      campaign.userId &&
-        (await this.usersService.trackUserById(campaign.userId))
+      campaign.userId && this.usersService.trackUserById(campaign.userId)
 
       return tx.campaign.update({
         where: { id: campaign.id },
@@ -180,8 +184,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       this.update({ where: { id: campaignId }, data: { isPro } }),
       this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
     ])
-    // TODO: Implement CRM updates
-    // await sails.helpers.crm.updateCampaign(campaign);
+    this.crm.trackCampaign(campaignId)
   }
 
   async getStatus(user: User, campaign?: Campaign) {
@@ -281,9 +284,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    // TODO: reimplement
-    // await sails.helpers.crm.updateCampaign(updated)
-    // await sails.helpers.fullstory.customAttr(updated.id)
+    this.crm.trackCampaign(campaign.id)
+    this.usersService.trackUserById(campaign.userId)
 
     await this.sendCampaignLaunchEmail(user)
 
@@ -291,7 +293,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async findSlug(user: User, suffix?: string) {
-    const name = getFullName(user)
+    const name = getUserFullName(user)
     const MAX_TRIES = 100
     const slug = buildSlug(name, suffix)
     const exists = await this.findUnique({ where: { slug } })
@@ -428,7 +430,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         subject: 'Full Suite of AI Campaign Tools Now Available',
         template: EmailTemplateNames.campaignLaunch,
         variables: {
-          name: getFullName(user),
+          name: getUserFullName(user),
           link: `${WEBAPP_ROOT}/dashboard`,
         },
       })
