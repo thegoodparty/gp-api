@@ -17,14 +17,13 @@ phases:
 
   build:
     commands:
-      - echo "Deploying SST app to stage: ${STAGE}... cluster: ${CLUSTER_NAME}. service: ${SERVICE_NAME}."
+      - echo "Deploying SST app to stage: '${STAGE}' cluster: '${CLUSTER_NAME}' service: '${SERVICE_NAME}'"
       - sst deploy --stage=${STAGE} --verbose --print-logs
       - echo "Waiting for ECS to be stable..."
       - aws ecs wait services-stable --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME}
       - echo "Done!"
 
   # todo: add post_build to check if build succeeded. this is currently bugged. 
-  # mapping values are not allowed in this context
   # post_build:
   #   commands:
   #     - if [ $CODEBUILD_BUILD_SUCCEEDING = 1 ]; then echo "Build completed successfully!"; else echo "Build failed!" && exit 1; fi
