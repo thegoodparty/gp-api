@@ -20,5 +20,5 @@ phases:
 
   build:
     commands:
-      - echo Deploying SST app to stage: $STAGE
+      - echo "Deploying SST app to stage: $STAGE"
       - echo "Done!"
