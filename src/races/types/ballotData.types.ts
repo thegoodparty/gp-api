@@ -14,3 +14,10 @@ export type BDElection = {
 export type RacesByYear = {
   [key: string]: RaceNode[]
 }
+
+export type PrimaryElectionDates = {
+  [key: string]: {
+    electionDay: string
+    primaryElectionId: string
+  }
+}

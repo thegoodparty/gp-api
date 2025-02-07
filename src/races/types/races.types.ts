@@ -118,71 +118,71 @@ export type GeoData = {
   borough?: string
 }
 
-export enum OfficeLevel {
-  FEDERAL = 10,
-  STATE = 8,
-  COUNTY = 6,
-  CITY = 4,
-  LOCAL = 0,
-  DEFAULT = 12,
-}
-
-type FilingPeriod = {
-  startOn: string
-  endOn: string
-}
-
-type Election = {
-  id: string
-  electionDay: string
-  name: string
-  originalElectionDate: string
-  state: string
-  timezone: string
-}
-
-type ElectionFrequency = {
-  frequency: number[]
-}
-
-type Position = {
-  id: string
-  appointed: boolean
-  hasPrimary: boolean
-  partisanType: 'nonpartisan' | 'partisan' // Adjust if needed
-  level: string
-  name: string
-  salary: string | null
-  state: string
-  subAreaName: string
-  subAreaValue: string
-  electionFrequencies: ElectionFrequency[]
-}
-
-type PositionElection = {
-  id: string
-  isPrimary: boolean
-  filingPeriods: FilingPeriod[]
-  election: Election
-  position: Position
-}
-
-export type RacesByYear = {
-  // Key is the year, len of 4
-  [key: string]: PositionElection[]
-}
-
-// export type BallotData = {
-//   edges: BallotNode[]
+// export enum OfficeLevel {
+//   FEDERAL = 10,
+//   STATE = 8,
+//   COUNTY = 6,
+//   CITY = 4,
+//   LOCAL = 0,
+//   DEFAULT = 12,
 // }
 
-// type BallotNode = {
-
+// type FilingPeriod = {
+//   startOn: string
+//   endOn: string
 // }
 
-type PageInfo = {
-  endCursor: string
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  startCursor: string
-}
+// type Election = {
+//   id: string
+//   electionDay: string
+//   name: string
+//   originalElectionDate: string
+//   state: string
+//   timezone: string
+// }
+
+// type ElectionFrequency = {
+//   frequency: number[]
+// }
+
+// type Position = {
+//   id: string
+//   appointed: boolean
+//   hasPrimary: boolean
+//   partisanType: 'nonpartisan' | 'partisan' // Adjust if needed
+//   level: string
+//   name: string
+//   salary: string | null
+//   state: string
+//   subAreaName: string
+//   subAreaValue: string
+//   electionFrequencies: ElectionFrequency[]
+// }
+
+// type PositionElection = {
+//   id: string
+//   isPrimary: boolean
+//   filingPeriods: FilingPeriod[]
+//   election: Election
+//   position: Position
+// }
+
+// export type RacesByYear = {
+//   // Key is the year, len of 4
+//   [key: string]: PositionElection[]
+// }
+
+// // export type BallotData = {
+// //   edges: BallotNode[]
+// // }
+
+// // type BallotNode = {
+
+// // }
+
+// type PageInfo = {
+//   endCursor: string
+//   hasNextPage: boolean
+//   hasPreviousPage: boolean
+//   startCursor: string
+// }

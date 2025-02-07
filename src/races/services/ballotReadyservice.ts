@@ -3,7 +3,11 @@ import { GraphQLClient, gql } from 'graphql-request'
 import { Logger } from '@nestjs/common'
 import { truncateZip } from 'src/shared/util/zipcodes.util'
 import { PositionLevel } from 'src/generated/graphql.types'
-import { RacesByZipcode } from '../types/ballotReady.types'
+import {
+  RacesById,
+  RacesByZipcode,
+  RacesWithElectionDates,
+} from '../types/ballotReady.types'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -22,23 +26,8 @@ export class BallotReadyService {
       'Content-Type': 'application/json',
     },
   })
-  // TODO: Type the params and return value
-  // async fetchGraphql(query: any, variables?: any) {
-  //   let data: any
 
-  //   try {
-  //     const gqlQuery = gql`
-  //       ${query}
-  //     `
-  //     data = await this.graphQLClient.request(gqlQuery, variables || {})
-  //   } catch (e) {
-  //     this.logger.error('error at fetchGraphql', e)
-  //     throw e
-  //   }
-  //   return data
-  //}
-
-  async fetchRaceById(raceId: string) {
+  async fetchRaceById(raceId: string): Promise<RacesById | null> {
     const query = gql`
           query Node {
             node(id: "${raceId}") {
@@ -166,7 +155,7 @@ export class BallotReadyService {
   async fetchRacesWithElectionDates(
     zipcode: string,
     positionLevel: PositionLevel,
-  ) {
+  ): Promise<RacesWithElectionDates | null> {
     const today = new Date().toISOString().split('T')[0]
 
     const query = gql`

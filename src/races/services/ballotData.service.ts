@@ -6,28 +6,22 @@ import {
 import { parseRaces } from '../util/parseRaces.util'
 import { sortRacesGroupedByYear } from '../util/sortRaces.util'
 import { BallotReadyService } from './ballotReadyservice'
-import { RacesByYear } from '../types/races.types'
+import { PrimaryElectionDates, RacesByYear } from '../types/ballotData.types'
 
 @Injectable()
 export class BallotDataService {
   private readonly logger = new Logger(BallotDataService.name)
   constructor(private readonly ballotReadyService: BallotReadyService) {}
 
-  async getRacesByZipcode(zipcode: string): Promise<any> {
-    // if (zipcode.length !== 5) {
-    //   throw new InternalServerErrorException(
-    //     'Zipcodes must be a string 5 digits in length. Received: ',
-    //     zipcode,
-    //   )
-    // }
-
+  async getRacesByZipcode(zipcode: string): Promise<RacesByYear> {
     try {
+      // TODO: Is this still needed?
       // await sails.helpers.queue.consumer();
 
       let startCursor: string | undefined | null
       const existingPositions: Set<string> = new Set()
       const racesByYear: RacesByYear = {}
-      const primaryElectionDates = {} // key - positionId, value - electionDay and raceId (primary election date)
+      const primaryElectionDates: PrimaryElectionDates = {}
       let hasNextPage = true
 
       let nextRacesPromise = this.ballotReadyService.fetchRacesByZipcode(
@@ -53,8 +47,6 @@ export class BallotDataService {
             ? this.ballotReadyService.fetchRacesByZipcode(zipcode, startCursor)
             : Promise.resolve(null)
 
-          //console.dir(races, { depth: 3 })
-
           // Process the current batch while the next request is running
           parseRaces(
             races,
@@ -62,9 +54,6 @@ export class BallotDataService {
             racesByYear,
             primaryElectionDates,
           )
-          // existingPositions = raceResponse.existingPositions
-          // electionsByYear = raceResponse.electionsByYear
-          // primaryElectionDates = raceResponse.primaryElectionDates
         } else {
           hasNextPage = false
         }

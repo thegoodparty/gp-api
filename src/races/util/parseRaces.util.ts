@@ -1,6 +1,6 @@
+import { PrimaryElectionDates, RacesByYear } from '../types/ballotData.types'
 import { RacesByZipcode } from '../types/ballotReady.types'
 import { PositionLevel } from 'src/generated/graphql.types'
-import { RacesByYear } from '../types/races.types'
 
 const isPOTUSorVPOTUSNode = ({ position }) =>
   position?.level === PositionLevel.FEDERAL &&
@@ -10,7 +10,7 @@ export function parseRaces(
   races: RacesByZipcode['races'],
   existingPositions: Set<string>,
   racesByYear: RacesByYear,
-  primaryElectionDates?,
+  primaryElectionDates: PrimaryElectionDates,
 ) {
   if (!races?.edges?.length) return
 
