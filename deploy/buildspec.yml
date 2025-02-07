@@ -13,12 +13,11 @@ phases:
       - cd deploy
       - echo "Installing local dependencies..."
       - npm ci || npm install
-      - echo "Stage: $STAGE"
+      - echo "Debug environment variables:"
+      - echo "STAGE=$STAGE"
+      - echo "CLUSTER_NAME=$CLUSTER_NAME"
+      - echo "SERVICE_NAME=$SERVICE_NAME"
 
   build:
     commands:
-      - echo "Deploying SST app to stage: '$STAGE' cluster: '$CLUSTER_NAME' service: '$SERVICE_NAME'"
-      - sst deploy --stage=$STAGE --verbose --print-logs
-      - echo "Waiting for ECS to be stable..."
-      - aws ecs wait services-stable --cluster $CLUSTER_NAME --services $SERVICE_NAME
       - echo "Done!"
