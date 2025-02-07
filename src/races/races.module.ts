@@ -6,7 +6,7 @@ import { CountiesService } from './services/counties.services'
 import { CensusEntitiesService } from './services/censusEntities.services'
 import { BallotDataService } from './services/ballotData.service'
 import { BallotDataController } from './ballotData.controller'
-import { BallotReadyService } from './services/ballotReadyservice'
+import { BallotReadyService } from './services/ballotReady.service'
 import { AiModule } from '../ai/ai.module'
 
 @Module({

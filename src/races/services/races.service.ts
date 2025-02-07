@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common'
 import slugify from 'slugify'
 import { addYears, format, startOfYear } from 'date-fns'
 import { County, Municipality } from '@prisma/client'
@@ -23,7 +27,7 @@ import { CountiesService } from './counties.services'
 import { MunicipalitiesService } from './municipalities.services'
 import { CensusEntitiesService } from './censusEntities.services'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { BallotReadyService } from './ballotReadyservice'
+import { BallotReadyService } from './ballotReady.service'
 import { PositionLevel } from 'src/generated/graphql.types'
 import { AiService } from '../../ai/ai.service'
 import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
@@ -833,11 +837,14 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
   ) {
     const electionDates: string[] = []
     try {
-      const { races } =
-        (await this.ballotReadyService.fetchRacesWithElectionDates(
-          zip,
-          level,
-        )) as any
+      const ballotReadyData =
+        await this.ballotReadyService.fetchRacesWithElectionDates(zip, level)
+      if (!ballotReadyData) {
+        throw new InternalServerErrorException(
+          'Could not fetch BallotReady data',
+        )
+      }
+      const { races } = ballotReadyData
       this.logger.log(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {

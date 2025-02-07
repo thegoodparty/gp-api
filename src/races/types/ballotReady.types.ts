@@ -60,12 +60,8 @@ interface BasicRaceNode {
   election: Pick<Election, 'electionDay'>
 }
 
-interface BasicRaceEdge {
-  node: BasicRaceNode
-}
-
 export interface RacesWithElectionDates {
-  races: PaginatedResponse<BasicRaceEdge>
+  races: PaginatedResponse<BasicRaceNode>
 }
 
 // -----------------------------
@@ -73,11 +69,7 @@ export interface RacesWithElectionDates {
 // -----------------------------
 
 export interface RacesById {
-  races: PaginatedResponse<RacesByIdEdge>
-}
-
-interface RacesByIdEdge {
-  node: RacesByIdNode
+  races: PaginatedResponse<RacesByIdNode>
 }
 
 interface RacesByIdNode {

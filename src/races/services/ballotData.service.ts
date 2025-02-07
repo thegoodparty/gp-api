@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common'
 import { parseRaces } from '../util/parseRaces.util'
 import { sortRacesGroupedByYear } from '../util/sortRaces.util'
-import { BallotReadyService } from './ballotReadyservice'
+import { BallotReadyService } from './ballotReady.service'
 import { PrimaryElectionDates, RacesByYear } from '../types/ballotData.types'
 
 @Injectable()

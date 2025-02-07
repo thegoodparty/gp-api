@@ -1,6 +1,5 @@
 import { Controller, Get, Query, UsePipes } from '@nestjs/common'
 import { RacesService } from './services/races.service'
-import { BallotDataService } from './services/ballotData.service'
 import {
   NormalizedRace,
   ProximityCitiesResponseBody,
@@ -18,10 +17,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 @UsePipes(ZodValidationPipe)
 @PublicAccess()
 export class RacesController {
-  constructor(
-    private readonly racesService: RacesService,
-    private readonly ballotDataService: BallotDataService,
-  ) {}
+  constructor(private readonly racesService: RacesService) {}
 
   @Get()
   async findRaces(
