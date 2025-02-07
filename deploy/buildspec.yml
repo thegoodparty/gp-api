@@ -13,21 +13,12 @@ phases:
       - cd deploy
       - echo "Installing local dependencies..."
       - npm ci || npm install
-      - echo "Stage: ${STAGE}"
+      - echo "Stage: $STAGE"
 
-  # build:
-  #   commands:
-  #     - echo "Deploying SST app to stage: '${STAGE}' cluster: '${CLUSTER_NAME}' service: '${SERVICE_NAME}'"
-  #     - sst deploy --stage=${STAGE} --verbose --print-logs
-  #     - echo "Waiting for ECS to be stable..."
-  #     - aws ecs wait services-stable --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME}
-  #     - echo "Done!"
-
-  # todo: add post_build to check if build succeeded. this is currently bugged.
-  # post_build:
-  #   commands:
-  #     - if [ $CODEBUILD_BUILD_SUCCEEDING = 1 ]; then echo "Build completed successfully!"; else echo "Build failed!" && exit 1; fi
-# cache:
-#   paths:
-#     - 'deploy/node_modules/**/*'
-#     - '.sst/**/*'
+  build:
+    commands:
+      - echo "Deploying SST app to stage: '$STAGE' cluster: '$CLUSTER_NAME' service: '$SERVICE_NAME'"
+      - sst deploy --stage=$STAGE --verbose --print-logs
+      - echo "Waiting for ECS to be stable..."
+      - aws ecs wait services-stable --cluster $CLUSTER_NAME --services $SERVICE_NAME
+      - echo "Done!"
