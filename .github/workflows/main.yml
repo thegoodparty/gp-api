@@ -1,8 +1,11 @@
 name: Deploy and Test
 
 on:
+  pull_request:
+    types: [ opened, synchronize ]
+    branches: [ 'develop' ]
   push:
-    branches: ['develop']
+    branches: [ 'develop' ]
 
 jobs:
   deploy:
