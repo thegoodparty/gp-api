@@ -6,7 +6,7 @@ import {
 } from './util/content.util'
 import { User } from '@prisma/client'
 import { EmailTemplateNames } from './email.types'
-import { getFullName } from '../users/util/users.util'
+import { getUserFullName } from '../users/util/users.util'
 import { DateFormats, formatDate } from '../shared/util/date.util'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
@@ -107,7 +107,7 @@ export class EmailService {
       subject: `Your Pro Subscription is Ending Today`,
       template: EmailTemplateNames.endOfProSubscription,
       variables: {
-        userFullName: getFullName(user),
+        userFullName: getUserFullName(user),
         todayDateString: formatDate(today, DateFormats.usDate),
       },
     })
@@ -122,7 +122,7 @@ export class EmailService {
       subject: `Your Cancellation Request Has Been Processed – Pro Access Until ${subscriptionEndDate}`,
       template: EmailTemplateNames.subscriptionCancellationConfirmation,
       variables: {
-        userFullName: getFullName(user),
+        userFullName: getUserFullName(user),
         subscriptionEndDate,
       },
     })

@@ -16,7 +16,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { UsersService } from './users.service'
+import { UsersService } from './services/users.service'
 import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { User } from '@prisma/client'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'

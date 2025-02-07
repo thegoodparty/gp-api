@@ -9,7 +9,7 @@ model Campaign {
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
   slug                  String                  @unique
-  isActive              Boolean?                @map("is_active")
+  isActive              Boolean                 @default(false) @map("is_active")
   isVerified            Boolean?                @map("is_verified")
   isPro                 Boolean?                @default(false) @map("is_pro")
   isDemo                Boolean                 @default(false) @map("is_demo")
