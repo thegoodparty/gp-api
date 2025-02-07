@@ -12,3 +12,8 @@ export function formatDate(
 ) {
   return format(date, formatString)
 }
+
+export const getMidnightForDate = (date: Date) =>
+  new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  )

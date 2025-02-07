@@ -12,12 +12,9 @@ import { lastValueFrom, Observable } from 'rxjs'
 import axios, { AxiosResponse } from 'axios'
 import { Campaign, PathToVictory, User } from '@prisma/client'
 import { IS_PROD } from '../shared/util/appEnvironment.util'
-import { UsersService } from '../users/users.service'
+import { UsersService } from '../users/services/users.service'
 import { DateFormats, formatDate } from '../shared/util/date.util'
-import {
-  CampaignWith,
-  PrimaryElectionResult,
-} from '../campaigns/campaigns.types'
+import { CampaignWith } from '../campaigns/campaigns.types'
 import {
   calculateVoterGoalsCount,
   generateAiContentTrackingFlags,
@@ -30,18 +27,13 @@ import {
 } from './fullStory.types'
 import { reduce as reduceAsync } from 'async'
 import Bottleneck from 'bottleneck'
+import { CRMCompanyProperties, PrimaryElectionResult } from '../crm/crm.types'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
 const { FULLSTORY_API_KEY, ENABLE_FULLSTORY } = process.env
 const enableFullStory = ENABLE_FULLSTORY === 'true'
 const FULLSTORY_ROOT_USERS_URL = 'https://api.fullstory.com/v2/users'
-
-// TODO: Move these to the CRM module when implemented
-type CRMCompanyProperties = {
-  primary_election_result: PrimaryElectionResult
-  election_results: string
-}
 
 // Limits calls to FullStory to 10requests for the first 10s, then a sustained
 //  rate of 30 requests per every minute
@@ -68,9 +60,9 @@ export class FullStoryService {
     !enableFullStory && (!FULLSTORY_API_KEY || !IS_PROD)
 
   constructor(
+    private readonly campaigns: CampaignsService,
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
-    private readonly campaigns: CampaignsService,
     private readonly httpService: HttpService,
   ) {}
 
@@ -109,7 +101,6 @@ export class FullStoryService {
       getCRMMonthPropertyMonthDate(filingPeriodsStart)
     const filingPeriodsEndMonth = getCRMMonthPropertyMonthDate(filingPeriodsEnd)
 
-    // TODO: Get these from CRM company object once implemented
     const {
       primary_election_result: primaryElectionResult,
       election_results: electionResults,
@@ -271,7 +262,7 @@ export class FullStoryService {
       return
     }
 
-    const campaign = await this.campaigns.findByUser(user.id, {
+    const campaign = await this.campaigns.findByUserId(user.id, {
       pathToVictory: true,
     })
     const { pathToVictory } = campaign

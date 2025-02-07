@@ -49,6 +49,7 @@ const bootstrap = async () => {
 
   await app.register(cors, {
     origin: process.env.CORS_ORIGIN || '*',
+    credentials: true,
   })
 
   await app.register(fastifyStatic, {

@@ -3,17 +3,18 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
-import { getFullName } from 'src/users/util/users.util'
+import { getUserFullName } from 'src/users/util/users.util'
 import { EmailTemplateNames } from 'src/email/email.types'
-import { UsersService } from 'src/users/users.service'
+import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
 import { CampaignWith, OnboardingStep } from 'src/campaigns/campaigns.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-import { VoterFileService } from 'src/voters/voterFile/voterFile.service'
 import { formatDate } from 'date-fns'
 import { P2VStatus } from 'src/races/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -22,7 +23,8 @@ export class AdminCampaignsService {
     private readonly users: UsersService,
     private readonly campaigns: CampaignsService,
     private readonly adminP2V: AdminP2VService,
-    private readonly voterFile: VoterFileService,
+    private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
+    private readonly crm: CrmCampaignsService,
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
@@ -62,8 +64,7 @@ export class AdminCampaignsService {
       },
     })
 
-    // TODO: reimplement
-    // await createCrmUser(firstName, lastName, email)
+    this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
@@ -91,8 +92,7 @@ export class AdminCampaignsService {
       data: attributes,
     })
 
-    //TODO: reimplment
-    // await sails.helpers.crm.updateCampaign(updatedCampaign);
+    this.crm.trackCampaign(updatedCampaign.id)
 
     return updatedCampaign
   }
@@ -114,7 +114,7 @@ export class AdminCampaignsService {
 
     // TODO: this check could probably be integrated into the above query
     for (const campaign of campaigns) {
-      const canDownload = await this.voterFile.canDownload(
+      const canDownload = this.voterFileDownloadAccess.canDownload(
         campaign as CampaignWith<'pathToVictory'>,
       )
       if (!canDownload) {
@@ -162,7 +162,7 @@ export class AdminCampaignsService {
 
     if (campaign?.data?.createdBy !== 'admin') {
       const variables = {
-        name: getFullName(user),
+        name: getUserFullName(user),
         link: `${WEBAPP_ROOT}/dashboard`,
       }
 

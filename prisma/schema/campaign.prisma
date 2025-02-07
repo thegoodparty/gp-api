@@ -9,7 +9,7 @@ model Campaign {
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
   slug                  String                  @unique
-  isActive              Boolean?                @map("is_active")
+  isActive              Boolean                 @default(false) @map("is_active")
   isVerified            Boolean?                @map("is_verified")
   isPro                 Boolean?                @default(false) @map("is_pro")
   isDemo                Boolean                 @default(false) @map("is_demo")
@@ -25,7 +25,7 @@ model Campaign {
   vendorTsData          Json                    @default("{}") @map("vendor_ts_data") @db.JsonB
   pathToVictory         PathToVictory?
   campaignUpdateHistory CampaignUpdateHistory[]
-  user                  User?                   @relation(fields: [userId], references: [id])
+  user                  User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId                Int                     @map("user_id")
   topIssues             TopIssue[]
   campaignPositions     CampaignPosition[]

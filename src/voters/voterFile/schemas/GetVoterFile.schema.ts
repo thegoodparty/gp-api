@@ -20,6 +20,6 @@ export class GetVoterFileSchema extends createZodDto(
         })
         .optional(),
     ),
-    countOnly: z.boolean().optional(),
+    countOnly: z.coerce.boolean().optional(),
   }),
 ) {}

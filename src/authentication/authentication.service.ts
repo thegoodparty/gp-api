@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
-import { UsersService } from '../users/users.service'
+import { UsersService } from '../users/services/users.service'
 import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
 import { LoginPayload } from './schemas/LoginPayload.schema'
 import { compare } from 'bcrypt'
@@ -97,7 +97,7 @@ export class AuthenticationService {
     const user = await this.usersService.findUser({ email })
 
     if (!user) {
-      throw new UnauthorizedException('User email not found')
+      throw new UnauthorizedException()
     }
 
     const validPassword = await this.validatePassword(
@@ -106,7 +106,7 @@ export class AuthenticationService {
     )
 
     if (!validPassword) {
-      throw new UnauthorizedException('Invalid password')
+      throw new UnauthorizedException()
     }
     return user
   }

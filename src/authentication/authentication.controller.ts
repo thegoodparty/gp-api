@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Inject,
   Post,
-  Request,
   Res,
   UseGuards,
   UsePipes,
@@ -16,12 +15,12 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { ReadUserOutputSchema } from '../users/schemas/ReadUserOutput.schema'
 import { RecoverPasswordSchema } from './schemas/RecoverPasswordEmail.schema'
 import { SetPasswordEmailSchema } from './schemas/SetPasswordEmail.schema'
-import { UsersService } from 'src/users/users.service'
+import { UsersService } from 'src/users/services/users.service'
 import { EmailService } from 'src/email/email.service'
 import { ResetPasswordSchema } from './schemas/ResetPassword.schema'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AuthGuard } from '@nestjs/passport'
-import { LoginResult, RequestWithUser } from './authentication.types'
+import { LoginResult } from './authentication.types'
 import { PublicAccess } from './decorators/PublicAccess.decorator'
 import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
 import { Roles } from './decorators/Roles.decorator'
@@ -51,7 +50,7 @@ export class AuthenticationController {
 
   @UseGuards(AuthGuard('local'))
   @Post('login')
-  async login(@Request() { user }: RequestWithUser): Promise<LoginResult> {
+  async login(@ReqUser() user: User): Promise<LoginResult> {
     return {
       user: ReadUserOutputSchema.parse(user),
       token: this.authenticationService.generateAuthToken({
@@ -125,7 +124,7 @@ export class AuthenticationController {
     if (adminCreate) {
       // check if the campaign attached to this user is marked as created by admin
       // to automatically login after the password change
-      const campaign = await this.campaignsService.findByUser(user.id)
+      const campaign = await this.campaignsService.findByUserId(user.id)
 
       if (campaign?.data.createdBy !== 'admin') {
         // don't login just return

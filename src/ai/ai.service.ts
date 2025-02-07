@@ -3,7 +3,7 @@ import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Prisma, User } from '@prisma/client'
-import { getFullName } from 'src/users/util/users.util'
+import { getUserFullName } from 'src/users/util/users.util'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 import { SlackChannel } from '../shared/services/slackService.types'
@@ -241,7 +241,7 @@ export class AiService {
       const campaignPositions = campaign.campaignPositions
       const user = campaign.user as User
 
-      const name = getFullName(user)
+      const name = getUserFullName(user)
       const details = campaign.details
 
       const positionsStr = positionsToStr(

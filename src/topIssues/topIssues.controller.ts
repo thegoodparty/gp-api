@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,10 +12,7 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { TopIssuesService } from './topIssues.service'
-import {
-  CreateTopIssueDto,
-  UpdateTopIssueDto,
-} from './schemas/topIssues.schema'
+import { CreateTopIssueDto } from './schemas/topIssues.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 @Controller('top-issues')
@@ -37,11 +33,8 @@ export class TopIssuesController {
   @Put(':id')
   async updateTopIssue(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateTopIssueDto,
+    @Body() body: CreateTopIssueDto,
   ) {
-    if (id !== body.id) {
-      throw new BadRequestException('ID in URL and body must match.')
-    }
     return await this.topIssuesService.update(id, body)
   }
 

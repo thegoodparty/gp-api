@@ -1,16 +1,22 @@
 import { CreateUserInputSchema } from './CreateUserInput.schema'
 import { z } from 'zod'
-import { ReadEmailSchema } from './Email.schema'
+import {
+  ZipSchema,
+  PhoneSchema,
+  EmailSchema,
+  RolesSchema,
+} from 'src/shared/schemas'
 
 export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   password: true,
 }).extend({
-  zip: CreateUserInputSchema.shape.zip.nullish(),
-  phone: CreateUserInputSchema.shape.phone.nullish(),
+  zip: ZipSchema.nullish(),
+  phone: PhoneSchema.nullish(),
   id: z.number(),
-  email: ReadEmailSchema,
+  email: EmailSchema,
   avatar: z.string().nullish(),
   hasPassword: z.boolean(),
+  roles: RolesSchema,
 })
 
 export type ReadUserOutput = z.infer<typeof ReadUserOutputSchema>

@@ -7,6 +7,7 @@ import { CensusEntitiesService } from './services/censusEntities.services'
 import { BallotDataService } from './services/ballotData.service'
 import { BallotDataController } from './ballotData.controller'
 import { BallotReadyService } from './services/ballotReadyservice'
+import { AiModule } from '../ai/ai.module'
 
 @Module({
   controllers: [RacesController, BallotDataController],
@@ -19,5 +20,6 @@ import { BallotReadyService } from './services/ballotReadyservice'
     BallotReadyService,
   ],
   exports: [RacesService, BallotDataService],
+  imports: [AiModule],
 })
 export class RacesModule {}

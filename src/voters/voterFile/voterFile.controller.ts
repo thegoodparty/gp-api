@@ -28,6 +28,7 @@ import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { VoterOutreachService } from '../services/voterOutreach.service'
 import { MimeTypes } from 'http-constants-ts'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
 export const VOTER_FILE_ROUTE = 'voter-data/voter-file'
 
@@ -39,6 +40,7 @@ export class VoterFileController {
   constructor(
     private readonly voterFileService: VoterFileService,
     private readonly voterOutreachService: VoterOutreachService,
+    private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
   ) {}
 
   @Get()
@@ -64,7 +66,7 @@ export class VoterFileController {
   @UseGuards(CanDownloadVoterFileGuard)
   @UseInterceptors(
     FilesInterceptor('image', {
-      mode: 'stream',
+      mode: 'buffer',
       mimeTypes: [
         MimeTypes.IMAGE_JPEG,
         MimeTypes.IMAGE_GIF,
@@ -106,6 +108,6 @@ export class VoterFileController {
     @ReqCampaign()
     campaign?: CampaignWith<'pathToVictory'>,
   ) {
-    return this.voterFileService.canDownload(campaign)
+    return this.voterFileDownloadAccess.canDownload(campaign)
   }
 }

@@ -1,28 +1,32 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import slugify from 'slugify'
-import { startOfYear, addYears, format } from 'date-fns'
+import { addYears, format, startOfYear } from 'date-fns'
 import { County, Municipality } from '@prisma/client'
 import {
   GeoData,
+  MunicipalityResponse,
   NormalizedRace,
+  ProximityCitiesResponseBody,
   Race,
   RaceData,
   RaceQuery,
 } from '../types/races.types'
 import {
-  COUNTY_PROMPT,
   CITY_PROMPT,
+  COUNTY_PROMPT,
   TOWN_PROMPT,
   TOWNSHIP_PROMPT,
   VILLAGE_PROMPT,
 } from '../constants/prompts.consts'
-import { MTFCC_TYPES, GEO_TYPES } from '../constants/geo.consts'
+import { GEO_TYPES, MTFCC_TYPES } from '../constants/geo.consts'
 import { CountiesService } from './counties.services'
 import { MunicipalitiesService } from './municipalities.services'
 import { CensusEntitiesService } from './censusEntities.services'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { BallotReadyService } from './ballotReadyservice'
 import { PositionLevel } from 'src/generated/graphql.types'
+import { AiService } from '../../ai/ai.service'
+import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
 
 @Injectable()
 export class RacesService extends createPrismaBase(MODELS.Race) {
@@ -31,6 +35,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     private readonly municipalities: MunicipalitiesService,
     private readonly censusEntities: CensusEntitiesService,
     private readonly ballotReadyService: BallotReadyService,
+    private readonly ai: AiService,
   ) {
     super()
   }
@@ -109,11 +114,107 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     return this.normalizeRace(race, state)
   }
 
+  async byCityProximity(
+    state: string,
+    city: string,
+  ): Promise<ProximityCitiesResponseBody> {
+    const messages: AiChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'You help me find close cities, and respond in JSON format that is parsable be JSON.parse().',
+      },
+      {
+        role: 'user',
+        content: `Given a city and state in the format "City, State", identify the two closest cities (excluding the provided city) to the specified location. Return the names of these two closest cities in a JSON array format, with each entry containing only the city name. Please ensure the response contains only the names of the two closest cities, without including their states or any additional text, in the specified JSON array format. The input city is ${city} in ${state} state. For example, if the input is "Springfield, Illinois", a correct output would be in the following format: ["CityName1", "CityName2"]. Don't add backticks or the string "json" before. just return the array as a string so I can perform JSON.parse() on the response
+          The input city is ${city} in ${state} state.`,
+      },
+    ]
+
+    const completion = await this.ai.llmChatCompletion(messages)
+
+    const cities = completion.content
+    const parsed: string[] = JSON.parse(cities)
+
+    const municipalityRecord1: MunicipalityResponse | null =
+      await this.municipalities.findFirst({
+        where: {
+          name: city,
+          state,
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      })
+
+    const resultCities: MunicipalityResponse[] = []
+
+    if (municipalityRecord1) {
+      municipalityRecord1.openElections = await this.model.count({
+        where: { municipalityId: municipalityRecord1.id },
+      })
+      municipalityRecord1.state = state
+      resultCities.push(municipalityRecord1)
+    }
+
+    let municipalityRecord2: MunicipalityResponse | null = null
+    let municipalityRecord3: MunicipalityResponse | null = null
+
+    if (parsed.length > 0) {
+      municipalityRecord2 = await this.municipalities.findFirst({
+        where: {
+          name: parsed[0],
+          state,
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      })
+      if (municipalityRecord2) {
+        municipalityRecord2.openElections = await this.model.count({
+          where: { municipalityId: municipalityRecord2.id },
+        })
+        municipalityRecord2.state = state
+        resultCities.push(municipalityRecord2)
+      }
+    }
+
+    if (parsed.length > 1) {
+      municipalityRecord3 = await this.municipalities.findFirst({
+        where: {
+          name: parsed[1],
+          state,
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      })
+      if (municipalityRecord3) {
+        municipalityRecord3.openElections = await this.model.count({
+          where: { municipalityId: municipalityRecord3.id },
+        })
+        municipalityRecord3.state = state
+        resultCities.push(municipalityRecord3)
+      }
+    }
+
+    return {
+      cities: resultCities,
+      ...(parsed && parsed.length ? { parsed } : {}),
+    }
+  }
+
   async byCity(state: string, county: string, city: string) {
     const countyRecord = await this.getCounty(state, county)
     const municipalityRecord = await this.getMunicipality(state, county, city)
-    if (!countyRecord && !municipalityRecord) {
-      return []
+    if (!countyRecord || !municipalityRecord) {
+      throw new BadRequestException('county and city are required')
     }
 
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
@@ -129,7 +230,6 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
           lt: new Date(nextYear),
         },
       },
-      // select: { data: true, hashId: true, positionSlug: true, countyId: true },
       orderBy: {
         electionDate: 'asc',
       },
@@ -146,7 +246,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
   async byCounty(state: string, county: string) {
     const countyRecord = await this.getCounty(state, county)
     if (!countyRecord) {
-      return []
+      throw new BadRequestException('county is required')
     }
 
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
@@ -168,7 +268,6 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         electionDate: 'asc',
       },
     })
-
     return this.deduplicateRaces(races as Race[], state, countyRecord)
   }
 
@@ -234,7 +333,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       filingDateEnd: filing_date_end,
       normalizedPositionName: normalized_position_name,
       positionDescription: position_description,
-      frequency,
+      ...(frequency ? { frequency } : {}),
       subAreaName: race.subAreaName,
       subAreaValue: race.subAreaValue,
       filingOfficeAddress: filing_office_address,
@@ -701,7 +800,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     }
 
     let completion
-    // todo: once the ai service is up, we can use this code
+    // TODO: once the ai service is up, we can use this code
     // const completion = await getChatToolCompletion(
     //   messages,
     //   0.1,
@@ -714,7 +813,6 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
     )
 
-    // console.log('completion', completion);
     const content = completion?.content
     let decodedContent: any = {}
     try {
