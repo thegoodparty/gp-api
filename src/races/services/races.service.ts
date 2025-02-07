@@ -781,7 +781,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       description: 'The county name.',
     }
 
-    const messages = [
+    const messages: AiChatMessage[] = [
       {
         role: 'system',
         content: systemPrompt,
@@ -798,15 +798,12 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       function: { name: 'extractLocation' },
     }
 
-    let completion
     // TODO: once the ai service is up, we can use this code
-    // const completion = await getChatToolCompletion(
-    //   messages,
-    //   0.1,
-    //   0.1,
-    //   tool,
-    //   toolChoice,
-    // )
+    const completion = await this.ai.getChatToolCompletion({
+      messages,
+      tool, // list of functions that could be called.
+      toolChoice, // force the function to be called on every generation if needed.
+    })
 
     this.logger.log(
       `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
