@@ -212,9 +212,7 @@ export default $config({
       managedPolicyArns: ['arn:aws:iam::aws:policy/AdministratorAccess'],
     })
 
-    // todo: codebuild projects for each stage.
-    // Note: our buildspec is only created when deploy is run since its part of the sst deploy process.
-    // so for any changes to the buildspec, we need to run deploy before running the codebuild project.
+    // buildspec updated to use file with env vars.
     const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
       name: `gp-deploy-build-${$app.stage}`,
       serviceRole: codeBuildRole.arn,
