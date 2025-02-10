@@ -16,6 +16,10 @@ export const racesListSchema = z
 
 export class RacesListQueryDto extends createZodDto(racesListSchema) {}
 
+export class RacesByStateQueryDto extends createZodDto(
+  racesListSchema.pick({ state: true }),
+) {}
+
 export class RacesByCountyQueryDto extends createZodDto(
   racesListSchema
     .pick({ state: true })

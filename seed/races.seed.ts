@@ -3,9 +3,9 @@ import { countyFactory } from './factories/county.factory'
 import { municipalityFactory } from './factories/municipality.factory'
 import { raceFactory } from './factories/race.factory'
 
-const NUM_COUNTIES = 2
-const NUM_MUNICIPALITIES_PER_COUNTY = 1
-const NUM_RACES = 2
+const NUM_COUNTIES = 10
+const NUM_MUNICIPALITIES_PER_COUNTY = 2
+const NUM_RACES = 10
 
 export default async function seedRaces(prisma: PrismaClient) {
   const fakeCounties: any[] = []
