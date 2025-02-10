@@ -1,16 +1,29 @@
 import { ChatOpenAI } from '@langchain/openai'
+import { OpenAI } from 'openai'
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Prisma, User } from '@prisma/client'
 import { getUserFullName } from 'src/users/util/users.util'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
-import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 import { SlackChannel } from '../shared/services/slackService.types'
+import {
+  ChatCompletion,
+  ChatCompletionTool,
+  ChatCompletionToolChoiceOption,
+} from 'openai/resources/chat/completions'
+import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
 
-const TOGETHER_AI_KEY = process.env.TOGETHER_AI_KEY
-const OPEN_AI_KEY = process.env.OPEN_AI_KEY
-const AI_MODELS = process.env.AI_MODELS || ''
+type GetChatToolCompletionArgs = {
+  messages?: AiChatMessage[]
+  temperature?: number
+  topP?: number
+  tool?: ChatCompletionTool // list of functions that could be called.
+  toolChoice?: ChatCompletionToolChoiceOption // force the function to be called on every generation if needed.
+  timeout?: number // timeout request after 5 minutes
+}
+
+const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
   include: {
@@ -104,17 +117,22 @@ export class AiService {
 
     const modelWithFallback = firstModel.withFallbacks([fallbackModel])
 
-    for (let i = 0; i < messages.length; i++) {
-      if (messages[i].content !== undefined && messages[i].content.length > 0) {
-        // replace invalid characters
-        messages[i].content = messages[i].content.replace(/\–/g, '-')
-        messages[i].content = messages[i].content.replace(/\`/g, "'")
+    const sanitizedMessages = messages.map((message) => {
+      let sanitizedContent = message.content
+      sanitizedContent =
+        sanitizedContent.replace(/\–/g, '-') || sanitizedContent
+      sanitizedContent =
+        sanitizedContent.replace(/\`/g, "'") || sanitizedContent
+
+      return {
+        ...message,
+        ...(sanitizedContent ? { content: sanitizedContent } : {}),
       }
-    }
+    })
 
     let completion
     try {
-      completion = await modelWithFallback.invoke(messages)
+      completion = await modelWithFallback.invoke(sanitizedMessages)
     } catch (error: any) {
       this.logger.error('Error in utils/ai/llmChatCompletion', error)
       this.logger.error('error response', error?.response)
@@ -143,6 +161,168 @@ export class AiService {
         content: '',
         tokens: 0,
       }
+    }
+  }
+
+  async getChatToolCompletion({
+    messages = [],
+    temperature = 0.1,
+    topP = 0.1,
+    tool = undefined, // list of functions that could be called.
+    toolChoice = undefined, // force the function to be called on every generation if needed.
+    timeout = 300000, // timeout request after 5 minutes
+  }: GetChatToolCompletionArgs) {
+    const models = AI_MODELS.split(',')
+    for (const model of models) {
+      // Lama 3.1 supports native function calling
+      // so we can modify the OpenAI base url to use the together.ai api
+      this.logger.debug('model', model)
+      const togetherAi = model.includes('meta-llama')
+      const client = new OpenAI({
+        apiKey: togetherAi ? TOGETHER_AI_KEY : OPEN_AI_KEY,
+        baseURL: togetherAi ? 'https://api.together.xyz/v1' : undefined,
+      })
+
+      let toolPrompt = ''
+      if (model.includes('meta-llama')) {
+        // the native function calling in llama is not working as expected
+        // so we use this function prompt to get the same result
+        toolPrompt = `You have access to the following functions:
+
+      Use the function '${tool?.function?.name}' to '${tool?.function?.description}':
+      ${JSON.stringify(tool)}
+      
+      If you choose to call a function ONLY reply in the following format with no prefix or suffix:
+      
+      <function=example_function_name>{"example_name": "example_value"}</function>
+      
+      Reminder:
+      - Function calls MUST follow the specified format, start with <function= and end with </function>
+      - Required parameters MUST be specified
+      - Only call one function at a time
+      - Put the entire function call reply on one line
+      - If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls`
+
+        // add the tool prompt to the last system message
+        for (const message of messages) {
+          if (message.role === 'system') {
+            message.content += toolPrompt
+            break
+          }
+        }
+
+        tool = undefined
+        toolChoice = undefined
+      }
+
+      this.logger.debug('toolChoice', toolChoice)
+
+      let completion: ChatCompletion
+      try {
+        if (tool) {
+          completion = await client.chat.completions.create(
+            {
+              model,
+              messages,
+              top_p: topP,
+              temperature: temperature,
+              tools: [tool],
+              ...(toolChoice ? { tool_choice: toolChoice } : {}),
+            },
+            {
+              timeout,
+            },
+          )
+        } else {
+          completion = await client.chat.completions.create(
+            {
+              model,
+              messages,
+              top_p: topP,
+              temperature: temperature,
+            },
+            {
+              timeout,
+            },
+          )
+        }
+
+        let content = ''
+        if (completion?.choices && completion.choices[0]?.message) {
+          if (completion.choices[0].message?.tool_calls) {
+            // console.log('completion (json)', JSON.stringify(completion, null, 2));
+            let toolCalls = completion.choices[0].message.tool_calls
+            if (toolCalls && toolCalls.length > 0) {
+              content = toolCalls[0]?.function?.arguments || ''
+            }
+            if (content === '') {
+              // we are expecting tool_calls to have a function call response
+              // but we can check if the model returned a response without a function call
+              content = completion.choices[0].message?.content || ''
+            }
+          } else {
+            // console.log('completion (raw)', completion);
+            content = completion.choices[0].message?.content || ''
+          }
+        }
+        content = content.trim()
+
+        if (content && content !== '') {
+          if (content.includes('<function=')) {
+            // there is some bug either with openai client, llama3.1 native FC, or together.ai api
+            // where the tool_calls are not being returned in the response
+            // so we can parse the function call from the content
+            let toolResponse = this.parseToolResponse(content)
+            if (toolResponse) {
+              content = toolResponse.arguments
+            }
+          }
+        }
+
+        if (content.includes('```html')) {
+          const match = content.match(/```html([\s\S]*?)```/)
+          content = match?.length ? match[1] : content
+        }
+        content = content.replace('/n', '<br/><br/>')
+        this.logger.debug('completion success', content)
+        return {
+          content,
+          tokens: completion?.usage?.total_tokens || 0,
+        }
+      } catch (error) {
+        this.logger.error('error', error)
+        await this.slack.formattedMessage({
+          message: `Error in getChatToolCompletion. model: ${model} Error: ${error}`,
+          channel: SlackChannel.botDev,
+        })
+      }
+    }
+
+    return {
+      content: '',
+      tokens: 0,
+    }
+  }
+
+  private parseToolResponse(response: string) {
+    {
+      const functionRegex = /<function=(\w+)>(.*?)<\/function>/
+      const match = response.match(functionRegex)
+
+      if (match) {
+        const [functionName, argsString] = match
+        try {
+          const args = JSON.parse(argsString)
+          return {
+            function: functionName,
+            arguments: args,
+          }
+        } catch (error) {
+          this.logger.error(`Error parsing function arguments: ${error}`)
+          return undefined
+        }
+      }
+      return undefined
     }
   }
 
