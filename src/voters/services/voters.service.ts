@@ -300,12 +300,9 @@ export class VotersService {
         response.data.message.includes('API threshold reached')
       ) {
         this.logger.error('L2-Data API threshold reached')
-        await this.slack.message(
-          {
-            body: `Error! L2-Data API threshold reached for ${searchColumn} in ${electionState}.`,
-          },
-          SlackChannel.botDev,
-        )
+        await this.slack.errorMessage({
+          message: `Error! L2-Data API threshold reached for ${searchColumn} in ${electionState}.`,
+        })
       }
     } catch (e) {
       this.logger.error('error at querySearchColumn', e)
