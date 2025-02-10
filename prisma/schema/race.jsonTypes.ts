@@ -14,6 +14,17 @@ declare global {
       city?: string
     }
 
+    export type CountyData = {
+      county_full?: string
+      city_largest?: string
+      population?: string
+      density?: string
+      income_household_median?: string
+      unemployment_rate?: string
+      home_value?: string
+      county?: string
+    }
+
     export type RaceData = {
       id?: number
       race_id?: number

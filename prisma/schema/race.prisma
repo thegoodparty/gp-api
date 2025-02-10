@@ -31,6 +31,7 @@ model County {
   slug           String         @unique
   name           String
   state          String         @db.Char(2)
+  /// [CountyData]
   data           Json?          @default("{}") @db.JsonB
   municipalities Municipality[]
   races          Race[]

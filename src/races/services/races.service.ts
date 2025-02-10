@@ -340,9 +340,33 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         electionDate: 'asc',
       },
     })
+
+    const {
+      county_full,
+      city_largest,
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+      county: countyName,
+    } = countyRecord.data || {}
+
+    const shortCounty = {
+      county: countyName,
+      county_full,
+      city_largest,
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+    }
+
     return {
       races: this.deduplicateRaces(races as Race[], state, countyRecord),
       municipalities,
+      county: shortCounty,
     }
   }
 
@@ -432,10 +456,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     }
   }
 
-  private async getCounty(
-    state: string,
-    county: string,
-  ): Promise<County | null> {
+  private async getCounty(state: string, county: string) {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}`
@@ -444,11 +465,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     })
   }
 
-  private async getMunicipality(
-    state: string,
-    county: string,
-    city: string,
-  ): Promise<Municipality | null> {
+  private async getMunicipality(state: string, county: string, city: string) {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}/${slugify(city, {
