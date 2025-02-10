@@ -506,7 +506,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
   ) {
     const data: any = {}
 
-    this.logger.log(slug, 'getting race from ballotReady api...')
+    this.logger.debug(slug, 'getting race from ballotReady api...')
 
     let race: any
     try {
@@ -515,7 +515,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       this.logger.error(slug, 'error getting race details', e)
       return
     }
-    this.logger.log(slug, 'got ballotReady Race')
+    this.logger.debug(slug, 'got ballotReady Race')
 
     let electionDate: string | undefined // the date of the election
     let termLength = 4
@@ -546,7 +546,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     } catch (e) {
       this.logger.error(slug, 'error getting election level', e)
     }
-    this.logger.log(slug, 'electionLevel', electionLevel)
+    this.logger.debug(slug, 'electionLevel', electionLevel)
 
     const officeName = race?.position?.name
     if (!officeName) {
@@ -572,10 +572,10 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     if (level !== 'state' && level !== 'federal') {
       // We use the mtfcc and geoId to get the city and county
       // and a more accurate electionLevel
-      this.logger.log(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
+      this.logger.debug(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
         const geoData: any = await this.resolveMtfcc(mtfcc, geoId)
-        this.logger.log(slug, 'geoData', geoData)
+        this.logger.debug(slug, 'geoData', geoData)
         if (geoData?.city) {
           city = geoData.city
           if (electionLevel !== 'city') {
@@ -631,7 +631,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         (electionLevel === 'city' && !city) ||
         (electionLevel === 'county' && !county)
       ) {
-        this.logger.log(
+        this.logger.debug(
           slug,
           'could not find location from mtfcc. getting location from AI',
         )
@@ -641,7 +641,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
           officeName + ' - ' + electionState,
           level,
         )
-        this.logger.log(slug, 'locationResp', locationResp)
+        this.logger.debug(slug, 'locationResp', locationResp)
       }
 
       if (locationResp?.level) {
@@ -660,10 +660,10 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     }
 
     if (county) {
-      this.logger.log(slug, 'Found county', county)
+      this.logger.debug(slug, 'Found county', county)
     }
     if (city) {
-      this.logger.log(slug, 'Found city', city)
+      this.logger.debug(slug, 'Found city', city)
     }
 
     let priorElectionDates: string[] = []
@@ -810,7 +810,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       toolChoice, // force the function to be called on every generation if needed.
     })
 
-    this.logger.log(
+    this.logger.debug(
       `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
     )
 
@@ -820,9 +820,9 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       decodedContent = JSON.parse(content)
       decodedContent.level = level
     } catch (e) {
-      console.log('error at extract-location-ai helper', e)
+      console.debug('error at extract-location-ai helper', e)
     }
-    console.log('extract ai location response', decodedContent)
+    console.debug('extract ai location response', decodedContent)
     return decodedContent
   }
 
@@ -842,7 +842,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         )
       }
       const { races } = ballotReadyData
-      this.logger.log(slug, 'getElectionDates graphql result', races)
+      this.logger.debug(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {
         const result = results[i]
@@ -855,7 +855,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
           }
         }
       }
-      this.logger.log(slug, 'electionDates', electionDates)
+      this.logger.debug(slug, 'electionDates', electionDates)
 
       return electionDates
     } catch (e) {
