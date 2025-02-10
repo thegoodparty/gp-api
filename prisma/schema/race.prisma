@@ -16,6 +16,7 @@ model Race {
   level          LevelType
   subAreaName    String        @map("sub_area_name")
   subAreaValue   String        @map("sub_area_value")
+  /// [RaceData]
   data           Json          @default("{}") @db.JsonB
   county         County?       @relation(fields: [countyId], references: [id])
   countyId       Int?          @map("county_id")
@@ -50,6 +51,7 @@ model Municipality {
   name     String
   type     MunicipalityType
   state    String           @db.Char(2)
+  /// [MunicipalityData]
   data     Json?            @default("{}") @db.JsonB
   county   County?          @relation(fields: [countyId], references: [id])
   countyId Int?             @map("county_id")

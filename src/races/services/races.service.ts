@@ -5,15 +5,12 @@ import {
 } from '@nestjs/common'
 import slugify from 'slugify'
 import { addYears, format, startOfYear } from 'date-fns'
-import { County, Municipality } from '@prisma/client'
+import { County, Municipality, Prisma, Race } from '@prisma/client'
 import {
   GeoData,
   MunicipalityResponse,
   NormalizedRace,
   ProximityCitiesResponseBody,
-  Race,
-  RaceData,
-  RaceQuery,
 } from '../types/races.types'
 import {
   CITY_PROMPT,
@@ -49,10 +46,9 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     county?: string,
     city?: string,
     positionSlug?: string,
-  ): Promise<NormalizedRace[]> {
+  ) {
     if (state && county && city && positionSlug) {
-      const singleRace = await this.findOne(state, county, city, positionSlug)
-      return singleRace ? [singleRace] : []
+      return await this.findOne(state, county, city, positionSlug)
     }
 
     if (state && county && city) {
@@ -87,35 +83,74 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
     const now = format(new Date(), 'M d, yyyy')
-    const query = {
+    const query: Prisma.RaceWhereInput = {
       state: state.toUpperCase(),
       positionSlug,
       electionDate: {
         gte: new Date(now),
         lt: new Date(nextYear),
       },
-    } as RaceQuery
+    }
 
     if (city && cityRecord) {
       query.municipalityId = cityRecord.id
     } else if (countyRecord) {
       query.countyId = countyRecord.id
     }
-    const race = (await this.findFirst({
+    const races = await this.findMany({
       where: query,
       orderBy: {
         electionDate: 'asc',
       },
-    })) as Race
+      include: {
+        municipality: true,
+        county: true,
+      },
+    })
 
-    if (!race) {
+    if (races.length === 0) {
       return null
     }
 
-    race.municipality = cityRecord
-    race.county = countyRecord
+    const race = races[0]
+    const positions: Array<string | undefined> = []
+    for (let i = 0; i < races.length; i++) {
+      positions.push(races[i].data.position_name)
+    }
 
-    return this.normalizeRace(race, state)
+    let otherRaces: Race[] = []
+    if (race.municipality) {
+      otherRaces = await this.findMany({
+        where: { municipalityId: race.municipality.id },
+      })
+    } else if (race.county) {
+      otherRaces = await this.findMany({
+        where: { countyId: race.county.id },
+      })
+    }
+
+    return {
+      race: this.normalizeRace(race, state),
+      otherRaces: this.deduplicateRaces(
+        otherRaces,
+        state,
+        race.county,
+        race.municipality,
+      ),
+      positions,
+    }
+  }
+
+  async getByHashId(hashId: string) {
+    return await this.findFirst({
+      where: {
+        hashId,
+      },
+      include: {
+        county: true,
+        municipality: true,
+      },
+    })
   }
 
   async byCityProximity(
@@ -239,12 +274,37 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       },
     })
 
-    return this.deduplicateRaces(
+    const {
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+      county_name,
+      city: municipalityCity,
+    } = municipalityRecord.data || {}
+
+    const shortCity = {
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+      county_name,
+      city: municipalityCity,
+    }
+
+    const deduplicatedRaces = this.deduplicateRaces(
       races as Race[],
       state,
       countyRecord,
       municipalityRecord,
     )
+
+    return {
+      races: deduplicatedRaces,
+      municipality: shortCity,
+    }
   }
 
   async byCounty(state: string, county: string) {
@@ -298,7 +358,12 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     return this.deduplicateRaces(races as Race[], state)
   }
 
-  private normalizeRace(race: Race, state: string): NormalizedRace {
+  private normalizeRace(
+    race: Prisma.RaceGetPayload<{
+      include: { county: true; municipality: true }
+    }>,
+    state: string,
+  ): NormalizedRace {
     const {
       election_name,
       position_name,
@@ -319,7 +384,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       eligibility_requirements,
       is_runoff,
       is_primary,
-    } = race.data as RaceData
+    } = race.data
 
     return {
       ...race,
@@ -401,7 +466,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
           position_description,
           level,
           frequency,
-        } = data as RaceData
+        } = data
 
         uniqueRaces.set(positionSlug as string, {
           ...withoutData,
