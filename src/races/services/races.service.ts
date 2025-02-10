@@ -317,6 +317,14 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
 
     const now = format(new Date(), 'M d, yyyy')
 
+    const municipalities = await this.municipalities.findMany({
+      where: { state, countyId: countyRecord.id },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
+
     const races = await this.findMany({
       where: {
         state: state.toUpperCase(),
@@ -332,7 +340,10 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         electionDate: 'asc',
       },
     })
-    return this.deduplicateRaces(races as Race[], state, countyRecord)
+    return {
+      races: this.deduplicateRaces(races as Race[], state, countyRecord),
+      municipalities,
+    }
   }
 
   async byState(state: string) {
