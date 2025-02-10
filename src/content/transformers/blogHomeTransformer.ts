@@ -4,7 +4,7 @@ import { BlogHomeRaw, BlogHomeAugmented, Transformer } from '../content.types'
 export const blogHomeTransformer: Transformer<
   BlogHomeRaw,
   BlogHomeAugmented
-> = (blogHomes: BlogHomeRaw[]): BlogHomeAugmented[] => {
+> = (blogHomes: BlogHomeRaw[]): BlogHomeAugmented => {
   const blogHome = blogHomes[0]
   const tags =
     blogHome.data?.topTags?.map((tag) => ({
@@ -18,5 +18,5 @@ export const blogHomeTransformer: Transformer<
       id: faq?.sys?.id?.toLowerCase() || 'Unknown-id',
     })) || []
 
-  return [{ tags, faqs }]
+  return { tags, faqs }
 }

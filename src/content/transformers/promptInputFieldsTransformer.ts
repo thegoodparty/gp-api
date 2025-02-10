@@ -7,7 +7,7 @@ import {
 export const promptInputFieldsTransformer: Transformer<
   PromptInputFieldsRaw,
   PromptInputFieldsAugmented
-> = (prompts: PromptInputFieldsRaw[]): PromptInputFieldsAugmented[] => {
+> = (prompts: PromptInputFieldsRaw[]): PromptInputFieldsAugmented => {
   const promptInputFields = prompts.reduce((acc, prompt) => {
     const key = prompt.data.fieldId
     const entry = prompt.data.contentInput.map(({ fields }) => ({
@@ -20,5 +20,5 @@ export const promptInputFieldsTransformer: Transformer<
     }
   }, {})
 
-  return [promptInputFields]
+  return promptInputFields
 }

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import { MapCampaign } from './campaignMap.types'
-import { RaceData } from 'src/races/races.types'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
@@ -151,7 +150,7 @@ export class CampaignMapService {
           where: { ballotHashId: details.raceId },
         })
         if (race) {
-          const raceData = race.data as RaceData
+          const raceData = race.data
           normalizedOffice = raceData?.normalized_position_name
         }
 

@@ -30,7 +30,7 @@ import { VoterOutreachService } from '../services/voterOutreach.service'
 import { MimeTypes } from 'http-constants-ts'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
-export const VOTER_FILE_ROUTE = 'voter-data/voter-file'
+export const VOTER_FILE_ROUTE = 'voters/voter-file'
 
 @Controller(VOTER_FILE_ROUTE)
 @UsePipes(ZodValidationPipe)
@@ -52,7 +52,7 @@ export class VoterFileController {
     @ReqCampaign() campaign: CampaignWith<'pathToVictory'>,
     @Query() query: GetVoterFileSchema,
   ) {
-    return this.voterFileService.getCsv(campaign, query)
+    return this.voterFileService.getCsvOrCount(campaign, query)
   }
 
   @Get('wake-up')

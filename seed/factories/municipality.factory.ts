@@ -2,13 +2,11 @@ import { Municipality } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import slugify from 'slugify'
 import { generateFactory } from './generate'
-import {
-  getRandomInt,
-  getRandomPercentage,
-  getRandomElementFromArray,
-} from 'src/shared/util/numbers.util'
+import { getRandomInt, getRandomPercentage } from 'src/shared/util/numbers.util'
 
 const cities = [
+  'Long Beach',
+  'Anaheim',
   'Glendale',
   'Santa Clarita',
   'Torrance',
@@ -28,9 +26,11 @@ const cities = [
   'Pico Rivera',
   'Montebello',
 ]
-
+let cityCount = 0
 export const municipalityFactory = generateFactory<Municipality>(() => {
-  const city = getRandomElementFromArray(cities)
+  const city =
+    cityCount < cities.length ? cities[cityCount] : faker.lorem.word()
+  cityCount++
   return {
     id: faker.number.int({ max: 2147483647 }),
     slug: `ca/los-angeles/${slugify(city, { lower: true })}`,

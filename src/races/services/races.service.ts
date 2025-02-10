@@ -1,17 +1,17 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
-import { GraphqlService } from 'src/graphql/graphql.service'
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common'
 import slugify from 'slugify'
 import { addYears, format, startOfYear } from 'date-fns'
-import { County, Municipality } from '@prisma/client'
+import { County, Municipality, Prisma, Race } from '@prisma/client'
 import {
   GeoData,
   MunicipalityResponse,
   NormalizedRace,
   ProximityCitiesResponseBody,
-  Race,
-  RaceData,
-  RaceQuery,
-} from '../races.types'
+} from '../types/races.types'
 import {
   CITY_PROMPT,
   COUNTY_PROMPT,
@@ -24,6 +24,8 @@ import { CountiesService } from './counties.services'
 import { MunicipalitiesService } from './municipalities.services'
 import { CensusEntitiesService } from './censusEntities.services'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { BallotReadyService } from './ballotReady.service'
+import { PositionLevel } from 'src/generated/graphql.types'
 import { AiService } from '../../ai/ai.service'
 import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
 
@@ -33,7 +35,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     private readonly counties: CountiesService,
     private readonly municipalities: MunicipalitiesService,
     private readonly censusEntities: CensusEntitiesService,
-    private readonly graphQLService: GraphqlService,
+    private readonly ballotReadyService: BallotReadyService,
     private readonly ai: AiService,
   ) {
     super()
@@ -44,10 +46,9 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     county?: string,
     city?: string,
     positionSlug?: string,
-  ): Promise<NormalizedRace[]> {
+  ) {
     if (state && county && city && positionSlug) {
-      const singleRace = await this.findOne(state, county, city, positionSlug)
-      return singleRace ? [singleRace] : []
+      return await this.findOne(state, county, city, positionSlug)
     }
 
     if (state && county && city) {
@@ -82,42 +83,76 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
     const now = format(new Date(), 'M d, yyyy')
-    const query = {
+    const query: Prisma.RaceWhereInput = {
       state: state.toUpperCase(),
       positionSlug,
       electionDate: {
         gte: new Date(now),
         lt: new Date(nextYear),
       },
-    } as RaceQuery
+    }
 
     if (city && cityRecord) {
       query.municipalityId = cityRecord.id
     } else if (countyRecord) {
       query.countyId = countyRecord.id
     }
-    const race = (await this.findFirst({
+    const races = await this.findMany({
       where: query,
       orderBy: {
         electionDate: 'asc',
       },
-    })) as Race
+      include: {
+        municipality: true,
+        county: true,
+      },
+    })
 
-    if (!race) {
+    if (races.length === 0) {
       return null
     }
 
-    race.municipality = cityRecord
-    race.county = countyRecord
+    const race = races[0]
+    const positions = races.map((race) => race.data.position_name)
+    const otherRaces = race.municipality
+      ? await this.findMany({
+          where: { municipalityId: race.municipality.id },
+        })
+      : race.county
+        ? await this.findMany({
+            where: { countyId: race.county.id },
+          })
+        : []
 
-    return this.normalizeRace(race, state)
+    return {
+      race: this.normalizeRace(race, state),
+      otherRaces: this.deduplicateRaces(
+        otherRaces,
+        state,
+        race.county,
+        race.municipality,
+      ),
+      positions,
+    }
+  }
+
+  async getByHashId(hashId: string) {
+    return await this.findFirst({
+      where: {
+        hashId,
+      },
+      include: {
+        county: true,
+        municipality: true,
+      },
+    })
   }
 
   async byCityProximity(
     state: string,
     city: string,
   ): Promise<ProximityCitiesResponseBody> {
-    let messages: AiChatMessage[] = [
+    const messages: AiChatMessage[] = [
       {
         role: 'system',
         content:
@@ -234,12 +269,37 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       },
     })
 
-    return this.deduplicateRaces(
+    const {
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+      county_name,
+      city: municipalityCity,
+    } = municipalityRecord.data || {}
+
+    const shortCity = {
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+      county_name,
+      city: municipalityCity,
+    }
+
+    const deduplicatedRaces = this.deduplicateRaces(
       races as Race[],
       state,
       countyRecord,
       municipalityRecord,
     )
+
+    return {
+      races: deduplicatedRaces,
+      municipality: shortCity,
+    }
   }
 
   async byCounty(state: string, county: string) {
@@ -251,6 +311,14 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
     const now = format(new Date(), 'M d, yyyy')
+
+    const municipalities = await this.municipalities.findMany({
+      where: { state, countyId: countyRecord.id },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
 
     const races = await this.findMany({
       where: {
@@ -267,13 +335,48 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         electionDate: 'asc',
       },
     })
-    return this.deduplicateRaces(races as Race[], state, countyRecord)
+
+    const {
+      county_full,
+      city_largest,
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+      county: countyName,
+    } = countyRecord.data || {}
+
+    const shortCounty = {
+      county: countyName,
+      county_full,
+      city_largest,
+      population,
+      density,
+      income_household_median,
+      unemployment_rate,
+      home_value,
+    }
+
+    return {
+      races: this.deduplicateRaces(races as Race[], state, countyRecord),
+      municipalities,
+      county: shortCounty,
+    }
   }
 
   async byState(state: string) {
     const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
 
     const now = format(new Date(), 'M d, yyyy')
+
+    const counties = await this.counties.findMany({
+      where: { state },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
 
     const races = await this.findMany({
       where: {
@@ -290,10 +393,145 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       },
     })
 
-    return this.deduplicateRaces(races as Race[], state)
+    return { races: this.deduplicateRaces(races as Race[], state), counties }
   }
 
-  private normalizeRace(race: Race, state: string): NormalizedRace {
+  async allForState(state: string) {
+    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
+
+    const now = format(new Date(), 'M d, yyyy')
+
+    const counties = await this.counties.findMany({
+      where: { state },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
+
+    const cities = await this.municipalities.findMany({
+      where: { state },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
+
+    const stateRaces = await this.findMany({
+      where: {
+        state: state.toUpperCase(),
+        countyId: null,
+        municipalityId: null,
+        level: 'state',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    // Deduplicate based on positionSlug
+    const uniqueStateRaces = new Map()
+
+    stateRaces.forEach((race) => {
+      if (!uniqueStateRaces.has(race.positionSlug)) {
+        const { positionSlug } = race
+        const stateRace: { slug?: string } = {}
+        stateRace.slug = `${state.toLowerCase()}/${positionSlug}`
+        uniqueStateRaces.set(race.positionSlug, stateRace)
+      }
+    })
+    // Convert the Map values back to an array for the final deduplicated list.
+    const dedupStateRaces = Array.from(uniqueStateRaces.values())
+
+    const countyRaces = await this.findMany({
+      where: {
+        state: state.toUpperCase(),
+        countyId: {
+          not: null,
+        },
+        municipalityId: null,
+        level: 'state',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      include: {
+        county: true,
+      },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    // Deduplicate based on positionSlug
+    const uniqueCountyRaces = new Map()
+
+    countyRaces.forEach((race) => {
+      if (!uniqueStateRaces.has(race.positionSlug)) {
+        const { positionSlug, county } = race
+        const countyRace: { slug?: string } = {}
+        countyRace.slug = `${county?.slug}/${positionSlug}`
+        uniqueCountyRaces.set(race.positionSlug, countyRace)
+      }
+    })
+    // Convert the Map values back to an array for the final deduplicated list
+    const dedupCountyRaces = Array.from(uniqueCountyRaces.values())
+
+    const cityRaces = await this.findMany({
+      where: {
+        state: state.toUpperCase(),
+        countyId: null,
+        municipalityId: {
+          not: null,
+        },
+        level: 'state',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      include: {
+        municipality: true,
+      },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    // Deduplicate based on positionSlug
+    const uniqueCityRaces = new Map()
+
+    cityRaces.forEach((race) => {
+      if (!uniqueStateRaces.has(race.positionSlug)) {
+        const { positionSlug, municipality } = race
+        const cityRace: { slug?: string } = {}
+        cityRace.slug = `${municipality?.slug}/${positionSlug}`
+        uniqueCityRaces.set(race.positionSlug, cityRace)
+      }
+    })
+    // Convert the Map values back to an array for the final deduplicated list
+    const dedupCityRaces = Array.from(uniqueCityRaces.values())
+
+    return {
+      counties,
+      cities,
+      stateRaces: dedupStateRaces,
+      countyRaces: dedupCountyRaces,
+      cityRaces: dedupCityRaces,
+    }
+  }
+
+  private normalizeRace(
+    race: Prisma.RaceGetPayload<{
+      include: { county: true; municipality: true }
+    }>,
+    state: string,
+  ): NormalizedRace {
     const {
       election_name,
       position_name,
@@ -314,7 +552,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       eligibility_requirements,
       is_runoff,
       is_primary,
-    } = race.data as RaceData
+    } = race.data
 
     return {
       ...race,
@@ -351,10 +589,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     }
   }
 
-  private async getCounty(
-    state: string,
-    county: string,
-  ): Promise<County | null> {
+  private async getCounty(state: string, county: string) {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}`
@@ -363,11 +598,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     })
   }
 
-  private async getMunicipality(
-    state: string,
-    county: string,
-    city: string,
-  ): Promise<Municipality | null> {
+  private async getMunicipality(state: string, county: string, city: string) {
     const slug = `${slugify(state, { lower: true })}/${slugify(county, {
       lower: true,
     })}/${slugify(city, {
@@ -396,7 +627,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
           position_description,
           level,
           frequency,
-        } = data as RaceData
+        } = data
 
         uniqueRaces.set(positionSlug as string, {
           ...withoutData,
@@ -501,16 +732,16 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
   ) {
     const data: any = {}
 
-    this.logger.log(slug, 'getting race from ballotReady api...')
+    this.logger.debug(slug, 'getting race from ballotReady api...')
 
     let race: any
     try {
-      race = await this.getRaceById(raceId)
+      race = await this.ballotReadyService.fetchRaceById(raceId)
     } catch (e) {
       this.logger.error(slug, 'error getting race details', e)
       return
     }
-    this.logger.log(slug, 'got ballotReady Race')
+    this.logger.debug(slug, 'got ballotReady Race')
 
     let electionDate: string | undefined // the date of the election
     let termLength = 4
@@ -541,7 +772,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     } catch (e) {
       this.logger.error(slug, 'error getting election level', e)
     }
-    this.logger.log(slug, 'electionLevel', electionLevel)
+    this.logger.debug(slug, 'electionLevel', electionLevel)
 
     const officeName = race?.position?.name
     if (!officeName) {
@@ -567,10 +798,10 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     if (level !== 'state' && level !== 'federal') {
       // We use the mtfcc and geoId to get the city and county
       // and a more accurate electionLevel
-      this.logger.log(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
+      this.logger.debug(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
         const geoData: any = await this.resolveMtfcc(mtfcc, geoId)
-        this.logger.log(slug, 'geoData', geoData)
+        this.logger.debug(slug, 'geoData', geoData)
         if (geoData?.city) {
           city = geoData.city
           if (electionLevel !== 'city') {
@@ -626,7 +857,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
         (electionLevel === 'city' && !city) ||
         (electionLevel === 'county' && !county)
       ) {
-        this.logger.log(
+        this.logger.debug(
           slug,
           'could not find location from mtfcc. getting location from AI',
         )
@@ -636,7 +867,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
           officeName + ' - ' + electionState,
           level,
         )
-        this.logger.log(slug, 'locationResp', locationResp)
+        this.logger.debug(slug, 'locationResp', locationResp)
       }
 
       if (locationResp?.level) {
@@ -655,10 +886,10 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     }
 
     if (county) {
-      this.logger.log(slug, 'Found county', county)
+      this.logger.debug(slug, 'Found county', county)
     }
     if (city) {
-      this.logger.log(slug, 'Found city', city)
+      this.logger.debug(slug, 'Found city', city)
     }
 
     let priorElectionDates: string[] = []
@@ -805,7 +1036,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       toolChoice, // force the function to be called on every generation if needed.
     })
 
-    this.logger.log(
+    this.logger.debug(
       `messages: ${messages}. tool: ${tool}. toolChoice: ${toolChoice}`,
     )
 
@@ -815,9 +1046,9 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       decodedContent = JSON.parse(content)
       decodedContent.level = level
     } catch (e) {
-      console.log('error at extract-location-ai helper', e)
+      console.debug('error at extract-location-ai helper', e)
     }
-    console.log('extract ai location response', decodedContent)
+    console.debug('extract ai location response', decodedContent)
     return decodedContent
   }
 
@@ -825,38 +1056,19 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     slug: string,
     officeName: string,
     zip: string,
-    level: string,
+    level: PositionLevel,
   ) {
     const electionDates: string[] = []
     try {
-      // get todays date in format YYYY-MM-DD
-      const today = new Date()
-      const year = today.getFullYear()
-      const month = (today.getMonth() + 1).toString().padStart(2, '0')
-      const day = today.getDate().toString().padStart(2, '0')
-      const dateToday = `${year}-${month}-${day}`
-
-      const query = `
-            query {
-                races(
-                    location: { zip: "${zip}" }
-                    filterBy: { electionDay: { gt: "2006-01-01", lt: "${dateToday}" }, level: ${level} }
-                ) {
-                    edges {
-                        node {
-                            position {    
-                                name
-                            }
-                            election {
-                                electionDay
-                            }
-                        }
-                    }
-                }
-            }`
-
-      const { races } = await this.graphQLService.fetchGraphql(query)
-      this.logger.log(slug, 'getElectionDates graphql result', races)
+      const ballotReadyData =
+        await this.ballotReadyService.fetchRacesWithElectionDates(zip, level)
+      if (!ballotReadyData) {
+        throw new InternalServerErrorException(
+          'Could not fetch BallotReady data',
+        )
+      }
+      const { races } = ballotReadyData
+      this.logger.debug(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {
         const result = results[i]
@@ -869,59 +1081,12 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
           }
         }
       }
-      this.logger.log(slug, 'electionDates', electionDates)
+      this.logger.debug(slug, 'electionDates', electionDates)
 
       return electionDates
     } catch (e) {
       this.logger.error(slug, 'error at getElectionDates', e)
       return []
     }
-  }
-
-  private async getRaceById(raceId: string) {
-    const query = `
-          query Node {
-            node(id: "${raceId}") {
-                ... on Race {
-                    databaseId
-                    isPartisan
-                    isPrimary
-                    election {
-                        electionDay
-                        name
-                        state
-                    }
-                    position {
-                        id
-                        description
-                        judicial
-                        level
-                        name
-                        partisanType
-                        staggeredTerm
-                        state
-                        subAreaName
-                        subAreaValue
-                        tier
-                        mtfcc
-                        geoId
-                        electionFrequencies {
-                            frequency
-                        }
-                        hasPrimary
-                        normalizedPosition {
-                          name
-                      }
-                    }
-                    filingPeriods {
-                        endOn
-                        startOn
-                    }
-                }
-            }
-        }
-        `
-    const { node } = await this.graphQLService.fetchGraphql(query)
-    return node
   }
 }

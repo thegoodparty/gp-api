@@ -198,6 +198,21 @@ export class ContentController {
     }
   }
 
+  @Get('blog-article/:slug')
+  async findBlogArticleBySlug(@Param('slug') slug: string) {
+    const blogArticles = await this.contentService.findByType({
+      type: ContentType.blogArticle,
+      where: {
+        data: {
+          path: ['slug'],
+          equals: slug,
+        },
+      },
+    })
+
+    return blogArticles[0]
+  }
+
   @Get('blog-articles-by-slug/:slug')
   async findBlogArticlesBySlug(@Param('slug') slug: string) {
     const blogArticles: BlogArticleAugmented[] =

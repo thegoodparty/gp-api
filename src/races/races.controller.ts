@@ -1,10 +1,10 @@
-import { Controller, Get, Query, UsePipes } from '@nestjs/common'
+import { Controller, Get, Param, Query, UsePipes } from '@nestjs/common'
 import { RacesService } from './services/races.service'
-import { NormalizedRace, ProximityCitiesResponseBody } from './races.types'
 import {
   RacesByCityProximityQueryDto,
   RacesByCityQueryDto,
   RacesByCountyQueryDto,
+  RacesByStateQueryDto,
   RacesListQueryDto,
 } from './schemas/racesList.schema'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
@@ -19,28 +19,39 @@ export class RacesController {
   @Get()
   async findRaces(
     @Query() { state, county, city, positionSlug }: RacesListQueryDto,
-  ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
+  ) {
     return await this.racesService.findRaces(state, county, city, positionSlug)
   }
 
+  @Get(':hashId')
+  async getByHashId(@Param('hashId') hashId: string) {
+    return await this.racesService.getByHashId(hashId)
+  }
+
+  @Get('by-state')
+  async findRacesByState(@Query() { state }: RacesByStateQueryDto) {
+    return this.racesService.byState(state)
+  }
+
   @Get('by-county')
-  async findRacesByCounty(
-    @Query() { state, county }: RacesByCountyQueryDto,
-  ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
+  async findRacesByCounty(@Query() { state, county }: RacesByCountyQueryDto) {
     return this.racesService.byCounty(state, county)
   }
 
   @Get('by-city')
-  async findRacesByCity(
-    @Query() { state, county, city }: RacesByCityQueryDto,
-  ): Promise<NormalizedRace | NormalizedRace[] | boolean> {
+  async findRacesByCity(@Query() { state, county, city }: RacesByCityQueryDto) {
     return this.racesService.byCity(state, county, city)
   }
 
   @Get('proximity-cities')
   async findProximityCities(
     @Query() { state, city }: RacesByCityProximityQueryDto,
-  ): Promise<ProximityCitiesResponseBody> {
+  ) {
     return this.racesService.byCityProximity(state, city)
+  }
+
+  @Get('all-state')
+  async getRacesForAllStates(@Query() { state }: RacesByStateQueryDto) {
+    return this.racesService.allForState(state)
   }
 }

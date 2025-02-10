@@ -451,7 +451,7 @@ export type FaqArticleContentAugmented = ContentAugmented<
 
 export type Transformer<I = Content, O = ContentAugmented> = (
   content: I[],
-) => O[]
+) => O[] | O
 
 type GlossaryItemRawData = {
   data: FieldsType & {
