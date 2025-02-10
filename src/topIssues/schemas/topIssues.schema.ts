@@ -5,7 +5,6 @@ export const TopIssueSchema = z
   .object({
     id: z.number(),
     name: z.string(),
-    icon: z.string().nullable(),
   })
   .strict()
 
