@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
 
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL } = process.env
+if (!STRIPE_SECRET_KEY || !WEBAPP_ROOT_URL) {
+  throw new Error(
+    'Please set STRIPE_SECRET_KEY and WEBAPP_ROOT_URL in your .env',
+  )
+}
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'

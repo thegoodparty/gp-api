@@ -17,6 +17,9 @@ import { SlackChannel } from 'src/shared/services/slackService.types'
 
 const API_BASE = 'https://api.l2datamapping.com/api/v2'
 const L2_DATA_KEY = process.env.L2_DATA_KEY
+if (!L2_DATA_KEY) {
+  throw new Error('Please set L2_DATA_KEY in your .env')
+}
 
 type L2Column = { type: string; id: string; name: { [key: string]: string } }
 

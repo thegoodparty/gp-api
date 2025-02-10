@@ -23,6 +23,9 @@ import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.servi
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
+if (!STRIPE_WEBSOCKET_SECRET) {
+  throw new Error('Please set STRIPE_WEBSOCKET_SECRET in your .env')
+}
 
 @Injectable()
 export class StripeEventsService {

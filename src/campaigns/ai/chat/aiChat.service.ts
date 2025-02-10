@@ -13,6 +13,10 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
 
+if (!LLAMA_AI_ASSISTANT) {
+  throw new Error('Please set LLAMA_AI_ASSISTANT in your .env')
+}
+
 @Injectable()
 export class AiChatService extends createPrismaBase(MODELS.AiChat) {
   constructor(

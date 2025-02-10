@@ -11,7 +11,11 @@ const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env as Record<
   string,
   string
 >
-
+if (!CONTENTFUL_SPACE_ID || !CONTENTFUL_ACCESS_TOKEN) {
+  throw new Error(
+    'Please set CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN in your .env',
+  )
+}
 const contentfulClient = createClient({
   space: CONTENTFUL_SPACE_ID,
   accessToken: CONTENTFUL_ACCESS_TOKEN,

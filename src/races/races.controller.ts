@@ -1,6 +1,9 @@
 import { Controller, Get, Query, UsePipes } from '@nestjs/common'
 import { RacesService } from './services/races.service'
-import { NormalizedRace, ProximityCitiesResponseBody } from './races.types'
+import {
+  NormalizedRace,
+  ProximityCitiesResponseBody,
+} from './types/races.types'
 import {
   RacesByCityProximityQueryDto,
   RacesByCityQueryDto,
