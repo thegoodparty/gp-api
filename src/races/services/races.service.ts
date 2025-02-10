@@ -375,6 +375,14 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
 
     const now = format(new Date(), 'M d, yyyy')
 
+    const counties = await this.counties.findMany({
+      where: { state },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
+
     const races = await this.findMany({
       where: {
         state: state.toUpperCase(),
@@ -390,7 +398,137 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
       },
     })
 
-    return this.deduplicateRaces(races as Race[], state)
+    return { races: this.deduplicateRaces(races as Race[], state), counties }
+  }
+
+  async allForState(state: string) {
+    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
+
+    const now = format(new Date(), 'M d, yyyy')
+
+    const counties = await this.counties.findMany({
+      where: { state },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
+
+    const cities = await this.municipalities.findMany({
+      where: { state },
+      select: {
+        name: true,
+        slug: true,
+      },
+    })
+
+    const stateRaces = await this.findMany({
+      where: {
+        state: state.toUpperCase(),
+        countyId: null,
+        municipalityId: null,
+        level: 'state',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    // Deduplicate based on positionSlug
+    const uniqueStateRaces = new Map()
+
+    stateRaces.forEach((race) => {
+      if (!uniqueStateRaces.has(race.positionSlug)) {
+        const { positionSlug } = race
+        const stateRace: { slug?: string } = {}
+        stateRace.slug = `${state.toLowerCase()}/${positionSlug}`
+        uniqueStateRaces.set(race.positionSlug, stateRace)
+      }
+    })
+    // Convert the Map values back to an array for the final deduplicated list.
+    const dedupStateRaces = Array.from(uniqueStateRaces.values())
+
+    const countyRaces = await this.findMany({
+      where: {
+        state: state.toUpperCase(),
+        countyId: {
+          not: null,
+        },
+        municipalityId: null,
+        level: 'state',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      include: {
+        county: true,
+      },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    // Deduplicate based on positionSlug
+    const uniqueCountyRaces = new Map()
+
+    countyRaces.forEach((race) => {
+      if (!uniqueStateRaces.has(race.positionSlug)) {
+        const { positionSlug, county } = race
+        const countyRace: { slug?: string } = {}
+        countyRace.slug = `${county?.slug}/${positionSlug}`
+        uniqueCountyRaces.set(race.positionSlug, countyRace)
+      }
+    })
+    // Convert the Map values back to an array for the final deduplicated list
+    const dedupCountyRaces = Array.from(uniqueCountyRaces.values())
+
+    const cityRaces = await this.findMany({
+      where: {
+        state: state.toUpperCase(),
+        countyId: null,
+        municipalityId: {
+          not: null,
+        },
+        level: 'state',
+        electionDate: {
+          gte: new Date(now),
+          lt: new Date(nextYear),
+        },
+      },
+      include: {
+        municipality: true,
+      },
+      orderBy: {
+        electionDate: 'asc',
+      },
+    })
+
+    // Deduplicate based on positionSlug
+    const uniqueCityRaces = new Map()
+
+    cityRaces.forEach((race) => {
+      if (!uniqueStateRaces.has(race.positionSlug)) {
+        const { positionSlug, municipality } = race
+        const cityRace: { slug?: string } = {}
+        cityRace.slug = `${municipality?.slug}/${positionSlug}`
+        uniqueCityRaces.set(race.positionSlug, cityRace)
+      }
+    })
+    // Convert the Map values back to an array for the final deduplicated list
+    const dedupCityRaces = Array.from(uniqueCityRaces.values())
+
+    return {
+      counties,
+      cities,
+      stateRaces: dedupStateRaces,
+      countyRaces: dedupCountyRaces,
+      cityRaces: dedupCityRaces,
+    }
   }
 
   private normalizeRace(

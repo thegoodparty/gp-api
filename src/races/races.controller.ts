@@ -49,4 +49,9 @@ export class RacesController {
   ) {
     return this.racesService.byCityProximity(state, city)
   }
+
+  @Get('all-state')
+  async getRacesForAllStates(@Query() { state }: RacesByStateQueryDto) {
+    return this.racesService.allForState(state)
+  }
 }
