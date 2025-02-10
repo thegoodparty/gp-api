@@ -6,10 +6,11 @@ import { VoterOutreachService } from './services/voterOutreach.service'
 import { FilesModule } from 'src/files/files.module'
 import { VotersService } from './services/voters.service'
 import { HttpModule } from '@nestjs/axios'
+import { VotersController } from './voters.controller'
 
 @Module({
   imports: [FilesModule, HttpModule],
-  controllers: [VoterFileController],
+  controllers: [VotersController, VoterFileController],
   providers: [
     VoterFileService,
     VoterDatabaseService,

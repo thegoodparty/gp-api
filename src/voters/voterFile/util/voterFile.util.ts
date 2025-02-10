@@ -21,6 +21,7 @@ export function typeToQuery(
   let l2ColumnName = campaign.pathToVictory?.data.electionType
   const l2ColumnValue = campaign.pathToVictory?.data.electionLocation
 
+  // TODO: if these two are not present, should we throw an error?
   if (l2ColumnName && l2ColumnValue) {
     // value is like "IN##CLARK##CLARK CNTY COMM DIST 1" we need just CLARK CNTY COMM DIST 1
     const cleanValue = extractLocation(l2ColumnValue, fixColumns)
@@ -31,6 +32,7 @@ export function typeToQuery(
     }
     whereClause += `("${l2ColumnName}" = '${cleanValue}' OR "${l2ColumnName}" = '${cleanValue} (EST.)') `
   }
+
   let columns = `"LALVOTERID", 
   "Voters_FirstName", 
   "Voters_LastName", 
@@ -152,7 +154,12 @@ export function typeToQuery(
   }
 
   if (customFilters?.filters && customFilters.filters.length > 0) {
-    whereClause += customFiltersToQuery(customFilters.filters)
+    const customFiltersQuery = customFiltersToQuery(customFilters.filters)
+    if (whereClause !== '') {
+      whereClause += ' AND ' + customFiltersQuery
+    } else {
+      whereClause += customFiltersQuery
+    }
   }
 
   if (justCount) {
@@ -315,5 +322,5 @@ function customFiltersToQuery(filters: CustomFilter[]) {
     .filter(Boolean)
     .join(' AND ')
 
-  return finalCondition ? ` AND ${finalCondition}` : ''
+  return finalCondition ? ` ${finalCondition}` : ''
 }

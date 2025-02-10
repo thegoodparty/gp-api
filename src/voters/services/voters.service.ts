@@ -12,6 +12,8 @@ import { Logger } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { AxiosResponse } from 'axios'
 import { cloneDeep } from 'es-toolkit'
+import { SlackService } from 'src/shared/services/slack.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
 
 const API_BASE = 'https://api.l2datamapping.com/api/v2'
 const L2_DATA_KEY = process.env.L2_DATA_KEY
@@ -24,7 +26,10 @@ type L2Column = { type: string; id: string; name: { [key: string]: string } }
 @Injectable()
 export class VotersService {
   private readonly logger = new Logger(VotersService.name)
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly slack: SlackService,
+  ) {}
 
   async getVoterCounts(
     electionTerm: number,
@@ -278,6 +283,31 @@ export class VotersService {
       columns = columnsResponse.data.columns
     }
     return columns
+  }
+
+  async querySearchColumn(searchColumn: string, electionState: string) {
+    let searchValues: string[] = []
+    try {
+      const searchUrl = `${API_BASE}/customer/application/column/values/1OSR/VM_${electionState}/${searchColumn}?id=1OSR&apikey=${L2_DATA_KEY}`
+      type ExpectedResponse = { values: string[]; message: string }
+      const response = await firstValueFrom(
+        this.httpService.get<ExpectedResponse>(searchUrl),
+      )
+      if (response?.data?.values && response.data.values.length > 0) {
+        searchValues = response.data.values
+      } else if (
+        response?.data?.message &&
+        response.data.message.includes('API threshold reached')
+      ) {
+        this.logger.error('L2-Data API threshold reached')
+        await this.slack.errorMessage({
+          message: `Error! L2-Data API threshold reached for ${searchColumn} in ${electionState}.`,
+        })
+      }
+    } catch (e) {
+      this.logger.error('error at querySearchColumn', e)
+    }
+    return searchValues
   }
 
   async getPartisanCounts(

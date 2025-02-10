@@ -23,7 +23,7 @@ export class VoterFileService {
     private readonly crm: CrmCampaignsService,
   ) {}
 
-  async getCsv(
+  async getCsvOrCount(
     campaign: CampaignWith<'pathToVictory'>,
     { type, countOnly, customFilters }: GetVoterFileSchema,
   ) {
