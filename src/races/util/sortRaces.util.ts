@@ -1,10 +1,10 @@
 import { RacesByYear } from '../types/ballotData.types'
 import { RaceNode } from '../types/ballotReady.types'
-import { checkOfficeLevelValue } from './checkOfficeLevelValue.util'
+import { getOfficeLevelValue } from './getOfficeLevelValue.util'
 
 export function sortRacesByLevel(a: RaceNode, b: RaceNode): number {
-  const aLevel = checkOfficeLevelValue(a.position?.level)
-  const bLevel = checkOfficeLevelValue(b.position?.level)
+  const aLevel = getOfficeLevelValue(a.position?.level)
+  const bLevel = getOfficeLevelValue(b.position?.level)
   return aLevel - bLevel
 }
 

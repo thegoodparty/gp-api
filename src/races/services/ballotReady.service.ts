@@ -8,6 +8,7 @@ import {
   RacesByZipcode,
   RacesWithElectionDates,
 } from '../types/ballotReady.types'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -17,14 +18,16 @@ if (!BALLOT_READY_KEY) {
   )
 }
 
+const headers = {
+  [Headers.AUTHORIZATION]: `Bearer ${BALLOT_READY_KEY}`,
+  [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
+}
+
 @Injectable()
 export class BallotReadyService {
   private readonly logger = new Logger(BallotReadyService.name)
   private readonly graphQLClient = new GraphQLClient(API_BASE, {
-    headers: {
-      authorization: `Bearer ${BALLOT_READY_KEY}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
   })
 
   async fetchRaceById(raceId: string): Promise<RacesById | null> {
