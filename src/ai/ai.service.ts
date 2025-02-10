@@ -14,6 +14,16 @@ import {
 } from 'openai/resources/chat/completions'
 import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
 
+const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
+if (!TOGETHER_AI_KEY) {
+  throw new Error('Please set TOGETHER_AI_KEY in your .env')
+}
+if (!OPEN_AI_KEY) {
+  throw new Error('Please set OPEN_AI_KEY in your .env')
+}
+if (AI_MODELS === undefined || AI_MODELS === null) {
+  throw new Error('Please set AI_MODELS in your .env')
+}
 type GetChatToolCompletionArgs = {
   messages?: AiChatMessage[]
   temperature?: number
@@ -22,8 +32,6 @@ type GetChatToolCompletionArgs = {
   toolChoice?: ChatCompletionToolChoiceOption // force the function to be called on every generation if needed.
   timeout?: number // timeout request after 5 minutes
 }
-
-const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 
 export type PromptReplaceCampaign = Prisma.CampaignGetPayload<{
   include: {
@@ -251,7 +259,7 @@ export class AiService {
         if (completion?.choices && completion.choices[0]?.message) {
           if (completion.choices[0].message?.tool_calls) {
             // console.log('completion (json)', JSON.stringify(completion, null, 2));
-            let toolCalls = completion.choices[0].message.tool_calls
+            const toolCalls = completion.choices[0].message.tool_calls
             if (toolCalls && toolCalls.length > 0) {
               content = toolCalls[0]?.function?.arguments || ''
             }
@@ -272,7 +280,7 @@ export class AiService {
             // there is some bug either with openai client, llama3.1 native FC, or together.ai api
             // where the tool_calls are not being returned in the response
             // so we can parse the function call from the content
-            let toolResponse = this.parseToolResponse(content)
+            const toolResponse = this.parseToolResponse(content)
             if (toolResponse) {
               content = toolResponse.arguments
             }

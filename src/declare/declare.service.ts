@@ -16,6 +16,9 @@ export class DeclareService {
   async getDeclarations() {
     const formId = 'f51c1352-c778-40a8-b589-b911c31e64b1'
     const hubspotToken = process.env.HUBSPOT_TOKEN
+    if (!hubspotToken) {
+      throw new Error('Please set HUBSPOT_TOKEN in your .env')
+    }
 
     let response
     try {

@@ -117,6 +117,16 @@ export type GeoData = {
   village?: string
   borough?: string
 }
+
+export enum OfficeLevel {
+  FEDERAL = 10,
+  STATE = 8,
+  COUNTY = 6,
+  CITY = 4,
+  LOCAL = 0,
+  DEFAULT = 12,
+}
+
 export type MunicipalityResponse = Pick<
   Municipality,
   'id' | 'slug' | 'name'

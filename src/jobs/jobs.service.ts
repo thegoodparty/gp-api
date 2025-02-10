@@ -5,6 +5,9 @@ import { Headers, MimeTypes } from 'http-constants-ts'
 
 const API_BASE = 'https://api.ashbyhq.com/jobPosting'
 const ASHBY_KEY = process.env.ASHBY_KEY
+if (!ASHBY_KEY) {
+  throw new Error('Please set ASHBY_KEY in your .env')
+}
 
 interface FetchJobsParams {
   listedOnly?: boolean

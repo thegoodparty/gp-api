@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { MapCampaign } from './campaignMap.types'
-import { RaceData } from 'src/races/races.types'
+import { RaceData } from 'src/races/types/races.types'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
