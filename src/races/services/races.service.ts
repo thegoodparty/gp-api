@@ -113,21 +113,16 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
     }
 
     const race = races[0]
-    const positions: Array<string | undefined> = []
-    for (let i = 0; i < races.length; i++) {
-      positions.push(races[i].data.position_name)
-    }
-
-    let otherRaces: Race[] = []
-    if (race.municipality) {
-      otherRaces = await this.findMany({
-        where: { municipalityId: race.municipality.id },
-      })
-    } else if (race.county) {
-      otherRaces = await this.findMany({
-        where: { countyId: race.county.id },
-      })
-    }
+    const positions = races.map((race) => race.data.position_name)
+    const otherRaces = race.municipality
+      ? await this.findMany({
+          where: { municipalityId: race.municipality.id },
+        })
+      : race.county
+        ? await this.findMany({
+            where: { countyId: race.county.id },
+          })
+        : []
 
     return {
       race: this.normalizeRace(race, state),
