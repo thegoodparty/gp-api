@@ -29,6 +29,8 @@ model Race {
 
 model County {
   id             Int            @id @default(autoincrement())
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
   slug           String         @unique
   name           String
   state          String         @db.Char(2)
@@ -48,6 +50,8 @@ enum MunicipalityType {
 
 model Municipality {
   id       Int              @id @default(autoincrement())
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
   slug     String           @unique
   name     String
   type     MunicipalityType
@@ -62,6 +66,8 @@ model Municipality {
 
 model CensusEntity {
   id        Int    @id @default(autoincrement())
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
   mtfcc     String
   mtfccType String @map("mtfcc_type")
   geoId     String @map("geo_id")
