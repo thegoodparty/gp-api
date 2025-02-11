@@ -1,0 +1,105 @@
+{
+	"id": "0205933f-8975-40bb-89f4-1c3db95f27e7",
+	"name": "localhost",
+	"values": [
+		{
+			"key": "protocol",
+			"value": "http",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "host",
+			"value": "localhost",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "port",
+			"value": ":3000",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "rootPath",
+			"value": "/v1",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "rootUrl",
+			"value": "{{protocol}}://{{host}}{{port}}{{rootPath}}",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "jobId",
+			"value": "e96b96f2-fc0d-4417-a52f-44a57da6a87a",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "entriesCount",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "firstEntityId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "firstEntryId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "positionSlug",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "testUserPassword",
+			"value": "no1TalksAboutFightClub",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "topIssueId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "testAdminUserEmail",
+			"value": "tyler@fightClub.org",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "testUserEmail",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "testUserId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2024-12-12T22:45:53.193Z",
+	"_postman_exported_using": "Postman/11.22.1"
+}
