@@ -21,7 +21,9 @@ const P2V_FIELDS = [
   { key: 'men', hubSpotKey: 'men' },
   { key: 'women', hubSpotKey: 'women' },
 ]
-export const getCrmP2VValues = (p2vData: PrismaJson.PathToVictoryData) => {
+export const getCrmP2VValues = (p2vData?: PrismaJson.PathToVictoryData) => {
+  if (!p2vData) return {}
+
   const p2v: Record<string, string> = Object.keys(p2vData)
     .filter((key) => KEEP_SNAKECASE.includes(key))
     .reduce(
