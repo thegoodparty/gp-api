@@ -1,6 +1,9 @@
 enum UserRole {
+  admin
   sales
-  campaign
+  candidate
+  campaignManager
+  demo
 }
 
 model User {
@@ -10,16 +13,19 @@ model User {
   firstName             String?                 @default("") @map("first_name")
   lastName              String?                 @default("") @map("last_name")
   name                  String?
-  password              String
+  avatar                String?
+  password              String?
+  hasPassword           Boolean                 @default(false) @map("has_password")
   email                 String                  @unique
   phone                 String?
   zip                   String?
-  role                  UserRole?
-  isAdmin               Boolean?                @default(false) @map("is_admin")
+  roles                 UserRole[]              @default([])
+  /// [UserMetaData]
   metaData              Json?                   @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
   campaigns             Campaign[]
   passwordResetToken    String?                 @map("password_reset_token")
+  aiChats               AiChat[]
 
   @@map("user")
 }

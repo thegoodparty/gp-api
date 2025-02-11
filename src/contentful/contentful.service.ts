@@ -11,7 +11,11 @@ const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env as Record<
   string,
   string
 >
-
+if (!CONTENTFUL_SPACE_ID || !CONTENTFUL_ACCESS_TOKEN) {
+  throw new Error(
+    'Please set CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN in your .env',
+  )
+}
 const contentfulClient = createClient({
   space: CONTENTFUL_SPACE_ID,
   accessToken: CONTENTFUL_ACCESS_TOKEN,
@@ -25,17 +29,16 @@ const CALLS = 8
 
 @Injectable()
 export class ContentfulService {
-  async getAllEntries(): Promise<Entry[]> {
+  async getAllEntries() {
     const allEntryCollections: EntryCollection<EntrySkeletonType>[] = []
-
     for (let i = 0; i < CALLS; i++) {
       const entryCollection = await contentfulClient.getEntries({
         limit: LIMIT,
+        include: 10,
         skip: i * LIMIT,
       })
       allEntryCollections.push(entryCollection)
     }
-
     return allEntryCollections.reduce((acc, entryCollection) => {
       return [...acc, ...entryCollection.items]
     }, [] as Entry[])
@@ -55,9 +58,5 @@ export class ContentfulService {
       allEntries: await this.getAllEntries(),
       deletedEntries,
     }
-  }
-
-  async getEntry(id: string) {
-    return await contentfulClient.getEntry(id)
   }
 }

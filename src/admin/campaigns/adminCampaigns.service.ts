@@ -1,69 +1,56 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientValidationError,
-} from '@prisma/client/runtime/library'
-import { findSlug } from '../../shared/util/slug.util'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Prisma } from '@prisma/client'
-import { generateRandomPassword } from '../../users/util/passwords.util'
+import { Campaign, Prisma } from '@prisma/client'
+import { EmailService } from 'src/email/email.service'
+import { getUserFullName } from 'src/users/util/users.util'
+import { EmailTemplateNames } from 'src/email/email.types'
+import { UsersService } from 'src/users/services/users.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { AdminP2VService } from '../services/adminP2V.service'
+import { CampaignWith, OnboardingStep } from 'src/campaigns/campaigns.types'
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { formatDate } from 'date-fns'
+import { P2VStatus } from 'src/races/types/pathToVictory.types'
+import { DateFormats } from 'src/shared/util/date.util'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 
 @Injectable()
 export class AdminCampaignsService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(
+    private readonly email: EmailService,
+    private readonly users: UsersService,
+    private readonly campaigns: CampaignsService,
+    private readonly adminP2V: AdminP2VService,
+    private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
+    private readonly crm: CrmCampaignsService,
+  ) {}
 
   async create(body: AdminCreateCampaignSchema) {
     const { firstName, lastName, email, zip, phone, party, otherParty } = body
 
-    // check if user with email exists first
-    const exists = await this.prismaService.user.count({
-      where: {
-        email: {
-          equals: email,
-          mode: 'insensitive',
-        },
-      },
-    })
-
-    if (exists > 0) {
-      throw new ConflictException('Email already in use')
-    }
-
     // create new user
-    let user
-    user = await this.prismaService.user.create({
-      data: {
-        firstName,
-        lastName,
-        name: `${firstName} ${lastName}`,
-        email,
-        password: generateRandomPassword(),
-        zip,
-        phone,
-        metaData: {},
-        role: 'campaign',
-      },
+    const user = await this.users.createUser({
+      firstName,
+      lastName,
+      email,
+      zip,
+      phone,
     })
 
     // find slug
-    const slug = await findSlug(this.prismaService, `${firstName} ${lastName}`)
+    const slug = await this.campaigns.findSlug(user)
     const data = {
       slug,
-      currentStep: 'onboarding-complete',
+      currentStep: OnboardingStep.complete,
       party,
       otherParty,
       createdBy: 'admin',
     }
 
     // create new campaign
-    const newCampaign = await this.prismaService.campaign.create({
+    const newCampaign = await this.campaigns.create({
       data: {
         slug,
         data,
@@ -77,9 +64,7 @@ export class AdminCampaignsService {
       },
     })
 
-    // TODO: reimplement these
-    // await claimExistingCampaignRequests(user, newCampaign)
-    // await createCrmUser(firstName, lastName, email)
+    this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
@@ -102,50 +87,244 @@ export class AdminCampaignsService {
       attributes.tier = tier
     }
 
-    const updatedCampaign = await this.prismaService.campaign.update({
+    const updatedCampaign = await this.campaigns.update({
       where: { id },
       data: attributes,
     })
 
-    //TODO: reimplment
-    // await sails.helpers.crm.updateCampaign(updatedCampaign);
+    this.crm.trackCampaign(updatedCampaign.id)
 
-      return updatedCampaign
+    return updatedCampaign
   }
 
-  async delete(id: number) {
-      await this.prismaService.campaign.delete({ where: { id } })
-      return true
+  async proNoVoterFile() {
+    const campaigns = (await this.campaigns.findMany({
+      where: {
+        NOT: {
+          userId: undefined,
+        },
+        isPro: true,
+      },
+      include: {
+        pathToVictory: true,
+      },
+    })) as CampaignWith<'pathToVictory'>[]
+
+    const noVoterFile: Campaign[] = []
+
+    // TODO: this check could probably be integrated into the above query
+    for (const campaign of campaigns) {
+      const canDownload = this.voterFileDownloadAccess.canDownload(
+        campaign as CampaignWith<'pathToVictory'>,
+      )
+      if (!canDownload) {
+        noVoterFile.push(campaign)
+      }
+    }
+
+    return noVoterFile
+  }
+
+  async p2vStats() {
+    // get todays date in format yyyy-mm-dd
+    const date = formatDate(new Date(), DateFormats.isoDate)
+
+    const [auto, manual, pending] = await Promise.all([
+      this.getAutoP2V(date),
+      this.getManualP2V(date),
+      this.getPendingP2V(date),
+    ])
+
+    return {
+      auto,
+      manual,
+      pending,
+      total: auto + manual + pending,
+    }
+  }
+
+  async sendVictoryEmail(id: number) {
+    const campaign = (await this.campaigns.findFirstOrThrow({
+      where: { id },
+      include: { user: true, pathToVictory: true },
+    })) as CampaignWith<'pathToVictory' | 'user'>
+
+    const { pathToVictory, user } = campaign
+
+    if (!pathToVictory) {
+      throw new BadRequestException('Path to Victory is not set.')
+    }
+    if (!user) {
+      throw new BadRequestException('Campaign has no user')
+    }
+
+    await this.adminP2V.completeP2V(user.id, pathToVictory)
+
+    if (campaign?.data?.createdBy !== 'admin') {
+      const variables = {
+        name: getUserFullName(user),
+        link: `${WEBAPP_ROOT}/dashboard`,
+      }
+
+      await this.email.sendTemplateEmail({
+        to: user.email,
+        subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
+        template: EmailTemplateNames.candidateVictoryReady,
+        variables,
+        from: 'jared@goodparty.org',
+      })
+    }
+
+    return true
+  }
+
+  private async getAutoP2V(electionDate: string) {
+    return this.campaigns.count({
+      where: {
+        AND: [
+          {
+            details: {
+              path: ['electionDate'],
+              gt: electionDate,
+            },
+          },
+          {
+            details: {
+              path: ['raceId'],
+              not: Prisma.AnyNull,
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vStatus'],
+                equals: P2VStatus.complete,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vNotNeeded'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['electionType'],
+                not: Prisma.AnyNull,
+              },
+            },
+          },
+        ],
+      },
+    })
+  }
+
+  private async getManualP2V(electionDate: string) {
+    // TODO: switch to checking for data->>'completedBy' IS NULL (comment copied from tgp-api)
+    return this.campaigns.count({
+      where: {
+        AND: [
+          {
+            details: {
+              path: ['electionDate'],
+              gt: electionDate,
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vStatus'],
+                equals: P2VStatus.complete,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vNotNeeded'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['electionType'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+        ],
+      },
+    })
+  }
+
+  private async getPendingP2V(electionDate: string) {
+    return this.campaigns.count({
+      where: {
+        AND: [
+          {
+            details: {
+              path: ['electionDate'],
+              gt: electionDate,
+            },
+          },
+          {
+            details: {
+              path: ['pledged'],
+              equals: true,
+            },
+          },
+          {
+            OR: [
+              {
+                details: {
+                  path: ['knowRun'],
+                  equals: 'yes',
+                },
+              },
+              {
+                details: {
+                  path: ['runForOffice'],
+                  equals: 'yes',
+                },
+              },
+            ],
+          },
+          {
+            OR: [
+              {
+                pathToVictory: {
+                  data: {
+                    path: ['p2vStatus'],
+                    equals: P2VStatus.waiting,
+                  },
+                },
+              },
+              {
+                pathToVictory: {
+                  data: {
+                    path: ['p2vStatus'],
+                    equals: Prisma.AnyNull,
+                  },
+                },
+              },
+            ],
+          },
+          {
+            pathToVictory: {
+              data: {
+                path: ['p2vNotNeeded'],
+                equals: Prisma.AnyNull,
+              },
+            },
+          },
+        ],
+      },
+    })
   }
 }
-
-// async function claimExistingCampaignRequests(user, campaign) {
-//   const campaignRequests = await CampaignRequest.find({
-//     candidateEmail: user.email,
-//   }).populate('user')
-
-//   if (campaignRequests?.length) {
-//     for (const campaignRequest of campaignRequests) {
-//       const { user } = campaignRequest
-
-//       await CampaignRequest.updateOne({
-//         id: campaignRequest.id,
-//       }).set({
-//         campaign: campaign.id,
-//       })
-
-//       await Notification.create({
-//         isRead: false,
-//         data: {
-//           type: 'campaignRequest',
-//           title: `${await sails.helpers.user.name(
-//             user,
-//           )} has requested to manage your campaign`,
-//           subTitle: 'You have a request!',
-//           link: '/dashboard/team',
-//         },
-//         user: user.id,
-//       })
-//     }
-//   }
-// }

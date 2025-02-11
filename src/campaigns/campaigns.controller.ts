@@ -1,50 +1,101 @@
 import {
-  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
   NotFoundException,
   Param,
-  ParseIntPipe,
   Post,
   Put,
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignsService } from './campaigns.service'
+import { CampaignsService } from './services/campaigns.service'
 import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
-import { CreateCampaignSchema } from './schemas/createCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
+import { Campaign, Prisma, User, UserRole } from '@prisma/client'
+import { Roles } from '../authentication/decorators/Roles.decorator'
+import { ReqCampaign } from './decorators/ReqCampaign.decorator'
+import { UseCampaign } from './decorators/UseCampaign.decorator'
+import { userHasRole } from 'src/users/util/users.util'
+import { SlackService } from 'src/shared/services/slack.service'
+import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
 export class CampaignsController {
-  constructor(private readonly campaignsService: CampaignsService) {}
+  private readonly logger = new Logger(CampaignsController.name)
 
+  constructor(
+    private readonly campaigns: CampaignsService,
+    private readonly planVersions: CampaignPlanVersionsService,
+    private readonly slack: SlackService,
+  ) {}
+
+  @Roles(UserRole.admin)
   @Get()
   findAll(@Query() query: CampaignListSchema) {
-    return this.campaignsService.findAll(query)
+    let where: Prisma.CampaignWhereInput = {}
+    if (Object.values(query).some((value) => !!value)) {
+      where = buildCampaignListFilters(query)
+    }
+    const include = {
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          phone: true,
+          email: true,
+          metaData: true,
+        },
+      },
+      pathToVictory: {
+        select: {
+          data: true,
+        },
+      },
+    }
+    return this.campaigns.findMany({ where, include })
   }
 
-  // @Get('mine')
-  // async findUserCampaign() {
-  // TODO: query campaign for current user
-  // }
-
-  @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    const campaign = await this.campaignsService.findOne({ id })
-
-    if (!campaign) throw new NotFoundException()
-
+  @Get('mine')
+  @UseCampaign()
+  async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
   }
 
+  @Get('mine/status')
+  @UseCampaign({ continueIfNotFound: true })
+  async getUserCampaignStatus(
+    @ReqUser() user: User,
+    @ReqCampaign() campaign?: Campaign,
+  ) {
+    return this.campaigns.getStatus(user, campaign)
+  }
+
+  @Get('mine/plan-version')
+  @UseCampaign()
+  async getCampaignPlanVersion(@ReqCampaign() campaign: Campaign) {
+    const version = await this.planVersions.findByCampaignId(campaign.id)
+
+    if (!version) throw new NotFoundException('No plan version found')
+
+    return version.data
+  }
+
   @Get('slug/:slug')
+  @Roles(UserRole.admin)
   async findBySlug(@Param('slug') slug: string) {
-    const campaign = await this.campaignsService.findOne({ slug })
+    const campaign = await this.campaigns.findFirst({
+      where: { slug },
+      include: { pathToVictory: true },
+    })
 
     if (!campaign) throw new NotFoundException()
 
@@ -52,20 +103,50 @@ export class CampaignsController {
   }
 
   @Post()
-  async create(@Body() body: CreateCampaignSchema) {
-      const campaign = await this.campaignsService.create(body)
-      return { slug: campaign.slug }
+  async create(@ReqUser() user: User) {
+    // see if the user already has campaign
+    const existing = await this.campaigns.findByUserId(user.id)
+    if (existing) {
+      throw new ConflictException('User campaign already exists.')
+    }
+    return await this.campaigns.createForUser(user)
   }
 
-  @Put(':id')
+  @Put('mine')
+  @UseCampaign({ continueIfNotFound: true })
   async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateCampaignSchema,
+    @ReqUser() user: User,
+    @ReqCampaign() campaign: Campaign,
+    @Body() { slug, ...body }: UpdateCampaignSchema,
   ) {
-    // TODO get campaign from req user
-    const updateResp = await this.campaignsService.update(id, body)
+    if (
+      typeof slug === 'string' &&
+      campaign?.slug !== slug &&
+      userHasRole(user, [UserRole.admin, UserRole.sales])
+    ) {
+      // if user has Admin or Sales role, allow loading campaign by slug param
+      campaign = await this.campaigns.findFirstOrThrow({
+        where: { slug },
+      })
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    if (updateResp === false) throw new NotFoundException()
-    return updateResp
+    return this.campaigns.updateJsonFields(campaign.id, body)
+  }
+
+  @Post('launch')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
+    try {
+      return await this.campaigns.launch(user, campaign)
+    } catch (e) {
+      this.logger.error('Error at campaign launch', e)
+      await this.slack.errorMessage({
+        message: 'Error at campaign launch',
+        error: e,
+      })
+
+      throw e
+    }
   }
 }

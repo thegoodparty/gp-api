@@ -1,11 +1,14 @@
 enum ContentType {
   aiChatPrompt
+  aiContentCategories
   aiContentTemplate
   articleCategory
   blogArticle
   blogHome
   blogSection
   candidateTestimonial
+  candidateContentPrompts
+  contentPromptsQuestions
   election
   faqArticle
   faqOrder

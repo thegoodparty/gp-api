@@ -1,23 +1,27 @@
-import { User } from '@prisma/client'
+import { User, UserRole } from '@prisma/client'
 import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 import { generateRandomPassword } from '../../src/users/util/passwords.util'
+
+// filter admin from seeded users
+const seedRoles = Object.values(UserRole).filter((r) => r !== UserRole.admin)
 
 export const userFactory = generateFactory<User>(() => {
   const firstName = faker.person.firstName()
   const lastName = faker.person.lastName()
   const name = `${firstName} ${lastName}`
   return {
-    id: faker.number.int({ max: 2147483647 }),
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
     firstName,
     lastName,
     name,
-    email: faker.internet.email(),
+    email: faker.internet.email({ provider: 'goodparty.org' }).toLowerCase(),
     password: generateRandomPassword(),
-    phone: faker.phone.number({ style: 'national' }),
+    hasPassword: true,
+    phone: faker.string.numeric({ length: 10, allowLeadingZeros: false }),
     zip: faker.location.zipCode(),
+    roles: [faker.helpers.arrayElement(seedRoles)],
     metaData: {},
   }
 })

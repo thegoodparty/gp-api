@@ -1,5 +1,6 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
 import * as aws from '@pulumi/aws'
+import * as pulumi from '@pulumi/pulumi'
 
 export default $config({
   app(input) {
@@ -10,7 +11,7 @@ export default $config({
       providers: {
         aws: {
           region: 'us-west-2',
-          version: '6.60.0',
+          version: '6.67.0',
         },
       },
     }
@@ -202,9 +203,87 @@ export default $config({
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineVersion: rdsCluster.engineVersion,
     })
+
+    // Create an IAM Role for CodeBuild
+    const codeBuildRole = new aws.iam.Role('codebuild-service-role', {
+      assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: 'codebuild.amazonaws.com',
+      }),
+      managedPolicyArns: ['arn:aws:iam::aws:policy/AdministratorAccess'],
+    })
+
+    // buildspec updated to use file with env vars.
+    const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
+      name: `gp-deploy-build-${$app.stage}`,
+      serviceRole: codeBuildRole.arn,
+      environment: {
+        computeType: 'BUILD_GENERAL1_LARGE',
+        image: 'aws/codebuild/standard:6.0',
+        type: 'LINUX_CONTAINER',
+        privilegedMode: true,
+        environmentVariables: [
+          {
+            name: 'STAGE',
+            value: $app.stage,
+            type: 'PLAINTEXT',
+          },
+          {
+            name: 'CLUSTER_NAME',
+            value: `gp-${$app.stage}-fargateCluster`,
+            type: 'PLAINTEXT',
+          },
+          {
+            name: 'SERVICE_NAME',
+            value: `gp-api-${$app.stage}`,
+            type: 'PLAINTEXT',
+          },
+        ],
+      },
+      vpcConfig: {
+        vpcId: 'vpc-0763fa52c32ebcf6a',
+        subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+        securityGroupIds: ['sg-01de8d67b0f0ec787'],
+      },
+      source: {
+        type: 'GITHUB',
+        location: 'https://github.com/thegoodparty/gp-api.git',
+        buildspec: 'deploy/buildspec.yml',
+      },
+      artifacts: {
+        type: 'NO_ARTIFACTS',
+      },
+    })
+
+    // Create an IAM Policy for Github actions
+    const actionsPolicy = new aws.iam.Policy('github-actions-policy', {
+      description: 'Limited policy for Github Actions to trigger CodeBuild',
+      policy: pulumi.output({
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: [
+              'codebuild:StartBuild',
+              'codebuild:BatchGetBuilds',
+              'codebuild:ListBuildsForProject',
+            ],
+            Resource: pulumi.interpolate`${codeBuildProject.arn}`,
+          },
+          {
+            Effect: 'Allow',
+            Action: ['codebuild:ListProjects'],
+            Resource: '*',
+          },
+          {
+            Effect: 'Allow',
+            Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
+            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/${codeBuildProject.name}:*`,
+          },
+        ],
+      }),
+    })
   },
-  // todo: deploy the runner into the vpc so it can access the database.
-  // sst currently has a bug with this feature as of 3.3.40
+  // we no longer use autodeploy. we use codebuild.
   // console: {
   //   autodeploy: {
   //     runner: {

@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - npm install -g sst
+
+  pre_build:
+    commands:
+      - echo "Moving into deploy folder..."
+      - cd deploy
+      - echo "Installing local dependencies..."
+      - npm ci || npm install
+      - echo "Debug environment variables:"
+      - echo "STAGE=$STAGE"
+      - echo "CLUSTER_NAME=$CLUSTER_NAME"
+      - echo "SERVICE_NAME=$SERVICE_NAME"
+
+  build:
+    commands:
+      - echo "Deploying SST app to stage $STAGE"
+      - sst deploy --stage=$STAGE --verbose --print-logs
+      # - aws ecs wait services-stable --cluster $CLUSTER_NAME --services $SERVICE_NAME
+      - echo "Done!"

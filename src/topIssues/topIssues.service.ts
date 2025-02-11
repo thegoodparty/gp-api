@@ -1,49 +1,49 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
-import { CreateTopIssueDto, TopIssueOutputDto, UpdateTopIssueDto } from './schemas/topIssues.schema';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { TopIssue } from '@prisma/client';
-import { PrismaClientValidationError } from '@prisma/client/runtime/library';
+import { Injectable } from '@nestjs/common'
+import {
+  CreateTopIssueDto,
+  TopIssueOutputDto,
+} from './schemas/topIssues.schema'
+import { TopIssue } from '@prisma/client'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
-export class TopIssuesService {
-  private readonly logger = new Logger(TopIssuesService.name);
-  constructor(private prismaService: PrismaService) {}
+export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
+  constructor() {
+    super()
+  }
 
   async create(body: CreateTopIssueDto): Promise<TopIssueOutputDto> {
-    const { name, icon } = body;
-    return await this.prismaService.topIssue.create({
+    const { name } = body
+    return await this.model.create({
       data: {
-        name, 
-        icon
-      }
+        name,
+      },
     })
   }
 
-  async update(id: number, body: UpdateTopIssueDto): Promise<TopIssue> {
-    const { name, icon } = body;
-      return await this.prismaService.topIssue.update({
-        where: { id },
-        data: { name, icon }
-      });
+  async update(id: number, body: CreateTopIssueDto): Promise<TopIssue> {
+    const { name } = body
+    return await this.model.update({
+      where: { id },
+      data: { name },
+    })
   }
 
   async delete(id: number): Promise<void> {
-    await this.prismaService.topIssue.delete({
+    await this.model.delete({
       where: { id },
-    });
+    })
   }
 
   async list(): Promise<TopIssue[]> {
-    return await this.prismaService.topIssue.findMany({
-      include: { 
+    return await this.model.findMany({
+      include: {
         positions: {
           orderBy: {
             name: 'asc',
-          }
-        }
-      }
-    });
+          },
+        },
+      },
+    })
   }
-
-
 }

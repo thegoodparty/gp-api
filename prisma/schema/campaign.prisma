@@ -9,23 +9,28 @@ model Campaign {
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
   slug                  String                  @unique
-  isActive              Boolean?                @map("is_active")
+  isActive              Boolean                 @default(false) @map("is_active")
   isVerified            Boolean?                @map("is_verified")
   isPro                 Boolean?                @default(false) @map("is_pro")
   isDemo                Boolean                 @default(false) @map("is_demo")
   didWin                Boolean?                @map("did_win")
   dateVerified          DateTime?               @map("date_verified")
   tier                  CampaignTier?
+  /// [CampaignData]
   data                  Json                    @default("{}") @db.JsonB
+  /// [CampaignDetails]
   details               Json                    @default("{}") @db.JsonB
+  /// [CampaignAiContent]
   aiContent             Json                    @default("{}") @map("ai_content") @db.JsonB
   vendorTsData          Json                    @default("{}") @map("vendor_ts_data") @db.JsonB
   pathToVictory         PathToVictory?
   campaignUpdateHistory CampaignUpdateHistory[]
-  user                  User?                   @relation(fields: [userId], references: [id])
-  userId                Int?                    @map("user_id")
+  user                  User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                Int                     @map("user_id")
   topIssues             TopIssue[]
   campaignPositions     CampaignPosition[]
+  campaignPlanVersion   CampaignPlanVersion?
+  aiChats               AiChat[]
 
   @@index([slug])
   @@map("campaign")

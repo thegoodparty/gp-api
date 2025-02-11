@@ -1,9 +1,13 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
 import { firstValueFrom } from 'rxjs'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 const API_BASE = 'https://api.ashbyhq.com/jobPosting'
 const ASHBY_KEY = process.env.ASHBY_KEY
+if (!ASHBY_KEY) {
+  throw new Error('Please set ASHBY_KEY in your .env')
+}
 
 interface FetchJobsParams {
   listedOnly?: boolean
@@ -27,11 +31,11 @@ export class JobsService {
     const response = await firstValueFrom(
       this.httpService.post(url, params, {
         headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Basic ${Buffer.from(ASHBY_KEY + ':').toString(
-            'base64',
-          )}`,
+          [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
+          [Headers.ACCEPT]: MimeTypes.APPLICATION_JSON,
+          [Headers.AUTHORIZATION]: `Basic ${Buffer.from(
+            ASHBY_KEY + ':',
+          ).toString('base64')}`,
         },
       }),
     )

@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
 import { ContentfulService } from '../contentful/contentful.service'
-import { Content, ContentType } from '@prisma/client'
+import { Content, ContentType, Prisma } from '@prisma/client'
 import { InputJsonObject } from '@prisma/client/runtime/library'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
+import { isObject } from 'src/shared/util/objects.util'
+import { AIChatPromptContents, findByTypeOptions } from './content.types'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const transformContent = (
   type: ContentType | InferredContentTypes,
@@ -18,39 +20,47 @@ const transformContent = (
 }
 
 @Injectable()
-export class ContentService {
-  constructor(
-    private prisma: PrismaService,
-    private contentfulService: ContentfulService,
-  ) {}
+export class ContentService extends createPrismaBase(MODELS.Content) {
+  constructor(private contentfulService: ContentfulService) {
+    super()
+  }
 
   async findAll() {
-    return this.prisma.content.findMany()
+    return this.findMany()
   }
 
   async findById(id: string) {
-    return this.prisma.content.findUnique({
+    const content = await this.findUniqueOrThrow({
       where: {
         id,
       },
     })
+
+    return transformContent(content.type, [content])?.[0]
   }
 
-  async findByType(type: ContentType | InferredContentTypes) {
+  async findByType({ type, take, orderBy, where }: findByTypeOptions) {
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
 
-    const entries = await this.prisma.content.findMany({
+    const whereCondition = Array.isArray(queryType)
+      ? { OR: queryType.map((type) => ({ type })) }
+      : { type: queryType }
+
+    const entries = await this.findMany({
       where: {
-        type: queryType,
+        ...whereCondition,
+        ...where,
       },
+      orderBy: orderBy || undefined,
+      take: take || undefined,
     })
 
     return transformContent(type, entries)
   }
 
   async fetchGlossaryItems() {
-    const entries = await this.prisma.content.findMany({
+    const entries = await this.findMany({
       where: {
         type: ContentType.glossaryItem,
       },
@@ -58,10 +68,65 @@ export class ContentService {
     return transformContent(ContentType.glossaryItem, entries)
   }
 
+  async getAiContentPrompts() {
+    const prompts = (await this.findMany({
+      where: {
+        OR: [
+          {
+            type: ContentType.onboardingPrompts,
+          },
+          {
+            type: ContentType.candidateContentPrompts,
+          },
+        ],
+      },
+    })) as Array<Omit<Content, 'data'> & { data: Prisma.JsonObject }>
+
+    if (
+      // should be one content record for each "type" of prompt
+      prompts.length !== 2 ||
+      // ensure that there is prompt data available
+      !prompts.some((prompt) => isObject(prompt.data))
+    ) {
+      throw new Error('Prompt content not found')
+    }
+
+    return {
+      ...prompts[0].data,
+      ...prompts[1].data,
+    }
+  }
+
+  async getChatSystemPrompt(initial: boolean = false) {
+    const date = new Date()
+    const today = date.toISOString().split('T')[0]
+
+    const aiChatPrompts = await this.findFirst({
+      where: {
+        type: ContentType.aiChatPrompt,
+      },
+    })
+
+    if (aiChatPrompts == null) throw Error('Failed to load system prompt')
+
+    const promptData = aiChatPrompts.data as AIChatPromptContents
+
+    const initialPrompt = promptData.initialPrompt
+    const systemPrompt = promptData.systemPrompt
+    const candidateJsonObject = promptData.candidateJson
+    let candidateJson = JSON.stringify(candidateJsonObject)
+    candidateJson = candidateJson.replace('${today}', today)
+
+    return {
+      systemPrompt: initial ? initialPrompt : systemPrompt,
+      candidateJson,
+    }
+  }
+
   private async getExistingContentIds() {
     return new Set(
       (
-        await this.prisma.content.findMany({
+        await this.model.findMany({
           select: {
             id: true,
           },
@@ -96,7 +161,7 @@ export class ContentService {
       await this.getSyncEntriesCategorized(recognizedEntries)
     const deletedEntryIds = deletedEntries.map((entry) => entry.sys.id)
 
-    await this.prisma.$transaction(
+    await this.client.$transaction(
       async (tx) => {
         for (const entry of updateEntries) {
           await tx.content.update({
@@ -118,8 +183,6 @@ export class ContentService {
             },
           })
         }
-
-        console.log(`deletedEntryIds =>`, deletedEntryIds)
 
         await tx.content.deleteMany({
           where: {
