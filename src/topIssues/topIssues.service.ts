@@ -13,20 +13,19 @@ export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
   }
 
   async create(body: CreateTopIssueDto): Promise<TopIssueOutputDto> {
-    const { name, icon } = body
+    const { name } = body
     return await this.model.create({
       data: {
         name,
-        icon,
       },
     })
   }
 
   async update(id: number, body: CreateTopIssueDto): Promise<TopIssue> {
-    const { name, icon } = body
+    const { name } = body
     return await this.model.update({
       where: { id },
-      data: { name, icon },
+      data: { name },
     })
   }
 

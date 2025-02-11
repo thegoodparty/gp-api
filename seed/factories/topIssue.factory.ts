@@ -10,8 +10,5 @@ const uniqueTopIssueNames = faker.helpers.uniqueArray(
 export const topIssueFactory = generateFactory<TopIssue>((overrides = {}) => {
   return {
     name: uniqueTopIssueNames.pop() || `fallback-${faker.string.uuid()}`,
-    icon:
-      faker.helpers.maybe(() => faker.image.url(), { probability: 0.5 }) ||
-      null,
   }
 })
