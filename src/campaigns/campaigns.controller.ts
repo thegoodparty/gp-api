@@ -26,6 +26,9 @@ import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/shared/services/slack.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
+import { PathToVictoryService } from './services/pathToVictory.service'
+import { P2VStatus } from 'src/races/types/pathToVictory.types'
+import { CreateP2VSchema } from './schemas/createP2V.schema'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -36,7 +39,50 @@ export class CampaignsController {
     private readonly campaigns: CampaignsService,
     private readonly planVersions: CampaignPlanVersionsService,
     private readonly slack: SlackService,
+    private readonly p2v: PathToVictoryService,
   ) {}
+
+  // TODO: this is a placeholder, remove once actual implememntation is in place!!!
+  @Post('mine/path-to-victory')
+  @UseCampaign({ continueIfNotFound: true })
+  async createPathToVictory(
+    @Body() { slug }: CreateP2VSchema,
+    @ReqUser() user: User,
+    @ReqCampaign() campaign?: Campaign,
+  ) {
+    if (
+      typeof slug === 'string' &&
+      campaign?.slug !== slug &&
+      userHasRole(user, UserRole.admin)
+    ) {
+      // if user has Admin role, allow loading campaign by slug param
+      campaign = await this.campaigns.findUniqueOrThrow({
+        where: { slug },
+      })
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
+
+    let p2v = await this.p2v.findUnique({ where: { campaignId: campaign.id } })
+
+    if (!p2v) {
+      p2v = await this.p2v.create({
+        data: {
+          campaignId: campaign.id,
+          data: { p2vStatus: P2VStatus.waiting },
+        },
+      })
+    } else {
+      await this.p2v.update({
+        where: {
+          id: p2v.id,
+        },
+        data: {
+          data: { ...p2v.data, p2vStatus: P2VStatus.waiting, p2vAttempts: 0 },
+        },
+      })
+    }
+
+    return p2v
+  }
 
   @Roles(UserRole.admin)
   @Get()

@@ -210,7 +210,7 @@ export class CrmCampaignsService {
     const pathToVictory = await this.pathToVictory.findFirst({
       where: { campaignId: campaignId },
     })
-    const p2vData = pathToVictory!.data
+    const p2vData = pathToVictory?.data
 
     const updateHistoryCount = await this.campaignUpdateHistory.count({
       where: {
@@ -376,7 +376,7 @@ export class CrmCampaignsService {
     }
 
     try {
-      this.hubspot.client.crm.associations.v4.batchApi.create(
+      await this.hubspot.client.crm.associations.v4.batchApi.create(
         'contact',
         'company',
         {
@@ -411,12 +411,11 @@ export class CrmCampaignsService {
       throw new Error(`No campaign found for given id: ${campaignId}`)
     }
 
-    const { data: campaignData, userId } = campaign!
-    const { hubspotId: existingHubspotId } = campaignData!
+    const { data: campaignData, userId } = campaign
+    const { hubspotId: existingHubspotId } = campaignData
 
-    const crmCompanyProperties = await this.calculateCRMCompanyProperties(
-      campaign!,
-    )
+    const crmCompanyProperties =
+      await this.calculateCRMCompanyProperties(campaign)
 
     let crmCompany: SimplePublicObject | undefined
     if (existingHubspotId) {
@@ -445,7 +444,7 @@ export class CrmCampaignsService {
     }
 
     const { metaData } = user
-    let { hubspotId: crmContactId } = metaData!
+    let { hubspotId: crmContactId } = metaData || {}
 
     if (!crmContactId) {
       const message = `No hubspot id found for user ${userId}`
@@ -577,7 +576,7 @@ export class CrmCampaignsService {
 
   async refreshCompanies(campaignId: number) {
     let updated = 0
-    let failures: number[] = []
+    const failures: number[] = []
 
     let campaigns: Campaign[]
 

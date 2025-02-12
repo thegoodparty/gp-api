@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   UsePipes,
 } from '@nestjs/common'
 import { TopIssuesService } from './topIssues.service'
@@ -42,5 +43,10 @@ export class TopIssuesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteTopIssue(@Param('id', ParseIntPipe) id: number) {
     await this.topIssuesService.delete(id)
+  }
+
+  @Get('by-location')
+  getByLocation(@Query('zip') zip: string) {
+    return this.topIssuesService.getByLocation(zip)
   }
 }
