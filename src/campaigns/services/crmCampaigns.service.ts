@@ -7,12 +7,13 @@ import {
 } from '@hubspot/api-client/lib/codegen/crm/deals'
 import {
   ApiException,
+  SimplePublicObjectBatchInput,
   SimplePublicObjectInput,
 } from '@hubspot/api-client/lib/codegen/crm/companies'
 import { HubspotService } from '../../crm/hubspot.service'
 import { CampaignsService } from './campaigns.service'
 import { SlackService } from '../../shared/services/slack.service'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, Prisma, User } from '@prisma/client'
 import { getUserFullName } from '../../users/util/users.util'
 import { formatDateForCRM, getCrmP2VValues } from '../../crm/util/cms.util'
 import { CrmUsersService } from '../../users/services/crmUsers.service'
@@ -574,35 +575,46 @@ export class CrmCampaignsService {
     this.fullStory.trackUserById(campaign.userId)
   }
 
-  async refreshCompanies(campaignId: number) {
+  /** Pushes campaign data to Hubspot record
+   *
+   * @param campaignId - The unique identifier of the campaign to refresh. If provided, only that campaign is processed;
+   *                     otherwise, all campaigns with a Hubspot ID are refreshed.
+   */
+  async refreshCompanies(campaignId?: number) {
     let updated = 0
     const failures: number[] = []
 
-    let campaigns: Campaign[]
-
-    if (campaignId) {
-      const campaign = await this.campaigns.findFirst({
-        where: { id: campaignId },
-      })
-      campaigns = campaign ? [campaign] : []
-    } else {
-      campaigns = (await this.campaigns.findMany()).filter(
-        (c: Campaign) => c.data?.hubspotId,
-      )
-    }
-
-    for (let i = 0; i < campaigns.length; i++) {
-      const { id: iCampaignId } = campaigns[i]
+    const runRefresh = async (campaignId: number) => {
       try {
-        await this.trackCampaign(iCampaignId)
+        await this.trackCampaign(campaignId)
         updated++
       } catch (error) {
-        failures.push(iCampaignId)
+        failures.push(campaignId)
         this.logger.error('error updating campaign', error)
         await this.slack.errorMessage({
-          message: `Error updating campaign ${iCampaignId} in hubspot`,
+          message: `Error updating campaign ${campaignId} in hubspot`,
           error,
         })
+      }
+    }
+
+    if (campaignId) {
+      await runRefresh(campaignId)
+    } else {
+      const campaigns = await this.campaigns.findMany({
+        select: {
+          id: true,
+        },
+        where: {
+          data: {
+            path: ['hubspotId'],
+            not: Prisma.AnyNull,
+          },
+        },
+      })
+
+      for (const campaign of campaigns) {
+        await runRefresh(campaign.id)
       }
     }
 
@@ -613,7 +625,62 @@ export class CrmCampaignsService {
     }
   }
 
-  async syncCampaign(campaignId: number, resync: boolean = false) {
+  /**
+   * Updates Hubspot company records for all campaigns with a Hubspot ID.
+   *
+   * @param fields - An array of property names to refresh. Pass ['all'] to refresh all properties.
+   */
+  async massRefreshCompanies(
+    fields: Array<keyof CRMCompanyProperties | 'all'>,
+  ) {
+    const campaigns = await this.campaigns.findMany({
+      where: {
+        data: {
+          path: ['hubspotId'],
+          not: Prisma.AnyNull,
+        },
+      },
+    })
+
+    const companyUpdateObjects = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const id = campaign.data.hubspotId as string
+        const crmCompanyProperties =
+          await this.calculateCRMCompanyProperties(campaign)
+        const includeAll = fields.length === 1 && fields.includes('all')
+
+        const properties = includeAll
+          ? crmCompanyProperties
+          : fields.reduce((acc, field) => {
+              if (
+                crmCompanyProperties[field] ||
+                crmCompanyProperties[field] === null
+              ) {
+                acc[field] = crmCompanyProperties[field]
+              }
+              return acc
+            }, {})
+
+        return { id, properties } as SimplePublicObjectBatchInput
+      }),
+    )
+
+    const updates = await this.hubspot.client.crm.companies.batchApi.update({
+      inputs: companyUpdateObjects,
+    })
+
+    return {
+      message: `OK: ${updates?.results?.length} companies updated`,
+    }
+  }
+
+  /** Pulls Hubspot data and updates campaign
+   *
+   * @param campaignId - The unique identifier of the campaign to sync. If provided, only that campaign is processed;
+   *                     otherwise, all campaigns are processed.
+   * @param resync - If false, skips campaigns that already have HubSpot updates.
+   */
+  async syncCampaign(campaignId?: number, resync: boolean = false) {
     let updated = 0
 
     const campaigns = campaignId
