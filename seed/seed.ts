@@ -13,13 +13,16 @@ import seedMtfcc from './mtfcc'
 import seedCounties from './counties'
 import seedMunicipalities from './municipalities'
 
-const IS_LOCAL = process.env.NODE_ENV === 'local'
+const LIMIT_SEEDS =
+  process.env.NODE_ENV === 'production' ||
+  process.env.NODE_ENV === 'qa' ||
+  process.env.NODE_ENV === 'development'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  if (!IS_LOCAL) {
-    // only want to run seeds from CSV files if not local
+  if (LIMIT_SEEDS) {
+    // only want to run seeds from CSV files in prod, qa, or dev
     await csvSeeds(prisma, true)
   } else {
     const seedType = getTypeArg()
