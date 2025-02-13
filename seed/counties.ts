@@ -34,24 +34,35 @@ export default async function seedCounties(
 
     const row = rows[i]
     const { county, state_id } = row
-    const slug = `${slugify(state_id, { lower: true })}/${slugify(county, {
-      lower: true,
-    })}`
 
-    await prisma.county.upsert({
-      where: {
-        slug,
-      },
-      update: {},
-      create: {
-        slug,
-        name: county,
-        state: state_id,
-        data: row,
-      },
-    })
-
+    await upsertCounty(prisma, county, state_id, row)
     count++
   }
   console.log(`\ninserted ${count} counties`)
+}
+
+export async function upsertCounty(
+  prisma: PrismaClient,
+  county: string,
+  state: string,
+  row: object,
+) {
+  const slug = `${slugify(state, {
+    lower: true,
+  })}/${slugify(county, {
+    lower: true,
+  })}`
+
+  return await prisma.county.upsert({
+    where: {
+      slug,
+    },
+    update: {},
+    create: {
+      slug,
+      name: county,
+      state: state,
+      data: row,
+    },
+  })
 }

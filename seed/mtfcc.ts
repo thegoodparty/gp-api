@@ -46,16 +46,17 @@ export default async function seedMtfcc(prisma: PrismaClient) {
     throw new Error('No rows found in sheet')
   }
 
+  const total = rows.length - 1
   let processedCount = 0
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i]
-    const total = rows.length - 1
-    const percentComplete = (((i + 1) / total) * 100).toFixed(0)
-
-    process.stdout.write(`\r ${i}/${total} ${percentComplete}% complete`)
-
-    await processRow(prisma, row)
-    processedCount++
+    processRow(prisma, row).then(() => {
+      processedCount++
+      const percentComplete = ((processedCount / total) * 100).toFixed(0)
+      process.stdout.write(
+        `\r ${processedCount}/${total} ${percentComplete}% complete`,
+      )
+    })
   }
 
   console.log(

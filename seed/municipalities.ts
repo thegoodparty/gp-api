@@ -2,6 +2,7 @@ import { MunicipalityType, PrismaClient } from '@prisma/client'
 import path from 'path'
 import { loadCSV } from './util/csv.util'
 import slugify from 'slugify'
+import { upsertCounty } from './counties'
 
 type ExpectedCSVRow = {
   city: string
@@ -60,7 +61,7 @@ async function insertCityIntoDatabase(
     type = 'town'
   }
 
-  const county = await upsertCounty(prisma, row)
+  const county = await upsertCounty(prisma, row.county_name, row.state_id, row)
   if (county) {
     await upsertCity(prisma, row, type, county.id)
   }
@@ -95,29 +96,6 @@ async function upsertCity(
       countyId: countyId,
       data: row,
       slug,
-    },
-  })
-}
-
-async function upsertCounty(prisma: PrismaClient, row: ExpectedCSVRow) {
-  const { county_name, state_id } = row
-
-  const slug = `${slugify(state_id, {
-    lower: true,
-  })}/${slugify(county_name, {
-    lower: true,
-  })}`
-
-  return await prisma.county.upsert({
-    where: {
-      slug,
-    },
-    update: {},
-    create: {
-      slug,
-      name: county_name,
-      state: state_id,
-      data: row,
     },
   })
 }
