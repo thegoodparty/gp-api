@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Query,
+  UsePipes,
 } from '@nestjs/common'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
@@ -15,6 +16,13 @@ import { SlackService } from '../shared/services/slack.service'
 import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'
+import { ZodValidationPipe } from 'nestjs-zod'
+import {
+  MassRefreshCompanySchema,
+  RefreshCompanySchema,
+  SyncCampaignSchema,
+} from './schemas/RefreshSync.schema'
+import { CRMCompanyProperties } from './crm.types'
 
 type HubspotObjectUpdate = {
   objectId: string
@@ -23,6 +31,7 @@ type HubspotObjectUpdate = {
 }
 
 @Controller('crm')
+@UsePipes(ZodValidationPipe)
 export class CrmController {
   logger = new Logger(this.constructor.name)
   constructor(
@@ -37,7 +46,7 @@ export class CrmController {
   async hubspotWebhook(@Body() payload: HubspotObjectUpdate[]) {
     if (payload && payload.length > 0) {
       for (let i = 0; i < payload.length; i++) {
-        let { objectId, propertyName, propertyValue } = payload[i]
+        const { objectId, propertyName, propertyValue } = payload[i]
         const campaign = await this.campaigns.findByHubspotId(objectId)
         if (!campaign) {
           continue
@@ -77,15 +86,22 @@ export class CrmController {
 
   @Get('refresh-companies')
   @Roles(UserRole.admin)
-  async refreshCompanies(@Query('campaignId') campaignId: number) {
+  async refreshCompanies(@Query() { campaignId }: RefreshCompanySchema) {
     return await this.crmCampaignsService.refreshCompanies(campaignId)
+  }
+
+  @Get('mass-refresh-companies')
+  @Roles(UserRole.admin)
+  async massRefreshCompanies(@Query() { fields }: MassRefreshCompanySchema) {
+    return await this.crmCampaignsService.massRefreshCompanies(
+      fields as Array<keyof CRMCompanyProperties>,
+    )
   }
 
   @Get('sync')
   @Roles(UserRole.admin)
   async syncCampaign(
-    @Query('campaignId') campaignId: number,
-    @Query('resync') resync: boolean = false,
+    @Query() { campaignId, resync = false }: SyncCampaignSchema,
   ) {
     return await this.crmCampaignsService.syncCampaign(campaignId, resync)
   }

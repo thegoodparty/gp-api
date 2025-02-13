@@ -23,6 +23,11 @@ declare global {
       unemployment_rate?: string
       home_value?: string
       county?: string
+      city?: string
+      state_id?: string
+      county_name?: string
+      township?: string
+      incorporated?: string
     }
 
     export type RaceData = {
