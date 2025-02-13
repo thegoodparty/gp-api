@@ -29,6 +29,7 @@ import { ReqUser } from './decorators/ReqUser.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 import { FastifyReply } from 'fastify'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
+import { CrmUsersService } from '../users/services/crmUsers.service'
 
 @PublicAccess()
 @Controller('authentication')
@@ -40,6 +41,7 @@ export class AuthenticationController {
     private usersService: UsersService,
     private campaignsService: CampaignsService,
     private emailService: EmailService,
+    private readonly crmUsers: CrmUsersService,
   ) {}
 
   @Post('register')
@@ -50,14 +52,20 @@ export class AuthenticationController {
 
   @UseGuards(AuthGuard('local'))
   @Post('login')
+  // TODO: this is so wrong. This should only take an object with email and password
+  //  we shouldn't be expecting a user object here on the request context: https://goodparty.atlassian.net/browse/WEB-3661
   async login(@ReqUser() user: User): Promise<LoginResult> {
-    return {
+    const result = {
       user: ReadUserOutputSchema.parse(user),
       token: this.authenticationService.generateAuthToken({
         email: user.email,
         sub: user.id,
       }),
     }
+
+    this.crmUsers.trackUserLogin(user)
+
+    return result
   }
 
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))

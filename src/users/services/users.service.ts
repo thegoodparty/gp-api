@@ -135,7 +135,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       'https://goodparty.org/sign-up',
     )
 
-    this.crm.trackUserUpdate(user.id)
+    await this.crm.trackUserUpdate(user.id)
 
     return user
   }

@@ -16,6 +16,7 @@ import { lastValueFrom } from 'rxjs'
 import { SlackService } from '../../shared/services/slack.service'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { AxiosError, isAxiosError } from 'axios'
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts'
 
 @Injectable()
 export class CrmUsersService {
@@ -101,20 +102,50 @@ export class CrmUsersService {
   }
 
   private async findCrmContactIdByEmail(email: string) {
+    this.logger.debug('Looking up contact by email:', email)
+    let crmContactId: string
     try {
-      const { id: crmContactId } =
-        await this.hubspot.client.crm.contacts.basicApi.getById(
-          email,
-          ['id', 'email'],
-          undefined,
-          undefined,
-          undefined,
-          'email',
-        )
+      const searchResultObj =
+        await this.hubspot.client.crm.contacts.searchApi.doSearch({
+          properties: ['email', 'id'],
+          filterGroups: [
+            {
+              filters: [
+                {
+                  propertyName: 'email',
+                  operator: FilterOperatorEnum.Eq,
+                  value: email,
+                },
+              ],
+            },
+          ],
+        })
+      this.logger.debug('Search result:', searchResultObj)
+      const { total, results } = searchResultObj
+
+      if (!total) {
+        throw new Error(`No contacts found for email: ${email}`)
+      } else {
+        crmContactId = results[0].id
+        const {
+          properties: { email: crmContactEmail },
+        } = results[0]
+        if (crmContactEmail !== email) {
+          throw new Error('Email mismatch on CRM contact lookup!')
+        }
+      }
+      // await this.hubspot.client.crm.contacts.basicApi.getById(
+      //   email,
+      //   ['id', 'email'],
+      //   undefined,
+      //   undefined,
+      //   undefined,
+      //   'email',
+      // )
 
       return crmContactId
     } catch (e) {
-      this.logger.error(
+      this.logger.debug(
         'could not find contact by email. user has never filled a form!',
         e,
       )
@@ -151,10 +182,14 @@ export class CrmUsersService {
 
     const campaign = await this.campaigns.findByUserId(userId)
 
-    const contactObj = await this.calculateCRMContactProperties(user, campaign)
+    const crmContactProperties = await this.calculateCRMContactProperties(
+      user,
+      campaign,
+    )
 
     if (!crmContactId) {
       crmContactId = await this.findCrmContactIdByEmail(email)
+      this.logger.debug('Found CRM Contact ID by email:', crmContactId)
       crmContactId &&
         (await this.users.patchUserMetaData(userId, {
           hubspotId: crmContactId,
@@ -162,11 +197,18 @@ export class CrmUsersService {
     }
 
     const aggregatedCrmContactProperties = {
-      ...contactObj,
+      ...crmContactProperties,
       ...(additionalCrmContactProperties
         ? { ...additionalCrmContactProperties }
         : {}),
     }
+
+    this.logger.debug(
+      'Aggregated CRM Contact Properties:',
+      aggregatedCrmContactProperties,
+    )
+
+    console.log(`crmContactId =>`, crmContactId)
 
     if (crmContactId) {
       return await this.updateCrmContact(
@@ -177,6 +219,7 @@ export class CrmUsersService {
       const newCrmContact = await this.createCrmContact(
         aggregatedCrmContactProperties,
       )
+      this.logger.debug('New CRM Contact:', newCrmContact)
       const { id: newCrmContactId } = newCrmContact || {}
       newCrmContactId &&
         (await this.users.patchUserMetaData(userId, {
@@ -238,9 +281,12 @@ export class CrmUsersService {
     crmContactProperties: CRMContactProperties,
   ) {
     try {
-      return this.hubspot.client.crm.contacts.basicApi.update(crmContactId, {
-        properties: crmContactProperties,
-      })
+      return await this.hubspot.client.crm.contacts.basicApi.update(
+        crmContactId,
+        {
+          properties: crmContactProperties,
+        },
+      )
     } catch (e) {
       this.logger.error(
         `error updating contact with CRM id: ${crmContactId}`,
@@ -251,7 +297,7 @@ export class CrmUsersService {
 
   private async createCrmContact(crmContactProperties: CRMContactProperties) {
     try {
-      return this.hubspot.client.crm.contacts.basicApi.create({
+      return await this.hubspot.client.crm.contacts.basicApi.create({
         properties: {
           ...crmContactProperties,
           lifecyclestage: 'opportunity',
