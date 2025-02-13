@@ -18,6 +18,7 @@ declare global {
   export namespace PrismaJson {
     export type PathToVictoryData = {
       p2vStatus?: P2VStatus
+      p2vAttempts?: number
       p2vCompleteDate?: string
       completedBy?: number
       electionType?: string
