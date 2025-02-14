@@ -344,7 +344,9 @@ export class CrmCampaignsService {
       ...(ballotLevel ? { office_level: ballotLevel } : {}),
       running: runForOffice ? 'yes' : 'no',
       ...getCrmP2VValues(p2vData),
-      ...(typeof winNumber === 'number' ? { win_number: `${winNumber}` } : {}),
+      ...(winNumber && typeof parseInt(`${winNumber}`) === 'number'
+        ? { win_number: `${winNumber}` }
+        : {}),
       voter_data_adoption: canDownloadVoterFile ? 'Unlocked' : 'Locked',
       created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
       admin_user: adminUserEmail ?? '',
