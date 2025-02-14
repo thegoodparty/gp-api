@@ -3,6 +3,7 @@ import { RacesService } from './services/races.service'
 import { MunicipalitiesService } from './services/municipalities.service'
 import { CountiesService } from './services/counties.service'
 import { CensusEntitiesService } from './services/censusEntities.service'
+import { ElectionTypeService } from './services/electionType.service'
 import { BallotReadyService } from './services/ballotReady.service'
 import { ElectionsController } from './elections.controller'
 import { AiModule } from '../ai/ai.module'
@@ -14,6 +15,7 @@ import { AiModule } from '../ai/ai.module'
     MunicipalitiesService,
     CountiesService,
     CensusEntitiesService,
+    ElectionTypeService,
     BallotReadyService,
   ],
   exports: [RacesService],
