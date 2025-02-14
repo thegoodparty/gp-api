@@ -52,8 +52,6 @@ export class AuthenticationController {
 
   @UseGuards(AuthGuard('local'))
   @Post('login')
-  // TODO: this is so wrong. This should only take an object with email and password
-  //  we shouldn't be expecting a user object here on the request context: https://goodparty.atlassian.net/browse/WEB-3661
   async login(@ReqUser() user: User): Promise<LoginResult> {
     const result = {
       user: ReadUserOutputSchema.parse(user),
