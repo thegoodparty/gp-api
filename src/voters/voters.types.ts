@@ -7,15 +7,17 @@ export type VoterHistoryColumn = {
 export type VoterCounts = Partial<TurnoutCounts> &
   Partial<PartisanCounts> &
   Partial<GenderCounts> &
-  Partial<EthnicityCounts>
+  Partial<EthnicityCounts> & {
+    foundColumns?: VoterHistoryColumn[]
+  }
 
 export type TurnoutCounts = {
   averageTurnout: number
   averageTurnoutPercent: string
   projectedTurnout: number
   projectedTurnoutPercent: string
-  winNumber: string
-  voterContactGoal: string
+  winNumber: number
+  voterContactGoal: number
 }
 
 export type PartisanCounts = {

@@ -28,15 +28,19 @@ export default $config({
 
     let bucketDomain: string
     let apiDomain: string
+    let webAppRootUrl: string
     if ($app.stage === 'master') {
       apiDomain = 'gp-api.goodparty.org'
       bucketDomain = 'assets.goodparty.org'
+      webAppRootUrl = 'https://app.goodparty.org'
     } else if ($app.stage === 'develop') {
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
+      webAppRootUrl = 'https://app-dev.goodparty.org'
     } else {
       apiDomain = `gp-api-${$app.stage}.goodparty.org`
       bucketDomain = `assets-${$app.stage}.goodparty.org`
+      webAppRootUrl = `https://app-${$app.stage}.goodparty.org`
     }
 
     let assetsBucket
@@ -120,6 +124,10 @@ export default $config({
         LOG_LEVEL: 'debug',
         CORS_ORIGIN:
           $app.stage === 'master' ? 'goodparty.org' : 'dev.goodparty.org',
+        AWS_REGION: 'us-west-2',
+        ENABLE_FULLSTORY: 'false',
+        ASSET_DOMAIN: bucketDomain,
+        WEBAPP_ROOT_URL: webAppRootUrl,
       },
       ssm: {
         // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
@@ -131,6 +139,8 @@ export default $config({
         // todo: secrets for more stages.
         DATABASE_URL:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
+        AUTH_SECRET:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AUTH_SECRET-eGe66U',
       },
       image: {
         context: '../', // Set the context to the main app directory

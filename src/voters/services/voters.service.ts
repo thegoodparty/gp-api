@@ -13,7 +13,6 @@ import { Prisma } from '@prisma/client'
 import { AxiosResponse } from 'axios'
 import { cloneDeep } from 'es-toolkit'
 import { SlackService } from 'src/shared/services/slack.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
 
 const API_BASE = 'https://api.l2datamapping.com/api/v2'
 const L2_DATA_KEY = process.env.L2_DATA_KEY
@@ -156,6 +155,10 @@ export class VotersService {
     }
     this.logger.debug('foundColumns', foundColumns)
 
+    // we now have the columns for the last 3 elections.
+    // we store it on counts for debugging purposes.
+    counts.foundColumns = foundColumns
+
     // get the counts for each of the 3 years.
     const turnoutCounts: number[] = []
     for (const column of foundColumns) {
@@ -247,8 +250,8 @@ export class VotersService {
       const voterContactGoal: string = Math.ceil(
         parseFloat(winNumber) * 5,
       ).toFixed(2)
-      counts.winNumber = winNumber
-      counts.voterContactGoal = voterContactGoal
+      counts.winNumber = parseInt(winNumber)
+      counts.voterContactGoal = parseInt(voterContactGoal)
     }
     return counts
   }
@@ -569,11 +572,12 @@ export class VotersService {
             const electionSplit = electionKey.split('_')
             const electionKeyType = electionSplit[0]
             const electionKeyDate = electionSplit[1]
+            // we skip primaries and runoffs.
             if (
-              electionKeyType !== 'EG' &&
-              electionKeyType !== 'ECG' &&
-              electionKeyType !== 'EL' &&
-              electionKeyType !== 'EP'
+              electionKeyType === 'EP' ||
+              electionKeyType === 'EPD' ||
+              electionKeyType === 'EPP' ||
+              electionKeyType === 'ER'
             ) {
               continue
             }
