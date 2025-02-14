@@ -134,14 +134,6 @@ export class CrmUsersService {
           throw new Error('Email mismatch on CRM contact lookup!')
         }
       }
-      // await this.hubspot.client.crm.contacts.basicApi.getById(
-      //   email,
-      //   ['id', 'email'],
-      //   undefined,
-      //   undefined,
-      //   undefined,
-      //   'email',
-      // )
 
       return crmContactId
     } catch (e) {
