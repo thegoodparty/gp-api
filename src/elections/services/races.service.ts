@@ -20,9 +20,9 @@ import {
   VILLAGE_PROMPT,
 } from '../constants/prompts.consts'
 import { GEO_TYPES, MTFCC_TYPES } from '../constants/geo.consts'
-import { CountiesService } from './counties.services'
-import { MunicipalitiesService } from './municipalities.services'
-import { CensusEntitiesService } from './censusEntities.services'
+import { CountiesService } from './counties.service'
+import { MunicipalitiesService } from './municipalities.service'
+import { CensusEntitiesService } from './censusEntities.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { BallotReadyService } from './ballotReady.service'
 import { PositionLevel } from 'src/generated/graphql.types'

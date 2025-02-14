@@ -9,8 +9,8 @@ import { BallotReadyService } from './ballotReady.service'
 import { PrimaryElectionDates, RacesByYear } from '../types/ballotData.types'
 
 @Injectable()
-export class BallotDataService {
-  private readonly logger = new Logger(BallotDataService.name)
+export class ElectionsService {
+  private readonly logger = new Logger(ElectionsService.name)
   constructor(private readonly ballotReadyService: BallotReadyService) {}
 
   async getRacesByZipcode(zipcode: string): Promise<RacesByYear> {

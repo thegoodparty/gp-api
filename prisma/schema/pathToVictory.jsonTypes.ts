@@ -1,4 +1,4 @@
-import { P2VStatus } from 'src/races/types/pathToVictory.types'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 
 export {}
 

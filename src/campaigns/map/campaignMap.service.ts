@@ -5,7 +5,6 @@ import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
 import { subDays } from 'date-fns'
 import { GeocodingService } from '../services/geocoding.service'
-import { RacesService } from 'src/races/services/races.service'
 
 type CampaignWithUser = Campaign & {
   user: Pick<User, 'firstName' | 'lastName' | 'avatar'>
@@ -16,7 +15,6 @@ export class CampaignMapService {
   constructor(
     private readonly campaignsService: CampaignsService,
     private readonly geocodingService: GeocodingService,
-    private readonly racesService: RacesService,
   ) {}
 
   async listMapCampaignsCount(
@@ -146,9 +144,11 @@ export class CampaignMapService {
         data?.hubSpotUpdates?.office_type || details?.normalizedOffice
 
       if (!normalizedOffice && details.raceId && !details.noNormalizedOffice) {
-        const race = await this.racesService.findFirst({
-          where: { ballotHashId: details.raceId },
-        })
+        /// TODO: query ballot ready here
+        // const race = await this.racesService.findFirst({
+        //   where: { ballotHashId: details.raceId },
+        // })
+        const race: any = null
         if (race) {
           const raceData = race.data
           normalizedOffice = raceData?.normalized_position_name
