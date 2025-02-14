@@ -5,7 +5,6 @@ import { CountiesService } from './services/counties.service'
 import { CensusEntitiesService } from './services/censusEntities.service'
 import { BallotReadyService } from './services/ballotReady.service'
 import { ElectionsController } from './elections.controller'
-import { ElectionsService } from './services/elections.service'
 import { AiModule } from '../ai/ai.module'
 
 @Module({
@@ -15,10 +14,9 @@ import { AiModule } from '../ai/ai.module'
     MunicipalitiesService,
     CountiesService,
     CensusEntitiesService,
-    ElectionsService,
     BallotReadyService,
   ],
-  exports: [ElectionsService],
+  exports: [RacesService],
   imports: [AiModule],
 })
 export class ElectionsModule {}

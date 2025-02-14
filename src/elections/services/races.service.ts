@@ -1,17 +1,9 @@
 import {
-  BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common'
-import slugify from 'slugify'
-import { addYears, format, startOfYear } from 'date-fns'
-import { County, Municipality, Prisma, Race } from '@prisma/client'
-import {
-  GeoData,
-  MunicipalityResponse,
-  NormalizedRace,
-  ProximityCitiesResponseBody,
-} from '../types/races.types'
+import { GeoData } from '../types/elections.types'
 import {
   CITY_PROMPT,
   COUNTY_PROMPT,
@@ -20,633 +12,80 @@ import {
   VILLAGE_PROMPT,
 } from '../constants/prompts.consts'
 import { GEO_TYPES, MTFCC_TYPES } from '../constants/geo.consts'
-import { CountiesService } from './counties.service'
-import { MunicipalitiesService } from './municipalities.service'
 import { CensusEntitiesService } from './censusEntities.service'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { BallotReadyService } from './ballotReady.service'
 import { PositionLevel } from 'src/generated/graphql.types'
 import { AiService } from '../../ai/ai.service'
 import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
+import { RacesByYear, PrimaryElectionDates } from '../types/elections.types'
+import { parseRaces } from '../util/parseRaces.util'
+import { sortRacesGroupedByYear } from '../util/sortRaces.util'
 
 @Injectable()
-export class RacesService extends createPrismaBase(MODELS.Race) {
+export class RacesService {
+  private readonly logger = new Logger(RacesService.name)
   constructor(
-    private readonly counties: CountiesService,
-    private readonly municipalities: MunicipalitiesService,
     private readonly censusEntities: CensusEntitiesService,
     private readonly ballotReadyService: BallotReadyService,
     private readonly ai: AiService,
-  ) {
-    super()
+  ) {}
+
+  async getRaceById(raceId: string) {
+    return this.ballotReadyService.fetchRaceById(raceId)
   }
 
-  async findRaces(
-    state?: string,
-    county?: string,
-    city?: string,
-    positionSlug?: string,
-  ) {
-    if (state && county && city && positionSlug) {
-      return await this.findOne(state, county, city, positionSlug)
-    }
-
-    if (state && county && city) {
-      return await this.byCity(state, county, city)
-    }
-
-    if (state && county) {
-      return await this.byCounty(state, county)
-    }
-
-    if (state) {
-      return await this.byState(state)
-    }
-
-    return []
+  async getNormalizedPosition(raceId: string) {
+    return this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
   }
 
-  async findOne(
-    state: string,
-    county: string,
-    city: string,
-    positionSlug: string,
-  ) {
-    let countyRecord: County | null | undefined
-    let cityRecord: Municipality | null | undefined
-    if (county) {
-      countyRecord = await this.getCounty(state, county)
-    }
-    if (city && countyRecord) {
-      cityRecord = await this.getMunicipality(state, county, city)
-    }
-    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
+  async getRacesByZipcode(zipcode: string): Promise<RacesByYear> {
+    try {
+      let startCursor: string | undefined | null
+      const existingPositions: Set<string> = new Set()
+      const racesByYear: RacesByYear = {}
+      const primaryElectionDates: PrimaryElectionDates = {}
+      let hasNextPage = true
 
-    const now = format(new Date(), 'M d, yyyy')
-    const query: Prisma.RaceWhereInput = {
-      state: state.toUpperCase(),
-      positionSlug,
-      electionDate: {
-        gte: new Date(now),
-        lt: new Date(nextYear),
-      },
-    }
+      let nextRacesPromise = this.ballotReadyService.fetchRacesByZipcode(
+        zipcode,
+        startCursor,
+      )
 
-    if (city && cityRecord) {
-      query.municipalityId = cityRecord.id
-    } else if (countyRecord) {
-      query.countyId = countyRecord.id
-    }
-    const races = await this.findMany({
-      where: query,
-      orderBy: {
-        electionDate: 'asc',
-      },
-      include: {
-        municipality: true,
-        county: true,
-      },
-    })
+      while (hasNextPage) {
+        // Wait for the API response (while the previous parse was happening)
+        const queryResponse = await nextRacesPromise
+        if (!queryResponse) {
+          throw new InternalServerErrorException(
+            'Could not fetch data from BallotReady',
+          )
+        }
+        const races = queryResponse.races
+        if (races?.edges) {
+          hasNextPage = races.pageInfo.hasNextPage
+          startCursor = races.pageInfo.endCursor ?? null
 
-    if (races.length === 0) {
-      return null
-    }
+          // Start the next API request while parsing
+          nextRacesPromise = hasNextPage
+            ? this.ballotReadyService.fetchRacesByZipcode(zipcode, startCursor)
+            : Promise.resolve(null)
 
-    const race = races[0]
-    const positions = races.map((race) => race.data.position_name)
-    const otherRaces = race.municipality
-      ? await this.findMany({
-          where: { municipalityId: race.municipality.id },
-        })
-      : race.county
-        ? await this.findMany({
-            where: { countyId: race.county.id },
-          })
-        : []
-
-    return {
-      race: this.normalizeRace(race, state),
-      otherRaces: this.deduplicateRaces(
-        otherRaces,
-        state,
-        race.county,
-        race.municipality,
-      ),
-      positions,
-    }
-  }
-
-  async getByHashId(hashId: string) {
-    return await this.findFirst({
-      where: {
-        hashId,
-      },
-      include: {
-        county: true,
-        municipality: true,
-      },
-    })
-  }
-
-  async byCityProximity(
-    state: string,
-    city: string,
-  ): Promise<ProximityCitiesResponseBody> {
-    const messages: AiChatMessage[] = [
-      {
-        role: 'system',
-        content:
-          'You help me find close cities, and respond in JSON format that is parsable be JSON.parse().',
-      },
-      {
-        role: 'user',
-        content: `Given a city and state in the format "City, State", identify the two closest cities (excluding the provided city) to the specified location. Return the names of these two closest cities in a JSON array format, with each entry containing only the city name. Please ensure the response contains only the names of the two closest cities, without including their states or any additional text, in the specified JSON array format. The input city is ${city} in ${state} state. For example, if the input is "Springfield, Illinois", a correct output would be in the following format: ["CityName1", "CityName2"]. Don't add backticks or the string "json" before. just return the array as a string so I can perform JSON.parse() on the response
-          The input city is ${city} in ${state} state.`,
-      },
-    ]
-
-    const completion = await this.ai.llmChatCompletion(messages)
-
-    const cities = completion.content
-    const parsed: string[] = JSON.parse(cities)
-
-    const municipalityRecord1: MunicipalityResponse | null =
-      await this.municipalities.findFirst({
-        where: {
-          name: city,
-          state,
-        },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-        },
-      })
-
-    const resultCities: MunicipalityResponse[] = []
-
-    if (municipalityRecord1) {
-      municipalityRecord1.openElections = await this.model.count({
-        where: { municipalityId: municipalityRecord1.id },
-      })
-      municipalityRecord1.state = state
-      resultCities.push(municipalityRecord1)
-    }
-
-    let municipalityRecord2: MunicipalityResponse | null = null
-    let municipalityRecord3: MunicipalityResponse | null = null
-
-    if (parsed.length > 0) {
-      municipalityRecord2 = await this.municipalities.findFirst({
-        where: {
-          name: parsed[0],
-          state,
-        },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-        },
-      })
-      if (municipalityRecord2) {
-        municipalityRecord2.openElections = await this.model.count({
-          where: { municipalityId: municipalityRecord2.id },
-        })
-        municipalityRecord2.state = state
-        resultCities.push(municipalityRecord2)
+          // Process the current batch while the next request is running
+          parseRaces(
+            races,
+            existingPositions,
+            racesByYear,
+            primaryElectionDates,
+          )
+        } else {
+          hasNextPage = false
+        }
       }
+
+      return sortRacesGroupedByYear(racesByYear)
+    } catch (e) {
+      this.logger.error('error at ballotData/get', e)
+      throw new InternalServerErrorException('Error getting races by zipcode')
     }
-
-    if (parsed.length > 1) {
-      municipalityRecord3 = await this.municipalities.findFirst({
-        where: {
-          name: parsed[1],
-          state,
-        },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-        },
-      })
-      if (municipalityRecord3) {
-        municipalityRecord3.openElections = await this.model.count({
-          where: { municipalityId: municipalityRecord3.id },
-        })
-        municipalityRecord3.state = state
-        resultCities.push(municipalityRecord3)
-      }
-    }
-
-    return {
-      cities: resultCities,
-      ...(parsed && parsed.length ? { parsed } : {}),
-    }
-  }
-
-  async byCity(state: string, county: string, city: string) {
-    const countyRecord = await this.getCounty(state, county)
-    const municipalityRecord = await this.getMunicipality(state, county, city)
-    if (!countyRecord || !municipalityRecord) {
-      throw new BadRequestException('county and city are required')
-    }
-
-    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
-
-    const now = format(new Date(), 'M d, yyyy')
-
-    const races = await this.findMany({
-      where: {
-        state: state.toUpperCase(),
-        municipalityId: municipalityRecord?.id,
-        electionDate: {
-          gte: new Date(now),
-          lt: new Date(nextYear),
-        },
-      },
-      orderBy: {
-        electionDate: 'asc',
-      },
-    })
-
-    const {
-      population,
-      density,
-      income_household_median,
-      unemployment_rate,
-      home_value,
-      county_name,
-      city: municipalityCity,
-    } = municipalityRecord.data || {}
-
-    const shortCity = {
-      population,
-      density,
-      income_household_median,
-      unemployment_rate,
-      home_value,
-      county_name,
-      city: municipalityCity,
-    }
-
-    const deduplicatedRaces = this.deduplicateRaces(
-      races as Race[],
-      state,
-      countyRecord,
-      municipalityRecord,
-    )
-
-    return {
-      races: deduplicatedRaces,
-      municipality: shortCity,
-    }
-  }
-
-  async byCounty(state: string, county: string) {
-    const countyRecord = await this.getCounty(state, county)
-    if (!countyRecord) {
-      throw new BadRequestException('county is required')
-    }
-
-    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
-
-    const now = format(new Date(), 'M d, yyyy')
-
-    const municipalities = await this.municipalities.findMany({
-      where: { state, countyId: countyRecord.id },
-      select: {
-        name: true,
-        slug: true,
-      },
-    })
-
-    const races = await this.findMany({
-      where: {
-        state: state.toUpperCase(),
-        countyId: countyRecord?.id,
-        level: 'county',
-        electionDate: {
-          gte: new Date(now),
-          lt: new Date(nextYear),
-        },
-      },
-      select: { data: true, hashId: true, positionSlug: true, countyId: true },
-      orderBy: {
-        electionDate: 'asc',
-      },
-    })
-
-    const {
-      county_full,
-      city_largest,
-      population,
-      density,
-      income_household_median,
-      unemployment_rate,
-      home_value,
-      county: countyName,
-    } = countyRecord.data || {}
-
-    const shortCounty = {
-      county: countyName,
-      county_full,
-      city_largest,
-      population,
-      density,
-      income_household_median,
-      unemployment_rate,
-      home_value,
-    }
-
-    return {
-      races: this.deduplicateRaces(races as Race[], state, countyRecord),
-      municipalities,
-      county: shortCounty,
-    }
-  }
-
-  async byState(state: string) {
-    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
-
-    const now = format(new Date(), 'M d, yyyy')
-
-    const counties = await this.counties.findMany({
-      where: { state },
-      select: {
-        name: true,
-        slug: true,
-      },
-    })
-
-    const races = await this.findMany({
-      where: {
-        state: state.toUpperCase(),
-        level: 'state',
-        electionDate: {
-          gte: new Date(now),
-          lt: new Date(nextYear),
-        },
-      },
-      select: { data: true, hashId: true, positionSlug: true, countyId: true },
-      orderBy: {
-        electionDate: 'asc',
-      },
-    })
-
-    return { races: this.deduplicateRaces(races as Race[], state), counties }
-  }
-
-  async allForState(state: string) {
-    const nextYear = format(addYears(startOfYear(new Date()), 2), 'M d, yyyy')
-
-    const now = format(new Date(), 'M d, yyyy')
-
-    const counties = await this.counties.findMany({
-      where: { state },
-      select: {
-        name: true,
-        slug: true,
-      },
-    })
-
-    const cities = await this.municipalities.findMany({
-      where: { state },
-      select: {
-        name: true,
-        slug: true,
-      },
-    })
-
-    const stateRaces = await this.findMany({
-      where: {
-        state: state.toUpperCase(),
-        countyId: null,
-        municipalityId: null,
-        level: 'state',
-        electionDate: {
-          gte: new Date(now),
-          lt: new Date(nextYear),
-        },
-      },
-      orderBy: {
-        electionDate: 'asc',
-      },
-    })
-
-    // Deduplicate based on positionSlug
-    const uniqueStateRaces = new Map()
-
-    stateRaces.forEach((race) => {
-      if (!uniqueStateRaces.has(race.positionSlug)) {
-        const { positionSlug } = race
-        const stateRace: { slug?: string } = {}
-        stateRace.slug = `${state.toLowerCase()}/${positionSlug}`
-        uniqueStateRaces.set(race.positionSlug, stateRace)
-      }
-    })
-    // Convert the Map values back to an array for the final deduplicated list.
-    const dedupStateRaces = Array.from(uniqueStateRaces.values())
-
-    const countyRaces = await this.findMany({
-      where: {
-        state: state.toUpperCase(),
-        countyId: {
-          not: null,
-        },
-        municipalityId: null,
-        level: 'state',
-        electionDate: {
-          gte: new Date(now),
-          lt: new Date(nextYear),
-        },
-      },
-      include: {
-        county: true,
-      },
-      orderBy: {
-        electionDate: 'asc',
-      },
-    })
-
-    // Deduplicate based on positionSlug
-    const uniqueCountyRaces = new Map()
-
-    countyRaces.forEach((race) => {
-      if (!uniqueStateRaces.has(race.positionSlug)) {
-        const { positionSlug, county } = race
-        const countyRace: { slug?: string } = {}
-        countyRace.slug = `${county?.slug}/${positionSlug}`
-        uniqueCountyRaces.set(race.positionSlug, countyRace)
-      }
-    })
-    // Convert the Map values back to an array for the final deduplicated list
-    const dedupCountyRaces = Array.from(uniqueCountyRaces.values())
-
-    const cityRaces = await this.findMany({
-      where: {
-        state: state.toUpperCase(),
-        countyId: null,
-        municipalityId: {
-          not: null,
-        },
-        level: 'state',
-        electionDate: {
-          gte: new Date(now),
-          lt: new Date(nextYear),
-        },
-      },
-      include: {
-        municipality: true,
-      },
-      orderBy: {
-        electionDate: 'asc',
-      },
-    })
-
-    // Deduplicate based on positionSlug
-    const uniqueCityRaces = new Map()
-
-    cityRaces.forEach((race) => {
-      if (!uniqueStateRaces.has(race.positionSlug)) {
-        const { positionSlug, municipality } = race
-        const cityRace: { slug?: string } = {}
-        cityRace.slug = `${municipality?.slug}/${positionSlug}`
-        uniqueCityRaces.set(race.positionSlug, cityRace)
-      }
-    })
-    // Convert the Map values back to an array for the final deduplicated list
-    const dedupCityRaces = Array.from(uniqueCityRaces.values())
-
-    return {
-      counties,
-      cities,
-      stateRaces: dedupStateRaces,
-      countyRaces: dedupCountyRaces,
-      cityRaces: dedupCityRaces,
-    }
-  }
-
-  private normalizeRace(
-    race: Prisma.RaceGetPayload<{
-      include: { county: true; municipality: true }
-    }>,
-    state: string,
-  ): NormalizedRace {
-    const {
-      election_name,
-      position_name,
-      election_day,
-      level,
-      partisan_type,
-      salary,
-      employment_type,
-      filing_date_start,
-      filing_date_end,
-      normalized_position_name,
-      position_description,
-      frequency,
-      filing_office_address,
-      filing_phone_number,
-      paperwork_instructions,
-      filing_requirements,
-      eligibility_requirements,
-      is_runoff,
-      is_primary,
-    } = race.data
-
-    return {
-      ...race,
-      ballotHashId: race.hashId,
-      hashId: race.hashId,
-      positionName: position_name,
-      electionDate: election_day,
-      electionName: election_name,
-      state,
-      level,
-      partisanType: partisan_type,
-      salary,
-      employmentType: employment_type,
-      filingDateStart: filing_date_start,
-      filingDateEnd: filing_date_end,
-      normalizedPositionName: normalized_position_name,
-      positionDescription: position_description,
-      ...(frequency ? { frequency } : {}),
-      subAreaName: race.subAreaName,
-      subAreaValue: race.subAreaValue,
-      filingOfficeAddress: filing_office_address,
-      filingPhoneNumber: filing_phone_number,
-      paperworkInstructions: paperwork_instructions,
-      filingRequirements: filing_requirements,
-      eligibilityRequirements: eligibility_requirements,
-      isRunoff: is_runoff,
-      isPrimary: is_primary,
-      municipality: race.municipality
-        ? { name: race.municipality.name, slug: race.municipality.slug }
-        : null,
-      county: race.county
-        ? { name: race.county.name, slug: race.county.slug }
-        : null,
-    }
-  }
-
-  private async getCounty(state: string, county: string) {
-    const slug = `${slugify(state, { lower: true })}/${slugify(county, {
-      lower: true,
-    })}`
-    return this.counties.findUnique({
-      where: { slug },
-    })
-  }
-
-  private async getMunicipality(state: string, county: string, city: string) {
-    const slug = `${slugify(state, { lower: true })}/${slugify(county, {
-      lower: true,
-    })}/${slugify(city, {
-      lower: true,
-    })}`
-    return this.municipalities.findUnique({
-      where: { slug },
-    })
-  }
-
-  private deduplicateRaces(
-    races: Race[],
-    state: string,
-    county?: County | null,
-    city?: Municipality | null,
-  ): NormalizedRace[] {
-    const uniqueRaces = new Map<string, NormalizedRace>()
-
-    for (const race of races) {
-      if (!race.positionSlug || !uniqueRaces.has(race.positionSlug)) {
-        const { data, positionSlug, ...withoutData } = race
-        const {
-          election_name,
-          election_day,
-          normalized_position_name,
-          position_description,
-          level,
-          frequency,
-        } = data
-
-        uniqueRaces.set(positionSlug as string, {
-          ...withoutData,
-          electionDate: election_day,
-          electionName: election_name,
-          date: election_day,
-          normalizedPositionName: normalized_position_name,
-          positionDescription: position_description,
-          level,
-          positionSlug: positionSlug,
-          state: state,
-          county: county,
-          municipality: city,
-          frequency,
-        })
-      }
-    }
-
-    return [...uniqueRaces.values()]
   }
 
   private getRaceLevel(level: string) {
@@ -736,7 +175,7 @@ export class RacesService extends createPrismaBase(MODELS.Race) {
 
     let race: any
     try {
-      race = await this.ballotReadyService.fetchRaceById(raceId)
+      race = await this.getRaceById(raceId)
     } catch (e) {
       this.logger.error(slug, 'error getting race details', e)
       return

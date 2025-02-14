@@ -1,4 +1,4 @@
-import { PrimaryElectionDates, RacesByYear } from '../types/ballotData.types'
+import { PrimaryElectionDates, RacesByYear } from '../types/elections.types'
 import { RacesByZipcode } from '../types/ballotReady.types'
 import { PositionLevel } from 'src/generated/graphql.types'
 

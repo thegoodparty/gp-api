@@ -17,7 +17,6 @@ model Municipality {
   data      Json?            @default("{}") @db.JsonB
   county    County?          @relation(fields: [countyId], references: [id])
   countyId  Int?             @map("county_id")
-  races     Race[]
 
   @@map("municipality")
 }

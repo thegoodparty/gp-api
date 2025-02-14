@@ -1,4 +1,4 @@
-import { RacesByYear } from '../types/ballotData.types'
+import { RacesByYear } from '../types/elections.types'
 import { RaceNode } from '../types/ballotReady.types'
 import { getOfficeLevelValue } from './getOfficeLevelValue.util'
 

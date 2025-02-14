@@ -5,6 +5,7 @@ import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
 import { subDays } from 'date-fns'
 import { GeocodingService } from '../services/geocoding.service'
+import { RacesService } from 'src/elections/services/races.service'
 
 type CampaignWithUser = Campaign & {
   user: Pick<User, 'firstName' | 'lastName' | 'avatar'>
@@ -13,6 +14,7 @@ type CampaignWithUser = Campaign & {
 @Injectable()
 export class CampaignMapService {
   constructor(
+    private readonly racesService: RacesService,
     private readonly campaignsService: CampaignsService,
     private readonly geocodingService: GeocodingService,
   ) {}
@@ -144,14 +146,14 @@ export class CampaignMapService {
         data?.hubSpotUpdates?.office_type || details?.normalizedOffice
 
       if (!normalizedOffice && details.raceId && !details.noNormalizedOffice) {
-        /// TODO: query ballot ready here
-        // const race = await this.racesService.findFirst({
-        //   where: { ballotHashId: details.raceId },
-        // })
-        const race: any = null
-        if (race) {
-          const raceData = race.data
-          normalizedOffice = raceData?.normalized_position_name
+        // TODO: This is a temporary stopgap to get the normalized office name
+        // we should just be storing this when creating the campaign!
+        const normalizedResult = await this.racesService.getNormalizedPosition(
+          details.raceId,
+        )
+
+        if (normalizedResult) {
+          normalizedOffice = normalizedResult
         }
 
         const updateData: Prisma.CampaignUpdateInput = {}

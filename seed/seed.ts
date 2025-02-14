@@ -2,7 +2,6 @@ import { PrismaClient } from '@prisma/client'
 import { parseArgs } from 'util'
 
 // factory seeds
-import seedRaces from './races'
 import seedCampaigns from './campaigns'
 import seedTopIssues from './topIssues'
 import seedUsers from './users'
@@ -35,7 +34,6 @@ async function main() {
     }
 
     // run factory seeds
-    await seedRaces(prisma)
     const users = await seedUsers(prisma)
     const campaignIds = await seedCampaigns(prisma, users)
     await seedTopIssues(prisma, campaignIds)

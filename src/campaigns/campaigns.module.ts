@@ -15,10 +15,17 @@ import { CrmModule } from '../crm/crmModule'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
+import { ElectionsModule } from 'src/elections/elections.module'
 
 @Global()
 @Module({
-  imports: [EmailModule, CampaignsAiModule, CrmModule, FullStoryModule],
+  imports: [
+    EmailModule,
+    CampaignsAiModule,
+    CrmModule,
+    FullStoryModule,
+    ElectionsModule,
+  ],
   controllers: [
     CampaignsController,
     CampaignPositionsController,

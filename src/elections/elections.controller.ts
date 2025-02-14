@@ -1,14 +1,14 @@
 import { Controller, Get, Query } from '@nestjs/common'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
-import { ElectionsService } from './services/elections.service'
+import { RacesService } from './services/races.service'
 
 @Controller('elections')
 @PublicAccess()
 export class ElectionsController {
-  constructor(private readonly electionsService: ElectionsService) {}
+  constructor(private readonly racesService: RacesService) {}
 
   @Get('races-by-year')
   async getRacesByZipcode(@Query('zipcode') zipcode: string) {
-    return await this.electionsService.getRacesByZipcode(zipcode)
+    return await this.racesService.getRacesByZipcode(zipcode)
   }
 }
