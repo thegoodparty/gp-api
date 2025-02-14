@@ -2,13 +2,9 @@ import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import usStates from 'states-us'
 import { CRMCompanyProperties } from '../../crm/crm.types'
 import {
-  SimplePublicObject,
-  SimplePublicObjectInputForCreate,
-} from '@hubspot/api-client/lib/codegen/crm/deals'
-import {
   ApiException,
+  SimplePublicObject,
   SimplePublicObjectBatchInput,
-  SimplePublicObjectInput,
 } from '@hubspot/api-client/lib/codegen/crm/companies'
 import { HubspotService } from '../../crm/hubspot.service'
 import { CampaignsService } from './campaigns.service'
@@ -84,10 +80,19 @@ export class CrmCampaignsService {
   ) {}
 
   async getCrmCompanyById(hubspotId: string) {
-    return await this.hubspot.client.crm.companies.basicApi.getById(
-      hubspotId,
-      HUBSPOT_COMPANY_PROPERTIES,
-    )
+    try {
+      return await this.hubspot.client.crm.companies.basicApi.getById(
+        hubspotId,
+        HUBSPOT_COMPANY_PROPERTIES,
+      )
+    } catch (error) {
+      const message = 'hubspot error - get-company-by-id'
+      this.logger.error(message, error)
+      this.slack.errorMessage({
+        message,
+        error,
+      })
+    }
   }
 
   private async getCompanyOwner(companyOwnerId: number) {
@@ -131,9 +136,9 @@ export class CrmCampaignsService {
   private async createCompany(companyObj: CRMCompanyProperties) {
     let crmCompany: SimplePublicObject | null = null
     try {
-      crmCompany = await this.hubspot.client.crm.companies.basicApi.create(
-        companyObj as SimplePublicObjectInputForCreate,
-      )
+      crmCompany = await this.hubspot.client.crm.companies.basicApi.create({
+        properties: companyObj,
+      })
     } catch (error) {
       this.logger.error('error creating company', error)
       this.slack.errorMessage({
@@ -149,6 +154,8 @@ export class CrmCampaignsService {
       return
     }
 
+    this.logger.debug('CRM Company created:', crmCompany)
+
     return crmCompany
   }
 
@@ -160,7 +167,7 @@ export class CrmCampaignsService {
     try {
       crmCompany = await this.hubspot.client.crm.companies.basicApi.update(
         hubspotId,
-        crmCompanyProperties as SimplePublicObjectInput,
+        { properties: crmCompanyProperties },
       )
     } catch (e) {
       const { name } = crmCompanyProperties
@@ -211,7 +218,7 @@ export class CrmCampaignsService {
     const pathToVictory = await this.pathToVictory.findFirst({
       where: { campaignId: campaignId },
     })
-    const p2vData = pathToVictory?.data
+    const p2vData = pathToVictory?.data || {}
 
     const updateHistoryCount = await this.campaignUpdateHistory.count({
       where: {
@@ -255,6 +262,7 @@ export class CrmCampaignsService {
       filingPeriodsStart,
       filingPeriodsEnd,
       isProUpdatedAt,
+      subscriptionCanceledAt,
     } = campaignDetails || {}
 
     const canDownloadVoterFile = this.voterFile.canDownload({
@@ -277,7 +285,11 @@ export class CrmCampaignsService {
       (usState) => usState.abbreviation === state?.toUpperCase(),
     )?.name
 
-    const proSubscriptionStatus = true
+    const proSubscriptionStatus = campaign.isPro
+      ? 'Active'
+      : subscriptionCanceledAt
+        ? 'Canceled'
+        : 'Inactive'
 
     const p2v_status =
       p2vNotNeeded || !p2vStatus
@@ -332,7 +344,9 @@ export class CrmCampaignsService {
       ...(ballotLevel ? { office_level: ballotLevel } : {}),
       running: runForOffice ? 'yes' : 'no',
       ...getCrmP2VValues(p2vData),
-      win_number: `${winNumber}`,
+      ...(winNumber && typeof parseInt(`${winNumber}`) === 'number'
+        ? { win_number: `${winNumber}` }
+        : {}),
       voter_data_adoption: canDownloadVoterFile ? 'Unlocked' : 'Locked',
       created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
       admin_user: adminUserEmail ?? '',
@@ -378,8 +392,8 @@ export class CrmCampaignsService {
 
     try {
       await this.hubspot.client.crm.associations.v4.batchApi.create(
-        'contact',
-        'company',
+        '0-2',
+        '0-1',
         {
           inputs: [
             {
@@ -418,6 +432,7 @@ export class CrmCampaignsService {
     const crmCompanyProperties =
       await this.calculateCRMCompanyProperties(campaign)
 
+    this.logger.debug('CRM Company Properties:', crmCompanyProperties)
     let crmCompany: SimplePublicObject | undefined
     if (existingHubspotId) {
       crmCompany = await this.updateCrmCompany(
@@ -449,7 +464,7 @@ export class CrmCampaignsService {
 
     if (!crmContactId) {
       const message = `No hubspot id found for user ${userId}`
-      this.logger.error(message)
+      this.logger.debug(message)
       this.slack.errorMessage({
         message,
       })
