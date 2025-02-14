@@ -1,9 +1,9 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import usStates from 'states-us'
 import { CRMCompanyProperties } from '../../crm/crm.types'
-import { SimplePublicObject } from '@hubspot/api-client/lib/codegen/crm/deals'
 import {
   ApiException,
+  SimplePublicObject,
   SimplePublicObjectBatchInput,
 } from '@hubspot/api-client/lib/codegen/crm/companies'
 import { HubspotService } from '../../crm/hubspot.service'
