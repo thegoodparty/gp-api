@@ -1,4 +1,4 @@
-import { OfficeLevel } from '../types/races.types'
+import { OfficeLevel } from '../types/elections.types'
 
 // TODO: Implement new level function and enum across the race service
 // Make sure this works

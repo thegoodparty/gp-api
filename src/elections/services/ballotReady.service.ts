@@ -30,6 +30,37 @@ export class BallotReadyService {
     headers,
   })
 
+  async fetchRaceNormalizedPosition(raceId: string) {
+    // Query for a single ID
+    const query = gql`
+      query GetNormalizedPosition {
+        node(id: "${raceId}") {
+          ... on Position {
+            normalizedPosition {
+              name
+            }
+          }
+        }
+      }
+    `
+    try {
+      const result = await this.graphQLClient.request<{
+        node: {
+          normalizedPosition: {
+            name: string
+          } | null
+        } | null
+      }>(query)
+      return result?.node?.normalizedPosition?.name ?? null
+    } catch (error) {
+      this.logger.error(
+        `Error at getNormalizedPosition for id ${raceId}:`,
+        error,
+      )
+      return null
+    }
+  }
+
   async fetchRaceById(raceId: string): Promise<RacesById | null> {
     const query = gql`
           query Node {

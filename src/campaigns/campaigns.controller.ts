@@ -27,7 +27,7 @@ import { SlackService } from 'src/shared/services/slack.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
-import { P2VStatus } from 'src/races/types/pathToVictory.types'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 
 @Controller('campaigns')

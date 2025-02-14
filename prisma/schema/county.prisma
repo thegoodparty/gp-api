@@ -8,7 +8,6 @@ model County {
   /// [CountyData]
   data           Json?          @default("{}") @db.JsonB
   municipalities Municipality[]
-  races          Race[]
 
   @@map("county")
 }

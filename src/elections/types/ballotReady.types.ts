@@ -1,5 +1,5 @@
 import { Election, PageInfo, Position } from 'src/generated/graphql.types'
-import { BDElection } from './ballotData.types'
+import { BDElection } from './elections.types'
 
 // -----------------------------
 // Shared/Generic Types

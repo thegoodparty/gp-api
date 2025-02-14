@@ -8,7 +8,6 @@ import { EmailModule } from 'src/email/email.module'
 import { CampaignPositionsController } from './positions/campaignPositions.controller'
 import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { GeocodingService } from './services/geocoding.service'
-import { RacesModule } from 'src/races/races.module'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
@@ -16,15 +15,16 @@ import { CrmModule } from '../crm/crmModule'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
+import { ElectionsModule } from 'src/elections/elections.module'
 
 @Global()
 @Module({
   imports: [
     EmailModule,
-    RacesModule,
     CampaignsAiModule,
     CrmModule,
     FullStoryModule,
+    ElectionsModule,
   ],
   controllers: [
     CampaignsController,
