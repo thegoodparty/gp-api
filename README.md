@@ -24,10 +24,15 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+[GoodParty.org](https://goodparty.org) API 
 
 ## Project setup
+### Prerequisites
+- Be sure to [install Node](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) if you haven't already.
+- You will need to be on node `22.12+`
+- If you have `nvm` installed, you can run `nvm use` to get the version from the `.nvmrc` file.
 
+### Setup
 ```bash
 $ npm install
 ```
@@ -37,9 +42,10 @@ $ npm install
 - Run the following command to create the database tables:
 
 ```bash
-$ npx prisma generate --schema=./api/prisma/schema/schema.prisma
-$ npx prisma migrate dev  --schema=./api/prisma/schema/schema.prisma
+$ npm run migrate:dev 
 ```
+- This also generates the Prisma Client and Typescript types.
+- This should also run seeds to populate your local DB with dummy data.
 
 ## Compile and run the project
 
