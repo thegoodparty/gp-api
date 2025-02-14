@@ -38,7 +38,15 @@ export class RacesService {
     return this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
   }
 
-  async getRacesByZipcode(zipcode: string): Promise<RacesByYear> {
+  async racesByYear({
+    zipcode,
+    level,
+    electionDate,
+  }: {
+    zipcode: string
+    level?: string
+    electionDate?: string
+  }): Promise<RacesByYear> {
     try {
       let startCursor: string | undefined | null
       const existingPositions: Set<string> = new Set()
@@ -468,7 +476,6 @@ export class RacesService {
       function: { name: 'extractLocation' },
     }
 
-    // TODO: once the ai service is up, we can use this code
     const completion = await this.ai.getChatToolCompletion({
       messages,
       tool, // list of functions that could be called.
@@ -485,9 +492,9 @@ export class RacesService {
       decodedContent = JSON.parse(content)
       decodedContent.level = level
     } catch (e) {
-      console.debug('error at extract-location-ai helper', e)
+      this.logger.debug('error at extract-location-ai helper', e)
     }
-    console.debug('extract ai location response', decodedContent)
+    this.logger.debug('extract ai location response', decodedContent)
     return decodedContent
   }
 
