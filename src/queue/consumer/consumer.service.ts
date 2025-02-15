@@ -3,12 +3,25 @@ import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import { QueueMessage } from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
+import { SlackService } from 'src/shared/services/slack.service'
+import { Campaign } from '@prisma/client'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
+import { PrismaService } from '../../prisma/prisma.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 
 @Injectable()
 export class ConsumerService {
   private readonly logger = new Logger(ConsumerService.name)
 
-  constructor(private aiContentService: AiContentService) {}
+  constructor(
+    private aiContentService: AiContentService,
+    private slackService: SlackService,
+    // private crmService: CrmService,
+    private pathToVictoryService: PathToVictoryService,
+    private prisma: PrismaService,
+  ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
@@ -51,8 +64,147 @@ export class ConsumerService {
         break
       case 'pathToVictory':
         this.logger.log('received pathToVictory message')
-        //   await handlePathToVictoryMessage(queueMessage.data)
+        await this.handlePathToVictoryMessage(queueMessage.data)
         break
+    }
+  }
+
+  private async handlePathToVictoryMessage(message: any) {
+    let p2vSuccess = false
+    let campaign: any // Campaign & { pathToVictory: PathToVictory } | null = null
+
+    try {
+      const p2vResponse: P2VResponse =
+        await this.pathToVictoryService.handlePathToVictory({
+          ...message,
+        })
+      this.logger.debug('p2vResponse', p2vResponse)
+
+      campaign = await this.prisma.campaign.findUnique({
+        where: { id: message.campaignId },
+        include: { pathToVictory: true },
+      })
+
+      p2vSuccess = await this.pathToVictoryService.analyzePathToVictoryResponse(
+        {
+          campaign,
+          pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
+          officeName: p2vResponse.officeName || '',
+          electionDate: p2vResponse.electionDate || '',
+          electionTerm: p2vResponse.electionTerm || 0,
+          electionLevel: p2vResponse.electionLevel || '',
+          electionState: p2vResponse.electionState || '',
+          electionCounty: p2vResponse.electionCounty || '',
+          electionMunicipality: p2vResponse.electionMunicipality || '',
+          subAreaName: p2vResponse.subAreaName,
+          subAreaValue: p2vResponse.subAreaValue,
+          partisanType: p2vResponse.partisanType || '',
+          priorElectionDates: p2vResponse.priorElectionDates || [],
+        },
+      )
+    } catch (e) {
+      this.logger.error('error in consumer/handlePathToVictoryMessage', e)
+      await this.slackService.errorMessage({
+        message: 'error in consumer/handlePathToVictoryMessage',
+        error: e,
+      })
+    }
+
+    if (p2vSuccess === false && campaign) {
+      await this.handlePathToVictoryFailure(campaign)
+      throw new Error('error in consumer/handlePathToVictoryMessage')
+    }
+
+    // Calculate viability score after a valid path to victory response
+    // let viability
+    // try {
+    //   viability = await this.viabilityService.calculateViabilityScore(
+    //     message.campaignId,
+    //   )
+    // } catch (e) {
+    //   this.logger.error('error calculating viability score', e)
+    //   await this.slackService.errorMessage({
+    //     message: 'error calculating viability score',
+    //     error: e,
+    //   })
+    // }
+
+    // this.logger.debug('viability', viability)
+    // if (viability) {
+    //   const pathToVictory = await this.prisma.pathToVictory.findUnique({
+    //     where: { campaignId: message.campaignId },
+    //   })
+
+    //   if (pathToVictory) {
+    //     const data = pathToVictory.data || {}
+    //     await this.prisma.pathToVictory.update({
+    //       where: { id: pathToVictory.id },
+    //       data: {
+    //         data: {
+    //           ...data,
+    //           viability,
+    //         },
+    //       },
+    //     })
+    //   }
+    // }
+
+    // const isProd = WEBAPP_ROOT === 'https://goodparty.org'
+    // // Send the candidate to google sheets for techspeed on production
+    // if (isProd) {
+    //   try {
+    //     await this.crmService.techspeedAppendSheets(message.campaignId)
+    //   } catch (e) {
+    //     this.logger.error('error in techspeedAppendSheets', e)
+    //     await this.slackService.errorMessage({
+    //       message: 'error in techspeedAppendSheets',
+    //       error: e,
+    //     })
+    //   }
+    // }
+  }
+
+  private async handlePathToVictoryFailure(campaign: Campaign) {
+    const p2v = await this.prisma.pathToVictory.findUnique({
+      where: { campaignId: campaign.id },
+    })
+
+    let p2vAttempts = 0
+    if (p2v?.data?.p2vAttempts) {
+      p2vAttempts = p2v.data.p2vAttempts
+    }
+    p2vAttempts += 1
+
+    if (p2vAttempts >= 3) {
+      await this.slackService.message(
+        {
+          body: `Path To Victory has failed 3 times for ${campaign.slug}. Marking as failed`,
+        },
+        SlackChannel.botPathToVictoryIssues,
+      )
+
+      // mark the p2vStatus as Failed
+      await this.prisma.pathToVictory.update({
+        where: { id: p2v!.id },
+        data: {
+          data: {
+            ...p2v?.data,
+            p2vAttempts,
+            p2vStatus: P2VStatus.failed,
+          },
+        },
+      })
+    } else {
+      // otherwise, increment the p2vAttempts
+      await this.prisma.pathToVictory.update({
+        where: { id: p2v!.id },
+        data: {
+          data: {
+            ...p2v?.data,
+            p2vAttempts,
+          },
+        },
+      })
     }
   }
 }
