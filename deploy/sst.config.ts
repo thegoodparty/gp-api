@@ -128,6 +128,12 @@ export default $config({
         ENABLE_FULLSTORY: 'false',
         ASSET_DOMAIN: bucketDomain,
         WEBAPP_ROOT_URL: webAppRootUrl,
+        AI_MODELS:
+          'meta-llama/Llama-3.3-70B-Instruct-Turbo,Qwen/Qwen2.5-72B-Instruct-Turbo',
+        LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
+        SQS_QUEUE: 'DEV_GP_Queue.fifo',
+        SQS_QUEUE_URL:
+          'https://sqs.us-west-2.amazonaws.com/333022194791/DEV_GP_Queue.fifo',
       },
       ssm: {
         // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
@@ -141,6 +147,38 @@ export default $config({
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
         AUTH_SECRET:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:AUTH_SECRET-eGe66U',
+        VOTER_DATASTORE:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:VOTER_DATASTORE-ooHetK',
+        AWS_ACCESS_KEY_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_ACCESS_KEY_ID-PWb1SB',
+        AWS_SECRET_ACCESS_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_SECRET_ACCESS_KEY-nkThRE',
+        AWS_S3_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_KEY-YFEbWy',
+        AWS_S3_SECRET:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_SECRET-KW7BQX',
+        HUBSPOT_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:HUBSPOT_TOKEN-gFRvGT',
+        ASHBY_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:ASHBY_KEY-5UdDjD',
+        FULLSTORY_API_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:FULLSTORY_API_KEY-Geho4f',
+        MAILGUN_API_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:MAILGUN_API_KEY-718eny',
+        TOGETHER_AI_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:TOGETHER_AI_KEY-sdX206',
+        OPENAI_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:OPEN_AI_KEY-VGhQ4h',
+        GOOGLE_CLIENT_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_CLIENT_ID-FcpHmK',
+        GOOGLE_API_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_API_KEY-dMkjI2',
+        STRIPE_SECRET_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_SECRET_KEY-GSGinp',
+        STRIPE_WEBSOCKET_SECRET:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_WEBSOCKET_SECRET-QT7A0C',
+        BALLOT_READY_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:BALLOT_READY_KEY-c5SoNE',
       },
       image: {
         context: '../', // Set the context to the main app directory
