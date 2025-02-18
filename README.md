@@ -53,7 +53,7 @@ $ npm install
     -- create a new database for app
     CREATE DATABASE gpdb;
     -- connect to the new database
-    \c gpdb
+    \c gpdb;
     -- create user and password
     CREATE USER postgres WITH PASSWORD 'postgres';
     -- grant all privileges to the user
