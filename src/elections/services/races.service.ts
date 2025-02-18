@@ -174,7 +174,7 @@ export class RacesService {
   async getRaceDetails(
     raceId: string,
     slug: string,
-    zip: string,
+    zip?: string | null,
     findElectionDates = true,
   ) {
     const data: any = {}

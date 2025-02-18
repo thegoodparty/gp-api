@@ -32,7 +32,7 @@ export default $config({
     if ($app.stage === 'master') {
       apiDomain = 'gp-api.goodparty.org'
       bucketDomain = 'assets.goodparty.org'
-      webAppRootUrl = 'https://app.goodparty.org'
+      webAppRootUrl = 'https://goodparty.org'
     } else if ($app.stage === 'develop') {
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
@@ -93,6 +93,18 @@ export default $config({
       )
     }
 
+    let enableFullstory = false
+    if ($app.stage === 'master') {
+      enableFullstory = true
+    }
+
+    let sqsQueueName = 'DEV_GP_Queue.fifo'
+    if ($app.stage === 'master') {
+      sqsQueueName = 'PROD_GP_Queue.fifo'
+    } else if ($app.stage === 'qa') {
+      sqsQueueName = 'QA_GP_Queue.fifo'
+    }
+
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain: apiDomain,
@@ -125,15 +137,14 @@ export default $config({
         CORS_ORIGIN:
           $app.stage === 'master' ? 'goodparty.org' : 'dev.goodparty.org',
         AWS_REGION: 'us-west-2',
-        ENABLE_FULLSTORY: 'false',
+        ENABLE_FULLSTORY: enableFullstory ? 'true' : 'false',
         ASSET_DOMAIN: bucketDomain,
         WEBAPP_ROOT_URL: webAppRootUrl,
         AI_MODELS:
           'meta-llama/Llama-3.3-70B-Instruct-Turbo,Qwen/Qwen2.5-72B-Instruct-Turbo',
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
-        SQS_QUEUE: 'DEV_GP_Queue.fifo',
-        SQS_QUEUE_URL:
-          'https://sqs.us-west-2.amazonaws.com/333022194791/DEV_GP_Queue.fifo',
+        SQS_QUEUE: sqsQueueName,
+        SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791/',
       },
       ssm: {
         // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets

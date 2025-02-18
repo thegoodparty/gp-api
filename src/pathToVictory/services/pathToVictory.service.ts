@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { RacesService } from '../../elections/services/races.service'
 import { VotersService } from '../../voters/services/voters.service'
@@ -6,7 +6,10 @@ import { OfficeMatchService } from './officeMatch.service'
 import { SlackService } from '../../shared/services/slack.service'
 import { EmailService } from '../../email/email.service'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-// import { Campaign, PathToVictory } from '@prisma/client'
+
+import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
+import { Prisma } from '@prisma/client'
+
 import {
   PathToVictoryInput,
   PathToVictoryResponse,
@@ -15,11 +18,12 @@ import { VoterCounts } from 'src/voters/voters.types'
 import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
+import { Campaign, PathToVictory } from '@prisma/client'
 
 @Injectable()
-export class PathToVictoryService {
-  private readonly logger = new Logger(PathToVictoryService.name)
-
+export class PathToVictoryService extends createPrismaBase(
+  MODELS.PathToVictory,
+) {
   constructor(
     private prisma: PrismaService,
     private racesService: RacesService,
@@ -28,7 +32,21 @@ export class PathToVictoryService {
     private slackService: SlackService,
     private emailService: EmailService,
     private crmService: CrmCampaignsService,
-  ) {}
+  ) {
+    super()
+  }
+
+  create<T extends Prisma.PathToVictoryCreateArgs>(
+    args: Prisma.SelectSubset<T, Prisma.PathToVictoryCreateArgs>,
+  ): Promise<Prisma.PathToVictoryGetPayload<T>> {
+    return this.model.create(args)
+  }
+
+  update<T extends Prisma.PathToVictoryUpdateArgs>(
+    args: Prisma.SelectSubset<T, Prisma.PathToVictoryUpdateArgs>,
+  ): Promise<Prisma.PathToVictoryGetPayload<T>> {
+    return this.model.update(args)
+  }
 
   async handlePathToVictory(input: PathToVictoryInput): Promise<{
     slug: string
@@ -187,7 +205,7 @@ export class PathToVictoryService {
   }
 
   async analyzePathToVictoryResponse(p2vResponse: {
-    campaign: any // Campaign & { pathToVictory: PathToVictory }
+    campaign: Campaign & { pathToVictory: PathToVictory }
     pathToVictoryResponse: {
       counts: VoterCounts
       electionType: string

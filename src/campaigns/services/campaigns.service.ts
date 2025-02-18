@@ -162,7 +162,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
     const { details: currentDetails } = currentCampaign
 
-    const updatedDetails = deepMerge(currentDetails, details)
+    const updatedDetails = {
+      ...currentDetails,
+      ...details,
+    } as typeof currentDetails
 
     return this.update({
       where: { id: campaignId },

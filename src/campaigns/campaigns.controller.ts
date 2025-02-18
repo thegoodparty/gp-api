@@ -26,7 +26,7 @@ import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/shared/services/slack.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
-import { PathToVictoryService } from './services/pathToVictory.service'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 

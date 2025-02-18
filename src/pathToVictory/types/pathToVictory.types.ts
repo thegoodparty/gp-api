@@ -2,6 +2,7 @@ import { VoterCounts } from 'src/voters/voters.types'
 
 export interface PathToVictoryInput {
   slug: string
+  campaignId: string
   officeName: string
   electionDate: string
   electionTerm: number

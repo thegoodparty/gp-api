@@ -1,16 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
-import { QueueMessage } from '../queue.types'
+import { GenerateAiContentMessage, QueueMessage } from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { Campaign } from '@prisma/client'
+import { Campaign, PathToVictory } from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
-
+import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
+import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 @Injectable()
 export class ConsumerService {
   private readonly logger = new Logger(ConsumerService.name)
@@ -21,6 +22,7 @@ export class ConsumerService {
     // private crmService: CrmService,
     private pathToVictoryService: PathToVictoryService,
     private prisma: PrismaService,
+    private enqueuePathToVictoryService: EnqueuePathToVictoryService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -60,18 +62,24 @@ export class ConsumerService {
     switch (queueMessage.type) {
       case 'generateAiContent':
         this.logger.log('received generateAiContent message')
-        await this.aiContentService.handleGenerateAiContent(queueMessage.data)
+        const generateAiContentMessage =
+          queueMessage.data as GenerateAiContentMessage
+        await this.aiContentService.handleGenerateAiContent(
+          generateAiContentMessage,
+        )
         break
       case 'pathToVictory':
         this.logger.log('received pathToVictory message')
-        await this.handlePathToVictoryMessage(queueMessage.data)
+        const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
+        await this.handlePathToVictoryMessage(pathToVictoryMessage)
         break
     }
   }
 
-  private async handlePathToVictoryMessage(message: any) {
+  private async handlePathToVictoryMessage(message: PathToVictoryInput) {
     let p2vSuccess = false
-    let campaign: any // Campaign & { pathToVictory: PathToVictory } | null = null
+    let campaign: (Campaign & { pathToVictory: PathToVictory | null }) | null =
+      null
 
     try {
       const p2vResponse: P2VResponse =
@@ -81,13 +89,18 @@ export class ConsumerService {
       this.logger.debug('p2vResponse', p2vResponse)
 
       campaign = await this.prisma.campaign.findUnique({
-        where: { id: message.campaignId },
+        where: { id: Number(message.campaignId) },
         include: { pathToVictory: true },
       })
 
+      if (!campaign || campaign === null) {
+        this.logger.error('campaign not found')
+        throw new Error('campaign not found')
+      }
+
       p2vSuccess = await this.pathToVictoryService.analyzePathToVictoryResponse(
         {
-          campaign,
+          campaign: campaign as Campaign & { pathToVictory: PathToVictory },
           pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
           officeName: p2vResponse.officeName || '',
           electionDate: p2vResponse.electionDate || '',
