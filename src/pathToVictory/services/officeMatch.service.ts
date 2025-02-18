@@ -4,7 +4,10 @@ import { SlackService } from '../../shared/services/slack.service'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { AiService } from '../../ai/ai.service'
 import { ElectionType } from '@prisma/client'
-import { ChatCompletionTool } from 'openai/resources/chat/completions'
+import {
+  ChatCompletionNamedToolChoice,
+  ChatCompletionTool,
+} from 'openai/resources/chat/completions'
 import { VotersService } from '../../voters/services/voters.service'
 import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 
@@ -215,7 +218,7 @@ export class OfficeMatchService {
       },
     }
 
-    const toolChoice = {
+    const toolChoice: ChatCompletionNamedToolChoice = {
       type: 'function',
       function: { name: 'match_columns' },
     }
@@ -523,7 +526,7 @@ export class OfficeMatchService {
       },
     }
 
-    const toolChoice = {
+    const toolChoice: ChatCompletionNamedToolChoice = {
       type: 'function',
       function: { name: 'matchLabels' },
     }
@@ -569,7 +572,7 @@ export class OfficeMatchService {
       temperature: 0.1,
       topP: 0.1,
       tool: matchLabelsTool,
-      toolChoice: toolChoice,
+      toolChoice,
     })
 
     const content = completion?.content

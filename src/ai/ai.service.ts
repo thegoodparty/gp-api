@@ -9,8 +9,8 @@ import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { SlackChannel } from '../shared/services/slackService.types'
 import {
   ChatCompletion,
+  ChatCompletionNamedToolChoice,
   ChatCompletionTool,
-  // ChatCompletionToolChoiceOption // this is not working as expected
 } from 'openai/resources/chat/completions'
 import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
 
@@ -29,7 +29,7 @@ type GetChatToolCompletionArgs = {
   temperature?: number
   topP?: number
   tool?: ChatCompletionTool // list of functions that could be called.
-  toolChoice?: any // ChatCompletionToolChoiceOption // force the function to be called on every generation if needed.
+  toolChoice?: ChatCompletionNamedToolChoice // force the function to be called on every generation if needed.
   timeout?: number // timeout request after 5 minutes
 }
 
