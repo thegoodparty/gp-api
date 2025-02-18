@@ -5,10 +5,8 @@ import { OfficeMatchService } from './officeMatch.service'
 import { SlackService } from '../../shared/services/slack.service'
 import { EmailService } from '../../email/email.service'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
-
 import {
   PathToVictoryInput,
   PathToVictoryResponse,
@@ -71,7 +69,7 @@ export class PathToVictoryService extends createPrismaBase(
     this.logger.debug(`Starting p2v for ${input.slug}`)
 
     try {
-      let searchColumns: string[] = []
+      let searchColumns: string[] = ['']
 
       if (!input.electionType || !input.electionLocation) {
         if (
@@ -87,8 +85,6 @@ export class PathToVictoryService extends createPrismaBase(
             input.electionLevel,
             input.electionState,
           )
-        } else {
-          searchColumns = ['']
         }
 
         const locationColumns =
@@ -104,8 +100,6 @@ export class PathToVictoryService extends createPrismaBase(
           this.logger.debug('locationColumns', locationColumns)
           searchColumns = searchColumns.concat(locationColumns)
         }
-      } else {
-        searchColumns = ['']
       }
 
       let attempts = 1
