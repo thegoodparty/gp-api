@@ -37,7 +37,33 @@
 $ npm install
 ```
 
-- Create a Postgres database for the project to connect to.
+- Create a Postgres database for the project to connect to. There are many ways to do this, below is an example using Homebrew on macOS:
+    ```sh
+    # install postgres
+    brew install postgresql
+
+    # start a postgres instance
+    brew services start postgresql
+
+    # connect to the local db
+    psql postgres
+    ```
+    Inside the psql prompt, create a new database:
+    ```sql
+    -- create a new database for app
+    CREATE DATABASE gpdb;
+    -- connect to the new database
+    \c gpdb
+    -- create user and password
+    CREATE USER postgres WITH PASSWORD 'postgres';
+    -- grant all privileges to the user
+    GRANT ALL PRIVILEGES ON DATABASE gpdb TO postgres;
+    -- allow the user to create databases
+    ALTER USER postgres WITH CREATEDB;
+    ```
+
+    Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
+
 - Copy `.env.example` to `.env` and fill in the necessary environment variables.
 - Run the following command to create the database tables:
 
