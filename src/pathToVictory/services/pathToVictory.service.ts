@@ -168,7 +168,6 @@ export class PathToVictoryService extends createPrismaBase(
           pathToVictoryResponse.electionType = electionType
           pathToVictoryResponse.electionLocation = electionLocation
           pathToVictoryResponse.counts = counts
-          //   await this.saveL2Counts(counts, electionType, electionLocation)
           break
         }
 
