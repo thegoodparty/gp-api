@@ -1,6 +1,5 @@
-import { Injectable } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
-import { RacesService } from '../../elections/services/races.service'
 import { VotersService } from '../../voters/services/voters.service'
 import { OfficeMatchService } from './officeMatch.service'
 import { SlackService } from '../../shared/services/slack.service'
@@ -8,7 +7,7 @@ import { EmailService } from '../../email/email.service'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
-import { Prisma } from '@prisma/client'
+import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 
 import {
   PathToVictoryInput,
@@ -18,7 +17,6 @@ import { VoterCounts } from 'src/voters/voters.types'
 import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
-import { Campaign, PathToVictory } from '@prisma/client'
 
 @Injectable()
 export class PathToVictoryService extends createPrismaBase(
@@ -26,11 +24,11 @@ export class PathToVictoryService extends createPrismaBase(
 ) {
   constructor(
     private prisma: PrismaService,
-    private racesService: RacesService,
     private votersService: VotersService,
     private officeMatchService: OfficeMatchService,
     private slackService: SlackService,
     private emailService: EmailService,
+    @Inject(forwardRef(() => CrmCampaignsService))
     private crmService: CrmCampaignsService,
   ) {
     super()
@@ -51,7 +49,6 @@ export class PathToVictoryService extends createPrismaBase(
   async handlePathToVictory(input: PathToVictoryInput): Promise<{
     slug: string
     pathToVictoryResponse: PathToVictoryResponse
-    [key: string]: any
   }> {
     const pathToVictoryResponse: PathToVictoryResponse = {
       electionType: '',

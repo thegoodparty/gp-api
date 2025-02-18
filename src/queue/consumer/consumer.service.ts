@@ -10,19 +10,17 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
-import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
+
 @Injectable()
 export class ConsumerService {
   private readonly logger = new Logger(ConsumerService.name)
 
   constructor(
+    private prisma: PrismaService,
     private aiContentService: AiContentService,
     private slackService: SlackService,
-    // private crmService: CrmService,
     private pathToVictoryService: PathToVictoryService,
-    private prisma: PrismaService,
-    private enqueuePathToVictoryService: EnqueuePathToVictoryService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)

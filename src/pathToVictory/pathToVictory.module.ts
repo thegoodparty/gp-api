@@ -6,9 +6,18 @@ import { ElectionsModule } from '../elections/elections.module'
 import { VotersModule } from '../voters/voters.module'
 import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 import { QueueProducerModule } from '../queue/producer/producer.module'
+import { EmailModule } from '../email/email.module'
+import { AiModule } from '../ai/ai.module'
 
 @Module({
-  imports: [PrismaModule, ElectionsModule, VotersModule, QueueProducerModule],
+  imports: [
+    PrismaModule,
+    AiModule,
+    ElectionsModule,
+    VotersModule,
+    EmailModule,
+    QueueProducerModule,
+  ],
   providers: [
     PathToVictoryService,
     OfficeMatchService,
