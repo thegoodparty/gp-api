@@ -3,6 +3,7 @@ enum MunicipalityType {
   village
   town
   township
+  local
 }
 
 model Municipality {
