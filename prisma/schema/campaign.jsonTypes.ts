@@ -57,6 +57,11 @@ declare global {
       subscriptionCancelAt?: number | null
       filingPeriodsStart?: string
       filingPeriodsEnd?: string
+      officeTermLength?: string
+      partisanType?: string
+      priorElectionDates?: string[]
+      positionId?: string
+      tier?: string
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
     //  No reason to have both.

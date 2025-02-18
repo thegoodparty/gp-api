@@ -27,6 +27,17 @@ declare global {
       winNumber?: number
       p2vNotNeeded?: boolean
       totalRegisteredVoters?: number
+      republicans?: number
+      democrats?: number
+      indies?: number
+      women?: number
+      men?: number
+      white?: number
+      asian?: number
+      africanAmerican?: number
+      hispanic?: number
+      averageTurnout?: number
+      projectedTurnout?: number
       viability?: P2VViability
     }
   }

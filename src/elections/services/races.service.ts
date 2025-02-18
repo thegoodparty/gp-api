@@ -171,10 +171,10 @@ export class RacesService {
   }
 
   // todo: split this function into smaller functions
-  private async getRaceDetails(
+  async getRaceDetails(
     raceId: string,
     slug: string,
-    zip: string,
+    zip?: string | null,
     findElectionDates = true,
   ) {
     const data: any = {}

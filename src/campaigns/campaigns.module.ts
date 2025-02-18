@@ -10,12 +10,12 @@ import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { GeocodingService } from './services/geocoding.service'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
-import { PathToVictoryService } from './services/pathToVictory.service'
 import { CrmModule } from '../crm/crmModule'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { ElectionsModule } from 'src/elections/elections.module'
+import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 
 @Global()
 @Module({
@@ -25,6 +25,7 @@ import { ElectionsModule } from 'src/elections/elections.module'
     CrmModule,
     FullStoryModule,
     ElectionsModule,
+    PathToVictoryModule,
   ],
   controllers: [
     CampaignsController,
@@ -39,12 +40,10 @@ import { ElectionsModule } from 'src/elections/elections.module'
     CampaignMapService,
     GeocodingService,
     CampaignUpdateHistoryService,
-    PathToVictoryService,
     CrmCampaignsService,
   ],
   exports: [
     CampaignsService,
-    PathToVictoryService,
     CampaignUpdateHistoryService,
     CrmCampaignsService,
   ],

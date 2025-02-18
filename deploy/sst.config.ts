@@ -28,15 +28,19 @@ export default $config({
 
     let bucketDomain: string
     let apiDomain: string
+    let webAppRootUrl: string
     if ($app.stage === 'master') {
       apiDomain = 'gp-api.goodparty.org'
       bucketDomain = 'assets.goodparty.org'
+      webAppRootUrl = 'https://goodparty.org'
     } else if ($app.stage === 'develop') {
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
+      webAppRootUrl = 'https://app-dev.goodparty.org'
     } else {
       apiDomain = `gp-api-${$app.stage}.goodparty.org`
       bucketDomain = `assets-${$app.stage}.goodparty.org`
+      webAppRootUrl = `https://app-${$app.stage}.goodparty.org`
     }
 
     let assetsBucket
@@ -89,6 +93,18 @@ export default $config({
       )
     }
 
+    let enableFullstory = false
+    if ($app.stage === 'master') {
+      enableFullstory = true
+    }
+
+    let sqsQueueName = 'DEV_GP_Queue.fifo'
+    if ($app.stage === 'master') {
+      sqsQueueName = 'PROD_GP_Queue.fifo'
+    } else if ($app.stage === 'qa') {
+      sqsQueueName = 'QA_GP_Queue.fifo'
+    }
+
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain: apiDomain,
@@ -120,6 +136,15 @@ export default $config({
         LOG_LEVEL: 'debug',
         CORS_ORIGIN:
           $app.stage === 'master' ? 'goodparty.org' : 'dev.goodparty.org',
+        AWS_REGION: 'us-west-2',
+        ENABLE_FULLSTORY: enableFullstory ? 'true' : 'false',
+        ASSET_DOMAIN: bucketDomain,
+        WEBAPP_ROOT_URL: webAppRootUrl,
+        AI_MODELS:
+          'meta-llama/Llama-3.3-70B-Instruct-Turbo,Qwen/Qwen2.5-72B-Instruct-Turbo',
+        LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
+        SQS_QUEUE: sqsQueueName,
+        SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791/',
       },
       ssm: {
         // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
@@ -131,6 +156,40 @@ export default $config({
         // todo: secrets for more stages.
         DATABASE_URL:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
+        AUTH_SECRET:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AUTH_SECRET-eGe66U',
+        VOTER_DATASTORE:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:VOTER_DATASTORE-ooHetK',
+        AWS_ACCESS_KEY_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_ACCESS_KEY_ID-PWb1SB',
+        AWS_SECRET_ACCESS_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_SECRET_ACCESS_KEY-nkThRE',
+        AWS_S3_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_KEY-YFEbWy',
+        AWS_S3_SECRET:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_SECRET-KW7BQX',
+        HUBSPOT_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:HUBSPOT_TOKEN-gFRvGT',
+        ASHBY_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:ASHBY_KEY-5UdDjD',
+        FULLSTORY_API_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:FULLSTORY_API_KEY-Geho4f',
+        MAILGUN_API_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:MAILGUN_API_KEY-718eny',
+        TOGETHER_AI_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:TOGETHER_AI_KEY-sdX206',
+        OPENAI_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:OPEN_AI_KEY-VGhQ4h',
+        GOOGLE_CLIENT_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_CLIENT_ID-FcpHmK',
+        GOOGLE_API_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_API_KEY-dMkjI2',
+        STRIPE_SECRET_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_SECRET_KEY-GSGinp',
+        STRIPE_WEBSOCKET_SECRET:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_WEBSOCKET_SECRET-QT7A0C',
+        BALLOT_READY_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:BALLOT_READY_KEY-c5SoNE',
       },
       image: {
         context: '../', // Set the context to the main app directory

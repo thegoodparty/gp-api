@@ -17,6 +17,6 @@ import { VotersController } from './voters.controller'
     VoterOutreachService,
     VotersService,
   ],
-  exports: [VoterFileService],
+  exports: [VoterFileService, VotersService],
 })
 export class VotersModule {}

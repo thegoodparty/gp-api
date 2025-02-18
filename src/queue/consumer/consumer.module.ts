@@ -3,6 +3,7 @@ import { SqsModule } from '@ssut/nestjs-sqs'
 import { ConsumerService } from './consumer.service'
 import { queueConfig } from '../queue.config'
 import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
+import { PathToVictoryModule } from '../../pathToVictory/pathToVictory.module'
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
       ],
     }),
     CampaignsAiModule,
+    PathToVictoryModule,
   ],
   providers: [ConsumerService],
 })
