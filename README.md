@@ -59,7 +59,7 @@ $ npm install
     -- grant all privileges to the user
     GRANT ALL PRIVILEGES ON DATABASE gpdb TO postgres;
     -- allow the user to create databases
-    ALTER USER postgres WITH CREATEDB;
+    ALTER USER postgres CREATEDB;
     ```
 
     Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
