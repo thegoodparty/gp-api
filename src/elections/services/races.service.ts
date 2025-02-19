@@ -74,7 +74,6 @@ export class RacesService {
             'Could not fetch data from BallotReady',
           )
         }
-        console.log('queryResponse', queryResponse)
         const races = queryResponse.races
         if (races?.edges) {
           hasNextPage = races.pageInfo.hasNextPage

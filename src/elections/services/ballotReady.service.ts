@@ -146,7 +146,7 @@ export class BallotReadyService {
         }
         filterBy: {
           electionDay: {
-             gte: "${gt}"
+            gte: "${gt}"
             lte: "${lt}"
           }
           level: [${levelWithTownship}]
