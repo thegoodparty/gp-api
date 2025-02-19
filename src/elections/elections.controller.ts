@@ -2,7 +2,7 @@ import { Controller, Get, Query, UsePipes } from '@nestjs/common'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { RacesService } from './services/races.service'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { RacesByYearSchema } from './schemas/RacesByYear.schema'
+import { RacesByZipSchema } from './schemas/RacesByZip.schema'
 
 @Controller('elections')
 @PublicAccess()
@@ -12,8 +12,12 @@ export class ElectionsController {
 
   @Get('races-by-year')
   async getRacesByZipcode(
-    @Query() { zipcode, level, electionDate }: RacesByYearSchema,
+    @Query() { zipcode, level, electionDate }: RacesByZipSchema,
   ) {
-    return await this.racesService.racesByYear({ zipcode, level, electionDate })
+    return await this.racesService.getRacesByZip({
+      zipcode,
+      level,
+      electionDate,
+    })
   }
 }

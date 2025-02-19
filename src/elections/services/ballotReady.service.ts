@@ -1,6 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { GraphQLClient, gql } from 'graphql-request'
-import { Logger } from '@nestjs/common'
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
+import { gql, GraphQLClient } from 'graphql-request'
 import { truncateZip } from 'src/shared/util/zipcodes.util'
 import { PositionLevel } from 'src/generated/graphql.types'
 import {
@@ -9,6 +12,7 @@ import {
   RacesWithElectionDates,
 } from '../types/ballotReady.types'
 import { Headers, MimeTypes } from 'http-constants-ts'
+import { ELECTION_LEVELS } from '../../shared/constants/governmentLevels'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -115,12 +119,28 @@ export class BallotReadyService {
 
   async fetchRacesByZipcode(
     zipcode: string,
+    level: string | null,
+    electionDate?: string | null,
     startCursor?: string | null,
   ): Promise<RacesByZipcode | null> {
-    const today = new Date().toISOString().split('T')[0]
-    const nextYear = new Date()
-    nextYear.setFullYear(nextYear.getFullYear() + 4)
-    const nextYearFormatted = nextYear.toISOString().split('T')[0]
+    let gt
+    let lt
+    if (electionDate) {
+      ;({ gt, lt } = getMonthBounds(electionDate))
+    } else {
+      gt = new Date().toISOString().split('T')[0]
+      const nextYear = new Date()
+      nextYear.setFullYear(nextYear.getFullYear() + 2)
+      lt = nextYear.toISOString().split('T')[0]
+    }
+
+    let levelWithTownship = level?.toUpperCase()
+    if (levelWithTownship === ELECTION_LEVELS.Local) {
+      levelWithTownship = `${ELECTION_LEVELS.Local},TOWNSHIP,${ELECTION_LEVELS.City}`
+    }
+    if (levelWithTownship === ELECTION_LEVELS.County) {
+      levelWithTownship = `${ELECTION_LEVELS.County},REGIONAL`
+    }
 
     const query = gql`
     query {
@@ -130,9 +150,10 @@ export class BallotReadyService {
         }
         filterBy: {
           electionDay: {
-            gt: "${today}"
-            lt: "${nextYearFormatted}"
+            gte: "${gt}"
+            lte: "${lt}"
           }
+          level: [${levelWithTownship}]
         }
         after: ${startCursor ? `"${startCursor}"` : null}
       ) {
@@ -218,4 +239,19 @@ export class BallotReadyService {
       return null
     }
   }
+}
+
+function getMonthBounds(dateString: string): { gt: string; lt: string } {
+  console.log('dateString', dateString)
+  // Parse the date parts directly from the string to avoid timezone issues
+  const [year, month] = dateString.split('-').map(Number)
+
+  const gt = new Date(year, month - 1, 1) // month - 1 because months are 0-based
+    .toISOString()
+    .split('T')[0]
+  const lt = new Date(year, month, 0) // Last day of the month
+    .toISOString()
+    .split('T')[0]
+
+  return { gt, lt }
 }
