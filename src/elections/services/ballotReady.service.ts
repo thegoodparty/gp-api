@@ -7,6 +7,8 @@ import {
   RacesById,
   RacesByZipcode,
   RacesWithElectionDates,
+  RaceWithOfficeHoldersNode,
+  RaceWithOfficeHolders,
 } from '../types/ballotReady.types'
 import { Headers, MimeTypes } from 'http-constants-ts'
 
@@ -215,6 +217,128 @@ export class BallotReadyService {
       return await this.graphQLClient.request(query)
     } catch (error) {
       this.logger.error('Error at fetchRacesWithElectionDates: ', error)
+      return null
+    }
+  }
+
+  async fetchRacesWithOfficeHolders(
+    raceId: string,
+  ): Promise<RaceWithOfficeHoldersNode | null> {
+    const query = gql`
+      query Node {
+        node(id: "${raceId}") {
+          ... on Race {
+            databaseId
+            isPartisan
+            isPrimary
+            election {
+              electionDay
+              name
+              state
+            }
+            position {
+              id
+              description
+              judicial
+              level
+              name
+              partisanType
+              staggeredTerm
+              state
+              seats
+              subAreaName
+              subAreaValue
+              tier
+              mtfcc
+              geoId
+              electionFrequencies {
+                frequency
+              }
+              hasPrimary
+              normalizedPosition {
+                name
+              }
+              officeHolders {
+                nodes {
+                  centralPhone
+                  createdAt
+                  databaseId
+                  endAt
+                  id
+                  isAppointed
+                  isCurrent
+                  isOffCycle
+                  isVacant
+                  officePhone
+                  officeTitle
+                  otherPhone
+                  primaryEmail
+                  specificity
+                  startAt
+                  totalYearsInOffice
+                  updatedAt
+                  person {
+                    createdAt
+                    databaseId
+                    email
+                    firstName
+                    fullName
+                    id
+                    lastName
+                    middleName
+                    nickname
+                    phone
+                    slug
+                    suffix
+                    updatedAt
+                  }
+                }
+              }
+            }
+            filingPeriods {
+              endOn
+              startOn
+            }
+            candidacies {
+              createdAt
+              databaseId
+              id
+              isCertified
+              isHidden
+              result
+              uncertified
+              updatedAt
+              withdrawn
+              candidate {
+                createdAt
+                databaseId
+                email
+                firstName
+                fullName
+                id
+                lastName
+                middleName
+                nickname
+                phone
+                slug
+                suffix
+                updatedAt
+              }
+              election {
+                electionDay
+              }
+            }
+          }
+        }
+      }
+    `
+
+    try {
+      const response =
+        await this.graphQLClient.request<RaceWithOfficeHolders>(query)
+      return response?.node || null
+    } catch (error) {
+      this.logger.error('Error at fetchRacesWithOfficeHolders:', error)
       return null
     }
   }

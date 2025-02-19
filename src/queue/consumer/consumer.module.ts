@@ -4,6 +4,7 @@ import { ConsumerService } from './consumer.service'
 import { queueConfig } from '../queue.config'
 import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
 import { PathToVictoryModule } from '../../pathToVictory/pathToVictory.module'
+import { ElectionsModule } from 'src/elections/elections.module'
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { PathToVictoryModule } from '../../pathToVictory/pathToVictory.module'
     }),
     CampaignsAiModule,
     PathToVictoryModule,
+    ElectionsModule,
   ],
   providers: [ConsumerService],
 })

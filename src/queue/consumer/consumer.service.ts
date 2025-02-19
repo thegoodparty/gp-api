@@ -10,7 +10,11 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
-import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
+import {
+  PathToVictoryInput,
+  ViabilityScore,
+} from 'src/pathToVictory/types/pathToVictory.types'
+import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 
 @Injectable()
 export class ConsumerService {
@@ -21,6 +25,7 @@ export class ConsumerService {
     private aiContentService: AiContentService,
     private slackService: SlackService,
     private pathToVictoryService: PathToVictoryService,
+    private viabilityService: ViabilityService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -127,39 +132,41 @@ export class ConsumerService {
     }
 
     // Calculate viability score after a valid path to victory response
-    // let viability
-    // try {
-    //   viability = await this.viabilityService.calculateViabilityScore(
-    //     message.campaignId,
-    //   )
-    // } catch (e) {
-    //   this.logger.error('error calculating viability score', e)
-    //   await this.slackService.errorMessage({
-    //     message: 'error calculating viability score',
-    //     error: e,
-    //   })
-    // }
+    let viability: ViabilityScore | null = null
+    try {
+      viability = await this.viabilityService.calculateViabilityScore(
+        Number(message.campaignId),
+      )
+    } catch (e) {
+      this.logger.error('error calculating viability score', e)
+      await this.slackService.errorMessage({
+        message: 'error calculating viability score',
+        error: e,
+      })
+    }
 
-    // this.logger.debug('viability', viability)
-    // if (viability) {
-    //   const pathToVictory = await this.prisma.pathToVictory.findUnique({
-    //     where: { campaignId: message.campaignId },
-    //   })
+    this.logger.debug('viability', viability)
+    if (viability) {
+      const pathToVictory = await this.prisma.pathToVictory.findUnique({
+        where: { campaignId: Number(message.campaignId) },
+      })
 
-    //   if (pathToVictory) {
-    //     const data = pathToVictory.data || {}
-    //     await this.prisma.pathToVictory.update({
-    //       where: { id: pathToVictory.id },
-    //       data: {
-    //         data: {
-    //           ...data,
-    //           viability,
-    //         },
-    //       },
-    //     })
-    //   }
-    // }
+      if (pathToVictory) {
+        const data = pathToVictory.data || {}
+        await this.prisma.pathToVictory.update({
+          where: { id: pathToVictory.id },
+          data: {
+            data: {
+              ...data,
+              viability,
+            },
+          },
+        })
+      }
+    }
 
+    // This is disabled until we have a process to load the data from the sheet
+    // and a place to store the data since BallotCandidate was deprecated.
     // const isProd = WEBAPP_ROOT === 'https://goodparty.org'
     // // Send the candidate to google sheets for techspeed on production
     // if (isProd) {
