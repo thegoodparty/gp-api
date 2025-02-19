@@ -17,9 +17,8 @@ import { BallotReadyService } from './ballotReady.service'
 import { PositionLevel } from 'src/generated/graphql.types'
 import { AiService } from '../../ai/ai.service'
 import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
-import { RacesByYear, PrimaryElectionDates } from '../types/elections.types'
 import { parseRaces } from '../util/parseRaces.util'
-import { sortRacesGroupedByYear } from '../util/sortRaces.util'
+import { RaceNode } from '../types/ballotReady.types'
 
 @Injectable()
 export class RacesService {
@@ -38,35 +37,44 @@ export class RacesService {
     return this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
   }
 
-  async racesByYear({
+  async getRaces({
     zipcode,
     level,
     electionDate,
   }: {
     zipcode: string
-    level?: string
+    level: string
     electionDate?: string
-  }): Promise<RacesByYear> {
+  }): Promise<RaceNode[]> {
     try {
       let startCursor: string | undefined | null
       const existingPositions: Set<string> = new Set()
-      const racesByYear: RacesByYear = {}
-      const primaryElectionDates: PrimaryElectionDates = {}
+      const elections: RaceNode[] = []
+      const primaryElectionDates: Record<
+        string,
+        {
+          electionDay: string
+          primaryElectionId: string
+        }
+      > = {}
       let hasNextPage = true
 
       let nextRacesPromise = this.ballotReadyService.fetchRacesByZipcode(
         zipcode,
+        level,
+        electionDate,
         startCursor,
       )
 
       while (hasNextPage) {
-        // Wait for the API response (while the previous parse was happening)
+        // Wait for the API response
         const queryResponse = await nextRacesPromise
         if (!queryResponse) {
           throw new InternalServerErrorException(
             'Could not fetch data from BallotReady',
           )
         }
+        console.log('queryResponse', queryResponse)
         const races = queryResponse.races
         if (races?.edges) {
           hasNextPage = races.pageInfo.hasNextPage
@@ -74,24 +82,23 @@ export class RacesService {
 
           // Start the next API request while parsing
           nextRacesPromise = hasNextPage
-            ? this.ballotReadyService.fetchRacesByZipcode(zipcode, startCursor)
+            ? this.ballotReadyService.fetchRacesByZipcode(
+                zipcode,
+                level,
+                electionDate,
+                startCursor,
+              )
             : Promise.resolve(null)
 
-          // Process the current batch while the next request is running
-          parseRaces(
-            races,
-            existingPositions,
-            racesByYear,
-            primaryElectionDates,
-          )
+          parseRaces(races, existingPositions, elections, primaryElectionDates)
         } else {
           hasNextPage = false
         }
       }
 
-      return sortRacesGroupedByYear(racesByYear)
+      return elections
     } catch (e) {
-      this.logger.error('error at ballotData/get', e)
+      this.logger.error('error at getRaces', e)
       throw new InternalServerErrorException('Error getting races by zipcode')
     }
   }

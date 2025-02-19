@@ -31,10 +31,19 @@ export interface RaceNode {
   position: RacesByZipcodePosition
 }
 
-export type RacesByZipcodeElection = Pick<
-  Election,
-  'id' | 'electionDay' | 'name' | 'originalElectionDate' | 'state' | 'timezone'
->
+export interface RacesByZipcodeElection
+  extends Pick<
+    Election,
+    | 'id'
+    | 'electionDay'
+    | 'name'
+    | 'originalElectionDate'
+    | 'state'
+    | 'timezone'
+  > {
+  primaryElectionDate?: string
+  primaryElectionId?: string
+}
 
 export type RacesByZipcodePosition = Pick<
   Position,
