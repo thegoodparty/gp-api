@@ -105,6 +105,13 @@ export default $config({
       sqsQueueName = 'QA_GP_Queue.fifo'
     }
 
+    // Fetch the JSON secret using Pulumi's AWS SDK
+    const secretArn =
+      'arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4'
+    const secret = new aws.secretsmanager.SecretVersion('gp-secrets', {
+      secretId: secretArn,
+    })
+
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain: apiDomain,
@@ -145,83 +152,15 @@ export default $config({
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
-      },
-      ssm: {
-        // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
-        //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
-        CONTENTFUL_ACCESS_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
-        CONTENTFUL_SPACE_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_SPACE_ID-BvsxFz',
-        // todo: secrets for more stages.
-        DATABASE_URL:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
-        AUTH_SECRET:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AUTH_SECRET-eGe66U',
-        VOTER_DATASTORE:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:VOTER_DATASTORE-ooHetK',
-        AWS_ACCESS_KEY_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_ACCESS_KEY_ID-PWb1SB',
-        AWS_SECRET_ACCESS_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_SECRET_ACCESS_KEY-nkThRE',
-        AWS_S3_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_KEY-YFEbWy',
-        AWS_S3_SECRET:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_SECRET-KW7BQX',
-        HUBSPOT_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:HUBSPOT_TOKEN-gFRvGT',
-        ASHBY_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:ASHBY_KEY-5UdDjD',
-        FULLSTORY_API_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:FULLSTORY_API_KEY-Geho4f',
-        MAILGUN_API_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:MAILGUN_API_KEY-718eny',
-        TOGETHER_AI_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:TOGETHER_AI_KEY-sdX206',
-        OPEN_AI_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:OPEN_AI_KEY-VGhQ4h',
-        GOOGLE_CLIENT_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_CLIENT_ID-FcpHmK',
-        GOOGLE_API_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_API_KEY-dMkjI2',
-        STRIPE_SECRET_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_SECRET_KEY-GSGinp',
-        STRIPE_WEBSOCKET_SECRET:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_WEBSOCKET_SECRET-QT7A0C',
-        BALLOT_READY_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:BALLOT_READY_KEY-c5SoNE',
-        L2_DATA_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:L2_DATA_KEY-uH6EFm',
-        SLACK_APP_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_APP_ID-gCZdTR',
-        SLACK_BOT_DEV_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_DEV_CHANNEL_ID-c6kd0u',
-        SLACK_BOT_DEV_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_DEV_CHANNEL_TOKEN-6GHsy8',
-        SLACK_BOT_PATH_TO_VICTORY_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_CHANNEL_ID-cvLCRc',
-        SLACK_BOT_PATH_TO_VICTORY_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_CHANNEL_TOKEN-x3OTUF',
-        SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_ID-Vf4jfd',
-        SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_TOKEN-ZYaTMY',
-        SLACK_USER_FEEDBACK_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_USER_FEEDBACK_CHANNEL_ID-qNgKov',
-        SLACK_USER_FEEDBACK_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_USER_FEEDBACK_CHANNEL_TOKEN-DVapEH',
-        SLACK_BOT_AI_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_AI_CHANNEL_ID-0m7pMg',
-        SLACK_BOT_AI_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_AI_CHANNEL_TOKEN-4dnzsC',
-        SLACK_BOT_POLITICS_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_POLITICS_CHANNEL_ID-Wq9jYg',
-        SLACK_BOT_POLITICS_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_POLITICS_CHANNEL_TOKEN-FUVDcL',
-        SLACK_BOT_FEEDBACK_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_FEEDBACK_CHANNEL_ID-pETcUU',
-        SLACK_BOT_FEEDBACK_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_FEEDBACK_CHANNEL_TOKEN-a7nvdu',
+
+        // Expand the JSON secret into individual environment variables
+        ...pulumi.output(secret.secretString).apply((str) => {
+          try {
+            return JSON.parse(str || '{}')
+          } catch {
+            throw new Error('Failed to parse GP_SECRETS JSON')
+          }
+        }),
       },
       image: {
         context: '../', // Set the context to the main app directory
