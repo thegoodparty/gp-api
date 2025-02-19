@@ -190,8 +190,8 @@ export default $config({
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_WEBSOCKET_SECRET-QT7A0C',
         BALLOT_READY_KEY:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:BALLOT_READY_KEY-c5SoNE',
-        L2_DATA_KEY: 
-        'arn:aws:secretsmanager:us-west-2:333022194791:secret:L2_DATA_KEY-uH6EFm',
+        L2_DATA_KEY:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:L2_DATA_KEY-uH6EFm',
         SLACK_APP_ID:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_APP_ID-gCZdTR',
         SLACK_BOT_DEV_CHANNEL_ID:
