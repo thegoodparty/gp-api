@@ -157,8 +157,8 @@ export default $config({
         ...pulumi.output(secret.secretString).apply((str) => {
           try {
             return JSON.parse(str || '{}')
-          } catch {
-            throw new Error('Failed to parse GP_SECRETS JSON')
+          } catch (e) {
+            throw new Error('Failed to parse GP_SECRETS JSON', e?.message)
           }
         }),
       },
