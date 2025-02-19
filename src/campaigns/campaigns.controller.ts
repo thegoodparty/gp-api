@@ -29,6 +29,7 @@ import { CampaignPlanVersionsService } from './services/campaignPlanVersions.ser
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
+import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -40,6 +41,7 @@ export class CampaignsController {
     private readonly planVersions: CampaignPlanVersionsService,
     private readonly slack: SlackService,
     private readonly p2v: PathToVictoryService,
+    private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -81,7 +83,9 @@ export class CampaignsController {
       })
     }
 
-    return p2v
+    await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+
+    return
   }
 
   @Roles(UserRole.admin)
