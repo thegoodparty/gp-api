@@ -85,7 +85,7 @@ export class CampaignsController {
 
     await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
 
-    return
+    return p2v
   }
 
   @Roles(UserRole.admin)
