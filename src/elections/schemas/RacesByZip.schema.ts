@@ -6,7 +6,11 @@ import { z } from 'zod'
 export class RacesByZipSchema extends createZodDto(
   z.object({
     zipcode: ZipSchema,
-    level: z.enum(LEVELS),
+    level: z
+      .string()
+      .refine((val: string) => LEVELS.includes(val?.toUpperCase()), {
+        message: 'invalid election level',
+      }),
     electionDate: z.string().date().optional(),
   }),
 ) {}

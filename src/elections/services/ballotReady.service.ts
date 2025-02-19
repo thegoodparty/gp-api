@@ -1,6 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { GraphQLClient, gql } from 'graphql-request'
-import { Logger } from '@nestjs/common'
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
+import { gql, GraphQLClient } from 'graphql-request'
 import { truncateZip } from 'src/shared/util/zipcodes.util'
 import { PositionLevel } from 'src/generated/graphql.types'
 import {
@@ -9,6 +12,7 @@ import {
   RacesWithElectionDates,
 } from '../types/ballotReady.types'
 import { Headers, MimeTypes } from 'http-constants-ts'
+import { ELECTION_LEVELS } from '../../shared/constants/governmentLevels'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -131,11 +135,11 @@ export class BallotReadyService {
     }
 
     let levelWithTownship = level?.toUpperCase()
-    if (levelWithTownship === 'LOCAL') {
-      levelWithTownship = 'LOCAL,TOWNSHIP,CITY'
+    if (levelWithTownship === ELECTION_LEVELS.Local) {
+      levelWithTownship = `${ELECTION_LEVELS.Local},TOWNSHIP,${ELECTION_LEVELS.City}`
     }
-    if (levelWithTownship === 'COUNTY') {
-      levelWithTownship = 'COUNTY,REGIONAL'
+    if (levelWithTownship === ELECTION_LEVELS.County) {
+      levelWithTownship = `${ELECTION_LEVELS.County},REGIONAL`
     }
 
     const query = gql`

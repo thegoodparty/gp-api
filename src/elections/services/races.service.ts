@@ -37,7 +37,7 @@ export class RacesService {
     return this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
   }
 
-  async getRaces({
+  async getRacesByZip({
     zipcode,
     level,
     electionDate,
@@ -97,7 +97,7 @@ export class RacesService {
 
       return elections
     } catch (e) {
-      this.logger.error('error at getRaces', e)
+      this.logger.error('error at getRacesByZip', e)
       throw new InternalServerErrorException('Error getting races by zipcode')
     }
   }

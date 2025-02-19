@@ -14,6 +14,10 @@ export class ElectionsController {
   async getRacesByZipcode(
     @Query() { zipcode, level, electionDate }: RacesByZipSchema,
   ) {
-    return await this.racesService.getRaces({ zipcode, level, electionDate })
+    return await this.racesService.getRacesByZip({
+      zipcode,
+      level,
+      electionDate,
+    })
   }
 }
