@@ -178,7 +178,7 @@ export default $config({
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:MAILGUN_API_KEY-718eny',
         TOGETHER_AI_KEY:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:TOGETHER_AI_KEY-sdX206',
-        OPENAI_KEY:
+        OPEN_AI_KEY:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:OPEN_AI_KEY-VGhQ4h',
         GOOGLE_CLIENT_ID:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_CLIENT_ID-FcpHmK',
