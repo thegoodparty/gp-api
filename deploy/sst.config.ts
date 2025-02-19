@@ -190,6 +190,36 @@ export default $config({
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_WEBSOCKET_SECRET-QT7A0C',
         BALLOT_READY_KEY:
           'arn:aws:secretsmanager:us-west-2:333022194791:secret:BALLOT_READY_KEY-c5SoNE',
+        SLACK_APP_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_APP_ID-gCZdTR',
+        SLACK_BOT_DEV_CHANNEL_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_DEV_CHANNEL_ID-c6kd0u',
+        SLACK_BOT_DEV_CHANNEL_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_DEV_CHANNEL_TOKEN-6GHsy8',
+        SLACK_BOT_PATH_TO_VICTORY_CHANNEL_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_CHANNEL_ID-cvLCRc',
+        SLACK_BOT_PATH_TO_VICTORY_CHANNEL_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_CHANNEL_TOKEN-x3OTUF',
+        SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_ID-Vf4jfd',
+        SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_TOKEN-ZYaTMY',
+        SLACK_USER_FEEDBACK_CHANNEL_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_USER_FEEDBACK_CHANNEL_ID-qNgKov',
+        SLACK_USER_FEEDBACK_CHANNEL_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_USER_FEEDBACK_CHANNEL_TOKEN-DVapEH',
+        SLACK_BOT_AI_CHANNEL_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_AI_CHANNEL_ID-0m7pMg',
+        SLACK_BOT_AI_CHANNEL_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_AI_CHANNEL_TOKEN-4dnzsC',
+        SLACK_BOT_POLITICS_CHANNEL_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_POLITICS_CHANNEL_ID-Wq9jYg',
+        SLACK_BOT_POLITICS_CHANNEL_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_POLITICS_CHANNEL_TOKEN-FUVDcL',
+        SLACK_BOT_FEEDBACK_CHANNEL_ID:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_FEEDBACK_CHANNEL_ID-pETcUU',
+        SLACK_BOT_FEEDBACK_CHANNEL_TOKEN:
+          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_FEEDBACK_CHANNEL_TOKEN-a7nvdu',
       },
       image: {
         context: '../', // Set the context to the main app directory
