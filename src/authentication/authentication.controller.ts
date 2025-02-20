@@ -30,13 +30,7 @@ import { userHasRole } from 'src/users/util/users.util'
 import { FastifyReply } from 'fastify'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
 import { CrmUsersService } from '../users/services/crmUsers.service'
-
-const setTokenCookie = (response: FastifyReply, token: string) =>
-  response.setCookie('token', token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-  })
+import { setTokenCookie } from './util/setTokenCookie.util'
 
 @PublicAccess()
 @Controller('authentication')
@@ -85,13 +79,19 @@ export class AuthenticationController {
 
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
   @Post('social-login/:socialProvider')
-  async socialLogin(@ReqUser() user: User): Promise<LoginResult> {
+  async socialLogin(
+    @Res({ passthrough: true }) response,
+    @ReqUser() user: User,
+  ): Promise<LoginResult> {
+    const token = this.authenticationService.generateAuthToken({
+      email: user.email,
+      sub: user.id,
+    })
+
+    setTokenCookie(response, token)
     return {
       user: ReadUserOutputSchema.parse(user),
-      token: this.authenticationService.generateAuthToken({
-        email: user.email,
-        sub: user.id,
-      }),
+      token,
     }
   }
 

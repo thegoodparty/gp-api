@@ -25,9 +25,7 @@ import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmCampaignsService } from './crmCampaigns.service'
-
-const objectNotEmpty = (obj: object) =>
-  Boolean(obj && Object.values(obj).length > 0)
+import { objectNotEmpty } from '../../shared/util/objects.util'
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
