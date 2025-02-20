@@ -29,3 +29,5 @@ export const pick = (obj: { [key: string]: any }, keys: string[]): object => {
     .filter((key) => key in obj)
     .reduce((obj2, key) => ((obj2[key] = obj[key]), obj2), {})
 }
+export const objectNotEmpty = (obj: object) =>
+  Boolean(obj && Object.values(obj).length > 0)
