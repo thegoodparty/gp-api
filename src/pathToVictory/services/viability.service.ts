@@ -168,118 +168,62 @@ export class ViabilityService {
     race: RaceWithOfficeHoldersNode,
     campaign: Campaign,
   ): number {
-    let candidates = 0
-    const candidateSet = new Set<string>()
+    // todo: we may need to add pagination to the officeHolders
     const candidacies = race?.candidacies || []
+    if (!candidacies.length) return 0
 
-    if (candidacies && candidacies.length > 0) {
-      this.logger.debug('candidacies', { candidacies })
+    const candidateSet = new Set<string>()
+    const campaignName = (campaign?.data?.name || '').toLowerCase()
+    const electionDate = new Date(campaign?.details?.electionDate || '')
 
-      for (const candidacy of candidacies) {
-        let candidacyName = candidacy?.candidate?.fullName || ''
-        candidacyName = candidacyName.toLowerCase()
-
-        let candidateName = campaign?.data?.name || ''
-        candidateName = candidateName.toLowerCase()
-
-        const candidacyElectionDay = candidacy?.election?.electionDay
-        this.logger.debug('candidacyElectionDay', { candidacyElectionDay })
-
-        const candidacyDate = candidacyElectionDay
-          ? new Date(candidacyElectionDay)
-          : null
-        const electionDate = new Date(campaign?.details?.electionDate || '')
-
-        this.logger.debug('comparison dates', {
-          candidacyName,
-          candidateName,
-          candidacyDate,
-          electionDate,
-        })
-
-        if (candidacyDate && candidacyDate < electionDate) {
-          this.logger.debug('candidacyDate < electionDate')
-          if (candidacy.result === 'LOST') {
-            if (candidacyName === candidateName) {
-              continue // we lost a primary
-            }
-            // rival candidate is no longer in the running
-            this.logger.debug('skipping candidate', {
-              name: candidacy?.candidate?.fullName,
-            })
-          } else if (candidacy.result === 'WON') {
-            if (candidacyName === candidateName) {
-              // we won the primary
-            } else {
-              this.logger.debug('adding candidate', {
-                name: candidacy?.candidate?.fullName,
-              })
-              if (candidacy?.candidate?.fullName) {
-                candidateSet.add(candidacy.candidate.fullName)
-              }
-            }
-          } else {
-            if (
-              candidacyName !== candidateName &&
-              candidacy?.candidate?.fullName
-            ) {
-              this.logger.debug('adding candidate', {
-                name: candidacy.candidate.fullName,
-              })
-              candidateSet.add(candidacy.candidate.fullName)
-            }
-          }
-        } else if (
-          candidacyDate &&
-          candidacyDate.getTime() === electionDate.getTime()
-        ) {
-          this.logger.debug('candidacyDate === electionDate')
-          if (candidacy.result === 'LOST') {
-            if (candidacyName === candidateName) {
-              continue // we lost the election
-            }
-          } else if (candidacy.result === 'WON') {
-            if (
-              candidacyName !== candidateName &&
-              candidacy?.candidate?.fullName
-            ) {
-              this.logger.debug('adding candidate', {
-                name: candidacy.candidate.fullName,
-              })
-              candidateSet.add(candidacy.candidate.fullName)
-            }
-          } else if (
-            candidacyName !== candidateName &&
-            candidacy?.candidate?.fullName
-          ) {
-            this.logger.debug('adding candidate', {
-              name: candidacy.candidate.fullName,
-            })
-            candidateSet.add(candidacy.candidate.fullName)
-          }
-        } else {
-          this.logger.debug('candidacyDate > electionDate')
-          if (
-            candidacyName !== candidateName &&
-            candidacy?.candidate?.fullName
-          ) {
-            this.logger.debug('adding candidate', {
-              name: candidacy.candidate.fullName,
-            })
-            candidateSet.add(candidacy.candidate.fullName)
-          }
-        }
+    for (const candidacy of candidacies) {
+      if (this.shouldAddCandidate(candidacy, campaignName, electionDate)) {
+        candidateSet.add(candidacy.candidate!.fullName!)
       }
     }
 
-    if (candidacies.length > 0) {
-      this.logger.debug('candidateSet', { candidateSet })
-      const candidateArray = Array.from(candidateSet)
-      this.logger.debug('candidateArray', { candidateArray })
-      candidates = candidateArray.length
-      candidates++ // increment by 1 to include our candidate
-    }
+    return candidateSet.size + 1 // +1 to include our candidate
+  }
 
-    return candidates
+  private shouldAddCandidate(
+    candidacy: RaceWithOfficeHoldersNode['candidacies'][0],
+    campaignName: string,
+    electionDate: Date,
+  ): boolean {
+    if (!candidacy?.candidate?.fullName) return false
+
+    const candidateName = candidacy.candidate.fullName.toLowerCase()
+    if (candidateName === campaignName) return false
+
+    const candidacyDate = candidacy.election?.electionDay
+      ? new Date(candidacy.election.electionDay)
+      : null
+
+    if (!candidacyDate) return true
+
+    const dateComparison = this.compareDates(candidacyDate, electionDate)
+    return this.isEligibleCandidate(
+      candidacy.result as 'WON' | 'LOST' | null,
+      dateComparison,
+    )
+  }
+
+  private compareDates(date1: Date, date2: Date): 'before' | 'same' | 'after' {
+    if (date1 < date2) return 'before'
+    if (date1.getTime() === date2.getTime()) return 'same'
+    return 'after'
+  }
+
+  private isEligibleCandidate(
+    result: 'WON' | 'LOST' | null | undefined,
+    dateComparison: 'before' | 'same' | 'after',
+  ): boolean {
+    if (dateComparison === 'before') {
+      return result === 'WON' || !result
+    }
+    if (dateComparison === 'same') {
+      return result !== 'LOST'
+    }
+    return true
   }
 }
