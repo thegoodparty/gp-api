@@ -169,6 +169,7 @@ export class CampaignsController {
     @ReqCampaign() campaign: Campaign,
     @Body() { slug, ...body }: UpdateCampaignSchema,
   ) {
+    this.logger.debug('Updating campaign', campaign, { slug, body })
     if (
       typeof slug === 'string' &&
       campaign?.slug !== slug &&

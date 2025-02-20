@@ -26,6 +26,9 @@ import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
+const objectNotEmpty = (obj: object) =>
+  Boolean(obj && Object.values(obj).length > 0)
+
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
@@ -78,6 +81,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async createForUser(user: User) {
+    this.logger.debug('Creating campaign for user', user)
     const slug = await this.findSlug(user)
 
     const newCampaign = await this.model.create({
@@ -94,7 +98,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         },
       },
     })
-
+    this.logger.debug('Created campaign', newCampaign)
     this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
@@ -110,6 +114,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const { data, details, pathToVictory } = body
 
     return this.client.$transaction(async (tx) => {
+      this.logger.debug('Updating campaign json fields', { id, body })
       const campaign = await tx.campaign.findFirst({
         where: { id },
         include: { pathToVictory: true },
@@ -122,7 +127,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         details: details
           ? deepMerge(campaign.details as object, details)
           : undefined,
-        ...(pathToVictory
+        ...(objectNotEmpty(pathToVictory as object)
           ? {
               pathToVictory: {
                 update: {
@@ -145,7 +150,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       return tx.campaign.update({
         where: { id: campaign.id },
         data: updateData,
-        include: { pathToVictory: true },
+        include: {
+          pathToVictory: true, // objectNotEmpty(updateData.pathToVictory as object),
+        },
       })
     })
   }

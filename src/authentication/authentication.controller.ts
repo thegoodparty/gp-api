@@ -31,6 +31,13 @@ import { FastifyReply } from 'fastify'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
 import { CrmUsersService } from '../users/services/crmUsers.service'
 
+const setTokenCookie = (response: FastifyReply, token: string) =>
+  response.setCookie('token', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+  })
+
 @PublicAccess()
 @Controller('authentication')
 @UsePipes(ZodValidationPipe)
@@ -45,21 +52,31 @@ export class AuthenticationController {
   ) {}
 
   @Post('register')
-  async register(@Body() userData: RegisterUserInputDto) {
+  async register(
+    @Res({ passthrough: true }) response: FastifyReply,
+    @Body() userData: RegisterUserInputDto,
+  ) {
     const { token, user } = await this.authenticationService.register(userData)
+    setTokenCookie(response, token)
     return { user: ReadUserOutputSchema.parse(user), token }
   }
 
   @UseGuards(AuthGuard('local'))
   @Post('login')
-  async login(@ReqUser() user: User): Promise<LoginResult> {
+  async login(
+    @Res({ passthrough: true }) response: FastifyReply,
+    @ReqUser() user: User,
+  ): Promise<LoginResult> {
+    const token = this.authenticationService.generateAuthToken({
+      email: user.email,
+      sub: user.id,
+    })
     const result = {
       user: ReadUserOutputSchema.parse(user),
-      token: this.authenticationService.generateAuthToken({
-        email: user.email,
-        sub: user.id,
-      }),
+      token,
     }
+
+    setTokenCookie(response, token)
 
     this.crmUsers.trackUserLogin(user)
 
