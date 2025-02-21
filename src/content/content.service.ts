@@ -10,18 +10,14 @@ import {
 import { isObject } from 'src/shared/util/objects.util'
 import { AIChatPromptContents, findByTypeOptions } from './content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-
-const transformContent = (
-  type: ContentType | InferredContentTypes,
-  entries: Content[],
-) => {
-  const transformer = CONTENT_TYPE_MAP[type]?.transformer
-  return transformer ? transformer(entries) : entries
-}
+import { ProcessTimersService } from '../shared/services/process-timers.service'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {
-  constructor(private contentfulService: ContentfulService) {
+  constructor(
+    private contentfulService: ContentfulService,
+    private timers: ProcessTimersService,
+  ) {
     super()
   }
 
@@ -36,7 +32,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       },
     })
 
-    return transformContent(content.type, [content])?.[0]
+    return this.transformContent(content.type, [content])?.[0]
   }
 
   async findByType({ type, take, orderBy, where }: findByTypeOptions) {
@@ -47,16 +43,21 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       ? { OR: queryType.map((type) => ({ type })) }
       : { type: queryType }
 
-    const entries = await this.findMany({
+    const timerId = this.timers.start(`FindContentByType: ${type}`)
+    const queryConfig = {
       where: {
         ...whereCondition,
         ...where,
       },
       orderBy: orderBy || undefined,
       take: take || undefined,
-    })
+    }
 
-    return transformContent(type, entries)
+    const entries = await this.findMany(queryConfig)
+
+    this.timers.end(timerId)
+
+    return this.transformContent(type, entries)
   }
 
   async fetchGlossaryItems() {
@@ -65,7 +66,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
         type: ContentType.glossaryItem,
       },
     })
-    return transformContent(ContentType.glossaryItem, entries)
+    return this.transformContent(ContentType.glossaryItem, entries)
   }
 
   async getAiContentPrompts() {
@@ -149,6 +150,17 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
         existingEntries.has(entry.sys.id),
       ),
     }
+  }
+
+  private transformContent(
+    type: ContentType | InferredContentTypes,
+    entries: Content[],
+  ) {
+    const timerId = this.timers.start(`TransformContent type: ${type}`)
+    const transformer = CONTENT_TYPE_MAP[type]?.transformer
+    const result = transformer ? transformer(entries) : entries
+    this.timers.end(timerId)
+    return result
   }
 
   async syncContent() {
