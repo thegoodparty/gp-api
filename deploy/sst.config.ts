@@ -350,6 +350,7 @@ export default $config({
         databaseName: voterDbName,
         masterUsername: voterDbUser,
         masterPassword: voterDbPassword,
+        dbSubnetGroupName: subnetGroup.name,
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
         deletionProtection: true,
