@@ -350,7 +350,7 @@ export default $config({
     })
 
     // buildspec updated to use file with env vars.
-    const codeBuildProject = new aws.codebuild.Project('gp-deploy-build', {
+    new aws.codebuild.Project('gp-deploy-build', {
       name: `gp-deploy-build-${$app.stage}`,
       serviceRole: codeBuildRole.arn,
       environment: {
@@ -404,7 +404,8 @@ export default $config({
               'codebuild:BatchGetBuilds',
               'codebuild:ListBuildsForProject',
             ],
-            Resource: pulumi.interpolate`${codeBuildProject.arn}`,
+            Resource:
+              'arn:aws:codebuild:us-west-2:333022194791:project/gp-deploy-build-*',
           },
           {
             Effect: 'Allow',
@@ -414,7 +415,7 @@ export default $config({
           {
             Effect: 'Allow',
             Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
-            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/${codeBuildProject.name}:*`,
+            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/:*`,
           },
         ],
       }),
