@@ -92,6 +92,9 @@ export default $config({
     let dbName: string | undefined
     let dbUser: string | undefined
     let dbPassword: string | undefined
+    let voterDbName: string | undefined
+    let voterDbUser: string | undefined
+    let voterDbPassword: string | undefined
     let vpcCidr: string | undefined
 
     // Fetch the JSON secret using Pulumi's AWS SDK
@@ -134,6 +137,14 @@ export default $config({
         }
         if (key === 'VPC_CIDR') {
           vpcCidr = value as string
+        }
+        if (key === 'VOTER_DATASTORE') {
+          const { username, password, database } = extractDbCredentials(
+            value as string,
+          )
+          voterDbName = database
+          voterDbUser = username
+          voterDbPassword = password
         }
         secrets.push({ key: value })
       }
@@ -329,6 +340,31 @@ export default $config({
           maxCapacity: 64,
           minCapacity: $app.stage === 'master' ? 1.0 : 0.5,
         },
+      })
+
+      const voterCluster = new aws.rds.Cluster('voterCluster', {
+        clusterIdentifier: 'gp-voter-db',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.2',
+        databaseName: voterDbName,
+        masterUsername: voterDbUser,
+        masterPassword: voterDbPassword,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 128,
+          minCapacity: 0.5,
+        },
+      })
+
+      new aws.rds.ClusterInstance('voterInstance', {
+        clusterIdentifier: voterCluster.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: voterCluster.engineVersion,
       })
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
