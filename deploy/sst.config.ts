@@ -26,6 +26,10 @@ export default $config({
           })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
+    if ($app.stage !== 'master' && $app.stage !== 'develop') {
+      throw new Error('Invalid stage. Only master and develop are supported.')
+    }
+
     let bucketDomain: string
     let apiDomain: string
     let webAppRootUrl: string
@@ -61,7 +65,6 @@ export default $config({
 
     if ($app.stage !== 'master') {
       // production bucket was setup manually. so no need to setup cloudfront.
-      // chore: re-deploy.
       new sst.aws.Router(`assets-${$app.stage}`, {
         routes: {
           '/*': {
@@ -72,25 +75,76 @@ export default $config({
       })
     }
 
+    // function to extract the username, password, and database name from the database url
+    // which the docker container needs to run migrations.
+    const extractDbCredentials = (dbUrl: string) => {
+      const url = new URL(dbUrl)
+      const username = url.username
+      const password = url.password
+      const database = url.pathname.slice(1)
+      return { username, password, database }
+    }
+
     // Each stage will get its own Cluster.
     const cluster = new sst.aws.Cluster('fargate', { vpc })
 
-    const dbUrl = new sst.Secret('DBURL')
-    const dbName = new sst.Secret('DBNAME')
-    const dbUser = new sst.Secret('DBUSER')
-    const dbPassword = new sst.Secret('DBPASSWORD')
-    const dbIps = new sst.Secret('DBIPS')
+    let dbUrl: string | undefined
+    let dbName: string | undefined
+    let dbUser: string | undefined
+    let dbPassword: string | undefined
+    let vpcCidr: string | undefined
 
-    if (
-      !dbName.value ||
-      !dbUser.value ||
-      !dbPassword.value ||
-      !dbIps.value ||
-      !dbUrl.value
-    ) {
+    // Fetch the JSON secret using Pulumi's AWS SDK
+    let secretArn: string | undefined
+    if ($app.stage === 'master') {
+      secretArn =
+        'arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_PROD-kvf2EI'
+    } else if ($app.stage === 'develop') {
+      secretArn =
+        'arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4'
+    }
+
+    if (!secretArn) {
       throw new Error(
-        'DBNAME, DBUSER, DBPASSWORD, DBURL, DBIPS secrets must be set.',
+        'No secretArn found for this stage. secretArn must be configured.',
       )
+    }
+
+    const secretVersion = aws.secretsmanager.getSecretVersion({
+      secretId: secretArn,
+    })
+
+    // Use async/await to get the actual secret value
+    const secretString = await secretVersion.then((v) => v.secretString)
+
+    const secrets: object[] = []
+    let secretsJson: Record<string, string> = {}
+    try {
+      secretsJson = JSON.parse(secretString || '{}')
+
+      for (const [key, value] of Object.entries(secretsJson)) {
+        if (key === 'DATABASE_URL') {
+          const { username, password, database } = extractDbCredentials(
+            value as string,
+          )
+          dbUrl = value as string
+          dbName = database
+          dbUser = username
+          dbPassword = password
+        }
+        if (key === 'VPC_CIDR') {
+          vpcCidr = value as string
+        }
+        secrets.push({ key: value })
+      }
+    } catch (e) {
+      throw new Error(
+        'Failed to parse GP_SECRETS JSON: ' + (e as Error).message,
+      )
+    }
+
+    if (!dbName || !dbUser || !dbPassword || !vpcCidr || !dbUrl) {
+      throw new Error('DATABASE_URL, VPC_CIDR keys must be set in the secret.')
     }
 
     let enableFullstory = false
@@ -98,13 +152,64 @@ export default $config({
       enableFullstory = true
     }
 
-    let sqsQueueName = 'DEV_GP_Queue.fifo'
+    const sqsQueueName = `${$app.stage}-Queue.fifo`
+    const sqsDlqName = `${$app.stage}-DLQ.fifo`
+
+    // Create Dead Letter Queue
+    const dlq = new aws.sqs.Queue(`${$app.stage}-dlq`, {
+      name: sqsDlqName,
+      fifoQueue: true,
+      messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+    })
+
+    // Create Main Queue
+    new aws.sqs.Queue(`${$app.stage}-queue`, {
+      name: sqsQueueName,
+      fifoQueue: true,
+      visibilityTimeoutSeconds: 300, // 5 minutes
+      messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+      delaySeconds: 0,
+      receiveWaitTimeSeconds: 0,
+      redrivePolicy: pulumi.interpolate`{
+        "deadLetterTargetArn": "${dlq.arn}",
+        "maxReceiveCount": 3
+      }`,
+    })
+
+    // Create shared VPC Endpoint for SQS (only in master stage)
     if ($app.stage === 'master') {
-      sqsQueueName = 'PROD_GP_Queue.fifo'
-    } else if ($app.stage === 'qa') {
-      sqsQueueName = 'QA_GP_Queue.fifo'
+      // Create security group for SQS
+      const sqsSecurityGroup = new aws.ec2.SecurityGroup('sqs-sg', {
+        vpcId: 'vpc-0763fa52c32ebcf6a',
+        ingress: [
+          {
+            protocol: 'tcp',
+            fromPort: 443,
+            toPort: 443,
+            cidrBlocks: [vpcCidr],
+          },
+        ],
+        egress: [
+          {
+            protocol: '-1',
+            fromPort: 0,
+            toPort: 0,
+            cidrBlocks: ['0.0.0.0/0'],
+          },
+        ],
+      })
+
+      new aws.ec2.VpcEndpoint('sqs-endpoint', {
+        vpcId: 'vpc-0763fa52c32ebcf6a',
+        serviceName: `com.amazonaws.us-west-2.sqs`,
+        vpcEndpointType: 'Interface',
+        subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+        securityGroupIds: [sqsSecurityGroup.id],
+        privateDnsEnabled: true,
+      })
     }
 
+    // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
         domain: apiDomain,
@@ -125,7 +230,7 @@ export default $config({
       cpu: '0.25 vCPU',
       scaling: {
         min: $app.stage === 'master' ? 2 : 1,
-        max: 16,
+        max: $app.stage === 'master' ? 16 : 4,
         cpuUtilization: 50,
         memoryUtilization: 50,
       },
@@ -145,83 +250,7 @@ export default $config({
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
-      },
-      ssm: {
-        // Key-value pairs of AWS Systems Manager Parameter Store parameter ARNs or AWS Secrets
-        //  * Manager secret ARNs. The values will be loaded into the container as environment variables.
-        CONTENTFUL_ACCESS_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_ACCESS_TOKEN-1bABvs',
-        CONTENTFUL_SPACE_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:CONTENTFUL_SPACE_ID-BvsxFz',
-        // todo: secrets for more stages.
-        DATABASE_URL:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:DATABASE_URL-SqMsak',
-        AUTH_SECRET:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AUTH_SECRET-eGe66U',
-        VOTER_DATASTORE:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:VOTER_DATASTORE-ooHetK',
-        AWS_ACCESS_KEY_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_ACCESS_KEY_ID-PWb1SB',
-        AWS_SECRET_ACCESS_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_SECRET_ACCESS_KEY-nkThRE',
-        AWS_S3_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_KEY-YFEbWy',
-        AWS_S3_SECRET:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:AWS_S3_SECRET-KW7BQX',
-        HUBSPOT_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:HUBSPOT_TOKEN-gFRvGT',
-        ASHBY_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:ASHBY_KEY-5UdDjD',
-        FULLSTORY_API_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:FULLSTORY_API_KEY-Geho4f',
-        MAILGUN_API_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:MAILGUN_API_KEY-718eny',
-        TOGETHER_AI_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:TOGETHER_AI_KEY-sdX206',
-        OPEN_AI_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:OPEN_AI_KEY-VGhQ4h',
-        GOOGLE_CLIENT_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_CLIENT_ID-FcpHmK',
-        GOOGLE_API_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:GOOGLE_API_KEY-dMkjI2',
-        STRIPE_SECRET_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_SECRET_KEY-GSGinp',
-        STRIPE_WEBSOCKET_SECRET:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:STRIPE_WEBSOCKET_SECRET-QT7A0C',
-        BALLOT_READY_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:BALLOT_READY_KEY-c5SoNE',
-        L2_DATA_KEY:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:L2_DATA_KEY-uH6EFm',
-        SLACK_APP_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_APP_ID-gCZdTR',
-        SLACK_BOT_DEV_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_DEV_CHANNEL_ID-c6kd0u',
-        SLACK_BOT_DEV_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_DEV_CHANNEL_TOKEN-6GHsy8',
-        SLACK_BOT_PATH_TO_VICTORY_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_CHANNEL_ID-cvLCRc',
-        SLACK_BOT_PATH_TO_VICTORY_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_CHANNEL_TOKEN-x3OTUF',
-        SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_ID-Vf4jfd',
-        SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_PATH_TO_VICTORY_ISSUES_CHANNEL_TOKEN-ZYaTMY',
-        SLACK_USER_FEEDBACK_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_USER_FEEDBACK_CHANNEL_ID-qNgKov',
-        SLACK_USER_FEEDBACK_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_USER_FEEDBACK_CHANNEL_TOKEN-DVapEH',
-        SLACK_BOT_AI_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_AI_CHANNEL_ID-0m7pMg',
-        SLACK_BOT_AI_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_AI_CHANNEL_TOKEN-4dnzsC',
-        SLACK_BOT_POLITICS_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_POLITICS_CHANNEL_ID-Wq9jYg',
-        SLACK_BOT_POLITICS_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_POLITICS_CHANNEL_TOKEN-FUVDcL',
-        SLACK_BOT_FEEDBACK_CHANNEL_ID:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_FEEDBACK_CHANNEL_ID-pETcUU',
-        SLACK_BOT_FEEDBACK_CHANNEL_TOKEN:
-          'arn:aws:secretsmanager:us-west-2:333022194791:secret:SLACK_BOT_FEEDBACK_CHANNEL_TOKEN-a7nvdu',
+        ...secretsJson,
       },
       image: {
         context: '../', // Set the context to the main app directory
@@ -231,7 +260,7 @@ export default $config({
           CACHEBUST: '1',
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
-          DATABASE_URL: dbUrl.value, // so we can run migrations.
+          DATABASE_URL: dbUrl, // so we can run migrations.
           STAGE: $app.stage,
         },
       },
@@ -240,7 +269,10 @@ export default $config({
 
     // Create a Security Group for the RDS Cluster
     const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
-      name: 'api-rds-security-group',
+      name:
+        $app.stage === 'develop'
+          ? 'api-rds-security-group'
+          : `api-${$app.stage}-rds-security-group`,
       description: 'Allow traffic to RDS',
       vpcId: 'vpc-0763fa52c32ebcf6a',
       ingress: [
@@ -248,7 +280,7 @@ export default $config({
           protocol: 'tcp',
           fromPort: 5432,
           toPort: 5432,
-          cidrBlocks: [dbIps.value],
+          cidrBlocks: [vpcCidr],
         },
       ],
       egress: [
@@ -261,32 +293,46 @@ export default $config({
       ],
     })
 
-    // Create a Subnet Group for the RDS Cluster
+    // Create a Subnet Group for the RDS Cluster (using our private subnets)
     const subnetGroup = new aws.rds.SubnetGroup('subnetGroup', {
-      name: 'api-rds-subnet-group',
+      name:
+        $app.stage === 'develop'
+          ? 'api-rds-subnet-group'
+          : `api-${$app.stage}-rds-subnet-group`,
       subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
       tags: {
-        Name: 'api-rds-subnet-group',
+        Name: `api-${$app.stage}-rds-subnet-group`,
       },
     })
 
-    const rdsCluster = new aws.rds.Cluster('rdsCluster', {
-      clusterIdentifier: 'gp-api-db',
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineMode: aws.rds.EngineMode.Provisioned,
-      engineVersion: '16.2',
-      databaseName: dbName.value,
-      // manageMasterUserPassword: true,
-      masterUsername: dbUser.value || '',
-      masterPassword: dbPassword.value || '',
-      dbSubnetGroupName: subnetGroup.name,
-      vpcSecurityGroupIds: [rdsSecurityGroup.id],
-      storageEncrypted: true,
-      serverlessv2ScalingConfiguration: {
-        maxCapacity: 64,
-        minCapacity: 0.5,
-      },
-    })
+    // Warning: Do not change the clusterIdentifier.
+    // The clusterIdentifier is used as a unique identifier for your RDS cluster.
+    // Changing it will cause Pulumi/SST to try to create a new RDS cluster and delete the old one
+    // which would result in data loss. This is because the clusterIdentifier is part of the cluster's
+    // identity and cannot be modified in place.
+    let rdsCluster: aws.rds.Cluster | undefined
+    if ($app.stage === 'master') {
+      rdsCluster = new aws.rds.Cluster('rdsCluster', {
+        clusterIdentifier: 'gp-api-db-prod',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.2',
+        databaseName: dbName,
+        masterUsername: dbUser,
+        masterPassword: dbPassword,
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-api-db-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 64,
+          minCapacity: $app.stage === 'master' ? 1.0 : 0.5,
+        },
+      })
+    } else {
+      rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
+    }
 
     new aws.rds.ClusterInstance('rdsInstance', {
       clusterIdentifier: rdsCluster.id,
@@ -346,7 +392,7 @@ export default $config({
     })
 
     // Create an IAM Policy for Github actions
-    const actionsPolicy = new aws.iam.Policy('github-actions-policy', {
+    new aws.iam.Policy('github-actions-policy', {
       description: 'Limited policy for Github Actions to trigger CodeBuild',
       policy: pulumi.output({
         Version: '2012-10-17',
@@ -374,19 +420,4 @@ export default $config({
       }),
     })
   },
-  // we no longer use autodeploy. we use codebuild.
-  // console: {
-  //   autodeploy: {
-  //     runner: {
-  //       engine: 'codebuild',
-  //       timeout: '10 minutes',
-  //       architecture: 'x86_64',
-  //       vpc: {
-  //         id: 'vpc-0763fa52c32ebcf6a',
-  //         subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-  //         securityGroups: ['sg-01de8d67b0f0ec787'],
-  //       },
-  //     },
-  //   },
-  // },
 })
