@@ -8,6 +8,7 @@ This guide provides comprehensive instructions for deploying the gp-api applicat
    - [Install Dependencies](#install-dependencies)
    - [Deploy the Application](#deploy-the-application)
    - [Deployment Secrets](#deployment-secrets)
+   - [State Management](#state-management)
 2. [Environment Variables](#environment-variables)
 3. [Scaling Configuration](#scaling)
 4. [Database Configuration](#database-configuration)
@@ -48,18 +49,26 @@ npx sst deploy --stage develop
 npx sst deploy --stage master
 ```
 
+### State Management
+
+If someone changes something in aws instead of doing it through SST, you can update the state by running:
+
+```bash
+npx sst --stage <stage> refresh
+```
+
+If the configs are different, it’ll update the state to reflect the change. If the resource doesn’t exist anymore, it’ll remove it from the state.
+
 ### Deployment Secrets
 
 Note: these secrets are only for the deployment phase. For application secrets see: [Environment Variables](#environment-variables).
 
-Each stage has its own secrets. More on sst Secrets can be found in the specific resources at the bottom of the README. Secrets must be set for all required deployment variables per stage. Below are EXAMPLE secrets only.
+We no longer use the built in sst secrets. We now have one secret for each stage in AWS Secrets Manager. The secret must contain the following keys:
 
-```
-npx sst secret set DBNAME dbname --stage develop
-npx sst secret set DBUSER dbuser --stage develop
-npx sst secret set DBPASSWORD dbpassword --stage develop
-npx sst secret set DBIPS 172.0.0.0/16 --stage develop
-```
+- `DATABASE_URL`
+- `VPC_CIDR`
+
+As well as any other variables that are required for the deployment of the service. The secret must be created in AWS Secrets Manager and then the ARN must be added to the `ssm` configuration for the service in the `sst.config.ts` file.
 
 ## Scaling
 
