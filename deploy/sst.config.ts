@@ -404,8 +404,7 @@ export default $config({
               'codebuild:BatchGetBuilds',
               'codebuild:ListBuildsForProject',
             ],
-            Resource:
-              'arn:aws:codebuild:us-west-2:333022194791:project/gp-deploy-build-*',
+            Resource: 'arn:aws:codebuild:us-west-2:333022194791:project/*',
           },
           {
             Effect: 'Allow',
@@ -415,7 +414,7 @@ export default $config({
           {
             Effect: 'Allow',
             Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
-            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/gp-deploy-build-*`,
+            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/*`,
           },
         ],
       }),
