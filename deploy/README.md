@@ -68,7 +68,7 @@ We no longer use the built in sst secrets. We now have one secret for each stage
 - `DATABASE_URL`
 - `VPC_CIDR`
 
-As well as any other variables that are required for the deployment of the service. The secret must be created in AWS Secrets Manager and then the ARN must be added to the `ssm` configuration for the service in the `sst.config.ts` file.
+As well as any other variables that are required for the deployment of the service. The secret must be created in AWS Secrets Manager and then the ARN must be added to the right stage in the `sst.config.ts` file.
 
 ## Scaling
 
@@ -81,7 +81,7 @@ As well as any other variables that are required for the deployment of the servi
 To add environment variables to the application, use AWS Secrets Manager:
 
 1. Create a plaintext secret in AWS Secrets Manager.
-2. Provide the secret's ARN under the `ssm` configuration for the service in the `sst.config.ts`
+2. Provide the secret's ARN for the correct stage in the `sst.config.ts`
 
 This ensures secure storage and retrieval of environment-specific variables.
 
@@ -109,7 +109,7 @@ Both the Fargate cluster and the RDS database are configured to use this VPC.
 
 ## Continuous Integration/Continuous Deployment (CI/CD)
 
-This project is configured with SST's auto-deployment feature. Simply push changes to the `gp-api` repository, and the CI/CD pipeline will trigger a CodeBuild process to build the project on the latest node image and upload it to ECR and deploy it automatically on Fargate.
+This project is configured with a github actions workflow to kick off a codebuild deployment. Simply push changes to the `gp-api` repository, and the CI/CD pipeline will trigger a CodeBuild process to build the project on the latest node image and upload it to ECR and deploy it automatically on Fargate.
 
 ### ECS Deployment Details
 
@@ -118,7 +118,7 @@ This project is configured with SST's auto-deployment feature. Simply push chang
 - **ECS Task Definition**: Specifies the container image, resources, and environment variables required for the application.
 - **Deployment Process**: When auto-deployment is triggered:
   1. CodeBuild builds the application and uploads the new Docker image to Amazon ECR.
-  2. Autodeploy initiates an update of the ECS service causing a new Deployment.
+  2. Github actions initiates an update of the ECS service causing a new Deployment.
   3. Deployment status can be tracked in the **Deployments** tab of the ECS service in the AWS Management Console.
 
 ## Logs
@@ -127,11 +127,11 @@ Logging is critical for troubleshooting and monitoring.
 
 - **Runner Logs**:
 
-  - Located in a CloudWatch log group dedicated to the build process at `/aws/codebuild/sst-runner`
+  - Located in a CloudWatch log group dedicated to the build process at `/aws/codebuild/gp-deploy-build-<stage>`
   - Use these logs to troubleshoot issues related to building the image or running migrations.
 
 - **API Logs**:
-  - Each stage has its own Fargate cluster and Fargate service, with a corresponding CloudWatch log group at `/sst/cluster/gp-stage-fargateCluster/gp-api-stage/gp-api-stage`
+  - Each stage has its own Fargate cluster and Fargate service, with a corresponding CloudWatch log group at `/sst/cluster/gp-<stage>-fargateCluster/gp-api-<stage>/gp-api-<stage>`
   - Use the logs to debug application-specific issues.
   - Task logs can also be found in the Logs section of the ECS Service for each stage.
 
