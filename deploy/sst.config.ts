@@ -227,8 +227,6 @@ export default $config({
         ports: [
           { listen: '80/http' },
           { listen: '443/https', forward: '80/http' },
-          // { listen: '3000/http' },
-          // { listen: '443/https', forward: '3000/http' },
         ],
         health: {
           '80/http': {
@@ -276,6 +274,11 @@ export default $config({
         },
       },
       link: [assetsBucket],
+      transform: {
+        loadBalancer: {
+          idleTimeout: 120,
+        },
+      },
     })
 
     // Create a Security Group for the RDS Cluster
