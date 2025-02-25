@@ -8,9 +8,19 @@ import {
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
 import { isObject } from 'src/shared/util/objects.util'
-import { AIChatPromptContents, findByTypeOptions } from './content.types'
+import {
+  AIChatPromptContents,
+  BlogArticleContentRaw,
+  BlogArticlePreprocessed,
+  findByTypeOptions,
+} from './content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../shared/services/process-timers.service'
+import { transformBlogArticleRawTags } from './util/transformBlogArticleRawTags.util'
+import { transformContentMedia } from './util/transformContentMedia.util'
+import { transformBlogArticleSection } from './util/transformBlogArticleSection.util'
+import { transformBlogArticleAuthor } from './util/transformBlogArticleAuthor.util'
+import { transformBlogArticleReferences } from './util/transformBlogArticleReferences.util'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {
@@ -163,11 +173,49 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     return result
   }
 
+  private preProcessBlogArticleMeta(
+    rawBlogArticle: BlogArticleContentRaw,
+  ): BlogArticlePreprocessed {
+    const { data, id: rawBlogArticleId } = rawBlogArticle
+    const {
+      title,
+      slug,
+      author: rawAuthor,
+      section: rawSection,
+      references: rawReferences,
+      mainImage: rawMainImage,
+      tags: rawTags,
+      summary,
+      relatedArticles: rawRelatedArticles,
+    } = data
+    return {
+      contentId: rawBlogArticleId,
+      author: transformBlogArticleAuthor(rawAuthor),
+      title,
+      slug,
+      summary,
+      tags: [...transformBlogArticleRawTags(rawTags).values()],
+      mainImage: transformContentMedia(rawMainImage),
+      section: transformBlogArticleSection(rawSection),
+      references: rawReferences?.length
+        ? transformBlogArticleReferences(rawReferences)
+        : [],
+      ...(rawRelatedArticles
+        ? {
+            relatedArticleIds: rawRelatedArticles.map(({ sys }) => sys.id),
+          }
+        : { relatedArticleIds: [] }),
+    }
+  }
+
   async syncContent() {
     const { allEntries = [], deletedEntries = [] } =
       await this.contentfulService.getSync()
-    const recognizedEntries = allEntries.filter((entry: Entry) =>
-      Boolean(CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]),
+    const recognizedEntries = allEntries.filter(
+      (entry: Entry) =>
+        Boolean(entry.sys.contentType.sys.id === ContentType.blogArticle),
+      // TODO: Put this back in after developing this!!
+      // Boolean(CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]),
     )
     const { createEntries, updateEntries } =
       await this.getSyncEntriesCategorized(recognizedEntries)
@@ -187,13 +235,23 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
         }
 
         for (const entry of createEntries) {
-          await tx.content.create({
-            data: {
-              id: entry.sys.id,
-              type: CONTENT_TYPE_MAP[entry.sys.contentType.sys.id].name,
-              data: entry.fields as InputJsonObject,
-            },
+          const contentRecord = {
+            id: entry.sys.id,
+            type: CONTENT_TYPE_MAP[entry.sys.contentType.sys.id].name,
+            data: entry.fields as InputJsonObject,
+          }
+          const record = await tx.content.create({
+            data: contentRecord,
           })
+          if (entry.sys.contentType.sys.id === ContentType.blogArticle) {
+            const blogArticleMeta = this.preProcessBlogArticleMeta(
+              record as BlogArticleContentRaw,
+            )
+            console.log(`blogArticleMeta =>`, blogArticleMeta)
+            await tx.blogArticleMeta.create({
+              data: blogArticleMeta,
+            })
+          }
         }
 
         await tx.content.deleteMany({

@@ -2,8 +2,8 @@ import {
   BadRequestException,
   Controller,
   Get,
-  Param,
   InternalServerErrorException,
+  Param,
 } from '@nestjs/common'
 import { ContentService } from './content.service'
 import { ContentType } from '@prisma/client'
@@ -21,7 +21,6 @@ import {
   BlogArticleAugmented,
   BlogArticlePreview1,
   BlogArticlePreview2,
-  BlogArticleTag,
   BlogSection,
   Hero,
 } from './content.types'
@@ -240,7 +239,7 @@ export class ContentController {
   }
 
   @Get('article-tags')
-  async articleTags(): Promise<BlogArticleTag[]> {
+  async articleTags(): Promise<PrismaJson.BlogArticleTag[]> {
     const articleSlugsByTag: ArticleSlugsByTag = (
       await this.findByType(InferredContentTypes.articleTag)
     )[0]

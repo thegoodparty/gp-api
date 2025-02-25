@@ -1,6 +1,6 @@
 import { Block, Inline } from '@contentful/rich-text-types'
 import { EntrySys, FieldsType } from 'contentful'
-import { Content, ContentType, Prisma } from '@prisma/client'
+import { BlogArticleMeta, Content, ContentType, Prisma } from '@prisma/client'
 import { InferredContentTypes } from './CONTENT_TYPE_MAP.const'
 
 export const TYPE_FAQ_ARTICLE = 'faqArticle'
@@ -13,6 +13,8 @@ export interface findByTypeOptions {
   orderBy?: Prisma.ContentOrderByWithRelationInput
   take?: number
   where?: Prisma.ContentWhereInput
+  select?: Prisma.ContentSelect
+  omit?: Prisma.ContentOmit
 }
 
 export interface ImageRaw {
@@ -162,14 +164,6 @@ export type BlogArticleAuthorRaw = {
   fields: BlogArticleAuthorFieldsRaw
 }
 
-type BlogArticleAuthorFields = {
-  image?: ContentMedia
-}
-
-export type BlogArticleAuthor = {
-  fields: BlogArticleAuthorFields
-}
-
 export type BlogArticleBannerRaw = {
   fields: {
     largeImage: ImageRaw
@@ -205,12 +199,12 @@ export type BlogArticleAugmented = ContentAugmented<
     id: string
     text: string
     updateDate: Date | null
-    tags: BlogArticleTag[]
+    tags: PrismaJson.BlogArticleTag[]
     mainImage: ContentMedia
-    author?: BlogArticleAuthor
+    author?: PrismaJson.BlogArticleAuthor
     banner?: BlogArticleBanner
     relatedArticles?: RelatedArticle[]
-    references?: BlogArticleReference[]
+    references?: PrismaJson.BlogArticleReference[]
     section?: BlogArticleSection
     slug: string
     title: string
@@ -223,13 +217,8 @@ export type BlogArticleReferenceRaw = {
   fields: FieldsType
 }
 
-export type BlogArticleReference = {
-  url: string
-  name: string
-  description: string
-}
-
 export type BlogArticleRelatedArticleRaw = {
+  sys: EntrySys
   fields: FieldsType & {
     mainImage: ImageRaw
   }
@@ -255,12 +244,7 @@ export type BlogArticleTagRaw = {
   }
 }
 
-export type BlogArticleTag = {
-  slug: string
-  name: string
-}
-
-export type BlogArticlesTagsMap = Map<string, BlogArticleTag>
+export type BlogArticlesTagsMap = Map<string, PrismaJson.BlogArticleTag>
 
 export type BlogSectionRaw = {
   id: string
@@ -321,6 +305,11 @@ export type BlogArticleTitle = {
   slug: string
 }
 
+export type BlogArticlePreprocessed = Omit<
+  BlogArticleMeta,
+  'id' | 'createdAt' | 'updatedAt'
+>
+
 export type ContentMedia = {
   url: string
   alt: string
@@ -338,7 +327,7 @@ export type BlogHomeRaw = {
 }
 
 export type BlogHomeAugmented = {
-  tags: BlogArticleTag[]
+  tags: PrismaJson.BlogArticleTag[]
   faqs: FaqBasic[]
 }
 
