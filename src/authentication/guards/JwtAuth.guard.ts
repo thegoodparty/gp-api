@@ -1,7 +1,6 @@
 import {
   ExecutionContext,
   Injectable,
-  HttpException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
@@ -9,7 +8,7 @@ import { Reflector } from '@nestjs/core'
 import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
 import { UserRole } from '@prisma/client'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
-
+import { TokenException } from './token.exception'
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(private reflector: Reflector) {
@@ -38,7 +37,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context)
   }
 
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest<TUser = any>(
+    err: any,
+    user: TUser,
+    info: any,
+    context: ExecutionContext,
+  ): TUser {
+    // Get the response object from the context
+    const response = context.switchToHttp().getResponse()
+
     // If there's an error or the user object is missing
     if (err || !user) {
       // Handle invalid or expired tokens
@@ -46,13 +53,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         info &&
         (info.name === 'JsonWebTokenError' || info.name === 'TokenExpiredError')
       ) {
-        throw new HttpException(
-          {
-            statusCode: 498,
-            message: 'Invalid or expired token',
-          },
-          498,
-        )
+        throw new TokenException(response)
       }
 
       // For other errors, throw the default UnauthorizedException
