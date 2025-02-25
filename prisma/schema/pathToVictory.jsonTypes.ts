@@ -2,16 +2,17 @@ import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 
 export {}
 
+// we allow for '' empty string which means the data is not yet available
 interface P2VViability {
   level?: string
   score?: number
-  seats?: number
-  opponents?: number
-  candidates?: number
-  isPartisan?: boolean
-  isIncumbent?: boolean
-  isUncontested?: string
-  candidatesPerSeat?: number
+  seats?: string | number
+  opponents?: string | number
+  candidates?: string | number
+  isPartisan?: string | boolean
+  isIncumbent?: string | boolean
+  isUncontested?: string | boolean
+  candidatesPerSeat?: string | number
 }
 
 declare global {
