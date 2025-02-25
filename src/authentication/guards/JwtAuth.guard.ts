@@ -9,6 +9,7 @@ import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
 import { User, UserRole } from '@prisma/client'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
 import { TokenException } from './token.exception'
+
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(private reflector: Reflector) {
@@ -38,9 +39,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest<TUser extends User = User>(
-    err: any,
-    user: TUser,
-    info: any,
+    err: Error | null,
+    user: TUser | false,
+    info: Error | null,
     context: ExecutionContext,
   ): TUser {
     // Get the response object from the context
