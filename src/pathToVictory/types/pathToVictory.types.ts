@@ -31,3 +31,14 @@ export interface L2Count {
   electionDistrict: string
   counts: VoterCounts
 }
+
+export interface ViabilityScore {
+  level: string
+  isPartisan: string | boolean
+  isIncumbent: string | boolean
+  isUncontested: string | boolean
+  candidates: string | number
+  seats: string | number
+  candidatesPerSeat: string | number
+  score: number
+}
