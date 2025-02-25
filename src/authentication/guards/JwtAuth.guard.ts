@@ -6,9 +6,10 @@ import {
 import { AuthGuard } from '@nestjs/passport'
 import { Reflector } from '@nestjs/core'
 import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
-import { UserRole } from '@prisma/client'
+import { User, UserRole } from '@prisma/client'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
 import { TokenException } from './token.exception'
+
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(private reflector: Reflector) {
@@ -37,10 +38,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context)
   }
 
-  handleRequest<TUser = any>(
-    err: any,
-    user: TUser,
-    info: any,
+  handleRequest<TUser extends User = User>(
+    err: Error | null,
+    user: TUser | false,
+    info: Error | null,
     context: ExecutionContext,
   ): TUser {
     // Get the response object from the context
