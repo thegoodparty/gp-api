@@ -24,11 +24,15 @@ import {
   BlogSection,
   Hero,
 } from './content.types'
+import { BlogArticleMetaService } from './services/blogArticleMeta.service'
 
 @Controller('content')
 @PublicAccess()
 export class ContentController {
-  constructor(private readonly contentService: ContentService) {}
+  constructor(
+    private readonly contentService: ContentService,
+    private readonly blogArticleMetaService: BlogArticleMetaService,
+  ) {}
 
   @Get()
   findAll() {
@@ -240,23 +244,6 @@ export class ContentController {
 
   @Get('article-tags')
   async articleTags(): Promise<PrismaJson.BlogArticleTag[]> {
-    const articleSlugsByTag: ArticleSlugsByTag = (
-      await this.findByType(InferredContentTypes.articleTag)
-    )[0]
-
-    return Object.entries(articleSlugsByTag)
-      .map(([tagSlug, tagObj]) => ({
-        slug: tagSlug,
-        name: tagObj.tagName,
-      }))
-      .sort((a, b) => {
-        if (a.name < b.name) {
-          return -1
-        }
-        if (a.name > b.name) {
-          return 1
-        }
-        return 0
-      })
+    return this.blogArticleMetaService.findAllBlogArticleTags()
   }
 }
