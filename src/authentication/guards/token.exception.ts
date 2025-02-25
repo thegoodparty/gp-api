@@ -6,7 +6,7 @@ export class TokenException extends HttpException {
   constructor(response?: FastifyReply) {
     super(
       {
-        statusCode: 498,
+        statusCode: 498, // Invalid Token Status Code
         message: 'Invalid or expired token',
       },
       498,
