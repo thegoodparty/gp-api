@@ -5,7 +5,7 @@ model BlogArticleMeta {
   slug        String    @unique
   publishDate DateTime  @map("publish_date")
   content     Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  contentId   String    @map("content_id")
+  contentId   String    @unique @map("content_id")
   title       String
   summary     String
   /// [BlogArticleAuthor]
