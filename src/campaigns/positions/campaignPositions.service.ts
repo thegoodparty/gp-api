@@ -8,9 +8,16 @@ export class CampaignPositionsService extends createPrismaBase(
   MODELS.CampaignPosition,
 ) {
   findByCampaignId(campaignId: number) {
-    return this.findFirstOrThrow({
+    return this.model.findMany({
       where: {
         campaignId,
+      },
+      orderBy: {
+        order: 'asc',
+      },
+      include: {
+        topIssue: true,
+        position: true,
       },
     })
   }
