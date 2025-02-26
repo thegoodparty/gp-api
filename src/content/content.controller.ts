@@ -103,7 +103,12 @@ export class ContentController {
   }
 
   @Get('article-tags')
-  async articleTags(): Promise<PrismaJson.BlogArticleTag[]> {
+  async articleTags() {
     return this.blogArticleMetaService.findAllBlogArticleTags()
+  }
+
+  @Get('article-tags/:tagSlug')
+  async articleTag(@Param('tagSlug') tagSlug: string) {
+    return this.blogArticleMetaService.findAllBlogArticleTags(tagSlug)
   }
 }

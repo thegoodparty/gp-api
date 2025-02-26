@@ -283,23 +283,6 @@ type BlogArticleHighlight = {
   summary: string
 }
 
-export type BlogArticlePreview1 = {
-  title: string
-  mainImage: ImageClean
-  slug: string
-  publishDate: string
-  summary: string
-}
-
-export type BlogArticlePreview2 = {
-  // Key is a slug
-  [key: string]: {
-    title: string
-    summary: string
-    slug: string
-  }
-}
-
 export type BlogArticleTitle = {
   title: string
   slug: string
@@ -344,7 +327,7 @@ export type CandidateTestimonialAugmented = {
   testimonial: string
 }
 
-export type CandidateTestimonalRaw = {
+export type CandidateTestimonialRaw = {
   data: {
     name: string
     image: ImageRaw

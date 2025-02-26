@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { addDays } from 'date-fns'
@@ -17,7 +17,7 @@ export class BlogArticleMetaService extends createPrismaBase(
     super()
   }
 
-  async findAllBlogArticleTags() {
+  async findAllBlogArticleTags(tagSlug?: string) {
     const articleTags = await this.model.findMany({
       select: {
         tags: true,
@@ -27,10 +27,20 @@ export class BlogArticleMetaService extends createPrismaBase(
       curr.tags.forEach((tag) => acc.set(tag.slug, tag))
       return acc
     }, new Map<string, PrismaJson.BlogArticleTag>())
-    return [...dedupedArticleTags.values()].sort(
+    const sortedTags = [...dedupedArticleTags.values()].sort(
       ({ name: aName }, { name: bName }) =>
         aName < bName ? -1 : aName > bName ? 1 : 0,
     )
+
+    if (tagSlug) {
+      const found = sortedTags.find(({ slug }) => slug === tagSlug)
+      if (!found) {
+        throw new NotFoundException(`Tag with slug ${tagSlug} not found`)
+      }
+      return found
+    }
+
+    return sortedTags
   }
 
   async findBlogArticlesByTag(tag: string) {
