@@ -104,11 +104,11 @@ export class ContentController {
 
   @Get('article-tags')
   async articleTags() {
-    return this.blogArticleMetaService.findAllBlogArticleTags()
+    return this.blogArticleMetaService.findBlogArticleTags()
   }
 
   @Get('article-tags/:tagSlug')
   async articleTag(@Param('tagSlug') tagSlug: string) {
-    return this.blogArticleMetaService.findAllBlogArticleTags(tagSlug)
+    return this.blogArticleMetaService.findBlogArticleTag(tagSlug)
   }
 }

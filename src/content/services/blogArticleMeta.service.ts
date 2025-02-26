@@ -17,7 +17,25 @@ export class BlogArticleMetaService extends createPrismaBase(
     super()
   }
 
-  async findAllBlogArticleTags(tagSlug?: string) {
+  async findBlogArticleTag(tagSlug?: string) {
+    const { tags: articleTags } =
+      (await this.model.findFirst({
+        where: {
+          tags: {
+            array_contains: [{ slug: tagSlug }],
+          },
+        },
+        select: {
+          tags: true,
+        },
+      })) || {}
+    if (!articleTags || !articleTags.length) {
+      throw new NotFoundException(`Tag with slug ${tagSlug} not found`)
+    }
+    return articleTags.find(({ slug }) => slug === tagSlug)
+  }
+
+  async findBlogArticleTags() {
     const articleTags = await this.model.findMany({
       select: {
         tags: true,
@@ -27,20 +45,10 @@ export class BlogArticleMetaService extends createPrismaBase(
       curr.tags.forEach((tag) => acc.set(tag.slug, tag))
       return acc
     }, new Map<string, PrismaJson.BlogArticleTag>())
-    const sortedTags = [...dedupedArticleTags.values()].sort(
+    return [...dedupedArticleTags.values()].sort(
       ({ name: aName }, { name: bName }) =>
         aName < bName ? -1 : aName > bName ? 1 : 0,
     )
-
-    if (tagSlug) {
-      const found = sortedTags.find(({ slug }) => slug === tagSlug)
-      if (!found) {
-        throw new NotFoundException(`Tag with slug ${tagSlug} not found`)
-      }
-      return found
-    }
-
-    return sortedTags
   }
 
   async findBlogArticlesByTag(tag: string) {
