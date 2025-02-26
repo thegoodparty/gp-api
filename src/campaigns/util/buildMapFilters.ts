@@ -80,14 +80,11 @@ export function buildMapFilters(
     })
   }
 
-  // Exclude campaigns without ZIP and where didWin is false
+  // Exclude campaigns without ZIP
   andConditions.push({
     details: {
       path: ['zip'],
       not: { equals: null },
-    },
-    didWin: {
-      not: false,
     },
   })
 

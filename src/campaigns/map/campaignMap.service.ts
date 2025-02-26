@@ -3,11 +3,13 @@ import { MapCampaign } from './campaignMap.types'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
-import { subDays } from 'date-fns'
 import { GeocodingService } from '../services/geocoding.service'
 import { RacesService } from 'src/elections/services/races.service'
 
-type CampaignWithUser = Campaign & {
+type BasicCampaignWithUser = Pick<
+  Campaign,
+  'id' | 'slug' | 'details' | 'didWin' | 'data'
+> & {
   user: Pick<User, 'firstName' | 'lastName' | 'avatar'>
 }
 
@@ -44,10 +46,9 @@ export class CampaignMapService {
         OR: [
           { didWin: true },
           {
-            didWin: null,
-            details: {
-              path: ['electionDate'],
-              gte: subDays(new Date(), 7),
+            data: {
+              path: ['hubSpotUpdates', 'election_results'],
+              equals: 'Won General',
             },
           },
         ],
@@ -57,7 +58,6 @@ export class CampaignMapService {
     const where: Prisma.CampaignWhereInput = {
       userId: { not: undefined },
       isDemo: false,
-      isActive: true,
       AND: combinedAndConditions,
     }
 
@@ -85,10 +85,9 @@ export class CampaignMapService {
         OR: [
           { didWin: true },
           {
-            didWin: null,
-            details: {
-              path: ['electionDate'],
-              gte: subDays(new Date(), 7),
+            data: {
+              path: ['hubSpotUpdates', 'election_results'],
+              equals: 'Won General',
             },
           },
         ],
@@ -98,7 +97,6 @@ export class CampaignMapService {
     const where: Prisma.CampaignWhereInput = {
       userId: { not: undefined },
       isDemo: false,
-      isActive: true,
       AND: combinedAndConditions,
     }
 
@@ -117,7 +115,12 @@ export class CampaignMapService {
 
     const campaigns = (await this.campaignsService.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        details: true,
+        didWin: true,
+        data: true,
         user: {
           select: {
             firstName: true,
@@ -126,7 +129,7 @@ export class CampaignMapService {
           },
         },
       },
-    })) as CampaignWithUser[]
+    })) as BasicCampaignWithUser[]
 
     const updates: Prisma.CampaignUpdateArgs[] = []
 

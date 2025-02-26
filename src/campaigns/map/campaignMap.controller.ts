@@ -2,8 +2,10 @@ import { Controller, Get, Query } from '@nestjs/common'
 import { CampaignMapService } from './campaignMap.service'
 import { MapCampaign } from './campaignMap.types'
 import { MapSchema } from '../schemas/mappingSchemas'
+import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 
 @Controller('campaigns/map')
+@PublicAccess()
 export class CampaignMapController {
   constructor(private readonly campaignMapService: CampaignMapService) {}
   @Get('count')
