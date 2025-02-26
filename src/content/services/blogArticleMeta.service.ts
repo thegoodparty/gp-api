@@ -105,13 +105,10 @@ const generateSpecificSectionResponseData = (
   sections: BlogArticlesSectionAugmented[],
   sectionSlug: string,
 ) => {
-  console.log(`sectionSlug =>`, sectionSlug)
-  console.log(`sections =>`, sections)
   const results: SpecificSectionResponseDatum[] = []
   let sectionIndex = 0
   const heroSection = sections.find((section) => section.slug === sectionSlug)
   const hero = heroSection?.articles?.[0]
-  console.log(`hero =>`, hero)
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i]
     if (section.fields.slug === sectionSlug) {
