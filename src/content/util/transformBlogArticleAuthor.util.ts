@@ -1,9 +1,9 @@
 import { transformContentMedia } from './transformContentMedia.util'
-import { BlogArticleAuthor, BlogArticleAuthorRaw } from '../content.types'
+import { BlogArticleAuthorRaw } from '../content.types'
 
 export const transformBlogArticleAuthor = (
   rawAuthor: BlogArticleAuthorRaw,
-): BlogArticleAuthor => {
+): PrismaJson.BlogArticleAuthor => {
   const { image: rawImg, ...restFields } = rawAuthor.fields
   return {
     fields: {

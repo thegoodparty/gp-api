@@ -24,6 +24,8 @@ export const blogArticlesTransformer: Transformer<
       banner: rawBanner,
       relatedArticles: rawRelatedArticles,
       references: rawReferences,
+      mainImage: rawMainImage,
+      tags: rawTags,
       ...restRawData
     } = data
     const text = documentToPlainTextString(restRawData.body)
@@ -34,8 +36,8 @@ export const blogArticlesTransformer: Transformer<
       type,
       text,
       updateDate: updatedAt,
-      mainImage: transformContentMedia(restRawData.mainImage),
-      tags: [...transformBlogArticleRawTags(restRawData.tags).values()],
+      mainImage: transformContentMedia(rawMainImage),
+      tags: [...transformBlogArticleRawTags(rawTags).values()],
       ...(rawSection
         ? {
             section: transformBlogArticleSection(rawSection),
@@ -51,6 +53,7 @@ export const blogArticlesTransformer: Transformer<
             banner: transformBlogArticleBanner(rawBanner),
           }
         : {}),
+      // TODO: Build relatedArticles from BlogArticleMeta relations
       ...(rawRelatedArticles
         ? {
             relatedArticles:

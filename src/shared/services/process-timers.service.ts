@@ -18,7 +18,7 @@ const registry = new FinalizationRegistry((intervalId: NodeJS.Timeout) =>
 
 @Injectable()
 export class ProcessTimersService {
-  private logger = new Logger('ProcessTimersServiceService')
+  private readonly logger = new Logger(ProcessTimersService.name)
   private timers: ProcessTimersMap = new Map()
   private readonly checkIntervalId: NodeJS.Timeout
 
