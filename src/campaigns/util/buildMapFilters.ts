@@ -2,6 +2,12 @@ import { Prisma } from '@prisma/client'
 import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
+const WINNERS_ELECTION_YEAR = process.env.WINNERS_ELECTION_YEAR
+
+if (!WINNERS_ELECTION_YEAR) {
+  throw new Error('Please set WINNERS_ELECTION_YEAR in your .env')
+}
+
 interface FilterParams {
   partyFilter?: string
   stateFilter?: string
@@ -59,6 +65,13 @@ export function buildMapFilters(
       ],
     })
   }
+
+  andConditions.push({
+    details: {
+      path: ['electionDate'],
+      string_contains: `${WINNERS_ELECTION_YEAR}`,
+    },
+  })
 
   if (officeFilter) {
     const officeCondition = createJsonOrConditionString(officeFilter, [

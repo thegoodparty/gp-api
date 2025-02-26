@@ -6,6 +6,8 @@ import { CampaignsService } from '../services/campaigns.service'
 import { GeocodingService } from '../services/geocoding.service'
 import { RacesService } from 'src/elections/services/races.service'
 
+const DB_UPDATE_CHUNK_SIZE = 20
+
 type BasicCampaignWithUser = Pick<
   Campaign,
   'id' | 'slug' | 'details' | 'didWin' | 'data'
@@ -42,17 +44,6 @@ export class CampaignMapService {
           equals: false,
         },
       },
-      {
-        OR: [
-          { didWin: true },
-          {
-            data: {
-              path: ['hubSpotUpdates', 'election_results'],
-              equals: 'Won General',
-            },
-          },
-        ],
-      },
     ]
 
     const where: Prisma.CampaignWhereInput = {
@@ -81,17 +72,6 @@ export class CampaignMapService {
         resultsFilter,
         officeFilter,
       }),
-      {
-        OR: [
-          { didWin: true },
-          {
-            data: {
-              path: ['hubSpotUpdates', 'election_results'],
-              equals: 'Won General',
-            },
-          },
-        ],
-      },
     ]
 
     const where: Prisma.CampaignWhereInput = {
@@ -134,7 +114,6 @@ export class CampaignMapService {
     const updates: Prisma.CampaignUpdateArgs[] = []
 
     const mapCampaigns: MapCampaign[] = []
-
     for (const campaign of campaigns) {
       const { didWin, slug } = campaign
       const details = campaign.details
@@ -203,13 +182,12 @@ export class CampaignMapService {
 
       mapCampaigns.push(mapCampaign)
     }
-
-    if (updates.length > 0) {
+    for (let i = 0; i < updates.length; i += DB_UPDATE_CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + DB_UPDATE_CHUNK_SIZE)
       await Promise.all(
-        updates.map((update) => this.campaignsService.update(update)),
+        chunk.map((update) => this.campaignsService.update(update)),
       )
     }
-
     return mapCampaigns
   }
 }
