@@ -187,9 +187,12 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       tags: rawTags,
       summary,
       relatedArticles: rawRelatedArticles,
+      publishDate: rawPublishDate,
     } = data
+
     return {
       contentId: rawBlogArticleId,
+      publishDate: new Date(rawPublishDate),
       author: transformBlogArticleAuthor(rawAuthor),
       title,
       slug,
@@ -211,10 +214,11 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
   async syncContent() {
     const { allEntries = [], deletedEntries = [] } =
       await this.contentfulService.getSync()
-    const recognizedEntries = allEntries.filter((entry: Entry) =>
-      // Boolean(entry.sys.contentType.sys.id === ContentType.blogArticle),
+    const recognizedEntries = allEntries.filter(
+      (entry: Entry) =>
+        Boolean(entry.sys.contentType.sys.id === ContentType.blogArticle),
       // TODO: Put this back in after developing this!!
-      Boolean(CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]),
+      // Boolean(CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]),
     )
     const { createEntries, updateEntries } =
       await this.getSyncEntriesCategorized(recognizedEntries)

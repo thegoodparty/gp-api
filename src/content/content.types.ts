@@ -462,22 +462,6 @@ export type GoodPartyTeamMembersRaw = {
   }
 }
 
-export type Hero = {
-  id: string
-  title: string
-  mainImage: ContentMedia
-  publishDate: string
-  slug: string
-  summary: string
-  section?: HeroSection
-}
-
-type HeroSection = {
-  fields: {
-    title: string
-  }
-}
-
 export type TeamMember = {
   sys: {
     id: string
@@ -539,4 +523,20 @@ export type TermsOfServiceRaw = {
 
 export type TermsOfServiceAugmented = {
   [key: string]: string
+}
+
+export type BlogArticlesSectionAugmented = {
+  slug?: string
+  articles: BlogArticleMeta[]
+} & PrismaJson.BlogArticleSection
+
+export type BlogSectionHero = {
+  section?: PrismaJson.BlogArticleSection
+} & Partial<BlogArticleMeta>
+
+export type SpecificSectionResponseDatum = Omit<
+  BlogArticlesSectionAugmented,
+  'articles'
+> & {
+  articles?: BlogArticleMeta[]
 }

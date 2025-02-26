@@ -12,7 +12,14 @@ declare global {
     export type BlogArticleMainImage = ContentMedia
     export type BlogArticleSection = {
       id: string
-      fields: FieldsType
+      fields:
+        | {
+            title: string
+            subtitle: string
+            slug: string
+            order: number
+          }
+        | FieldsType
     }
     export type BlogArticleAuthor = {
       fields: {
