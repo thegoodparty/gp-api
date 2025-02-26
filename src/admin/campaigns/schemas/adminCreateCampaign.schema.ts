@@ -11,6 +11,7 @@ export class AdminCreateCampaignSchema extends createZodDto(
       email: WriteEmailSchema,
       zip: ZipSchema,
       party: z.string(),
+      adminUserEmail: z.string(),
       otherParty: z.string().optional(),
     })
     .strict(),

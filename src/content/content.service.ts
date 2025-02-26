@@ -8,9 +8,14 @@ import {
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
 import { isObject } from 'src/shared/util/objects.util'
-import { AIChatPromptContents, findByTypeOptions } from './content.types'
+import {
+  AIChatPromptContents,
+  BlogArticleContentRaw,
+  findByTypeOptions,
+} from './content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../shared/services/process-timers.service'
+import { preProcessBlogArticleMeta } from './util/preProcessBlogArticleMeta'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {
@@ -26,9 +31,12 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
   }
 
   async findById(id: string) {
-    const content = await this.findUniqueOrThrow({
+    const content = await this.findFirstOrThrow({
       where: {
-        id,
+        id: {
+          equals: id,
+          mode: 'insensitive',
+        },
       },
     })
 
@@ -176,7 +184,8 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     await this.client.$transaction(
       async (tx) => {
         for (const entry of updateEntries) {
-          await tx.content.update({
+          const contentTypeDef = CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]
+          const record = await tx.content.update({
             where: {
               id: entry.sys.id,
             },
@@ -184,18 +193,40 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
               data: entry.fields as InputJsonObject,
             },
           })
+          if (contentTypeDef.name === ContentType.blogArticle) {
+            const blogArticleMeta = preProcessBlogArticleMeta(
+              record as BlogArticleContentRaw,
+            )
+            await tx.blogArticleMeta.update({
+              where: {
+                contentId: record.id,
+              },
+              data: blogArticleMeta,
+            })
+          }
         }
 
         for (const entry of createEntries) {
-          await tx.content.create({
-            data: {
-              id: entry.sys.id,
-              type: CONTENT_TYPE_MAP[entry.sys.contentType.sys.id].name,
-              data: entry.fields as InputJsonObject,
-            },
+          const contentTypeDef = CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]
+          const contentRecord = {
+            id: entry.sys.id,
+            type: contentTypeDef.name,
+            data: entry.fields as InputJsonObject,
+          }
+          const record = await tx.content.create({
+            data: contentRecord,
           })
+          if (contentTypeDef.name === ContentType.blogArticle) {
+            const blogArticleMeta = preProcessBlogArticleMeta(
+              record as BlogArticleContentRaw,
+            )
+            await tx.blogArticleMeta.create({
+              data: blogArticleMeta,
+            })
+          }
         }
 
+        // No need to delete blogArticleMeta records, as they are cascade deleted
         await tx.content.deleteMany({
           where: {
             id: {

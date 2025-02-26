@@ -25,11 +25,12 @@ enum ContentType {
 }
 
 model Content {
-  createdAt DateTime?   @default(now()) @map("created_at")
-  updatedAt DateTime?   @updatedAt @map("updated_at")
-  id        String      @id
-  type      ContentType
-  data      Json        @db.JsonB
+  createdAt       DateTime?         @default(now()) @map("created_at")
+  updatedAt       DateTime?         @updatedAt @map("updated_at")
+  id              String            @id
+  type            ContentType
+  data            Json              @db.JsonB
+  BlogArticleMeta BlogArticleMeta[]
 
   @@index([type])
   @@map("content")
