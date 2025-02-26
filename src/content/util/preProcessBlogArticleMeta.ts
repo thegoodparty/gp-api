@@ -7,6 +7,7 @@ import { transformBlogArticleRawTags } from './transformBlogArticleRawTags.util'
 import { transformContentMedia } from './transformContentMedia.util'
 import { transformBlogArticleSection } from './transformBlogArticleSection.util'
 import { transformBlogArticleReferences } from './transformBlogArticleReferences.util'
+import { isValid } from 'date-fns'
 
 export const preProcessBlogArticleMeta = (
   rawBlogArticle: BlogArticleContentRaw,
@@ -24,6 +25,14 @@ export const preProcessBlogArticleMeta = (
     relatedArticles: rawRelatedArticles,
     publishDate: rawPublishDate,
   } = data
+
+  const publishDate = new Date(rawPublishDate)
+
+  if (!isValid(publishDate)) {
+    throw new Error(
+      `Invalid publish date, "${rawPublishDate}", on blogArticle content entity with id: ${rawBlogArticleId}`,
+    )
+  }
 
   return {
     contentId: rawBlogArticleId,
