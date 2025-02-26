@@ -28,7 +28,16 @@ export class AdminCampaignsService {
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
-    const { firstName, lastName, email, zip, phone, party, otherParty } = body
+    const {
+      firstName,
+      lastName,
+      email,
+      zip,
+      phone,
+      party,
+      otherParty,
+      adminUserEmail,
+    } = body
 
     // create new user
     const user = await this.users.createUser({
@@ -47,6 +56,7 @@ export class AdminCampaignsService {
       party,
       otherParty,
       createdBy: 'admin',
+      adminUserEmail,
     }
 
     // create new campaign
