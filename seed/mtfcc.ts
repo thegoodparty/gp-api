@@ -50,13 +50,12 @@ export default async function seedMtfcc(prisma: PrismaClient) {
   let processedCount = 0
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i]
-    processRow(prisma, row).then(() => {
-      processedCount++
-      const percentComplete = ((processedCount / total) * 100).toFixed(0)
-      process.stdout.write(
-        `\r ${processedCount}/${total} ${percentComplete}% complete`,
-      )
-    })
+    await processRow(prisma, row)
+    processedCount++
+    const percentComplete = ((processedCount / total) * 100).toFixed(0)
+    process.stdout.write(
+      `\r ${processedCount}/${total} ${percentComplete}% complete`,
+    )
   }
 
   console.log(

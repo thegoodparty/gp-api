@@ -10,6 +10,8 @@ import { EmailModule } from '../email/email.module'
 import { AiModule } from '../ai/ai.module'
 import { ViabilityService } from './services/viability.service'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
+import { PathToVictoryController } from './pathToVictory.controller'
+
 @Module({
   imports: [
     PrismaModule,
@@ -19,6 +21,7 @@ import { BallotReadyService } from 'src/elections/services/ballotReady.service'
     EmailModule,
     QueueProducerModule,
   ],
+  controllers: [PathToVictoryController],
   providers: [
     PathToVictoryService,
     OfficeMatchService,

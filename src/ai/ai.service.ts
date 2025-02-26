@@ -182,7 +182,7 @@ export class AiService {
   }: GetChatToolCompletionArgs) {
     const models = AI_MODELS.split(',')
     for (const model of models) {
-      // Lama 3.1 supports native function calling
+      // Lama 3.3 supports native function calling
       // so we can modify the OpenAI base url to use the together.ai api
       this.logger.debug('model', model)
       const togetherAi = model.includes('meta-llama') || model.includes('Qwen')
@@ -268,7 +268,8 @@ export class AiService {
       } catch (error) {
         this.logger.error('error', error)
         await this.slack.formattedMessage({
-          message: `Error in getChatToolCompletion. model: ${model} Error: ${error}`,
+          message: `Error in getChatToolCompletion. model: ${model}`,
+          error,
           channel: SlackChannel.botDev,
         })
       }

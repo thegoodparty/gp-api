@@ -1,5 +1,10 @@
 import { VoterCounts } from 'src/voters/voters.types'
 
+export interface PathToVictoryQueueMessage {
+  type: 'pathToVictory'
+  data: PathToVictoryInput
+}
+
 export interface PathToVictoryInput {
   slug: string
   campaignId: string

@@ -7,7 +7,7 @@ import { gql, GraphQLClient } from 'graphql-request'
 import { truncateZip } from 'src/shared/util/zipcodes.util'
 import { PositionLevel } from 'src/generated/graphql.types'
 import {
-  RacesById,
+  RacesByIdNode,
   RacesByZipcode,
   RacesWithElectionDates,
   RaceWithOfficeHoldersNode,
@@ -67,7 +67,7 @@ export class BallotReadyService {
     }
   }
 
-  async fetchRaceById(raceId: string): Promise<RacesById | null> {
+  async fetchRaceById(raceId: string): Promise<RacesByIdNode | null> {
     const query = gql`
           query Node {
             node(id: "${raceId}") {

@@ -59,7 +59,6 @@ export class ConsumerService {
       return
     }
     const queueMessage: QueueMessage = JSON.parse(body)
-
     this.logger.log('processing queue message type ', queueMessage.type)
 
     switch (queueMessage.type) {

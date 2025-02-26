@@ -95,7 +95,7 @@ export class SlackService {
             type: SlackMessageType.SECTION,
             text: {
               type: SlackMessageType.MRKDWN,
-              text: `*${message}*\n\n${JSON.stringify(error)}`,
+              text: `${message}\n\n${error ? JSON.stringify(error) : ''}`,
             },
           },
         ],

@@ -77,17 +77,16 @@ export interface RacesWithElectionDates {
 // Races By Id Types
 // -----------------------------
 
-export interface RacesById {
-  races: PaginatedResponse<RacesByIdNode>
-}
-
-interface RacesByIdNode {
-  databaseId: string
-  isPartisan: boolean
-  isPrimary: boolean
-  filingPeriods: FilingPeriod[]
-  election: RacesByIdElection
-  position: RacesByIdPosition
+export interface RacesByIdNode {
+  node: {
+    databaseId: string
+    isPartisan: boolean
+    isPrimary: boolean
+    filingPeriods: FilingPeriod[]
+    election: RacesByIdElection
+    position: RacesByIdPosition
+    normalizedPosition: Record<string, string>
+  }
 }
 
 type RacesByIdElection = Pick<Election, 'electionDay' | 'name' | 'state'>
