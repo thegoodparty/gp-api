@@ -33,7 +33,6 @@
     "@aws-sdk/s3-request-presigner": "^3.730.0",
     "@contentful/rich-text-plain-text-renderer": "^17.0.0",
     "@faker-js/faker": "^9.2.0",
-    "@fastify/caching": "^9.0.3",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^10.0.2",
     "@fastify/helmet": "^13.0.1",
