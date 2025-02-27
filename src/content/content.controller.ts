@@ -11,10 +11,7 @@ import {
 } from './util/glossaryItems.util'
 import { BlogArticleMetaService } from './services/blogArticleMeta.service'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
-
-enum DerivedContentTypes {
-  blogArticleTitles = 'blogArticleTitles',
-}
+import { DerivedContentTypes } from './content.types'
 
 @Controller('content')
 @PublicAccess()
@@ -57,15 +54,12 @@ export class ContentController {
 
   @Get(`type/${DerivedContentTypes.blogArticleTitles}`)
   async getBlogArticleTitles() {
-    const blogArticleMetas = await this.blogArticleMetaService.findMany({
+    return await this.blogArticleMetaService.findMany({
       select: {
-        id: false,
         title: true,
         slug: true,
       },
     })
-    console.log(`blogArticleMetas.length =>`, blogArticleMetas.length)
-    return blogArticleMetas
   }
 
   @Get('type/:type')

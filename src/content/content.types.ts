@@ -523,3 +523,7 @@ export type SpecificSectionResponseDatum = Omit<
 > & {
   articles?: BlogArticleMeta[]
 }
+
+export enum DerivedContentTypes {
+  blogArticleTitles = 'blogArticleTitles',
+}
