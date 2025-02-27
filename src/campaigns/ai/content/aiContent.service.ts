@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
-import { ContentService } from 'src/content/content.service'
+import { ContentService } from 'src/content/services/content.service'
 
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { SlackService } from 'src/shared/services/slack.service'

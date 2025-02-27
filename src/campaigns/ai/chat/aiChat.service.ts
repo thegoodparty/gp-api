@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
-import { ContentService } from 'src/content/content.service'
+import { ContentService } from 'src/content/services/content.service'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
