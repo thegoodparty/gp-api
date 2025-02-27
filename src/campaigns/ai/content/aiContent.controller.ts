@@ -26,7 +26,7 @@ import { CampaignsService } from '../../services/campaigns.service'
 import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../decorators/UseCampaign.decorator'
 import { GetSystemPromptSchema } from './schemas/GetSystemPrompt.schema'
-import { ContentService } from 'src/content/content.service'
+import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 

@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Get, Param } from '@nestjs/common'
-import { ContentService } from './content.service'
+import { ContentService } from './services/content.service'
 import { ContentType } from '@prisma/client'
 import {
   CONTENT_TYPE_MAP,
@@ -9,8 +9,9 @@ import {
   groupGlossaryItemsByAlpha,
   mapGlossaryItemsToSlug,
 } from './util/glossaryItems.util'
-import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { BlogArticleMetaService } from './services/blogArticleMeta.service'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
+import { DerivedContentTypes } from './content.types'
 
 @Controller('content')
 @PublicAccess()
@@ -49,6 +50,16 @@ export class ContentController {
     return mapGlossaryItemsToSlug(
       await this.contentService.fetchGlossaryItems(),
     )
+  }
+
+  @Get(`type/${DerivedContentTypes.blogArticleTitles}`)
+  async getBlogArticleTitles() {
+    return await this.blogArticleMetaService.findMany({
+      select: {
+        title: true,
+        slug: true,
+      },
+    })
   }
 
   @Get('type/:type')
