@@ -32,7 +32,7 @@ export function buildCampaignListFilters({
     AND.push({
       user: {
         email: {
-          equals: email,
+          contains: email,
           mode: 'insensitive',
         },
       },
