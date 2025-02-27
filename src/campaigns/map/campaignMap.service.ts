@@ -49,6 +49,7 @@ export class CampaignMapService {
     const where: Prisma.CampaignWhereInput = {
       userId: { not: undefined },
       isDemo: false,
+      isActive: true,
       AND: combinedAndConditions,
     }
 
@@ -77,6 +78,7 @@ export class CampaignMapService {
     const where: Prisma.CampaignWhereInput = {
       userId: { not: undefined },
       isDemo: false,
+      isActive: true,
       AND: combinedAndConditions,
     }
 
