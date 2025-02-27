@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
+import { CacheModule } from '@nestjs/cache-manager'
 import { ContentModule } from './content/content.module'
 import { JobsModule } from './jobs/jobs.module'
 import { HealthModule } from './health/health.module'
@@ -24,6 +25,7 @@ import { SubscribeModule } from './subscribe/subscribe.module'
 
 @Module({
   imports: [
+    CacheModule.register(),
     UsersModule,
     AuthenticationModule,
     ContentModule,

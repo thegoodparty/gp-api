@@ -1,4 +1,16 @@
-import { BadRequestException, Controller, Get, Param } from '@nestjs/common'
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  UseInterceptors,
+} from '@nestjs/common'
+import {
+  CACHE_MANAGER,
+  CacheInterceptor,
+  CacheTTL,
+} from '@nestjs/cache-manager'
 import { ContentService } from './content.service'
 import { ContentType } from '@prisma/client'
 import {
@@ -11,13 +23,17 @@ import {
 } from './util/glossaryItems.util'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { BlogArticleMetaService } from './services/blogArticleMeta.service'
+import { Cache } from 'cache-manager'
 
 @Controller('content')
+@CacheTTL(3600 * 24) // 1 day
+@UseInterceptors(CacheInterceptor)
 @PublicAccess()
 export class ContentController {
   constructor(
     private readonly contentService: ContentService,
     private readonly blogArticleMetaService: BlogArticleMetaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   @Get()
@@ -64,6 +80,7 @@ export class ContentController {
     const { entries, createEntries, updateEntries, deletedEntries } =
       await this.contentService.syncContent()
 
+    await this.cacheManager.clear()
     return {
       entriesCount: entries.length,
       createEntriesCount: createEntries.length,
