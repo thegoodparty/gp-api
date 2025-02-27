@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign } from '@prisma/client'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/content.service'
@@ -10,7 +10,6 @@ import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../shared/services/slackService.types'
-import { FullStoryService } from 'src/fullStory/fullStory.service'
 
 @Injectable()
 export class AiContentService {
@@ -22,15 +21,10 @@ export class AiContentService {
     private readonly aiService: AiService,
     private readonly slack: SlackService,
     private readonly queue: EnqueueService,
-    private readonly fullstory: FullStoryService,
   ) {}
 
   /** function to kickoff ai content generation and enqueue a message to run later */
-  async createContent(
-    user: User,
-    campaign: Campaign,
-    inputs: CreateAiContentSchema,
-  ) {
+  async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
     const { key, regenerate, editMode, chat, inputValues } = inputs
 
     const { slug, id } = campaign
@@ -152,13 +146,6 @@ export class AiContentService {
         regenerate,
       },
     }
-
-    // Don't need to await here, don't want to wait for this call
-    this.fullstory.trackEvent(user, 'Content Builder: Generation Started', {
-      slug,
-      key,
-      regenerate,
-    })
 
     await this.queue.sendMessage(queueMessage)
     await this.slack.aiMessage({
@@ -294,16 +281,6 @@ export class AiContentService {
           where: { id: campaign.id },
           data: { aiContent },
         })
-
-        this.fullstory.trackEvent(
-          campaign.user as User,
-          'Content Builder: Generation Completed',
-          {
-            slug,
-            key,
-            regenerate,
-          },
-        )
 
         await this.slack.aiMessage({
           message: `updated campaign with ai. chatResponse: key: ${key}`,
