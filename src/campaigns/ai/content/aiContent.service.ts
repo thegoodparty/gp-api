@@ -1,9 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/content.service'
-
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { EnqueueService } from 'src/queue/producer/enqueue.service'
@@ -11,21 +10,27 @@ import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../shared/services/slackService.types'
+import { FullStoryService } from 'src/fullStory/fullStory.service'
 
 @Injectable()
 export class AiContentService {
   private readonly logger = new Logger(AiContentService.name)
 
   constructor(
-    private campaignsService: CampaignsService,
-    private contentService: ContentService,
-    private aiService: AiService,
-    private slack: SlackService,
-    private queue: EnqueueService,
+    private readonly campaignsService: CampaignsService,
+    private readonly contentService: ContentService,
+    private readonly aiService: AiService,
+    private readonly slack: SlackService,
+    private readonly queue: EnqueueService,
+    private readonly fullstory: FullStoryService,
   ) {}
 
   /** function to kickoff ai content generation and enqueue a message to run later */
-  async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
+  async createContent(
+    user: User,
+    campaign: Campaign,
+    inputs: CreateAiContentSchema,
+  ) {
     const { key, regenerate, editMode, chat, inputValues } = inputs
 
     const { slug, id } = campaign
@@ -147,6 +152,14 @@ export class AiContentService {
         regenerate,
       },
     }
+
+    // Don't need to await here, don't want to wait for this call
+    this.fullstory.trackEvent(user, 'Content Builder: Generation Started', {
+      slug,
+      key,
+      regenerate,
+    })
+
     await this.queue.sendMessage(queueMessage)
     await this.slack.aiMessage({
       message: 'Enqueued AI prompt',
@@ -170,7 +183,7 @@ export class AiContentService {
 
     let campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
-      include: { pathToVictory: true },
+      include: { pathToVictory: true, user: true },
     })
     let aiContent = campaign.aiContent
     const { prompt, existingChat, inputValues } =
@@ -226,7 +239,7 @@ export class AiContentService {
       campaign =
         (await this.campaignsService.findFirst({
           where: { slug },
-          include: { pathToVictory: true },
+          include: { pathToVictory: true, user: true },
         })) || campaign
       aiContent = campaign.aiContent
       let oldVersion
@@ -281,6 +294,16 @@ export class AiContentService {
           where: { id: campaign.id },
           data: { aiContent },
         })
+
+        this.fullstory.trackEvent(
+          campaign.user as User,
+          'Content Builder: Generation Completed',
+          {
+            slug,
+            key,
+            regenerate,
+          },
+        )
 
         await this.slack.aiMessage({
           message: `updated campaign with ai. chatResponse: key: ${key}`,

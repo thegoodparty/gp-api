@@ -19,7 +19,7 @@ import {
 import { AiContentService } from './aiContent.service'
 import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { Campaign, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '@prisma/client'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
 import { CampaignsService } from '../../services/campaigns.service'
@@ -29,6 +29,7 @@ import { GetSystemPromptSchema } from './schemas/GetSystemPrompt.schema'
 import { ContentService } from 'src/content/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 
 @Controller('campaigns/ai')
 @UseCampaign()
@@ -46,11 +47,12 @@ export class AiContentController {
   @Post()
   async create(
     @Res({ passthrough: true }) res: FastifyReply,
+    @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
     @Body() body: CreateAiContentSchema,
   ) {
     try {
-      const result = await this.aiContent.createContent(campaign, body)
+      const result = await this.aiContent.createContent(user, campaign, body)
 
       if (result.created) {
         res.statusCode = HttpStatus.CREATED
