@@ -14,6 +14,7 @@ import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
+import fastifyCaching from '@fastify/caching'
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
@@ -34,6 +35,11 @@ const bootstrap = async () => {
       rawBody: true,
     },
   )
+  const fastifyInstance = app.getHttpAdapter().getInstance()
+  await fastifyInstance.register(fastifyCaching, {
+    privacy: fastifyCaching.privacy.PRIVATE,
+    expiresIn: 86400, // 1 day in seconds
+  })
   app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()
