@@ -236,7 +236,7 @@ export default $config({
           },
         },
       },
-      memory: '1.0 GB',
+      memory: '2.0 GB',
       cpu: '1 vCPU',
       scaling: {
         min: $app.stage === 'master' ? 2 : 1,
