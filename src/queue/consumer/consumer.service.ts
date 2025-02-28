@@ -4,9 +4,8 @@ import { Message } from '@aws-sdk/client-sqs'
 import { GenerateAiContentMessage, QueueMessage } from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { Campaign, PathToVictory } from '@prisma/client'
+import { Campaign, PathToVictory, User } from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { PrismaService } from '../../prisma/prisma.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
@@ -15,17 +14,20 @@ import {
   ViabilityScore,
 } from 'src/pathToVictory/types/pathToVictory.types'
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
+import { FullStoryService } from 'src/fullStory/fullStory.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
 @Injectable()
 export class ConsumerService {
   private readonly logger = new Logger(ConsumerService.name)
 
   constructor(
-    private prisma: PrismaService,
-    private aiContentService: AiContentService,
-    private slackService: SlackService,
-    private pathToVictoryService: PathToVictoryService,
-    private viabilityService: ViabilityService,
+    private readonly aiContentService: AiContentService,
+    private readonly slackService: SlackService,
+    private readonly pathToVictoryService: PathToVictoryService,
+    private readonly viabilityService: ViabilityService,
+    private readonly fullstory: FullStoryService,
+    private readonly campaignsService: CampaignsService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -69,6 +71,21 @@ export class ConsumerService {
         await this.aiContentService.handleGenerateAiContent(
           generateAiContentMessage,
         )
+
+        const campaign = await this.campaignsService.findUniqueOrThrow({
+          where: { slug: generateAiContentMessage.slug },
+          include: { user: true },
+        })
+
+        this.fullstory.trackEvent(
+          campaign.user as User,
+          'Content Builder: Generation Completed',
+          {
+            slug: generateAiContentMessage.slug,
+            key: generateAiContentMessage.key,
+            regenerate: generateAiContentMessage.regenerate,
+          },
+        )
         break
       case 'pathToVictory':
         this.logger.log('received pathToVictory message')
@@ -90,7 +107,7 @@ export class ConsumerService {
         })
       this.logger.debug('p2vResponse', p2vResponse)
 
-      campaign = await this.prisma.campaign.findUnique({
+      campaign = await this.campaignsService.findUnique({
         where: { id: Number(message.campaignId) },
         include: { pathToVictory: true },
       })
@@ -146,13 +163,13 @@ export class ConsumerService {
 
     this.logger.debug('viability', viability)
     if (viability) {
-      const pathToVictory = await this.prisma.pathToVictory.findUnique({
+      const pathToVictory = await this.pathToVictoryService.findUnique({
         where: { campaignId: Number(message.campaignId) },
       })
 
       if (pathToVictory) {
         const data = pathToVictory.data || {}
-        await this.prisma.pathToVictory.update({
+        await this.pathToVictoryService.update({
           where: { id: pathToVictory.id },
           data: {
             data: {
@@ -182,7 +199,7 @@ export class ConsumerService {
   }
 
   private async handlePathToVictoryFailure(campaign: Campaign) {
-    const p2v = await this.prisma.pathToVictory.findUnique({
+    const p2v = await this.pathToVictoryService.findUnique({
       where: { campaignId: campaign.id },
     })
 
@@ -201,7 +218,7 @@ export class ConsumerService {
       )
 
       // mark the p2vStatus as Failed
-      await this.prisma.pathToVictory.update({
+      await this.pathToVictoryService.update({
         where: { id: p2v!.id },
         data: {
           data: {
@@ -213,7 +230,7 @@ export class ConsumerService {
       })
     } else {
       // otherwise, increment the p2vAttempts
-      await this.prisma.pathToVictory.update({
+      await this.pathToVictoryService.update({
         where: { id: p2v!.id },
         data: {
           data: {

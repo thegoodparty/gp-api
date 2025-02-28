@@ -11,7 +11,7 @@ export class CampaignListSchema extends createZodDto(
     state: StateSchema()
       .transform((val) => val.toUpperCase())
       .optional(),
-    email: z.string().email().optional(),
+    email: z.string().optional(),
     slug: z.string().optional(),
     level: z.enum(LEVELS).optional(),
     primaryElectionDateStart: z.string().date().optional(),

@@ -1,21 +1,21 @@
 import { Injectable } from '@nestjs/common'
-import { ContentfulService } from '../contentful/contentful.service'
+import { ContentfulService } from '../../contentful/contentful.service'
 import { Content, ContentType, Prisma } from '@prisma/client'
-import { InputJsonObject } from '@prisma/client/runtime/library'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
-} from './CONTENT_TYPE_MAP.const'
+} from '../CONTENT_TYPE_MAP.const'
 import { isObject } from 'src/shared/util/objects.util'
 import {
   AIChatPromptContents,
   BlogArticleContentRaw,
   findByTypeOptions,
-} from './content.types'
+} from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { ProcessTimersService } from '../shared/services/process-timers.service'
-import { preProcessBlogArticleMeta } from './util/preProcessBlogArticleMeta'
+import { ProcessTimersService } from '../../shared/services/process-timers.service'
+import { preProcessBlogArticleMeta } from '../util/preProcessBlogArticleMeta'
+import { InputJsonObject } from '@prisma/client/runtime/client'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {
