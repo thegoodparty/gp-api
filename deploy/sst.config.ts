@@ -236,10 +236,10 @@ export default $config({
           },
         },
       },
-      memory: '2 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
+      memory: '4 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
       cpu: '1 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
       scaling: {
-        min: $app.stage === 'master' ? 2 : 1,
+        min: $app.stage === 'master' ? 2 : 2,
         max: $app.stage === 'master' ? 16 : 4,
         cpuUtilization: 50,
         memoryUtilization: 50,
