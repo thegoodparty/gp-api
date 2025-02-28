@@ -16,10 +16,11 @@ This guide provides comprehensive instructions for deploying the gp-api applicat
 6. [Continuous Integration/Continuous Deployment (CI/CD)](#continuous-integrationcontinuous-deployment-cicd)
    - [ECS Deployment Details](#ecs-deployment-details)
 7. [Logs](#logs)
-8. [Benefits](#benefits)
+8. [Troubleshooting Deployment Errors](#troubleshooting-deployment-errors)
+9. [Benefits](#benefits)
    - [Why Use AWS Fargate?](#why-use-aws-fargate)
    - [Why Use SST and Pulumi?](#why-use-sst-and-pulumi)
-9. [Resources](#resources)
+10. [Resources](#resources)
 
 ## Usage
 
@@ -134,6 +135,12 @@ Logging is critical for troubleshooting and monitoring.
   - Each stage has its own Fargate cluster and Fargate service, with a corresponding CloudWatch log group at `/sst/cluster/gp-<stage>-fargateCluster/gp-api-<stage>/gp-api-<stage>`
   - Use the logs to debug application-specific issues.
   - Task logs can also be found in the Logs section of the ECS Service for each stage.
+
+## Troubleshooting Deployment Errors
+
+- **If the Service Deployment Rolls Back**: Go to the Service in the ECS console. Go to the events section. Find the task that failed to register and copy its task id. Then head to the services' log group (the api logs described above) and then search the task id in the Log Streams search box. This will give you the logs for that specific task so its easy to diagnose the reason for the crash.
+
+- **If the Build Fails**: You can click on the action link in slack in the deploy channel and look for the error in the github actions log. If its not found there you can check the runner logs as described above.
 
 ## Benefits
 
