@@ -371,7 +371,7 @@ export class PathToVictoryService extends createPrismaBase(
         })
       }
 
-      let p2vStatus: P2VStatus = P2VStatus.complete
+      let p2vStatus: P2VStatus = P2VStatus.waiting
       if (
         pathToVictoryResponse?.counts?.total &&
         pathToVictoryResponse.counts.total > 0 &&
