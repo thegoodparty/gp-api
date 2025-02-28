@@ -524,7 +524,6 @@ export class RacesService {
         )
       }
       const { races } = ballotReadyData
-      // this.logger.debug(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {
         const result = results[i]

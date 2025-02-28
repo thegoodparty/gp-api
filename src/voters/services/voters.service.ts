@@ -367,7 +367,6 @@ export class VotersService {
     const searchUrl = `${API_BASE}/records/search/estimate/1OSR/VM_${electionState}?id=1OSR&apikey=${L2_DATA_KEY}`
     type ExpectedResponse = { results: { count: number } }
     let response: AxiosResponse<ExpectedResponse>
-    // this.logger.debug('searchUrl', searchUrl, searchJson)
     try {
       response = await firstValueFrom(
         this.httpService.post<ExpectedResponse>(searchUrl, searchJson),
