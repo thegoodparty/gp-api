@@ -107,6 +107,10 @@ export function buildMapFilters(
       'verified_candidates',
     ])
     if (isProdCondition) {
+      isProdCondition.OR.push({
+        isVerified: true,
+      })
+
       andConditions.push(isProdCondition)
     }
   }
@@ -117,7 +121,7 @@ export function buildMapFilters(
 function createJsonOrConditionString(
   filter: string,
   paths: string[] | string[][],
-): Prisma.CampaignWhereInput | null {
+): { OR: Prisma.CampaignWhereInput[] } | null {
   if (!filter) return null
 
   const filterUpper = capitalizeFirstLetter(filter).trim()

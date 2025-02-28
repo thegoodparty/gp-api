@@ -29,7 +29,6 @@ export class FilesService {
         fileName ?? file.filename,
         file.mimetype,
         {
-          accessControl: 'public-read',
           cacheControl: `${CacheControls.MAX_AGE}=${31_536_000}`,
         },
       )
