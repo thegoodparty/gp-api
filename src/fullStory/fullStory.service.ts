@@ -201,6 +201,11 @@ export class FullStoryService {
   }
 
   async trackEvent(user: User, eventName: string, properties: any) {
+    this.logger.debug(`this.disabled: ${this.disabled}`)
+    if (this.disabled) {
+      this.logger.warn(`FullStory is disabled`)
+      return
+    }
     const fullStoryUserId = await this.getFullStoryUserId(user)
     if (!fullStoryUserId) {
       throw new BadGatewayException('Could not resolve FullStory user ID')

@@ -1,12 +1,11 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { ContentfulService } from '../../contentful/contentful.service'
-import { Content, ContentType, Prisma } from '@prisma/client'
+import { Content, ContentType } from '@prisma/client'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from '../CONTENT_TYPE_MAP.const'
-import { isObject } from 'src/shared/util/objects.util'
 import {
   AIChatPromptContents,
   BlogArticleContentRaw,
@@ -78,31 +77,18 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
   }
 
   async getAiContentPrompts() {
-    const prompts = (await this.findMany({
-      where: {
-        OR: [
-          {
-            type: ContentType.onboardingPrompts,
-          },
-          {
-            type: ContentType.candidateContentPrompts,
-          },
-        ],
-      },
-    })) as Array<Omit<Content, 'data'> & { data: Prisma.JsonObject }>
-
-    if (
-      // should be one content record for each "type" of prompt
-      prompts.length !== 2 ||
-      // ensure that there is prompt data available
-      !prompts.some((prompt) => isObject(prompt.data))
-    ) {
-      throw new Error('Prompt content not found')
+    const [onboardingPrompts, candidatePrompts] = await Promise.all([
+      this.findByType({ type: ContentType.onboardingPrompts }),
+      this.findByType({ type: InferredContentTypes.candidateContentPrompts }),
+    ])
+    if (!onboardingPrompts || !candidatePrompts) {
+      throw new InternalServerErrorException(
+        'Failed to fetch onboardingPrompts and candidateContentPrompts',
+      )
     }
-
     return {
-      ...prompts[0].data,
-      ...prompts[1].data,
+      ...onboardingPrompts,
+      ...candidatePrompts,
     }
   }
 

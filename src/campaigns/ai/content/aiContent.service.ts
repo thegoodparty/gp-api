@@ -26,7 +26,7 @@ export class AiContentService {
   /** function to kickoff ai content generation and enqueue a message to run later */
   async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
     const { key, regenerate, editMode, chat, inputValues } = inputs
-
+    console.log('key: ', key)
     const { slug, id } = campaign
     const aiContent = campaign.aiContent
 
@@ -61,9 +61,11 @@ export class AiContentService {
 
     // generating a new ai content here
     const cmsPrompts = await this.contentService.getAiContentPrompts()
+    //console.dir(cmsPrompts, { depth: 4 })
     const keyNoDigits = key.replace(/\d+/g, '') // we allow multiple keys like key1, key2
+    console.log('keyNoDigits: ', keyNoDigits)
     let prompt = cmsPrompts[keyNoDigits] as string
-
+    console.log('prompt from cmsprompts[keynodigits]: ', prompt)
     const campaignWithRelations = (await this.campaignsService.findFirst({
       where: { id: campaign.id },
       include: {
