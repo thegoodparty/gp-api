@@ -280,7 +280,7 @@ export class PathToVictoryService extends createPrismaBase(
         channel: SlackChannel.botPathToVictory,
       })
 
-      if (campaign.pathToVictory?.data?.p2vStatus === 'Complete') {
+      if (campaign.pathToVictory?.data?.p2vStatus === P2VStatus.complete) {
         this.logger.debug(
           'Path To Victory already completed for',
           campaign.slug,
@@ -371,7 +371,7 @@ export class PathToVictoryService extends createPrismaBase(
         })
       }
 
-      let p2vStatus: P2VStatus = P2VStatus.waiting
+      let p2vStatus: P2VStatus = P2VStatus.complete
       if (
         pathToVictoryResponse?.counts?.total &&
         pathToVictoryResponse.counts.total > 0 &&

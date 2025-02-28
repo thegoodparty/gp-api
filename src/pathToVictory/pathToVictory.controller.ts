@@ -5,6 +5,7 @@ import {
   Logger,
   BadGatewayException,
   HttpException,
+  ParseIntPipe,
 } from '@nestjs/common'
 import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 import { Roles } from '../authentication/decorators/Roles.decorator'
@@ -20,11 +21,11 @@ export class PathToVictoryController {
   ) {}
 
   @Get(':campaignId')
-  async enqueuePathToVictory(@Param('campaignId') campaignId: string) {
+  async enqueuePathToVictory(
+    @Param('campaignId', ParseIntPipe) campaignId: number,
+  ) {
     try {
-      await this.enqueuePathToVictoryService.enqueuePathToVictory(
-        parseInt(campaignId),
-      )
+      await this.enqueuePathToVictoryService.enqueuePathToVictory(campaignId)
       return {
         success: true,
         message: `Path to victory calculation for campaign ${campaignId} has been enqueued successfully`,

@@ -199,12 +199,12 @@ export class ConsumerService {
   }
 
   private async handlePathToVictoryFailure(campaign: Campaign) {
-    const p2v = await this.pathToVictoryService.findUnique({
+    const p2v = await this.pathToVictoryService.findUniqueOrThrow({
       where: { campaignId: campaign.id },
     })
 
     let p2vAttempts = 0
-    if (p2v?.data?.p2vAttempts) {
+    if (p2v.data.p2vAttempts) {
       p2vAttempts = p2v.data.p2vAttempts
     }
     p2vAttempts += 1
@@ -219,10 +219,10 @@ export class ConsumerService {
 
       // mark the p2vStatus as Failed
       await this.pathToVictoryService.update({
-        where: { id: p2v!.id },
+        where: { id: p2v.id },
         data: {
           data: {
-            ...p2v?.data,
+            ...p2v.data,
             p2vAttempts,
             p2vStatus: P2VStatus.failed,
           },
@@ -231,10 +231,10 @@ export class ConsumerService {
     } else {
       // otherwise, increment the p2vAttempts
       await this.pathToVictoryService.update({
-        where: { id: p2v!.id },
+        where: { id: p2v.id },
         data: {
           data: {
-            ...p2v?.data,
+            ...p2v.data,
             p2vAttempts,
           },
         },
