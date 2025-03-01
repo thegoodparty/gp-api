@@ -125,7 +125,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       campaign.userId && this.usersService.trackUserById(campaign.userId)
 
       // Handle data and details JSON fields
-      const campaignUpdateData: any = {}
+      const campaignUpdateData: Prisma.CampaignUpdateInput = {}
       if (data) {
         campaignUpdateData.data = deepMerge(campaign.data as object, data)
       }
@@ -139,7 +139,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         campaignUpdateData.aiContent = deepMerge(
           (campaign.aiContent as object) || {},
           aiContent,
-        )
+        ) as PrismaJson.CampaignAiContent
       }
 
       // Update the campaign with JSON fields
