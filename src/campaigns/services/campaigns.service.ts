@@ -232,13 +232,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     )
 
     if (!campaign) {
-      let step = 'account-type'
-      if (user.metaData?.accountType === 'browsing') {
-        step = 'browsing'
-      }
       return {
         status: false,
-        step,
       }
     }
 
