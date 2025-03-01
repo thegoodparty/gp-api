@@ -109,7 +109,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
-    const { data, details, pathToVictory } = body
+    const { data, details, pathToVictory, aiContent } = body
 
     return this.client.$transaction(async (tx) => {
       this.logger.debug('Updating campaign json fields', { id, body })
@@ -120,37 +120,60 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
       if (!campaign) return false
 
-      const updateData = {
-        data: data ? deepMerge(campaign.data as object, data) : undefined,
-        details: details
-          ? deepMerge(campaign.details as object, details)
-          : undefined,
-        ...(objectNotEmpty(pathToVictory as object)
-          ? {
-              pathToVictory: {
-                update: {
-                  data: {
-                    data: deepMerge(
-                      (campaign.pathToVictory?.data as object) || {},
-                      pathToVictory,
-                    ),
-                  },
-                },
-              },
-            }
-          : {}),
-      }
-
+      // Track campaign and user
       this.crm.trackCampaign(campaign.id)
-
       campaign.userId && this.usersService.trackUserById(campaign.userId)
 
-      return tx.campaign.update({
+      // Handle data and details JSON fields
+      const campaignUpdateData: Prisma.CampaignUpdateInput = {}
+      if (data) {
+        campaignUpdateData.data = deepMerge(campaign.data as object, data)
+      }
+      if (details) {
+        campaignUpdateData.details = deepMerge(
+          campaign.details as object,
+          details,
+        )
+      }
+      if (objectNotEmpty(aiContent as object)) {
+        campaignUpdateData.aiContent = deepMerge(
+          (campaign.aiContent as object) || {},
+          aiContent,
+        ) as PrismaJson.CampaignAiContent
+      }
+
+      // Update the campaign with JSON fields
+      await tx.campaign.update({
         where: { id: campaign.id },
-        data: updateData,
-        include: {
-          pathToVictory: true, // objectNotEmpty(updateData.pathToVictory as object),
-        },
+        data: campaignUpdateData,
+      })
+
+      // Handle pathToVictory relation separately if needed
+      if (objectNotEmpty(pathToVictory as object)) {
+        if (campaign.pathToVictory) {
+          await tx.pathToVictory.update({
+            where: { id: campaign.pathToVictory.id },
+            data: {
+              data: deepMerge(
+                (campaign.pathToVictory.data as object) || {},
+                pathToVictory,
+              ),
+            },
+          })
+        } else {
+          await tx.pathToVictory.create({
+            data: {
+              campaignId: campaign.id,
+              data: pathToVictory,
+            },
+          })
+        }
+      }
+
+      // Return the updated campaign with pathToVictory included
+      return tx.campaign.findFirst({
+        where: { id: campaign.id },
+        include: { pathToVictory: true },
       })
     })
   }
