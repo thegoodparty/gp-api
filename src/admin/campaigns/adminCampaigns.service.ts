@@ -15,6 +15,7 @@ import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
+import { AuthenticationService } from 'src/authentication/authentication.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -25,6 +26,7 @@ export class AdminCampaignsService {
     private readonly adminP2V: AdminP2VService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly crm: CrmCampaignsService,
+    private readonly auth: AuthenticationService,
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
@@ -47,6 +49,10 @@ export class AdminCampaignsService {
       zip,
       phone,
     })
+
+    const resetToken = this.auth.generatePasswordResetToken()
+    const updatedUser = await this.users.setResetToken(user.id, resetToken)
+    this.email.sendSetPasswordEmail(updatedUser)
 
     // find slug
     const slug = await this.campaigns.findSlug(user)
