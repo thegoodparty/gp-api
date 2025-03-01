@@ -4,7 +4,7 @@ model CampaignPosition {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   description String?
   order       Int?
-  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId  Int       @map("campaign_id")
   position    Position  @relation(fields: [positionId], references: [id], onDelete: Cascade)
   positionId  Int       @map("position_id")
