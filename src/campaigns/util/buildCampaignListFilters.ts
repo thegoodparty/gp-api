@@ -1,3 +1,4 @@
+import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
 import { Prisma } from '@prisma/client'
 
@@ -14,13 +15,21 @@ export function buildCampaignListFilters({
   generalElectionDateEnd,
   p2vStatus,
 }: CampaignListSchema): Prisma.CampaignWhereInput {
-  // store AND array in var for easy push access
-  const andConditions: Prisma.CampaignWhereInput[] = []
+  // base query
+  const where: Prisma.CampaignWhereInput = {
+    NOT: {
+      user: null,
+    },
+    AND: [],
+  }
 
-  if (id) andConditions.push({ id })
-  if (slug) andConditions.push({ slug: { equals: slug, mode: 'insensitive' } })
+  // store AND array in var for easy push access
+  const AND = where.AND as Prisma.CampaignWhereInput[]
+
+  if (id) AND.push({ id })
+  if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
   if (email) {
-    andConditions.push({
+    AND.push({
       user: {
         email: {
           contains: email,
@@ -29,42 +38,20 @@ export function buildCampaignListFilters({
       },
     })
   }
-  if (state) {
-    andConditions.push({
-      details: {
-        path: ['state'],
-        string_contains: state,
-        mode: 'insensitive',
-      },
-    })
-  }
-  if (level) {
-    andConditions.push({
-      details: {
-        path: ['ballotLevel'],
-        string_contains: level,
-        mode: 'insensitive',
-      },
-    })
-  }
+  if (state) AND.push(caseInsensitiveCompare('details', ['state'], state))
+  if (level) AND.push(caseInsensitiveCompare('details', ['ballotLevel'], level))
   if (campaignStatus) {
-    andConditions.push({
+    AND.push({
       isActive: campaignStatus === 'active',
     })
   }
   if (p2vStatus) {
-    andConditions.push({
-      pathToVictory: {
-        data: {
-          path: ['p2vStatus'],
-          string_contains: p2vStatus,
-          mode: 'insensitive',
-        },
-      },
+    AND.push({
+      pathToVictory: caseInsensitiveCompare('data', ['p2vStatus'], p2vStatus),
     })
   }
   if (generalElectionDateStart) {
-    andConditions.push({
+    AND.push({
       details: {
         path: ['electionDate'],
         gte: generalElectionDateStart,
@@ -72,7 +59,7 @@ export function buildCampaignListFilters({
     })
   }
   if (generalElectionDateEnd) {
-    andConditions.push({
+    AND.push({
       details: {
         path: ['electionDate'],
         lte: generalElectionDateEnd,
@@ -80,7 +67,7 @@ export function buildCampaignListFilters({
     })
   }
   if (primaryElectionDateStart) {
-    andConditions.push({
+    AND.push({
       details: {
         path: ['primaryElectionDate'],
         gte: primaryElectionDateStart,
@@ -88,7 +75,7 @@ export function buildCampaignListFilters({
     })
   }
   if (primaryElectionDateEnd) {
-    andConditions.push({
+    AND.push({
       details: {
         path: ['primaryElectionDate'],
         lte: primaryElectionDateEnd,
@@ -96,5 +83,5 @@ export function buildCampaignListFilters({
     })
   }
 
-  return { AND: andConditions }
+  return where
 }

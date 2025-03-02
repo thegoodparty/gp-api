@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
 const WINNERS_ELECTION_YEAR = process.env.WINNERS_ELECTION_YEAR
@@ -26,13 +27,11 @@ export function buildMapFilters(
   const andConditions: Prisma.CampaignWhereInput[] = []
 
   if (partyFilter) {
-    andConditions.push({
-      details: {
-        path: ['party'],
-        string_contains: partyFilter,
-        mode: 'insensitive',
-      },
-    })
+    // Prisma doesn't support case-insensitive searching inside JSON
+    const partyCondition = createJsonOrConditionString(partyFilter, ['party'])
+    if (partyCondition) {
+      andConditions.push(partyCondition)
+    }
   }
 
   if (stateFilter) {
@@ -40,19 +39,17 @@ export function buildMapFilters(
       details: {
         path: ['state'],
         string_contains: stateFilter,
-        mode: 'insensitive',
       },
     })
   }
 
   if (levelFilter) {
-    andConditions.push({
-      details: {
-        path: ['ballotLevel'],
-        string_contains: levelFilter,
-        mode: 'insensitive',
-      },
-    })
+    const levelCondition = createJsonOrConditionString(levelFilter, [
+      'ballotLevel',
+    ])
+    if (levelCondition) {
+      andConditions.push(levelCondition)
+    }
   }
 
   if (resultsFilter) {
@@ -77,29 +74,22 @@ export function buildMapFilters(
   })
 
   if (officeFilter) {
+    const officeCondition = createJsonOrConditionString(officeFilter, [
+      ['normalizedOffice'],
+      ['office'],
+      ['otherOffice'],
+    ])
+    if (officeCondition) {
+      andConditions.push(officeCondition)
+    }
+  }
+
+  if (IS_PROD) {
     andConditions.push({
-      OR: [
-        {
-          details: {
-            path: ['normalizedOffice'],
-            string_contains: officeFilter,
-            mode: 'insensitive',
-          },
-        },
-        {
-          details: {
-            path: ['office'],
-            string_contains: officeFilter,
-            mode: 'insensitive',
-          },
-        },
-        {
-          details: {
-            path: ['otherOffice'],
-            string_contains: officeFilter,
-          },
-        },
-      ],
+      data: {
+        path: ['hubSpotUpdates', 'verified_candidates'],
+        equals: 'Yes',
+      },
     })
   }
 
@@ -112,21 +102,53 @@ export function buildMapFilters(
   })
 
   if (IS_PROD) {
-    andConditions.push({
-      OR: [
-        {
-          isVerified: true,
-        },
-        {
-          data: {
-            path: ['hubSpotUpdates', 'verified_candidates'],
-            equals: 'Yes',
-            mode: 'insensitive',
-          },
-        },
-      ],
-    })
+    const isProdCondition = createJsonOrConditionString('Yes', [
+      'hubSpotUpdates',
+      'verified_candidates',
+    ])
+    if (isProdCondition) {
+      isProdCondition.OR.push({
+        isVerified: true,
+      })
+
+      andConditions.push(isProdCondition)
+    }
   }
 
   return andConditions
+}
+
+function createJsonOrConditionString(
+  filter: string,
+  paths: string[] | string[][],
+): { OR: Prisma.CampaignWhereInput[] } | null {
+  if (!filter) return null
+
+  const filterUpper = capitalizeFirstLetter(filter).trim()
+  const filterLower = filter.toLowerCase().trim()
+
+  const normalizedPaths = Array.isArray(paths[0])
+    ? (paths as string[][])
+    : [paths as string[]]
+
+  const orConditions = normalizedPaths
+    .map((path) => [
+      {
+        details: {
+          path: path,
+          string_contains: filterUpper,
+        },
+      },
+      {
+        details: {
+          path: path,
+          string_contains: filterLower,
+        },
+      },
+    ])
+    .flat()
+
+  return {
+    OR: orConditions,
+  }
 }
