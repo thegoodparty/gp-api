@@ -84,15 +84,6 @@ export function buildMapFilters(
     }
   }
 
-  if (IS_PROD) {
-    andConditions.push({
-      data: {
-        path: ['hubSpotUpdates', 'verified_candidates'],
-        equals: 'Yes',
-      },
-    })
-  }
-
   // Exclude campaigns without ZIP
   andConditions.push({
     details: {
