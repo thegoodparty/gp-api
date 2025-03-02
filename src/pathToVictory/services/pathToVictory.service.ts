@@ -272,17 +272,15 @@ export class PathToVictoryService extends createPrismaBase(
       ￮ Voter Contact Goal: ${pathToVictoryResponse.counts.voterContactGoal}
       `
 
-      await this.slackService.message(
-        {
-          body:
-            candidateSlackMessage +
-            pathToVictorySlackMessage +
-            turnoutSlackMessage,
-        },
-        SlackChannel.botPathToVictory,
-      )
+      await this.slackService.formattedMessage({
+        message:
+          candidateSlackMessage +
+          pathToVictorySlackMessage +
+          turnoutSlackMessage,
+        channel: SlackChannel.botPathToVictory,
+      })
 
-      if (campaign.pathToVictory?.data?.p2vStatus === 'Complete') {
+      if (campaign.pathToVictory?.data?.p2vStatus === P2VStatus.complete) {
         this.logger.debug(
           'Path To Victory already completed for',
           campaign.slug,
@@ -303,13 +301,11 @@ export class PathToVictoryService extends createPrismaBase(
       pathToVictoryResponse.counts.total > 0
     ) {
       const debugMessage = 'Was not able to get the turnout numbers.\n'
-      await this.slackService.message(
-        {
-          body:
-            candidateSlackMessage + pathToVictorySlackMessage + debugMessage,
-        },
-        SlackChannel.botPathToVictoryIssues,
-      )
+      await this.slackService.formattedMessage({
+        message:
+          candidateSlackMessage + pathToVictorySlackMessage + debugMessage,
+        channel: SlackChannel.botPathToVictoryIssues,
+      })
 
       if (campaign.pathToVictory?.data?.p2vStatus !== 'Complete') {
         await this.completePathToVictory(
@@ -325,12 +321,10 @@ export class PathToVictoryService extends createPrismaBase(
         debugMessage +=
           'pathToVictoryResponse: ' + JSON.stringify(pathToVictoryResponse)
       }
-      await this.slackService.message(
-        {
-          body: candidateSlackMessage + debugMessage,
-        },
-        SlackChannel.botPathToVictoryIssues,
-      )
+      await this.slackService.formattedMessage({
+        message: candidateSlackMessage + debugMessage,
+        channel: SlackChannel.botPathToVictoryIssues,
+      })
     }
 
     await this.crmService.handleUpdateCampaign(

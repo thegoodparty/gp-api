@@ -1,7 +1,21 @@
-import { startOfDay } from 'date-fns'
+export const formatDateForCRM = (date: string | number | undefined) => {
+  if (!date) return undefined
+  const dateObj = new Date(date)
+  // Set to start of day in UTC
+  const utcStartOfDay = new Date(
+    Date.UTC(
+      dateObj.getUTCFullYear(),
+      dateObj.getUTCMonth(),
+      dateObj.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ),
+  )
+  return utcStartOfDay.getTime().toString()
+}
 
-export const formatDateForCRM = (date) =>
-  date ? startOfDay(new Date(date)).getTime().toString() : undefined
 // Some Hubspot keys couldn't be changed, see:
 // https://goodpartyorg.slack.com/archives/C01AEH4TEBX/p1716572940340399?thread_ts=1716563708.979759&cid=C01AEH4TEBX
 const KEEP_SNAKECASE = ['p2vStatus', 'p2vCompleteDate', 'winNumber']

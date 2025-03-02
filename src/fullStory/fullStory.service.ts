@@ -10,13 +10,14 @@ import { HttpService } from '@nestjs/axios'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom, Observable } from 'rxjs'
 import axios, { AxiosResponse } from 'axios'
-import { Campaign, PathToVictory, User } from '@prisma/client'
+import { PathToVictory, User } from '@prisma/client'
 import { IS_PROD } from '../shared/util/appEnvironment.util'
 import { UsersService } from '../users/services/users.service'
 import { DateFormats, formatDate } from '../shared/util/date.util'
 import { CampaignWith } from '../campaigns/campaigns.types'
 import {
   calculateVoterGoalsCount,
+  countAnsweredQuestions,
   generateAiContentTrackingFlags,
 } from './util/tracking.util'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
@@ -33,7 +34,9 @@ const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
 const { FULLSTORY_API_KEY, ENABLE_FULLSTORY } = process.env
 const enableFullStory = ENABLE_FULLSTORY === 'true'
-const FULLSTORY_ROOT_USERS_URL = 'https://api.fullstory.com/v2/users'
+const FULLSTORY_API_ROOT = 'https://api.fullstory.com/v2'
+const FULLSTORY_ROOT_USERS_URL = `${FULLSTORY_API_ROOT}/users`
+const FULLSTORY_ROOT_EVENTS_URL = `${FULLSTORY_API_ROOT}/events`
 
 // Limits calls to FullStory to 10requests for the first 10s, then a sustained
 //  rate of 30 requests per every minute
@@ -67,7 +70,7 @@ export class FullStoryService {
   ) {}
 
   private getTrackingProperties(
-    campaign: Campaign,
+    campaign: CampaignWith<'campaignPositions' | 'pathToVictory'>,
     pathToVictory: PathToVictory,
   ): TrackingProperties {
     const { slug, isActive, details, data, isVerified, isPro, aiContent } =
@@ -82,7 +85,8 @@ export class FullStoryService {
       filingPeriodsStart,
       filingPeriodsEnd,
     } = details || {}
-    const { currentStep, reportedVoterGoals, hubSpotUpdates } = data || {}
+    const { currentStep, reportedVoterGoals, hubSpotUpdates, createdBy } =
+      data || {}
     const { calls, digital, directMail, digitalAds, text, events } =
       reportedVoterGoals || {}
 
@@ -109,6 +113,11 @@ export class FullStoryService {
       election_results: 'Won General',
     } as CRMCompanyProperties
 
+    const { answeredQuestions } = countAnsweredQuestions(
+      campaign,
+      campaign.campaignPositions,
+    )
+
     return {
       slug,
       isActive,
@@ -123,6 +132,7 @@ export class FullStoryService {
       currentStep,
       isVerified,
       isPro,
+      createdByAdmin: createdBy === 'admin',
       aiContentCount: aiContent ? Object.keys(aiContent).length : 0,
       p2vStatus: pathToVictoryData?.p2vStatus || 'n/a',
       electionDateStr: electionDateMonth,
@@ -135,8 +145,15 @@ export class FullStoryService {
       digitalAds: digitalAds || 0,
       smsSent: text || 0,
       events: events || 0,
+      reportedVoterGoals: reportedVoterGoals || {},
       reportedVoterGoalsTotalCount: reportedVoterGoalsTotalCount || 0,
       voterContactGoal: pathToVictoryData?.voterContactGoal || 'n/a',
+      voterContactPercentage: pathToVictoryData?.voterContactGoal
+        ? (reportedVoterGoalsTotalCount /
+            Number(pathToVictoryData?.voterContactGoal)) *
+          100
+        : 'n/a',
+      contentQuestionsAnswered: answeredQuestions,
       ...(hubSpotUpdates || {}),
       ...generateAiContentTrackingFlags(aiContent),
     }
@@ -183,6 +200,26 @@ export class FullStoryService {
     }
   }
 
+  async trackEvent(user: User, eventName: string, properties: any) {
+    if (this.disabled) {
+      this.logger.warn(`FullStory is disabled`)
+      return
+    }
+    const fullStoryUserId = await this.getFullStoryUserId(user)
+    if (!fullStoryUserId) {
+      throw new BadGatewayException('Could not resolve FullStory user ID')
+    }
+
+    const result = await lastValueFrom(
+      this.httpService.post(
+        FULLSTORY_ROOT_EVENTS_URL,
+        { user: { id: fullStoryUserId }, name: eventName, properties },
+        { ...this.axiosConfig, method: 'POST' },
+      ),
+    )
+    return result
+  }
+
   private async makeTrackingRequest(
     user: User,
     properties: TrackingProperties,
@@ -214,7 +251,7 @@ export class FullStoryService {
 
   private async multiTrackIterator(
     resultCounts: SyncTrackingResultCounts,
-    campaign: CampaignWith<'pathToVictory'>,
+    campaign: CampaignWith<'pathToVictory' | 'campaignPositions'>,
   ) {
     try {
       const user = await this.users.findUser({ id: campaign.userId })
@@ -264,6 +301,7 @@ export class FullStoryService {
 
     const campaign = await this.campaigns.findByUserId(user.id, {
       pathToVictory: true,
+      campaignPositions: true,
     })
     const { pathToVictory } = campaign
 

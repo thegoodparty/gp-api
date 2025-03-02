@@ -40,7 +40,8 @@ export default $config({
     } else if ($app.stage === 'develop') {
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
-      webAppRootUrl = 'https://app-dev.goodparty.org'
+      webAppRootUrl =
+        'https://gp-ui-git-web-3367-make-the-web-app-work-with-nestjs-good-party.vercel.app'
     } else {
       apiDomain = `gp-api-${$app.stage}.goodparty.org`
       bucketDomain = `assets-${$app.stage}.goodparty.org`
@@ -227,8 +228,6 @@ export default $config({
         ports: [
           { listen: '80/http' },
           { listen: '443/https', forward: '80/http' },
-          // { listen: '3000/http' },
-          // { listen: '443/https', forward: '3000/http' },
         ],
         health: {
           '80/http': {
@@ -237,10 +236,10 @@ export default $config({
           },
         },
       },
-      memory: '0.5 GB',
-      cpu: '0.25 vCPU',
+      memory: '4 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
+      cpu: '1 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
       scaling: {
-        min: $app.stage === 'master' ? 2 : 1,
+        min: $app.stage === 'master' ? 2 : 2,
         max: $app.stage === 'master' ? 16 : 4,
         cpuUtilization: 50,
         memoryUtilization: 50,
@@ -276,6 +275,11 @@ export default $config({
         },
       },
       link: [assetsBucket],
+      transform: {
+        loadBalancer: {
+          idleTimeout: 120,
+        },
+      },
     })
 
     // Create a Security Group for the RDS Cluster

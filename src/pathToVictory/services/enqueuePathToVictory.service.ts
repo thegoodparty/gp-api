@@ -5,7 +5,7 @@ import { EnqueueService } from '../../queue/producer/enqueue.service'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
-import { PathToVictoryInput } from '../types/pathToVictory.types'
+import { PathToVictoryQueueMessage } from '../types/pathToVictory.types'
 
 @Injectable()
 export class EnqueuePathToVictoryService {
@@ -42,7 +42,7 @@ export class EnqueuePathToVictoryService {
 
       const slug = campaign.slug
       const details = campaign.details as PrismaJson.CampaignDetails
-      let queueMessage: PathToVictoryInput | undefined
+      let queueMessage: PathToVictoryQueueMessage | undefined
 
       if (details?.raceId) {
         this.logger.debug(
@@ -67,8 +67,11 @@ export class EnqueuePathToVictoryService {
         // queueMessage.data = { campaignId, ...raceData }
 
         queueMessage = {
-          campaignId: campaignId.toString(),
-          ...raceData,
+          type: 'pathToVictory',
+          data: {
+            campaignId: campaignId.toString(),
+            ...raceData,
+          },
         }
 
         // Update Campaign details
@@ -112,8 +115,8 @@ export class EnqueuePathToVictoryService {
         // If electionType and electionLocation are already specified
         // we can skip those steps and just do the counts
         if (p2vData?.electionType && p2vData?.electionLocation) {
-          queueMessage.electionType = p2vData.electionType
-          queueMessage.electionLocation = p2vData.electionLocation
+          queueMessage.data.electionType = p2vData.electionType
+          queueMessage.data.electionLocation = p2vData.electionLocation
         }
       }
 

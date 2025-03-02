@@ -8,6 +8,9 @@ import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.ser
 import { QueueProducerModule } from '../queue/producer/producer.module'
 import { EmailModule } from '../email/email.module'
 import { AiModule } from '../ai/ai.module'
+import { ViabilityService } from './services/viability.service'
+import { BallotReadyService } from 'src/elections/services/ballotReady.service'
+import { PathToVictoryController } from './pathToVictory.controller'
 
 @Module({
   imports: [
@@ -18,15 +21,20 @@ import { AiModule } from '../ai/ai.module'
     EmailModule,
     QueueProducerModule,
   ],
+  controllers: [PathToVictoryController],
   providers: [
     PathToVictoryService,
     OfficeMatchService,
     EnqueuePathToVictoryService,
+    ViabilityService,
+    BallotReadyService,
   ],
   exports: [
     PathToVictoryService,
     OfficeMatchService,
     EnqueuePathToVictoryService,
+    ViabilityService,
+    BallotReadyService,
   ],
 })
 export class PathToVictoryModule {}

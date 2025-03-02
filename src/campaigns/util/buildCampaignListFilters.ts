@@ -1,4 +1,3 @@
-import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
 import { Prisma } from '@prisma/client'
 
@@ -15,43 +14,57 @@ export function buildCampaignListFilters({
   generalElectionDateEnd,
   p2vStatus,
 }: CampaignListSchema): Prisma.CampaignWhereInput {
-  // base query
-  const where: Prisma.CampaignWhereInput = {
-    NOT: {
-      user: null,
-    },
-    AND: [],
-  }
-
   // store AND array in var for easy push access
-  const AND = where.AND as Prisma.CampaignWhereInput[]
+  const andConditions: Prisma.CampaignWhereInput[] = []
 
-  if (id) AND.push({ id })
-  if (slug) AND.push({ slug: { equals: slug, mode: 'insensitive' } })
+  if (id) andConditions.push({ id })
+  if (slug) andConditions.push({ slug: { equals: slug, mode: 'insensitive' } })
   if (email) {
-    AND.push({
+    andConditions.push({
       user: {
         email: {
-          equals: email,
+          contains: email,
           mode: 'insensitive',
         },
       },
     })
   }
-  if (state) AND.push(caseInsensitiveCompare('details', ['state'], state))
-  if (level) AND.push(caseInsensitiveCompare('details', ['ballotLevel'], level))
+  if (state) {
+    andConditions.push({
+      details: {
+        path: ['state'],
+        string_contains: state,
+        mode: 'insensitive',
+      },
+    })
+  }
+  if (level) {
+    andConditions.push({
+      details: {
+        path: ['ballotLevel'],
+        string_contains: level,
+        mode: 'insensitive',
+      },
+    })
+  }
   if (campaignStatus) {
-    AND.push({
+    andConditions.push({
       isActive: campaignStatus === 'active',
     })
   }
   if (p2vStatus) {
-    AND.push({
-      pathToVictory: caseInsensitiveCompare('data', ['p2vStatus'], p2vStatus),
+    andConditions.push({
+      pathToVictory: {
+        data: {
+          path: ['p2vStatus'],
+          string_contains: p2vStatus,
+          mode: 'insensitive',
+        },
+      },
     })
   }
   if (generalElectionDateStart) {
-    AND.push({
+    andConditions.push({
       details: {
         path: ['electionDate'],
         gte: generalElectionDateStart,
@@ -59,7 +72,7 @@ export function buildCampaignListFilters({
     })
   }
   if (generalElectionDateEnd) {
-    AND.push({
+    andConditions.push({
       details: {
         path: ['electionDate'],
         lte: generalElectionDateEnd,
@@ -67,7 +80,7 @@ export function buildCampaignListFilters({
     })
   }
   if (primaryElectionDateStart) {
-    AND.push({
+    andConditions.push({
       details: {
         path: ['primaryElectionDate'],
         gte: primaryElectionDateStart,
@@ -75,7 +88,7 @@ export function buildCampaignListFilters({
     })
   }
   if (primaryElectionDateEnd) {
-    AND.push({
+    andConditions.push({
       details: {
         path: ['primaryElectionDate'],
         lte: primaryElectionDateEnd,
@@ -83,5 +96,5 @@ export function buildCampaignListFilters({
     })
   }
 
-  return where
+  return { AND: andConditions }
 }

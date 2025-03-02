@@ -3,11 +3,15 @@ import { MapCampaign } from './campaignMap.types'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { buildMapFilters } from '../util/buildMapFilters'
 import { CampaignsService } from '../services/campaigns.service'
-import { subDays } from 'date-fns'
 import { GeocodingService } from '../services/geocoding.service'
 import { RacesService } from 'src/elections/services/races.service'
 
-type CampaignWithUser = Campaign & {
+const DB_UPDATE_CHUNK_SIZE = 20
+
+type BasicCampaignWithUser = Pick<
+  Campaign,
+  'id' | 'slug' | 'details' | 'didWin' | 'data'
+> & {
   user: Pick<User, 'firstName' | 'lastName' | 'avatar'>
 }
 
@@ -40,22 +44,9 @@ export class CampaignMapService {
           equals: false,
         },
       },
-      {
-        OR: [
-          { didWin: true },
-          {
-            didWin: null,
-            details: {
-              path: ['electionDate'],
-              gte: subDays(new Date(), 7),
-            },
-          },
-        ],
-      },
     ]
 
     const where: Prisma.CampaignWhereInput = {
-      userId: { not: undefined },
       isDemo: false,
       isActive: true,
       AND: combinedAndConditions,
@@ -81,22 +72,9 @@ export class CampaignMapService {
         resultsFilter,
         officeFilter,
       }),
-      {
-        OR: [
-          { didWin: true },
-          {
-            didWin: null,
-            details: {
-              path: ['electionDate'],
-              gte: subDays(new Date(), 7),
-            },
-          },
-        ],
-      },
     ]
 
     const where: Prisma.CampaignWhereInput = {
-      userId: { not: undefined },
       isDemo: false,
       isActive: true,
       AND: combinedAndConditions,
@@ -117,7 +95,12 @@ export class CampaignMapService {
 
     const campaigns = (await this.campaignsService.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        details: true,
+        didWin: true,
+        data: true,
         user: {
           select: {
             firstName: true,
@@ -126,12 +109,11 @@ export class CampaignMapService {
           },
         },
       },
-    })) as CampaignWithUser[]
+    })) as BasicCampaignWithUser[]
 
     const updates: Prisma.CampaignUpdateArgs[] = []
 
     const mapCampaigns: MapCampaign[] = []
-
     for (const campaign of campaigns) {
       const { didWin, slug } = campaign
       const details = campaign.details
@@ -200,13 +182,12 @@ export class CampaignMapService {
 
       mapCampaigns.push(mapCampaign)
     }
-
-    if (updates.length > 0) {
+    for (let i = 0; i < updates.length; i += DB_UPDATE_CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + DB_UPDATE_CHUNK_SIZE)
       await Promise.all(
-        updates.map((update) => this.campaignsService.update(update)),
+        chunk.map((update) => this.campaignsService.update(update)),
       )
     }
-
     return mapCampaigns
   }
 }

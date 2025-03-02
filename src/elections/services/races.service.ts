@@ -30,11 +30,15 @@ export class RacesService {
   ) {}
 
   async getRaceById(raceId: string) {
-    return this.ballotReadyService.fetchRaceById(raceId)
+    const raceNode = await this.ballotReadyService.fetchRaceById(raceId)
+    if (raceNode && raceNode?.node) {
+      return raceNode.node
+    }
+    return null
   }
 
   async getNormalizedPosition(raceId: string) {
-    return this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
+    return await this.ballotReadyService.fetchRaceNormalizedPosition(raceId)
   }
 
   async getRacesByZip({
@@ -520,7 +524,6 @@ export class RacesService {
         )
       }
       const { races } = ballotReadyData
-      this.logger.debug(slug, 'getElectionDates graphql result', races)
       const results = races?.edges || []
       for (let i = 0; i < results.length; i++) {
         const result = results[i]

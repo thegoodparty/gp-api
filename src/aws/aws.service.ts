@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
 import {
-  ObjectCannedACL,
   PutObjectCommand,
   PutObjectCommandInput,
   S3Client,
@@ -10,7 +9,6 @@ import { Upload } from '@aws-sdk/lib-storage'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 
 export type UploadOptions = {
-  accessControl?: ObjectCannedACL
   cacheControl?: string // Cache-Control header value
 }
 
@@ -59,7 +57,6 @@ export class AwsService {
           Key: filePath,
           Body: fileObject,
           ContentType: fileType,
-          ACL: options?.accessControl,
           CacheControl: options?.cacheControl,
         },
       })
