@@ -145,6 +145,12 @@ function createJsonOrConditionString(
           string_contains: filterLower,
         },
       },
+      {
+        details: {
+          path: path,
+          string_contains: filter,
+        },
+      },
     ])
     .flat()
 
