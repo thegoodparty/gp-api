@@ -36,8 +36,7 @@ export default $config({
     if ($app.stage === 'master') {
       apiDomain = 'gp-api.goodparty.org'
       bucketDomain = 'assets.goodparty.org'
-      // webAppRootUrl = 'https://goodparty.org'
-      webAppRootUrl = 'https://gp-ui.vercel.app/'
+      webAppRootUrl = 'https://goodparty.org'
     } else if ($app.stage === 'develop') {
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
