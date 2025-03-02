@@ -1,3 +1,4 @@
+import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
 import { Prisma } from '@prisma/client'
 
@@ -30,22 +31,12 @@ export function buildCampaignListFilters({
     })
   }
   if (state) {
-    andConditions.push({
-      details: {
-        path: ['state'],
-        string_contains: state,
-        mode: 'insensitive',
-      },
-    })
+    andConditions.push(caseInsensitiveCompare('details', ['state'], state))
   }
   if (level) {
-    andConditions.push({
-      details: {
-        path: ['ballotLevel'],
-        string_contains: level,
-        mode: 'insensitive',
-      },
-    })
+    andConditions.push(
+      caseInsensitiveCompare('details', ['ballotLevel'], level),
+    )
   }
   if (campaignStatus) {
     andConditions.push({
@@ -54,13 +45,7 @@ export function buildCampaignListFilters({
   }
   if (p2vStatus) {
     andConditions.push({
-      pathToVictory: {
-        data: {
-          path: ['p2vStatus'],
-          string_contains: p2vStatus,
-          mode: 'insensitive',
-        },
-      },
+      pathToVictory: caseInsensitiveCompare('data', ['p2vStatus'], p2vStatus),
     })
   }
   if (generalElectionDateStart) {
