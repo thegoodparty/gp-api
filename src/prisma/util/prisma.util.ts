@@ -3,7 +3,19 @@ import { PrismaService } from '../prisma.service'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { lowerFirst } from 'lodash'
 
-export const MODELS = Prisma.ModelName
+export const MODELS = {
+  AiChat: 'AiChat',
+  BlogArticleMeta: 'BlogArticleMeta',
+  Campaign: 'Campaign',
+  CampaignPlanVersion: 'CampaignPlanVersion',
+  CampaignPosition: 'CampaignPosition',
+  CampaignUpdateHistory: 'CampaignUpdateHistory',
+  Ecanvasser: 'Ecanvasser',
+  PathToVictory: 'PathToVictory',
+  Position: 'Position',
+  TopIssue: 'TopIssue',
+  User: 'User',
+} as const
 
 type ExcludeTypes = `$${string}` | symbol
 type PrismaModels = Exclude<keyof PrismaClient, ExcludeTypes>
@@ -22,7 +34,7 @@ const PASSTHROUGH_MODEL_METHODS = [
 ] satisfies PrismaMethods[]
 
 export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
-  const lowerModelName = lowerFirst(modelName)
+  const lowerModelName = lowerFirst(modelName) as Uncapitalize<T>
   /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
   @Injectable()
   class BasePrismaService implements OnModuleInit {

@@ -1,0 +1,27 @@
+model Ecanvasser {
+    id         Int      @id @default(autoincrement())
+    createdAt  DateTime @default(now()) @map("created_at")
+    updatedAt  DateTime @updatedAt @map("updated_at")
+    apiKey     String   @map("api_key")
+    campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+    campaignId Int      @unique @map("campaign_id")
+
+    appointments Json @default("[]") @map("appointments") @db.JsonB
+    contacts     Json @default("[]") @map("contacts") @db.JsonB
+    customFields Json @default("[]") @map("custom_fields") @db.JsonB
+    documents    Json @default("[]") @map("documents") @db.JsonB
+    efforts      Json @default("[]") @map("efforts") @db.JsonB
+    followUps    Json @default("[]") @map("follow_ups") @db.JsonB
+    houses       Json @default("[]") @map("houses") @db.JsonB
+    interactions Json @default("[]") @map("interactions") @db.JsonB
+    surveys      Json @default("[]") @map("surveys") @db.JsonB
+    questions    Json @default("[]") @map("questions") @db.JsonB
+    teams        Json @default("[]") @map("teams") @db.JsonB
+    users        Json @default("[]") @map("users") @db.JsonB
+
+    lastSync DateTime? @map("last_sync")
+    error    String?
+
+    @@index([campaignId])
+    @@map("ecanvasser")
+}
