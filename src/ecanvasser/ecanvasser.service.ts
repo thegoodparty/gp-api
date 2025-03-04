@@ -88,6 +88,8 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   async sync(campaignId: number): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
 
+    const limit = 1000
+
     try {
       const [
         appointments,
@@ -102,17 +104,17 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
         teams,
         users,
       ] = await Promise.all([
-        this.fetchFromApi('/appointment', ecanvasser.apiKey),
-        this.fetchFromApi('/contact', ecanvasser.apiKey),
-        this.fetchFromApi('/customfield', ecanvasser.apiKey),
-        this.fetchFromApi('/document', ecanvasser.apiKey),
-        this.fetchFromApi('/effort', ecanvasser.apiKey),
-        this.fetchFromApi('/followuprequest', ecanvasser.apiKey),
-        this.fetchFromApi('/house', ecanvasser.apiKey),
-        this.fetchFromApi('/interaction', ecanvasser.apiKey),
-        this.fetchFromApi('/survey', ecanvasser.apiKey),
-        this.fetchFromApi('/team', ecanvasser.apiKey),
-        this.fetchFromApi('/user', ecanvasser.apiKey),
+        this.fetchFromApi(`/appointment?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/contact?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/customfield?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/document?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/effort?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/followuprequest?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/house?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/interaction?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/survey?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/team?limit=${limit}`, ecanvasser.apiKey),
+        this.fetchFromApi(`/user?limit=${limit}`, ecanvasser.apiKey),
       ])
 
       return this.model.update({
