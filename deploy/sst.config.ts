@@ -40,8 +40,7 @@ export default $config({
     } else if ($app.stage === 'develop') {
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
-      webAppRootUrl =
-        'https://gp-ui-git-web-3367-make-the-web-app-work-with-nestjs-good-party.vercel.app'
+      webAppRootUrl = 'https://dev.goodparty.org'
     } else {
       apiDomain = `gp-api-${$app.stage}.goodparty.org`
       bucketDomain = `assets-${$app.stage}.goodparty.org`
