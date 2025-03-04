@@ -5,6 +5,7 @@ export class CreateEcanvasserDto extends createZodDto(
   z
     .object({
       apiKey: z.string().min(1),
+      email: z.string().email(),
     })
     .strict(),
 ) {}
