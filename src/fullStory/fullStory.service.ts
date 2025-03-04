@@ -29,6 +29,8 @@ import {
 import { reduce as reduceAsync } from 'async'
 import Bottleneck from 'bottleneck'
 import { CRMCompanyProperties, PrimaryElectionResult } from '../crm/crm.types'
+import { SlackService } from 'src/shared/services/slack.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
@@ -67,6 +69,7 @@ export class FullStoryService {
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
     private readonly httpService: HttpService,
+    private readonly slack: SlackService,
   ) {}
 
   private getTrackingProperties(
@@ -290,6 +293,12 @@ export class FullStoryService {
       this.multiTrackIterator.bind(this),
     )
     this.logger.log('FullStory trackCampaigns results:', resultCounts)
+    this.slack.message(
+      {
+        body: `FullStory trackCampaigns results:\nUpdated: ${resultCounts.updated}\nFailed: ${resultCounts.failed}`,
+      },
+      SlackChannel.botDev,
+    )
     return resultCounts
   }
 

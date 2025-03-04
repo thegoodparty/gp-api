@@ -141,7 +141,7 @@ export class StripeEventsService {
     event: Stripe.CheckoutSessionCompletedEvent,
   ): Promise<void> {
     const session = event.data.object
-    const { customer: customerId, subscription: subscriptionId } = session
+    const { customer: customerId, subscription } = session
     if (!customerId) {
       throw new BadGatewayException('No customerId found in checkout session')
     }
@@ -177,7 +177,7 @@ export class StripeEventsService {
         checkoutSessionId: null,
       }),
       this.campaignsService.patchCampaignDetails(campaignId, {
-        subscriptionId: subscriptionId as string,
+        subscriptionId: subscription as string,
       }),
       this.campaignsService.setIsPro(campaignId),
       this.sendProSignUpSlackMessage(user, campaign),
