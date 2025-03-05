@@ -232,8 +232,12 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     )
 
     if (!campaign) {
+      // every user should have a campaign
+      campaign = await this.createForUser(user)
       return {
-        status: false,
+        status: CampaignStatus.onboarding,
+        slug: campaign.slug,
+        step: 1,
       }
     }
 
