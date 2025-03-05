@@ -55,9 +55,9 @@ export class CampaignsController {
     if (
       typeof slug === 'string' &&
       campaign?.slug !== slug &&
-      userHasRole(user, UserRole.admin)
+      userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {
-      // if user has Admin role, allow loading campaign by slug param
+      // if user has Admin or sales role, allow loading campaign by slug param
       campaign = await this.campaigns.findUniqueOrThrow({
         where: { slug },
       })

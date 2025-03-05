@@ -17,9 +17,10 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Roles } from '../../authentication/decorators/Roles.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { UserRole } from '@prisma/client'
 
 @Controller('admin/campaigns')
-@Roles('admin')
+@Roles(UserRole.admin)
 @UsePipes(ZodValidationPipe)
 export class AdminCampaignsController {
   constructor(
@@ -28,11 +29,13 @@ export class AdminCampaignsController {
   ) {}
 
   @Post()
+  @Roles(UserRole.admin, UserRole.sales)
   create(@Body() body: AdminCreateCampaignSchema) {
     return this.adminCampaigns.create(body)
   }
 
   @Put(':id')
+  @Roles(UserRole.admin, UserRole.sales)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AdminUpdateCampaignSchema,
