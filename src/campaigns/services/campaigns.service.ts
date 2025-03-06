@@ -114,6 +114,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     deepMergeUpdate: boolean = true, // Concatenates nested arrays if true
   ) {
     const { data, details, pathToVictory, aiContent } = body
+    console.log('details.customIssues: ', details?.customIssues)
+    console.log('details.runningAgainst: ', details?.runningAgainst)
+    if (details?.customIssues || details?.runningAgainst) {
+      deepMergeUpdate = false // This is a safeguard for all the places we pass details from the frontend and don't set this to false
+    }
 
     return this.client.$transaction(async (tx) => {
       this.logger.debug('Updating campaign json fields', { id, body })
@@ -151,6 +156,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
             )
           : undefined,
       }
+
+      console.log('campaignUpdateData')
+      console.dir(campaignUpdateData, { depth: 10 })
 
       await tx.campaign.update({
         where: { id: campaign.id },
