@@ -6,22 +6,14 @@ import { CampaignsService } from '../campaigns/services/campaigns.service'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { Ecanvasser } from '@prisma/client'
+import { EcanvasserSummary } from './ecanvasser.types'
 import {
-  EcanvasserSummary,
-  EcanvasserAppointment,
-  EcanvasserContact,
-  EcanvasserCustomField,
-  EcanvasserDocument,
-  EcanvasserEffort,
-  EcanvasserFollowUp,
-  EcanvasserHouse,
-  EcanvasserInteraction,
-  EcanvasserSurvey,
-  EcanvasserQuestion,
-  EcanvasserTeam,
-  EcanvasserUser,
+  ApiEcanvasserContact,
+  ApiEcanvasserCustomField,
+  ApiEcanvasserInteraction,
 } from './ecanvasser.types'
 
+const RECORDS_LIMIT = 10
 @Injectable()
 export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   public readonly logger = new Logger(EcanvasserService.name)
@@ -64,7 +56,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
         houses: true,
         interactions: true,
         surveys: true,
-        questions: true,
         teams: true,
         users: true,
       },
@@ -118,7 +109,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
   async sync(campaignId: number): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
-    const limit = 1000
 
     try {
       const [
@@ -131,56 +121,51 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
         houses,
         interactions,
         surveys,
-        questions,
         teams,
         users,
       ] = await Promise.all([
-        this.fetchFromApi<EcanvasserAppointment>(
-          `/appointment?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/appointment?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserContact>(
-          `/contact?limit=${limit}`,
+        this.fetchFromApi<ApiEcanvasserContact>(
+          `/contact?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserCustomField>(
-          `/customfield?limit=${limit}`,
+        this.fetchFromApi<ApiEcanvasserCustomField>(
+          `/customfield?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserDocument>(
-          `/document?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/document?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserEffort>(
-          `/effort?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/effort?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserFollowUp>(
-          `/followuprequest?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/followuprequest?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserHouse>(
-          `/house?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/house?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserInteraction>(
-          `/interaction?limit=${limit}`,
+        this.fetchFromApi<ApiEcanvasserInteraction>(
+          `/interaction?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserSurvey>(
-          `/survey?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/survey?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserQuestion>(
-          `/question?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/team?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
-        this.fetchFromApi<EcanvasserTeam>(
-          `/team?limit=${limit}`,
-          ecanvasser.apiKey,
-        ),
-        this.fetchFromApi<EcanvasserUser>(
-          `/user?limit=${limit}`,
+        this.fetchFromApi<any>(
+          `/user?limit=${RECORDS_LIMIT}`,
           ecanvasser.apiKey,
         ),
       ])
@@ -216,9 +201,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
           surveys: {
             deleteMany: {},
           },
-          questions: {
-            deleteMany: {},
-          },
           teams: {
             deleteMany: {},
           },
@@ -235,17 +217,17 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
           appointments: {
             create: appointments.map((appointment) => ({
               name: appointment.name,
-              description: appointment.description,
-              scheduledFor: appointment.scheduled_for
-                ? new Date(appointment.scheduled_for)
+              description: appointment.description || null,
+              scheduledFor: appointment.scheduledFor
+                ? new Date(appointment.scheduledFor)
                 : null,
               status: appointment.status,
-              createdBy: appointment.created_by,
-              updatedBy: appointment.updated_by,
-              assignedTo: appointment.assigned_to,
-              canvassId: appointment.canvass_id,
-              contactId: appointment.contact_id,
-              houseId: appointment.house_id,
+              createdBy: appointment.createdBy,
+              updatedBy: appointment.updatedBy,
+              assignedTo: appointment.assignedTo,
+              canvassId: appointment.canvassId,
+              contactId: appointment.contactId,
+              houseId: appointment.houseId,
             })),
           },
           contacts: {
@@ -253,22 +235,22 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
               firstName: contact.first_name,
               lastName: contact.last_name,
               type: contact.type,
-              gender: contact.gender,
+              gender: contact.gender || null,
               dateOfBirth: contact.date_of_birth
                 ? new Date(contact.date_of_birth)
                 : null,
-              yearOfBirth: contact.year_of_birth,
-              houseId: contact.house_id,
-              uniqueIdentifier: contact.unique_identifier,
-              organization: contact.organization,
+              yearOfBirth: contact.year_of_birth?.toString() || null,
+              houseId: contact.house_id || null,
+              uniqueIdentifier: contact.unique_identifier || null,
+              organization: contact.organization || null,
               volunteer: contact.volunteer,
               deceased: contact.deceased,
               donor: contact.donor,
-              homePhone: contact.home_phone,
-              mobilePhone: contact.mobile_phone,
-              email: contact.email,
-              actionId: contact.action_id,
-              lastInteractionId: contact.last_interaction_id,
+              homePhone: contact.contact_details.home || null,
+              mobilePhone: contact.contact_details.mobile || null,
+              email: contact.contact_details.email || null,
+              actionId: contact.action_id || null,
+              lastInteractionId: contact.last_interaction_id || null,
               createdBy: contact.created_by,
             })),
           },
@@ -276,28 +258,28 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
             create: customFields.map((field) => ({
               name: field.name,
               createdBy: field.created_by,
-              typeId: field.type_id,
-              typeName: field.type_name,
-              defaultValue: field.default_value,
-              nationbuilderSlug: field.nationbuilder_slug,
+              typeId: field.type.id,
+              typeName: field.type.name,
+              defaultValue: field.default || null,
+              nationbuilderSlug: field.nationbuilder_slug || null,
             })),
           },
           documents: {
             create: documents.map((doc) => ({
               fileName: doc.file_name,
               createdBy: doc.created_by,
-              fileSize: doc.file_size,
+              fileSize: doc.file_size || null,
               type: doc.type,
             })),
           },
           efforts: {
             create: efforts.map((effort) => ({
-              description: effort.description,
+              description: effort.description || '',
               name: effort.name,
-              status: effort.status,
-              createdBy: effort.created_by,
-              updatedBy: effort.updated_by,
-              icon: effort.icon,
+              status: effort.status || 'Active',
+              createdBy: effort.created_by || 0,
+              updatedBy: effort.updated_by || 0,
+              icon: effort.icon || 'default_icon',
             })),
           },
           followUps: {
@@ -307,86 +289,59 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
               status: followUp.status,
               origin: followUp.origin,
               contactId: followUp.contact_id,
-              interactionId: followUp.interaction_id,
-              assignedTo: followUp.assigned_to,
+              interactionId: followUp.interaction_id || null,
+              assignedTo: followUp.assigned_to || null,
               createdBy: followUp.created_by,
             })),
           },
           houses: {
             create: houses.map((house) => ({
-              unit: house.unit,
-              number: house.number,
-              name: house.name,
               address: house.address,
-              city: house.city,
-              state: house.state,
-              latitude: house.latitude,
-              longitude: house.longitude,
-              source: house.source,
-              locationType: house.location_type,
-              lastInteractionId: house.last_interaction_id,
-              actionId: house.action_id,
-              buildingId: house.building_id,
-              type: house.type,
-              zipCode: house.zip_code,
-              precinct: house.precinct,
-              notes: house.notes,
-              createdBy: house.created_by,
+              latitude: house.latitude || null,
+              longitude: house.longitude || null,
+              uniqueIdentifier: house.unique_identifier || null,
+              externalId: house.external_id || null,
             })),
           },
           interactions: {
             create: interactions.map((interaction) => ({
-              rating: interaction.rating,
-              statusId: interaction.status_id,
-              statusName: interaction.status_name,
-              statusDescription: interaction.status_description,
-              statusColor: interaction.status_color,
-              effortId: interaction.effort_id,
-              contactId: interaction.contact_id,
-              houseId: interaction.house_id,
               type: interaction.type,
-              actionId: interaction.action_id,
+              status: interaction.status.name,
+              contactId: interaction.contact_id || 0,
               createdBy: interaction.created_by,
+              notes: null,
+              source: null,
             })),
           },
           surveys: {
             create: surveys.map((survey) => ({
               name: survey.name,
-              description: survey.description,
+              description: survey.description || null,
               requiresSignature: survey.requires_signature,
-              nationbuilderId: survey.nationbuilder_id,
+              nationbuilderId: survey.nationbuilder_id || null,
               status: survey.status,
-              teamId: survey.team_id,
+              teamId: survey.team_id || null,
               createdBy: survey.created_by,
-            })),
-          },
-          questions: {
-            create: questions.map((question) => ({
-              surveyId: question.survey_id,
-              name: question.name,
-              answerTypeId: question.answer_type_id,
-              answerTypeName: question.answer_type_name,
-              order: question.order,
-              required: question.required,
             })),
           },
           teams: {
             create: teams.map((team) => ({
               name: team.name,
-              color: team.color,
-              createdBy: team.created_by,
+              description: team.description || '',
+              type: team.type || 'Default',
+              status: team.status || 'Active',
+              createdBy: team.created_by || 0,
             })),
           },
           users: {
             create: users.map((user) => ({
               firstName: user.first_name,
               lastName: user.last_name,
-              permission: user.permission,
               email: user.email,
-              phoneNumber: user.phone_number,
-              countryCode: user.country_code,
-              joined: new Date(user.joined),
-              billing: user.billing,
+              phone: user.phone || null,
+              type: user.type || 'Default',
+              status: user.status || 'Active',
+              createdBy: user.created_by || 0,
             })),
           },
           lastSync: new Date(),
@@ -428,7 +383,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
         houses: true,
         interactions: true,
         surveys: true,
-        questions: true,
         teams: true,
         users: true,
       },
@@ -444,7 +398,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       houses: ecanvasser.houses.length,
       interactions: ecanvasser.interactions.length,
       surveys: ecanvasser.surveys.length,
-      questions: ecanvasser.questions.length,
       teams: ecanvasser.teams.length,
       users: ecanvasser.users.length,
       email: ecanvasser.campaign?.user?.email ?? null,

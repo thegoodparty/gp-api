@@ -19,8 +19,12 @@ model Ecanvasser {
     teams        EcanvasserTeam[]
     users        EcanvasserUser[]
 
-    lastSync DateTime? @map("last_sync")
-    error    String?
+    lastSync         DateTime?          @map("last_sync")
+    error            String?
+    EcanvasserList   EcanvasserList[]
+    EcanvasserNote   EcanvasserNote[]
+    EcanvasserPerson EcanvasserPerson[]
+    EcanvasserScript EcanvasserScript[]
 
     @@index([campaignId])
     @@map("ecanvasser")
@@ -31,9 +35,9 @@ model EcanvasserAppointment {
     createdAt    DateTime   @default(now()) @map("created_at")
     updatedAt    DateTime   @updatedAt @map("updated_at")
     name         String
-    description  String
+    description  String?
     scheduledFor DateTime?  @map("scheduled_for")
-    status       String?    @default("Active")
+    status       String     @default("Active")
     createdBy    Int        @map("created_by")
     updatedBy    Int        @map("updated_by")
     assignedTo   Int        @map("assigned_to")
@@ -48,29 +52,31 @@ model EcanvasserAppointment {
 }
 
 model EcanvasserContact {
-    id                Int        @id @default(autoincrement())
-    createdAt         DateTime   @default(now()) @map("created_at")
-    updatedAt         DateTime   @updatedAt @map("updated_at")
-    firstName         String     @map("first_name")
-    lastName          String     @map("last_name")
+    id                Int              @id @default(autoincrement())
+    createdAt         DateTime         @default(now()) @map("created_at")
+    updatedAt         DateTime         @updatedAt @map("updated_at")
+    firstName         String           @map("first_name")
+    lastName          String           @map("last_name")
     type              String
     gender            String?
-    dateOfBirth       DateTime?  @map("date_of_birth")
-    yearOfBirth       Int?
-    houseId           Int?       @map("house_id")
-    uniqueIdentifier  String?    @map("unique_identifier")
+    dateOfBirth       DateTime?        @map("date_of_birth")
+    yearOfBirth       String?          @map("year_of_birth")
+    houseId           Int?             @map("house_id")
+    uniqueIdentifier  String?          @map("unique_identifier")
     organization      String?
-    volunteer         Boolean    @default(false)
-    deceased          Boolean    @default(false)
-    donor             Boolean    @default(false)
-    homePhone         String?    @map("home_phone")
-    mobilePhone       String?    @map("mobile_phone")
+    volunteer         Boolean          @default(false)
+    deceased          Boolean          @default(false)
+    donor             Boolean          @default(false)
+    homePhone         String?          @map("home_phone")
+    mobilePhone       String?          @map("mobile_phone")
     email             String?
-    actionId          Int?       @map("action_id")
-    lastInteractionId Int?       @map("last_interaction_id")
-    createdBy         Int        @map("created_by")
-    ecanvasser        Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
-    ecanvasserId      Int        @map("ecanvasser_id")
+    actionId          Int?             @map("action_id")
+    lastInteractionId Int?             @map("last_interaction_id")
+    createdBy         Int              @map("created_by")
+    ecanvasser        Ecanvasser       @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
+    ecanvasserId      Int              @map("ecanvasser_id")
+    EcanvasserHouse   EcanvasserHouse? @relation(fields: [ecanvasserHouseId], references: [id])
+    ecanvasserHouseId Int?
 
     @@index([ecanvasserId])
     @@map("ecanvasser_contacts")
@@ -98,7 +104,7 @@ model EcanvasserDocument {
     createdAt    DateTime   @default(now()) @map("created_at")
     fileName     String     @map("file_name")
     createdBy    Int        @map("created_by")
-    fileSize     Int        @map("file_size")
+    fileSize     Float?     @map("file_size")
     type         String
     ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
     ecanvasserId Int        @map("ecanvasser_id")
@@ -144,51 +150,34 @@ model EcanvasserFollowUp {
 }
 
 model EcanvasserHouse {
-    id                Int        @id @default(autoincrement())
-    createdAt         DateTime   @default(now()) @map("created_at")
-    updatedAt         DateTime   @updatedAt @map("updated_at")
-    unit              String?
-    number            String?
-    name              String?
-    address           String
-    city              String
-    state             String
-    latitude          Float?
-    longitude         Float?
-    source            String
-    locationType      String?    @map("location_type")
-    lastInteractionId Int?       @map("last_interaction_id")
-    actionId          Int?       @map("action_id")
-    buildingId        Int?       @map("building_id")
-    type              String
-    zipCode           String?    @map("zip_code")
-    precinct          String?
-    notes             String?
-    createdBy         Int        @map("created_by")
-    ecanvasser        Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
-    ecanvasserId      Int        @map("ecanvasser_id")
+    id               Int                 @id @default(autoincrement())
+    createdAt        DateTime            @default(now()) @map("created_at")
+    updatedAt        DateTime            @updatedAt @map("updated_at")
+    address          String
+    latitude         Float?
+    longitude        Float?
+    uniqueIdentifier String?             @map("unique_identifier")
+    externalId       String?             @map("external_id")
+    ecanvasser       Ecanvasser          @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
+    ecanvasserId     Int                 @map("ecanvasser_id")
+    contacts         EcanvasserContact[]
 
     @@index([ecanvasserId])
     @@map("ecanvasser_houses")
 }
 
 model EcanvasserInteraction {
-    id                Int        @id @default(autoincrement())
-    createdAt         DateTime   @default(now()) @map("created_at")
-    updatedAt         DateTime   @updatedAt @map("updated_at")
-    rating            Int?
-    statusId          Int        @map("status_id")
-    statusName        String     @map("status_name")
-    statusDescription String     @map("status_description")
-    statusColor       String     @map("status_color")
-    effortId          Int        @map("effort_id")
-    contactId         Int?
-    houseId           Int?
-    type              String
-    actionId          Int?       @map("action_id")
-    createdBy         Int        @map("created_by")
-    ecanvasser        Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
-    ecanvasserId      Int        @map("ecanvasser_id")
+    id           Int        @id @default(autoincrement())
+    createdAt    DateTime   @default(now()) @map("created_at")
+    updatedAt    DateTime   @updatedAt @map("updated_at")
+    type         String
+    status       String     @default("Active")
+    contactId    Int        @map("contact_id")
+    createdBy    Int        @map("created_by")
+    notes        String?
+    source       String?
+    ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
+    ecanvasserId Int        @map("ecanvasser_id")
 
     @@index([ecanvasserId])
     @@map("ecanvasser_interactions")
@@ -199,7 +188,7 @@ model EcanvasserSurvey {
     createdAt         DateTime   @default(now()) @map("created_at")
     updatedAt         DateTime   @updatedAt @map("updated_at")
     name              String
-    description       String
+    description       String?
     requiresSignature Boolean    @default(false) @map("requires_signature")
     nationbuilderId   Int?       @map("nationbuilder_id")
     status            String     @default("Not Live")
@@ -234,7 +223,9 @@ model EcanvasserTeam {
     createdAt    DateTime   @default(now()) @map("created_at")
     updatedAt    DateTime   @updatedAt @map("updated_at")
     name         String
-    color        String
+    description  String?
+    type         String
+    status       String     @default("Active")
     createdBy    Int        @map("created_by")
     ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
     ecanvasserId Int        @map("ecanvasser_id")
@@ -249,15 +240,79 @@ model EcanvasserUser {
     updatedAt    DateTime   @updatedAt @map("updated_at")
     firstName    String     @map("first_name")
     lastName     String     @map("last_name")
-    permission   String
-    email        String?
-    phoneNumber  String?    @map("phone_number")
-    countryCode  String?    @map("country_code")
-    joined       DateTime
-    billing      Boolean    @default(false)
+    email        String
+    phone        String?
+    type         String
+    status       String     @default("Active")
+    createdBy    Int        @map("created_by")
     ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
     ecanvasserId Int        @map("ecanvasser_id")
 
     @@index([ecanvasserId])
     @@map("ecanvasser_users")
+}
+
+model EcanvasserList {
+    id           Int        @id @default(autoincrement())
+    createdAt    DateTime   @default(now()) @map("created_at")
+    updatedAt    DateTime   @updatedAt @map("updated_at")
+    name         String
+    description  String?
+    type         String
+    status       String     @default("Active")
+    createdBy    Int        @map("created_by")
+    ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
+    ecanvasserId Int        @map("ecanvasser_id")
+
+    @@index([ecanvasserId])
+    @@map("ecanvasser_lists")
+}
+
+model EcanvasserNote {
+    id           Int        @id @default(autoincrement())
+    createdAt    DateTime   @default(now()) @map("created_at")
+    updatedAt    DateTime   @updatedAt @map("updated_at")
+    content      String
+    type         String
+    contactId    Int        @map("contact_id")
+    createdBy    Int        @map("created_by")
+    ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
+    ecanvasserId Int        @map("ecanvasser_id")
+
+    @@index([ecanvasserId])
+    @@map("ecanvasser_notes")
+}
+
+model EcanvasserPerson {
+    id           Int        @id @default(autoincrement())
+    createdAt    DateTime   @default(now()) @map("created_at")
+    updatedAt    DateTime   @updatedAt @map("updated_at")
+    firstName    String     @map("first_name")
+    lastName     String     @map("last_name")
+    email        String?
+    phone        String?
+    type         String
+    status       String     @default("Active")
+    createdBy    Int        @map("created_by")
+    ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
+    ecanvasserId Int        @map("ecanvasser_id")
+
+    @@index([ecanvasserId])
+    @@map("ecanvasser_people")
+}
+
+model EcanvasserScript {
+    id           Int        @id @default(autoincrement())
+    createdAt    DateTime   @default(now()) @map("created_at")
+    updatedAt    DateTime   @updatedAt @map("updated_at")
+    name         String
+    description  String?
+    type         String
+    status       String     @default("Active")
+    createdBy    Int        @map("created_by")
+    ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
+    ecanvasserId Int        @map("ecanvasser_id")
+
+    @@index([ecanvasserId])
+    @@map("ecanvasser_scripts")
 }
