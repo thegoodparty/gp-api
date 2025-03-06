@@ -10,6 +10,7 @@ export class UpdateCampaignSchema extends createZodDto(
       details: z.record(z.string(), z.unknown()).optional(),
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
       aiContent: z.record(z.string(), z.unknown()).optional(),
+      deepMergeUpdate: z.boolean().optional(),
     })
     .strict(),
 ) {}
