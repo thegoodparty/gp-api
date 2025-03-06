@@ -46,4 +46,5 @@ export interface ViabilityScore {
   seats: string | number
   candidatesPerSeat: string | number
   score: number
+  probOfWin: number
 }

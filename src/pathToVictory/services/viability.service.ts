@@ -5,6 +5,7 @@ import { Campaign } from '@prisma/client'
 import { ViabilityScore } from '../types/pathToVictory.types'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { RaceWithOfficeHoldersNode } from 'src/elections/types/ballotReady.types'
+import { SHORT_TO_LONG_STATE } from '../../shared/constants/states'
 
 @Injectable()
 export class ViabilityService {
@@ -18,31 +19,29 @@ export class ViabilityService {
 
   async calculateViabilityScore(campaignId: number): Promise<ViabilityScore> {
     try {
-      const viability: ViabilityScore = {
-        level: '',
-        isPartisan: '',
-        isIncumbent: '',
-        isUncontested: '',
-        candidates: '',
-        seats: '',
-        candidatesPerSeat: '',
-        score: 0,
-      }
-
       const campaign = await this.prisma.campaign.findUnique({
         where: { id: campaignId },
       })
-
       if (!campaign) {
         throw new Error('Campaign not found')
       }
 
+      const stateShort = campaign?.details?.state
+      if (!stateShort) {
+        throw new Error('State not found in campaign details')
+      }
+      const state = SHORT_TO_LONG_STATE[stateShort]
+      if (!state) {
+        throw new Error('State not found in SHORT_TO_LONG_STATE')
+      }
+      let officeLevel: string | undefined
+
       if (campaign?.details?.ballotLevel) {
-        viability.level = campaign.details.ballotLevel.toLowerCase()
+        officeLevel = campaign.details.ballotLevel.toLowerCase()
       }
 
-      let raceId
-      let positionId
+      let raceId: string | undefined
+      let positionId: string | undefined
       if (campaign?.details?.raceId && campaign?.details?.positionId) {
         raceId = campaign.details.raceId
         positionId = campaign.details.positionId
@@ -57,53 +56,68 @@ export class ViabilityService {
         throw new Error('Invalid race')
       }
 
+      let isPartisan: boolean | undefined
+      let seats: number | undefined
       this.logger.debug('positionId on race', { id: race.position?.id })
       if (race) {
-        viability.isPartisan = race.isPartisan || false
-        viability.seats = race.position?.seats || 0
+        isPartisan = race.isPartisan || false
+        seats = race.position?.seats || 0
       }
 
       let isIncumbent: boolean | undefined
-      let isUncontested: boolean | undefined
-
-      if (isIncumbent === undefined) {
-        this.logger.debug('Checking officeHolders')
-        const officeHolders = race?.position?.officeHolders || []
-        if (officeHolders.nodes.length > 0) {
-          for (const officeHolder of officeHolders.nodes) {
-            if (
-              officeHolder &&
-              officeHolder.person?.fullName.toLowerCase() ===
-                campaign.data?.name?.toLowerCase()
-            ) {
-              isIncumbent = true
-            }
+      this.logger.debug('Checking officeHolders')
+      const officeHolders = race?.position?.officeHolders || []
+      if (officeHolders.nodes.length > 0) {
+        for (const officeHolder of officeHolders.nodes) {
+          if (
+            officeHolder &&
+            officeHolder.person?.fullName.toLowerCase() ===
+              campaign.data?.name?.toLowerCase()
+          ) {
+            isIncumbent = true
           }
         }
       }
 
-      if (isIncumbent !== undefined) {
-        viability.isIncumbent = isIncumbent
-      }
-      if (isUncontested !== undefined) {
-        viability.isUncontested = isUncontested
-      }
-
-      const candidates = this.getBallotReadyCandidates(race, campaign)
-
+      let candidates = this.getBallotReadyCandidates(race, campaign)
+      // openSeat is when the number of incumbents running is less than the number of seats available
       this.logger.debug('candidates', { candidates })
+      let openSeat = false
       if (candidates === 1) {
-        viability.isUncontested = true
-        viability.candidates = 1
-        viability.candidatesPerSeat = 1
+        candidates = 1
+        openSeat = true
       } else if (candidates > 1) {
-        viability.candidates = candidates
-        if (typeof viability.seats === 'number' && viability.seats > 0) {
-          viability.candidatesPerSeat = Math.ceil(candidates / viability.seats)
+        if (typeof seats === 'number' && seats > 0) {
+          openSeat = candidates < seats
         }
       }
 
-      viability.score = this.calculateScore(viability)
+      const opponents = candidates - 1
+      const officeType = this.getOfficeType(race.position?.name)
+
+      if (
+        !state ||
+        !officeLevel ||
+        !officeType ||
+        !isPartisan ||
+        !seats ||
+        !isIncumbent ||
+        !opponents ||
+        !openSeat
+      ) {
+        throw new Error('Missing required parameters')
+      }
+
+      const viability = this.calculateNewViabilityScore(
+        state,
+        officeLevel,
+        officeType,
+        isPartisan,
+        seats,
+        isIncumbent,
+        opponents,
+        openSeat,
+      )
 
       return viability
     } catch (e) {
@@ -116,52 +130,291 @@ export class ViabilityService {
     }
   }
 
-  private calculateScore(viability: ViabilityScore): number {
-    let score = 0
+  getOfficeType(officeName: string): string {
+    // TODO: consider passing the L2 Columns in here to get
+    // a more accurate match, or consider using an AI model to
+    // match the office name to the correct office type.
+    const officeType = officeName.toLowerCase()
+    if (officeType.includes('congress')) {
+      return 'Congressional'
+    }
+    if (officeType.includes('senator')) {
+      return 'State Senate'
+    }
+    if (officeType.includes('house')) {
+      return 'State House'
+    }
+    if (officeType.includes('president')) {
+      return 'President'
+    }
+    if (officeType.includes('governor')) {
+      return 'Governor'
+    }
+    if (officeType.includes('state')) {
+      return 'Statewide/Governor'
+    }
+    if (officeType.includes('county')) {
+      return 'County Supervisor'
+    }
+    if (officeType.includes('sheriff')) {
+      return 'Sheriff'
+    }
+    if (officeType.includes('mayor')) {
+      return 'Mayor'
+    }
+    if (officeType.includes('city council')) {
+      return 'City Council'
+    }
+    if (officeType.includes('school board')) {
+      return 'School Board'
+    }
+    if (officeType.includes('judge')) {
+      return 'Judge'
+    }
+    if (officeType.includes('town council')) {
+      return 'Town Council'
+    }
+    if (officeType.includes('alderman')) {
+      return 'Alderman'
+    }
+    if (officeType.includes('treasurer')) {
+      return 'Treasurer'
+    }
+    if (officeType.includes('attorney')) {
+      return 'Attorney'
+    }
+    if (officeType.includes('clerk')) {
+      return 'Clerk'
+    }
 
-    if (viability.level) {
-      if (viability.level === 'city' || viability.level === 'local') {
-        score += 1
-      } else if (viability.level === 'county') {
-        score += 1
-      } else if (viability.level === 'state') {
-        score += 0.5
+    return 'Other'
+  }
+
+  // This function is a wrapper to call the ported python code (getInitialViabilityScore)
+  // It is separated so that we can easily update the getInitialViabilityScore function.
+  calculateNewViabilityScore(
+    state: string,
+    officeLevel: string,
+    officeType: string,
+    electionPartisanship: boolean,
+    seats: number,
+    incumbent: boolean,
+    opponents: number,
+    openSeat: boolean,
+  ): ViabilityScore {
+    try {
+      this.logger.log(
+        `Calculating new viability score for ${state}, ${officeLevel}, ${officeType}`,
+      )
+
+      const { probOfWin, rating } = this.calculateInitialViability(
+        state,
+        officeLevel,
+        officeType,
+        electionPartisanship,
+        seats,
+        incumbent,
+        opponents,
+        openSeat,
+      )
+
+      // Format the viability score according to the existing interface
+      const viabilityScore: ViabilityScore = {
+        level: officeLevel,
+        isPartisan: electionPartisanship,
+        isIncumbent: incumbent,
+        isUncontested: opponents === 0,
+        candidates: opponents + 1, // Total candidates including the campaign
+        seats: seats,
+        candidatesPerSeat: (opponents + 1) / seats,
+        score: rating,
+        probOfWin,
       }
+
+      return viabilityScore
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error'
+      const errorStack = error instanceof Error ? error.stack : undefined
+      this.logger.error(
+        `Error calculating new viability score: ${errorMessage}`,
+        errorStack,
+      )
+      throw error
+    }
+  }
+
+  /**
+   * This function has been ported from python and will need to be updated
+   * Calculates the initial viability score for a campaign based on various factors
+   * @param state - The state where the election is taking place
+   * @param officeLevel - The level of office (federal, regional, state, county, city, town, local)
+   * @param officeType - The type of office being sought
+   * @param electionPartisanship - Whether the election is partisan
+   * @param seats - Number of seats available
+   * @param incumbent - Whether the candidate is an incumbent
+   * @param opponents - Number of opponents
+   * @param openSeat - Open seat is when the number of incumbents running is less than the number of seats available
+   * @returns An object containing the probability exponent, probability of winning, and rating (1-5)
+   */
+  calculateInitialViability(
+    state: string,
+    officeLevel: string,
+    officeType: string,
+    electionPartisanship: boolean,
+    seats: number,
+    incumbent: boolean,
+    opponents: number,
+    openSeat: boolean,
+  ): { probExponent: number; probOfWin: number; rating: number } {
+    // Implements a logistic regression term by term with co-efficients hard-coded
+    let probExponent = -1.70059412
+
+    // Incumbency
+    if (incumbent) {
+      probExponent += 1.45186084
     }
 
-    if (typeof viability.isPartisan === 'boolean') {
-      score += viability.isPartisan ? 0.25 : 1
+    // Race partisanship
+    if (electionPartisanship) {
+      probExponent += -1.00791154
     }
 
-    if (typeof viability.isIncumbent === 'boolean') {
-      score += viability.isIncumbent ? 1 : 0.5
+    // Open seat status
+    if (openSeat) {
+      probExponent += 0.41226921
     }
 
-    if (
-      typeof viability.isUncontested === 'boolean' &&
-      viability.isUncontested
-    ) {
-      return score + 5
+    // Office level
+    const officeLevelLower = officeLevel.toLowerCase()
+    if (officeLevelLower === 'federal') {
+      probExponent += -12.58769739
+    } else if (officeLevelLower === 'regional') {
+      probExponent += -1.29313821
+    } else if (officeLevelLower === 'state') {
+      probExponent += -1.61385769
+    } else if (officeLevelLower === 'county') {
+      probExponent += -0.12648397
+    } else if (officeLevelLower === 'city') {
+      probExponent += 0
+    } else if (officeLevelLower === 'town' || officeLevelLower === 'local') {
+      probExponent += -0.19114514
     }
 
-    if (typeof viability.candidates === 'number' && viability.candidates > 0) {
-      const candidatesPerSeat =
-        typeof viability.candidatesPerSeat === 'number'
-          ? viability.candidatesPerSeat
-          : 0
+    // Seats and opponents
+    probExponent += 0.65931675 * Math.log(Math.min(seats, 6))
+    probExponent -= 0.84858689 * Math.log(Math.min(opponents + 1 - seats, 6))
 
-      if (candidatesPerSeat <= 2) {
-        score += 0.75
-      } else if (candidatesPerSeat === 3) {
-        score += 0.5
-      } else if (candidatesPerSeat >= 4) {
-        score += 0.25
-      }
-    } else {
-      score += 0.25
+    // State binning
+    let stateBin = 5.5 // Default value for unmatched states
+
+    const stateBin1 = [
+      'Connecticut',
+      'Illinois',
+      'Missouri',
+      'New Hampshire',
+      'New Mexico',
+      'Pennsylvania',
+      'Colorado',
+      'Hawaii',
+      'Kansas',
+      'West Virginia',
+      'Wisconsin',
+      'Alabama',
+      'Idaho',
+      'Massachusetts',
+      'New York',
+      'Ohio',
+      'Georgia',
+      'Iowa',
+      'Nevada',
+      'Oklahoma',
+      'Rhode Island',
+      'Utah',
+      'Washington',
+    ]
+
+    const stateBin2 = [
+      'Alaska',
+      'Mississippi',
+      'Montana',
+      'Puerto Rico',
+      'Florida',
+      'Maryland',
+      'North Carolina',
+      'Oregon',
+    ]
+
+    const stateBin3 = ['South Carolina', 'California']
+    const stateBin4 = ['Louisiana', 'Nebraska', 'Tennessee', 'Texas']
+    const stateBin5 = [
+      'Arkansas',
+      'District Of Columbia',
+      'Indiana',
+      'Virginia',
+      'Wyoming',
+    ]
+    const stateBin6 = ['Minnesota', 'New Jersey', 'North Dakota']
+    const stateBin7 = ['Arizona', 'Delaware', 'Maine', 'Vermont', 'Michigan']
+    const stateBin8 = ['Kentucky', 'Northern Mariana Islands', 'South Dakota']
+
+    if (stateBin1.includes(state)) {
+      stateBin = 1
+    } else if (stateBin2.includes(state)) {
+      stateBin = 2
+    } else if (stateBin3.includes(state)) {
+      stateBin = 3
+    } else if (stateBin4.includes(state)) {
+      stateBin = 4
+    } else if (stateBin5.includes(state)) {
+      stateBin = 5
+    } else if (stateBin6.includes(state)) {
+      stateBin = 6
+    } else if (stateBin7.includes(state)) {
+      stateBin = 7
+    } else if (stateBin8.includes(state)) {
+      stateBin = 8
     }
 
-    return score
+    probExponent += 0.08551596 * stateBin
+
+    // Office type binning
+    let officeTypeBin = 3 // Default value for unmatched office types
+
+    const officeTypeBin1 = [
+      'Congressional',
+      'President',
+      'State Senate',
+      'Statewide/Governor',
+      'State House',
+      'County Supervisor',
+      'Sheriff',
+    ]
+
+    const officeTypeBin2 = ['Attorney', 'Clerk/Treasurer', 'Mayor']
+    const officeTypeBin3 = ['Other', 'City Council']
+    const officeTypeBin4 = ['School Board', 'Alderman']
+    const officeTypeBin5 = ['Judge', 'Town Council']
+
+    if (officeTypeBin1.includes(officeType)) {
+      officeTypeBin = 1
+    } else if (officeTypeBin2.includes(officeType)) {
+      officeTypeBin = 2
+    } else if (officeTypeBin3.includes(officeType)) {
+      officeTypeBin = 3
+    } else if (officeTypeBin4.includes(officeType)) {
+      officeTypeBin = 4
+    } else if (officeTypeBin5.includes(officeType)) {
+      officeTypeBin = 5
+    }
+
+    probExponent += 0.23143397 * officeTypeBin
+
+    // Calculate probability of winning
+    const probOfWin = 1 / (1 + Math.exp(-probExponent))
+    const rating = Math.ceil(probOfWin * 5)
+
+    return { probExponent, probOfWin, rating }
   }
 
   private getBallotReadyCandidates(
