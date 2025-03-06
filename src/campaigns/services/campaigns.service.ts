@@ -135,12 +135,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           details,
         ) as PrismaJson.CampaignDetails
         if (details?.customIssues) {
+          // If this isn't done, customIssues' entries duplicate
           mergedDetails.customIssues = details.customIssues as Array<{
             position: string
             title: string
           }>
         }
         if (details.runningAgainst) {
+          // If this isn't done, runningAgainst's entries duplicate
           mergedDetails.runningAgainst = details.runningAgainst as Array<{
             name: string
             party: string
