@@ -58,9 +58,9 @@ export class EcanvasserController {
     return this.ecanvasserService.findAll()
   }
 
-  @Post('sync-all')
-  @PublicAccess() // why is this not working?
+  @Get('sync-all')
+  @PublicAccess()
   syncAll() {
-    this.ecanvasserService.syncAll()
+    return this.ecanvasserService.syncAll()
   }
 }
