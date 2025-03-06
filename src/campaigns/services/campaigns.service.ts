@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getUserFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
@@ -25,7 +24,8 @@ import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmCampaignsService } from './crmCampaigns.service'
-import { objectNotEmpty } from '../../shared/util/objects.util'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
+import { objectNotEmpty } from 'src/shared/util/objects.util'
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
@@ -130,10 +130,26 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         campaignUpdateData.data = deepMerge(campaign.data as object, data)
       }
       if (details) {
-        campaignUpdateData.details = deepMerge(
+        const mergedDetails = deepMerge(
           campaign.details as object,
           details,
-        )
+        ) as PrismaJson.CampaignDetails
+        if (details?.customIssues) {
+          // If this isn't done, customIssues' entries duplicate
+          mergedDetails.customIssues = details.customIssues as Array<{
+            position: string
+            title: string
+          }>
+        }
+        if (details.runningAgainst) {
+          // If this isn't done, runningAgainst's entries duplicate
+          mergedDetails.runningAgainst = details.runningAgainst as Array<{
+            name: string
+            party: string
+            description: string
+          }>
+        }
+        campaignUpdateData.details = mergedDetails
       }
       if (objectNotEmpty(aiContent as object)) {
         campaignUpdateData.aiContent = deepMerge(
