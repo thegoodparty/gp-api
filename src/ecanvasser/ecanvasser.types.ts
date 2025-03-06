@@ -2,18 +2,9 @@ import { Prisma } from '@prisma/client'
 
 export type EcanvasserWithRelations = Prisma.EcanvasserGetPayload<{
   include: {
-    appointments: true
     contacts: true
-    customFields: true
-    documents: true
-    efforts: true
-    followUps: true
     houses: true
     interactions: true
-    surveys: true
-    questions: true
-    teams: true
-    users: true
     campaign: {
       select: {
         id: true
@@ -28,17 +19,9 @@ export type EcanvasserWithRelations = Prisma.EcanvasserGetPayload<{
 }>
 
 export interface EcanvasserSummary {
-  appointments: number
   contacts: number
-  customFields: number
-  documents: number
-  efforts: number
-  followUps: number
   houses: number
   interactions: number
-  surveys: number
-  teams: number
-  users: number
   email: string | null
   campaignId: number | undefined
   lastSync: Date | null
@@ -70,21 +53,6 @@ export interface EcanvasserContact {
   created_at: string
   updated_at: string
   customFields?: Array<any>
-}
-
-export interface EcanvasserCustomField {
-  id: number
-  name: string
-  created_by: number
-  type: {
-    id: number
-    name: string
-  }
-  options: any[]
-  default: string | null
-  nationbuilder_slug: string | null
-  created_at: string
-  updated_at: string
 }
 
 export interface EcanvasserInteraction {
@@ -147,21 +115,6 @@ export interface ApiEcanvasserContact {
   customFields?: Array<any>
 }
 
-export interface ApiEcanvasserCustomField {
-  id: number
-  name: string
-  created_by: number
-  type: {
-    id: number
-    name: string
-  }
-  options: any[]
-  default: string | null
-  nationbuilder_slug: string | null
-  created_at: string
-  updated_at: string
-}
-
 export interface ApiEcanvasserInteraction {
   id: number
   rating?: number | null
@@ -193,5 +146,3 @@ export interface ApiEcanvasserInteraction {
     responses: any[]
   } | null
 }
-
-// Add other API response types as needed...
