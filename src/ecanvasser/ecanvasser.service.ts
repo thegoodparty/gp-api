@@ -6,13 +6,16 @@ import { CampaignsService } from '../campaigns/services/campaigns.service'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { Ecanvasser } from '@prisma/client'
-import { EcanvasserSummary } from './ecanvasser.types'
 import {
+  EcanvasserSummary,
   ApiEcanvasserContact,
   ApiEcanvasserInteraction,
+  PaginationParams,
+  ApiResponse,
 } from './ecanvasser.types'
 
-const RECORDS_LIMIT = 10
+const DEFAULT_PAGE_SIZE = 1000
+
 @Injectable()
 export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   public readonly logger = new Logger(EcanvasserService.name)
@@ -34,12 +37,16 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       },
     })
 
-    return this.model.create({
+    const ecanvasser = await this.model.create({
       data: {
         campaignId: campaign.id,
         apiKey: createEcanvasserDto.apiKey,
       },
     })
+
+    await this.sync(campaign.id)
+
+    return ecanvasser
   }
 
   async findByCampaignId(campaignId: number) {
@@ -82,58 +89,127 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   private async fetchFromApi<T>(
     endpoint: string,
     apiKey: string,
-  ): Promise<T[]> {
+    params: PaginationParams = {},
+  ): Promise<ApiResponse<T>> {
     try {
+      const queryParams = new URLSearchParams()
+
+      if (params.limit) {
+        queryParams.append('limit', params.limit.toString())
+      }
+      if (params.order) {
+        queryParams.append('order', params.order)
+      }
+      if (params.after_id) {
+        queryParams.append('after_id', params.after_id.toString())
+      }
+      if (params.before_id) {
+        queryParams.append('before_id', params.before_id.toString())
+      }
+      if (params.start_date) {
+        queryParams.append('start_date', params.start_date)
+      }
+
+      const url = `${this.apiBaseUrl}${endpoint}${
+        queryParams.toString() ? `?${queryParams.toString()}` : ''
+      }`
+
       const response = await lastValueFrom(
-        this.httpService.get(`${this.apiBaseUrl}${endpoint}`, {
+        this.httpService.get(url, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
           },
         }),
       )
-      return response.data?.data as T[]
+      return response.data as ApiResponse<T>
     } catch (error) {
       this.logger.error(`Failed to fetch from ${endpoint}`, error)
       throw error
     }
   }
 
+  private async fetchAllPages<T>(
+    endpoint: string,
+    apiKey: string,
+    startDate?: Date,
+  ): Promise<T[]> {
+    const allData: T[] = []
+    let hasMore = true
+    let lastId: number | undefined
+
+    const params: PaginationParams = {
+      limit: DEFAULT_PAGE_SIZE,
+      order: 'asc',
+    }
+
+    if (startDate) {
+      params.start_date = startDate
+        .toISOString()
+        .replace('T', ' ')
+        .replace(/\.\d+Z$/, '')
+    }
+
+    while (hasMore) {
+      if (lastId) {
+        params.after_id = lastId
+      }
+
+      const response = await this.fetchFromApi<T>(endpoint, apiKey, params)
+
+      if (!response.data.length) {
+        break
+      }
+
+      allData.push(...response.data)
+
+      if (response.meta.links.next) {
+        lastId = response.meta.ids.last
+      } else {
+        hasMore = false
+      }
+
+      await this.sleep(1000)
+    }
+
+    return allData
+  }
+
   async sync(campaignId: number): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
+    const startDate = ecanvasser.lastSync || undefined
 
     try {
-      const [contacts, houses, interactions] = await Promise.all([
-        this.fetchFromApi<ApiEcanvasserContact>(
-          `/contact?limit=${RECORDS_LIMIT}`,
-          ecanvasser.apiKey,
-        ),
-        this.fetchFromApi<any>(
-          `/house?limit=${RECORDS_LIMIT}`,
-          ecanvasser.apiKey,
-        ),
-        this.fetchFromApi<ApiEcanvasserInteraction>(
-          `/interaction?limit=${RECORDS_LIMIT}`,
-          ecanvasser.apiKey,
-        ),
-      ])
+      const contacts = await this.fetchAllPages<ApiEcanvasserContact>(
+        '/contact',
+        ecanvasser.apiKey,
+        startDate,
+      )
 
-      // Delete existing records
-      await this.model.update({
-        where: { id: ecanvasser.id },
-        data: {
-          contacts: {
-            deleteMany: {},
-          },
-          houses: {
-            deleteMany: {},
-          },
-          interactions: {
-            deleteMany: {},
-          },
-        },
-      })
+      const houses = await this.fetchAllPages<any>(
+        '/house',
+        ecanvasser.apiKey,
+        startDate,
+      )
 
-      // Create new records
+      const interactions = await this.fetchAllPages<ApiEcanvasserInteraction>(
+        '/interaction',
+        ecanvasser.apiKey,
+        startDate,
+      )
+
+      // Delete existing records only if we're doing a full sync
+      if (!startDate) {
+        await this.model.update({
+          where: { id: ecanvasser.id },
+          data: {
+            contacts: { deleteMany: {} },
+            houses: { deleteMany: {} },
+            interactions: { deleteMany: {} },
+          },
+        })
+      }
+
+      // Create or update records
       return this.model.update({
         where: { id: ecanvasser.id },
         data: {
@@ -153,12 +229,12 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
               volunteer: contact.volunteer,
               deceased: contact.deceased,
               donor: contact.donor,
-              homePhone: contact.contact_details.home || null,
-              mobilePhone: contact.contact_details.mobile || null,
-              email: contact.contact_details.email || null,
+              homePhone: contact.contact_details?.home || null,
+              mobilePhone: contact.contact_details?.mobile || null,
+              email: contact.contact_details?.email || null,
               actionId: contact.action_id || null,
               lastInteractionId: contact.last_interaction_id || null,
-              createdBy: contact.created_by,
+              createdBy: contact.created_by || 0,
             })),
           },
           houses: {
@@ -175,23 +251,19 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
               type: interaction.type,
               status: interaction.status.name,
               contactId: interaction.contact_id || 0,
-              createdBy: interaction.created_by,
-              notes: null,
-              source: null,
+              createdBy: interaction.created_by || 0,
             })),
           },
-
           lastSync: new Date(),
           error: null,
         },
       })
     } catch (error) {
       this.logger.error('Failed to sync with ecanvasser', error)
-
       return this.model.update({
         where: { id: ecanvasser.id },
         data: {
-          lastSync: new Date(),
+          lastSync: startDate,
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       })
@@ -200,6 +272,9 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
   async findAll(): Promise<EcanvasserSummary[]> {
     const ecanvassers = await this.model.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
       include: {
         campaign: {
           select: {
@@ -228,34 +303,25 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }))
   }
 
-  async syncAll(): Promise<Ecanvasser[]> {
+  async syncAll(): Promise<void> {
     const ecanvassers = await this.model.findMany()
-    const results: Ecanvasser[] = []
 
     for (const ecanvasser of ecanvassers) {
       try {
-        const result = await this.sync(ecanvasser.campaignId)
-        results.push(result)
+        await this.sync(ecanvasser.campaignId)
       } catch (error) {
         this.logger.error(
           `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
           error,
         )
-        results.push(
-          await this.model.update({
-            where: { id: ecanvasser.id },
-            data: {
-              lastSync: new Date(),
-              error: error instanceof Error ? error.message : 'Unknown error',
-            },
-          }),
-        )
       }
 
-      // Wait 2 seconds before processing the next ecanvasser (rate limit is 300 requests per minute)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Wait before processing the next ecanvasser (rate limit is 300 requests per minute)
+      await this.sleep(5000)
     }
+  }
 
-    return results
+  private async sleep(ms: number) {
+    await new Promise((resolve) => setTimeout(resolve, ms))
   }
 }
