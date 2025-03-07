@@ -1,9 +1,9 @@
 import {
   Injectable,
   Logger,
-  NotFoundException,
   forwardRef,
   Inject,
+  NotFoundException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CreateEcanvasserDto } from './dto/create-ecanvasser.dto'
@@ -69,10 +69,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       },
     })
 
-    if (!ecanvasser) {
-      throw new NotFoundException('Ecanvasser integration not found')
-    }
-
     return ecanvasser
   }
 
@@ -82,6 +78,10 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   ): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
 
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
     return this.model.update({
       where: { id: ecanvasser.id },
       data: updateEcanvasserDto,
@@ -90,6 +90,10 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
   async remove(campaignId: number): Promise<void> {
     const ecanvasser = await this.findByCampaignId(campaignId)
+
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
 
     await this.model.delete({
       where: { id: ecanvasser.id },
@@ -186,6 +190,11 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
   async sync(campaignId: number): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
+
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
     const startDate = ecanvasser.lastSync || undefined
 
     try {
