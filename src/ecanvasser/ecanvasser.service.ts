@@ -283,6 +283,10 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return updated
     } catch (error) {
       this.logger.error('Failed to sync with ecanvasser', error)
+      await this.slack.errorMessage({
+        message: `Failed to sync with ecanvasser for campaign ${ecanvasser.campaignId}`,
+        error,
+      })
       return this.model.update({
         where: { id: ecanvasser.id },
         data: {
@@ -337,10 +341,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
           `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
           error,
         )
-        await this.slack.errorMessage({
-          message: `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
-          error,
-        })
       }
 
       // Wait before processing the next ecanvasser (rate limit is 300 requests per minute)
