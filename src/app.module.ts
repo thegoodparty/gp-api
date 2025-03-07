@@ -22,6 +22,7 @@ import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
 import { EcanvasserModule } from './ecanvasser/ecanvasser.module'
+import { SessionsService } from './shared/services/sessions.service'
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { EcanvasserModule } from './ecanvasser/ecanvasser.module'
     EcanvasserModule,
   ],
   providers: [
+    SessionsService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

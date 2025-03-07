@@ -1,5 +1,5 @@
 import { Logger, Module } from '@nestjs/common'
-import { AuthenticationService } from './services/authentication.service'
+import { AuthenticationService } from './authentication.service'
 import { PassportModule } from '@nestjs/passport'
 import { JwtModule } from '@nestjs/jwt'
 import { AuthenticationController } from './authentication.controller'
@@ -9,7 +9,6 @@ import { RolesGuard } from './guards/Roles.guard'
 import { LocalStrategy } from './auth-strategies/Local.strategy'
 import { EmailModule } from 'src/email/email.module'
 import { SocialLoginStrategy } from './auth-strategies/SocialLogin.strategy'
-import { SessionsService } from './services/sessions.service'
 
 const JWT_EXPIRATION = '1y'
 
@@ -23,7 +22,6 @@ if (!process.env.AUTH_SECRET) {
 @Module({
   providers: [
     AuthenticationService,
-    SessionsService,
     LocalStrategy,
     SocialLoginStrategy,
     JwtAuthStrategy,

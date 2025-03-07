@@ -30,7 +30,7 @@ import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
-import { AuthenticationService } from '../authentication/services/authentication.service'
+import { AuthenticationService } from '../authentication/authentication.service'
 import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
 
 @Controller('users')
