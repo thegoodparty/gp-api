@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  forwardRef,
+  Inject,
+} from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CreateEcanvasserDto } from './dto/create-ecanvasser.dto'
 import { UpdateEcanvasserDto } from './dto/update-ecanvasser.dto'
@@ -13,6 +19,7 @@ import {
   PaginationParams,
   ApiResponse,
 } from './ecanvasser.types'
+import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 
 const DEFAULT_PAGE_SIZE = 1000
 
@@ -22,8 +29,11 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   private readonly apiBaseUrl = 'https://public-api.ecanvasser.com'
 
   constructor(
+    @Inject(forwardRef(() => CampaignsService))
     private readonly campaignsService: CampaignsService,
     private readonly httpService: HttpService,
+    @Inject(forwardRef(() => CrmCampaignsService))
+    private readonly crm: CrmCampaignsService,
   ) {
     super()
   }
@@ -258,6 +268,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
           error: null,
         },
       })
+      this.crm.trackCampaign(campaignId)
     } catch (error) {
       this.logger.error('Failed to sync with ecanvasser', error)
       return this.model.update({
