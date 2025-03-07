@@ -351,7 +351,7 @@ export class CrmCampaignsService {
       filing_start: filingStartMs,
       filing_end: filingEndMs,
       ecanvasser_contacts_count: `${ecanvasserCount}`,
-      ecanvasser_interactions_count: `${ecanvasserInteractionsCount}`,
+      knocked_doors: `${ecanvasserInteractionsCount}`,
       ...(website ? { website } : {}),
       ...(level ? { ai_office_level: level } : {}),
       ...(ballotLevel ? { office_level: ballotLevel } : {}),

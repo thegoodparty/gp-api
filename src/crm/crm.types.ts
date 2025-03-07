@@ -57,7 +57,7 @@ export type CRMCompanyProperties = {
   partisan_np?: 'Partisan' | 'Nonpartisan'
   primary_election_result?: PrimaryElectionResult.WON
   ecanvasser_contacts_count?: string
-  ecanvasser_interactions_count?: string
+  knocked_doors?: string
   election_results?: 'Won General'
 } & FilteredCRMProperties
 // & Partial<SimplePublicObjectInput>
