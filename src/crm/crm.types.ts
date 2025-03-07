@@ -50,7 +50,7 @@ export type CRMCompanyProperties = {
   voter_data_adoption?: 'Unlocked' | 'Locked'
   created_by_admin?: 'yes' | 'no'
   admin_user?: string
-  opponents?: string
+  number_of_opponents?: string
   incumbent?: 'Yes' | 'No'
   seats_available?: string
   automated_score?: string
