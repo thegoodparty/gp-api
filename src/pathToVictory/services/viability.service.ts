@@ -18,8 +18,9 @@ export class ViabilityService {
   ) {}
 
   async calculateViabilityScore(campaignId: number): Promise<ViabilityScore> {
+    let campaign: Campaign | null = null
     try {
-      const campaign = await this.prisma.campaign.findUnique({
+      campaign = await this.prisma.campaign.findUnique({
         where: { id: campaignId },
       })
       if (!campaign) {
@@ -45,8 +46,8 @@ export class ViabilityService {
       if (campaign?.details?.raceId && campaign?.details?.positionId) {
         raceId = campaign.details.raceId
         positionId = campaign.details.positionId
-        this.logger.debug('raceId', { raceId })
-        this.logger.debug('positionId', { positionId })
+        this.logger.debug('raceId', raceId)
+        this.logger.debug('positionId', positionId)
       } else {
         throw new Error('RaceId not found')
       }
@@ -68,6 +69,7 @@ export class ViabilityService {
       this.logger.debug('Checking officeHolders')
       const officeHolders = race?.position?.officeHolders || []
       if (officeHolders.nodes.length > 0) {
+        this.logger.debug('officeHolders', officeHolders)
         for (const officeHolder of officeHolders.nodes) {
           if (
             officeHolder &&
@@ -77,11 +79,13 @@ export class ViabilityService {
             isIncumbent = true
           }
         }
+      } else {
+        this.logger.debug('No office holders found')
       }
 
       let candidates = this.getBallotReadyCandidates(race, campaign)
       // openSeat is when the number of incumbents running is less than the number of seats available
-      this.logger.debug('candidates', { candidates })
+      this.logger.debug('candidates', candidates)
       let openSeat = false
       if (candidates === 1) {
         candidates = 1
@@ -95,17 +99,28 @@ export class ViabilityService {
       const opponents = candidates - 1
       const officeType = this.getOfficeType(race.position?.name)
 
+      this.logger.debug('state', state)
+      this.logger.debug('officeLevel', officeLevel)
+      this.logger.debug('officeType', officeType)
+      this.logger.debug('isPartisan', isPartisan)
+      this.logger.debug('isIncumbent', isIncumbent)
+      this.logger.debug('seats', seats)
+      this.logger.debug('opponents', opponents)
+      this.logger.debug('openSeat', openSeat)
+
       if (
-        !state ||
-        !officeLevel ||
-        !officeType ||
-        !isPartisan ||
-        !seats ||
-        !isIncumbent ||
-        !opponents ||
-        !openSeat
+        state === undefined ||
+        officeLevel === undefined ||
+        officeType === undefined ||
+        isPartisan === undefined ||
+        seats === undefined ||
+        isIncumbent === undefined ||
+        opponents === undefined ||
+        openSeat === undefined
       ) {
-        throw new Error('Missing required parameters')
+        throw new Error(
+          'Cannot run Viability score. Missing required parameters',
+        )
       }
 
       const viability = this.calculateNewViabilityScore(
@@ -119,11 +134,13 @@ export class ViabilityService {
         openSeat,
       )
 
+      this.logger.debug('viability', viability)
+
       return viability
     } catch (e) {
       this.logger.error('Error calculating viability score', e)
       await this.slackService.errorMessage({
-        message: 'Error calculating viability score',
+        message: `Not enough information to calculate viability score for campaign: ${campaign?.slug}`,
         error: e,
       })
       throw e
