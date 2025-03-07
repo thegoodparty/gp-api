@@ -15,7 +15,7 @@ import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { AuthenticationService } from 'src/authentication/authentication.service'
+import { AuthenticationService } from 'src/authentication/services/authentication.service'
 
 @Injectable()
 export class AdminCampaignsService {

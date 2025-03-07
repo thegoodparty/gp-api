@@ -24,7 +24,7 @@ import { subDays, subMonths } from 'date-fns'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
 import { AdminImpersonateSchema } from './schemas/AdminImpersonate.schema'
-import { AuthenticationService } from 'src/authentication/authentication.service'
+import { AuthenticationService } from 'src/authentication/services/authentication.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { ReadUserOutputSchema } from 'src/users/schemas/ReadUserOutput.schema'
 

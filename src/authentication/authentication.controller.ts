@@ -10,7 +10,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { AuthenticationService } from './authentication.service'
+import { AuthenticationService } from './services/authentication.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReadUserOutputSchema } from '../users/schemas/ReadUserOutput.schema'
 import { RecoverPasswordSchema } from './schemas/RecoverPasswordEmail.schema'

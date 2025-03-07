@@ -1,5 +1,5 @@
 import { Strategy } from 'passport-custom'
-import { AuthenticationService } from '../authentication.service'
+import { AuthenticationService } from '../services/authentication.service'
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { SocialAuthPayload, SocialProvider } from '../authentication.types'
