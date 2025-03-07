@@ -22,7 +22,7 @@ import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
 import { EcanvasserModule } from './ecanvasser/ecanvasser.module'
-import { SessionsService } from './shared/services/sessions.service'
+import { SessionsService } from './users/services/sessions.service'
 
 @Module({
   imports: [

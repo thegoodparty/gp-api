@@ -9,7 +9,7 @@ import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
 import { User, UserRole } from '@prisma/client'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
 import { TokenException } from './token.exception'
-import { SessionsService } from '../../shared/services/sessions.service'
+import { SessionsService } from '../../users/services/sessions.service'
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {

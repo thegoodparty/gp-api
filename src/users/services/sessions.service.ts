@@ -1,10 +1,14 @@
+import { Inject, forwardRef } from '@nestjs/common'
 import { User } from '@prisma/client'
 import { UsersService } from 'src/users/services/users.service'
 
-const SESSION_TIMEOUT = 1000 * 60 * 60 * 24 // 24 hours
+const SESSION_TIMEOUT = 1000 * 60 * 60 * 8 // 8 hours
 
 export class SessionsService {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    @Inject(forwardRef(() => UsersService))
+    private readonly users: UsersService,
+  ) {}
 
   async trackSession(user: User) {
     const currentTime = Date.now()
