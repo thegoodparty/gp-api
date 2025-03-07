@@ -50,12 +50,14 @@ export type CRMCompanyProperties = {
   voter_data_adoption?: 'Unlocked' | 'Locked'
   created_by_admin?: 'yes' | 'no'
   admin_user?: string
-  opponents?: string
+  number_of_opponents?: string
   incumbent?: 'Yes' | 'No'
   seats_available?: string
   automated_score?: string
   partisan_np?: 'Partisan' | 'Nonpartisan'
   primary_election_result?: PrimaryElectionResult.WON
+  ecanvasser_contacts_count?: string
+  ecanvasser_interactions_count?: string
   election_results?: 'Won General'
 } & FilteredCRMProperties
 // & Partial<SimplePublicObjectInput>

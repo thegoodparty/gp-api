@@ -11,6 +11,7 @@ import { AiModule } from '../ai/ai.module'
 import { ViabilityService } from './services/viability.service'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { PathToVictoryController } from './pathToVictory.controller'
+import { ViabilityController } from './viability.controller'
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { PathToVictoryController } from './pathToVictory.controller'
     EmailModule,
     QueueProducerModule,
   ],
-  controllers: [PathToVictoryController],
+  controllers: [PathToVictoryController, ViabilityController],
   providers: [
     PathToVictoryService,
     OfficeMatchService,

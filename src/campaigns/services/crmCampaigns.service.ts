@@ -24,7 +24,7 @@ import { FullStoryService } from '../../fullStory/fullStory.service'
 import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-
+import { EcanvasserService } from '../../ecanvasser/ecanvasser.service'
 export const HUBSPOT_COMPANY_PROPERTIES = [
   'past_candidate',
   'incumbent',
@@ -40,7 +40,7 @@ export const HUBSPOT_COMPANY_PROPERTIES = [
   'date_verified',
   'pro_candidate',
   'filing_deadline',
-  'opponents',
+  'number_of_opponents',
   'hubspot_owner_id',
   'office_type',
 ]
@@ -77,6 +77,7 @@ export class CrmCampaignsService {
     private readonly campaignUpdateHistory: CampaignUpdateHistoryService,
     private readonly voterFile: VoterFileDownloadAccessService,
     private readonly slack: SlackService,
+    private readonly ecanvasser: EcanvasserService,
   ) {}
 
   async getCrmCompanyById(hubspotId: string) {
@@ -298,6 +299,16 @@ export class CrmCampaignsService {
           ? 'Complete'
           : p2vStatus
 
+    const ecanvasser = await this.ecanvasser.findByCampaignId(campaignId)
+    let ecanvasserCount = 0
+    let ecanvasserInteractionsCount = 0
+    if (ecanvasser) {
+      // get count of contacts and interactions
+      const { contacts, interactions } = ecanvasser
+      ecanvasserCount = contacts.length
+      ecanvasserInteractionsCount = interactions.length
+    }
+
     const properties: CRMCompanyProperties = {
       name,
       candidate_party: party,
@@ -339,6 +350,8 @@ export class CrmCampaignsService {
       pro_upgrade_date: isProUpdatedAtMs,
       filing_start: filingStartMs,
       filing_end: filingEndMs,
+      ecanvasser_contacts_count: `${ecanvasserCount}`,
+      ecanvasser_interactions_count: `${ecanvasserInteractionsCount}`,
       ...(website ? { website } : {}),
       ...(level ? { ai_office_level: level } : {}),
       ...(ballotLevel ? { office_level: ballotLevel } : {}),
@@ -351,7 +364,7 @@ export class CrmCampaignsService {
       created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
       admin_user: adminUserEmail ?? '',
       ...(candidates && typeof candidates === 'number' && candidates > 0
-        ? { opponents: `${candidates - 1}` }
+        ? { number_of_opponents: `${candidates - 1}` }
         : {}),
       ...(typeof isIncumbent === 'boolean'
         ? { incumbent: isIncumbent ? 'Yes' : 'No' }
