@@ -71,21 +71,6 @@ CREATE TABLE "ecanvasser_interactions" (
     CONSTRAINT "ecanvasser_interactions_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "ecanvasser_lists" (
-    "id" SERIAL NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "type" TEXT NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'Active',
-    "created_by" INTEGER NOT NULL,
-    "ecanvasser_id" INTEGER NOT NULL,
-
-    CONSTRAINT "ecanvasser_lists_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "ecanvasser_campaign_id_key" ON "ecanvasser"("campaign_id");
 
@@ -101,9 +86,6 @@ CREATE INDEX "ecanvasser_houses_ecanvasser_id_idx" ON "ecanvasser_houses"("ecanv
 -- CreateIndex
 CREATE INDEX "ecanvasser_interactions_ecanvasser_id_idx" ON "ecanvasser_interactions"("ecanvasser_id");
 
--- CreateIndex
-CREATE INDEX "ecanvasser_lists_ecanvasser_id_idx" ON "ecanvasser_lists"("ecanvasser_id");
-
 -- AddForeignKey
 ALTER TABLE "ecanvasser" ADD CONSTRAINT "ecanvasser_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -118,6 +100,3 @@ ALTER TABLE "ecanvasser_houses" ADD CONSTRAINT "ecanvasser_houses_ecanvasser_id_
 
 -- AddForeignKey
 ALTER TABLE "ecanvasser_interactions" ADD CONSTRAINT "ecanvasser_interactions_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ecanvasser_lists" ADD CONSTRAINT "ecanvasser_lists_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;

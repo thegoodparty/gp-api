@@ -10,9 +10,8 @@ model Ecanvasser {
     interactions EcanvasserInteraction[]
     houses       EcanvasserHouse[]
 
-    lastSync       DateTime?        @map("last_sync")
-    error          String?
-    EcanvasserList EcanvasserList[]
+    lastSync DateTime? @map("last_sync")
+    error    String?
 
     @@index([campaignId])
     @@map("ecanvasser")
@@ -81,20 +80,4 @@ model EcanvasserInteraction {
 
     @@index([ecanvasserId])
     @@map("ecanvasser_interactions")
-}
-
-model EcanvasserList {
-    id           Int        @id @default(autoincrement())
-    createdAt    DateTime   @default(now()) @map("created_at")
-    updatedAt    DateTime   @updatedAt @map("updated_at")
-    name         String
-    description  String?
-    type         String
-    status       String     @default("Active")
-    createdBy    Int        @map("created_by")
-    ecanvasser   Ecanvasser @relation(fields: [ecanvasserId], references: [id], onDelete: Cascade)
-    ecanvasserId Int        @map("ecanvasser_id")
-
-    @@index([ecanvasserId])
-    @@map("ecanvasser_lists")
 }
