@@ -12,7 +12,7 @@ CREATE TABLE "ecanvasser" (
 );
 
 -- CreateTable
-CREATE TABLE "ecanvasser_contacts" (
+CREATE TABLE "ecanvasser_contact" (
     "id" SERIAL NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -37,11 +37,11 @@ CREATE TABLE "ecanvasser_contacts" (
     "ecanvasser_id" INTEGER NOT NULL,
     "ecanvasserHouseId" INTEGER,
 
-    CONSTRAINT "ecanvasser_contacts_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ecanvasser_contact_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "ecanvasser_houses" (
+CREATE TABLE "ecanvasser_house" (
     "id" SERIAL NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -52,11 +52,11 @@ CREATE TABLE "ecanvasser_houses" (
     "external_id" TEXT,
     "ecanvasser_id" INTEGER NOT NULL,
 
-    CONSTRAINT "ecanvasser_houses_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ecanvasser_house_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "ecanvasser_interactions" (
+CREATE TABLE "ecanvasser_interaction" (
     "id" SERIAL NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE "ecanvasser_interactions" (
     "source" TEXT,
     "ecanvasser_id" INTEGER NOT NULL,
 
-    CONSTRAINT "ecanvasser_interactions_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ecanvasser_interaction_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -78,25 +78,25 @@ CREATE UNIQUE INDEX "ecanvasser_campaign_id_key" ON "ecanvasser"("campaign_id");
 CREATE INDEX "ecanvasser_campaign_id_idx" ON "ecanvasser"("campaign_id");
 
 -- CreateIndex
-CREATE INDEX "ecanvasser_contacts_ecanvasser_id_idx" ON "ecanvasser_contacts"("ecanvasser_id");
+CREATE INDEX "ecanvasser_contact_ecanvasser_id_idx" ON "ecanvasser_contact"("ecanvasser_id");
 
 -- CreateIndex
-CREATE INDEX "ecanvasser_houses_ecanvasser_id_idx" ON "ecanvasser_houses"("ecanvasser_id");
+CREATE INDEX "ecanvasser_house_ecanvasser_id_idx" ON "ecanvasser_house"("ecanvasser_id");
 
 -- CreateIndex
-CREATE INDEX "ecanvasser_interactions_ecanvasser_id_idx" ON "ecanvasser_interactions"("ecanvasser_id");
+CREATE INDEX "ecanvasser_interaction_ecanvasser_id_idx" ON "ecanvasser_interaction"("ecanvasser_id");
 
 -- AddForeignKey
 ALTER TABLE "ecanvasser" ADD CONSTRAINT "ecanvasser_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ecanvasser_contacts" ADD CONSTRAINT "ecanvasser_contacts_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ecanvasser_contact" ADD CONSTRAINT "ecanvasser_contact_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ecanvasser_contacts" ADD CONSTRAINT "ecanvasser_contacts_ecanvasserHouseId_fkey" FOREIGN KEY ("ecanvasserHouseId") REFERENCES "ecanvasser_houses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ecanvasser_contact" ADD CONSTRAINT "ecanvasser_contact_ecanvasserHouseId_fkey" FOREIGN KEY ("ecanvasserHouseId") REFERENCES "ecanvasser_house"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ecanvasser_houses" ADD CONSTRAINT "ecanvasser_houses_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ecanvasser_house" ADD CONSTRAINT "ecanvasser_house_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ecanvasser_interactions" ADD CONSTRAINT "ecanvasser_interactions_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ecanvasser_interaction" ADD CONSTRAINT "ecanvasser_interaction_ecanvasser_id_fkey" FOREIGN KEY ("ecanvasser_id") REFERENCES "ecanvasser"("id") ON DELETE CASCADE ON UPDATE CASCADE;

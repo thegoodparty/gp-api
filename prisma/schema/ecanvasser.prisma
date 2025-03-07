@@ -45,7 +45,7 @@ model EcanvasserContact {
     ecanvasserHouseId Int?
 
     @@index([ecanvasserId])
-    @@map("ecanvasser_contacts")
+    @@map("ecanvasser_contact")
 }
 
 model EcanvasserHouse {
@@ -62,7 +62,7 @@ model EcanvasserHouse {
     contacts         EcanvasserContact[]
 
     @@index([ecanvasserId])
-    @@map("ecanvasser_houses")
+    @@map("ecanvasser_house")
 }
 
 model EcanvasserInteraction {
@@ -79,5 +79,5 @@ model EcanvasserInteraction {
     ecanvasserId Int        @map("ecanvasser_id")
 
     @@index([ecanvasserId])
-    @@map("ecanvasser_interactions")
+    @@map("ecanvasser_interaction")
 }
