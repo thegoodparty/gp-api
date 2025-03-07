@@ -20,6 +20,7 @@ import {
   ApiResponse,
 } from './ecanvasser.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
+import { SlackService } from 'src/shared/services/slack.service'
 
 const DEFAULT_PAGE_SIZE = 1000
 
@@ -34,6 +35,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     private readonly httpService: HttpService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
+    private slack: SlackService,
   ) {
     super()
   }
@@ -334,6 +336,10 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
           `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
           error,
         )
+        await this.slack.errorMessage({
+          message: `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
+          error,
+        })
       }
 
       // Wait before processing the next ecanvasser (rate limit is 300 requests per minute)
