@@ -26,8 +26,14 @@ export default $config({
           })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
-    if ($app.stage !== 'master' && $app.stage !== 'develop') {
-      throw new Error('Invalid stage. Only master and develop are supported.')
+    if (
+      $app.stage !== 'master' &&
+      $app.stage !== 'develop' &&
+      $app.stage !== 'qa'
+    ) {
+      throw new Error(
+        'Invalid stage. Only master, qa and develop are supported.',
+      )
     }
 
     let bucketDomain: string
