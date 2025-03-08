@@ -41,6 +41,10 @@ export default $config({
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
       webAppRootUrl = 'https://dev.goodparty.org'
+    } else if ($app.stage === 'qa') {
+      apiDomain = 'gp-api-qa.goodparty.org'
+      bucketDomain = 'assets-qa.goodparty.org'
+      webAppRootUrl = 'https://qa.goodparty.org'
     } else {
       apiDomain = `gp-api-${$app.stage}.goodparty.org`
       bucketDomain = `assets-${$app.stage}.goodparty.org`
@@ -105,6 +109,9 @@ export default $config({
     } else if ($app.stage === 'develop') {
       secretArn =
         'arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4'
+    } else if ($app.stage === 'qa') {
+      secretArn =
+        'arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_QA-w290tg'
     }
 
     if (!secretArn) {
@@ -251,7 +258,7 @@ export default $config({
       memory: $app.stage === 'master' ? '4 GB' : '2 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
       cpu: $app.stage === 'master' ? '1 vCPU' : '0.5 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
       scaling: {
-        min: $app.stage === 'master' ? 2 : 2,
+        min: $app.stage === 'master' ? 2 : 1,
         max: $app.stage === 'master' ? 16 : 4,
         cpuUtilization: 50,
         memoryUtilization: 50,
