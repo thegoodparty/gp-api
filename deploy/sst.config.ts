@@ -396,6 +396,25 @@ export default $config({
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterCluster.engineVersion,
       })
+    } else if ($app.stage === 'qa') {
+      rdsCluster = new aws.rds.Cluster('rdsCluster', {
+        clusterIdentifier: 'gp-api-db-qa',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.2',
+        databaseName: dbName,
+        masterUsername: dbUser,
+        masterPassword: dbPassword,
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-api-db-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 64,
+          minCapacity: 0.5,
+        },
+      })
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
     }
