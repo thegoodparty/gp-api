@@ -117,8 +117,28 @@ export interface ApiEcanvasserInteraction {
   status: {
     name: string
   }
+  rating?: number
   contact_id?: number
   created_by: number
+  created_at: string
+}
+
+export interface InteractionsByDay {
+  [date: string]: {
+    count: number
+    [status: string]: number
+  }
+}
+
+export interface EcanvasserSummaryResponse {
+  totalContacts: number
+  totalHouses: number
+  totalInteractions: number
+  averageRating: number
+  interactions: {
+    [key: string]: number
+  }
+  interactionsByDay: InteractionsByDay
 }
 
 export interface PaginationParams {

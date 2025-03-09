@@ -15,6 +15,10 @@ import { UpdateEcanvasserDto } from './dto/update-ecanvasser.dto'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { CampaignOwnerOrAdminGuard } from 'src/campaigns/guards/CampaignOwnerOrAdmin.guard'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
+import { Campaign } from '@prisma/client'
+import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+
 @Controller('ecanvasser')
 export class EcanvasserController {
   constructor(private readonly ecanvasserService: EcanvasserService) {}
@@ -23,6 +27,18 @@ export class EcanvasserController {
   @Roles('admin')
   create(@Body() createEcanvasserDto: CreateEcanvasserDto) {
     return this.ecanvasserService.create(createEcanvasserDto)
+  }
+
+  @Get('mine')
+  @UseCampaign()
+  async findMine(@ReqCampaign() campaign: Campaign) {
+    return this.ecanvasserService.mine(campaign.id)
+  }
+
+  @Get('mine/summary')
+  @UseCampaign()
+  async findMineSummary(@ReqCampaign() campaign: Campaign) {
+    return this.ecanvasserService.summary(campaign.id)
   }
 
   @Get(':campaignId')
