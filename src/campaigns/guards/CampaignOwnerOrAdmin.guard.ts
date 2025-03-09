@@ -10,6 +10,9 @@ export class CampaignOwnerOrAdminGuard implements CanActivate {
   constructor(private campaignService: CampaignsService) {}
   async canActivate(context: ExecutionContext) {
     const { user, params } = context.switchToHttp().getRequest()
+    console.log('--------------------------------')
+    console.log('user', user)
+    console.log('--------------------------------')
     const { id: campaignId } = params
     const campaign = await this.campaignService.findFirst({
       where: { id: parseInt(campaignId) },
