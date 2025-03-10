@@ -40,7 +40,7 @@ export const HUBSPOT_COMPANY_PROPERTIES = [
   'date_verified',
   'pro_candidate',
   'filing_deadline',
-  'opponents',
+  'number_of_opponents',
   'hubspot_owner_id',
   'office_type',
 ]
@@ -351,7 +351,7 @@ export class CrmCampaignsService {
       filing_start: filingStartMs,
       filing_end: filingEndMs,
       ecanvasser_contacts_count: `${ecanvasserCount}`,
-      ecanvasser_interactions_count: `${ecanvasserInteractionsCount}`,
+      knocked_doors: `${ecanvasserInteractionsCount}`,
       ...(website ? { website } : {}),
       ...(level ? { ai_office_level: level } : {}),
       ...(ballotLevel ? { office_level: ballotLevel } : {}),
@@ -364,7 +364,7 @@ export class CrmCampaignsService {
       created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
       admin_user: adminUserEmail ?? '',
       ...(candidates && typeof candidates === 'number' && candidates > 0
-        ? { opponents: `${candidates - 1}` }
+        ? { number_of_opponents: `${candidates - 1}` }
         : {}),
       ...(typeof isIncumbent === 'boolean'
         ? { incumbent: isIncumbent ? 'Yes' : 'No' }
