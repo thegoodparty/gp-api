@@ -25,6 +25,7 @@ import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service
 import { SlackService } from 'src/shared/services/slack.service'
 
 const DEFAULT_PAGE_SIZE = 1000
+const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
 @Injectable()
 export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
@@ -76,11 +77,10 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     return ecanvasser
   }
 
-  async mine(campaignId: number): Promise<Omit<Ecanvasser, 'apiKey'> | null> {
-    const ecanvasser = await this.model.findFirst({
+  async mine(campaignId: number): Promise<Omit<Ecanvasser, 'apiKey'>> {
+    const ecanvasser = await this.model.findFirstOrThrow({
       where: { campaignId },
     })
-    if (!ecanvasser) return null
     const { apiKey, ...rest } = ecanvasser
     return rest
   }
@@ -88,7 +88,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   private getInteractionsByDay(interactions: EcanvasserInteraction[]) {
     const recentInteractions = interactions.filter(
       (interaction) =>
-        interaction.createdAt > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        interaction.createdAt > new Date(Date.now() - THIRTY_DAYS),
     )
 
     return recentInteractions.reduce((acc, interaction) => {
@@ -134,18 +134,15 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   private groupedRatings(
     interactions: EcanvasserInteraction[],
   ): Record<string, number> {
-    return interactions.reduce(
-      (acc, interaction) => {
-        const key = interaction.rating ? `${interaction.rating}` : 'unrated'
-        acc[key] = (acc[key] || 0) + 1
-        return acc
-      },
-      {} as Record<string, number>,
-    )
+    return interactions.reduce((acc, interaction) => {
+      const key = interaction.rating ? `${interaction.rating}` : 'unrated'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {})
   }
 
-  async summary(campaignId: number): Promise<EcanvasserSummaryResponse | null> {
-    const ecanvasser = await this.model.findFirst({
+  async summary(campaignId: number): Promise<EcanvasserSummaryResponse> {
+    const ecanvasser = await this.model.findFirstOrThrow({
       where: { campaignId },
       include: {
         contacts: true,
@@ -153,7 +150,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
         interactions: true,
       },
     })
-    if (!ecanvasser) return null
 
     const interactionsByDay = this.getInteractionsByDay(ecanvasser.interactions)
 
