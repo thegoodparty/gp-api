@@ -4,7 +4,6 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
-  NotImplementedException,
 } from '@nestjs/common'
 import { StripeSingleton } from './stripe.service'
 import { WebhookEventType } from '../payments.types'
@@ -62,7 +61,7 @@ export class StripeEventsService {
       case WebhookEventType.CustomerSubscriptionResumed:
         return await this.customerSubscriptionResumedHandler(event)
     }
-    throw new NotImplementedException('event type not supported')
+    this.logger.warn(`Stripe Event type ${event.type} not handled`)
   }
 
   async customerSubscriptionResumedHandler(
