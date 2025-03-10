@@ -28,6 +28,7 @@ export interface TrackingProperties {
   currentStep?: string
   isVerified?: boolean | null
   isPro?: boolean | null
+  sessionCount?: number
   createdByAdmin?: boolean
   aiContentCount?: number
   p2vStatus?: string
