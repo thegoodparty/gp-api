@@ -26,8 +26,14 @@ export default $config({
           })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
-    if ($app.stage !== 'master' && $app.stage !== 'develop') {
-      throw new Error('Invalid stage. Only master and develop are supported.')
+    if (
+      $app.stage !== 'master' &&
+      $app.stage !== 'develop' &&
+      $app.stage !== 'qa'
+    ) {
+      throw new Error(
+        'Invalid stage. Only master, qa and develop are supported.',
+      )
     }
 
     let bucketDomain: string
@@ -41,6 +47,10 @@ export default $config({
       apiDomain = 'gp-api-dev.goodparty.org'
       bucketDomain = 'assets-dev.goodparty.org'
       webAppRootUrl = 'https://dev.goodparty.org'
+    } else if ($app.stage === 'qa') {
+      apiDomain = 'gp-api-qa.goodparty.org'
+      bucketDomain = 'assets-qa.goodparty.org'
+      webAppRootUrl = 'https://qa.goodparty.org'
     } else {
       apiDomain = `gp-api-${$app.stage}.goodparty.org`
       bucketDomain = `assets-${$app.stage}.goodparty.org`
@@ -105,6 +115,9 @@ export default $config({
     } else if ($app.stage === 'develop') {
       secretArn =
         'arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4'
+    } else if ($app.stage === 'qa') {
+      secretArn =
+        'arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_QA-w290tg'
     }
 
     if (!secretArn) {
@@ -235,10 +248,23 @@ export default $config({
           },
         },
       },
-      memory: '4 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
-      cpu: '1 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
+      // https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html#fargate-tasks-size
+      capacity:
+        $app.stage === 'master'
+          ? {
+              // Use 50% regular Fargate and 50% Fargate Spot.
+              // But make sure the first instance is a regular Fargate instance.
+              fargate: { weight: 1, base: 1 },
+              spot: { weight: 1 },
+            }
+          : {
+              // Use 100% Fargate Spot.
+              spot: { weight: 1, base: 1 },
+            },
+      memory: $app.stage === 'master' ? '4 GB' : '2 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
+      cpu: $app.stage === 'master' ? '1 vCPU' : '0.5 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
       scaling: {
-        min: $app.stage === 'master' ? 2 : 2,
+        min: $app.stage === 'master' ? 2 : 1,
         max: $app.stage === 'master' ? 16 : 4,
         cpuUtilization: 50,
         memoryUtilization: 50,
@@ -369,6 +395,25 @@ export default $config({
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterCluster.engineVersion,
+      })
+    } else if ($app.stage === 'qa') {
+      rdsCluster = new aws.rds.Cluster('rdsCluster', {
+        clusterIdentifier: 'gp-api-db-qa',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.2',
+        databaseName: dbName,
+        masterUsername: dbUser,
+        masterPassword: dbPassword,
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-api-db-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 64,
+          minCapacity: 0.5,
+        },
       })
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
