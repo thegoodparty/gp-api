@@ -51,6 +51,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       : { type: queryType }
 
     const timerId = this.timers.start(`FindContentByType: ${type}`)
+
     const queryConfig = {
       where: {
         ...whereCondition,
@@ -60,7 +61,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
       take: take || undefined,
     }
 
-    const entries = await this.findMany(queryConfig)
+    const entries = await this.model.findMany(queryConfig)
 
     this.timers.end(timerId)
 
