@@ -1,4 +1,10 @@
-import { BadRequestException, Controller, Get, Param } from '@nestjs/common'
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+} from '@nestjs/common'
 import { ContentService } from './services/content.service'
 import { ContentType } from '@prisma/client'
 import {
@@ -100,7 +106,7 @@ export class ContentController {
 
   @Get('blog-article/:slug')
   async findBlogArticleBySlug(@Param('slug') slug: string) {
-    return (
+    const article = (
       await this.contentService.findByType({
         type: ContentType.blogArticle,
         where: {
@@ -111,6 +117,10 @@ export class ContentController {
         },
       })
     )[0]
+    if (!article) {
+      throw new NotFoundException(`Article with slug ${slug} not found`)
+    }
+    return article
   }
 
   @Get('article-tags')
