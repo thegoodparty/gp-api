@@ -6,6 +6,7 @@ import { ViabilityScore } from '../types/pathToVictory.types'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { RaceWithOfficeHoldersNode } from 'src/elections/types/ballotReady.types'
 import { SHORT_TO_LONG_STATE } from '../../shared/constants/states'
+import { SlackChannel } from 'src/shared/services/slackService.types'
 
 @Injectable()
 export class ViabilityService {
@@ -139,10 +140,12 @@ export class ViabilityService {
       return viability
     } catch (e) {
       this.logger.error('Error calculating viability score', e)
-      await this.slackService.errorMessage({
-        message: `Not enough information to calculate viability score for campaign: ${campaign?.slug}`,
-        error: e,
-      })
+      await this.slackService.message(
+        {
+          body: `Not enough information to calculate viability score for campaign: ${campaign?.slug}`,
+        },
+        SlackChannel.botPathToVictoryIssues,
+      )
       throw e
     }
   }
