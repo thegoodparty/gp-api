@@ -105,6 +105,45 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }, {})
   }
 
+  private calculateAverageRating(
+    interactions: EcanvasserInteraction[],
+  ): number {
+    const ratedInteractions = interactions.filter((i) => i.rating)
+    if (ratedInteractions.length === 0) return 0
+
+    const sum = ratedInteractions.reduce(
+      (total, interaction) => total + (interaction.rating || 0),
+      0,
+    )
+    return sum / ratedInteractions.length
+  }
+
+  private interactionsByStatus(
+    interactions: EcanvasserInteraction[],
+  ): Record<string, number> {
+    return interactions.reduce(
+      (acc, interaction) => {
+        const key = slugify(interaction.status, { lower: true })
+        acc[key] = (acc[key] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+  }
+
+  private groupedRatings(
+    interactions: EcanvasserInteraction[],
+  ): Record<string, number> {
+    return interactions.reduce(
+      (acc, interaction) => {
+        const key = interaction.rating ? `${interaction.rating}` : 'unrated'
+        acc[key] = (acc[key] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+  }
+
   async summary(campaignId: number): Promise<EcanvasserSummaryResponse | null> {
     const ecanvasser = await this.model.findFirst({
       where: { campaignId },
@@ -122,18 +161,9 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       totalContacts: ecanvasser.contacts.length,
       totalHouses: ecanvasser.houses.length,
       totalInteractions: ecanvasser.interactions.length,
-      averageRating:
-        ecanvasser.interactions.reduce(
-          (sum, interaction: EcanvasserInteraction) => {
-            return sum + (interaction.rating || 0)
-          },
-          0,
-        ) / (ecanvasser.interactions.filter((i) => i.rating).length || 1),
-      interactions: ecanvasser.interactions.reduce((acc, interaction) => {
-        const key = slugify(interaction.status, { lower: true })
-        acc[key] = (acc[key] || 0) + 1
-        return acc
-      }, {}),
+      averageRating: this.calculateAverageRating(ecanvasser.interactions),
+      groupedRatings: this.groupedRatings(ecanvasser.interactions),
+      interactions: this.interactionsByStatus(ecanvasser.interactions),
       interactionsByDay,
     }
     return summary
