@@ -2,7 +2,7 @@ import { Inject, forwardRef } from '@nestjs/common'
 import { User } from '@prisma/client'
 import { UsersService } from 'src/users/services/users.service'
 
-const SESSION_TIMEOUT = 1000 * 60 * 60 * 8 // 8 hours
+const SESSION_TIMEOUT = 1000 * 60 * 30 // 30 minutes (fullstory's inactivity timeout)
 
 export class SessionsService {
   constructor(
