@@ -62,10 +62,14 @@ export class EcanvasserController {
     return this.ecanvasserService.remove(campaignId)
   }
 
-  @Post(':campaignId/sync')
-  @Roles('admin')
-  sync(@Param('campaignId', ParseIntPipe) campaignId: number) {
-    return this.ecanvasserService.sync(campaignId)
+  @Post(':id/sync')
+  @UseGuards(CampaignOwnerOrAdminGuard)
+  sync(
+    @Param('id', ParseIntPipe) campaignId: number,
+    @Body() body: { force?: boolean },
+  ) {
+    const force = body.force === true
+    return this.ecanvasserService.sync(campaignId, force)
   }
 
   @Get('list')

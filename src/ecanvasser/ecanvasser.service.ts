@@ -161,6 +161,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       groupedRatings: this.groupedRatings(ecanvasser.interactions),
       interactions: this.interactionsByStatus(ecanvasser.interactions),
       interactionsByDay,
+      lastSync: ecanvasser.lastSync,
     }
     return summary
   }
@@ -281,11 +282,20 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     return allData
   }
 
-  async sync(campaignId: number): Promise<Ecanvasser> {
+  async sync(campaignId: number, force?: boolean): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
 
     if (!ecanvasser) {
       throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    // Check if we should sync based on last sync time
+    if (!force && ecanvasser.lastSync) {
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+      const lastSyncDate = new Date(ecanvasser.lastSync)
+      if (lastSyncDate < thirtyMinutesAgo) {
+        return ecanvasser // Return existing data if last sync was less than 30 minutes ago
+      }
     }
 
     const startDate = ecanvasser.lastSync || undefined
@@ -428,7 +438,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
     for (const ecanvasser of ecanvassers) {
       try {
-        await this.sync(ecanvasser.campaignId)
+        await this.sync(ecanvasser.campaignId, true)
       } catch (error) {
         this.logger.error(
           `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
