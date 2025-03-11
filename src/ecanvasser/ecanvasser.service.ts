@@ -288,12 +288,11 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     if (!ecanvasser) {
       throw new NotFoundException('Ecanvasser integration not found')
     }
-
     // Check if we should sync based on last sync time
     if (!force && ecanvasser.lastSync) {
       const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
       const lastSyncDate = new Date(ecanvasser.lastSync)
-      if (lastSyncDate < thirtyMinutesAgo) {
+      if (lastSyncDate > thirtyMinutesAgo) {
         return ecanvasser // Return existing data if last sync was less than 30 minutes ago
       }
     }
