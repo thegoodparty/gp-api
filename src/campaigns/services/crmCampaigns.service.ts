@@ -195,6 +195,7 @@ export class CrmCampaignsService {
       } else {
         this.slack.errorMessage({
           message: `Error updating company for ${name} with existing hubspotId: ${hubspotId} in hubspot`,
+          error: e,
         })
       }
       return

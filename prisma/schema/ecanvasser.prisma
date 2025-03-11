@@ -70,6 +70,8 @@ model EcanvasserInteraction {
     createdAt    DateTime   @default(now()) @map("created_at")
     updatedAt    DateTime   @updatedAt @map("updated_at")
     type         String
+    rating       Int?
+    date         DateTime   @default(now()) @map("date")
     status       String     @default("Active")
     contactId    Int        @map("contact_id")
     createdBy    Int        @map("created_by")

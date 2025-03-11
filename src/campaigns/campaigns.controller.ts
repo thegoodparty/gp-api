@@ -63,13 +63,19 @@ export class CampaignsController {
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
+    const name = campaign?.data?.name
+    let p2vStatus = P2VStatus.waiting
+    if (name && name.toLowerCase().includes('test')) {
+      p2vStatus = P2VStatus.complete
+    }
+
     let p2v = await this.p2v.findUnique({ where: { campaignId: campaign.id } })
 
     if (!p2v) {
       p2v = await this.p2v.create({
         data: {
           campaignId: campaign.id,
-          data: { p2vStatus: P2VStatus.waiting },
+          data: { p2vStatus },
         },
       })
     } else {
@@ -78,12 +84,14 @@ export class CampaignsController {
           id: p2v.id,
         },
         data: {
-          data: { ...p2v.data, p2vStatus: P2VStatus.waiting, p2vAttempts: 0 },
+          data: { ...p2v.data, p2vStatus, p2vAttempts: 0 },
         },
       })
     }
 
-    await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    if (p2vStatus === P2VStatus.waiting) {
+      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
 
     return p2v
   }

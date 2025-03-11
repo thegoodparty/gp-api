@@ -11,18 +11,21 @@ import { UpdateEcanvasserDto } from './dto/update-ecanvasser.dto'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
-import { Ecanvasser } from '@prisma/client'
+import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
+import slugify from 'slugify'
 import {
   EcanvasserSummary,
   ApiEcanvasserContact,
   ApiEcanvasserInteraction,
   PaginationParams,
   ApiResponse,
+  EcanvasserSummaryResponse,
 } from './ecanvasser.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { SlackService } from 'src/shared/services/slack.service'
 
 const DEFAULT_PAGE_SIZE = 1000
+const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
 @Injectable()
 export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
@@ -72,6 +75,94 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     })
 
     return ecanvasser
+  }
+
+  async mine(campaignId: number): Promise<Omit<Ecanvasser, 'apiKey'>> {
+    const ecanvasser = await this.model.findFirstOrThrow({
+      where: { campaignId },
+    })
+    const { apiKey, ...rest } = ecanvasser
+    return rest
+  }
+
+  private getInteractionsByDay(interactions: EcanvasserInteraction[]) {
+    const recentInteractions = interactions.filter(
+      (interaction) =>
+        interaction.createdAt > new Date(Date.now() - THIRTY_DAYS),
+    )
+
+    return recentInteractions.reduce((acc, interaction) => {
+      const date = interaction.date.toISOString().split('T')[0]
+      if (!acc[date]) {
+        acc[date] = { count: 0 }
+      }
+      acc[date].count++
+      if (!acc[date][interaction.status]) {
+        acc[date][interaction.status] = 0
+      }
+      acc[date][interaction.status]++
+      return acc
+    }, {})
+  }
+
+  private calculateAverageRating(
+    interactions: EcanvasserInteraction[],
+  ): number {
+    const ratedInteractions = interactions.filter((i) => i.rating)
+    if (ratedInteractions.length === 0) return 0
+
+    const sum = ratedInteractions.reduce(
+      (total, interaction) => total + (interaction.rating || 0),
+      0,
+    )
+    return sum / ratedInteractions.length
+  }
+
+  private interactionsByStatus(
+    interactions: EcanvasserInteraction[],
+  ): Record<string, number> {
+    return interactions.reduce(
+      (acc, interaction) => {
+        const key = slugify(interaction.status, { lower: true })
+        acc[key] = (acc[key] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+  }
+
+  private groupedRatings(
+    interactions: EcanvasserInteraction[],
+  ): Record<string, number> {
+    return interactions.reduce((acc, interaction) => {
+      const key = interaction.rating ? `${interaction.rating}` : 'unrated'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {})
+  }
+
+  async summary(campaignId: number): Promise<EcanvasserSummaryResponse> {
+    const ecanvasser = await this.model.findFirstOrThrow({
+      where: { campaignId },
+      include: {
+        contacts: true,
+        houses: true,
+        interactions: true,
+      },
+    })
+
+    const interactionsByDay = this.getInteractionsByDay(ecanvasser.interactions)
+
+    const summary = {
+      totalContacts: ecanvasser.contacts.length,
+      totalHouses: ecanvasser.houses.length,
+      totalInteractions: ecanvasser.interactions.length,
+      averageRating: this.calculateAverageRating(ecanvasser.interactions),
+      groupedRatings: this.groupedRatings(ecanvasser.interactions),
+      interactions: this.interactionsByStatus(ecanvasser.interactions),
+      interactionsByDay,
+    }
+    return summary
   }
 
   async update(
@@ -273,6 +364,8 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
               status: interaction.status.name,
               contactId: interaction.contact_id || 0,
               createdBy: interaction.created_by || 0,
+              date: interaction.created_at,
+              rating: interaction.rating || null,
             })),
           },
           lastSync: new Date(),

@@ -155,13 +155,8 @@ export class ConsumerService {
       )
     } catch (e) {
       this.logger.error('error calculating viability score', e)
-      await this.slackService.errorMessage({
-        message: 'error calculating viability score',
-        error: e,
-      })
     }
 
-    this.logger.debug('viability', viability)
     if (viability) {
       const pathToVictory = await this.pathToVictoryService.findUnique({
         where: { campaignId: Number(message.campaignId) },
@@ -179,6 +174,13 @@ export class ConsumerService {
           },
         })
       }
+      this.logger.debug('viability', viability)
+      await this.slackService.message(
+        {
+          body: `Viability score calculated for ${campaign?.slug}: ${viability.score}`,
+        },
+        SlackChannel.botPathToVictory,
+      )
     }
 
     // This is disabled until we have a process to load the data from the sheet
