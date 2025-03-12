@@ -139,6 +139,7 @@ export interface EcanvasserSummaryResponse {
     [key: string]: number
   }
   interactionsByDay: InteractionsByDay
+  lastSync: Date | null
 }
 
 export interface PaginationParams {
