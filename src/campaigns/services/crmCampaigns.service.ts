@@ -58,6 +58,7 @@ const EMAIL_TO_SLACK_ID = {
   'dllane2012@gmail.com': 'U06U033GHDE',
   'aaron.soriano@goodparty.org': 'U07QXHVNDEJ',
   'nate.allen@goodparty.org': 'U07R9RNFTFX',
+  'julian@goodparty.org': 'U05B0CX71QB',
 }
 
 @Injectable()
