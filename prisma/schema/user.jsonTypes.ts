@@ -14,6 +14,7 @@ declare global {
       checkoutSessionId?: string | null
       accountType?: string
       lastVisited?: number
+      sessionCount?: number
       isDeleted?: boolean
       fsUserId?: string
       whyBrowsing?: WhyBrowsing

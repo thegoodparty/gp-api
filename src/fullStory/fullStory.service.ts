@@ -73,6 +73,7 @@ export class FullStoryService {
   ) {}
 
   private getTrackingProperties(
+    user: User,
     campaign: CampaignWith<'campaignPositions' | 'pathToVictory'>,
     pathToVictory: PathToVictory,
   ): TrackingProperties {
@@ -135,6 +136,7 @@ export class FullStoryService {
       currentStep,
       isVerified,
       isPro,
+      sessionCount: user?.metaData?.sessionCount || 0,
       createdByAdmin: createdBy === 'admin',
       aiContentCount: aiContent ? Object.keys(aiContent).length : 0,
       p2vStatus: pathToVictoryData?.p2vStatus || 'n/a',
@@ -262,6 +264,7 @@ export class FullStoryService {
         this.makeTrackingRequest(
           user as User,
           this.getTrackingProperties(
+            user as User,
             campaign,
             campaign.pathToVictory as PathToVictory,
           ),
@@ -318,7 +321,11 @@ export class FullStoryService {
     limiter.schedule(() =>
       this.makeTrackingRequest(
         user,
-        this.getTrackingProperties(campaign, pathToVictory as PathToVictory),
+        this.getTrackingProperties(
+          user,
+          campaign,
+          pathToVictory as PathToVictory,
+        ),
       ),
     )
   }

@@ -237,16 +237,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async getStatus(user: User, campaign?: Campaign) {
     const timestamp = new Date().getTime()
 
-    await this.usersService.updateUser(
-      { id: user.id },
-      {
-        metaData: {
-          ...user.metaData,
-          lastVisited: timestamp,
-        },
-      },
-    )
-
     if (!campaign) {
       return {
         status: false,
