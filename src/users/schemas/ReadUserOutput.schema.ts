@@ -6,13 +6,14 @@ import {
   RolesSchema,
   ZipSchema,
 } from 'src/shared/schemas'
+import { makeOptional } from 'src/shared/util/zod.util'
 
 export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   password: true,
 }).extend({
   name: z.string().nullish(),
-  zip: ZipSchema.nullish(),
-  phone: PhoneSchema.nullish(),
+  zip: makeOptional(ZipSchema),
+  phone: makeOptional(PhoneSchema),
   id: z.number(),
   email: EmailSchema,
   avatar: z.string().nullish(),
