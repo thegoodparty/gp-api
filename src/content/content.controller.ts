@@ -123,6 +123,13 @@ export class ContentController {
     return article
   }
 
+  @Get('blog-articles/by-section/:sectionSlug')
+  async listBlogArticleSummariesBySection(
+    @Param('sectionSlug') sectionSlug?: string,
+  ) {
+    return this.blogArticleMetaService.listArticlesBySection(sectionSlug)
+  }
+
   @Get('article-tags')
   async articleTags() {
     return this.blogArticleMetaService.findBlogArticleTags()

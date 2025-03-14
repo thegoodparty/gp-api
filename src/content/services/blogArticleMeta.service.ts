@@ -8,6 +8,7 @@ import {
   SpecificSectionResponseDatum,
 } from '../content.types'
 import { generateAllSectionsResponseData } from '../util/generateAllSectionsResponseData'
+import * as assert from 'node:assert'
 
 @Injectable()
 export class BlogArticleMetaService extends createPrismaBase(
@@ -98,6 +99,36 @@ export class BlogArticleMetaService extends createPrismaBase(
     return sectionSlug
       ? generateSpecificSectionResponseData(augmentedSections, sectionSlug)
       : generateAllSectionsResponseData(augmentedSections, blogArticleMetas)
+  }
+
+  async listArticlesBySection(sectionSlug?: string) {
+    const blogArticleMetas = await this.model.findMany({
+      ...(sectionSlug
+        ? {
+            where: {
+              section: {
+                path: ['fields', 'slug'],
+                equals: sectionSlug,
+              },
+            },
+          }
+        : {}),
+      orderBy: {
+        contentId: 'desc',
+      },
+    })
+
+    this.logger.debug(
+      'assertion:',
+      assert.ok(
+        blogArticleMetas.every(
+          (meta) => meta.section.fields.slug === sectionSlug,
+        ),
+        'All blog article metas should have section',
+      ),
+    )
+
+    return {}
   }
 }
 
