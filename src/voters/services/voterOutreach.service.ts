@@ -6,7 +6,11 @@ import { buildSlackBlocks } from '../util/voterOutreach.util'
 import { FileUpload } from 'src/files/files.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import sanitizeHtml from 'sanitize-html'
-import { IS_PROD, WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import {
+  IS_PROD,
+  WEBAPP_API_PATH,
+  WEBAPP_ROOT,
+} from 'src/shared/util/appEnvironment.util'
 import { VOTER_FILE_ROUTE } from '../voterFile/voterFile.controller'
 import { FilesService } from 'src/files/files.service'
 import {
@@ -61,7 +65,7 @@ export class VoterOutreachService {
         }
       }
       const encodedFilters = encodeURIComponent(JSON.stringify({ filters }))
-      voterFileUrl = `${WEBAPP_ROOT}/${VOTER_FILE_ROUTE}?type=${type}&slug=${campaign.slug}&customFilters=${encodedFilters}`
+      voterFileUrl = `${WEBAPP_ROOT}${WEBAPP_API_PATH}${VOTER_FILE_ROUTE}?type=${type}&slug=${campaign.slug}&customFilters=${encodedFilters}`
     } catch (e) {
       this.logger.error('Error building voterFileUrl: ', e)
       voterFileUrl = null
