@@ -7,7 +7,7 @@ export class HealthService {
   private readonly logger = new Logger(HealthService.name)
   async checkHealth(): Promise<boolean> {
     // Right now, this just simply checks if the database connection is working,
-    //   but we can add more checks here for other backend services as well
+    //   but we can add more checks here for other backend services as well..
     try {
       await this.prisma.$queryRaw`SELECT 1`
       return true
