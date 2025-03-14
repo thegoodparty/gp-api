@@ -80,7 +80,6 @@ export interface EcanvasserInteraction {
     created_by: number
     updated_at: string
     created_at: string
-    nationbuilder_id: number | null
     team_id: number | null
     requires_signature: boolean
     responses: any[]
@@ -167,4 +166,43 @@ export interface ApiResponse<T> {
     }
   }
   message?: string
+}
+
+export interface ApiEcanvasserSurvey {
+  created_by: number
+  created_at: string
+  updated_at: string
+  id: number
+  name: string
+  description: string
+  requires_signature: boolean
+  status: 'Live' | 'Not Live'
+  team_id: number | null
+  questions: ApiEcanvasserSurveyQuestion[]
+}
+
+export interface ApiEcanvasserSurveyQuestion {
+  id: number
+  survey_id: number
+  name: string
+  answer_type: {
+    id: number
+    name: string
+  }
+  order: number
+  required: boolean
+  created_at: string
+  updated_at: string
+  answers?: Array<{
+    name: string
+  }>
+}
+
+export interface ApiEcanvasserTeam {
+  id: number
+  name: string
+  color: string
+  created_by: number
+  created_at: string
+  updated_at: string
 }

@@ -20,9 +20,14 @@ import {
   PaginationParams,
   ApiResponse,
   EcanvasserSummaryResponse,
+  ApiEcanvasserSurvey,
+  ApiEcanvasserSurveyQuestion,
+  ApiEcanvasserTeam,
 } from './ecanvasser.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { SlackService } from 'src/shared/services/slack.service'
+import { CreateSurveyDto } from './dto/create-survey.dto'
+import { CreateSurveyQuestionDto } from './dto/create-survey-question.dto'
 
 const DEFAULT_PAGE_SIZE = 1000
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
@@ -197,9 +202,14 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   private async fetchFromApi<T>(
     endpoint: string,
     apiKey: string,
-    params: PaginationParams = {},
+    options: {
+      method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+      data?: any
+      params?: PaginationParams
+    } = {},
   ): Promise<ApiResponse<T>> {
     try {
+      const { method = 'GET', data, params = {} } = options
       const queryParams = new URLSearchParams()
 
       if (params.limit) {
@@ -222,16 +232,37 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
         queryParams.toString() ? `?${queryParams.toString()}` : ''
       }`
 
-      const response = await lastValueFrom(
-        this.httpService.get(url, {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        }),
-      )
+      const config = {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      }
+
+      let response
+      switch (method) {
+        case 'POST':
+          response = await lastValueFrom(
+            this.httpService.post(url, data, config),
+          )
+          break
+        case 'PUT':
+          response = await lastValueFrom(
+            this.httpService.put(url, data, config),
+          )
+          break
+        case 'DELETE':
+          response = await lastValueFrom(this.httpService.delete(url, config))
+          break
+        default:
+          response = await lastValueFrom(this.httpService.get(url, config))
+      }
+
       return response.data as ApiResponse<T>
     } catch (error) {
-      this.logger.error(`Failed to fetch from ${endpoint}`, error)
+      this.logger.error(
+        `Failed to ${options.method || 'GET'} ${endpoint}`,
+        error,
+      )
       throw error
     }
   }
@@ -262,7 +293,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
         params.after_id = lastId
       }
 
-      const response = await this.fetchFromApi<T>(endpoint, apiKey, params)
+      const response = await this.fetchFromApi<T>(endpoint, apiKey, { params })
 
       if (!response.data.length) {
         break
@@ -452,5 +483,120 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
   private async sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  async createSurvey(campaignId: number, createSurveyDto: CreateSurveyDto) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    const payload = {
+      name: createSurveyDto.name,
+      description: createSurveyDto.description,
+      requires_signature: createSurveyDto.requiresSignature,
+      status: createSurveyDto.status,
+      team_id: createSurveyDto.teamId,
+    } as ApiEcanvasserSurvey
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
+        '/survey',
+        ecanvasser.apiKey,
+        {
+          method: 'POST',
+          data: payload,
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to create survey', error)
+      throw error
+    }
+  }
+
+  async findSurveys(campaignId: number) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
+        '/survey',
+        ecanvasser.apiKey,
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to fetch surveys', error)
+      throw error
+    }
+  }
+
+  async createSurveyQuestion(
+    campaignId: number,
+    surveyId: number,
+    createQuestionDto: CreateSurveyQuestionDto,
+  ) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserSurveyQuestion>(
+        `/survey/${surveyId}/question`,
+        ecanvasser.apiKey,
+        {
+          method: 'POST',
+          data: createQuestionDto,
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to create survey question', error)
+      throw error
+    }
+  }
+
+  async findSurvey(campaignId: number, surveyId: number) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
+        `/survey/${surveyId}`,
+        ecanvasser.apiKey,
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to fetch survey', error)
+      throw error
+    }
+  }
+
+  async findTeams(campaignId: number) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserTeam>(
+        '/team',
+        ecanvasser.apiKey,
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to fetch teams', error)
+      throw error
+    }
   }
 }

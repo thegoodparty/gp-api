@@ -18,6 +18,8 @@ import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { CreateSurveyDto } from './dto/create-survey.dto'
+import { CreateSurveyQuestionDto } from './dto/create-survey-question.dto'
 
 @Controller('ecanvasser')
 export class EcanvasserController {
@@ -82,5 +84,49 @@ export class EcanvasserController {
   @PublicAccess()
   syncAll() {
     return this.ecanvasserService.syncAll()
+  }
+
+  @Post('survey')
+  @UseCampaign()
+  createSurvey(
+    @ReqCampaign() campaign: Campaign,
+    @Body() createSurveyDto: CreateSurveyDto,
+  ) {
+    return this.ecanvasserService.createSurvey(campaign.id, createSurveyDto)
+  }
+
+  @Get('surveys')
+  @UseCampaign()
+  findSurveys(@ReqCampaign() campaign: Campaign) {
+    return this.ecanvasserService.findSurveys(campaign.id)
+  }
+
+  @Get('survey/:surveyId')
+  @UseCampaign()
+  findSurvey(
+    @ReqCampaign() campaign: Campaign,
+    @Param('surveyId', ParseIntPipe) surveyId: number,
+  ) {
+    return this.ecanvasserService.findSurvey(campaign.id, surveyId)
+  }
+
+  @Post('survey/:surveyId/questions')
+  @UseCampaign()
+  createSurveyQuestion(
+    @ReqCampaign() campaign: Campaign,
+    @Param('surveyId', ParseIntPipe) surveyId: number,
+    @Body() createQuestionDto: CreateSurveyQuestionDto,
+  ) {
+    return this.ecanvasserService.createSurveyQuestion(
+      campaign.id,
+      surveyId,
+      createQuestionDto,
+    )
+  }
+
+  @Get('teams')
+  @UseCampaign()
+  findTeams(@ReqCampaign() campaign: Campaign) {
+    return this.ecanvasserService.findTeams(campaign.id)
   }
 }
