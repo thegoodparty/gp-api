@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://goodparty.org.com/" target="blank"><img src="https://goodparty.org/images/logo-hologram-white.svg" width="120" alt="GoodParty.org Logo" /></a>
+  <a href="https://goodparty.org" target="blank"><img src="https://goodparty.org/images/logo-hologram-white.svg" width="120" alt="GoodParty.org Logo" /></a>
 </p>
 
 [circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
