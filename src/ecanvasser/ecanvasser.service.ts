@@ -609,4 +609,26 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       throw error
     }
   }
+
+  async deleteSurveyQuestion(campaignId: number, questionId: number) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi(
+        `/survey/question/${questionId}`,
+        ecanvasser.apiKey,
+        {
+          method: 'DELETE',
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to delete survey question', error)
+      throw error
+    }
+  }
 }

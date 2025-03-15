@@ -129,4 +129,13 @@ export class EcanvasserController {
   findTeams(@ReqCampaign() campaign: Campaign) {
     return this.ecanvasserService.findTeams(campaign.id)
   }
+
+  @Delete('survey/question/:questionId')
+  @UseCampaign()
+  deleteSurveyQuestion(
+    @ReqCampaign() campaign: Campaign,
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ) {
+    return this.ecanvasserService.deleteSurveyQuestion(campaign.id, questionId)
+  }
 }
