@@ -110,7 +110,7 @@ export class EcanvasserController {
     return this.ecanvasserService.findSurvey(campaign.id, surveyId)
   }
 
-  @Post('survey/:surveyId/questions')
+  @Post('survey/:surveyId/question')
   @UseCampaign()
   createSurveyQuestion(
     @ReqCampaign() campaign: Campaign,

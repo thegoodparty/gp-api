@@ -544,14 +544,24 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     if (!ecanvasser) {
       throw new NotFoundException('Ecanvasser integration not found')
     }
-
+    const payload = {
+      survey_id: surveyId,
+      name: createQuestionDto.name,
+      order: createQuestionDto.order,
+      required: createQuestionDto.required,
+      answer_type: {
+        id: createQuestionDto.answerFormatId,
+        name: createQuestionDto.answerFormatName,
+      },
+      answers: createQuestionDto.answers || undefined,
+    }
     try {
       const response = await this.fetchFromApi<ApiEcanvasserSurveyQuestion>(
-        `/survey/${surveyId}/question`,
+        `/survey/question`,
         ecanvasser.apiKey,
         {
           method: 'POST',
-          data: createQuestionDto,
+          data: payload,
         },
       )
 

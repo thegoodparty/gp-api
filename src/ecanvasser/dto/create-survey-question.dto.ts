@@ -8,10 +8,8 @@ export class CreateSurveyQuestionDto extends createZodDto(
       surveyId: z.number().int().positive(),
       order: z.number().int().positive().optional(),
       required: z.boolean().optional(),
-      answerType: z.object({
-        id: z.number(),
-        name: z.string(),
-      }),
+      answerFormatName: z.string().optional(),
+      answerFormatId: z.number().int().positive(),
       answers: z
         .array(
           z.object({
