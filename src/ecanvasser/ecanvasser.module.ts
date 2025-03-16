@@ -1,12 +1,14 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
+import { EcanvasserService } from './services/ecanvasser.service'
 import { EcanvasserController } from './ecanvasser.controller'
-import { EcanvasserService } from './ecanvasser.service'
+import { CampaignsModule } from '../campaigns/campaigns.module'
 import { HttpModule } from '@nestjs/axios'
+import { SurveyService } from './services/survey.service'
 
 @Module({
-  imports: [HttpModule],
+  imports: [forwardRef(() => CampaignsModule), HttpModule],
   controllers: [EcanvasserController],
-  providers: [EcanvasserService],
-  exports: [EcanvasserService],
+  providers: [EcanvasserService, SurveyService],
+  exports: [EcanvasserService, SurveyService],
 })
 export class EcanvasserModule {}

@@ -6,9 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CreateEcanvasserDto } from './dto/create-ecanvasser.dto'
-import { UpdateEcanvasserDto } from './dto/update-ecanvasser.dto'
-import { CampaignsService } from '../campaigns/services/campaigns.service'
+import { CreateEcanvasserDto } from '../dto/create-ecanvasser.dto'
+import { UpdateEcanvasserDto } from '../dto/update-ecanvasser.dto'
+import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
@@ -23,13 +23,13 @@ import {
   ApiEcanvasserSurvey,
   ApiEcanvasserSurveyQuestion,
   ApiEcanvasserTeam,
-} from './ecanvasser.types'
+} from '../ecanvasser.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { CreateSurveyDto } from './dto/create-survey.dto'
-import { CreateSurveyQuestionDto } from './dto/create-survey-question.dto'
-import { UpdateSurveyQuestionDto } from './dto/update-survey-question.dto'
-import { UpdateSurveyDto } from './dto/update-survey.dto'
+import { CreateSurveyDto } from '../dto/create-survey.dto'
+import { CreateSurveyQuestionDto } from '../dto/create-survey-question.dto'
+import { UpdateSurveyQuestionDto } from '../dto/update-survey-question.dto'
+import { UpdateSurveyDto } from '../dto/update-survey.dto'
 
 const DEFAULT_PAGE_SIZE = 1000
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000

@@ -24,7 +24,7 @@ import { FullStoryService } from '../../fullStory/fullStory.service'
 import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { EcanvasserService } from '../../ecanvasser/ecanvasser.service'
+import { EcanvasserService } from '../../ecanvasser/services/ecanvasser.service'
 export const HUBSPOT_COMPANY_PROPERTIES = [
   'past_candidate',
   'incumbent',

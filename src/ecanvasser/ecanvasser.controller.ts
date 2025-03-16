@@ -10,7 +10,8 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common'
-import { EcanvasserService } from './ecanvasser.service'
+import { EcanvasserService } from './services/ecanvasser.service'
+import { SurveyService } from './services/survey.service'
 import { CreateEcanvasserDto } from './dto/create-ecanvasser.dto'
 import { UpdateEcanvasserDto } from './dto/update-ecanvasser.dto'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
@@ -26,7 +27,10 @@ import { UpdateSurveyDto } from './dto/update-survey.dto'
 
 @Controller('ecanvasser')
 export class EcanvasserController {
-  constructor(private readonly ecanvasserService: EcanvasserService) {}
+  constructor(
+    private readonly ecanvasserService: EcanvasserService,
+    private readonly surveyService: SurveyService,
+  ) {}
 
   @Post()
   @Roles('admin')
@@ -95,13 +99,13 @@ export class EcanvasserController {
     @ReqCampaign() campaign: Campaign,
     @Body() createSurveyDto: CreateSurveyDto,
   ) {
-    return this.ecanvasserService.createSurvey(campaign.id, createSurveyDto)
+    return this.surveyService.createSurvey(campaign.id, createSurveyDto)
   }
 
   @Get('surveys')
   @UseCampaign()
   findSurveys(@ReqCampaign() campaign: Campaign) {
-    return this.ecanvasserService.findSurveys(campaign.id)
+    return this.surveyService.findSurveys(campaign.id)
   }
 
   @Get('survey/:surveyId')
@@ -110,7 +114,7 @@ export class EcanvasserController {
     @ReqCampaign() campaign: Campaign,
     @Param('surveyId', ParseIntPipe) surveyId: number,
   ) {
-    return this.ecanvasserService.findSurvey(campaign.id, surveyId)
+    return this.surveyService.findSurvey(campaign.id, surveyId)
   }
 
   @Put('survey/:surveyId')
@@ -120,7 +124,7 @@ export class EcanvasserController {
     @Param('surveyId', ParseIntPipe) surveyId: number,
     @Body() updateSurveyDto: UpdateSurveyDto,
   ) {
-    return this.ecanvasserService.updateSurvey(
+    return this.surveyService.updateSurvey(
       campaign.id,
       surveyId,
       updateSurveyDto,
@@ -133,7 +137,7 @@ export class EcanvasserController {
     @ReqCampaign() campaign: Campaign,
     @Param('surveyId', ParseIntPipe) surveyId: number,
   ) {
-    return this.ecanvasserService.deleteSurvey(campaign.id, surveyId)
+    return this.surveyService.deleteSurvey(campaign.id, surveyId)
   }
 
   @Post('survey/:surveyId/question')
@@ -143,7 +147,7 @@ export class EcanvasserController {
     @Param('surveyId', ParseIntPipe) surveyId: number,
     @Body() createQuestionDto: CreateSurveyQuestionDto,
   ) {
-    return this.ecanvasserService.createSurveyQuestion(
+    return this.surveyService.createSurveyQuestion(
       campaign.id,
       surveyId,
       createQuestionDto,
@@ -153,7 +157,7 @@ export class EcanvasserController {
   @Get('teams')
   @UseCampaign()
   findTeams(@ReqCampaign() campaign: Campaign) {
-    return this.ecanvasserService.findTeams(campaign.id)
+    return this.surveyService.findTeams(campaign.id)
   }
 
   @Delete('survey/question/:questionId')
@@ -162,7 +166,7 @@ export class EcanvasserController {
     @ReqCampaign() campaign: Campaign,
     @Param('questionId', ParseIntPipe) questionId: number,
   ) {
-    return this.ecanvasserService.deleteSurveyQuestion(campaign.id, questionId)
+    return this.surveyService.deleteSurveyQuestion(campaign.id, questionId)
   }
 
   @Get('survey/question/:questionId')
@@ -171,7 +175,7 @@ export class EcanvasserController {
     @ReqCampaign() campaign: Campaign,
     @Param('questionId', ParseIntPipe) questionId: number,
   ) {
-    return this.ecanvasserService.findSurveyQuestion(campaign.id, questionId)
+    return this.surveyService.findSurveyQuestion(campaign.id, questionId)
   }
 
   @Put('survey/question/:questionId')
@@ -181,7 +185,7 @@ export class EcanvasserController {
     @Param('questionId', ParseIntPipe) questionId: number,
     @Body() updateQuestionDto: UpdateSurveyQuestionDto,
   ) {
-    return this.ecanvasserService.updateSurveyQuestion(
+    return this.surveyService.updateSurveyQuestion(
       campaign.id,
       questionId,
       updateQuestionDto,
