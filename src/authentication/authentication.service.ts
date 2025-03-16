@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotImplementedException,
   UnauthorizedException,
@@ -167,7 +168,9 @@ export class AuthenticationService {
             : 'Invalid token',
         )
       }
-      throw e
+      throw new InternalServerErrorException('Failed to update password', {
+        cause: e,
+      })
     }
 
     return await this.usersService.updatePassword(user.id, password, true)

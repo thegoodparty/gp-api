@@ -1,6 +1,10 @@
 import { STATES, STATE_CODES } from '../constants/states'
 import { z } from 'zod'
 
+export function makeOptional<T>(schema: z.ZodType<T>) {
+  return z.union([z.null(), z.undefined(), z.literal(''), schema])
+}
+
 /**
  * State validation function intended to be used in a zod schema
  * @example
