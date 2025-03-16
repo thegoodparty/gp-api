@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common'
 import { EcanvasserService } from './ecanvasser.service'
@@ -20,6 +21,8 @@ import { Campaign } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CreateSurveyDto } from './dto/create-survey.dto'
 import { CreateSurveyQuestionDto } from './dto/create-survey-question.dto'
+import { UpdateSurveyQuestionDto } from './dto/update-survey-question.dto'
+import { UpdateSurveyDto } from './dto/update-survey.dto'
 
 @Controller('ecanvasser')
 export class EcanvasserController {
@@ -110,6 +113,29 @@ export class EcanvasserController {
     return this.ecanvasserService.findSurvey(campaign.id, surveyId)
   }
 
+  @Put('survey/:surveyId')
+  @UseCampaign()
+  updateSurvey(
+    @ReqCampaign() campaign: Campaign,
+    @Param('surveyId', ParseIntPipe) surveyId: number,
+    @Body() updateSurveyDto: UpdateSurveyDto,
+  ) {
+    return this.ecanvasserService.updateSurvey(
+      campaign.id,
+      surveyId,
+      updateSurveyDto,
+    )
+  }
+
+  @Delete('survey/:surveyId')
+  @UseCampaign()
+  deleteSurvey(
+    @ReqCampaign() campaign: Campaign,
+    @Param('surveyId', ParseIntPipe) surveyId: number,
+  ) {
+    return this.ecanvasserService.deleteSurvey(campaign.id, surveyId)
+  }
+
   @Post('survey/:surveyId/question')
   @UseCampaign()
   createSurveyQuestion(
@@ -137,5 +163,28 @@ export class EcanvasserController {
     @Param('questionId', ParseIntPipe) questionId: number,
   ) {
     return this.ecanvasserService.deleteSurveyQuestion(campaign.id, questionId)
+  }
+
+  @Get('survey/question/:questionId')
+  @UseCampaign()
+  findSurveyQuestion(
+    @ReqCampaign() campaign: Campaign,
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ) {
+    return this.ecanvasserService.findSurveyQuestion(campaign.id, questionId)
+  }
+
+  @Put('survey/question/:questionId')
+  @UseCampaign()
+  updateSurveyQuestion(
+    @ReqCampaign() campaign: Campaign,
+    @Param('questionId', ParseIntPipe) questionId: number,
+    @Body() updateQuestionDto: UpdateSurveyQuestionDto,
+  ) {
+    return this.ecanvasserService.updateSurveyQuestion(
+      campaign.id,
+      questionId,
+      updateQuestionDto,
+    )
   }
 }

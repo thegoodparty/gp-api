@@ -28,6 +28,8 @@ import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service
 import { SlackService } from 'src/shared/services/slack.service'
 import { CreateSurveyDto } from './dto/create-survey.dto'
 import { CreateSurveyQuestionDto } from './dto/create-survey-question.dto'
+import { UpdateSurveyQuestionDto } from './dto/update-survey-question.dto'
+import { UpdateSurveyDto } from './dto/update-survey.dto'
 
 const DEFAULT_PAGE_SIZE = 1000
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
@@ -628,6 +630,107 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to delete survey question', error)
+      throw error
+    }
+  }
+
+  async findSurveyQuestion(campaignId: number, questionId: number) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserSurveyQuestion>(
+        `/survey/question/${questionId}`,
+        ecanvasser.apiKey,
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to fetch survey question', error)
+      throw error
+    }
+  }
+
+  async updateSurveyQuestion(
+    campaignId: number,
+    questionId: number,
+    updateQuestionDto: UpdateSurveyQuestionDto,
+  ) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    const payload = {
+      survey_id: updateQuestionDto.surveyId,
+      name: updateQuestionDto.name,
+      answers: updateQuestionDto.answers,
+    }
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserSurveyQuestion>(
+        `/survey/question/${questionId}`,
+        ecanvasser.apiKey,
+        {
+          method: 'PUT',
+          data: payload,
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to update survey question', error)
+      throw error
+    }
+  }
+
+  async updateSurvey(
+    campaignId: number,
+    surveyId: number,
+    updateSurveyDto: UpdateSurveyDto,
+  ) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
+        `/survey/${surveyId}`,
+        ecanvasser.apiKey,
+        {
+          method: 'PUT',
+          data: updateSurveyDto,
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to update survey', error)
+      throw error
+    }
+  }
+
+  async deleteSurvey(campaignId: number, surveyId: number) {
+    const ecanvasser = await this.findByCampaignId(campaignId)
+    if (!ecanvasser) {
+      throw new NotFoundException('Ecanvasser integration not found')
+    }
+
+    try {
+      const response = await this.fetchFromApi(
+        `/survey/${surveyId}`,
+        ecanvasser.apiKey,
+        {
+          method: 'DELETE',
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      this.logger.error('Failed to delete survey', error)
       throw error
     }
   }
