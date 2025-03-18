@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import {
+  ObjectCannedACL,
   PutObjectCommand,
   PutObjectCommandInput,
   S3Client,
@@ -58,6 +59,7 @@ export class AwsService {
           Body: fileObject,
           ContentType: fileType,
           CacheControl: options?.cacheControl,
+          ACL: ObjectCannedACL.public_read,
         },
       })
       const response = await upload.done()
