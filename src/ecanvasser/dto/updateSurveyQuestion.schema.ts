@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 
-export class UpdateSurveyQuestionDto extends createZodDto(
+export class UpdateSurveyQuestionSchema extends createZodDto(
   z
     .object({
       name: z.string().min(1),

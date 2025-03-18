@@ -12,18 +12,18 @@ import {
 } from '@nestjs/common'
 import { EcanvasserService } from './services/ecanvasser.service'
 import { SurveyService } from './services/survey.service'
-import { CreateEcanvasserDto } from './dto/create-ecanvasser.dto'
-import { UpdateEcanvasserDto } from './dto/update-ecanvasser.dto'
+import { CreateEcanvasserSchema } from './dto/createEcanvasser.schema'
+import { UpdateEcanvasserSchema } from './dto/updateEcanvasser.schema'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { CampaignOwnerOrAdminGuard } from 'src/campaigns/guards/CampaignOwnerOrAdmin.guard'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { CreateSurveyDto } from './dto/create-survey.dto'
-import { CreateSurveyQuestionDto } from './dto/create-survey-question.dto'
-import { UpdateSurveyQuestionDto } from './dto/update-survey-question.dto'
-import { UpdateSurveyDto } from './dto/update-survey.dto'
+import { CreateSurveySchema } from './dto/createSurvey.schema'
+import { CreateSurveyQuestionSchema } from './dto/createSurveyQuestion.schema'
+import { UpdateSurveyQuestionSchema } from './dto/updateSurveyQuestion.schema'
+import { UpdateSurveySchema } from './dto/updateSurvey.schema'
 
 @Controller('ecanvasser')
 export class EcanvasserController {
@@ -34,7 +34,7 @@ export class EcanvasserController {
 
   @Post()
   @Roles('admin')
-  create(@Body() createEcanvasserDto: CreateEcanvasserDto) {
+  create(@Body() createEcanvasserDto: CreateEcanvasserSchema) {
     return this.ecanvasserService.create(createEcanvasserDto)
   }
 
@@ -60,7 +60,7 @@ export class EcanvasserController {
   @UseGuards(CampaignOwnerOrAdminGuard)
   update(
     @Param('campaignId', ParseIntPipe) campaignId: number,
-    @Body() updateEcanvasserDto: UpdateEcanvasserDto,
+    @Body() updateEcanvasserDto: UpdateEcanvasserSchema,
   ) {
     return this.ecanvasserService.update(campaignId, updateEcanvasserDto)
   }
@@ -97,7 +97,7 @@ export class EcanvasserController {
   @UseCampaign()
   createSurvey(
     @ReqCampaign() campaign: Campaign,
-    @Body() createSurveyDto: CreateSurveyDto,
+    @Body() createSurveyDto: CreateSurveySchema,
   ) {
     return this.surveyService.createSurvey(campaign.id, createSurveyDto)
   }
@@ -122,7 +122,7 @@ export class EcanvasserController {
   updateSurvey(
     @ReqCampaign() campaign: Campaign,
     @Param('surveyId', ParseIntPipe) surveyId: number,
-    @Body() updateSurveyDto: UpdateSurveyDto,
+    @Body() updateSurveyDto: UpdateSurveySchema,
   ) {
     return this.surveyService.updateSurvey(
       campaign.id,
@@ -145,7 +145,7 @@ export class EcanvasserController {
   createSurveyQuestion(
     @ReqCampaign() campaign: Campaign,
     @Param('surveyId', ParseIntPipe) surveyId: number,
-    @Body() createQuestionDto: CreateSurveyQuestionDto,
+    @Body() createQuestionDto: CreateSurveyQuestionSchema,
   ) {
     return this.surveyService.createSurveyQuestion(
       campaign.id,
@@ -183,7 +183,7 @@ export class EcanvasserController {
   updateSurveyQuestion(
     @ReqCampaign() campaign: Campaign,
     @Param('questionId', ParseIntPipe) questionId: number,
-    @Body() updateQuestionDto: UpdateSurveyQuestionDto,
+    @Body() updateQuestionDto: UpdateSurveyQuestionSchema,
   ) {
     return this.surveyService.updateSurveyQuestion(
       campaign.id,

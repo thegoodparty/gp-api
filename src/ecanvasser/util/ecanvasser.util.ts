@@ -2,6 +2,7 @@ import { HttpService } from '@nestjs/axios'
 import { Logger } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import { ApiResponse, PaginationParams } from '../ecanvasser.types'
+import { Methods } from 'http-constants-ts'
 
 const DEFAULT_PAGE_SIZE = 1000
 
@@ -21,7 +22,7 @@ export class EcanvasserApiUtil {
     } = {},
   ): Promise<ApiResponse<T>> {
     try {
-      const { method = 'GET', data, params = {} } = options
+      const { method = Methods.GET, data, params = {} } = options
       const queryParams = new URLSearchParams()
 
       if (params.limit) {
@@ -52,17 +53,17 @@ export class EcanvasserApiUtil {
 
       let response
       switch (method) {
-        case 'POST':
+        case Methods.POST:
           response = await lastValueFrom(
             this.httpService.post(url, data, config),
           )
           break
-        case 'PUT':
+        case Methods.PUT:
           response = await lastValueFrom(
             this.httpService.put(url, data, config),
           )
           break
-        case 'DELETE':
+        case Methods.DELETE:
           response = await lastValueFrom(this.httpService.delete(url, config))
           break
         default:
@@ -72,7 +73,7 @@ export class EcanvasserApiUtil {
       return response.data as ApiResponse<T>
     } catch (error) {
       this.logger.error(
-        `Failed to ${options.method || 'GET'} ${endpoint}`,
+        `Failed to ${options.method || Methods.GET} ${endpoint}`,
         error,
       )
       throw error

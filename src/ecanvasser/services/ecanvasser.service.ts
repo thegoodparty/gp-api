@@ -4,10 +4,11 @@ import {
   forwardRef,
   Inject,
   NotFoundException,
+  BadGatewayException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CreateEcanvasserDto } from '../dto/create-ecanvasser.dto'
-import { UpdateEcanvasserDto } from '../dto/update-ecanvasser.dto'
+import { CreateEcanvasserSchema } from '../dto/createEcanvasser.schema'
+import { UpdateEcanvasserSchema } from '../dto/updateEcanvasser.schema'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
@@ -26,10 +27,11 @@ import {
 } from '../ecanvasser.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { CreateSurveyDto } from '../dto/create-survey.dto'
-import { CreateSurveyQuestionDto } from '../dto/create-survey-question.dto'
-import { UpdateSurveyQuestionDto } from '../dto/update-survey-question.dto'
-import { UpdateSurveyDto } from '../dto/update-survey.dto'
+import { CreateSurveySchema } from '../dto/createSurvey.schema'
+import { CreateSurveyQuestionSchema } from '../dto/createSurveyQuestion.schema'
+import { UpdateSurveyQuestionSchema } from '../dto/updateSurveyQuestion.schema'
+import { UpdateSurveySchema } from '../dto/updateSurvey.schema'
+import { Methods } from 'http-constants-ts'
 
 const DEFAULT_PAGE_SIZE = 1000
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
@@ -50,7 +52,9 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     super()
   }
 
-  async create(createEcanvasserDto: CreateEcanvasserDto): Promise<Ecanvasser> {
+  async create(
+    createEcanvasserDto: CreateEcanvasserSchema,
+  ): Promise<Ecanvasser> {
     const campaign = await this.campaignsService.findFirstOrThrow({
       where: {
         user: {
@@ -175,7 +179,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
   async update(
     campaignId: number,
-    updateEcanvasserDto: UpdateEcanvasserDto,
+    updateEcanvasserDto: UpdateEcanvasserSchema,
   ): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
 
@@ -211,7 +215,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     } = {},
   ): Promise<ApiResponse<T>> {
     try {
-      const { method = 'GET', data, params = {} } = options
+      const { method = Methods.GET, data, params = {} } = options
       const queryParams = new URLSearchParams()
 
       if (params.limit) {
@@ -242,17 +246,17 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
 
       let response
       switch (method) {
-        case 'POST':
+        case Methods.POST:
           response = await lastValueFrom(
             this.httpService.post(url, data, config),
           )
           break
-        case 'PUT':
+        case Methods.PUT:
           response = await lastValueFrom(
             this.httpService.put(url, data, config),
           )
           break
-        case 'DELETE':
+        case Methods.DELETE:
           response = await lastValueFrom(this.httpService.delete(url, config))
           break
         default:
@@ -262,10 +266,10 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data as ApiResponse<T>
     } catch (error) {
       this.logger.error(
-        `Failed to ${options.method || 'GET'} ${endpoint}`,
+        `Failed to ${options.method || Methods.GET} ${endpoint}`,
         error,
       )
-      throw error
+      throw new BadGatewayException('Failed to communicate with Ecanvasser API')
     }
   }
 
@@ -487,7 +491,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     await new Promise((resolve) => setTimeout(resolve, ms))
   }
 
-  async createSurvey(campaignId: number, createSurveyDto: CreateSurveyDto) {
+  async createSurvey(campaignId: number, createSurveyDto: CreateSurveySchema) {
     const ecanvasser = await this.findByCampaignId(campaignId)
     if (!ecanvasser) {
       throw new NotFoundException('Ecanvasser integration not found')
@@ -514,7 +518,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to create survey', error)
-      throw error
+      throw new BadGatewayException('Failed to create survey in Ecanvasser')
     }
   }
 
@@ -533,14 +537,14 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to fetch surveys', error)
-      throw error
+      throw new BadGatewayException('Failed to fetch surveys from Ecanvasser')
     }
   }
 
   async createSurveyQuestion(
     campaignId: number,
     surveyId: number,
-    createQuestionDto: CreateSurveyQuestionDto,
+    createQuestionDto: CreateSurveyQuestionSchema,
   ) {
     const ecanvasser = await this.findByCampaignId(campaignId)
     if (!ecanvasser) {
@@ -570,7 +574,9 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to create survey question', error)
-      throw error
+      throw new BadGatewayException(
+        'Failed to create survey question in Ecanvasser',
+      )
     }
   }
 
@@ -589,7 +595,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to fetch survey', error)
-      throw error
+      throw new BadGatewayException('Failed to fetch survey from Ecanvasser')
     }
   }
 
@@ -608,7 +614,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to fetch teams', error)
-      throw error
+      throw new BadGatewayException('Failed to fetch teams from Ecanvasser')
     }
   }
 
@@ -630,7 +636,9 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to delete survey question', error)
-      throw error
+      throw new BadGatewayException(
+        'Failed to delete survey question in Ecanvasser',
+      )
     }
   }
 
@@ -649,14 +657,16 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to fetch survey question', error)
-      throw error
+      throw new BadGatewayException(
+        'Failed to fetch survey question from Ecanvasser',
+      )
     }
   }
 
   async updateSurveyQuestion(
     campaignId: number,
     questionId: number,
-    updateQuestionDto: UpdateSurveyQuestionDto,
+    updateQuestionDto: UpdateSurveyQuestionSchema,
   ) {
     const ecanvasser = await this.findByCampaignId(campaignId)
     if (!ecanvasser) {
@@ -682,14 +692,16 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to update survey question', error)
-      throw error
+      throw new BadGatewayException(
+        'Failed to update survey question in Ecanvasser',
+      )
     }
   }
 
   async updateSurvey(
     campaignId: number,
     surveyId: number,
-    updateSurveyDto: UpdateSurveyDto,
+    updateSurveyDto: UpdateSurveySchema,
   ) {
     const ecanvasser = await this.findByCampaignId(campaignId)
     if (!ecanvasser) {
@@ -709,7 +721,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to update survey', error)
-      throw error
+      throw new BadGatewayException('Failed to update survey in Ecanvasser')
     }
   }
 
@@ -731,7 +743,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       return response.data
     } catch (error) {
       this.logger.error('Failed to delete survey', error)
-      throw error
+      throw new BadGatewayException('Failed to delete survey in Ecanvasser')
     }
   }
 }

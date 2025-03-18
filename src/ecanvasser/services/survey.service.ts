@@ -7,10 +7,10 @@ import {
   ApiEcanvasserSurveyQuestion,
   ApiEcanvasserTeam,
 } from '../ecanvasser.types'
-import { CreateSurveyDto } from '../dto/create-survey.dto'
-import { CreateSurveyQuestionDto } from '../dto/create-survey-question.dto'
-import { UpdateSurveyQuestionDto } from '../dto/update-survey-question.dto'
-import { UpdateSurveyDto } from '../dto/update-survey.dto'
+import { CreateSurveySchema } from '../dto/createSurvey.schema'
+import { CreateSurveyQuestionSchema } from '../dto/createSurveyQuestion.schema'
+import { UpdateSurveyQuestionSchema } from '../dto/updateSurveyQuestion.schema'
+import { UpdateSurveySchema } from '../dto/updateSurvey.schema'
 
 @Injectable()
 export class SurveyService {
@@ -24,7 +24,7 @@ export class SurveyService {
     this.apiUtil = new EcanvasserApiUtil(httpService)
   }
 
-  async createSurvey(campaignId: number, createSurveyDto: CreateSurveyDto) {
+  async createSurvey(campaignId: number, createSurveyDto: CreateSurveySchema) {
     const ecanvasser = await this.ecanvasserService.findByCampaignId(campaignId)
     if (!ecanvasser) {
       throw new NotFoundException('Ecanvasser integration not found')
@@ -77,7 +77,7 @@ export class SurveyService {
   async createSurveyQuestion(
     campaignId: number,
     surveyId: number,
-    createQuestionDto: CreateSurveyQuestionDto,
+    createQuestionDto: CreateSurveyQuestionSchema,
   ) {
     const ecanvasser = await this.ecanvasserService.findByCampaignId(campaignId)
     if (!ecanvasser) {
@@ -197,7 +197,7 @@ export class SurveyService {
   async updateSurveyQuestion(
     campaignId: number,
     questionId: number,
-    updateQuestionDto: UpdateSurveyQuestionDto,
+    updateQuestionDto: UpdateSurveyQuestionSchema,
   ) {
     const ecanvasser = await this.ecanvasserService.findByCampaignId(campaignId)
     if (!ecanvasser) {
@@ -231,7 +231,7 @@ export class SurveyService {
   async updateSurvey(
     campaignId: number,
     surveyId: number,
-    updateSurveyDto: UpdateSurveyDto,
+    updateSurveyDto: UpdateSurveySchema,
   ) {
     const ecanvasser = await this.ecanvasserService.findByCampaignId(campaignId)
     if (!ecanvasser) {
