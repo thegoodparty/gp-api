@@ -1,32 +1,32 @@
 import {
-  Injectable,
-  Logger,
+  BadGatewayException,
   forwardRef,
   Inject,
+  Injectable,
+  Logger,
   NotFoundException,
-  BadGatewayException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CreateEcanvasserSchema } from '../dto/createEcanvasser.schema'
-import { UpdateEcanvasserSchema } from '../dto/updateEcanvasser.schema'
+import { CreateEcanvasserSchema } from '../schemas/createEcanvasser.schema'
+import { UpdateEcanvasserSchema } from '../schemas/updateEcanvasser.schema'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
 import slugify from 'slugify'
 import {
-  EcanvasserSummary,
   ApiEcanvasserContact,
   ApiEcanvasserInteraction,
-  EcanvasserSummaryResponse,
   ApiEcanvasserSurvey,
   ApiEcanvasserSurveyQuestion,
   ApiEcanvasserTeam,
+  EcanvasserSummary,
+  EcanvasserSummaryResponse,
 } from '../ecanvasser.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { CreateSurveySchema } from '../dto/createSurvey.schema'
-import { CreateSurveyQuestionSchema } from '../dto/createSurveyQuestion.schema'
-import { UpdateSurveyQuestionSchema } from '../dto/updateSurveyQuestion.schema'
-import { UpdateSurveySchema } from '../dto/updateSurvey.schema'
+import { CreateSurveySchema } from '../schemas/createSurvey.schema'
+import { CreateSurveyQuestionSchema } from '../schemas/createSurveyQuestion.schema'
+import { UpdateSurveyQuestionSchema } from '../schemas/updateSurveyQuestion.schema'
+import { UpdateSurveySchema } from '../schemas/updateSurvey.schema'
 import { EcanvasserApiService } from './ecanvasserAPI.service'
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000

@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { EcanvasserService } from './ecanvasser.service'
-import { CreateSurveySchema } from '../dto/createSurvey.schema'
-import { CreateSurveyQuestionSchema } from '../dto/createSurveyQuestion.schema'
-import { UpdateSurveyQuestionSchema } from '../dto/updateSurveyQuestion.schema'
-import { UpdateSurveySchema } from '../dto/updateSurvey.schema'
+import { CreateSurveySchema } from '../schemas/createSurvey.schema'
+import { CreateSurveyQuestionSchema } from '../schemas/createSurveyQuestion.schema'
+import { UpdateSurveyQuestionSchema } from '../schemas/updateSurveyQuestion.schema'
+import { UpdateSurveySchema } from '../schemas/updateSurvey.schema'
 import {
   ApiEcanvasserSurvey,
   ApiEcanvasserSurveyQuestion,
