@@ -10,16 +10,12 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CreateEcanvasserSchema } from '../dto/createEcanvasser.schema'
 import { UpdateEcanvasserSchema } from '../dto/updateEcanvasser.schema'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
-import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
 import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
 import slugify from 'slugify'
 import {
   EcanvasserSummary,
   ApiEcanvasserContact,
   ApiEcanvasserInteraction,
-  PaginationParams,
-  ApiResponse,
   EcanvasserSummaryResponse,
   ApiEcanvasserSurvey,
   ApiEcanvasserSurveyQuestion,
@@ -31,9 +27,8 @@ import { CreateSurveySchema } from '../dto/createSurvey.schema'
 import { CreateSurveyQuestionSchema } from '../dto/createSurveyQuestion.schema'
 import { UpdateSurveyQuestionSchema } from '../dto/updateSurveyQuestion.schema'
 import { UpdateSurveySchema } from '../dto/updateSurvey.schema'
-import { Methods } from 'http-constants-ts'
+import { EcanvasserApiService } from './ecanvasserAPI.service'
 
-const DEFAULT_PAGE_SIZE = 1000
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
 @Injectable()
@@ -44,7 +39,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
   constructor(
     @Inject(forwardRef(() => CampaignsService))
     private readonly campaignsService: CampaignsService,
-    private readonly httpService: HttpService,
+    private readonly ecanvasserApi: EcanvasserApiService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
     private slack: SlackService,
@@ -205,120 +200,6 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     })
   }
 
-  private async fetchFromApi<T>(
-    endpoint: string,
-    apiKey: string,
-    options: {
-      method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
-      data?: any
-      params?: PaginationParams
-    } = {},
-  ): Promise<ApiResponse<T>> {
-    try {
-      const { method = Methods.GET, data, params = {} } = options
-      const queryParams = new URLSearchParams()
-
-      if (params.limit) {
-        queryParams.append('limit', params.limit.toString())
-      }
-      if (params.order) {
-        queryParams.append('order', params.order)
-      }
-      if (params.after_id) {
-        queryParams.append('after_id', params.after_id.toString())
-      }
-      if (params.before_id) {
-        queryParams.append('before_id', params.before_id.toString())
-      }
-      if (params.start_date) {
-        queryParams.append('start_date', params.start_date)
-      }
-
-      const url = `${this.apiBaseUrl}${endpoint}${
-        queryParams.toString() ? `?${queryParams.toString()}` : ''
-      }`
-
-      const config = {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      }
-
-      let response
-      switch (method) {
-        case Methods.POST:
-          response = await lastValueFrom(
-            this.httpService.post(url, data, config),
-          )
-          break
-        case Methods.PUT:
-          response = await lastValueFrom(
-            this.httpService.put(url, data, config),
-          )
-          break
-        case Methods.DELETE:
-          response = await lastValueFrom(this.httpService.delete(url, config))
-          break
-        default:
-          response = await lastValueFrom(this.httpService.get(url, config))
-      }
-
-      return response.data as ApiResponse<T>
-    } catch (error) {
-      this.logger.error(
-        `Failed to ${options.method || Methods.GET} ${endpoint}`,
-        error,
-      )
-      throw new BadGatewayException('Failed to communicate with Ecanvasser API')
-    }
-  }
-
-  private async fetchAllPages<T>(
-    endpoint: string,
-    apiKey: string,
-    startDate?: Date,
-  ): Promise<T[]> {
-    const allData: T[] = []
-    let hasMore = true
-    let lastId: number | undefined
-
-    const params: PaginationParams = {
-      limit: DEFAULT_PAGE_SIZE,
-      order: 'asc',
-    }
-
-    if (startDate) {
-      params.start_date = startDate
-        .toISOString()
-        .replace('T', ' ')
-        .replace(/\.\d+Z$/, '')
-    }
-
-    while (hasMore) {
-      if (lastId) {
-        params.after_id = lastId
-      }
-
-      const response = await this.fetchFromApi<T>(endpoint, apiKey, { params })
-
-      if (!response.data.length) {
-        break
-      }
-
-      allData.push(...response.data)
-
-      if (response.meta.links.next) {
-        lastId = response.meta.ids.last
-      } else {
-        hasMore = false
-      }
-
-      await this.sleep(1000)
-    }
-
-    return allData
-  }
-
   async sync(campaignId: number, force?: boolean): Promise<Ecanvasser> {
     const ecanvasser = await this.findByCampaignId(campaignId)
 
@@ -337,23 +218,25 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     const startDate = ecanvasser.lastSync || undefined
 
     try {
-      const contacts = await this.fetchAllPages<ApiEcanvasserContact>(
-        '/contact',
-        ecanvasser.apiKey,
-        startDate,
-      )
+      const contacts =
+        await this.ecanvasserApi.fetchAllPages<ApiEcanvasserContact>(
+          '/contact',
+          ecanvasser.apiKey,
+          startDate,
+        )
 
-      const houses = await this.fetchAllPages<any>(
+      const houses = await this.ecanvasserApi.fetchAllPages<any>(
         '/house',
         ecanvasser.apiKey,
         startDate,
       )
 
-      const interactions = await this.fetchAllPages<ApiEcanvasserInteraction>(
-        '/interaction',
-        ecanvasser.apiKey,
-        startDate,
-      )
+      const interactions =
+        await this.ecanvasserApi.fetchAllPages<ApiEcanvasserInteraction>(
+          '/interaction',
+          ecanvasser.apiKey,
+          startDate,
+        )
 
       // Delete existing records only if we're doing a full sync
       if (!startDate) {
@@ -481,14 +364,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
           error,
         )
       }
-
-      // Wait before processing the next ecanvasser (rate limit is 300 requests per minute)
-      await this.sleep(5000)
     }
-  }
-
-  private async sleep(ms: number) {
-    await new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   async createSurvey(campaignId: number, createSurveyDto: CreateSurveySchema) {
@@ -506,14 +382,15 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     } as ApiEcanvasserSurvey
 
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
-        '/survey',
-        ecanvasser.apiKey,
-        {
-          method: 'POST',
-          data: payload,
-        },
-      )
+      const response =
+        await this.ecanvasserApi.fetchFromApi<ApiEcanvasserSurvey>(
+          '/survey',
+          ecanvasser.apiKey,
+          {
+            method: 'POST',
+            data: payload,
+          },
+        )
 
       return response.data
     } catch (error) {
@@ -529,10 +406,11 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
-        '/survey',
-        ecanvasser.apiKey,
-      )
+      const response =
+        await this.ecanvasserApi.fetchFromApi<ApiEcanvasserSurvey>(
+          '/survey',
+          ecanvasser.apiKey,
+        )
 
       return response.data
     } catch (error) {
@@ -562,14 +440,15 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
       answers: createQuestionDto.answers || undefined,
     }
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserSurveyQuestion>(
-        `/survey/question`,
-        ecanvasser.apiKey,
-        {
-          method: 'POST',
-          data: payload,
-        },
-      )
+      const response =
+        await this.ecanvasserApi.fetchFromApi<ApiEcanvasserSurveyQuestion>(
+          `/survey/question`,
+          ecanvasser.apiKey,
+          {
+            method: 'POST',
+            data: payload,
+          },
+        )
 
       return response.data
     } catch (error) {
@@ -587,10 +466,11 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
-        `/survey/${surveyId}`,
-        ecanvasser.apiKey,
-      )
+      const response =
+        await this.ecanvasserApi.fetchFromApi<ApiEcanvasserSurvey>(
+          `/survey/${surveyId}`,
+          ecanvasser.apiKey,
+        )
 
       return response.data
     } catch (error) {
@@ -606,7 +486,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserTeam>(
+      const response = await this.ecanvasserApi.fetchFromApi<ApiEcanvasserTeam>(
         '/team',
         ecanvasser.apiKey,
       )
@@ -625,7 +505,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi(
+      const response = await this.ecanvasserApi.fetchFromApi(
         `/survey/question/${questionId}`,
         ecanvasser.apiKey,
         {
@@ -649,10 +529,11 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserSurveyQuestion>(
-        `/survey/question/${questionId}`,
-        ecanvasser.apiKey,
-      )
+      const response =
+        await this.ecanvasserApi.fetchFromApi<ApiEcanvasserSurveyQuestion>(
+          `/survey/question/${questionId}`,
+          ecanvasser.apiKey,
+        )
 
       return response.data
     } catch (error) {
@@ -680,14 +561,15 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserSurveyQuestion>(
-        `/survey/question/${questionId}`,
-        ecanvasser.apiKey,
-        {
-          method: 'PUT',
-          data: payload,
-        },
-      )
+      const response =
+        await this.ecanvasserApi.fetchFromApi<ApiEcanvasserSurveyQuestion>(
+          `/survey/question/${questionId}`,
+          ecanvasser.apiKey,
+          {
+            method: 'PUT',
+            data: payload,
+          },
+        )
 
       return response.data
     } catch (error) {
@@ -709,14 +591,15 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi<ApiEcanvasserSurvey>(
-        `/survey/${surveyId}`,
-        ecanvasser.apiKey,
-        {
-          method: 'PUT',
-          data: updateSurveyDto,
-        },
-      )
+      const response =
+        await this.ecanvasserApi.fetchFromApi<ApiEcanvasserSurvey>(
+          `/survey/${surveyId}`,
+          ecanvasser.apiKey,
+          {
+            method: 'PUT',
+            data: updateSurveyDto,
+          },
+        )
 
       return response.data
     } catch (error) {
@@ -732,7 +615,7 @@ export class EcanvasserService extends createPrismaBase(MODELS.Ecanvasser) {
     }
 
     try {
-      const response = await this.fetchFromApi(
+      const response = await this.ecanvasserApi.fetchFromApi(
         `/survey/${surveyId}`,
         ecanvasser.apiKey,
         {
