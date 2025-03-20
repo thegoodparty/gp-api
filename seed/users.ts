@@ -8,7 +8,7 @@ const ADMIN_STRIPE_CUSTOMER_ID = 'cus_RWKP2JnywRA590'
 
 const ADMIN_FIRST_NAME = 'Tyler'
 const ADMIN_LAST_NAME = 'Durden'
-const ADMIN_USER = {
+export const ADMIN_USER = {
   email: 'tyler@fightclub.org',
   password: hashPasswordSync('no1TalksAboutFightClub'),
   hasPassword: true,

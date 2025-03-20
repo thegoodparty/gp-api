@@ -1,4 +1,4 @@
-import { Global, Module, forwardRef } from '@nestjs/common'
+import { forwardRef, Global, Module } from '@nestjs/common'
 import { CampaignsController } from './campaigns.controller'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignMapController } from './map/campaignMap.controller'
@@ -16,7 +16,7 @@ import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
-import { EcanvasserModule } from '../ecanvasser/ecanvasser.module'
+import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasserIntegration.module'
 
 @Global()
 @Module({
@@ -27,7 +27,7 @@ import { EcanvasserModule } from '../ecanvasser/ecanvasser.module'
     FullStoryModule,
     ElectionsModule,
     PathToVictoryModule,
-    forwardRef(() => EcanvasserModule),
+    forwardRef(() => EcanvasserIntegrationModule),
   ],
   controllers: [
     CampaignsController,

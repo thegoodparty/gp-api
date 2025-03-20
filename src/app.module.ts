@@ -21,7 +21,7 @@ import { VotersModule } from './voters/voters.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
-import { EcanvasserModule } from './ecanvasser/ecanvasser.module'
+import { EcanvasserIntegrationModule } from './ecanvasserIntegration/ecanvasserIntegration.module'
 import { SessionsService } from './users/services/sessions.service'
 
 @Module({
@@ -45,7 +45,7 @@ import { SessionsService } from './users/services/sessions.service'
     ErrorLoggerModule,
     CrmModule,
     SubscribeModule,
-    EcanvasserModule,
+    EcanvasserIntegrationModule,
   ],
   providers: [
     SessionsService,

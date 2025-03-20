@@ -24,7 +24,8 @@ import { FullStoryService } from '../../fullStory/fullStory.service'
 import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { EcanvasserService } from '../../ecanvasser/services/ecanvasser.service'
+import { EcanvasserIntegrationService } from '../../ecanvasserIntegration/services/ecanvasserIntegration.service'
+
 export const HUBSPOT_COMPANY_PROPERTIES = [
   'past_candidate',
   'incumbent',
@@ -78,7 +79,7 @@ export class CrmCampaignsService {
     private readonly campaignUpdateHistory: CampaignUpdateHistoryService,
     private readonly voterFile: VoterFileDownloadAccessService,
     private readonly slack: SlackService,
-    private readonly ecanvasser: EcanvasserService,
+    private readonly ecanvasser: EcanvasserIntegrationService,
   ) {}
 
   async getCrmCompanyById(hubspotId: string) {

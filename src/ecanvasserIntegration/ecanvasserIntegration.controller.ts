@@ -10,7 +10,7 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common'
-import { EcanvasserService } from './services/ecanvasser.service'
+import { EcanvasserIntegrationService } from './services/ecanvasserIntegration.service'
 import { SurveyService } from './services/survey.service'
 import { CreateEcanvasserSchema } from './schemas/createEcanvasser.schema'
 import { UpdateEcanvasserSchema } from './schemas/updateEcanvasser.schema'
@@ -26,9 +26,9 @@ import { UpdateSurveyQuestionSchema } from './schemas/updateSurveyQuestion.schem
 import { UpdateSurveySchema } from './schemas/updateSurvey.schema'
 
 @Controller('ecanvasser')
-export class EcanvasserController {
+export class EcanvasserIntegrationController {
   constructor(
-    private readonly ecanvasserService: EcanvasserService,
+    private readonly ecanvasserService: EcanvasserIntegrationService,
     private readonly surveyService: SurveyService,
   ) {}
 
