@@ -74,7 +74,7 @@ export class EmailService {
       `${WEBAPP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
-    const subject = 'Reset your password - The Good Party'
+    const subject = 'Reset your password - GoodParty.org'
     const message = getRecoverPasswordEmailContent(name, link)
 
     return await this.sendEmail({ to: user.email, subject, message })
