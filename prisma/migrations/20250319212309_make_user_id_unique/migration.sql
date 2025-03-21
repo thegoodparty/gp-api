@@ -5,4 +5,4 @@
 
 */
 -- CreateIndex
-CREATE UNIQUE INDEX "campaign_user_id_key" ON "campaign"("user_id");
+-- CREATE UNIQUE INDEX "campaign_user_id_key" ON "campaign"("user_id");
