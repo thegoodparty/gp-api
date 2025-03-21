@@ -4,9 +4,10 @@ import {
   Get,
   NotFoundException,
   Param,
+  Query,
 } from '@nestjs/common'
 import { ContentService } from './services/content.service'
-import { ContentType } from '@prisma/client'
+import { ContentType, Prisma } from '@prisma/client'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
@@ -123,11 +124,32 @@ export class ContentController {
     return article
   }
 
-  @Get('blog-articles/by-section/:sectionSlug')
+  @Get('blog-articles')
+  async listBlogArticleSummaries(args?: Prisma.BlogArticleMetaDefaultArgs) {
+    return this.blogArticleMetaService.findMany({
+      orderBy: {
+        publishDate: 'desc',
+      },
+      take: 1,
+    })
+  }
+
+  @Get(['blog-articles/by-section/:sectionSlug', 'blog-articles/by-section'])
   async listBlogArticleSummariesBySection(
     @Param('sectionSlug') sectionSlug?: string,
+    @Query('limit') limit?: number, // Limit articles per section
   ) {
-    return this.blogArticleMetaService.listArticlesBySection(sectionSlug)
+    return this.blogArticleMetaService.listArticlesBySection(sectionSlug, limit)
+  }
+
+  @Get('blog-articles/sections')
+  async getBlogArticleSections() {
+    return this.blogArticleMetaService.listArticleSections()
+  }
+
+  @Get('blog-articles/sections/:sectionSlug')
+  async getBlogArticleSectionBySlug(@Param('sectionSlug') sectionSlug: string) {
+    return this.blogArticleMetaService.getBlogArticleSectionBySlug(sectionSlug)
   }
 
   @Get('article-tags')

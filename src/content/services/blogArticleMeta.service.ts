@@ -2,13 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { addDays } from 'date-fns'
-import { BlogArticleMeta } from '@prisma/client'
+import { BlogArticleMeta, Prisma } from '@prisma/client'
 import {
   BlogArticlesSectionAugmented,
   SpecificSectionResponseDatum,
 } from '../content.types'
 import { generateAllSectionsResponseData } from '../util/generateAllSectionsResponseData'
-import * as assert from 'node:assert'
 
 @Injectable()
 export class BlogArticleMetaService extends createPrismaBase(
@@ -101,7 +100,11 @@ export class BlogArticleMetaService extends createPrismaBase(
       : generateAllSectionsResponseData(augmentedSections, blogArticleMetas)
   }
 
-  async listArticlesBySection(sectionSlug?: string) {
+  async listBlogArticleSummaries(args?: Prisma.BlogArticleMetaDefaultArgs) {
+    return this.model.findMany(args)
+  }
+
+  async listArticlesBySection(sectionSlug?: string, limit?: number) {
     const blogArticleMetas = await this.model.findMany({
       ...(sectionSlug
         ? {
@@ -114,22 +117,55 @@ export class BlogArticleMetaService extends createPrismaBase(
           }
         : {}),
       orderBy: {
-        contentId: 'desc',
+        publishDate: 'desc',
       },
     })
 
-    this.logger.debug(
-      'assertion:',
-      assert.ok(
-        blogArticleMetas.every(
-          (meta) => meta.section.fields.slug === sectionSlug,
-        ),
-        'All blog article metas should have section',
-      ),
-    )
-
-    return {}
+    return mapBlogArticlesToSections(blogArticleMetas, limit)
   }
+
+  async listArticleSections() {
+    return (
+      await this.model.findMany({
+        distinct: ['section'],
+        select: {
+          section: true,
+        },
+      })
+    ).map(({ section }) => section)
+  }
+
+  async getBlogArticleSectionBySlug(sectionSlug: string) {
+    return (
+      await this.model.findFirstOrThrow({
+        select: {
+          section: true,
+        },
+        where: {
+          section: {
+            path: ['fields', 'slug'],
+            equals: sectionSlug,
+          },
+        },
+      })
+    ).section
+  }
+}
+
+const mapBlogArticlesToSections = (
+  articles: BlogArticleMeta[],
+  limit?: number,
+) => {
+  return Object.fromEntries(
+    articles.reduce((acc, curr) => {
+      const currentSectionSlug = curr.section.fields.slug
+      return acc.set(currentSectionSlug, [
+        ...(acc.has(currentSectionSlug)
+          ? [...(acc.get(currentSectionSlug) || []), curr].slice(0, limit)
+          : [curr]),
+      ])
+    }, new Map<string, BlogArticleMeta[]>()),
+  )
 }
 
 const generateSpecificSectionResponseData = (
