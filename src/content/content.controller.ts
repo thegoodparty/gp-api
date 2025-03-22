@@ -4,10 +4,11 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseIntPipe,
   Query,
 } from '@nestjs/common'
 import { ContentService } from './services/content.service'
-import { ContentType, Prisma } from '@prisma/client'
+import { ContentType } from '@prisma/client'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
@@ -90,16 +91,6 @@ export class ContentController {
     }
   }
 
-  @Get('blog-articles-by-section/:sectionSlug')
-  async findBlogArticlesBySection(@Param('sectionSlug') sectionSlug: string) {
-    return this.blogArticleMetaService.findBlogArticlesBySection(sectionSlug)
-  }
-
-  @Get('blog-articles-by-section')
-  async listBlogArticlesBySection() {
-    return await this.blogArticleMetaService.findBlogArticlesBySection()
-  }
-
   @Get('blog-articles-by-tag/:tag')
   async findBlogArticlesByTag(@Param('tag') tag: string) {
     return this.blogArticleMetaService.findBlogArticlesByTag(tag)
@@ -125,12 +116,14 @@ export class ContentController {
   }
 
   @Get('blog-articles')
-  async listBlogArticleSummaries(args?: Prisma.BlogArticleMetaDefaultArgs) {
+  async listBlogArticleSummaries(
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
     return this.blogArticleMetaService.findMany({
       orderBy: {
         publishDate: 'desc',
       },
-      take: 1,
+      ...(limit ? { take: limit } : {}),
     })
   }
 
