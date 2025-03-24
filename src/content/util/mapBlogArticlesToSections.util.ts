@@ -7,11 +7,10 @@ export const mapBlogArticlesToSections = (
   return Object.fromEntries(
     articles.reduce((acc, curr) => {
       const currentSectionSlug = curr.section.fields.slug
-      return acc.set(currentSectionSlug, [
-        ...(acc.has(currentSectionSlug)
-          ? [...(acc.get(currentSectionSlug) || []), curr].slice(0, limit)
-          : [curr]),
-      ])
+      const existingSection = acc.get(currentSectionSlug) || []
+      const sectionArticles = [...existingSection, curr].slice(0, limit)
+
+      return acc.set(currentSectionSlug, sectionArticles)
     }, new Map<string, BlogArticleMeta[]>()),
   )
 }
