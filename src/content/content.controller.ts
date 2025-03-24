@@ -130,7 +130,7 @@ export class ContentController {
   @Get(['blog-articles/by-section/:sectionSlug', 'blog-articles/by-section'])
   async listBlogArticleSummariesBySection(
     @Param('sectionSlug') sectionSlug?: string,
-    @Query('limit') limit?: number, // Limit articles per section
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number, // Limit articles per section
   ) {
     return this.blogArticleMetaService.listArticlesBySection(sectionSlug, limit)
   }
