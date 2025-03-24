@@ -283,7 +283,7 @@ function customFiltersToQuery(filters: CustomFilter[]) {
           '("Voters_Age"::integer > 35 AND "Voters_Age"::integer <= 50)',
         )
         break
-      case 'age_50+':
+      case 'age_50_plus':
         filterConditions.age.push('"Voters_Age"::integer > 50')
         break
       case 'gender_male':

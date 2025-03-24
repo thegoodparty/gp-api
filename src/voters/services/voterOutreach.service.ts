@@ -18,6 +18,7 @@ import {
   SlackMessageType,
 } from 'src/shared/services/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { TextCampaignService } from 'src/textCampaign/services/textCampaign.service'
 
 @Injectable()
 export class VoterOutreachService {
@@ -28,6 +29,7 @@ export class VoterOutreachService {
     private readonly filesService: FilesService,
     private readonly campaignsService: CampaignsService,
     private readonly crmCampaigns: CrmCampaignsService,
+    private readonly textCampaignService: TextCampaignService,
   ) {}
 
   async scheduleOutreachCampaign(
@@ -122,6 +124,28 @@ export class VoterOutreachService {
       formattedAudience,
       audienceRequest: audience['audience_request'],
     })
+
+    // If type is SMS, create a TextCampaign
+    if (type === 'sms') {
+      try {
+        await this.textCampaignService.createTextCampaign(
+          campaign.id,
+          `SMS Campaign ${new Date(date).toLocaleDateString()}`,
+          message,
+          audience,
+          messagingScript,
+          new Date(date),
+          imageUrl,
+        )
+
+        this.logger.log(`Created TextCampaign for campaign ${campaign.id}`)
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to create TextCampaign: ${error.message}`,
+          error.stack,
+        )
+      }
+    }
 
     await this.slack.message(
       slackBlocks,
