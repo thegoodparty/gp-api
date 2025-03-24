@@ -28,13 +28,30 @@ jobs:
       - name: Login to Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
-      # Run Postman collections
+      # Run Postman collections with debug output
       - name: Run Postman Collections
         env:
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
-          postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
-          postman collection run ${{ secrets.AUTH_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
-          postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
-          # ... add more collections as needed
+          echo "Testing with email: $ADMIN_EMAIL"
+          
+          # Run collections with verbose output
+          postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
+            --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
+            --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" \
+            --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD" \
+            -v
+
+          # Only run other collections if first one succeeds
+          if [ $? -eq 0 ]; then
+            postman collection run ${{ secrets.AUTH_COLLECTION_ID }} \
+              --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
+              --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" \
+              --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
+            
+            postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} \
+              --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
+              --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" \
+              --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
+          fi
