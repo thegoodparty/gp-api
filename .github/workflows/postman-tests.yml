@@ -32,24 +32,25 @@ jobs:
       - name: Create Test Environment
         run: |
           # Create environment file with all variables
-          echo '{
+          cat > test_env.json << 'EOF'
+          {
             "name": "CI Environment",
             "values": [
               {
                 "key": "protocol",
-                "value": "http",
+                "value": "https",
                 "type": "default",
                 "enabled": true
               },
               {
                 "key": "host",
-                "value": "localhost",
+                "value": "gp-api-dev.goodparty.org",
                 "type": "default",
                 "enabled": true
               },
               {
                 "key": "port",
-                "value": ":3000",
+                "value": "",
                 "type": "default",
                 "enabled": true
               },
@@ -78,11 +79,14 @@ jobs:
                 "enabled": true
               }
             ]
-          }' > test_env.json
-          
-          # Create new environment and store its ID
-          ENV_ID=$(postman environment create -f test_env.json | jq -r '.environment.id')
-          echo "POSTMAN_TEST_ENV_ID=$ENV_ID" >> $GITHUB_ENV
+          }
+          EOF
+
+          # Create new environment
+          postman api create-environment \
+            --workspace ${{ secrets.POSTMAN_WORKSPACE_ID }} \
+            --name "CI Environment" \
+            --file test_env.json
 
       # Run Postman collections with debug output
       - name: Run Postman Collections
@@ -91,5 +95,5 @@ jobs:
           
           # Run collections with verbose output
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
-            --environment $POSTMAN_TEST_ENV_ID \
+            --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
             --verbose
