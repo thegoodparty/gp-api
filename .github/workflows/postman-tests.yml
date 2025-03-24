@@ -30,6 +30,7 @@ jobs:
 
       # Create environment file for tests
       - name: Create Test Environment
+        id: create_env
         run: |
           # Create environment file with all variables
           cat > test_env.json << 'EOF'
@@ -83,15 +84,21 @@ jobs:
           EOF
 
           # Create new environment and capture its ID
-          ENV_ID=$(postman environment import test_env.json | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+          RESPONSE=$(postman environment import test_env.json)
+          echo "Response from import: $RESPONSE"
+          ENV_ID=$(echo "$RESPONSE" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+          echo "Environment ID: $ENV_ID"
           echo "POSTMAN_TEST_ENV_ID=$ENV_ID" >> $GITHUB_ENV
 
       # Run Postman collections with debug output
       - name: Run Postman Collections
+        env:
+          POSTMAN_TEST_ENV_ID: ${{ env.POSTMAN_TEST_ENV_ID }}
         run: |
           echo "Testing with email: ${{ secrets.ADMIN_EMAIL }}"
+          echo "Using environment ID: $POSTMAN_TEST_ENV_ID"
           
           # Run collections with verbose output
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
-            --environment $POSTMAN_TEST_ENV_ID \
+            --environment "$POSTMAN_TEST_ENV_ID" \
             --verbose
