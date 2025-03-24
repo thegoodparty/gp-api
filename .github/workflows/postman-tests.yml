@@ -28,32 +28,34 @@ jobs:
       - name: Login to Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
+      # Update environment variables before running tests
+      - name: Update Postman Environment
+        run: |
+          # Create a temporary environment file
+          echo '{
+            "values": [
+              {
+                "key": "testAdminUserEmail",
+                "value": "${{ secrets.ADMIN_EMAIL }}",
+                "enabled": true
+              },
+              {
+                "key": "testUserPassword",
+                "value": "${{ secrets.ADMIN_PASSWORD }}",
+                "enabled": true
+              }
+            ]
+          }' > updated_env.json
+          
+          # Update the environment in Postman
+          postman environment update ${{ secrets.POSTMAN_ENVIRONMENT_ID }} -f updated_env.json
+
       # Run Postman collections with debug output
       - name: Run Postman Collections
-        env:
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
-          echo "Testing with email: $ADMIN_EMAIL"
+          echo "Testing with email: ${{ secrets.ADMIN_EMAIL }}"
           
           # Run collections with verbose output
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
             --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-            --global-var "testAdminUserEmail=$ADMIN_EMAIL" \
-            --global-var "testUserPassword=$ADMIN_PASSWORD" \
             --verbose
-
-          # Only run other collections if first one succeeds
-          if [ $? -eq 0 ]; then
-            postman collection run ${{ secrets.AUTH_COLLECTION_ID }} \
-              --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-              --global-var "testAdminUserEmail=$ADMIN_EMAIL" \
-              --global-var "testUserPassword=$ADMIN_PASSWORD" \
-              --verbose
-
-            postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} \
-              --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-              --global-var "testAdminUserEmail=$ADMIN_EMAIL" \
-              --global-var "testUserPassword=$ADMIN_PASSWORD" \
-              --verbose
-          fi
