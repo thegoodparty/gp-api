@@ -19,16 +19,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Set up Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
+      # Install Postman CLI
+      - name: Install Postman CLI
+        run: |
+          curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
 
-      # Install newman
-      - name: Install Newman
-        run: npm install -g newman
+      # Login to Postman CLI using API key
+      - name: Login to Postman CLI
+        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
-      # Run Postman collection
-      - name: Run Postman Collection
-        run: newman run postman/health.json -e postman/environment.json
+      # Run Postman collections
+      - name: Run Postman Collections
+        run: |
+          postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }}
+          postman collection run ${{ secrets.AUTH_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }}
+          postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }}
+          # ... add more collections as needed
