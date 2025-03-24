@@ -1,0 +1,25 @@
+enum TextCampaignStatus {
+    pending
+    approved
+    denied
+}
+
+model TextCampaign {
+    id         Int                @id @default(autoincrement())
+    campaign   Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+    campaignId Int
+    projectId  String?
+    name       String?
+    message    String?
+    status     TextCampaignStatus @default(pending)
+    error      String?
+    audience   Json?              @db.JsonB
+    script     String?            @db.Text
+    date       DateTime?
+    imageUrl   String?
+    createdAt  DateTime           @default(now())
+    updatedAt  DateTime           @updatedAt
+
+    @@index([campaignId])
+    @@map("text_campaign")
+}

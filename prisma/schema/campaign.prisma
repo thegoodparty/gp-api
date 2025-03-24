@@ -32,6 +32,7 @@ model Campaign {
   campaignPlanVersion   CampaignPlanVersion?
   aiChats               AiChat[]
   ecanvasser            Ecanvasser?
+  textCampaigns         TextCampaign[]
 
   @@index([slug])
   @@map("campaign")

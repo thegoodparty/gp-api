@@ -47,6 +47,7 @@ export const CUSTOM_FILTERS = [
   'gender_male',
   'gender_female',
   'gender_unknown',
+  'audience_request',
 ] as const
 
 export const CUSTOM_PURPOSES = ['GOTV', 'Persuasion', 'Voter ID'] as const

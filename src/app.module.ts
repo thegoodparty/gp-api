@@ -22,6 +22,7 @@ import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
 import { EcanvasserIntegrationModule } from './ecanvasserIntegration/ecanvasserIntegration.module'
+import { TextCampaignModule } from './textCampaign/textCampaign.module'
 import { SessionsService } from './users/services/sessions.service'
 
 @Module({
@@ -46,6 +47,7 @@ import { SessionsService } from './users/services/sessions.service'
     CrmModule,
     SubscribeModule,
     EcanvasserIntegrationModule,
+    TextCampaignModule,
   ],
   providers: [
     SessionsService,
