@@ -39,21 +39,21 @@ jobs:
           # Run collections with verbose output
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
             --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-            --env-var "email=$ADMIN_EMAIL" \
-            --env-var "password=$ADMIN_PASSWORD" \
+            --global-var "testAdminUserEmail=$ADMIN_EMAIL" \
+            --global-var "testUserPassword=$ADMIN_PASSWORD" \
             --verbose
 
           # Only run other collections if first one succeeds
           if [ $? -eq 0 ]; then
             postman collection run ${{ secrets.AUTH_COLLECTION_ID }} \
               --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-              --env-var "email=$ADMIN_EMAIL" \
-              --env-var "password=$ADMIN_PASSWORD" \
+              --global-var "testAdminUserEmail=$ADMIN_EMAIL" \
+              --global-var "testUserPassword=$ADMIN_PASSWORD" \
               --verbose
 
             postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} \
               --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-              --env-var "email=$ADMIN_EMAIL" \
-              --env-var "password=$ADMIN_PASSWORD" \
+              --global-var "testAdminUserEmail=$ADMIN_EMAIL" \
+              --global-var "testUserPassword=$ADMIN_PASSWORD" \
               --verbose
           fi
