@@ -82,11 +82,9 @@ jobs:
           }
           EOF
 
-          # Create new environment
-          postman api create-environment \
-            --workspace ${{ secrets.POSTMAN_WORKSPACE_ID }} \
-            --name "CI Environment" \
-            --file test_env.json
+          # Create new environment and capture its ID
+          ENV_ID=$(postman environment import test_env.json | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+          echo "POSTMAN_TEST_ENV_ID=$ENV_ID" >> $GITHUB_ENV
 
       # Run Postman collections with debug output
       - name: Run Postman Collections
@@ -95,5 +93,5 @@ jobs:
           
           # Run collections with verbose output
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
-            --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
+            --environment $POSTMAN_TEST_ENV_ID \
             --verbose
