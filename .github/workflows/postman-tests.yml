@@ -36,22 +36,25 @@ jobs:
         run: |
           echo "Testing with email: $ADMIN_EMAIL"
           
-          # Run collections with verbose output
+          # Run collections with verbose output and cookie handling
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
             --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-            --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" \
-            --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD" \
+            --env-var "email=$ADMIN_EMAIL" \
+            --env-var "password=$ADMIN_PASSWORD" \
+            --cookie-jar cookies.txt \
             -v
 
           # Only run other collections if first one succeeds
           if [ $? -eq 0 ]; then
             postman collection run ${{ secrets.AUTH_COLLECTION_ID }} \
               --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-              --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" \
-              --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
-            
+              --env-var "email=$ADMIN_EMAIL" \
+              --env-var "password=$ADMIN_PASSWORD" \
+              --cookie-jar cookies.txt
+
             postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} \
               --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
-              --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" \
-              --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
+              --env-var "email=$ADMIN_EMAIL" \
+              --env-var "password=$ADMIN_PASSWORD" \
+              --cookie-jar cookies.txt
           fi
