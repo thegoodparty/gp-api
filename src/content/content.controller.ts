@@ -4,6 +4,8 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseIntPipe,
+  Query,
 } from '@nestjs/common'
 import { ContentService } from './services/content.service'
 import { ContentType } from '@prisma/client'
@@ -89,16 +91,6 @@ export class ContentController {
     }
   }
 
-  @Get('blog-articles-by-section/:sectionSlug')
-  async findBlogArticlesBySection(@Param('sectionSlug') sectionSlug: string) {
-    return this.blogArticleMetaService.findBlogArticlesBySection(sectionSlug)
-  }
-
-  @Get('blog-articles-by-section')
-  async listBlogArticlesBySection() {
-    return await this.blogArticleMetaService.findBlogArticlesBySection()
-  }
-
   @Get('blog-articles-by-tag/:tag')
   async findBlogArticlesByTag(@Param('tag') tag: string) {
     return this.blogArticleMetaService.findBlogArticlesByTag(tag)
@@ -121,6 +113,36 @@ export class ContentController {
       throw new NotFoundException(`Article with slug ${slug} not found`)
     }
     return article
+  }
+
+  @Get('blog-articles')
+  async listBlogArticleSummaries(
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return this.blogArticleMetaService.findMany({
+      orderBy: {
+        publishDate: 'desc',
+      },
+      ...(limit ? { take: limit } : {}),
+    })
+  }
+
+  @Get(['blog-articles/by-section/:sectionSlug', 'blog-articles/by-section'])
+  async listBlogArticleSummariesBySection(
+    @Param('sectionSlug') sectionSlug?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number, // Limit articles per section
+  ) {
+    return this.blogArticleMetaService.listArticlesBySection(sectionSlug, limit)
+  }
+
+  @Get('blog-articles/sections')
+  async getBlogArticleSections() {
+    return this.blogArticleMetaService.listArticleSections()
+  }
+
+  @Get('blog-articles/sections/:sectionSlug')
+  async getBlogArticleSectionBySlug(@Param('sectionSlug') sectionSlug: string) {
+    return this.blogArticleMetaService.getBlogArticleSectionBySlug(sectionSlug)
   }
 
   @Get('article-tags')
