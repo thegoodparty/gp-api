@@ -28,27 +28,61 @@ jobs:
       - name: Login to Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
-      # Update environment variables before running tests
-      - name: Update Postman Environment
+      # Create environment file for tests
+      - name: Create Test Environment
         run: |
-          # Create a temporary environment file
+          # Create environment file with all variables
           echo '{
+            "name": "CI Environment",
             "values": [
+              {
+                "key": "protocol",
+                "value": "http",
+                "type": "default",
+                "enabled": true
+              },
+              {
+                "key": "host",
+                "value": "localhost",
+                "type": "default",
+                "enabled": true
+              },
+              {
+                "key": "port",
+                "value": ":3000",
+                "type": "default",
+                "enabled": true
+              },
+              {
+                "key": "rootPath",
+                "value": "/v1",
+                "type": "default",
+                "enabled": true
+              },
+              {
+                "key": "rootUrl",
+                "value": "{{protocol}}://{{host}}{{port}}{{rootPath}}",
+                "type": "default",
+                "enabled": true
+              },
               {
                 "key": "testAdminUserEmail",
                 "value": "${{ secrets.ADMIN_EMAIL }}",
+                "type": "default",
                 "enabled": true
               },
               {
                 "key": "testUserPassword",
                 "value": "${{ secrets.ADMIN_PASSWORD }}",
+                "type": "default",
                 "enabled": true
               }
             ]
-          }' > updated_env.json
+          }' > test_env.json
           
-          # Update the environment in Postman
-          postman environment update ${{ secrets.POSTMAN_ENVIRONMENT_ID }} -f updated_env.json
+          # Create new environment and store its ID
+          ENV_ID=$(postman environment create -f test_env.json | jq -r '.environment.id')
+          echo "POSTMAN_TEST_ENV_ID=$ENV_ID" >> $GITHUB_ENV
 
       # Run Postman collections with debug output
       - name: Run Postman Collections
@@ -57,5 +91,5 @@ jobs:
           
           # Run collections with verbose output
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
-            --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
+            --environment $POSTMAN_TEST_ENV_ID \
             --verbose
