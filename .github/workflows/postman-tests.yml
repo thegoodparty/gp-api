@@ -28,9 +28,9 @@ jobs:
       - name: Login to Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
-      # Create cookie jar file
+      # Create cookie jar file with empty JSON array
       - name: Create cookie jar
-        run: touch cookies.txt
+        run: echo "[]" > cookies.txt
 
       # Run Postman collections with debug output
       - name: Run Postman Collections
