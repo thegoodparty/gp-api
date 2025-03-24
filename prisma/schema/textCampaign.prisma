@@ -2,6 +2,9 @@ enum TextCampaignStatus {
     pending
     approved
     denied
+    paid
+    in_progress
+    completed
 }
 
 model TextCampaign {
