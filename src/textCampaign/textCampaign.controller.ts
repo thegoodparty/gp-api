@@ -18,7 +18,7 @@ export class TextCampaignController {
     return this.textCampaignService.createProject(campaign.id, createProjectDto)
   }
 
-  @Get()
+  @Get('text-campaigns')
   @UseCampaign()
   findAll(@ReqCampaign() campaign: Campaign) {
     return this.textCampaignService.findByCampaignId(campaign.id)
