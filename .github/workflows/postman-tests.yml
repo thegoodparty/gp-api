@@ -28,10 +28,6 @@ jobs:
       - name: Login to Postman CLI
         run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
 
-      # Create cookie jar file with empty JSON array
-      - name: Create cookie jar
-        run: echo "[]" > cookies.txt
-
       # Run Postman collections with debug output
       - name: Run Postman Collections
         env:
@@ -40,13 +36,12 @@ jobs:
         run: |
           echo "Testing with email: $ADMIN_EMAIL"
           
-          # Run collections with verbose output and cookie handling
+          # Run collections with verbose output
           postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
             --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
             --env-var "email=$ADMIN_EMAIL" \
             --env-var "password=$ADMIN_PASSWORD" \
-            --cookie-jar cookies.txt \
-            -v
+            --verbose
 
           # Only run other collections if first one succeeds
           if [ $? -eq 0 ]; then
@@ -54,11 +49,11 @@ jobs:
               --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
               --env-var "email=$ADMIN_EMAIL" \
               --env-var "password=$ADMIN_PASSWORD" \
-              --cookie-jar cookies.txt
+              --verbose
 
             postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} \
               --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
               --env-var "email=$ADMIN_EMAIL" \
               --env-var "password=$ADMIN_PASSWORD" \
-              --cookie-jar cookies.txt
+              --verbose
           fi
