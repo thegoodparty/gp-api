@@ -28,7 +28,7 @@ import {
 } from './fullStory.types'
 import { reduce as reduceAsync } from 'async'
 import Bottleneck from 'bottleneck'
-import { CRMCompanyProperties, PrimaryElectionResult } from '../crm/crm.types'
+import { PrimaryElectionResult } from '../crm/crm.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 
@@ -115,8 +115,7 @@ export class FullStoryService {
     } = {
       primary_election_result: PrimaryElectionResult.WON,
       election_results: 'Won General',
-    } as CRMCompanyProperties
-
+    }
     const { answeredQuestions } = countAnsweredQuestions(
       campaign,
       campaign.campaignPositions,

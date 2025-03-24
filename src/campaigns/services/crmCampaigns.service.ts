@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import usStates from 'states-us'
-import { CRMCompanyProperties } from '../../crm/crm.types'
+import { HubSpot } from '../../crm/crm.types'
 import {
   ApiException,
   SimplePublicObject,
@@ -11,7 +11,7 @@ import { CampaignsService } from './campaigns.service'
 import { SlackService } from '../../shared/services/slack.service'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { getUserFullName } from '../../users/util/users.util'
-import { formatDateForCRM, getCrmP2VValues } from '../../crm/util/cms.util'
+import { formatDateForCRM } from '../../crm/util/cms.util'
 import { CrmUsersService } from '../../users/services/crmUsers.service'
 import { UsersService } from '../../users/services/users.service'
 import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4/models/AssociationSpec'
@@ -25,26 +25,12 @@ import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { EcanvasserIntegrationService } from '../../ecanvasserIntegration/services/ecanvasserIntegration.service'
+import {
+  CRMCompanyPropertiesSchema,
+  CRMCompanyProperties,
+} from 'src/crm/schemas/CRMCompanyProperties.schema'
 
-export const HUBSPOT_COMPANY_PROPERTIES = [
-  'past_candidate',
-  'incumbent',
-  'candidate_experience_level',
-  'final_viability_rating',
-  'primary_election_result',
-  'election_results',
-  'professional_experience',
-  'p2p_campaigns',
-  'p2p_sent',
-  'confirmed_self_filer',
-  'verified_candidates',
-  'date_verified',
-  'pro_candidate',
-  'filing_deadline',
-  'number_of_opponents',
-  'hubspot_owner_id',
-  'office_type',
-]
+const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 
 /// map of emails to slack ids for mentioning users
 const EMAIL_TO_SLACK_ID = {
@@ -145,14 +131,14 @@ export class CrmCampaignsService {
     } catch (error) {
       this.logger.error('error creating company', error)
       this.slack.errorMessage({
-        message: `Error creating company for ${companyObj.name} in hubspot`,
+        message: `Error creating company for ${companyObj.candidate_name} in hubspot`,
         error,
       })
     }
 
     if (!crmCompany) {
       this.slack.errorMessage({
-        message: `Error creating company for ${companyObj.name} in hubspot. No response from hubspot.`,
+        message: `Error creating company for ${companyObj.candidate_name} in hubspot. No response from hubspot.`,
       })
       return
     }
@@ -173,7 +159,7 @@ export class CrmCampaignsService {
         { properties: crmCompanyProperties },
       )
     } catch (e) {
-      const { name } = crmCompanyProperties
+      const { candidate_name: name } = crmCompanyProperties
       this.logger.error('error updating crm', e)
       if (e instanceof ApiException && e.code === 404) {
         this.slack.errorMessage({
@@ -215,7 +201,8 @@ export class CrmCampaignsService {
       userId,
       id: campaignId,
     } = campaign || {}
-    const user = (await this.users.findByCampaign(campaign)) || {}
+    const user: User =
+      (await this.users.findByCampaign(campaign)) || ({} as User)
     const aiChatCount = userId
       ? await this.aiChat.count({ where: { id: userId } })
       : 0
@@ -274,6 +261,8 @@ export class CrmCampaignsService {
       pathToVictory,
     })
 
+    const lastPortalVisit = formatDateForCRM(user.metaData?.lastVisited)
+    const sessionCount = user.metaData?.sessionCount
     const name = getUserFullName(user as User)
 
     const electionDateMs = formatDateForCRM(electionDate)
@@ -282,18 +271,15 @@ export class CrmCampaignsService {
     const p2vCompleteDateMs = formatDateForCRM(p2vCompleteDate)
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
-
+    const lastStepDateMs = formatDateForCRM(lastStepDate)
     const resolvedOffice = office === 'Other' ? otherOffice : office
 
     const longState = usStates.find(
       (usState) => usState.abbreviation === state?.toUpperCase(),
     )?.name
 
-    const proSubscriptionStatus = campaign.isPro
-      ? 'Active'
-      : subscriptionCanceledAt
-        ? 'Canceled'
-        : 'Inactive'
+    // TODO: need to figure out what to do with this in HS
+    const proSubscriptionStatus = campaign.isPro ? 'Active' : 'Inactive'
 
     const p2v_status =
       p2vNotNeeded || !p2vStatus
@@ -312,84 +298,71 @@ export class CrmCampaignsService {
       ecanvasserInteractionsCount = interactions.length
     }
 
-    const properties: CRMCompanyProperties = {
-      name,
-      candidate_party: party,
-      candidate_office: resolvedOffice,
-      state: longState,
-      candidate_state: longState,
+    const fieldsToSync = {
+      // voter contact numbers
+      calls_made: reportedVoterGoals?.calls,
+      direct_mail_sent: reportedVoterGoals?.directMail,
+      event_impressions: reportedVoterGoals?.events,
+      knocked_doors: reportedVoterGoals?.doorKnocking,
+      doors_knocked: reportedVoterGoals?.doorKnocking, // TODO: remove one of these duped doorknock fields
+      online_impressions: reportedVoterGoals?.digitalAds,
+      yard_signs_impressions: reportedVoterGoals?.yardSigns,
+      p2p_texts: reportedVoterGoals?.text,
+      ecanvasser_contacts_count: ecanvasserCount,
+      automated_score:
+        typeof score === 'number'
+          ? Math.floor(score > 5 ? 5 : score)
+          : undefined,
+      campaign_assistant_chats: aiChatCount,
       candidate_district: district,
-      logged_campaign_tracker_events: `${updateHistoryCount}`,
-      voter_files_created: `${
-        (campaignData?.customVoterFiles &&
-          campaignData?.customVoterFiles.length) ||
-        0
-      }`,
-      sms_campaigns_requested: `${campaignData?.textCampaignCount || 0}`,
-      campaign_assistant_chats: `${aiChatCount || 0}`,
-      pro_subscription_status: `${proSubscriptionStatus}`,
-      ...(city ? { city } : {}),
-      type: 'CAMPAIGN',
-      last_step: isActive ? 'onboarding-complete' : currentStep,
-      last_step_date: lastStepDate || undefined,
-      ...(zip ? { zip } : {}),
-      pledge_status: pledged ? 'yes' : 'no',
-      is_active: `${!!name}`,
-      live_candidate: `${isActive}`,
-      p2v_complete_date: p2vCompleteDateMs,
-      p2v_status,
+      candidate_email: user?.email,
+      candidate_name: name,
+      candidate_office: resolvedOffice,
+      candidate_party: party,
+      candidate_state: longState,
+      city,
+      created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
       election_date: electionDateMs,
-      primary_date: primaryElectionDateMs,
-      doors_knocked: `${reportedVoterGoals?.doorKnocking || 0}`,
-      direct_mail_sent: `${reportedVoterGoals?.directMail || 0}`,
-      calls_made: `${reportedVoterGoals?.calls || 0}`,
-      online_impressions: `${reportedVoterGoals?.digitalAds || 0}`,
-      p2p_sent: `${reportedVoterGoals?.text || 0}`,
-      event_impressions: `${reportedVoterGoals?.events || 0}`,
-      yard_signs_impressions: `${reportedVoterGoals?.yardSigns || 0}`,
-      my_content_pieces_created: `${aiContent ? Object.keys(aiContent).length : 0}`,
-      filed_candidate: campaignCommittee ? 'yes' : 'no',
-      pro_candidate: isPro ? 'Yes' : 'No',
-      pro_upgrade_date: isProUpdatedAtMs,
+      filing_deadline: filingEndMs, // TODO: is this different than filing_end?
       filing_start: filingStartMs,
       filing_end: filingEndMs,
-      ecanvasser_contacts_count: `${ecanvasserCount}`,
-      knocked_doors: `${ecanvasserInteractionsCount}`,
-      ...(website ? { website } : {}),
-      ...(level ? { ai_office_level: level } : {}),
-      ...(ballotLevel ? { office_level: ballotLevel } : {}),
+      last_portal_visit: lastPortalVisit,
+      last_step: isActive ? 'onboarding-complete' : currentStep,
+      last_step_date: lastStepDateMs,
+      my_content_pieces_created: aiContent ? Object.keys(aiContent).length : 0,
+      office_level: ballotLevel,
+      p2v_status: p2v_status,
+      pledge_status: pledged ? 'yes' : 'no',
+      primary_date: primaryElectionDateMs,
+      pro_candidate: isPro ? 'Yes' : 'No',
+      pro_subscription_status: proSubscriptionStatus,
+      pro_upgrade_date: isProUpdatedAtMs,
+      product_sessions: sessionCount,
       running: runForOffice ? 'yes' : 'no',
-      ...getCrmP2VValues(p2vData),
-      ...(winNumber && typeof parseInt(`${winNumber}`) === 'number'
-        ? { win_number: `${winNumber}` }
-        : {}),
-      voter_data_adoption: canDownloadVoterFile ? 'Unlocked' : 'Locked',
-      created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
-      admin_user: adminUserEmail ?? '',
-      ...(candidates && typeof candidates === 'number' && candidates > 0
-        ? { number_of_opponents: `${candidates - 1}` }
-        : {}),
-      ...(typeof isIncumbent === 'boolean'
-        ? { incumbent: isIncumbent ? 'Yes' : 'No' }
-        : {}),
-      ...(seats && typeof seats === 'number' && seats > 0
-        ? { seats_available: `${seats}` }
-        : {}),
-      ...(typeof score === 'number' && score > 0
-        ? { automated_score: `${Math.floor(score > 5 ? 5 : score)}` }
-        : {}),
-      ...(typeof isPartisan === 'boolean'
-        ? { partisan_np: isPartisan ? 'Partisan' : 'Nonpartisan' }
-        : {}),
+      seats_available: seats,
+      totalregisteredvoters: totalRegisteredVoters,
+      votegoal: p2vData?.voterContactGoal,
+      voter_files_created: campaignData?.customVoterFiles?.length,
+      win_number: winNumber,
     }
 
-    delete properties.winnumber
-    delete properties.p2vStatus
-    delete properties.p2vstatus
-    delete properties.p2vCompleteDate
-    delete properties.p2vcompletedate
+    const validated = CRMCompanyPropertiesSchema.safeParse(fieldsToSync)
 
-    return properties
+    if (!validated.success) {
+      // Handle validation errors
+      const msg = 'CRM Push cancelled - validation failed'
+      this.logger.error(msg, {
+        errors: validated.error.errors,
+        fields: fieldsToSync,
+      })
+      this.slack.errorMessage({
+        message: msg,
+        error: validated.error,
+      })
+      throw new Error(msg)
+    }
+
+    return validated.data
   }
 
   private async associateCompanyWithContact(
@@ -435,12 +408,9 @@ export class CrmCampaignsService {
   }
 
   async trackCampaign(campaignId: number) {
-    const campaign = await this.campaigns.findFirst({
+    const campaign = await this.campaigns.findUniqueOrThrow({
       where: { id: campaignId },
     })
-    if (!campaign) {
-      throw new Error(`No campaign found for given id: ${campaignId}`)
-    }
 
     const { data: campaignData, userId } = campaign
     const { hubspotId: existingHubspotId } = campaignData
@@ -449,6 +419,7 @@ export class CrmCampaignsService {
       await this.calculateCRMCompanyProperties(campaign)
 
     this.logger.debug('CRM Company Properties:', crmCompanyProperties)
+
     let crmCompany: SimplePublicObject | undefined
     if (existingHubspotId) {
       crmCompany = await this.updateCrmCompany(
@@ -499,20 +470,29 @@ export class CrmCampaignsService {
     const crmCompanyId = crmCompany.id
 
     // make sure we refresh campaign object so we have hubspotId.
+    // first reload campaign data to avoid race conditions
+    const { data: updatedCampaignData } =
+      await this.campaigns.findUniqueOrThrow({
+        where: { id: campaignId },
+        select: {
+          data: true,
+        },
+      })
+
     await this.campaigns.update({
       where: { id: campaignId },
       data: {
         data: {
-          ...campaignData,
+          ...updatedCampaignData,
           hubspotId: crmCompanyId,
-          name: crmCompanyProperties.name,
+          name: crmCompanyProperties.candidate_name,
         },
       },
     })
 
     // associate the Contact with the Company in Hubspot
     try {
-      this.associateCompanyWithContact(crmContactId, crmCompanyId)
+      await this.associateCompanyWithContact(crmContactId, crmCompanyId)
     } catch (e) {
       const message = `Error associating user ${userId}. hubspot id: ${crmContactId} to campaign ${campaign.id} in hubspot`
       this.logger.error(message, e)
@@ -525,82 +505,33 @@ export class CrmCampaignsService {
     return crmCompanyId
   }
 
-  async handleUpdateViability(
-    campaign: Campaign,
-    propertyName: string,
-    propertyValue: string | boolean | number,
-  ) {
-    if (propertyName === 'incumbent') {
-      if (propertyValue === 'Yes') {
-        propertyName = 'isIncumbent'
-        propertyValue = true
-      } else {
-        propertyName = 'isIncumbent'
-        propertyValue = false
-      }
-    }
-    if (propertyName === 'opponents') {
-      propertyName = 'opponents'
-      propertyValue = parseInt(propertyValue as string)
-    }
-
-    const campaignId = campaign.id
-
-    try {
-      const { id: p2vId, data: { viability, ...restData } = {} } =
-        (await this.pathToVictory.findFirst({
-          where: { campaignId },
-        })) || {}
-      this.pathToVictory.model.update({
-        where: { id: p2vId },
-        data: {
-          data: {
-            ...restData,
-            viability: {
-              ...viability,
-              [propertyName]: propertyValue,
-            },
-          },
-        },
-      })
-    } catch (e) {
-      const message = 'error at update viability'
-      this.logger.error(message, e)
-      this.slack.errorMessage({
-        message,
-        error: e,
-      })
-    }
-  }
-
   async handleUpdateCampaign(
     campaign: Campaign,
     propertyName: string,
-    propertyValue: string | boolean | number,
+    propertyValue: string,
   ) {
-    const hubSpotUpdates = campaign.data.hubSpotUpdates
-      ? {
-          hubSpotUpdates: campaign.data.hubSpotUpdates,
-          [propertyName]: propertyValue,
-        }
-      : {}
+    const campaignData = campaign.data
+    const hubSpotUpdates = campaignData.hubSpotUpdates || {}
+    hubSpotUpdates[propertyName] = propertyValue
+
+    const updatePayload: Prisma.CampaignUpdateInput = {
+      data: {
+        ...campaignData,
+        hubSpotUpdates,
+      },
+    }
+
+    if (propertyName === HubSpot.IncomingProperty.verified_candidates) {
+      updatePayload.isVerified = propertyValue.toLowerCase() === 'yes'
+    }
+
+    if (propertyName === HubSpot.IncomingProperty.election_results) {
+      updatePayload.didWin = propertyValue.toLowerCase() === 'won general'
+    }
 
     this.campaigns.update({
       where: { id: campaign.id },
-      data: {
-        ...(propertyName === 'verified_candidates' && !campaign.isVerified
-          ? { isVerified: propertyValue === 'Yes' }
-          : {}),
-        ...(propertyName === 'pro_candidate' && !campaign.isPro
-          ? { isPro: propertyValue === 'Yes' }
-          : {}),
-      },
-    })
-
-    this.campaigns.updateJsonFields(campaign.id, {
-      data: {
-        ...hubSpotUpdates,
-      },
+      data: updatePayload,
     })
 
     this.fullStory.trackUserById(campaign.userId)
@@ -738,36 +669,27 @@ export class CrmCampaignsService {
 
         this.logger.log(`Syncing - ${campaignId}`)
 
-        const { verified_candidates, pro_candidate, election_results } =
-          company.properties
-
         const hubSpotUpdates = pick(
           company.properties,
           HUBSPOT_COMPANY_PROPERTIES,
-        ) as Record<string, string>
+        ) as Partial<Record<HubSpot.IncomingProperty, string>>
 
-        const updatedCampaign: Partial<Campaign> = {
+        const updatedCampaign: Prisma.CampaignUpdateInput = {
           data: campaign?.data,
         }
 
         if (
-          String(verified_candidates).toLowerCase() === 'yes' &&
-          !campaign?.isVerified
+          String(hubSpotUpdates.verified_candidates).toLowerCase() === 'yes'
         ) {
           updatedCampaign.isVerified = true
         }
 
-        if (String(pro_candidate).toLowerCase() === 'yes' && !campaign?.isPro) {
-          updatedCampaign.isPro = true
-        }
-
         if (
-          String(election_results).toLowerCase() === 'won general' &&
-          !campaign?.didWin
+          String(hubSpotUpdates.election_results).toLowerCase() ===
+          'won general'
         ) {
           updatedCampaign.didWin = true
         }
-        /* eslint-enable camelcase */
 
         await this.campaigns.update({
           where: { id: campaignId },

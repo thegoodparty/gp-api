@@ -117,15 +117,13 @@ export class CampaignMapService {
     for (const campaign of campaigns) {
       const { didWin, slug } = campaign
       const details = campaign.details
-      const data = campaign.data
 
       const electionDate = details.electionDate as string
 
       const resolvedOffice =
         (details.otherOffice as string) || (details.office as string)
 
-      let normalizedOffice =
-        data?.hubSpotUpdates?.office_type || details?.normalizedOffice
+      let normalizedOffice = details?.normalizedOffice
 
       if (!normalizedOffice && details.raceId && !details.noNormalizedOffice) {
         // TODO: This is a temporary stopgap to get the normalized office name

@@ -5,70 +5,6 @@ export enum PrimaryElectionResult {
   NOT_ON_BALLOT = 'Not on Ballot',
 }
 
-export type CRMCompanyProperties = {
-  name?: string
-  candidate_party?: string
-  candidate_office?: string
-  state?: string
-  candidate_state?: string
-  candidate_district?: string
-  logged_campaign_tracker_events?: string
-  voter_files_created?: string
-  sms_campaigns_requested?: string
-  campaign_assistant_chats?: string
-  pro_subscription_status?: string
-  city?: string
-  type: 'CAMPAIGN'
-  last_step?: string
-  last_step_date?: string | undefined
-  zip?: string
-  pledge_status?: 'yes' | 'no'
-  is_active?: string
-  live_candidate?: string
-  p2v_complete_date?: string
-  p2v_status?: string
-  election_date?: string
-  primary_date?: string
-  doors_knocked?: string
-  direct_mail_sent?: string
-  calls_made?: string
-  online_impressions?: string
-  p2p_sent?: string
-  event_impressions?: string
-  yard_signs_impressions?: string
-  my_content_pieces_created?: string
-  filed_candidate?: 'yes' | 'no'
-  pro_candidate?: 'Yes' | 'No'
-  pro_upgrade_date?: string
-  filing_start?: string
-  filing_end?: string
-  website?: string
-  ai_office_level?: string
-  office_level?: string
-  running?: 'yes' | 'no'
-  win_number?: string
-  voter_data_adoption?: 'Unlocked' | 'Locked'
-  created_by_admin?: 'yes' | 'no'
-  admin_user?: string
-  number_of_opponents?: string
-  incumbent?: 'Yes' | 'No'
-  seats_available?: string
-  automated_score?: string
-  partisan_np?: 'Partisan' | 'Nonpartisan'
-  primary_election_result?: PrimaryElectionResult.WON
-  ecanvasser_contacts_count?: string
-  knocked_doors?: string
-  election_results?: 'Won General'
-} & FilteredCRMProperties
-// & Partial<SimplePublicObjectInput>
-
-type FilteredCRMProperties = {
-  winnumber?: string
-  p2vStatus?: string
-  p2vstatus?: string
-  p2vCompleteDate?: string
-  p2vcompletedate?: string
-}
 export type CRMContactProperties = {
   firstname?: string
   lastname?: string
@@ -85,4 +21,113 @@ export type CRMContactProperties = {
   last_login?: string //DateString
   profile_updated_date?: string //DateString
   profile_updated_count?: string
+}
+
+/** HubSpot related types and enums */
+export namespace HubSpot {
+  /** Hubspot webhook payload */
+  export type ObjectUpdate = {
+    /**
+     * HubSpot object ID (typically numeric ID as string)
+     */
+    objectId: string
+    /**
+     * Property name in HubSpot's property registry
+     */
+    propertyName: IncomingProperty
+    /**
+     * New value for the property
+     */
+    propertyValue: string
+    /**
+     * Source category of the change
+     * @see https://knowledge.hubspot.com/properties/hubspots-change-sources
+     */
+    changeSource: ChangeSource
+    /**
+     * ID of your HubSpot app receiving the webhook
+     */
+    appId: string
+    /**
+     * ID of app integration that made the change
+     * If we are the source of the change appId will match sourceId
+     */
+    sourceId: string
+  }
+
+  export enum ChangeSource {
+    INTEGRATION = 'INTEGRATION',
+  }
+
+  /**
+   * Hubspot property names that we recieve from Hubspot via webhook or sync pulls
+   */
+  export enum IncomingProperty {
+    /** Not used? Only displayed in Admin UI */
+    past_candidate = 'past_candidate',
+    incumbent = 'incumbent', // TODO: new viability calculates this automatically, but we may still need to incorporate this
+    candidate_experience_level = 'candidate_experience_level',
+    final_viability_rating = 'final_viability_rating', // TODO: this is used to also show a special callout message for text campaign scheduling. DEPRECATE THIS FIELD for new viability?
+    professional_experience = 'professional_experience',
+    p2p_campaigns = 'p2p_campaigns',
+    p2p_sent = 'p2p_sent',
+    confirmed_self_filer = 'confirmed_self_filer',
+    date_verified = 'date_verified',
+    number_of_opponents = 'number_of_opponents', // TODO: New viability calculates this automatically, we may not need to pull this in
+    /** end not used */
+    primary_election_result = 'primary_election_result',
+    election_results = 'election_results',
+    verified_candidates = 'verified_candidates',
+
+    // hubspot_owner_id only comes from sync pulls, not webhooks
+    hubspot_owner_id = 'hubspot_owner_id',
+  }
+
+  /**
+   * Hubspot property names that we send to Hubspot via app integration
+   */
+  export enum OutgoingProperty {
+    // voter contact numbers
+    calls_made = 'calls_made',
+    direct_mail_sent = 'direct_mail_sent',
+    event_impressions = 'event_impressions',
+    knocked_doors = 'knocked_doors',
+    doors_knocked = 'doors_knocked',
+    online_impressions = 'online_impressions',
+    yard_signs_impressions = 'yard_signs_impressions',
+    p2p_texts = 'p2p_texts',
+    ecanvasser_contacts_count = 'ecanvasser_contacts_count',
+    automated_score = 'automated_score',
+    campaign_assistant_chats = 'campaign_assistant_chats',
+    candidate_district = 'candidate_district',
+    candidate_email = 'candidate_email',
+    candidate_name = 'candidate_name',
+    candidate_office = 'candidate_office',
+    candidate_party = 'candidate_party',
+    candidate_state = 'candidate_state',
+    city = 'city',
+    created_by_admin = 'created_by_admin',
+    election_date = 'election_date',
+    filing_deadline = 'filing_deadline',
+    filing_end = 'filing_end',
+    filing_start = 'filing_start',
+    last_portal_visit = 'last_portal_visit',
+    last_step = 'last_step',
+    last_step_date = 'last_step_date',
+    my_content_pieces_created = 'my_content_pieces_created',
+    office_level = 'office_level',
+    p2v_status = 'p2v_status',
+    pledge_status = 'pledge_status',
+    primary_date = 'primary_date',
+    pro_candidate = 'pro_candidate',
+    pro_subscription_status = 'pro_subscription_status',
+    pro_upgrade_date = 'pro_upgrade_date',
+    product_sessions = 'product_sessions',
+    running = 'running',
+    seats_available = 'seats_available',
+    totalregisteredvoters = 'totalregisteredvoters',
+    votegoal = 'votegoal',
+    voter_files_created = 'voter_files_created',
+    win_number = 'win_number',
+  }
 }
