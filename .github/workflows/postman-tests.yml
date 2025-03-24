@@ -30,11 +30,16 @@ jobs:
 
       # Run Postman collections
       - name: Run Postman Collections
-        env:
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
-          postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
-          postman collection run ${{ secrets.AUTH_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
-          postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }} --env-var "ADMIN_EMAIL=$ADMIN_EMAIL" --env-var "ADMIN_PASSWORD=$ADMIN_PASSWORD"
+          # First update environment with credentials
+          postman environment update ${{ secrets.POSTMAN_ENVIRONMENT_ID }} \
+            --data '[
+              {"key": "ADMIN_EMAIL", "value": "${{ secrets.ADMIN_EMAIL }}"},
+              {"key": "ADMIN_PASSWORD", "value": "${{ secrets.ADMIN_PASSWORD }}"}
+            ]'
+          
+          # Then run collections
+          postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }}
+          postman collection run ${{ secrets.AUTH_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }}
+          postman collection run ${{ secrets.CAMPAIGNS_COLLECTION_ID }} --environment ${{ secrets.POSTMAN_ENVIRONMENT_ID }}
           # ... add more collections as needed
