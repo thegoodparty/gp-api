@@ -125,13 +125,16 @@ jobs:
             total_passed=$((total_passed + passed))
             total_failed=$((total_failed + failed))
             
-            # Check for any failures in the output
-            if echo "$output" | grep -q "AssertionError\|TypeError\|error: collection could not be loaded"; then
-              status="❌"
-            elif [ $failed_assertions -gt 0 ]; then
+            # Check for failures - only mark as failed if there are actual failed assertions
+            if [ $failed_assertions -gt 0 ]; then
               status="❌"
             else
-              status="✅"
+              # Check for script errors only if no failed assertions
+              if echo "$output" | grep -q "AssertionError\|TypeError\|error: collection could not be loaded"; then
+                status="❌"
+              else
+                status="✅"
+              fi
             fi
             
             # Only show collections that have tests
