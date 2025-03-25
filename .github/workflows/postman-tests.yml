@@ -136,13 +136,13 @@ jobs:
             
             # Only show collections that have tests
             if [ $total_assertions -gt 0 ]; then
-              summary+="$status $name: $passed/$total_assertions\n"
+              summary+="$status $name: $passed passed, $failed_assertions failed ($total_assertions total)\n"
             fi
           done
           
-          # Add summary line
+          # Add summary line with more detail
           summary+="\n---\n"
-          summary+="Total: $total_passed/$((total_passed + total_failed)) tests passed ($total_failed failed)"
+          summary+="Total: $total_passed passed, $total_failed failed ($((total_passed + total_failed)) total)"
 
           # Set the summary as an environment variable
           echo "summary_text=\`\`\`$summary\`\`\`" >> $GITHUB_ENV
