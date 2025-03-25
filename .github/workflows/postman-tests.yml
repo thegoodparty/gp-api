@@ -94,7 +94,17 @@ jobs:
           total_failed=0
           
           # Run each collection and build summary
-          summary="*API Test Results*\n\n"
+          summary="*API Test Results*"
+          
+          # Add branch, commit, and timestamp info
+          branch="${{ github.head_ref || github.ref_name }}"
+          commit="${{ github.sha }}"
+          timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
+          
+          summary+="\n📍 Branch: \`$branch\`"
+          summary+="\n📝 Commit: \`${commit:0:7}\`"
+          summary+="\n🕒 Time: \`$timestamp\`"
+          summary+="\n\n"
           
           for name in "${!collections[@]}"; do
             collection_id=${collections[$name]}
