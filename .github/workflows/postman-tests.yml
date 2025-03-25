@@ -104,7 +104,7 @@ jobs:
               --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
               --suppress-exit-code 2>&1) || true
             
-            # Extract test results more accurately
+            # Extract test results
             # Get total assertions
             total_assertions=$(echo "$output" | grep -o "assertions.*" | grep -o "[0-9]*" | head -1)
             if [ -z "$total_assertions" ]; then
@@ -125,11 +125,13 @@ jobs:
             total_passed=$((total_passed + passed))
             total_failed=$((total_failed + failed))
             
-            # Add to summary string with total assertions
-            if [ $failed -eq 0 ]; then
-              status="✅"
-            else
+            # Check for any failures in the output
+            if echo "$output" | grep -q "AssertionError\|TypeError\|error: collection could not be loaded"; then
               status="❌"
+            elif [ $failed_assertions -gt 0 ]; then
+              status="❌"
+            else
+              status="✅"
             fi
             
             # Only show collections that have tests
