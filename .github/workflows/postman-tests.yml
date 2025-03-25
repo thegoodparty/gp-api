@@ -65,8 +65,16 @@ jobs:
           # Array of collection IDs
           declare -A collections=(
             ["Admin"]="${{ secrets.ADMIN_COLLECTION_ID }}"
+            ["Authentication"]="${{ secrets.AUTHENTICATION_COLLECTION_ID }}"
+            ["Authentication [Social OAuth]"]="${{ secrets.AUTHENTICATION_OAUTH_COLLECTION_ID }}"
+            ["Campaigns"]="${{ secrets.CAMPAIGNS_COLLECTION_ID }}"
+            ["CMS Content"]="${{ secrets.CMS_CONTENT_COLLECTION_ID }}"
+            ["Elections"]="${{ secrets.ELECTIONS_COLLECTION_ID }}"
+            ["Error Logger"]="${{ secrets.ERROR_LOGGER_COLLECTION_ID }}"
+            ["Generate Signed Upload Url"]="${{ secrets.GENERATE_SIGNED_UPLOAD_URL_COLLECTION_ID }}"
             ["Health"]="${{ secrets.HEALTH_COLLECTION_ID }}"
-            # Add other collections as needed
+            
+            
           )
           
           # Run each collection
