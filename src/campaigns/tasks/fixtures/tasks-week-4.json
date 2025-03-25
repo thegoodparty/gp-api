@@ -1,0 +1,41 @@
+[
+  {
+    "id": "1f0e3dad-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Schedule your 1 month to election persuasive text message",
+    "description": "Build trust and persuade voters.",
+    "week": 4,
+    "flowType": "texting",
+    "proRequired": true
+  },
+  {
+    "id": "098f6bcd-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Schedule your 1 month to election persuasive robocall",
+    "description": "Build trust and persuade voters.",
+    "week": 4,
+    "flowType": "robocall",
+    "proRequired": true
+  },
+  {
+    "id": "c51ce410-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Knock on doors to persuade voters",
+    "description": "Build trust and persuade voters.",
+    "week": 4,
+    "flowType": "door-knocking",
+    "proRequired": true
+  },
+  {
+    "id": "a5771bce-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Plan your persuasive phone banking campaign",
+    "description": "Build trust and persuade voters.",
+    "week": 4,
+    "flowType": "phone-banking",
+    "proRequired": true
+  },
+  {
+    "id": "d67d8ab4-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Post to social media talking about one of your top voter issues",
+    "description": "Tell people you have solutions for their issues.",
+    "week": 4,
+    "flowType": "social-media"
+  }
+]
