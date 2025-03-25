@@ -298,7 +298,13 @@ export class CrmCampaignsService {
       ecanvasserInteractionsCount = interactions.length
     }
 
-    const fieldsToSync = {
+    const fieldsToSync: Record<
+      HubSpot.OutgoingProperty,
+      string | number | undefined
+    > = {
+      // some hardcoded things for hubspot
+      type: 'CAMPAIGN',
+
       // voter contact numbers
       calls_made: reportedVoterGoals?.calls,
       direct_mail_sent: reportedVoterGoals?.directMail,
@@ -318,7 +324,7 @@ export class CrmCampaignsService {
       office_level: ballotLevel,
       candidate_party: party,
       candidate_state: longState,
-      city,
+      city: city ?? undefined,
       created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
       pledge_status: pledged ? 'yes' : 'no',
       pro_candidate: isPro ? 'Yes' : 'No',
@@ -327,7 +333,6 @@ export class CrmCampaignsService {
       running: runForOffice ? 'yes' : 'no',
 
       // election details
-
       election_date: electionDateMs,
       filing_deadline: filingEndMs, // TODO: is this different than filing_end?
       filing_start: filingStartMs,
@@ -342,6 +347,7 @@ export class CrmCampaignsService {
       my_content_pieces_created: aiContent ? Object.keys(aiContent).length : 0,
       product_sessions: sessionCount,
       voter_files_created: campaignData?.customVoterFiles?.length,
+      voter_data_adoption: canDownloadVoterFile ? 'Unlocked' : 'Locked',
 
       // p2v details / viability
       automated_score:

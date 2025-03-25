@@ -88,6 +88,9 @@ export namespace HubSpot {
    * Hubspot property names that we send to Hubspot via app integration
    */
   export enum OutgoingProperty {
+    // some hardcoded things for hubspot
+    type = 'type',
+
     // voter contact numbers
     calls_made = 'calls_made',
     direct_mail_sent = 'direct_mail_sent',
@@ -130,6 +133,7 @@ export namespace HubSpot {
     my_content_pieces_created = 'my_content_pieces_created',
     product_sessions = 'product_sessions',
     voter_files_created = 'voter_files_created',
+    voter_data_adoption = 'voter_data_adoption',
 
     // p2v details / viability
     automated_score = 'automated_score',
