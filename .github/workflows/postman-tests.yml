@@ -62,6 +62,7 @@ jobs:
       - name: Run All Collections
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        shell: bash
         run: |
           # Create a temporary file for the summary
           touch test_summary.txt
@@ -86,6 +87,9 @@ jobs:
             ["VoterData"]="${{ secrets.VOTER_DATA_COLLECTION_ID }}"
           )
           
+          # Set bash to continue on errors
+          set +e
+          
           total_passed=0
           total_failed=0
           
@@ -102,7 +106,10 @@ jobs:
               --reporters cli,json,htmlextra \
               --reporter-json-export "testResults/${name// /_}-report.json" \
               --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
-              --suppress-exit-code 2>&1) || true
+              2>&1) || true
+            
+            # Print newman output for debugging
+            echo "$output"
             
             # Extract test results
             # Get total assertions
@@ -161,30 +168,14 @@ jobs:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload: |
             {
-              "text": "API Test Results",
+              "text": "${{ env.summary_text }}",
               "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "API Test Results"
-                  }
-                },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ env.summary_text }}"
+                    "text": "${{ env.summary_text }}\n\n👉 <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
                   }
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "👉 <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
-                    }
-                  ]
                 }
               ]
             }
