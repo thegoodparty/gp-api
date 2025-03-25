@@ -50,4 +50,5 @@ jobs:
           newman run "${{ secrets.POSTMAN_COLLECTION_URL }}" \
             -e updated_env.json \
             --reporters cli,json \
-            --reporter-json-export test-results.json
+            --reporter-json-export test-results.json \
+            --header "X-Api-Key:${{ secrets.POSTMAN_API_KEY }}"
