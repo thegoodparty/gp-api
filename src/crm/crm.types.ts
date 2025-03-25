@@ -129,6 +129,7 @@ export namespace HubSpot {
     campaign_assistant_chats = 'campaign_assistant_chats',
     my_content_pieces_created = 'my_content_pieces_created',
     product_sessions = 'product_sessions',
+    voter_files_created = 'voter_files_created',
 
     // p2v details / viability
     automated_score = 'automated_score',
@@ -136,7 +137,6 @@ export namespace HubSpot {
     seats_available = 'seats_available',
     totalregisteredvoters = 'totalregisteredvoters',
     votegoal = 'votegoal',
-    voter_files_created = 'voter_files_created',
     win_number = 'win_number',
   }
 }

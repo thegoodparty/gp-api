@@ -341,6 +341,7 @@ export class CrmCampaignsService {
       campaign_assistant_chats: aiChatCount,
       my_content_pieces_created: aiContent ? Object.keys(aiContent).length : 0,
       product_sessions: sessionCount,
+      voter_files_created: campaignData?.customVoterFiles?.length,
 
       // p2v details / viability
       automated_score:
@@ -351,7 +352,6 @@ export class CrmCampaignsService {
       seats_available: seats,
       totalregisteredvoters: totalRegisteredVoters,
       votegoal: p2vData?.voterContactGoal,
-      voter_files_created: campaignData?.customVoterFiles?.length,
       win_number: winNumber,
     }
 
