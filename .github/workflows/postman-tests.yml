@@ -1,13 +1,13 @@
 name: Postman Tests
 
 on:
-  # Trigger on pushes to main and develop
+  # Run on all pushes
   push:
-    branches: [main, develop]
+    branches:
+      - '*'
   
-  # Trigger on PRs to main and develop
+  # Run on all PRs
   pull_request:
-    branches: [main, develop]
   
   # Daily run at midnight UTC
   schedule:
@@ -18,11 +18,17 @@ on:
 
 jobs:
   postman-tests:
-    # Don't run on draft PRs
-    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 
+    # Add debug info to see what's triggering the workflow
     steps:
+      - name: Debug Event
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Branch name: ${{ github.ref }}"
+          echo "PR number: ${{ github.event.pull_request.number }}"
+          echo "SHA: ${{ github.sha }}"
+
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
