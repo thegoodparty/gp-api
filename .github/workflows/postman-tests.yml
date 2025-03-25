@@ -89,7 +89,9 @@ jobs:
           total_passed=0
           total_failed=0
           
-          # Run each collection
+          # Run each collection and build summary
+          summary="*API Test Results*\n\n"
+          
           for name in "${!collections[@]}"; do
             collection_id=${collections[$name]}
             echo "Running collection: $name"
@@ -110,26 +112,22 @@ jobs:
             total_passed=$((total_passed + passed))
             total_failed=$((total_failed + failed))
             
-            # Add to summary file with simplified format
+            # Add to summary string
             if [ $failed -eq 0 ]; then
               status="✅"
             else
               status="❌"
             fi
             
-            # Format each line more compactly
-            printf "%s %s: %d/%d\n" "$status" "$name" "$passed" "$((passed + failed))" >> test_summary.txt
+            # Append to summary string
+            summary+="$status $name: $passed/$((passed + failed))\n"
           done
           
           # Add summary line
-          echo "---" >> test_summary.txt
-          printf "Total: %d/%d tests passed (%d failed)\n" "$total_passed" "$((total_passed + total_failed))" "$total_failed" >> test_summary.txt
+          summary+="\n---\n"
+          summary+="Total: $total_passed/$((total_passed + total_failed)) tests passed ($total_failed failed)"
 
-          # Convert summary file to environment variable with proper escaping
-          summary=$(cat test_summary.txt)
-          summary="${summary//'%'/'%25'}"
-          summary="${summary//$'\n'/'%0A'}"
-          summary="${summary//$'\r'/'%0D'}"
+          # Set the summary as an environment variable
           echo "summary_text=\`\`\`$summary\`\`\`" >> $GITHUB_ENV
 
       # Upload test results as artifacts
