@@ -111,27 +111,24 @@ jobs:
             # Print newman output for debugging
             echo "$output"
             
-            # Debug: Print the full output to a file for inspection
-            echo "$output" > "testResults/${name// /_}-debug.txt"
-            
             # Extract test results from the summary table
-            # Look for the line with "assertions" and get the numbers
-            if echo "$output" | grep -q "│.*assertions.*│"; then
-              # Get the line containing "assertions" and extract numbers using a more precise pattern
-              assertion_line=$(echo "$output" | grep -A1 "│.*assertions.*│" | tail -n 1)
-              echo "Assertion line: $assertion_line"  # Debug
+            # First, try to get the assertions line using a more specific pattern
+            assertion_line=$(echo "$output" | grep "assertions" | grep "│" | tail -n 1)
+            
+            if [ ! -z "$assertion_line" ]; then
+              # Extract numbers using awk with │ as field separator
+              total_assertions=$(echo "$assertion_line" | awk -F'│' '{print $3}' | tr -d ' ')
+              failed_assertions=$(echo "$assertion_line" | awk -F'│' '{print $4}' | tr -d ' ')
               
-              # Extract numbers more precisely
-              total_assertions=$(echo "$assertion_line" | grep -o "[0-9]\+" | head -1)
-              failed_assertions=$(echo "$assertion_line" | grep -o "[0-9]\+" | tail -1)
-              
-              echo "Found assertions - Total: $total_assertions, Failed: $failed_assertions"  # Debug
+              echo "Debug - Raw assertion line: $assertion_line"
+              echo "Debug - Total assertions: $total_assertions"
+              echo "Debug - Failed assertions: $failed_assertions"
               
               # Handle empty or invalid values
-              if [ -z "$total_assertions" ]; then
+              if [ -z "$total_assertions" ] || ! [[ "$total_assertions" =~ ^[0-9]+$ ]]; then
                 total_assertions=0
               fi
-              if [ -z "$failed_assertions" ]; then
+              if [ -z "$failed_assertions" ] || ! [[ "$failed_assertions" =~ ^[0-9]+$ ]]; then
                 failed_assertions=0
               fi
               
@@ -154,7 +151,41 @@ jobs:
                 summary+="$status $name: $passed passed, $failed_assertions failed ($total_assertions total)\n"
               fi
             else
-              echo "No assertions found in output for $name"  # Debug
+              # Try alternate format - look for the summary at the end
+              total_line=$(echo "$output" | grep -A5 "assertions.*executed.*failed" | grep "assertions")
+              if [ ! -z "$total_line" ]; then
+                total_assertions=$(echo "$total_line" | awk '{print $3}')
+                failed_assertions=$(echo "$total_line" | awk '{print $5}')
+                
+                echo "Debug - Using alternate format"
+                echo "Debug - Total line: $total_line"
+                echo "Debug - Total assertions: $total_assertions"
+                echo "Debug - Failed assertions: $failed_assertions"
+                
+                # Rest of the processing remains the same
+                if [ -z "$total_assertions" ] || ! [[ "$total_assertions" =~ ^[0-9]+$ ]]; then
+                  total_assertions=0
+                fi
+                if [ -z "$failed_assertions" ] || ! [[ "$failed_assertions" =~ ^[0-9]+$ ]]; then
+                  failed_assertions=0
+                fi
+                
+                passed=$((total_assertions - failed_assertions))
+                total_passed=$((total_passed + passed))
+                total_failed=$((total_failed + failed_assertions))
+                
+                if [ $failed_assertions -gt 0 ]; then
+                  status="❌"
+                else
+                  status="✅"
+                fi
+                
+                if [ $total_assertions -gt 0 ]; then
+                  summary+="$status $name: $passed passed, $failed_assertions failed ($total_assertions total)\n"
+                fi
+              else
+                echo "No test results found for $name"
+              fi
             fi
           done
           
