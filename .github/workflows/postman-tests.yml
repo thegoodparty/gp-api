@@ -9,6 +9,9 @@ on:
       - opened
       - synchronize
       - reopened
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
   postman-tests:
@@ -18,6 +21,11 @@ jobs:
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
+        
+      # Create results directory
+      - name: Create Results Directory
+        run: |
+          mkdir -p testResults
 
       # Install Node.js
       - name: Setup Node.js
@@ -25,10 +33,11 @@ jobs:
         with:
           node-version: '18'
 
-      # Install Newman
-      - name: Install Newman
+      # Install Newman and dependencies
+      - name: Install Newman and Dependencies
         run: |
           npm install -g newman
+          npm install -g newman-reporter-htmlextra
 
       # Create environment file for tests
       - name: Create Test Environment
@@ -44,12 +53,21 @@ jobs:
               (.values[] | select(.key == "testUserPassword").value) = $password' \
              test_env.json > updated_env.json
 
-      # Run Newman tests
+      # Run Newman tests with multiple reporters
       - name: Run Newman Tests
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
           newman run "https://api.getpostman.com/collections/${{ secrets.COLLECTION_UID }}?apikey=${{ secrets.POSTMAN_API_KEY }}" \
             -e updated_env.json \
-            --reporters cli,json \
-            --reporter-json-export test-results.json
+            --reporters cli,json,htmlextra \
+            --reporter-json-export testResults/newman-report.json \
+            --reporter-htmlextra-export testResults/newman-report.html
+
+      # Upload test results as artifacts
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: testResults
