@@ -65,7 +65,8 @@ jobs:
         run: |
           # Create a temporary file for the summary
           touch test_summary.txt
-          echo "API Test Results Summary:" > test_summary.txt
+          echo "*API Test Results Summary*" > test_summary.txt
+          echo "" >> test_summary.txt
           
           # Array of collection IDs
           declare -A collections=(
@@ -87,6 +88,9 @@ jobs:
             ["VoterData"]="${{ secrets.VOTER_DATA_COLLECTION_ID }}"
           )
           
+          total_passed=0
+          total_failed=0
+          
           # Run each collection
           for name in "${!collections[@]}"; do
             collection_id=${collections[$name]}
@@ -100,9 +104,13 @@ jobs:
               --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
               --suppress-exit-code 2>&1) || true
             
-            # Extract test results
-            passed=$(echo "$output" | grep -o "✓.*" | wc -l)
-            failed=$(echo "$output" | grep -o "×.*" | wc -l)
+            # Extract test results using more precise grep patterns
+            passed=$(echo "$output" | grep -o "✓ .*" | wc -l)
+            failed=$(echo "$output" | grep -o "× .*" | wc -l)
+            
+            # Update totals
+            total_passed=$((total_passed + passed))
+            total_failed=$((total_failed + failed))
             
             # Add to summary file
             if [ $failed -eq 0 ]; then
@@ -110,8 +118,15 @@ jobs:
             else
               status="❌"
             fi
-            echo "$status $name: $passed passed, $failed failed" >> test_summary.txt
+            
+            # Format the line with proper spacing
+            printf "%s %-30s %d passed, %d failed\n" "$status" "$name" "$passed" "$failed" >> test_summary.txt
           done
+          
+          # Add total summary
+          echo "" >> test_summary.txt
+          echo "*Total Tests:* $((total_passed + total_failed))" >> test_summary.txt
+          echo "*Results:* ✅ $total_passed passed, ❌ $total_failed failed" >> test_summary.txt
 
           # Convert summary file to environment variable with proper escaping
           summary=$(cat test_summary.txt)
@@ -136,21 +151,22 @@ jobs:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload: |
             {
-              "text": "API Test Results",
               "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "API Test Results"
-                  }
-                },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ env.summary_text }}\n\n*Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                    "text": "${{ env.summary_text }}"
                   }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "👉 <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                    }
+                  ]
                 }
               ]
             }
