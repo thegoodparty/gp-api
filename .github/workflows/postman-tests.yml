@@ -46,9 +46,10 @@ jobs:
 
       # Run Newman tests
       - name: Run Newman Tests
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
-          newman run "${{ secrets.POSTMAN_COLLECTION_URL }}" \
+          newman run "${{ secrets.POSTMAN_COLLECTION_URL }}?apikey=${{ secrets.POSTMAN_API_KEY }}" \
             -e updated_env.json \
             --reporters cli,json \
-            --reporter-json-export test-results.json \
-            --header "X-Api-Key:${{ secrets.POSTMAN_API_KEY }}"
+            --reporter-json-export test-results.json
