@@ -1,34 +1,23 @@
 name: Postman Tests
 
 on:
-  # Run on all pushes
   push:
     branches:
-      - '*'
-  
-  # Run on all PRs
+      - main
   pull_request:
-  
-  # Daily run at midnight UTC
+    types:
+      - opened
+      - synchronize
+      - reopened
   schedule:
-    - cron: '0 0 * * *'
-  
-  # Manual trigger
-  workflow_dispatch:
+    - cron: '0 0 * * *'  # Runs daily at midnight
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
   postman-tests:
     runs-on: ubuntu-latest
 
-    # Add debug info to see what's triggering the workflow
     steps:
-      - name: Debug Event
-        run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Branch name: ${{ github.ref }}"
-          echo "PR number: ${{ github.event.pull_request.number }}"
-          echo "SHA: ${{ github.sha }}"
-
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -74,9 +63,8 @@ jobs:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
           # Create a temporary file for the summary
-          touch summary.txt
-          echo "API Test Results Summary:" > summary.txt
-          echo "" >> summary.txt
+          touch test_summary.txt
+          echo "API Test Results Summary:" > test_summary.txt
           
           # Array of collection IDs
           declare -A collections=(
@@ -112,34 +100,24 @@ jobs:
               --suppress-exit-code 2>&1) || true
             
             # Extract test results
-            passed=$(echo "$output" | grep -o "│.*assertions.*│" | awk -F'│' '{print $3}' | tr -d ' ')
-            total=$(echo "$output" | grep -o "│.*assertions.*│" | awk -F'│' '{print $4}' | tr -d ' ')
-            
-            if [ -z "$passed" ] || [ -z "$total" ]; then
-              # Fallback to counting ✓ and × if we can't get the summary
-              passed=$(echo "$output" | grep -o "✓.*" | wc -l)
-              failed=$(echo "$output" | grep -o "×.*" | wc -l)
-              total=$((passed + failed))
-            else
-              failed=$((total - passed))
-            fi
+            passed=$(echo "$output" | grep -o "✓.*" | wc -l)
+            failed=$(echo "$output" | grep -o "×.*" | wc -l)
             
             # Add to summary file
-            if [ $failed -eq 0 ] && [ $total -gt 0 ]; then
+            if [ $failed -eq 0 ]; then
               status="✅"
-            elif [ $total -eq 0 ]; then
-              status="⚠️"
             else
               status="❌"
             fi
-            echo "$status $name: $passed passed, $failed failed" >> summary.txt
+            echo "$status $name: $passed passed, $failed failed" >> test_summary.txt
           done
-          
-          # Set the environment variable with the full summary
-          summary=$(cat summary.txt)
-          echo "summary_text<<EOF" >> $GITHUB_ENV
-          echo "$summary" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+
+          # Convert summary file to environment variable with proper escaping
+          summary=$(cat test_summary.txt)
+          summary="${summary//'%'/'%25'}"
+          summary="${summary//$'\n'/'%0A'}"
+          summary="${summary//$'\r'/'%0D'}"
+          echo "summary_text=$summary" >> $GITHUB_ENV
 
       # Upload test results as artifacts
       - name: Upload Test Results
@@ -153,47 +131,27 @@ jobs:
       - name: Send Slack Notification
         if: always()
         uses: slackapi/slack-github-action@v1.25.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "API Test Results",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "API Test Results"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.summary_text }}\n\n*Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                  }
+                }
+              ]
+            }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SUMMARY: ${{ env.summary_text }}
-        run: |
-          # Escape newlines and quotes for JSON
-          ESCAPED_SUMMARY=$(echo "$SUMMARY" | jq -aRs .)
-          
-          # Create the payload
-          payload=$(cat <<EOF
-          {
-            "text": "API Test Results",
-            "blocks": [
-              {
-                "type": "header",
-                "text": {
-                  "type": "plain_text",
-                  "text": "API Test Results"
-                }
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": ${ESCAPED_SUMMARY}
-                }
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "*Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
-                }
-              }
-            ]
-          }
-          EOF
-          )
-          
-          # Send to Slack
-          curl -X POST \
-            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$payload" \
-            "https://slack.com/api/chat.postMessage?channel=${{ secrets.SLACK_CHANNEL_ID }}"
