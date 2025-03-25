@@ -22,11 +22,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         
-      # Create results directory
-      - name: Create Results Directory
-        run: |
-          mkdir -p testResults
-
       # Install Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -46,14 +41,16 @@ jobs:
           # Copy the existing environment file
           cp postman/environment.json test_env.json
 
-          # Update the credentials using jq
-          jq --arg email "${{ secrets.ADMIN_EMAIL }}" \
+          # Update the environment with dev API URL and credentials
+          jq --arg url "https://gp-api-dev.goodparty.org" \
+             --arg email "${{ secrets.ADMIN_EMAIL }}" \
              --arg password "${{ secrets.ADMIN_PASSWORD }}" \
-             '(.values[] | select(.key == "testAdminUserEmail").value) = $email | 
+             '(.values[] | select(.key == "baseUrl").value) = $url | 
+              (.values[] | select(.key == "testAdminUserEmail").value) = $email | 
               (.values[] | select(.key == "testUserPassword").value) = $password' \
              test_env.json > updated_env.json
 
-      # Run Newman tests with multiple reporters
+      # Run Newman tests
       - name: Run Newman Tests
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
