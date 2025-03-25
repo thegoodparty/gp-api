@@ -142,27 +142,47 @@ jobs:
       - name: Send Slack Notification
         if: always()
         uses: slackapi/slack-github-action@v1.25.0
-        with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
-          payload: |
-            {
-              "text": "API Test Results",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "API Test Results"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "${{ env.summary_text }}\n\n*Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
-                  }
-                }
-              ]
-            }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SUMMARY: ${{ env.summary_text }}
+        run: |
+          # Escape newlines and quotes for JSON
+          ESCAPED_SUMMARY=$(echo "$SUMMARY" | jq -aRs .)
+          
+          # Create the payload
+          payload=$(cat <<EOF
+          {
+            "text": "API Test Results",
+            "blocks": [
+              {
+                "type": "header",
+                "text": {
+                  "type": "plain_text",
+                  "text": "API Test Results"
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ${ESCAPED_SUMMARY}
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                }
+              }
+            ]
+          }
+          EOF
+          )
+          
+          # Send to Slack
+          curl -X POST \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "https://slack.com/api/chat.postMessage?channel=${{ secrets.SLACK_CHANNEL_ID }}"
