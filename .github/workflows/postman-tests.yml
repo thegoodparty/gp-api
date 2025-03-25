@@ -19,86 +19,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Install Postman CLI
-      - name: Install Postman CLI
-        run: |
-          curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+      # Install Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-      # Login to Postman CLI using API key
-      - name: Login to Postman CLI
-        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
+      # Install Newman
+      - name: Install Newman
+        run: |
+          npm install -g newman
 
       # Create environment file for tests
       - name: Create Test Environment
         id: create_env
         run: |
-          # Create environment file with all variables
-          cat > test_env.json << 'EOF'
-          {
-            "name": "CI Environment",
-            "values": [
-              {
-                "key": "protocol",
-                "value": "https",
-                "type": "default",
-                "enabled": true
-              },
-              {
-                "key": "host",
-                "value": "gp-api-dev.goodparty.org",
-                "type": "default",
-                "enabled": true
-              },
-              {
-                "key": "port",
-                "value": "",
-                "type": "default",
-                "enabled": true
-              },
-              {
-                "key": "rootPath",
-                "value": "/v1",
-                "type": "default",
-                "enabled": true
-              },
-              {
-                "key": "rootUrl",
-                "value": "{{protocol}}://{{host}}{{port}}{{rootPath}}",
-                "type": "default",
-                "enabled": true
-              },
-              {
-                "key": "testAdminUserEmail",
-                "value": "${{ secrets.ADMIN_EMAIL }}",
-                "type": "default",
-                "enabled": true
-              },
-              {
-                "key": "testUserPassword",
-                "value": "${{ secrets.ADMIN_PASSWORD }}",
-                "type": "default",
-                "enabled": true
-              }
-            ]
-          }
-          EOF
+          # Copy the existing environment file
+          cp postman/environment.json test_env.json
 
-          # Create new environment and capture its ID
-          RESPONSE=$(postman environment import test_env.json)
-          echo "Response from import: $RESPONSE"
-          ENV_ID=$(echo "$RESPONSE" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
-          echo "Environment ID: $ENV_ID"
-          echo "POSTMAN_TEST_ENV_ID=$ENV_ID" >> $GITHUB_ENV
+          # Update the credentials using jq
+          jq --arg email "${{ secrets.ADMIN_EMAIL }}" \
+             --arg password "${{ secrets.ADMIN_PASSWORD }}" \
+             '(.values[] | select(.key == "testAdminUserEmail").value) = $email | 
+              (.values[] | select(.key == "testUserPassword").value) = $password' \
+             test_env.json > updated_env.json
 
-      # Run Postman collections with debug output
-      - name: Run Postman Collections
-        env:
-          POSTMAN_TEST_ENV_ID: ${{ env.POSTMAN_TEST_ENV_ID }}
+      # Run Newman tests
+      - name: Run Newman Tests
         run: |
-          echo "Testing with email: ${{ secrets.ADMIN_EMAIL }}"
-          echo "Using environment ID: $POSTMAN_TEST_ENV_ID"
-          
-          # Run collections with verbose output
-          postman collection run ${{ secrets.ADMIN_COLLECTION_ID }} \
-            --environment "$POSTMAN_TEST_ENV_ID" \
-            --verbose
+          newman run "${{ secrets.POSTMAN_COLLECTION_URL }}" \
+            -e updated_env.json \
+            --reporters cli,json \
+            --reporter-json-export test-results.json
