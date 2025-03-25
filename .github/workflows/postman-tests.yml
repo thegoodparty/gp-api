@@ -111,13 +111,21 @@ jobs:
             # Print newman output for debugging
             echo "$output"
             
+            # Debug: Print the full output to a file for inspection
+            echo "$output" > "testResults/${name// /_}-debug.txt"
+            
             # Extract test results from the summary table
             # Look for the line with "assertions" and get the numbers
-            if echo "$output" | grep -q "assertions"; then
-              # Get the line containing "assertions" and extract numbers
-              assertion_line=$(echo "$output" | grep "assertions" | tail -n 1)
-              total_assertions=$(echo "$assertion_line" | awk '{print $3}')
-              failed_assertions=$(echo "$assertion_line" | awk '{print $5}')
+            if echo "$output" | grep -q "│.*assertions.*│"; then
+              # Get the line containing "assertions" and extract numbers using a more precise pattern
+              assertion_line=$(echo "$output" | grep -A1 "│.*assertions.*│" | tail -n 1)
+              echo "Assertion line: $assertion_line"  # Debug
+              
+              # Extract numbers more precisely
+              total_assertions=$(echo "$assertion_line" | grep -o "[0-9]\+" | head -1)
+              failed_assertions=$(echo "$assertion_line" | grep -o "[0-9]\+" | tail -1)
+              
+              echo "Found assertions - Total: $total_assertions, Failed: $failed_assertions"  # Debug
               
               # Handle empty or invalid values
               if [ -z "$total_assertions" ]; then
@@ -145,6 +153,8 @@ jobs:
               if [ $total_assertions -gt 0 ]; then
                 summary+="$status $name: $passed passed, $failed_assertions failed ($total_assertions total)\n"
               fi
+            else
+              echo "No assertions found in output for $name"  # Debug
             fi
           done
           
