@@ -161,7 +161,15 @@ jobs:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload: |
             {
+              "text": "API Test Results",
               "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "API Test Results"
+                  }
+                },
                 {
                   "type": "section",
                   "text": {
