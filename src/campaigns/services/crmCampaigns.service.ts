@@ -303,42 +303,51 @@ export class CrmCampaignsService {
       calls_made: reportedVoterGoals?.calls,
       direct_mail_sent: reportedVoterGoals?.directMail,
       event_impressions: reportedVoterGoals?.events,
-      knocked_doors: reportedVoterGoals?.doorKnocking,
-      doors_knocked: reportedVoterGoals?.doorKnocking, // TODO: remove one of these duped doorknock fields
+      knocked_doors: ecanvasserInteractionsCount, // TODO: remove/rename one of these two doorknock fields?
+      doors_knocked: reportedVoterGoals?.doorKnocking, // TODO: remove/rename one of these two doorknock fields?
       online_impressions: reportedVoterGoals?.digitalAds,
       yard_signs_impressions: reportedVoterGoals?.yardSigns,
       p2p_texts: reportedVoterGoals?.text,
       ecanvasser_contacts_count: ecanvasserCount,
-      automated_score:
-        typeof score === 'number'
-          ? Math.floor(score > 5 ? 5 : score)
-          : undefined,
-      campaign_assistant_chats: aiChatCount,
+
+      // candidate details
       candidate_district: district,
       candidate_email: user?.email,
       candidate_name: name,
       candidate_office: resolvedOffice,
+      office_level: ballotLevel,
       candidate_party: party,
       candidate_state: longState,
       city,
       created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
+      pledge_status: pledged ? 'yes' : 'no',
+      pro_candidate: isPro ? 'Yes' : 'No',
+      pro_subscription_status: proSubscriptionStatus,
+      pro_upgrade_date: isProUpdatedAtMs,
+      running: runForOffice ? 'yes' : 'no',
+
+      // election details
+
       election_date: electionDateMs,
       filing_deadline: filingEndMs, // TODO: is this different than filing_end?
       filing_start: filingStartMs,
       filing_end: filingEndMs,
+      primary_date: primaryElectionDateMs,
+
+      // usage details
       last_portal_visit: lastPortalVisit,
       last_step: isActive ? 'onboarding-complete' : currentStep,
       last_step_date: lastStepDateMs,
+      campaign_assistant_chats: aiChatCount,
       my_content_pieces_created: aiContent ? Object.keys(aiContent).length : 0,
-      office_level: ballotLevel,
-      p2v_status: p2v_status,
-      pledge_status: pledged ? 'yes' : 'no',
-      primary_date: primaryElectionDateMs,
-      pro_candidate: isPro ? 'Yes' : 'No',
-      pro_subscription_status: proSubscriptionStatus,
-      pro_upgrade_date: isProUpdatedAtMs,
       product_sessions: sessionCount,
-      running: runForOffice ? 'yes' : 'no',
+
+      // p2v details / viability
+      automated_score:
+        typeof score === 'number'
+          ? Math.floor(score > 5 ? 5 : score)
+          : undefined,
+      p2v_status: p2v_status,
       seats_available: seats,
       totalregisteredvoters: totalRegisteredVoters,
       votegoal: p2vData?.voterContactGoal,
