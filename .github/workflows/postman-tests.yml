@@ -104,23 +104,38 @@ jobs:
               --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
               --suppress-exit-code 2>&1) || true
             
-            # Extract test results using more precise grep patterns
-            passed=$(echo "$output" | grep -o "✓ .*" | wc -l)
-            failed=$(echo "$output" | grep -o "× .*" | wc -l)
+            # Extract test results more accurately
+            # Get total assertions
+            total_assertions=$(echo "$output" | grep -o "assertions.*" | grep -o "[0-9]*" | head -1)
+            if [ -z "$total_assertions" ]; then
+              total_assertions=0
+            fi
+            
+            # Get failed assertions
+            failed_assertions=$(echo "$output" | grep -o "failed assertions.*" | grep -o "[0-9]*" | head -1)
+            if [ -z "$failed_assertions" ]; then
+              failed_assertions=0
+            fi
+            
+            # Calculate passed assertions
+            passed=$((total_assertions - failed_assertions))
+            failed=$failed_assertions
             
             # Update totals
             total_passed=$((total_passed + passed))
             total_failed=$((total_failed + failed))
             
-            # Add to summary string
+            # Add to summary string with total assertions
             if [ $failed -eq 0 ]; then
               status="✅"
             else
               status="❌"
             fi
             
-            # Append to summary string
-            summary+="$status $name: $passed/$((passed + failed))\n"
+            # Only show collections that have tests
+            if [ $total_assertions -gt 0 ]; then
+              summary+="$status $name: $passed/$total_assertions\n"
+            fi
           done
           
           # Add summary line
