@@ -62,34 +62,22 @@ jobs:
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
-          # Array of collection names
-          collections=(
-            "Admin"
-            "Authentication"
-            "Authentication [Social OAuth]"
-            "Campaigns"
-            "CMS Content"
-            "Elections"
-            "Error Logger"
-            "Generate Signed Upload Url"
-            "Health"
-            "Integrations"
-            "Jobs (Ashby)"
-            "Payments"
-            "Subscribe"
-            "TopIssues"
-            "Users"
-            "VoterData"
+          # Array of collection IDs
+          declare -A collections=(
+            ["Admin"]="${{ secrets.ADMIN_COLLECTION_ID }}"
+            ["Health"]="${{ secrets.HEALTH_COLLECTION_ID }}"
+            # Add other collections as needed
           )
-
+          
           # Run each collection
-          for collection in "${collections[@]}"; do
-            echo "Running collection: $collection"
-            newman run "${{ secrets.POSTMAN_WORKSPACE_URL }}/$collection" \
+          for name in "${!collections[@]}"; do
+            collection_id=${collections[$name]}
+            echo "Running collection: $name"
+            newman run "https://api.getpostman.com/collections/${collection_id}?apikey=${{ secrets.POSTMAN_API_KEY }}" \
               -e updated_env.json \
               --reporters cli,json,htmlextra \
-              --reporter-json-export "testResults/${collection// /_}-report.json" \
-              --reporter-htmlextra-export "testResults/${collection// /_}-report.html" \
+              --reporter-json-export "testResults/${name// /_}-report.json" \
+              --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
               --suppress-exit-code || true
           done
 
