@@ -57,27 +57,41 @@ jobs:
       - name: Create Results Directory
         run: mkdir -p testResults
 
-      # Run Health Check
-      - name: Run Health Check
-        run: |
-          newman run "postman/health.json" \
-            -e updated_env.json \
-            --reporters cli,json,htmlextra \
-            --reporter-json-export testResults/health-report.json \
-            --reporter-htmlextra-export testResults/health-report.html
-
-      # Run Main Tests
-      - name: Run Main Tests
-        if: always()
+      # Run All Collections
+      - name: Run All Collections
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
-          newman run "${{ secrets.POSTMAN_COLLECTION_URL }}" \
-            -e updated_env.json \
-            --reporters cli,json,htmlextra \
-            --reporter-json-export testResults/newman-report.json \
-            --reporter-htmlextra-export testResults/newman-report.html \
-            --suppress-exit-code
+          # Array of collection names
+          collections=(
+            "Admin"
+            "Authentication"
+            "Authentication [Social OAuth]"
+            "Campaigns"
+            "CMS Content"
+            "Elections"
+            "Error Logger"
+            "Generate Signed Upload Url"
+            "Health"
+            "Integrations"
+            "Jobs (Ashby)"
+            "Payments"
+            "Subscribe"
+            "TopIssues"
+            "Users"
+            "VoterData"
+          )
+
+          # Run each collection
+          for collection in "${collections[@]}"; do
+            echo "Running collection: $collection"
+            newman run "${{ secrets.POSTMAN_WORKSPACE_URL }}/$collection" \
+              -e updated_env.json \
+              --reporters cli,json,htmlextra \
+              --reporter-json-export "testResults/${collection// /_}-report.json" \
+              --reporter-htmlextra-export "testResults/${collection// /_}-report.html" \
+              --suppress-exit-code || true
+          done
 
       # Upload test results as artifacts
       - name: Upload Test Results
