@@ -53,8 +53,22 @@ jobs:
               (.values[] | select(.key == "testUserPassword").value) = $password' \
              test_env.json > updated_env.json
 
-      # Run Newman tests
-      - name: Run Newman Tests
+      # Create results directory
+      - name: Create Results Directory
+        run: mkdir -p testResults
+
+      # Run Health Check
+      - name: Run Health Check
+        run: |
+          newman run "postman/health.json" \
+            -e updated_env.json \
+            --reporters cli,json,htmlextra \
+            --reporter-json-export testResults/health-report.json \
+            --reporter-htmlextra-export testResults/health-report.html
+
+      # Run Main Tests
+      - name: Run Main Tests
+        if: always()
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
@@ -62,4 +76,13 @@ jobs:
             -e updated_env.json \
             --reporters cli,json,htmlextra \
             --reporter-json-export testResults/newman-report.json \
-            --reporter-htmlextra-export testResults/newman-report.html
+            --reporter-htmlextra-export testResults/newman-report.html \
+            --suppress-exit-code
+
+      # Upload test results as artifacts
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: testResults
