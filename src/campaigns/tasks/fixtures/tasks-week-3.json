@@ -1,0 +1,25 @@
+[
+  {
+    "id": "c74d97b1-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Knock on doors to persuade voters",
+    "description": "Build trust and persuade voters.",
+    "week": 3,
+    "flowType": "door-knocking",
+    "proRequired": true
+  },
+  {
+    "id": "70efdf2e-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Plan your persuasive phone banking campaign",
+    "description": "Build trust and persuade voters.",
+    "week": 3,
+    "flowType": "phone-banking",
+    "proRequired": true
+  },
+  {
+    "id": "6f4922f4-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Post to social media talking about one of your top voter issues",
+    "description": "Tell people you have solutions for their issues.",
+    "week": 3,
+    "flowType": "social-media"
+  }
+]

@@ -1,0 +1,57 @@
+[
+  {
+    "id": "d3b07384-d9a0-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Schedule your election day reminder text message",
+    "description": "Encourage people to get out and vote.",
+    "week": 1,
+    "flowType": "texting",
+    "proRequired": true
+  },
+  {
+    "id": "9b74c989-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Schedule your election day reminder robocall",
+    "description": "Encourage people to get out and vote.",
+    "week": 1,
+    "flowType": "robocall",
+    "proRequired": true
+  },
+  {
+    "id": "a1d0c6e8-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Knock on doors to remind people to vote",
+    "description": "Encourage people to get out and vote.",
+    "week": 1,
+    "flowType": "door-knocking",
+    "proRequired": true
+  },
+  {
+    "id": "8f14e45f-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Plan your phone banking campaign reminding people to vote",
+    "description": "Encourage people to get out and vote.",
+    "week": 1,
+    "flowType": "social-media",
+    "proRequired": true
+  },
+  {
+    "id": "c9f0f895-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Post to social media reminding people to vote",
+    "description": "Encourage people to get out and vote.",
+    "week": 1,
+    "flowType": "social-media"
+  },
+  {
+    "id": "45c48cce-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Go to the polls",
+    "description": "Your presence shows commitment and allows last-minute voter contact.",
+    "week": 1,
+    "flowType": "link",
+    "link": "https://goodparty.org/blog/article/turning-support-into-victory-vote-phase-of-a-political-campaign"
+  },
+  {
+    "id": "d3d94468-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "title": "Celebrate your efforts",
+    "description": "Acknowledge everyone who made your campaign possible.",
+    "week": 1,
+    "flowType": "link",
+    "link": "https://goodparty.org/blog/article/what-to-do-after-winning-or-losing-election"
+  }
+]

@@ -17,6 +17,8 @@ import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasserIntegration.module'
+import { CampaignTasksController } from './tasks/campaignTasksController'
+import { CampaignTasksService } from './tasks/campaignTasksService'
 
 @Global()
 @Module({
@@ -34,6 +36,7 @@ import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasser
     CampaignPositionsController,
     CampaignMapController,
     CampaignUpdateHistoryController,
+    CampaignTasksController,
   ],
   providers: [
     CampaignsService,
@@ -43,6 +46,7 @@ import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasser
     GeocodingService,
     CampaignUpdateHistoryService,
     CrmCampaignsService,
+    CampaignTasksService,
   ],
   exports: [
     CampaignsService,
