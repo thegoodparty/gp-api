@@ -3,13 +3,14 @@ import { Campaign } from '@prisma/client'
 import { parse } from 'date-fns'
 import { DateFormats } from '../../shared/util/date.util'
 import { getCurrentWeekTillEndOfElectionDate } from './util/getCurrentWeekTillEndOfElectionDate.util'
-import { getListOfTasks } from './util/getListOfTasks.util'
+import { STATIC_CAMPAIGN_TASKS } from './campaignTasks.consts'
 
 @Injectable()
 export class CampaignTasksService {
+  private readonly fullTasksList = STATIC_CAMPAIGN_TASKS
   listCampaignTasks({ details }: Campaign, currentDate?: Date, endDate?: Date) {
     if (!currentDate) {
-      return getListOfTasks()
+      return this.getListOfTasks()
     }
     const { electionDate: electionDateStr } = details
     const electionDate =
@@ -20,6 +21,12 @@ export class CampaignTasksService {
       electionDate,
     )
 
-    return getListOfTasks(weekNumber)
+    return this.getListOfTasks(weekNumber)
+  }
+
+  getListOfTasks(weekNumber?: number) {
+    return weekNumber
+      ? this.fullTasksList.filter(({ week }) => week === weekNumber)
+      : this.fullTasksList
   }
 }
