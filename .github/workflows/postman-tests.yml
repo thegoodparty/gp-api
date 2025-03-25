@@ -34,29 +34,19 @@ jobs:
           npm install -g newman
           npm install -g newman-reporter-htmlextra
 
-      # Create environment file for tests
-      - name: Create Test Environment
-        id: create_env
-        run: |
-          # Copy the existing environment file
-          cp postman/environment.json test_env.json
-
-          # Update the environment with dev API URL and credentials
-          jq --arg url "https://gp-api-dev.goodparty.org" \
-             --arg email "${{ secrets.ADMIN_EMAIL }}" \
-             --arg password "${{ secrets.ADMIN_PASSWORD }}" \
-             '(.values[] | select(.key == "baseUrl").value) = $url | 
-              (.values[] | select(.key == "testAdminUserEmail").value) = $email | 
-              (.values[] | select(.key == "testUserPassword").value) = $password' \
-             test_env.json > updated_env.json
-
       # Run Newman tests
       - name: Run Newman Tests
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
           newman run "${{ secrets.POSTMAN_COLLECTION_URL }}" \
-            -e updated_env.json \
+            --env-var "protocol=https" \
+            --env-var "host=gp-api-dev.goodparty.org" \
+            --env-var "port=" \
+            --env-var "rootPath=/v1" \
+            --env-var "rootUrl=https://gp-api-dev.goodparty.org/v1" \
+            --env-var "testAdminUserEmail=${{ secrets.ADMIN_EMAIL }}" \
+            --env-var "testUserPassword=${{ secrets.ADMIN_PASSWORD }}" \
             --reporters cli,json,htmlextra \
             --reporter-json-export testResults/newman-report.json \
             --reporter-htmlextra-export testResults/newman-report.html
