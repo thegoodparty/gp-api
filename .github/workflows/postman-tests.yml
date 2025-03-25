@@ -73,8 +73,13 @@ jobs:
             ["Error Logger"]="${{ secrets.ERROR_LOGGER_COLLECTION_ID }}"
             ["Generate Signed Upload Url"]="${{ secrets.GENERATE_SIGNED_UPLOAD_URL_COLLECTION_ID }}"
             ["Health"]="${{ secrets.HEALTH_COLLECTION_ID }}"
-            
-            
+            ["Integrations"]="${{ secrets.INTEGRATIONS_COLLECTION_ID }}"
+            ["Jobs (Ashby)"]="${{ secrets.JOBS_ASHBY_COLLECTION_ID }}"
+            ["Payments"]="${{ secrets.PAYMENTS_COLLECTION_ID }}"
+            ["Subscribe"]="${{ secrets.SUBSCRIBE_COLLECTION_ID }}"
+            ["TopIssues"]="${{ secrets.TOP_ISSUES_COLLECTION_ID }}"
+            ["Users"]="${{ secrets.USERS_COLLECTION_ID }}"
+            ["VoterData"]="${{ secrets.VOTER_DATA_COLLECTION_ID }}"
           )
           
           # Run each collection
