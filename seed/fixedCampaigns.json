@@ -14,7 +14,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Governor"
       }
     },
     "didWin": true,
@@ -36,7 +37,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Senator"
       }
     },
     "didWin": true,
@@ -58,7 +60,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "City Council"
       }
     },
     "didWin": true,
@@ -80,7 +83,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Mayor"
       }
     },
     "didWin": true,
@@ -102,7 +106,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Sheriff"
       }
     },
     "didWin": true,
@@ -124,7 +129,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Governor"
       }
     },
     "didWin": true,
@@ -146,7 +152,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Commissioner"
       }
     },
     "didWin": true,
@@ -168,7 +175,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Attorney General"
       }
     },
     "didWin": true,
@@ -190,7 +198,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "Treasurer"
       }
     },
     "didWin": true,
@@ -212,7 +221,8 @@
     "data": {
       "hubSpotUpdates": {
         "election_results": "Won General",
-        "verified_candidates": "Yes"
+        "verified_candidates": "Yes",
+        "office_type": "City Council"
       }
     },
     "didWin": true,

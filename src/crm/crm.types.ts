@@ -79,8 +79,9 @@ export namespace HubSpot {
     election_results = 'election_results',
     verified_candidates = 'verified_candidates',
 
-    // hubspot_owner_id only comes from sync pulls, not webhooks
+    // hubspot_owner_id + office_type only comes from sync pulls, not webhooks
     hubspot_owner_id = 'hubspot_owner_id',
+    office_type = 'office_type',
   }
 
   /**
