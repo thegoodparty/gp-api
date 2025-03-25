@@ -58,7 +58,7 @@ jobs:
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
-          newman run "https://api.getpostman.com/collections/${{ secrets.COLLECTION_UID }}?apikey=${{ secrets.POSTMAN_API_KEY }}" \
+          newman run "${{ secrets.POSTMAN_COLLECTION_URL }}" \
             -e updated_env.json \
             --reporters cli,json,htmlextra \
             --reporter-json-export testResults/newman-report.json \
