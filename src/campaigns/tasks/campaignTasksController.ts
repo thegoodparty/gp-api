@@ -1,4 +1,12 @@
-import { Controller, Get, ParseDatePipe, Query } from '@nestjs/common'
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseDatePipe,
+  Put,
+  Query,
+} from '@nestjs/common'
 import { CampaignTasksService } from './campaignTasksService'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
@@ -16,5 +24,21 @@ export class CampaignTasksController {
     @Query('endDate', new ParseDatePipe({ optional: true })) endDate?: Date,
   ) {
     return this.tasksService.listCampaignTasks(campaign, date, endDate)
+  }
+
+  @Put('complete/:taskId')
+  async completeTask(
+    @ReqCampaign() campaign: Campaign,
+    @Param('taskId') taskId: string,
+  ) {
+    return this.tasksService.completeTask(campaign, taskId)
+  }
+
+  @Delete('complete/:taskId')
+  async unCompleteTask(
+    @ReqCampaign() campaign: Campaign,
+    @Param('taskId') taskId: string,
+  ) {
+    return this.tasksService.unCompleteTask(campaign, taskId)
   }
 }

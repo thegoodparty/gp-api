@@ -4,11 +4,19 @@ import { parse } from 'date-fns'
 import { DateFormats } from '../../shared/util/date.util'
 import { getCurrentWeekTillEndOfElectionDate } from './util/getCurrentWeekTillEndOfElectionDate.util'
 import { STATIC_CAMPAIGN_TASKS } from './campaignTasks.consts'
+import { CampaignsService } from '../services/campaigns.service'
 
 @Injectable()
 export class CampaignTasksService {
   private readonly fullTasksList = STATIC_CAMPAIGN_TASKS
-  listCampaignTasks({ details }: Campaign, currentDate?: Date, endDate?: Date) {
+
+  constructor(private readonly campaigns: CampaignsService) {}
+
+  listCampaignTasks(
+    { details, completedTaskIds }: Campaign,
+    currentDate?: Date,
+    endDate?: Date,
+  ) {
     if (!currentDate) {
       return this.getListOfTasks()
     }
@@ -21,12 +29,55 @@ export class CampaignTasksService {
       electionDate,
     )
 
-    return this.getListOfTasks(weekNumber)
+    const tasks = this.getListOfTasks(weekNumber)
+    return tasks.map((task) => ({
+      ...task,
+      completed: Boolean(completedTaskIds.includes(task.id)),
+    }))
   }
 
-  getListOfTasks(weekNumber?: number) {
+  private getListOfTasks(weekNumber?: number) {
     return weekNumber
       ? this.fullTasksList.filter(({ week }) => week === weekNumber)
       : this.fullTasksList
+  }
+
+  getCampaignTaskById(taskId: string, completedTaskIds?: string[]) {
+    return {
+      ...this.fullTasksList.find(({ id }) => id === taskId)!,
+      ...(completedTaskIds
+        ? { completed: Boolean(completedTaskIds.includes(taskId)) }
+        : {}),
+    }
+  }
+
+  async completeTask({ id, completedTaskIds }: Campaign, taskId: string) {
+    const updatedCompletedTaskIds = [...new Set([...completedTaskIds, taskId])]
+    const updatedCampaign = await this.campaigns.update({
+      where: {
+        id,
+      },
+      data: {
+        completedTaskIds: updatedCompletedTaskIds,
+      },
+    })
+
+    return this.getCampaignTaskById(taskId, updatedCampaign.completedTaskIds)
+  }
+
+  async unCompleteTask({ id, completedTaskIds }: Campaign, taskId: string) {
+    const updatedCompletedTaskIds = completedTaskIds.filter(
+      (id) => id !== taskId,
+    )
+    const updatedCampaign = await this.campaigns.update({
+      where: {
+        id,
+      },
+      data: {
+        completedTaskIds: updatedCompletedTaskIds,
+      },
+    })
+
+    return this.getCampaignTaskById(taskId, updatedCampaign.completedTaskIds)
   }
 }
