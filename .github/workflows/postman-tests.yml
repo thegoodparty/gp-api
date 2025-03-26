@@ -110,9 +110,14 @@ jobs:
             collection_id=${collections[$name]}
             echo "Running collection: $name"
             
-            # Run newman and capture output
-            output=$(newman run "https://api.getpostman.com/collections/${collection_id}?apikey=${{ secrets.POSTMAN_API_KEY }}" \
+            # Add a small delay between collections
+            sleep 2
+            
+            # Run newman with a lower request rate
+            output=$(newman run "https://api.getpostman.com/collections/${collection_id}?apikey=$POSTMAN_API_KEY" \
               -e updated_env.json \
+              --delay-request 1000 \  # Add 1 second delay between requests
+              --timeout-request 60000 \  # Increase request timeout
               --reporters cli,json,htmlextra \
               --reporter-json-export "testResults/${name// /_}-report.json" \
               --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
