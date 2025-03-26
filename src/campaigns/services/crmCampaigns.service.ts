@@ -302,9 +302,6 @@ export class CrmCampaignsService {
       HubSpot.OutgoingProperty,
       string | number | undefined
     > = {
-      // some hardcoded things for hubspot
-      type: 'CAMPAIGN',
-
       // voter contact numbers
       calls_made: reportedVoterGoals?.calls,
       direct_mail_sent: reportedVoterGoals?.directMail,
@@ -324,8 +321,10 @@ export class CrmCampaignsService {
       office_level: ballotLevel,
       candidate_party: party,
       candidate_state: longState,
+      state: longState,
       city: city ?? undefined,
       created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
+      admin_user: adminUserEmail,
       pledge_status: pledged ? 'yes' : 'no',
       pro_candidate: isPro ? 'Yes' : 'No',
       pro_subscription_status: proSubscriptionStatus,
@@ -333,6 +332,8 @@ export class CrmCampaignsService {
       running: runForOffice ? 'yes' : 'no',
 
       // election details
+      br_position_id: campaignDetails?.positionId,
+      br_race_id: campaignDetails?.raceId,
       election_date: electionDateMs,
       filing_deadline: filingEndMs, // TODO: is this different than filing_end?
       filing_start: filingStartMs,
@@ -361,7 +362,12 @@ export class CrmCampaignsService {
       win_number: winNumber,
     }
 
-    const validated = CRMCompanyPropertiesSchema.safeParse(fieldsToSync)
+    const validated = CRMCompanyPropertiesSchema.transform((obj) =>
+      Object.fromEntries(
+        // remove undefined values, just to be safe
+        Object.entries(obj).filter(([_, v]) => v !== undefined),
+      ),
+    ).safeParse(fieldsToSync)
 
     if (!validated.success) {
       // Handle validation errors

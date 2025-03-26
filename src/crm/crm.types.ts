@@ -88,9 +88,6 @@ export namespace HubSpot {
    * Hubspot property names that we send to Hubspot via app integration
    */
   export enum OutgoingProperty {
-    // some hardcoded things for hubspot
-    type = 'type',
-
     // voter contact numbers
     calls_made = 'calls_made',
     direct_mail_sent = 'direct_mail_sent',
@@ -110,8 +107,10 @@ export namespace HubSpot {
     office_level = 'office_level',
     candidate_party = 'candidate_party',
     candidate_state = 'candidate_state',
+    state = 'state',
     city = 'city',
     created_by_admin = 'created_by_admin',
+    admin_user = 'admin_user',
     pledge_status = 'pledge_status',
     pro_candidate = 'pro_candidate',
     pro_subscription_status = 'pro_subscription_status',
@@ -119,6 +118,8 @@ export namespace HubSpot {
     running = 'running',
 
     // election details
+    br_position_id = 'br_position_id',
+    br_race_id = 'br_race_id',
     election_date = 'election_date',
     filing_deadline = 'filing_deadline',
     filing_end = 'filing_end',

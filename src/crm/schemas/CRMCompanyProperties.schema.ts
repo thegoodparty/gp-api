@@ -11,9 +11,6 @@ const upperYesNoSchema = z.union([z.literal('Yes'), z.literal('No')])
 
 export const CRMCompanyPropertiesSchema = z
   .object({
-    // some hardcoded things for hubspot
-    [HS_PROPS.type]: z.literal('CAMPAIGN'),
-
     // voter contact numbers
     [HS_PROPS.calls_made]: intSchema,
     [HS_PROPS.direct_mail_sent]: intSchema,
@@ -33,8 +30,10 @@ export const CRMCompanyPropertiesSchema = z
     [HS_PROPS.office_level]: z.string(),
     [HS_PROPS.candidate_party]: z.string(),
     [HS_PROPS.candidate_state]: z.string(),
+    [HS_PROPS.state]: z.string(),
     [HS_PROPS.city]: z.string(),
     [HS_PROPS.created_by_admin]: yesNoSchema,
+    [HS_PROPS.admin_user]: z.string().email(),
     [HS_PROPS.pledge_status]: yesNoSchema,
     [HS_PROPS.pro_candidate]: upperYesNoSchema,
     [HS_PROPS.pro_subscription_status]: z.union([
@@ -45,6 +44,8 @@ export const CRMCompanyPropertiesSchema = z
     [HS_PROPS.running]: yesNoSchema,
 
     // election details
+    [HS_PROPS.br_position_id]: z.string(),
+    [HS_PROPS.br_race_id]: z.string(),
     [HS_PROPS.election_date]: timestampSchema,
     [HS_PROPS.filing_deadline]: timestampSchema,
     [HS_PROPS.filing_start]: timestampSchema,
