@@ -4,7 +4,7 @@
       "state": "CA",
       "zip": "90001",
       "ballotLevel": "State",
-      "electionDate": "2024-11-05",
+      "electionDate": "2025-04-01",
       "primaryElectionDate": "2024-06-03",
       "geoLocation": {},
       "party": "Libertarian",
@@ -27,7 +27,7 @@
       "state": "TX",
       "zip": "73301",
       "ballotLevel": "State",
-      "electionDate": "2024-11-05",
+      "electionDate": "2025-04-01",
       "primaryElectionDate": "2024-03-05",
       "geoLocation": {},
       "party": "Communist",
@@ -161,7 +161,7 @@
     "isActive": true
   },
   {
-    
+
     "details": {
       "state": "AZ",
       "zip": "85001",

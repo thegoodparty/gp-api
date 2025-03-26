@@ -1,6 +1,6 @@
 [
   {
-    "id": "6512bd43-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "id": "f58b4523-c36d-4a5b-9e5f-88e4d3a7c70c",
     "title": "Schedule your persuasive text message",
     "description": "Build trust and persuade voters.",
     "week": 2,
@@ -8,7 +8,7 @@
     "proRequired": true
   },
   {
-    "id": "c20ad4d7-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "id": "a5f07d6c-8e3d-49e2-b131-92103c2be07e",
     "title": "Schedule your persuasive robocall",
     "description": "Build trust and persuade voters.",
     "week": 2,
@@ -16,7 +16,7 @@
     "proRequired": true
   },
   {
-    "id": "c51ce410-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "id": "d92e5b8c-7ac0-4e1a-9b87-562f5824dfe9",
     "title": "Knock on doors to remind people to vote",
     "description": "Encourage people to get out and vote.",
     "week": 2,
@@ -24,7 +24,7 @@
     "proRequired": true
   },
   {
-    "id": "a5771bce-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "id": "b41c6e7f-29e8-438d-89d3-6ed28742c4a5",
     "title": "Plan your phone banking campaign reminding people to vote",
     "description": "Encourage people to get out and vote.",
     "week": 2,
@@ -32,14 +32,14 @@
     "proRequired": true
   },
   {
-    "id": "d67d8ab4-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "id": "e718329f-8b47-4e18-9f3b-8c7dfa96021c",
     "title": "Post to social media answering common questions",
     "description": "Mobilize your base and control the narrative about your campaign.",
     "week": 2,
     "flowType": "social-media"
   },
   {
-    "id": "77de68da-7c4c-4c9b-8a1e-5b2b5b5b5b5b",
+    "id": "17a6ceb8-5f9d-4e83-80c7-2f8e41736104",
     "title": "Plan a GOTV event",
     "description": "Last opportunity to mobilize your volunteers and voters.",
     "week": 2,
