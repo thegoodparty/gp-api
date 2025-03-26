@@ -110,14 +110,16 @@ jobs:
             collection_id=${collections[$name]}
             echo "Running collection: $name"
             
-            # Add a small delay between collections
-            sleep 2
+            # Increase delay between collections to 5 seconds
+            sleep 5
             
-            # Run newman with a lower request rate
+            # Run newman with more conservative settings
             output=$(newman run "https://api.getpostman.com/collections/${collection_id}?apikey=$POSTMAN_API_KEY" \
               -e updated_env.json \
-              --delay-request 1000 \  # Add 1 second delay between requests
-              --timeout-request 60000 \  # Increase request timeout
+              --delay-request 2000 \    # Increase to 2 seconds between requests
+              --timeout-request 120000 \ # Increase timeout to 2 minutes
+              --timeout 300000 \        # Set overall timeout to 5 minutes
+              --timeout-script 60000 \  # Increase script timeout
               --reporters cli,json,htmlextra \
               --reporter-json-export "testResults/${name// /_}-report.json" \
               --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
@@ -202,6 +204,9 @@ jobs:
                 echo "No test results found for $name"
               fi
             fi
+            
+            # Add additional delay after each collection
+            sleep 3
           done
           
           # Add summary line with more detail
