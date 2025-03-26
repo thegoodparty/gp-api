@@ -1,22 +1,22 @@
 {
-	"id": "0205933f-8975-40bb-89f4-1c3db95f27e7",
-	"name": "localhost",
+	"id": "b4c40f8c-8f69-447d-bd06-0deb2571e7b9",
+	"name": "gp-api-dev",
 	"values": [
 		{
 			"key": "protocol",
-			"value": "http",
+			"value": "https",
 			"type": "default",
 			"enabled": true
 		},
 		{
 			"key": "host",
-			"value": "localhost",
+			"value": "gp-api-dev.goodparty.org",
 			"type": "default",
 			"enabled": true
 		},
 		{
 			"key": "port",
-			"value": ":3000",
+			"value": "",
 			"type": "default",
 			"enabled": true
 		},
@@ -82,7 +82,13 @@
 		},
 		{
 			"key": "testAdminUserEmail",
-			"value": "tyler@fightClub.org",
+			"value": "dustin+playwright@goodparty.org",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "testAdminUserPassword",
+			"value": "8G5235$%A",
 			"type": "default",
 			"enabled": true
 		},
@@ -97,9 +103,109 @@
 			"value": "",
 			"type": "any",
 			"enabled": true
+		},
+		{
+			"key": "GOOGLE_CLIENT_ID",
+			"value": "28351607421-c9m6ig3vmto6hpke4g96ukgfl3vvko7g.apps.googleusercontent.com",
+			"enabled": true
+		},
+		{
+			"key": "socialPic",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "socialEmail",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "socialPicUrl",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "oAuthtoken",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "oAuthUserId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "oAuthUserEmail",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "candidateUserEmail",
+			"value": "candidate@fightclub.org",
+			"enabled": true
+		},
+		{
+			"key": "candidateUserPassword",
+			"value": "makeFightClubGreatAgain123",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "noRoleUserEmail",
+			"value": "visitor@fightclub.org",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "noRoleUserPassword",
+			"value": "tellMeAllAboutFightClub123",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "s3Bucket",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "s3BucketFolder",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "s3FileName",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "testUserResetPassword",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "testUserUpdatePassword",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "campaignId",
+			"value": "",
+			"type": "default",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2024-12-12T22:45:53.193Z",
-	"_postman_exported_using": "Postman/11.22.1"
+	"_postman_exported_at": "2025-03-26T03:30:01.393Z",
+	"_postman_exported_using": "Postman/11.37.5"
 }
