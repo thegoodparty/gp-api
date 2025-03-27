@@ -15,6 +15,7 @@ import { VoterCounts } from 'src/voters/voters.types'
 import { EmailTemplateNames } from '../../email/email.types'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
+import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 
 @Injectable()
 export class PathToVictoryService extends createPrismaBase(
@@ -420,7 +421,7 @@ export class PathToVictoryService extends createPrismaBase(
 
         if (
           process.env.WEBAPP_ROOT === 'https://goodparty.org' &&
-          campaign?.data?.createdBy !== 'admin'
+          campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN
         ) {
           this.logger.debug('sending email to user', campaign.user.email)
           await this.emailService.sendTemplateEmail({

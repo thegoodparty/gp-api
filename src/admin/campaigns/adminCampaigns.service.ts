@@ -8,7 +8,11 @@ import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
-import { CampaignWith, OnboardingStep } from 'src/campaigns/campaigns.types'
+import {
+  CampaignCreatedBy,
+  CampaignWith,
+  OnboardingStep,
+} from 'src/campaigns/campaigns.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { formatDate } from 'date-fns'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
@@ -61,7 +65,7 @@ export class AdminCampaignsService {
       currentStep: OnboardingStep.complete,
       party,
       otherParty,
-      createdBy: 'admin',
+      createdBy: CampaignCreatedBy.ADMIN,
       adminUserEmail,
     }
 
@@ -176,7 +180,7 @@ export class AdminCampaignsService {
 
     await this.adminP2V.completeP2V(user.id, pathToVictory)
 
-    if (campaign?.data?.createdBy !== 'admin') {
+    if (campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN) {
       const variables = {
         name: getUserFullName(user),
         link: `${WEBAPP_ROOT}/dashboard`,

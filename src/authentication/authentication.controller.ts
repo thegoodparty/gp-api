@@ -31,6 +31,7 @@ import { FastifyReply } from 'fastify'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
 import { CrmUsersService } from '../users/services/crmUsers.service'
 import { setTokenCookie } from './util/setTokenCookie.util'
+import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 
 @PublicAccess()
 @Controller('authentication')
@@ -149,7 +150,7 @@ export class AuthenticationController {
       // to automatically login after the password change
       const campaign = await this.campaignsService.findByUserId(user.id)
 
-      if (campaign?.data.createdBy !== 'admin') {
+      if (campaign?.data.createdBy !== CampaignCreatedBy.ADMIN) {
         // don't login just return
         return userOut
       }

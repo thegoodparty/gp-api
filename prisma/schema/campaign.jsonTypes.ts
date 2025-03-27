@@ -4,12 +4,14 @@ import {
   AiContentGenerationStatus,
 } from 'src/campaigns/ai/content/aiContent.types'
 import {
+  CampaignCreatedBy,
   CampaignLaunchStatus,
   ElectionLevel,
   OnboardingStep,
   VoterGoals,
 } from 'src/campaigns/campaigns.types'
 import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
+import { HubSpot } from 'src/crm/crm.types'
 
 export {}
 
@@ -67,13 +69,9 @@ declare global {
     //  No reason to have both.
     //  Take care not to duplicate a field on both details and data, for now
     export type CampaignData = {
-      createdBy?: 'admin' | string
+      createdBy?: CampaignCreatedBy
       slug?: string
-      hubSpotUpdates?: {
-        verified_candidates?: string
-        election_results?: string
-        office_type?: string
-      } & Record<string, string>
+      hubSpotUpdates?: Partial<Record<HubSpot.IncomingProperty, string>>
       currentStep?: OnboardingStep
       launchStatus?: CampaignLaunchStatus
       lastVisited?: number

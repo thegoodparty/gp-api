@@ -39,12 +39,12 @@ export interface L2Count {
 
 export interface ViabilityScore {
   level: string
-  isPartisan: string | boolean
-  isIncumbent: string | boolean
-  isUncontested: string | boolean
-  candidates: string | number
-  seats: string | number
-  candidatesPerSeat: string | number
+  isPartisan: boolean
+  isIncumbent: boolean
+  isUncontested: boolean
+  candidates: number
+  seats: number
+  candidatesPerSeat: number
   score: number
   probOfWin: number
 }

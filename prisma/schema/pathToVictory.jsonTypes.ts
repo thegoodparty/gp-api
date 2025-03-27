@@ -1,19 +1,7 @@
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { ViabilityScore } from 'src/pathToVictory/types/pathToVictory.types'
 
 export {}
-
-// we allow for '' empty string which means the data is not yet available
-interface P2VViability {
-  level?: string
-  score?: number
-  seats?: string | number
-  opponents?: string | number
-  candidates?: string | number
-  isPartisan?: string | boolean
-  isIncumbent?: string | boolean
-  isUncontested?: string | boolean
-  candidatesPerSeat?: string | number
-}
 
 declare global {
   export namespace PrismaJson {
@@ -39,7 +27,7 @@ declare global {
       hispanic?: number
       averageTurnout?: number
       projectedTurnout?: number
-      viability?: P2VViability
+      viability?: ViabilityScore
     }
   }
 }
