@@ -19,6 +19,7 @@ import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasserIntegration.module'
 import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
+import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 
 @Global()
 @Module({
@@ -30,6 +31,7 @@ import { CampaignTasksService } from './tasks/campaignTasksService'
     ElectionsModule,
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
+    ScheduledMessagingModule,
   ],
   controllers: [
     CampaignsController,

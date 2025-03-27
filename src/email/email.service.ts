@@ -5,26 +5,14 @@ import {
   getRecoverPasswordEmailContent,
 } from './util/content.util'
 import { User } from '@prisma/client'
-import { EmailTemplateNames } from './email.types'
+import {
+  EmailTemplateNames,
+  SendEmailInput,
+  SendTemplateEmailInput,
+} from './email.types'
 import { getUserFullName } from '../users/util/users.util'
 import { DateFormats, formatDate } from '../shared/util/date.util'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-
-type SendEmailInput = {
-  to: string
-  subject: string
-  message: string
-  from?: string
-}
-
-type SendTemplateEmailInput = {
-  to: string
-  subject: string
-  template: EmailTemplateNames
-  variables?: object
-  from?: string
-  cc?: string
-}
 
 @Injectable()
 export class EmailService {

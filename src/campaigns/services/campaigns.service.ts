@@ -18,7 +18,10 @@ import {
   PlanVersion,
 } from '../campaigns.types'
 import { EmailService } from 'src/email/email.service'
-import { EmailTemplateNames } from 'src/email/email.types'
+import {
+  EmailTemplateNames,
+  ScheduledMessageTypes,
+} from 'src/email/email.types'
 import { UsersService } from 'src/users/services/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
@@ -26,6 +29,8 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmCampaignsService } from './crmCampaigns.service'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
+import { ScheduledMessagingService } from '../../scheduled-messaging/scheduled-messaging.service'
+import { addSeconds } from 'date-fns'
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
@@ -36,6 +41,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly crm: CrmCampaignsService,
     private planVersionService: CampaignPlanVersionsService,
     private emailService: EmailService,
+    private scheduledMessaging: ScheduledMessagingService,
   ) {
     super()
   }
@@ -51,7 +57,20 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
-    return this.model.create(args)
+    const campaign = await this.model.create(args)
+    await this.scheduledMessaging.scheduleMessage(
+      campaign.id,
+      {
+        type: ScheduledMessageTypes.EMAIL,
+        message: {
+          to: 'matthew@goodparty.org',
+          subject: 'Campaign Created',
+          message: `Campaign ${campaign.id} created`,
+        },
+      },
+      addSeconds(new Date(), 3),
+    )
+    return campaign
   }
 
   // TODO: Find a way to make these JSON path lookups type-safe
@@ -82,7 +101,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     this.logger.debug('Creating campaign for user', user)
     const slug = await this.findSlug(user)
 
-    const newCampaign = await this.model.create({
+    const newCampaign = await this.create({
       data: {
         slug,
         isActive: false,

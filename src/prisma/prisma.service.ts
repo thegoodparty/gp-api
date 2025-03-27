@@ -13,6 +13,8 @@ const PRISMA_LOG_LEVELS = [
   ...(process.env.LOG_LEVEL === 'debug' ? ['query' as Prisma.LogLevel] : []),
 ]
 
+const enableQueryLogging = Boolean(process.env.ENABLE_QUERY_LOGGING === 'true')
+
 @Injectable()
 export class PrismaService
   extends PrismaClient<Prisma.PrismaClientOptions, 'query'>
@@ -33,11 +35,12 @@ export class PrismaService
   async onModuleInit() {
     await this.$connect()
 
-    this.$on('query', (event: Prisma.QueryEvent) => {
-      this.logger.debug('Query: ' + event.query)
-      this.logger.debug('Parameters: ' + event.params)
-      this.logger.debug('Duration: ' + event.duration + 'ms')
-    })
+    enableQueryLogging &&
+      this.$on('query', (event: Prisma.QueryEvent) => {
+        this.logger.debug('Query: ' + event.query)
+        this.logger.debug('Parameters: ' + event.params)
+        this.logger.debug('Duration: ' + event.duration + 'ms')
+      })
   }
 
   async onModuleDestroy() {
