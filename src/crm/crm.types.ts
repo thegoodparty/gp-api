@@ -59,6 +59,53 @@ export namespace HubSpot {
     INTEGRATION = 'INTEGRATION',
   }
 
+  /** pro_subscription_status values */
+  export enum ProSubStatus {
+    ACTIVE = 'Active',
+    INACTIVE = 'Inactive',
+  }
+
+  /** verified_candidates values */
+  export enum VerifiedCandidate {
+    YES = 'yes',
+    NO = 'no',
+  }
+
+  /** election_results values */
+  export enum ElectionResult {
+    WON_GENERAL = 'won general',
+    LOST_GENERAL = 'lost general',
+  }
+
+  /** created_by_admin values */
+  export enum CreatedByAdmin {
+    YES = 'yes',
+    NO = 'no',
+  }
+
+  /** pledge_status values */
+  export enum PledgeStatus {
+    YES = 'yes',
+    NO = 'no',
+  }
+
+  /** pro_candidate values */
+  export enum ProCandidate {
+    YES = 'Yes',
+    NO = 'No',
+  }
+
+  export enum Running {
+    YES = 'yes',
+    NO = 'no',
+  }
+
+  /** voter_data_adoption values */
+  export enum VoterDataAdoption {
+    LOCKED = 'Locked',
+    UNLOCKED = 'Unlocked',
+  }
+
   /**
    * Hubspot property names that we recieve from Hubspot via webhook or sync pulls
    */

@@ -4,6 +4,7 @@ import {
   AiContentGenerationStatus,
 } from 'src/campaigns/ai/content/aiContent.types'
 import {
+  CampaignCreatedBy,
   CampaignLaunchStatus,
   ElectionLevel,
   OnboardingStep,
@@ -68,7 +69,7 @@ declare global {
     //  No reason to have both.
     //  Take care not to duplicate a field on both details and data, for now
     export type CampaignData = {
-      createdBy?: 'admin' | string
+      createdBy?: CampaignCreatedBy
       slug?: string
       hubSpotUpdates?: Partial<Record<HubSpot.IncomingProperty, string>>
       currentStep?: OnboardingStep

@@ -29,6 +29,11 @@ import {
   CRMCompanyPropertiesSchema,
   CRMCompanyProperties,
 } from 'src/crm/schemas/CRMCompanyProperties.schema'
+import {
+  P2V_LOCKED_STATUS,
+  P2VStatus,
+} from 'src/elections/types/pathToVictory.types'
+import { CampaignCreatedBy, OnboardingStep } from '../campaigns.types'
 
 const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 
@@ -279,13 +284,15 @@ export class CrmCampaignsService {
     )?.name
 
     // TODO: need to figure out what to do with this in HS
-    const proSubscriptionStatus = campaign.isPro ? 'Active' : 'Inactive'
+    const proSubscriptionStatus = campaign.isPro
+      ? HubSpot.ProSubStatus.ACTIVE
+      : HubSpot.ProSubStatus.INACTIVE
 
     const p2v_status =
       p2vNotNeeded || !p2vStatus
-        ? 'Locked'
+        ? P2V_LOCKED_STATUS
         : totalRegisteredVoters
-          ? 'Complete'
+          ? P2VStatus.complete
           : p2vStatus
 
     const ecanvasser = await this.ecanvasser.findByCampaignId(campaignId)
@@ -323,13 +330,18 @@ export class CrmCampaignsService {
       candidate_state: longState,
       state: longState,
       city: city ?? undefined,
-      created_by_admin: createdBy === 'admin' ? 'yes' : 'no',
+      created_by_admin:
+        createdBy === CampaignCreatedBy.ADMIN
+          ? HubSpot.CreatedByAdmin.YES
+          : HubSpot.CreatedByAdmin.NO,
       admin_user: adminUserEmail,
-      pledge_status: pledged ? 'yes' : 'no',
-      pro_candidate: isPro ? 'Yes' : 'No',
+      pledge_status: pledged
+        ? HubSpot.PledgeStatus.YES
+        : HubSpot.PledgeStatus.NO,
+      pro_candidate: isPro ? HubSpot.ProCandidate.YES : HubSpot.ProCandidate.NO,
       pro_subscription_status: proSubscriptionStatus,
       pro_upgrade_date: isProUpdatedAtMs,
-      running: runForOffice ? 'yes' : 'no',
+      running: runForOffice ? HubSpot.Running.YES : HubSpot.Running.NO,
 
       // election details
       br_position_id: campaignDetails?.positionId,
@@ -342,13 +354,15 @@ export class CrmCampaignsService {
 
       // usage details
       last_portal_visit: lastPortalVisit,
-      last_step: isActive ? 'onboarding-complete' : currentStep,
+      last_step: isActive ? OnboardingStep.complete : currentStep,
       last_step_date: lastStepDateMs,
       campaign_assistant_chats: aiChatCount,
       my_content_pieces_created: aiContent ? Object.keys(aiContent).length : 0,
       product_sessions: sessionCount,
       voter_files_created: campaignData?.customVoterFiles?.length,
-      voter_data_adoption: canDownloadVoterFile ? 'Unlocked' : 'Locked',
+      voter_data_adoption: canDownloadVoterFile
+        ? HubSpot.VoterDataAdoption.UNLOCKED
+        : HubSpot.VoterDataAdoption.LOCKED,
 
       // p2v details / viability
       automated_score:
@@ -543,11 +557,13 @@ export class CrmCampaignsService {
     }
 
     if (propertyName === HubSpot.IncomingProperty.verified_candidates) {
-      updatePayload.isVerified = propertyValue.toLowerCase() === 'yes'
+      updatePayload.isVerified =
+        propertyValue.toLowerCase() === HubSpot.VerifiedCandidate.YES
     }
 
     if (propertyName === HubSpot.IncomingProperty.election_results) {
-      updatePayload.didWin = propertyValue.toLowerCase() === 'won general'
+      updatePayload.didWin =
+        propertyValue.toLowerCase() === HubSpot.ElectionResult.WON_GENERAL
     }
 
     this.campaigns.update({
@@ -700,14 +716,15 @@ export class CrmCampaignsService {
         }
 
         if (
-          String(hubSpotUpdates.verified_candidates).toLowerCase() === 'yes'
+          String(hubSpotUpdates.verified_candidates).toLowerCase() ===
+          HubSpot.VerifiedCandidate.YES
         ) {
           updatedCampaign.isVerified = true
         }
 
         if (
           String(hubSpotUpdates.election_results).toLowerCase() ===
-          'won general'
+          HubSpot.ElectionResult.WON_GENERAL
         ) {
           updatedCampaign.didWin = true
         }
