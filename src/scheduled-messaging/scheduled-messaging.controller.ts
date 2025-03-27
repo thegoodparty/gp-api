@@ -20,7 +20,7 @@ export class ScheduledMessagingController {
           message: 'Testing scheduled messaging',
         },
       },
-      addSeconds(new Date(), 10),
+      addSeconds(new Date(), 5),
     )
   }
 }

@@ -25,17 +25,37 @@ export class ScheduledMessagingService extends createPrismaBase(
     )
   }
 
-  private async processScheduledMessages() {
-    const messages = await this.model.findMany({
-      where: {
-        scheduledAt: {
-          lte: new Date(),
+  private async queryScheduledMessagesAndFlag() {
+    let messages: ScheduledMessage[] = []
+    await this.client.$transaction(async (tx) => {
+      messages = await this.model.findMany({
+        where: {
+          scheduledAt: {
+            lte: new Date(),
+          },
+          processing: false,
+          sentAt: {
+            equals: null,
+          },
         },
-        sentAt: {
-          equals: null,
+      })
+
+      await this.model.updateMany({
+        where: {
+          id: {
+            in: messages.map((m) => m.id),
+          },
         },
-      },
+        data: {
+          processing: true, // Ensure no other process is trying to send this message
+        },
+      })
     })
+    return messages
+  }
+
+  private async processScheduledMessages() {
+    const messages = await this.queryScheduledMessagesAndFlag()
 
     if (!messages?.length) {
       return []
@@ -51,6 +71,7 @@ export class ScheduledMessagingService extends createPrismaBase(
           },
           data: {
             sentAt: new Date(),
+            processing: false,
           },
         })
         updatedMessages.push(updatedScheduledMsg)

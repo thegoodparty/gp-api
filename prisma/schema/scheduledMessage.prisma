@@ -5,6 +5,7 @@ model ScheduledMessage {
   scheduledAt   DateTime  @map("scheduled_at")
   campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId    Int       @map("campaign_id")
+  processing    Boolean   @default(false)
   sentAt        DateTime? @map("sent_at")
   messageConfig Json      @default("{}") @map("message_config") @db.JsonB
   error         String?
