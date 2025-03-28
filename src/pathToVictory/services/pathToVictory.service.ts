@@ -12,7 +12,7 @@ import {
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
 import { VoterCounts } from 'src/voters/voters.types'
-import { EmailTemplateNames } from '../../email/email.types'
+import { EmailTemplateName } from '../../email/email.types'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
 
@@ -426,7 +426,7 @@ export class PathToVictoryService extends createPrismaBase(
           await this.emailService.sendTemplateEmail({
             to: campaign.user.email,
             subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-            template: EmailTemplateNames.candidateVictoryReady,
+            template: EmailTemplateName.candidateVictoryReady,
             variables,
             cc: 'jared@goodparty.org',
           })

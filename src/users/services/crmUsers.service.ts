@@ -200,8 +200,6 @@ export class CrmUsersService {
       aggregatedCrmContactProperties,
     )
 
-    console.log(`crmContactId =>`, crmContactId)
-
     if (crmContactId) {
       return await this.updateCrmContact(
         crmContactId,

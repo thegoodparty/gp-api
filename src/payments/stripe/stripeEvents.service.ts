@@ -15,7 +15,7 @@ import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
-import { EmailTemplateNames } from '../../email/email.types'
+import { EmailTemplateName } from '../../email/email.types'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -316,7 +316,7 @@ export class StripeEventsService {
       await this.emailService.sendTemplateEmail({
         to: user.email,
         subject: `Welcome to Pro! Let's Empower Your Campaign Together`,
-        template: EmailTemplateNames.proConfirmation,
+        template: EmailTemplateName.proConfirmation,
         variables: emailVars,
       })
     } catch (e) {

@@ -28,7 +28,10 @@ export enum DAY_OF_WEEK {
   SATURDAY = 6,
 }
 
-export const findPreviousWeekDay = (endDate: Date, dayOfWeek: DAY_OF_WEEK = DAY_OF_WEEK.SUNDAY): Date => {
+export const findPreviousWeekDay = (
+  endDate: Date,
+  dayOfWeek: DAY_OF_WEEK = DAY_OF_WEEK.SUNDAY,
+): Date => {
   const previousWeek = subWeeks(endDate, 1)
   const startOfPreviousWeek = startOfWeek(previousWeek)
   return addDays(startOfPreviousWeek, dayOfWeek)
