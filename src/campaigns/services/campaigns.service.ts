@@ -49,13 +49,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
-    const campaign = await this.model.create(args)
-    try {
-      this.campaignEmails.scheduleCampaignCountdownEmails(campaign)
-    } catch (error) {
-      this.logger.error('Error scheduling campaign countdown emails', error)
-    }
-    return campaign
+    return await this.model.create(args)
   }
 
   // TODO: Find a way to make these JSON path lookups type-safe

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
 import { ScheduledMessage } from '@prisma/client'
+import { EmailService } from '../email/email.service'
+import { ScheduledMessageTypes } from '../email/email.types'
 
 const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
   .SCHEDULED_MESSAGING_INTERVAL_SECS
@@ -13,7 +15,7 @@ export class ScheduledMessagingService extends createPrismaBase(
 ) {
   private readonly intervalId: NodeJS.Timeout
 
-  constructor() {
+  constructor(private readonly emails: EmailService) {
     super()
     this.processScheduledMessages = this.processScheduledMessages.bind(this)
     this.intervalId = setInterval(
@@ -37,6 +39,9 @@ export class ScheduledMessagingService extends createPrismaBase(
           sentAt: {
             equals: null,
           },
+          error: {
+            equals: null,
+          },
         },
       })
 
@@ -54,18 +59,52 @@ export class ScheduledMessagingService extends createPrismaBase(
     return messages
   }
 
+  private sendEmailMessage({ messageConfig: { message } }: ScheduledMessage) {
+    if ('template' in message) {
+      this.emails.sendTemplateEmail(message)
+    } else {
+      this.emails.sendEmail(message)
+    }
+  }
+
   private async processScheduledMessages() {
-    const messages = await this.queryScheduledMessagesAndFlag()
+    const messages: ScheduledMessage[] =
+      await this.queryScheduledMessagesAndFlag()
 
     if (!messages?.length) {
       return []
     }
 
-    this.logger.debug('Sending messages:', messages)
+    return this.sendMessagesAndUpdate(messages)
+  }
+
+  private async sendMessagesAndUpdate(messages: ScheduledMessage[]) {
     const updatedMessages: ScheduledMessage[] = []
+    this.logger.debug('Sending messages:', messages)
     await this.client.$transaction(async (tx) => {
       for (let m of messages) {
-        const updatedScheduledMsg = await tx.scheduledMessage.update({
+        let updatedScheduledMsg: ScheduledMessage
+
+        try {
+          switch (m.messageConfig.type) {
+            case ScheduledMessageTypes.EMAIL:
+              this.sendEmailMessage(m)
+          }
+        } catch (e) {
+          this.logger.error('Error sending message', e)
+          const errorMessage = e instanceof Error ? e.toString() : String(e)
+          updatedScheduledMsg = await tx.scheduledMessage.update({
+            where: {
+              id: m.id,
+            },
+            data: {
+              error: errorMessage,
+            },
+          })
+          continue
+        }
+
+        updatedScheduledMsg = await tx.scheduledMessage.update({
           where: {
             id: m.id,
           },

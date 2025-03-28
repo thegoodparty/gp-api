@@ -8,9 +8,9 @@ export {}
 
 declare global {
   export namespace PrismaJson {
-    export type ScheduledMessageConfig = {
+    export interface ScheduledMessageConfig {
       type: ScheduledMessageTypes
-      message: SendTemplateEmailInput | SendEmailInput
+      message: SendEmailInput | SendTemplateEmailInput
     }
   }
 }

@@ -199,7 +199,13 @@ export class CampaignsController {
   @HttpCode(HttpStatus.OK)
   async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
     try {
-      return await this.campaigns.launch(user, campaign)
+      const launchResult = await this.campaigns.launch(user, campaign)
+      try {
+        this.campaignEmails.scheduleCampaignCountdownEmails(campaign)
+      } catch (error) {
+        this.logger.error('Error scheduling campaign countdown emails', error)
+      }
+      return launchResult
     } catch (e) {
       this.logger.error('Error at campaign launch', e)
       await this.slack.errorMessage({

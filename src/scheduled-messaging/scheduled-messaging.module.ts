@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
-import { ScheduledMessagingController } from './scheduled-messaging.controller'
 import { ScheduledMessagingService } from './scheduled-messaging.service'
+import { EmailModule } from '../email/email.module'
 
 @Module({
-  controllers: [ScheduledMessagingController],
+  imports: [EmailModule],
   providers: [ScheduledMessagingService],
   exports: [ScheduledMessagingService],
 })
