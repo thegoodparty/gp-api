@@ -20,6 +20,7 @@ import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasser
 import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
+import { CampaignEmailsService } from './services/campaignEmails.service'
 
 @Global()
 @Module({
@@ -49,6 +50,7 @@ import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messa
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTasksService,
+    CampaignEmailsService,
   ],
   exports: [
     CampaignsService,

@@ -30,6 +30,7 @@ import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.s
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
+import { CampaignEmailsService } from './services/campaignEmails.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -42,6 +43,7 @@ export class CampaignsController {
     private readonly slack: SlackService,
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
+    private readonly campaignEmails: CampaignEmailsService,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -207,5 +209,12 @@ export class CampaignsController {
 
       throw e
     }
+  }
+
+  @Post('mine/schedule-countdown-emails')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  async scheduleCampaignCountdownEmails(@ReqCampaign() campaign: Campaign) {
+    await this.campaignEmails.scheduleCampaignCountdownEmails(campaign)
   }
 }

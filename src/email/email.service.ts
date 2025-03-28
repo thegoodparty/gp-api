@@ -6,7 +6,7 @@ import {
 } from './util/content.util'
 import { User } from '@prisma/client'
 import {
-  EmailTemplateNames,
+  EmailTemplateName,
   SendEmailInput,
   SendTemplateEmailInput,
 } from './email.types'
@@ -83,7 +83,7 @@ export class EmailService {
     return await this.sendTemplateEmail({
       to: email,
       subject,
-      template: EmailTemplateNames.setPassword,
+      template: EmailTemplateName.setPassword,
       variables,
     })
   }
@@ -93,7 +93,7 @@ export class EmailService {
     await this.sendTemplateEmail({
       to: user.email,
       subject: `Your Pro Subscription is Ending Today`,
-      template: EmailTemplateNames.endOfProSubscription,
+      template: EmailTemplateName.endOfProSubscription,
       variables: {
         userFullName: getUserFullName(user),
         todayDateString: formatDate(today, DateFormats.usDate),
@@ -108,7 +108,7 @@ export class EmailService {
     await this.sendTemplateEmail({
       to: user.email,
       subject: `Your Cancellation Request Has Been Processed – Pro Access Until ${subscriptionEndDate}`,
-      template: EmailTemplateNames.subscriptionCancellationConfirmation,
+      template: EmailTemplateName.subscriptionCancellationConfirmation,
       variables: {
         userFullName: getUserFullName(user),
         subscriptionEndDate,

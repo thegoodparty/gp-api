@@ -86,7 +86,11 @@ export class ScheduledMessagingService extends createPrismaBase(
     messageConfig: PrismaJson.ScheduledMessageConfig,
     sendDate: Date,
   ) {
-    this.logger.debug('Scheduling message: ', { campaignId, messageConfig })
+    this.logger.debug('Scheduling message: ', {
+      campaignId,
+      messageConfig,
+      sendDate,
+    })
     return await this.model.create({
       data: {
         campaignId,
