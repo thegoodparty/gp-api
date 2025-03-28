@@ -216,11 +216,4 @@ export class CampaignsController {
       throw e
     }
   }
-
-  @Post('mine/schedule-countdown-emails')
-  @UseCampaign()
-  @HttpCode(HttpStatus.OK)
-  async scheduleCampaignCountdownEmails(@ReqCampaign() campaign: Campaign) {
-    await this.campaignEmails.scheduleCampaignCountdownEmails(campaign)
-  }
 }
