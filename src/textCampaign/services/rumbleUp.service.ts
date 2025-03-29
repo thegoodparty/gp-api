@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import { ApiRumbleUpProject, ApiRumbleUpResponse } from '../textCampaign.types'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 @Injectable()
 export class RumbleUpService {
@@ -14,8 +15,8 @@ export class RumbleUpService {
 
   private readonly serviceHttpConfig = {
     headers: {
-      Authorization: `Basic ${Buffer.from(`${this.accountId}:${this.apiKey}`).toString('base64')}`,
-      'Content-Type': 'application/json',
+      [Headers.AUTHORIZATION]: `Basic ${Buffer.from(`${this.accountId}:${this.apiKey}`).toString('base64')}`,
+      [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
     },
   }
 

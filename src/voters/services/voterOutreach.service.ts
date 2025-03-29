@@ -127,24 +127,17 @@ export class VoterOutreachService {
 
     // If type is SMS, create a TextCampaign
     if (type === 'sms') {
-      try {
-        await this.textCampaignService.createTextCampaign(
-          campaign.id,
-          `SMS Campaign ${new Date(date).toLocaleDateString()}`,
-          message,
-          audience,
-          messagingScript,
-          new Date(date),
-          imageUrl,
-        )
+      await this.textCampaignService.createTextCampaign(
+        campaign.id,
+        `SMS Campaign ${new Date(date).toLocaleDateString()}`,
+        message,
+        audience,
+        messagingScript,
+        new Date(date),
+        imageUrl,
+      )
 
-        this.logger.log(`Created TextCampaign for campaign ${campaign.id}`)
-      } catch (error: any) {
-        this.logger.error(
-          `Failed to create TextCampaign: ${error.message}`,
-          error.stack,
-        )
-      }
+      this.logger.debug(`Created TextCampaign for campaign ${campaign.id}`)
     }
 
     await this.slack.message(
