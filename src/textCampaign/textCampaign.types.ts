@@ -11,23 +11,40 @@ export interface ApiRumbleUpProject {
   name: string
   msg: string
   areacode: string
-  group: string
-  flags: string
-  outsource_start: string
-  outsource_end: string
-  outsource_email: string
+  group?: string
+  group_file?: string
+  tcr_cid?: string
+  tcr_phone?: string | 'All'
+  flags?: string
+  media?: string
+  outsource_start?: string // Format: YYYY-MM-DDTHH:MM:SS±HH:MM
+  outsource_end?: string // Format: YYYY-MM-DDTHH:MM:SS±HH:MM
+  outsource_email?: string
+  outsource_contact?: string
+  outsource_notes?: string
+  shorturl_domain?: string
+  shorturl_tracking?: boolean
 }
 
 export interface ApiRumbleUpResponse {
   success: boolean
-  data?: any
+  data?: {
+    id: string
+  }
   message?: string
+  gid?: string
   error?: string
+  error_code?: string
 }
 
 export interface CreateProjectResponse {
   success: boolean
-  data?: any
+  data?: {
+    id: string
+    name: string
+    message: string
+    projectId: string
+  }
   error?: string
   message?: string
 }

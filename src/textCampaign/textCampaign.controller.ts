@@ -4,6 +4,8 @@ import { CreateProjectSchema } from './schemas/createProject.schema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { UseGuards } from '@nestjs/common'
+import { ValidCampaignGuard } from 'src/campaigns/guards/validCampaign.guard'
 
 @Controller('text-campaign')
 export class TextCampaignController {
@@ -11,6 +13,7 @@ export class TextCampaignController {
 
   @Post('project')
   @UseCampaign()
+  @UseGuards(ValidCampaignGuard)
   createProject(
     @ReqCampaign() campaign: Campaign,
     @Body() createProjectDto: CreateProjectSchema,
