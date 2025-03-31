@@ -3,6 +3,7 @@ import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
 import { ScheduledMessage } from '@prisma/client'
 import { EmailService } from '../email/email.service'
 import { ScheduledMessageTypes } from '../email/email.types'
+import { SlackService } from 'src/shared/services/slack.service'
 
 const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
   .SCHEDULED_MESSAGING_INTERVAL_SECS
@@ -15,7 +16,10 @@ export class ScheduledMessagingService extends createPrismaBase(
 ) {
   private readonly intervalId: NodeJS.Timeout
 
-  constructor(private readonly emails: EmailService) {
+  constructor(
+    private readonly emails: EmailService,
+    private readonly slack: SlackService,
+  ) {
     super()
     this.processScheduledMessages = this.processScheduledMessages.bind(this)
     this.intervalId = setInterval(
@@ -93,6 +97,10 @@ export class ScheduledMessagingService extends createPrismaBase(
         } catch (e) {
           this.logger.error('Error sending message', e)
           const errorMessage = e instanceof Error ? e.toString() : String(e)
+          this.slack.errorMessage({
+            message: 'Error sending scheduled message',
+            error: e,
+          })
           updatedScheduledMsg = await tx.scheduledMessage.update({
             where: {
               id: m.id,
