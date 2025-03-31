@@ -1,0 +1,154 @@
+import { Injectable } from '@nestjs/common'
+import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
+import { ScheduledMessage } from '@prisma/client'
+import { EmailService } from '../email/email.service'
+import { ScheduledMessageTypes } from '../email/email.types'
+import { SlackService } from 'src/shared/services/slack.service'
+
+const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
+  .SCHEDULED_MESSAGING_INTERVAL_SECS
+  ? parseInt(process.env.SCHEDULED_MESSAGING_INTERVAL_SECS)
+  : 60 * 60 // defaults to 1 hour
+
+@Injectable()
+export class ScheduledMessagingService extends createPrismaBase(
+  MODELS.ScheduledMessage,
+) {
+  private readonly intervalId: NodeJS.Timeout
+
+  constructor(
+    private readonly emails: EmailService,
+    private readonly slack: SlackService,
+  ) {
+    super()
+    this.processScheduledMessages = this.processScheduledMessages.bind(this)
+    this.intervalId = setInterval(
+      this.processScheduledMessages,
+      SCHEDULED_MESSAGING_INTERVAL_SECS * 1000,
+    )
+    this.logger.debug(
+      `Scheduled task running every ${SCHEDULED_MESSAGING_INTERVAL_SECS}s w/ id ${this.intervalId}`,
+    )
+  }
+
+  private async queryScheduledMessagesAndFlag() {
+    let messages: ScheduledMessage[] = []
+    await this.client.$transaction(async (tx) => {
+      messages = await this.model.findMany({
+        where: {
+          scheduledAt: {
+            lte: new Date(),
+          },
+          processing: false,
+          sentAt: {
+            equals: null,
+          },
+          error: {
+            equals: null,
+          },
+        },
+      })
+
+      await this.model.updateMany({
+        where: {
+          id: {
+            in: messages.map((m) => m.id),
+          },
+        },
+        data: {
+          processing: true, // Ensure no other process is trying to send this message
+        },
+      })
+    })
+    return messages
+  }
+
+  private sendEmailMessage({ messageConfig: { message } }: ScheduledMessage) {
+    if ('template' in message) {
+      this.emails.sendTemplateEmail(message)
+    } else {
+      this.emails.sendEmail(message)
+    }
+  }
+
+  private async processScheduledMessages() {
+    const messages: ScheduledMessage[] =
+      await this.queryScheduledMessagesAndFlag()
+
+    if (!messages?.length) {
+      return []
+    }
+
+    return this.sendMessagesAndUpdate(messages)
+  }
+
+  private async sendMessagesAndUpdate(messages: ScheduledMessage[]) {
+    const updatedMessages: ScheduledMessage[] = []
+    this.logger.debug('Sending messages:', messages)
+    await this.client.$transaction(async (tx) => {
+      for (let m of messages) {
+        let updatedScheduledMsg: ScheduledMessage
+
+        try {
+          switch (m.messageConfig.type) {
+            case ScheduledMessageTypes.EMAIL:
+              this.sendEmailMessage(m)
+          }
+        } catch (e) {
+          this.logger.error('Error sending message', e)
+          const errorMessage = e instanceof Error ? e.toString() : String(e)
+          this.slack.errorMessage({
+            message: 'Error sending scheduled message',
+            error: e,
+          })
+          updatedScheduledMsg = await tx.scheduledMessage.update({
+            where: {
+              id: m.id,
+            },
+            data: {
+              error: errorMessage,
+            },
+          })
+          continue
+        }
+
+        updatedScheduledMsg = await tx.scheduledMessage.update({
+          where: {
+            id: m.id,
+          },
+          data: {
+            sentAt: new Date(),
+            processing: false,
+          },
+        })
+        updatedMessages.push(updatedScheduledMsg)
+      }
+    })
+
+    return updatedMessages
+  }
+
+  async scheduleMessage(
+    campaignId: number,
+    messageConfig: PrismaJson.ScheduledMessageConfig,
+    sendDate: Date,
+  ) {
+    this.logger.debug('Scheduling message: ', {
+      campaignId,
+      messageConfig,
+      sendDate,
+    })
+    return await this.model.create({
+      data: {
+        campaignId,
+        messageConfig,
+        scheduledAt: sendDate,
+      },
+    })
+  }
+
+  onModuleDestroy() {
+    this.logger.debug(`Cleaning up scheduled interval w/ id ${this.intervalId}`)
+    clearInterval(this.intervalId)
+  }
+}

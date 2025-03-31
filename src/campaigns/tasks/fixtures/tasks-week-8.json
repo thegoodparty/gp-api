@@ -1,0 +1,33 @@
+[
+  {
+    "id": "1e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b",
+    "title": "Knock on doors to get to know your voters",
+    "description": "Learn about their top issues.",
+    "week": 8,
+    "flowType": "door-knocking",
+    "proRequired": true
+  },
+  {
+    "id": "7c8d9e0f-1a2b-3c4d-5e6f-7a8b9c0d1e2f",
+    "title": "Plan a phone banking campaign to get to know your voters",
+    "description": "Learn about their top issues.",
+    "week": 8,
+    "flowType": "phone-banking",
+    "proRequired": true
+  },
+  {
+    "id": "3a4b5c6d-7e8f-9a0b-1c2d-3e4f5a6b7c8d",
+    "title": "Post to social media talking about your local community",
+    "description": "Get to know who your voters are and show them you are active in the community.",
+    "week": 8,
+    "flowType": "social-media"
+  },
+  {
+    "id": "9e0f1a2b-3c4d-5e6f-7a8b-9c0d1e2f3a4b",
+    "title": "Hold a volunteering event",
+    "description": "Start to recruit volunteers to help spread the word about your candidacy.",
+    "week": 8,
+    "flowType": "link",
+    "link": "https://goodparty.org/blog/article/volunteers-bridging-campaign-constituent "
+  }
+]

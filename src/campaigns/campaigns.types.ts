@@ -2,6 +2,10 @@ import { Prisma } from '@prisma/client'
 
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 
+export enum CampaignCreatedBy {
+  ADMIN = 'admin',
+}
+
 export type PlanVersion = {
   date: Date | string
   text: string

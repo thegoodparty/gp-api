@@ -22,18 +22,13 @@ import {
   RefreshCompanySchema,
   SyncCampaignSchema,
 } from './schemas/RefreshSync.schema'
-import { CRMCompanyProperties } from './crm.types'
-
-type HubspotObjectUpdate = {
-  objectId: string
-  propertyName: string
-  propertyValue: string | boolean | number
-}
+import { HubSpot } from './crm.types'
 
 @Controller('crm')
 @UsePipes(ZodValidationPipe)
 export class CrmController {
   logger = new Logger(this.constructor.name)
+
   constructor(
     private readonly crmCampaignsService: CrmCampaignsService,
     private readonly campaigns: CampaignsService,
@@ -43,31 +38,40 @@ export class CrmController {
   @Post('hubspot-webhook')
   @PublicAccess()
   @HttpCode(HttpStatus.OK)
-  async hubspotWebhook(@Body() payload: HubspotObjectUpdate[]) {
+  async hubspotWebhook(@Body() payload: HubSpot.ObjectUpdate[]) {
+    // NOTE: this webhook handler assumes that all payloads are "subscriptionType": "company.propertyChange"
     if (payload && payload.length > 0) {
       for (let i = 0; i < payload.length; i++) {
-        const { objectId, propertyName, propertyValue } = payload[i]
+        const {
+          objectId,
+          propertyName,
+          propertyValue,
+          changeSource,
+          sourceId,
+          appId,
+        } = payload[i]
+
+        if (
+          // If this webhook call was triggered by a change from us, we don't need to process it
+          changeSource === HubSpot.ChangeSource.INTEGRATION &&
+          sourceId === appId
+        ) {
+          continue
+        }
+
         const campaign = await this.campaigns.findByHubspotId(objectId)
         if (!campaign) {
           continue
         }
 
         try {
-          if (propertyName === 'incumbent' || propertyName === 'opponents') {
-            this.crmCampaignsService.handleUpdateViability(
-              campaign,
-              propertyName,
-              propertyValue,
-            )
-          } else {
-            this.crmCampaignsService.handleUpdateCampaign(
-              campaign,
-              propertyName,
-              propertyValue,
-            )
-          }
+          this.crmCampaignsService.handleUpdateCampaign(
+            campaign,
+            propertyName,
+            propertyValue,
+          )
         } catch (error) {
-          const message = 'error at crm/hubspot-webhook'
+          const message = `CRM Webhook Error: objectId: ${objectId}, key: ${propertyName}, value: ${propertyValue}`
           this.logger.error(message, error)
           this.slack.errorMessage({
             message,
@@ -85,20 +89,20 @@ export class CrmController {
   }
 
   @Get('refresh-companies')
-  @Roles(UserRole.admin)
+  @Roles(UserRole.admin) // push from all or one campaign to hubspot
   async refreshCompanies(@Query() { campaignId }: RefreshCompanySchema) {
     return await this.crmCampaignsService.refreshCompanies(campaignId)
   }
 
   @Get('mass-refresh-companies')
-  @Roles(UserRole.admin)
+  @Roles(UserRole.admin) // push from all campaigns to hubspot, but only for certain fields
   async massRefreshCompanies(@Query() { fields }: MassRefreshCompanySchema) {
     return await this.crmCampaignsService.massRefreshCompanies(
-      fields as Array<keyof CRMCompanyProperties>,
+      fields as Array<HubSpot.OutgoingProperty>,
     )
   }
 
-  @Get('sync')
+  @Get('sync') // pull from hubspot to campaign
   @Roles(UserRole.admin)
   async syncCampaign(
     @Query() { campaignId, resync = false }: SyncCampaignSchema,
