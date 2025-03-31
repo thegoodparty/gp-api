@@ -77,6 +77,7 @@ export class ViabilityService {
             officeHolder.person?.fullName.toLowerCase() ===
               campaign.data?.name?.toLowerCase()
           ) {
+            // TODO: this seems too flimsy to rely on (what if name is slightly different?)
             isIncumbent = true
           }
         }
