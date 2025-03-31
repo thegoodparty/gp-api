@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { ScheduleOutreachCampaignSchema } from '../voterFile/schemas/ScheduleOutreachCampaign.schema'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User, TextCampaignStatus } from '@prisma/client'
 import { buildSlackBlocks } from '../util/voterOutreach.util'
 import { FileUpload } from 'src/files/files.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -127,15 +127,35 @@ export class VoterOutreachService {
 
     // If type is SMS, create a TextCampaign
     if (type === 'sms') {
-      await this.textCampaignService.createTextCampaign(
-        campaign.id,
-        `SMS Campaign ${new Date(date).toLocaleDateString()}`,
-        message,
-        audience,
-        messagingScript,
-        new Date(date),
-        imageUrl,
-      )
+      await this.textCampaignService.model.create({
+        data: {
+          campaignId: campaign.id,
+          name: `SMS Campaign ${new Date(date).toLocaleDateString()}`,
+          message,
+          status: TextCampaignStatus.pending,
+          ...(audience && {
+            audience_superVoters: audience.audience_superVoters,
+            audience_likelyVoters: audience.audience_likelyVoters,
+            audience_unreliableVoters: audience.audience_unreliableVoters,
+            audience_unlikelyVoters: audience.audience_unlikelyVoters,
+            audience_firstTimeVoters: audience.audience_firstTimeVoters,
+            party_independent: audience.party_independent,
+            party_democrat: audience.party_democrat,
+            party_republican: audience.party_republican,
+            age_18_25: audience.age_18_25,
+            age_25_35: audience.age_25_35,
+            age_35_50: audience.age_35_50,
+            age_50_plus: audience.age_50_plus,
+            gender_male: audience.gender_male,
+            gender_female: audience.gender_female,
+            gender_unknown: audience.gender_unknown,
+            audience_request: audience.audience_request,
+          }),
+          script: messagingScript,
+          date: new Date(date),
+          imageUrl,
+        },
+      })
 
       this.logger.debug(`Created TextCampaign for campaign ${campaign.id}`)
     }

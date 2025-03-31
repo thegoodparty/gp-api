@@ -1,7 +1,12 @@
 // Documentation URL: https://app.rumbleup.com/app/docs/api
 
 import { HttpService } from '@nestjs/axios'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  Injectable,
+  Logger,
+  HttpStatus,
+} from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import { ApiRumbleUpProject, ApiRumbleUpResponse } from '../textCampaign.types'
 import { Headers, MimeTypes } from 'http-constants-ts'
@@ -49,12 +54,12 @@ export class RumbleUpService {
       error.response?.data || error.message,
     )
 
-    if (error.response?.status === 401) {
+    if (error.response?.status === HttpStatus.UNAUTHORIZED) {
       throw new BadGatewayException(
         'Unauthorized: Invalid RumbleUp credentials',
       )
     }
-    if (error.response?.status === 429) {
+    if (error.response?.status === HttpStatus.TOO_MANY_REQUESTS) {
       throw new BadGatewayException('Too many requests to RumbleUp API')
     }
 
