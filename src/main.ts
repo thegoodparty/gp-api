@@ -72,6 +72,7 @@ const bootstrap = async () => {
   })
 
   app.useGlobalFilters(new PrismaExceptionFilter())
+  app.enableShutdownHooks()
 
   await app.listen(APP_LISTEN_CONFIG)
   return app
