@@ -317,7 +317,7 @@ export class CrmCampaignsService {
       doors_knocked: reportedVoterGoals?.doorKnocking, // TODO: remove/rename one of these two doorknock fields?
       online_impressions: reportedVoterGoals?.digitalAds,
       yard_signs_impressions: reportedVoterGoals?.yardSigns,
-      p2p_texts: reportedVoterGoals?.text,
+      // p2p_texts: reportedVoterGoals?.text, TODO: we need a new field in HS for sms text contact numbers!!!
       ecanvasser_contacts_count: ecanvasserCount,
 
       // candidate details
