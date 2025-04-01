@@ -1,6 +1,4 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
-import * as aws from '@pulumi/aws'
-import * as pulumi from '@pulumi/pulumi'
 
 export default $config({
   app(input) {
@@ -17,6 +15,8 @@ export default $config({
     }
   },
   async run() {
+    const { default: aws } = await import('@pulumi/aws')
+    const { default: pulumi } = await import('@pulumi/pulumi')
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
