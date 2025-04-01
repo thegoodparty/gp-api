@@ -3,6 +3,7 @@
     "id": "9a0b1c2d-3e4f-5a6b-7c8d-9e0f1a2b3c4d",
     "title": "Knock on doors to persuade voters",
     "description": "Build trust and persuade voters.",
+    "cta": "Schedule",
     "week": 6,
     "flowType": "door-knocking",
     "proRequired": true
@@ -11,6 +12,7 @@
     "id": "5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
     "title": "Plan your persuasive phone banking campaign",
     "description": "Build trust and persuade voters.",
+    "cta": "Develop strategy",
     "week": 6,
     "flowType": "phone-banking",
     "proRequired": true
@@ -19,6 +21,7 @@
     "id": "1c2d3e4f-5a6b-7c8d-9e0f-1a2b3c4d5e6f",
     "title": "Post your event calendar to social media",
     "description": "Tell everyone what you have going on",
+    "cta": "Write Post",
     "week": 6,
     "flowType": "social-media"
   },
@@ -26,6 +29,7 @@
     "id": "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
     "title": "Attend a town hall meeting",
     "description": "Make relationships with people currently working in local government.",
+    "cta": "Get Guidance",
     "week": 6,
     "flowType": "link",
     "link": "https://goodparty.org/blog/article/10-ways-independent-candidates-engage-voters"
