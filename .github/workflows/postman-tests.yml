@@ -110,13 +110,10 @@ jobs:
             collection_id=${collections[$name]}
             echo "Running collection: $name"
             
-            # Increase delay between collections to 5 seconds
-            sleep 5
-            
             # Run newman with more conservative settings
             output=$(newman run "https://api.getpostman.com/collections/${collection_id}?apikey=$POSTMAN_API_KEY" \
               -e updated_env.json \
-              --delay-request 10000 \
+              --delay-request 3000 \
               --timeout-request 120000 \
               --timeout 300000 \
               --timeout-script 60000 \
