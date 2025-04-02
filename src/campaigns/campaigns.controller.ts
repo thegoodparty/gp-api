@@ -179,7 +179,6 @@ export class CampaignsController {
     @ReqCampaign() campaign: Campaign,
     @Body() { slug, ...body }: UpdateCampaignSchema,
   ) {
-    this.logger.debug('Updating campaign', campaign, { slug, body })
     if (
       typeof slug === 'string' &&
       campaign?.slug !== slug &&
@@ -190,6 +189,8 @@ export class CampaignsController {
         where: { slug },
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
+
+    this.logger.debug('Updating campaign', campaign, { slug, body })
 
     return this.campaigns.updateJsonFields(campaign.id, body)
   }

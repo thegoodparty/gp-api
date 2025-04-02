@@ -171,14 +171,9 @@ export class CrmCampaignsService {
           message: `Could not find hubspot company for ${name} with hubspotId ${hubspotId}`,
           error: e,
         })
-        const campaign = await this.campaigns.findFirst({
-          where: {
-            data: {
-              path: ['hubspotId'],
-              equals: hubspotId,
-            },
-          },
-        })
+
+        const campaign = await this.campaigns.findByHubspotId(hubspotId)
+
         campaign &&
           (await this.campaigns.updateJsonFields(campaign.id, {
             data: {
