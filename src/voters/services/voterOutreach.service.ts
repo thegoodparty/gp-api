@@ -144,26 +144,21 @@ export class VoterOutreachService {
 
     this.crmCampaigns.trackCampaign(campaign.id)
 
-    // send email to the user
-    await this.sendSubmittedEmail(user, message, date)
+    this.sendSubmittedEmail(user, message, date)
 
     return true
   }
 
   async sendSubmittedEmail(user: User, message: string, date: string) {
-    try {
-      await this.emailService.sendTemplateEmail({
-        to: user.email,
-        subject: 'Your Texting Campaign is Scheduled - Next Steps Inside',
-        template: EmailTemplateName.textCampaignSubmitted,
-        variables: {
-          name: getUserFullName(user),
-          message,
-          scheduledDate: date,
-        },
-      })
-    } catch (e) {
-      this.logger.error('Error sending campaign submitted email', e)
-    }
+    await this.emailService.sendTemplateEmail({
+      to: user.email,
+      subject: 'Your Texting Campaign is Scheduled - Next Steps Inside',
+      template: EmailTemplateName.textCampaignSubmitted,
+      variables: {
+        name: getUserFullName(user),
+        message,
+        scheduledDate: date,
+      },
+    })
   }
 }
