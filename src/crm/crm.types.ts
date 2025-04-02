@@ -157,6 +157,7 @@ export namespace HubSpot {
     candidate_state = 'candidate_state',
     state = 'state',
     city = 'city',
+    zip = 'zip',
     created_by_admin = 'created_by_admin',
     admin_user = 'admin_user',
     pledge_status = 'pledge_status',

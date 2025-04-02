@@ -331,6 +331,7 @@ export class CrmCampaignsService {
       candidate_state: longState,
       state: longState,
       city: city ?? undefined,
+      zip: zip ?? undefined,
       created_by_admin:
         createdBy === CampaignCreatedBy.ADMIN
           ? HubSpot.CreatedByAdmin.YES
@@ -345,8 +346,8 @@ export class CrmCampaignsService {
       running: runForOffice ? HubSpot.Running.YES : HubSpot.Running.NO,
 
       // election details
-      br_position_id: campaignDetails?.positionId,
-      br_race_id: campaignDetails?.raceId,
+      br_position_id: campaignDetails?.positionId ?? undefined,
+      br_race_id: campaignDetails?.raceId ?? undefined,
       election_date: electionDateMs,
       filing_deadline: filingEndMs, // TODO: is this different than filing_end?
       filing_start: filingStartMs,
@@ -355,7 +356,7 @@ export class CrmCampaignsService {
 
       // usage details
       last_portal_visit: lastPortalVisit,
-      last_step: isActive ? OnboardingStep.complete : currentStep,
+      last_step: isActive ? OnboardingStep.complete : String(currentStep ?? ''),
       last_step_date: lastStepDateMs,
       campaign_assistant_chats: aiChatCount,
       my_content_pieces_created: aiContent ? Object.keys(aiContent).length : 0,
