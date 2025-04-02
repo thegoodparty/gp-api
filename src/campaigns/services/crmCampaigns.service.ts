@@ -324,6 +324,7 @@ export class CrmCampaignsService {
       candidate_district: district,
       candidate_email: user?.email,
       candidate_name: name,
+      name: name,
       candidate_office: resolvedOffice,
       office_level: ballotLevel,
       candidate_party: party,
@@ -370,10 +371,11 @@ export class CrmCampaignsService {
           ? Math.floor(score > 5 ? 5 : score)
           : undefined,
       p2v_status: p2v_status,
-      seats_available: seats,
-      totalregisteredvoters: totalRegisteredVoters,
-      votegoal: p2vData?.voterContactGoal,
-      win_number: winNumber,
+      //NOTE: Older versions of these fields may be strings, so we need to convert to numbers in case
+      seats_available: Number(seats || 0),
+      totalregisteredvoters: Number(totalRegisteredVoters || 0),
+      votegoal: Number(p2vData?.voterContactGoal || 0),
+      win_number: Number(winNumber || 0),
     }
 
     const validated = CRMCompanyPropertiesSchema.transform((obj) =>
