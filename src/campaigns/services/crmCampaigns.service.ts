@@ -128,6 +128,8 @@ export class CrmCampaignsService {
   }
 
   private async createCompany(companyObj: CRMCompanyProperties) {
+    if (!IS_PROD) return
+
     let crmCompany: SimplePublicObject | null = null
     try {
       crmCompany = await this.hubspot.client.crm.companies.basicApi.create({
@@ -157,7 +159,10 @@ export class CrmCampaignsService {
     hubspotId: string,
     crmCompanyProperties: CRMCompanyProperties,
   ) {
+    if (!IS_PROD) return
+
     let crmCompany: SimplePublicObject
+
     try {
       crmCompany = await this.hubspot.client.crm.companies.basicApi.update(
         hubspotId,

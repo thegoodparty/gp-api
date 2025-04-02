@@ -47,7 +47,7 @@ export const CRMCompanyPropertiesSchema = z
     // election details
     [HS_PROPS.br_position_id]: z.string(),
     [HS_PROPS.br_race_id]: z.string(),
-    [HS_PROPS.election_date]: z.string().date(),
+    [HS_PROPS.election_date]: timestampSchema,
     [HS_PROPS.filing_deadline]: timestampSchema,
     [HS_PROPS.filing_start]: timestampSchema,
     [HS_PROPS.filing_end]: timestampSchema,
