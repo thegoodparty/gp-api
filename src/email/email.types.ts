@@ -2,6 +2,7 @@ export enum EmailTemplateName {
   candidateVictoryReady = 'candidate-victory-ready',
   // TODO: "campagin-launch" is misspelled in Mailgun as well, must change there first.
   campaignLaunch = 'campagin-launch',
+  textCampaignSubmitted = 'text-campaign-submitted',
   blank = 'blank-email',
   proConfirmation = 'pro-confirmation',
   volunteerInvitation = 'volunteer-invitation',

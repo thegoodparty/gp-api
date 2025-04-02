@@ -18,7 +18,9 @@ import {
   SlackMessageType,
 } from 'src/shared/services/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-
+import { getUserFullName } from 'src/users/util/users.util'
+import { EmailService } from 'src/email/email.service'
+import { EmailTemplateName } from 'src/email/email.types'
 @Injectable()
 export class VoterOutreachService {
   private readonly logger = new Logger(VoterOutreachService.name)
@@ -28,6 +30,7 @@ export class VoterOutreachService {
     private readonly filesService: FilesService,
     private readonly campaignsService: CampaignsService,
     private readonly crmCampaigns: CrmCampaignsService,
+    private readonly emailService: EmailService,
   ) {}
 
   async scheduleOutreachCampaign(
@@ -141,6 +144,21 @@ export class VoterOutreachService {
 
     this.crmCampaigns.trackCampaign(campaign.id)
 
+    this.sendSubmittedEmail(user, message, date)
+
     return true
+  }
+
+  async sendSubmittedEmail(user: User, message: string, date: string) {
+    await this.emailService.sendTemplateEmail({
+      to: user.email,
+      subject: 'Your Texting Campaign is Scheduled - Next Steps Inside',
+      template: EmailTemplateName.textCampaignSubmitted,
+      variables: {
+        name: getUserFullName(user),
+        message,
+        scheduledDate: date,
+      },
+    })
   }
 }
