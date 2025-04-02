@@ -163,7 +163,7 @@ export class VoterOutreachService {
         },
       })
     } catch (e) {
-      this.logger.error('Error sending campaign launch email', e)
+      this.logger.error('Error sending campaign submitted email', e)
     }
   }
 }
