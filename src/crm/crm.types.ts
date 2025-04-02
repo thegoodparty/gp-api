@@ -30,7 +30,7 @@ export namespace HubSpot {
     /**
      * HubSpot object ID (typically numeric ID as string)
      */
-    objectId: string
+    objectId: number
     /**
      * Property name in HubSpot's property registry
      */
@@ -47,7 +47,7 @@ export namespace HubSpot {
     /**
      * ID of your HubSpot app receiving the webhook
      */
-    appId: string
+    appId: number
     /**
      * ID of app integration that made the change
      * If we are the source of the change appId will match sourceId
