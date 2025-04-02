@@ -51,16 +51,22 @@ export class CrmController {
           appId,
         } = payload[i]
 
+        this.logger.debug(
+          `CRM Webhook Received: objectId: ${objectId}, key: ${propertyName}, value: ${propertyValue}, changeSource: ${changeSource}, sourceId: ${sourceId}, appId: ${appId}`,
+        )
+
         if (
           // If this webhook call was triggered by a change from us, we don't need to process it
           changeSource === HubSpot.ChangeSource.INTEGRATION &&
-          sourceId === appId
+          sourceId === String(appId)
         ) {
+          this.logger.debug(`CRM Webhook Skipped: change initiated by us`)
           continue
         }
 
-        const campaign = await this.campaigns.findByHubspotId(objectId)
+        const campaign = await this.campaigns.findByHubspotId(String(objectId))
         if (!campaign) {
+          this.logger.debug(`CRM Webhook Skipped: no campaign found`)
           continue
         }
 
@@ -69,6 +75,9 @@ export class CrmController {
             campaign,
             propertyName,
             propertyValue,
+          )
+          this.logger.debug(
+            `CRM Webhook Processed: campaignId: ${campaign.id}, key: ${propertyName}, value: ${propertyValue}`,
           )
         } catch (error) {
           const message = `CRM Webhook Error: objectId: ${objectId}, key: ${propertyName}, value: ${propertyValue}`
