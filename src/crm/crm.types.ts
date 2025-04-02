@@ -149,6 +149,7 @@ export namespace HubSpot {
     // candidate details
     candidate_district = 'candidate_district',
     candidate_email = 'candidate_email',
+    name = 'name', // HS Company name field
     candidate_name = 'candidate_name',
     candidate_office = 'candidate_office',
     office_level = 'office_level',
