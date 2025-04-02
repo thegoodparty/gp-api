@@ -118,10 +118,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
       if (!campaign) return false
 
-      // Track campaign and user
-      this.crm.trackCampaign(campaign.id)
-      campaign.userId && this.usersService.trackUserById(campaign.userId)
-
       // Handle data and details JSON fields
       const campaignUpdateData: Prisma.CampaignUpdateInput = {}
       if (data) {
@@ -183,6 +179,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           })
         }
       }
+
+      // Track campaign and user
+      this.crm.trackCampaign(campaign.id)
+      campaign.userId && this.usersService.trackUserById(campaign.userId)
 
       // Return the updated campaign with pathToVictory included
       return tx.campaign.findFirst({
