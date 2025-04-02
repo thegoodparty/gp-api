@@ -25,6 +25,7 @@ export const CRMCompanyPropertiesSchema = z
     [HS_PROPS.candidate_district]: z.string(),
     [HS_PROPS.candidate_email]: z.string().email(),
     [HS_PROPS.candidate_name]: z.string(),
+    [HS_PROPS.name]: z.string(),
     [HS_PROPS.candidate_office]: z.string(),
     [HS_PROPS.office_level]: z.string(),
     [HS_PROPS.candidate_party]: z.string(),
