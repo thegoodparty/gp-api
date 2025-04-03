@@ -38,6 +38,9 @@ export type VoterGoals = {
   text?: number
   events?: number
   yardSigns?: number
+  robocall?: number
+  phoneBanking?: number
+  socialMedia?: number
 }
 
 export enum ElectionLevel {
