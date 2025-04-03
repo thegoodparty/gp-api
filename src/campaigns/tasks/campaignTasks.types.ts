@@ -3,6 +3,7 @@ enum CampaignTaskType {
   robocall = 'robocall',
   doorKnocking = 'door-knocking',
   phoneBanking = 'phone-banking',
+  socialMedia = 'social-media',
   link = 'link',
 }
 

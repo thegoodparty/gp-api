@@ -7,6 +7,9 @@ enum CampaignUpdateHistoryType {
   text
   events
   yardSigns
+  robocall
+  phoneBanking
+  socialMedia
 }
 
 model CampaignUpdateHistory {
