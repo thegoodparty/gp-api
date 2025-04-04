@@ -25,6 +25,11 @@ import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { CampaignEmailsService } from './campaignEmails.service'
 
+enum CandidateVerification {
+  yes = 'YES',
+  no = 'NO',
+}
+
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
@@ -250,7 +255,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    const isVerified = data?.hubSpotUpdates?.verified_candidates === 'Yes'
+    const isVerified =
+      data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
+      CandidateVerification.yes
 
     if (campaign.isActive) {
       return {
