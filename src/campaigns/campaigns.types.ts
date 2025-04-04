@@ -2,6 +2,10 @@ import { Prisma } from '@prisma/client'
 
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 
+export enum CampaignCreatedBy {
+  ADMIN = 'admin',
+}
+
 export type PlanVersion = {
   date: Date | string
   text: string
@@ -25,6 +29,7 @@ export enum CampaignStatus {
 export type CampaignWith<T extends keyof Prisma.CampaignInclude> =
   Prisma.CampaignGetPayload<{ include: { [field in T]: true } }>
 
+// TODO: this should be based off CampaignUpdateHistoryType, we're having to change these in too many places
 export type VoterGoals = {
   doorKnocking?: number
   calls?: number
@@ -34,6 +39,9 @@ export type VoterGoals = {
   text?: number
   events?: number
   yardSigns?: number
+  robocall?: number
+  phoneBanking?: number
+  socialMedia?: number
 }
 
 export enum ElectionLevel {

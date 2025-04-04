@@ -14,7 +14,7 @@ import { PathToVictory, User } from '@prisma/client'
 import { IS_PROD } from '../shared/util/appEnvironment.util'
 import { UsersService } from '../users/services/users.service'
 import { DateFormats, formatDate } from '../shared/util/date.util'
-import { CampaignWith } from '../campaigns/campaigns.types'
+import { CampaignCreatedBy, CampaignWith } from '../campaigns/campaigns.types'
 import {
   calculateVoterGoalsCount,
   countAnsweredQuestions,
@@ -28,7 +28,7 @@ import {
 } from './fullStory.types'
 import { reduce as reduceAsync } from 'async'
 import Bottleneck from 'bottleneck'
-import { CRMCompanyProperties, PrimaryElectionResult } from '../crm/crm.types'
+import { PrimaryElectionResult } from '../crm/crm.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 
@@ -115,8 +115,7 @@ export class FullStoryService {
     } = {
       primary_election_result: PrimaryElectionResult.WON,
       election_results: 'Won General',
-    } as CRMCompanyProperties
-
+    }
     const { answeredQuestions } = countAnsweredQuestions(
       campaign,
       campaign.campaignPositions,
@@ -137,7 +136,7 @@ export class FullStoryService {
       isVerified,
       isPro,
       sessionCount: user?.metaData?.sessionCount || 0,
-      createdByAdmin: createdBy === 'admin',
+      createdByAdmin: createdBy === CampaignCreatedBy.ADMIN,
       aiContentCount: aiContent ? Object.keys(aiContent).length : 0,
       p2vStatus: pathToVictoryData?.p2vStatus || 'n/a',
       electionDateStr: electionDateMonth,

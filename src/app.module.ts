@@ -24,6 +24,7 @@ import { SubscribeModule } from './subscribe/subscribe.module'
 import { EcanvasserIntegrationModule } from './ecanvasserIntegration/ecanvasserIntegration.module'
 import { TextCampaignModule } from './textCampaign/textCampaign.module'
 import { SessionsService } from './users/services/sessions.service'
+import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messaging.module'
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { SessionsService } from './users/services/sessions.service'
     CrmModule,
     SubscribeModule,
     EcanvasserIntegrationModule,
+    ScheduledMessagingModule,
     TextCampaignModule,
   ],
   providers: [

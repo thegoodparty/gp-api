@@ -17,15 +17,18 @@ import {
   OnboardingStep,
   PlanVersion,
 } from '../campaigns.types'
-import { EmailService } from 'src/email/email.service'
-import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/services/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmCampaignsService } from './crmCampaigns.service'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
+import { CampaignEmailsService } from './campaignEmails.service'
+
+enum CandidateVerification {
+  yes = 'YES',
+  no = 'NO',
+}
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
@@ -35,7 +38,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
     private planVersionService: CampaignPlanVersionsService,
-    private emailService: EmailService,
+    private readonly campaignEmails: CampaignEmailsService,
   ) {
     super()
   }
@@ -51,10 +54,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
-    return this.model.create(args)
+    return await this.model.create(args)
   }
 
   // TODO: Find a way to make these JSON path lookups type-safe
+
   async findBySubscriptionId(subscriptionId: string) {
     return this.findFirst({
       where: {
@@ -65,8 +69,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-
   // TODO: Find a way to make these JSON path lookups type-safe
+
   async findByHubspotId(hubspotId: string) {
     return this.findFirst({
       where: {
@@ -77,12 +81,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-
   async createForUser(user: User) {
     this.logger.debug('Creating campaign for user', user)
     const slug = await this.findSlug(user)
 
-    const newCampaign = await this.model.create({
+    const newCampaign = await this.create({
       data: {
         slug,
         isActive: false,
@@ -119,10 +122,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       })
 
       if (!campaign) return false
-
-      // Track campaign and user
-      this.crm.trackCampaign(campaign.id)
-      campaign.userId && this.usersService.trackUserById(campaign.userId)
 
       // Handle data and details JSON fields
       const campaignUpdateData: Prisma.CampaignUpdateInput = {}
@@ -185,6 +184,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           })
         }
       }
+
+      // Track campaign and user
+      this.crm.trackCampaign(campaign.id)
+      campaign.userId && this.usersService.trackUserById(campaign.userId)
 
       // Return the updated campaign with pathToVictory included
       return tx.campaign.findFirst({
@@ -252,10 +255,15 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
+    const isVerified =
+      data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
+      CandidateVerification.yes
+
     if (campaign.isActive) {
       return {
         status: CampaignStatus.candidate,
         slug,
+        isVerified,
       }
     }
     let step = 1
@@ -319,7 +327,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     this.crm.trackCampaign(campaign.id)
     this.usersService.trackUserById(campaign.userId)
 
-    await this.sendCampaignLaunchEmail(user)
+    await this.campaignEmails.sendCampaignLaunchEmail(user)
 
     return true
   }
@@ -454,91 +462,4 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     return true
   }
-
-  private async sendCampaignLaunchEmail(user: User) {
-    try {
-      await this.emailService.sendTemplateEmail({
-        to: user.email,
-        subject: 'Full Suite of AI Campaign Tools Now Available',
-        template: EmailTemplateNames.campaignLaunch,
-        variables: {
-          name: getUserFullName(user),
-          link: `${WEBAPP_ROOT}/dashboard`,
-        },
-      })
-    } catch (e) {
-      this.logger.error('Error sending campaign launch email', e)
-    }
-  }
 }
-
-// async function updatePathToVictory(campaign, columnKey, value) {
-//   try {
-//     const p2v = await PathToVictory.findOrCreate(
-//       {
-//         campaign: campaign.id,
-//       },
-//       {
-//         campaign: campaign.id,
-//       },
-//     )
-
-//     const data = p2v.data || {}
-//     const updatedData = {
-//       ...data,
-//       [columnKey]: value,
-//     }
-
-//     await PathToVictory.updateOne({ id: p2v.id }).set({
-//       data: updatedData,
-//     })
-
-//     if (!campaign.pathToVictory) {
-//       await Campaign.updateOne({ id: campaign.id }).set({
-//         pathToVictory: p2v.id,
-//       })
-//     }
-//   } catch (e) {
-//     console.log('Error at updatePathToVictory', e)
-//     await sails.helpers.slack.errorLoggerHelper(
-//       'Error at updatePathToVictory',
-//       e,
-//     )
-//   }
-// }
-
-// async function updateViability(campaign, columnKey, value) {
-//   try {
-//     const p2v = await PathToVictory.findOrCreate(
-//       {
-//         campaign: campaign.id,
-//       },
-//       {
-//         campaign: campaign.id,
-//       },
-//     )
-
-//     const data = p2v.data || {}
-//     const viability = data.viability || {}
-//     const updatedData = {
-//       ...data,
-//       viability: {
-//         ...viability,
-//         [columnKey]: value,
-//       },
-//     }
-
-//     await PathToVictory.updateOne({ id: p2v.id }).set({
-//       data: updatedData,
-//     })
-
-//     if (!campaign.pathToVictory) {
-//       await Campaign.updateOne({ id: campaign.id }).set({
-//         pathToVictory: p2v.id,
-//       })
-//     }
-//   } catch (e) {
-//     console.log('Error at updateViability', e)
-//     await sails.helpers.slack.errorLoggerHelper('Error at updateViability', e)
-//   }
-// }

@@ -2,12 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { addDays } from 'date-fns'
-import { BlogArticleMeta } from '@prisma/client'
-import {
-  BlogArticlesSectionAugmented,
-  SpecificSectionResponseDatum,
-} from '../content.types'
-import { generateAllSectionsResponseData } from '../util/generateAllSectionsResponseData'
+import { mapBlogArticlesToSections } from '../util/mapBlogArticlesToSections.util'
 
 @Injectable()
 export class BlogArticleMetaService extends createPrismaBase(
@@ -75,51 +70,50 @@ export class BlogArticleMetaService extends createPrismaBase(
       }))
   }
 
-  async findBlogArticlesBySection(sectionSlug?: string) {
+  async listArticlesBySection(sectionSlug?: string, limit?: number) {
     const blogArticleMetas = await this.model.findMany({
+      ...(sectionSlug
+        ? {
+            where: {
+              section: {
+                path: ['fields', 'slug'],
+                equals: sectionSlug,
+              },
+            },
+          }
+        : {}),
       orderBy: {
-        contentId: 'desc',
+        publishDate: 'desc',
       },
     })
 
-    const bySectionMap = blogArticleMetas.reduce((acc, curr) => {
-      return acc.set(curr.section.id, {
-        ...curr.section,
-        slug: curr.section.fields.slug,
-        articles: (acc.has(curr.section.id)
-          ? [...(acc.get(curr.section.id)?.articles as BlogArticleMeta[]), curr]
-          : [curr]
-        ).sort((a, b) => b.publishDate.getTime() - a.publishDate.getTime()),
+    return mapBlogArticlesToSections(blogArticleMetas, limit)
+  }
+
+  async listArticleSections() {
+    return (
+      await this.model.findMany({
+        distinct: ['section'],
+        select: {
+          section: true,
+        },
       })
-    }, new Map<string, BlogArticlesSectionAugmented>())
-
-    const augmentedSections = [...bySectionMap.values()]
-
-    return sectionSlug
-      ? generateSpecificSectionResponseData(augmentedSections, sectionSlug)
-      : generateAllSectionsResponseData(augmentedSections, blogArticleMetas)
+    ).map(({ section }) => section)
   }
-}
 
-const generateSpecificSectionResponseData = (
-  sections: BlogArticlesSectionAugmented[],
-  sectionSlug: string,
-) => {
-  const results: SpecificSectionResponseDatum[] = []
-  let sectionIndex = 0
-  const heroSection = sections.find((section) => section.slug === sectionSlug)
-  const hero = heroSection?.articles?.[0]
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i]
-    if (section.fields.slug === sectionSlug) {
-      sectionIndex = i
-      if (!section.articles) continue
-      section.articles = section.articles.slice(1)
-      results.push(section)
-    } else {
-      const { articles: _articles, ...sectionSansArticles } = section
-      results.push(sectionSansArticles)
-    }
+  async getBlogArticleSectionBySlug(sectionSlug: string) {
+    return (
+      await this.model.findFirstOrThrow({
+        select: {
+          section: true,
+        },
+        where: {
+          section: {
+            path: ['fields', 'slug'],
+            equals: sectionSlug,
+          },
+        },
+      })
+    ).section
   }
-  return { sections: results, hero: hero, sectionIndex }
 }
