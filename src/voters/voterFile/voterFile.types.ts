@@ -43,11 +43,14 @@ export const CUSTOM_FILTERS = [
   'age_18_25',
   'age_25_35',
   'age_35_50',
-  'age_50+',
+  'age_50_plus',
   'gender_male',
   'gender_female',
   'gender_unknown',
+  'audience_request',
 ] as const
+
+
 
 export const CUSTOM_PURPOSES = ['GOTV', 'Persuasion', 'Voter ID'] as const
 
