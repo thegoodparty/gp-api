@@ -26,8 +26,8 @@ import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { EcanvasserIntegrationService } from '../../ecanvasserIntegration/services/ecanvasserIntegration.service'
 import {
-  CRMCompanyPropertiesSchema,
   CRMCompanyProperties,
+  CRMCompanyPropertiesSchema,
 } from 'src/crm/schemas/CRMCompanyProperties.schema'
 import {
   P2V_LOCKED_STATUS,
@@ -397,7 +397,7 @@ export class CrmCampaignsService {
         message: msg,
         error: validated.error,
       })
-      throw new Error(msg)
+      return null
     }
 
     return validated.data
@@ -455,6 +455,10 @@ export class CrmCampaignsService {
 
     const crmCompanyProperties =
       await this.calculateCRMCompanyProperties(campaign)
+
+    if (!crmCompanyProperties) {
+      return
+    }
 
     this.logger.debug('CRM Company Properties:', crmCompanyProperties)
 
@@ -649,6 +653,10 @@ export class CrmCampaignsService {
         const id = campaign.data.hubspotId as string
         const crmCompanyProperties =
           await this.calculateCRMCompanyProperties(campaign)
+        if (!crmCompanyProperties) {
+          return { id, properties: {} } as SimplePublicObjectBatchInput
+        }
+
         const includeAll = fields.length === 1 && fields.includes('all')
 
         const properties = includeAll
