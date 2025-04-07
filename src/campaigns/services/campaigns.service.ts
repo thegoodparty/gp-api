@@ -256,8 +256,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
 
     const isVerified =
+      campaign.isVerified ||
       data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
-      CandidateVerification.yes
+        CandidateVerification.yes
 
     if (campaign.isActive) {
       return {
