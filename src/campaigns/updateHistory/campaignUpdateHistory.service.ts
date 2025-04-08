@@ -15,7 +15,25 @@ export class CampaignUpdateHistoryService extends createPrismaBase(
     super()
   }
 
-  create(campaign: Campaign, { type, quantity }: CreateUpdateHistorySchema) {
+  async create(
+    campaign: Campaign,
+    { type, quantity }: CreateUpdateHistorySchema,
+  ) {
+    const { data } = campaign
+    const { reportedVoterGoals = {} } = data
+
+    // Initialize or increment the voter goal count
+    reportedVoterGoals[type] = (reportedVoterGoals[type] || 0) + quantity
+
+    data.reportedVoterGoals = { ...reportedVoterGoals }
+
+    await this.campaigns.update({
+      where: { id: campaign.id },
+      data: {
+        data,
+      },
+    })
+
     return this.model.create({
       data: {
         type,

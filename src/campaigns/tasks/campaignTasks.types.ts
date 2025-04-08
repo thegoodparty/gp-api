@@ -1,10 +1,10 @@
-enum CampaignTaskType {
+export enum CampaignTaskType {
   texting = 'texting',
   robocall = 'robocall',
   doorKnocking = 'door-knocking',
   phoneBanking = 'phone-banking',
   socialMedia = 'social-media',
-  link = 'link',
+  events = 'events',
 }
 
 type CampaignTask = {
