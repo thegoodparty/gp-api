@@ -1,3 +1,4 @@
+import { CampaignTask } from './campaignTasks.types'
 import tasksWeek1 from './fixtures/tasks-week-1.json'
 import tasksWeek2 from './fixtures/tasks-week-2.json'
 import tasksWeek3 from './fixtures/tasks-week-3.json'

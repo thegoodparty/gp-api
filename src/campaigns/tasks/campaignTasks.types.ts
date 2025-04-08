@@ -7,7 +7,7 @@ export enum CampaignTaskType {
   events = 'events',
 }
 
-type CampaignTask = {
+export type CampaignTask = {
   id: string
   title: string
   description: string
