@@ -114,7 +114,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
     const { data, details, pathToVictory, aiContent } = body
 
-    return this.client.$transaction(async (tx) => {
+    const updatedCampaign = await this.client.$transaction(async (tx) => {
       this.logger.debug('Updating campaign json fields', { id, body })
       const campaign = await tx.campaign.findFirst({
         where: { id },
@@ -185,16 +185,21 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         }
       }
 
-      // Track campaign and user
-      this.crm.trackCampaign(campaign.id)
-      campaign.userId && this.usersService.trackUserById(campaign.userId)
-
       // Return the updated campaign with pathToVictory included
       return tx.campaign.findFirst({
         where: { id: campaign.id },
         include: { pathToVictory: true },
       })
     })
+
+    if (updatedCampaign) {
+      // Track campaign and user
+      this.crm.trackCampaign(updatedCampaign.id)
+      updatedCampaign.userId &&
+        this.usersService.trackUserById(updatedCampaign.userId)
+    }
+
+    return updatedCampaign
   }
 
   async patchCampaignDetails(
