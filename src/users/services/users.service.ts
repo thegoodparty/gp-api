@@ -90,7 +90,8 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   async createUser(
     userData: WithOptional<CreateUserInputDto, 'password' | 'phone'>,
   ): Promise<User> {
-    const { password, firstName, lastName, email, zip, phone, name } = userData
+    const { password, firstName, lastName, zip, phone, name } = userData
+    const email = userData.email?.toLowerCase()
 
     const hashedPassword = password ? await hashPassword(password) : null
     const existingUser = await this.findUser({ email })
