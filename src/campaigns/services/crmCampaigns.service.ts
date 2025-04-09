@@ -373,10 +373,14 @@ export class CrmCampaignsService {
           : undefined,
       p2v_status: p2v_status,
       //NOTE: Older versions of these fields may be strings, so we need to convert to numbers in case
-      seats_available: Number(seats || 0),
-      totalregisteredvoters: Number(totalRegisteredVoters || 0),
-      votegoal: Number(p2vData?.voterContactGoal || 0),
-      win_number: Number(winNumber || 0),
+      seats_available: seats ? Number(seats) : undefined,
+      totalregisteredvoters: totalRegisteredVoters
+        ? Number(totalRegisteredVoters)
+        : undefined,
+      votegoal: p2vData?.voterContactGoal
+        ? Number(p2vData?.voterContactGoal)
+        : undefined,
+      win_number: winNumber ? Number(winNumber) : undefined,
     }
 
     const validated = CRMCompanyPropertiesSchema.transform((obj) =>
