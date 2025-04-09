@@ -67,7 +67,7 @@ declare global {
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
     //  No reason to have both.
-    //  Take care not to duplicate a field on both details and data, for now
+    //  Take care not to duplicate a field on both details and data, for now.
     export type CampaignData = {
       createdBy?: CampaignCreatedBy
       slug?: string
