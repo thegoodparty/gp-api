@@ -6,6 +6,7 @@ import tasksWeek5 from './fixtures/tasks-week-5'
 import tasksWeek6 from './fixtures/tasks-week-6'
 import tasksWeek7 from './fixtures/tasks-week-7'
 import tasksWeek8 from './fixtures/tasks-week-8'
+import tasksWeek9 from './fixtures/tasks-week-9'
 
 export const STATIC_CAMPAIGN_TASKS = [
   ...tasksWeek1,
@@ -16,4 +17,5 @@ export const STATIC_CAMPAIGN_TASKS = [
   ...tasksWeek6,
   ...tasksWeek7,
   ...tasksWeek8,
+  ...tasksWeek9,
 ]
