@@ -32,6 +32,7 @@ export class ScheduleOutreachCampaignSchema extends createZodDto(
       VoterFileType.sms,
       VoterFileType.telemarketing,
       CampaignTaskType.texting,
+      CampaignTaskType.robocall,
     ]),
   }),
 ) {}

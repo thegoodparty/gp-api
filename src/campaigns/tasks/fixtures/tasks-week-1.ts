@@ -1,0 +1,72 @@
+import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+
+const tasksWeek1: CampaignTask[] = [
+  {
+    id: '41b8b290-7e50-4d5a-8c9f-b8e17b253cde',
+    title: 'Schedule your election day reminder text message',
+    description: 'Encourage people to get out and vote.',
+    cta: 'Schedule',
+    week: 1,
+    flowType: CampaignTaskType.texting,
+    deadline: 3,
+    proRequired: true,
+  },
+  {
+    id: '5fc21abd-2792-4c09-96f1-de94a28b2b3c',
+    title: 'Schedule your election day reminder robocall',
+    description: 'Encourage people to get out and vote.',
+    cta: 'Schedule',
+    week: 1,
+    flowType: CampaignTaskType.robocall,
+    deadline: 3,
+    proRequired: true,
+  },
+  {
+    id: '83cb4a9e-ae02-4c30-a0d9-27b9672ce556',
+    title: 'Knock on doors to remind people to vote',
+    description: 'Encourage people to get out and vote.',
+    cta: 'Schedule',
+    week: 1,
+    flowType: CampaignTaskType.doorKnocking,
+    proRequired: true,
+  },
+  {
+    id: 'cf0b27bc-fd6b-48f1-8ce0-e69e3b0c16d5',
+    title: 'Plan your phone banking campaign reminding people to vote',
+    description: 'Encourage people to get out and vote.',
+    cta: 'Develop strategy',
+    week: 1,
+    flowType: CampaignTaskType.phoneBanking,
+    deadline: 14,
+    proRequired: true,
+  },
+  {
+    id: '1a9fcb0d-ce37-46a0-87e2-3e8c8bdcca5d',
+    title: 'Post to social media reminding people to vote',
+    description: 'Encourage people to get out and vote.',
+    cta: 'Write Post',
+    week: 1,
+    flowType: CampaignTaskType.socialMedia,
+  },
+  {
+    id: '62efdb34-5865-4c2d-85a0-c71d7650a8a7',
+    title: 'Go to the polls',
+    description:
+      'Your presence shows commitment and allows last-minute voter contact.',
+    cta: 'Get Guidance',
+    week: 1,
+    flowType: CampaignTaskType.event,
+    link: 'https://goodparty.org/blog/article/turning-support-into-victory-vote-phase-of-a-political-campaign',
+  },
+  {
+    id: '3e7b69f2-9ea5-4d4a-b98d-c2d9e6b60e18',
+    title: 'Celebrate your efforts',
+    description: 'Acknowledge everyone who made your campaign possible.',
+    cta: 'Get Guidance',
+    week: 1,
+    flowType: CampaignTaskType.event,
+    link: 'https://goodparty.org/blog/article/what-to-do-after-winning-or-losing-election',
+  },
+]
+
+export default tasksWeek1
