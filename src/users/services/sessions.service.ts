@@ -5,10 +5,10 @@ import { UsersService } from 'src/users/services/users.service'
 const SESSION_TIMEOUT = 1000 * 60 * 30 // 30 minutes (fullstory's inactivity timeout)
 
 export class SessionsService {
+  private readonly logger = new Logger(SessionsService.name)
   constructor(
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
-    private readonly logger: Logger,
   ) {}
 
   async trackSession(user: User) {
