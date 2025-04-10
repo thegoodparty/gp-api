@@ -1,7 +1,11 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
-import { CHANNEL_TO_TYPE_MAP } from './voterFile.types'
+import {
+  CHANNEL_TO_TYPE_MAP,
+  TASK_TO_TYPE_MAP,
+  VoterFileType,
+} from './voterFile.types'
 import { typeToQuery } from './util/voterFile.util'
 import { VoterDatabaseService } from '../services/voterDatabase.service'
 import { Campaign, User } from '@prisma/client'
@@ -11,6 +15,7 @@ import { buildSlackBlocks } from './util/slack.util'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 
 @Injectable()
 export class VoterFileService {
@@ -27,10 +32,15 @@ export class VoterFileService {
     campaign: CampaignWith<'pathToVictory'>,
     { type, countOnly, customFilters }: GetVoterFileSchema,
   ) {
-    const resolvedType =
+    // If type == custom, map the custom channel name to a VoterFileType
+    // if type is a CampaignTaskType, map it to a VoterFileType
+    // otherwise, use the type as is
+    const resolvedType: VoterFileType =
       type === 'custom' && customFilters?.channel
         ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
-        : type
+        : Object.values(CampaignTaskType).includes(type as CampaignTaskType)
+          ? TASK_TO_TYPE_MAP[type]
+          : type
 
     const countQuery = typeToQuery(resolvedType, campaign, customFilters, true)
     this.logger.debug('Count Query:', countQuery)

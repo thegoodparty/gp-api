@@ -1,3 +1,5 @@
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
+
 export enum VoterFileType {
   full = 'full',
   doorKnocking = 'doorKnocking',
@@ -31,6 +33,19 @@ export const CHANNEL_TO_TYPE_MAP: {
   Facebook: VoterFileType.digitalAds,
 }
 
+export const TASK_TO_TYPE_MAP: {
+  [key in CampaignTaskType]: VoterFileType
+} = {
+  [CampaignTaskType.doorKnocking]: VoterFileType.doorKnocking,
+  [CampaignTaskType.phoneBanking]: VoterFileType.telemarketing,
+  [CampaignTaskType.socialMedia]: VoterFileType.full, // TODO: check if voter file type is correct, should it be digitalAds?
+  [CampaignTaskType.robocall]: VoterFileType.sms,
+  [CampaignTaskType.texting]: VoterFileType.sms,
+  // These maybe won't be used?, putting here for completeness
+  [CampaignTaskType.event]: VoterFileType.full,
+  [CampaignTaskType.education]: VoterFileType.full,
+}
+
 export const CUSTOM_FILTERS = [
   'audience_superVoters',
   'audience_likelyVoters',
@@ -49,8 +64,6 @@ export const CUSTOM_FILTERS = [
   'gender_unknown',
   'audience_request',
 ] as const
-
-
 
 export const CUSTOM_PURPOSES = ['GOTV', 'Persuasion', 'Voter ID'] as const
 
