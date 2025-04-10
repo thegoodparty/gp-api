@@ -1,12 +1,11 @@
-import { CampaignTask } from './campaignTasks.types'
-import tasksWeek1 from './fixtures/tasks-week-1.json'
-import tasksWeek2 from './fixtures/tasks-week-2.json'
-import tasksWeek3 from './fixtures/tasks-week-3.json'
-import tasksWeek4 from './fixtures/tasks-week-4.json'
-import tasksWeek5 from './fixtures/tasks-week-5.json'
-import tasksWeek6 from './fixtures/tasks-week-6.json'
-import tasksWeek7 from './fixtures/tasks-week-7.json'
-import tasksWeek8 from './fixtures/tasks-week-8.json'
+import tasksWeek1 from './fixtures/tasks-week-1'
+import tasksWeek2 from './fixtures/tasks-week-2'
+import tasksWeek3 from './fixtures/tasks-week-3'
+import tasksWeek4 from './fixtures/tasks-week-4'
+import tasksWeek5 from './fixtures/tasks-week-5'
+import tasksWeek6 from './fixtures/tasks-week-6'
+import tasksWeek7 from './fixtures/tasks-week-7'
+import tasksWeek8 from './fixtures/tasks-week-8'
 
 export const STATIC_CAMPAIGN_TASKS = [
   ...tasksWeek1,
@@ -17,4 +16,4 @@ export const STATIC_CAMPAIGN_TASKS = [
   ...tasksWeek6,
   ...tasksWeek7,
   ...tasksWeek8,
-] as CampaignTask[]
+]
