@@ -322,6 +322,13 @@ export default $config({
           toPort: 5432,
           cidrBlocks: [vpcCidr],
         },
+        // Allow access from Codebuild's security group
+        {
+          protocol: 'tcp',
+          fromPort: 5432,
+          toPort: 5432,
+          securityGroups: ['sg-01de8d67b0f0ec787'], // Codebuild SG ID
+        },
       ],
       egress: [
         {
