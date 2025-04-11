@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { StripeSingleton } from './stripe.service'
+import { StripeService, StripeSingleton } from './stripe.service'
 import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
@@ -20,6 +20,15 @@ import { SlackChannel } from '../../shared/services/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
+import { addSeconds, parse } from 'date-fns'
+
+const parseCampaignElectionDate = (campaign: Campaign) => {
+  const { details } = campaign
+  const { electionDate: electionDateStr } = details || {}
+  return (
+    electionDateStr && parse(electionDateStr!, DateFormats.isoDate, new Date())
+  )
+}
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -38,6 +47,7 @@ export class StripeEventsService {
     private readonly emailService: EmailService,
     private readonly crm: CrmCampaignsService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
+    private readonly stripeService: StripeService,
   ) {}
 
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
@@ -88,12 +98,22 @@ export class StripeEventsService {
       )
     }
     const { id: campaignId } = campaign
+    const electionDate = parseCampaignElectionDate(campaign)
+
+    if (!electionDate || electionDate < new Date()) {
+      throw new BadGatewayException(
+        'No electionDate or electionDate is in the past',
+      )
+    }
+
+    const testDate = addSeconds(new Date(), 15)
 
     await Promise.allSettled([
       this.campaignsService.patchCampaignDetails(campaignId, {
         subscriptionId: subscriptionId as string,
       }),
       this.campaignsService.setIsPro(campaignId),
+      this.stripeService.setSubscriptionCancelAt(subscriptionId, testDate),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
@@ -140,7 +160,7 @@ export class StripeEventsService {
     event: Stripe.CheckoutSessionCompletedEvent,
   ): Promise<void> {
     const session = event.data.object
-    const { customer: customerId, subscription } = session
+    const { customer: customerId, subscription: subscriptionId } = session
     if (!customerId) {
       throw new BadGatewayException('No customerId found in checkout session')
     }
@@ -169,6 +189,9 @@ export class StripeEventsService {
     }
 
     const { id: campaignId } = campaign
+    const electionDate = parseCampaignElectionDate(campaign)
+
+    const testDate = addSeconds(new Date(), 15)
 
     await Promise.allSettled([
       this.usersService.patchUserMetaData(user.id, {
@@ -176,9 +199,13 @@ export class StripeEventsService {
         checkoutSessionId: null,
       }),
       this.campaignsService.patchCampaignDetails(campaignId, {
-        subscriptionId: subscription as string,
+        subscriptionId: subscriptionId as string,
       }),
       this.campaignsService.setIsPro(campaignId),
+      this.stripeService.setSubscriptionCancelAt(
+        subscriptionId as string,
+        testDate,
+      ),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),

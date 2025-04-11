@@ -53,4 +53,11 @@ export class StripeService {
       return_url: `${WEBAPP_ROOT_URL}/profile`,
     })
   }
+
+  async setSubscriptionCancelAt(subscriptionId: string, cancelAt: Date) {
+    return await this.stripe.subscriptions.update(subscriptionId, {
+      cancel_at_period_end: false,
+      cancel_at: cancelAt.getTime() / 1000,
+    })
+  }
 }
