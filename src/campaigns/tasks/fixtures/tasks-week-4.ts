@@ -7,7 +7,7 @@ const tasksWeek4: CampaignTask[] = [
     description: 'Build trust and persuade voters.',
     cta: 'Schedule',
     week: 4,
-    flowType: CampaignTaskType.texting,
+    flowType: CampaignTaskType.text,
     proRequired: true,
   },
   {

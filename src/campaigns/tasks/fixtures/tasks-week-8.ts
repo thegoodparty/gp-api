@@ -35,7 +35,7 @@ const tasksWeek8: CampaignTask[] = [
       'Start to recruit volunteers to help spread the word about your candidacy.',
     cta: 'Get Guidance',
     week: 8,
-    flowType: CampaignTaskType.event,
+    flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/volunteers-bridging-campaign-constituent',
   },
   {
