@@ -22,6 +22,8 @@ import { getUserFullName } from 'src/users/util/users.util'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateName } from 'src/email/email.types'
 import { TextCampaignService } from 'src/textCampaign/services/textCampaign.service'
+import { VoterFileType } from '../voterFile/voterFile.types'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 
 @Injectable()
 export class VoterOutreachService {
@@ -130,7 +132,7 @@ export class VoterOutreachService {
     })
 
     // If type is SMS, create a TextCampaign
-    if (type === 'sms') {
+    if (type === VoterFileType.sms || type === CampaignTaskType.texting) {
       await this.textCampaignService.model.create({
         data: {
           campaignId: campaign.id,

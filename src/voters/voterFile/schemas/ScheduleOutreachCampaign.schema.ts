@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { CUSTOM_FILTERS, VoterFileType } from '../voterFile.types'
 import { isNumeric } from 'validator'
 import { parseJsonString } from 'src/shared/util/zod.util'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 
 export class ScheduleOutreachCampaignSchema extends createZodDto(
   z.object({
@@ -27,6 +28,11 @@ export class ScheduleOutreachCampaignSchema extends createZodDto(
     date: z.string().date(),
     message: z.string(),
     voicemail: z.boolean().optional(),
-    type: z.enum([VoterFileType.sms, VoterFileType.telemarketing]),
+    type: z.enum([
+      VoterFileType.sms,
+      VoterFileType.telemarketing,
+      CampaignTaskType.texting,
+      CampaignTaskType.robocall,
+    ]),
   }),
 ) {}
