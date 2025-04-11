@@ -7,7 +7,7 @@ const tasksWeek1: CampaignTask[] = [
     description: 'Encourage people to get out and vote.',
     cta: 'Schedule',
     week: 1,
-    flowType: CampaignTaskType.texting,
+    flowType: CampaignTaskType.text,
     deadline: 3,
     proRequired: true,
   },
@@ -55,7 +55,7 @@ const tasksWeek1: CampaignTask[] = [
       'Your presence shows commitment and allows last-minute voter contact.',
     cta: 'Get Guidance',
     week: 1,
-    flowType: CampaignTaskType.event,
+    flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/turning-support-into-victory-vote-phase-of-a-political-campaign',
   },
   {
@@ -64,7 +64,7 @@ const tasksWeek1: CampaignTask[] = [
     description: 'Acknowledge everyone who made your campaign possible.',
     cta: 'Get Guidance',
     week: 1,
-    flowType: CampaignTaskType.event,
+    flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/what-to-do-after-winning-or-losing-election',
   },
 ]

@@ -7,7 +7,7 @@ const tasksWeek2: CampaignTask[] = [
     description: 'Build trust and persuade voters.',
     cta: 'Schedule',
     week: 2,
-    flowType: CampaignTaskType.texting,
+    flowType: CampaignTaskType.text,
     proRequired: true,
   },
   {
@@ -52,7 +52,7 @@ const tasksWeek2: CampaignTask[] = [
     description: 'Last opportunity to mobilize your volunteers and voters.',
     cta: 'Get Guidance',
     week: 2,
-    flowType: CampaignTaskType.event,
+    flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/how-to-organize-campaign-events',
   },
 ]

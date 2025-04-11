@@ -33,7 +33,7 @@ const tasksWeek5: CampaignTask[] = [
     description: 'Figure out when the debate is and put it on your calendar.',
     cta: 'Get Guidance',
     week: 5,
-    flowType: CampaignTaskType.event,
+    flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/10-tips-to-prepare-for-first-candidate-debate',
   },
 ]
