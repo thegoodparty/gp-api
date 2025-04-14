@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
-import { parse } from 'date-fns'
+import { parse, differenceInWeeks } from 'date-fns'
 import { DateFormats } from '../../shared/util/date.util'
-import { getCurrentWeekTillEndOfElectionDate } from './util/getCurrentWeekTillEndOfElectionDate.util'
 import { STATIC_CAMPAIGN_TASKS } from './campaignTasks.consts'
 import { CampaignsService } from '../services/campaigns.service'
+
+const MAX_WEEK_NUMBER = 9
 
 @Injectable()
 export class CampaignTasksService {
@@ -24,9 +25,9 @@ export class CampaignTasksService {
     const electionDate =
       endDate || parse(electionDateStr!, DateFormats.isoDate, currentDate)
 
-    const weekNumber = getCurrentWeekTillEndOfElectionDate(
-      currentDate,
-      electionDate,
+    const weekNumber = Math.min(
+      Math.max(1, differenceInWeeks(electionDate, currentDate)),
+      MAX_WEEK_NUMBER,
     )
 
     const tasks = this.getListOfTasks(weekNumber)
