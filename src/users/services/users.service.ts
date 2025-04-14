@@ -156,6 +156,13 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     newMetaData: PrismaJson.UserMetaData,
   ) {
     const currentUser = await this.findUser({ id: userId })
+    if (!currentUser) {
+      this.logger.warn(
+        `User with id ${userId} not found. Skipping metadata update`,
+      )
+      return null
+    }
+
     const currentMetaData = currentUser?.metaData
     return this.updateUser(
       {

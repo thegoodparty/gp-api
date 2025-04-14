@@ -7,6 +7,7 @@ import {
   VoterFileType,
 } from '../voterFile.types'
 import { parseJsonString } from 'src/shared/util/zod.util'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 
 const LOWER_CASE_TYPE_MAP = {
   doorknocking: VoterFileType.doorKnocking,
@@ -16,10 +17,13 @@ const LOWER_CASE_TYPE_MAP = {
 
 export class GetVoterFileSchema extends createZodDto(
   z.object({
-    type: z.preprocess((val) => {
-      // check if val is a lowercase version
-      return LOWER_CASE_TYPE_MAP[val as string] ?? val
-    }, z.nativeEnum(VoterFileType)),
+    type: z.preprocess(
+      (val) => {
+        // check if val is a lowercase version
+        return LOWER_CASE_TYPE_MAP[val as string] ?? val
+      },
+      z.union([z.nativeEnum(VoterFileType), z.nativeEnum(CampaignTaskType)]),
+    ),
     customFilters: parseJsonString(
       z
         .object({
