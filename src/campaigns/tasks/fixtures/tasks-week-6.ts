@@ -34,7 +34,7 @@ const tasksWeek6: CampaignTask[] = [
       'Make relationships with people currently working in local government.',
     cta: 'Get Guidance',
     week: 6,
-    flowType: CampaignTaskType.event,
+    flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/10-ways-independent-candidates-engage-voters',
   },
 ]

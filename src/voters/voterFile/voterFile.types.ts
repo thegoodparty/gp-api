@@ -40,9 +40,9 @@ export const TASK_TO_TYPE_MAP: {
   [CampaignTaskType.phoneBanking]: VoterFileType.telemarketing,
   [CampaignTaskType.socialMedia]: VoterFileType.full, // TODO: check if voter file type is correct, should it be digitalAds?
   [CampaignTaskType.robocall]: VoterFileType.sms,
-  [CampaignTaskType.texting]: VoterFileType.sms,
+  [CampaignTaskType.text]: VoterFileType.sms,
   // These maybe won't be used?, putting here for completeness
-  [CampaignTaskType.event]: VoterFileType.full,
+  [CampaignTaskType.events]: VoterFileType.full,
   [CampaignTaskType.education]: VoterFileType.full,
 }
 
