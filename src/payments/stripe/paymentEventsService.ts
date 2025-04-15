@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { StripeService, StripeSingleton } from './stripe.service'
+import { StripeService } from '../../stripe/services/stripe.service'
 import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
@@ -28,9 +28,8 @@ if (!STRIPE_WEBSOCKET_SECRET) {
 }
 
 @Injectable()
-export class StripeEventsService {
-  private readonly logger = new Logger(StripeEventsService.name)
-  private stripe = StripeSingleton
+export class PaymentEventsService {
+  private readonly logger = new Logger(PaymentEventsService.name)
 
   constructor(
     private readonly usersService: UsersService,
@@ -42,16 +41,10 @@ export class StripeEventsService {
     private readonly stripeService: StripeService,
   ) {}
 
-  async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
-    return this.stripe.webhooks.constructEvent(
-      rawBody,
-      stripeSignature,
-      STRIPE_WEBSOCKET_SECRET as string,
-    )
-  }
-
   async handleEvent(event: Stripe.Event) {
     switch (event.type) {
+      case WebhookEventType.CustomerSubscriptionCreated:
+        return await this.customerSubscriptionCreatedHandler(event)
       case WebhookEventType.CheckoutSessionCompleted:
         return await this.checkoutSessionCompletedHandler(event)
       case WebhookEventType.CheckoutSessionExpired:
@@ -64,6 +57,40 @@ export class StripeEventsService {
         return await this.customerSubscriptionResumedHandler(event)
     }
     this.logger.warn(`Stripe Event type ${event.type} not handled`)
+  }
+
+  async customerSubscriptionCreatedHandler(
+    event: Stripe.CustomerSubscriptionCreatedEvent,
+  ) {
+    const { id: subscriptionId, customer: customerId } = event.data.object
+    if (!subscriptionId) {
+      throw new BadRequestException('No subscriptionId found in subscription')
+    }
+
+    const user = await this.usersService.findByCustomerId(customerId as string)
+    if (!user) {
+      throw new BadGatewayException(
+        'No user found with given subscription customerId',
+      )
+    }
+    const campaign = await this.campaignsService.findByUserId(user.id)
+    if (!campaign) {
+      throw new BadGatewayException(
+        'No campaign found associated with given customerId',
+      )
+    }
+
+    const { id: campaignId, details: campaignDetails } = campaign
+
+    return this.campaignsService.update({
+      where: { id: campaignId },
+      data: {
+        details: {
+          ...campaignDetails,
+          subscriptionId,
+        },
+      },
+    })
   }
 
   async customerSubscriptionResumedHandler(

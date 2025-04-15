@@ -24,6 +24,8 @@ import { CrmCampaignsService } from './crmCampaigns.service'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { CampaignEmailsService } from './campaignEmails.service'
+import { parseIsoDateString } from '../../shared/util/date.util'
+import { StripeService } from '../../stripe/services/stripe.service'
 
 enum CandidateVerification {
   yes = 'YES',
@@ -39,6 +41,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly crm: CrmCampaignsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly campaignEmails: CampaignEmailsService,
+    private readonly stripeService: StripeService,
   ) {
     super()
   }
@@ -130,6 +133,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           campaignUpdateData.data = deepMerge(campaign.data as object, data)
         }
         if (details) {
+          await this.handleSubscriptionCancelAtUpdate(campaign.details, details)
           const mergedDetails = deepMerge(
             campaign.details as object,
             details,
@@ -207,34 +211,50 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return updatedCampaign
   }
 
+  private async handleSubscriptionCancelAtUpdate(
+    currentDetails: PrismaJson.CampaignDetails,
+    updateDetails: Partial<PrismaJson.CampaignDetails>,
+  ) {
+    const { subscriptionId } = currentDetails
+    const { electionDate: electionDateUpdateStr } = updateDetails
+
+    // If we're changing the electionDate and there's an existing subscriptionId,
+    //  then we need to also update the cancelAt date on the subscription
+    if (electionDateUpdateStr && subscriptionId) {
+      const electionDate = parseIsoDateString(electionDateUpdateStr)
+      await this.stripeService.setSubscriptionCancelAt(
+        subscriptionId,
+        electionDate,
+      )
+    }
+  }
+
   async patchCampaignDetails(
     campaignId: number,
     details: Partial<PrismaJson.CampaignDetails>,
   ) {
+    const currentCampaign = await this.model.findFirst({
+      where: { id: campaignId },
+    })
+    if (!currentCampaign?.details) {
+      throw new InternalServerErrorException(
+        `Campaign ${campaignId} has no details JSON`,
+      )
+    }
+    const { details: currentDetails } = currentCampaign
+
+    await this.handleSubscriptionCancelAtUpdate(currentDetails, details)
+
+    const updatedDetails = {
+      ...currentDetails,
+      ...details,
+    } as typeof currentDetails
     return this.client.$transaction(
-      async (tx) => {
-        const currentCampaign = await tx.campaign.findFirst({
-          where: { id: campaignId },
-        })
-        if (!currentCampaign?.details) {
-          throw new InternalServerErrorException(
-            `Campaign ${campaignId} has no details JSON`,
-          )
-        }
-        const { details: currentDetails } = currentCampaign
-
-        this.logger.debug('currentDetails', currentDetails)
-        const updatedDetails = {
-          ...currentDetails,
-          ...details,
-        } as typeof currentDetails
-
-        this.logger.debug('updatedDetails', updatedDetails)
-        return tx.campaign.update({
+      async (tx) =>
+        tx.campaign.update({
           where: { id: campaignId },
           data: { details: updatedDetails },
-        })
-      },
+        }),
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       },

@@ -25,6 +25,7 @@ import { EcanvasserIntegrationModule } from './ecanvasserIntegration/ecanvasserI
 import { TextCampaignModule } from './textCampaign/textCampaign.module'
 import { SessionsService } from './users/services/sessions.service'
 import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messaging.module'
+import { StripeModule } from './stripe/stripe.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messag
     EcanvasserIntegrationModule,
     ScheduledMessagingModule,
     TextCampaignModule,
+    StripeModule,
   ],
   providers: [
     SessionsService,

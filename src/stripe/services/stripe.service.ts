@@ -1,21 +1,24 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
 
-const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL } = process.env
+const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
+  process.env
 if (!STRIPE_SECRET_KEY || !WEBAPP_ROOT_URL) {
   throw new Error(
     'Please set STRIPE_SECRET_KEY and WEBAPP_ROOT_URL in your .env',
   )
 }
 
+if (!STRIPE_WEBSOCKET_SECRET) {
+  throw new Error('Please set STRIPE_WEBSOCKET_SECRET in your .env')
+}
+
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 
-export const StripeSingleton = new Stripe(STRIPE_SECRET_KEY as string)
-
 @Injectable()
 export class StripeService {
-  private stripe = StripeSingleton
+  private stripe = new Stripe(STRIPE_SECRET_KEY as string)
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
@@ -66,5 +69,13 @@ export class StripeService {
       }
       throw e
     }
+  }
+
+  async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
+    return this.stripe.webhooks.constructEvent(
+      rawBody,
+      stripeSignature,
+      STRIPE_WEBSOCKET_SECRET as string,
+    )
   }
 }
