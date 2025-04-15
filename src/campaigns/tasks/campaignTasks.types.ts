@@ -26,6 +26,7 @@ export type CampaignTask = {
   proRequired?: boolean
   /** Number of days before election, after which the task is no longer available */
   deadline?: number
-  /** Whether to skip counting voter contacts for this task */
-  skipVoterCount?: boolean
+
+  /** CMS ID of the default AI template to use for the task */
+  defaultAiTemplateId?: string
 }
