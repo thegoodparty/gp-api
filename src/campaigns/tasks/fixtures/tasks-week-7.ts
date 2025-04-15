@@ -9,6 +9,7 @@ const tasksWeek7: CampaignTask[] = [
     week: 7,
     flowType: CampaignTaskType.doorKnocking,
     proRequired: true,
+    defaultAiTemplateId: '5jrvZCd28PMH4ipYl9DzTB',
   },
   {
     id: '7b8c9d0e-1f2g-3h4i-5j6k-7l8m9n0o1p2q',
@@ -18,6 +19,7 @@ const tasksWeek7: CampaignTask[] = [
     week: 7,
     flowType: CampaignTaskType.phoneBanking,
     proRequired: true,
+    defaultAiTemplateId: '2QCSobc5r6R7gO5hb0i8Ho',
   },
   {
     id: '7c8d9e0f-1g2h-3i4j-5k6l-7m8n9o0p1q2r',
@@ -27,6 +29,7 @@ const tasksWeek7: CampaignTask[] = [
     cta: 'Write Post',
     week: 7,
     flowType: CampaignTaskType.socialMedia,
+    defaultAiTemplateId: 'NogRPt7eIxTU3ZEIw87LA',
   },
 ]
 
