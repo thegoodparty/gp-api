@@ -216,15 +216,9 @@ export class PaymentEventsService {
     }
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
-    this.logger.debug(
-      `setting subscriptionId on campaign: ${campaignId} -> ${subscriptionId}`,
-    )
     await this.campaignsService.patchCampaignDetails(campaignId, {
       subscriptionId: subscriptionId as string,
     })
-    this.logger.debug(
-      `setting isPro and isProUpdatedAt on campaign: ${campaignId}`,
-    )
     await this.campaignsService.setIsPro(campaignId)
 
     return await Promise.allSettled([
