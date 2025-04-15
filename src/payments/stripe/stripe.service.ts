@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
 
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL } = process.env
@@ -55,9 +55,16 @@ export class StripeService {
   }
 
   async setSubscriptionCancelAt(subscriptionId: string, cancelAt: Date) {
-    return await this.stripe.subscriptions.update(subscriptionId, {
-      cancel_at_period_end: false,
-      cancel_at: cancelAt.getTime() / 1000,
-    })
+    try {
+      await this.stripe.subscriptions.update(subscriptionId, {
+        // Stripe API throws cryptic error if an int is not sent here
+        cancel_at: Math.floor(cancelAt.getTime() / 1000),
+      })
+    } catch (e) {
+      if (e instanceof Error) {
+        throw new BadGatewayException('Error updating subscription', e.message)
+      }
+      throw e
+    }
   }
 }

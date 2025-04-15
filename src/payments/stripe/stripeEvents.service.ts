@@ -20,15 +20,7 @@ import { SlackChannel } from '../../shared/services/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { addSeconds, parse } from 'date-fns'
-
-const parseCampaignElectionDate = (campaign: Campaign) => {
-  const { details } = campaign
-  const { electionDate: electionDateStr } = details || {}
-  return (
-    electionDateStr && parse(electionDateStr!, DateFormats.isoDate, new Date())
-  )
-}
+import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -106,14 +98,14 @@ export class StripeEventsService {
       )
     }
 
-    const testDate = addSeconds(new Date(), 15)
+    // These have to happen in serial since setIsPro also mutates the JSONP details column
+    await this.campaignsService.patchCampaignDetails(campaignId, {
+      subscriptionId: subscriptionId as string,
+    })
+    await this.campaignsService.setIsPro(campaignId)
 
     await Promise.allSettled([
-      this.campaignsService.patchCampaignDetails(campaignId, {
-        subscriptionId: subscriptionId as string,
-      }),
-      this.campaignsService.setIsPro(campaignId),
-      this.stripeService.setSubscriptionCancelAt(subscriptionId, testDate),
+      this.stripeService.setSubscriptionCancelAt(subscriptionId, electionDate),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
@@ -158,7 +150,7 @@ export class StripeEventsService {
 
   async checkoutSessionCompletedHandler(
     event: Stripe.CheckoutSessionCompletedEvent,
-  ): Promise<void> {
+  ) {
     const session = event.data.object
     const { customer: customerId, subscription: subscriptionId } = session
     if (!customerId) {
@@ -190,21 +182,32 @@ export class StripeEventsService {
 
     const { id: campaignId } = campaign
     const electionDate = parseCampaignElectionDate(campaign)
+    if (!electionDate || electionDate < new Date()) {
+      throw new BadGatewayException(
+        'No electionDate or electionDate is in the past',
+      )
+    }
 
-    const testDate = addSeconds(new Date(), 15)
+    // These have to happen in serial since setIsPro also mutates the JSONP details column
+    this.logger.debug(
+      `setting subscriptionId on campaign: ${campaignId} -> ${subscriptionId}`,
+    )
+    await this.campaignsService.patchCampaignDetails(campaignId, {
+      subscriptionId: subscriptionId as string,
+    })
+    this.logger.debug(
+      `setting isPro and isProUpdatedAt on campaign: ${campaignId}`,
+    )
+    await this.campaignsService.setIsPro(campaignId)
 
-    await Promise.allSettled([
+    return await Promise.allSettled([
       this.usersService.patchUserMetaData(user.id, {
         customerId: customerId as string,
         checkoutSessionId: null,
       }),
-      this.campaignsService.patchCampaignDetails(campaignId, {
-        subscriptionId: subscriptionId as string,
-      }),
-      this.campaignsService.setIsPro(campaignId),
       this.stripeService.setSubscriptionCancelAt(
         subscriptionId as string,
-        testDate,
+        electionDate,
       ),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),

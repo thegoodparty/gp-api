@@ -132,11 +132,8 @@ export class CampaignsController {
 
   @Get('mine/status')
   @UseCampaign({ continueIfNotFound: true })
-  async getUserCampaignStatus(
-    @ReqUser() user: User,
-    @ReqCampaign() campaign?: Campaign,
-  ) {
-    return this.campaigns.getStatus(user, campaign)
+  async getUserCampaignStatus(@ReqCampaign() campaign?: Campaign) {
+    return this.campaigns.getStatus(campaign)
   }
 
   @Get('mine/plan-version')
