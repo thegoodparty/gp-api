@@ -11,6 +11,7 @@ if (!API_KEY) {
 
 export type EmailData = MailgunMessageData & {
   variables?: Record<string, string | number | boolean>
+  template?: string
 }
 
 @Injectable()
