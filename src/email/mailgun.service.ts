@@ -31,6 +31,11 @@ export class MailgunService {
       emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
     }
 
+    // Add tag header based on template name
+    if (emailData.template) {
+      emailData['o:tag'] = emailData.template
+    }
+
     if (process.env.MAILGUN_INTERCEPT_EMAIL) {
       // override to email address to send to MAILGUN_INTERCEPT_EMAIL
       emailData.to = process.env.MAILGUN_INTERCEPT_EMAIL
