@@ -1,4 +1,11 @@
-import { addDays, DateArg, format, startOfWeek, subWeeks } from 'date-fns'
+import {
+  addDays,
+  DateArg,
+  format,
+  parse,
+  startOfWeek,
+  subWeeks,
+} from 'date-fns'
 
 export enum DateFormats {
   isoDate = 'yyyy-MM-dd',
@@ -36,3 +43,6 @@ export const findPreviousWeekDay = (
   const startOfPreviousWeek = startOfWeek(previousWeek)
   return addDays(startOfPreviousWeek, dayOfWeek)
 }
+
+export const parseIsoDateString = (dateString: string) =>
+  parse(dateString, DateFormats.isoDate, new Date())
