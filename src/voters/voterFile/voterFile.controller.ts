@@ -29,6 +29,8 @@ import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { VoterOutreachService } from '../services/voterOutreach.service'
 import { MimeTypes } from 'http-constants-ts'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
+import { VoterFileType } from './voterFile.types'
 
 export const VOTER_FILE_ROUTE = 'voters/voter-file'
 
@@ -80,7 +82,10 @@ export class VoterFileController {
     @Body() body: ScheduleOutreachCampaignSchema,
     @ReqFile() image?: FileUpload,
   ) {
-    if (!image) throw new BadRequestException('No image file provided')
+    const imgRequired =
+      body.type === VoterFileType.sms || body.type === CampaignTaskType.text
+    if (!image && imgRequired)
+      throw new BadRequestException('No image file provided')
 
     return this.voterOutreachService.scheduleOutreachCampaign(
       user,

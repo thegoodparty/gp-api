@@ -5,7 +5,7 @@ const tasksWeek6: CampaignTask[] = [
     id: '6a7b8c9d-0e1f-2g3h-4i5j-6k7l8m9n0o1p',
     title: 'Knock on doors to persuade voters',
     description: 'Build trust and persuade voters.',
-    cta: 'Schedule',
+    cta: 'Develop strategy',
     week: 6,
     flowType: CampaignTaskType.doorKnocking,
     proRequired: true,
@@ -38,7 +38,7 @@ const tasksWeek6: CampaignTask[] = [
     cta: 'Get Guidance',
     week: 6,
     flowType: CampaignTaskType.events,
-    link: 'https://goodparty.org/blog/article/10-ways-independent-candidates-engage-voters',
+    link: 'https://goodparty.org/blog/article/town-hall-meetings',
   },
 ]
 

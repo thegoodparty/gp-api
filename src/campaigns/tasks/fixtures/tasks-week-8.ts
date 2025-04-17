@@ -5,7 +5,7 @@ const tasksWeek8: CampaignTask[] = [
     id: '1e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b',
     title: 'Knock on doors to get to know your voters',
     description: 'Learn about their top issues.',
-    cta: 'Schedule',
+    cta: 'Develop strategy',
     week: 8,
     flowType: CampaignTaskType.doorKnocking,
     proRequired: true,

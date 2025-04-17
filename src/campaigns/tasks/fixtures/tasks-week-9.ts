@@ -5,7 +5,7 @@ const tasksWeek9: CampaignTask[] = [
     id: '9a1b2c3d-4e5f-6g7h-8i9j-0k1l2m3n4o5p',
     title: 'Review and complete your profile',
     description: 'A crucial step to build your campaign platform.',
-    cta: 'Profile',
+    cta: 'Review',
     week: 9,
     flowType: CampaignTaskType.education,
     link: '/dashboard/campaign-details',
