@@ -19,6 +19,7 @@ import { AiService } from '../../ai/ai.service'
 import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
 import { parseRaces } from '../util/parseRaces.util'
 import { RaceNode } from '../types/ballotReady.types'
+import { RacesByZipSchema } from '../schemas/RacesByZip.schema'
 
 @Injectable()
 export class RacesService {
@@ -45,13 +46,8 @@ export class RacesService {
     zipcode,
     level,
     electionDate,
-  }: {
-    zipcode: string
-    level: string
-    electionDate?: string
-  }): Promise<RaceNode[]> {
+  }: RacesByZipSchema): Promise<RaceNode[]> {
     try {
-      let startCursor: string | undefined | null
       const existingPositions: Set<string> = new Set()
       const elections: RaceNode[] = []
       const primaryElectionDates: Record<
@@ -67,7 +63,6 @@ export class RacesService {
         zipcode,
         level,
         electionDate,
-        startCursor,
       )
 
       while (hasNextPage) {
@@ -81,7 +76,7 @@ export class RacesService {
         const races = queryResponse.races
         if (races?.edges) {
           hasNextPage = races.pageInfo.hasNextPage
-          startCursor = races.pageInfo.endCursor ?? null
+          const startCursor = races.pageInfo.endCursor ?? null
 
           // Start the next API request while parsing
           nextRacesPromise = hasNextPage
