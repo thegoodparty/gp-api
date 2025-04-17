@@ -10,8 +10,8 @@ import {
   RacesByIdNode,
   RacesByZipcode,
   RacesWithElectionDates,
-  RaceWithOfficeHoldersNode,
   RaceWithOfficeHolders,
+  RaceWithOfficeHoldersNode,
 } from '../types/ballotReady.types'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { ELECTION_LEVELS } from '../../shared/constants/governmentLevels'
@@ -121,7 +121,7 @@ export class BallotReadyService {
 
   async fetchRacesByZipcode(
     zipcode: string,
-    level: string | null,
+    level?: string | null,
     electionDate?: string | null,
     startCursor?: string | null,
   ): Promise<RacesByZipcode | null> {
@@ -155,7 +155,7 @@ export class BallotReadyService {
             gte: "${gt}"
             lte: "${lt}"
           }
-          level: [${levelWithTownship}]
+          ${levelWithTownship ? `level: [${levelWithTownship}]` : ''}
         }
         after: ${startCursor ? `"${startCursor}"` : null}
       ) {
