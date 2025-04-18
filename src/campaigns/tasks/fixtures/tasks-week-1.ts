@@ -10,6 +10,7 @@ const tasksWeek1: CampaignTask[] = [
     flowType: CampaignTaskType.text,
     deadline: 3,
     proRequired: true,
+    defaultAiTemplateId: '5b6W9pYlX796TBI2HV7HlQ',
   },
   {
     id: '5fc21abd-2792-4c09-96f1-de94a28b2b3c',
@@ -20,15 +21,17 @@ const tasksWeek1: CampaignTask[] = [
     flowType: CampaignTaskType.robocall,
     deadline: 3,
     proRequired: true,
+    defaultAiTemplateId: '2GMO6bQoQermNhdRmRe1fh',
   },
   {
     id: '83cb4a9e-ae02-4c30-a0d9-27b9672ce556',
     title: 'Knock on doors to remind people to vote',
     description: 'Encourage people to get out and vote.',
-    cta: 'Schedule',
+    cta: 'Develop strategy',
     week: 1,
     flowType: CampaignTaskType.doorKnocking,
     proRequired: true,
+    defaultAiTemplateId: '2p3mztAVPhuDHOYJetmdWJ',
   },
   {
     id: 'cf0b27bc-fd6b-48f1-8ce0-e69e3b0c16d5',
@@ -37,8 +40,8 @@ const tasksWeek1: CampaignTask[] = [
     cta: 'Develop strategy',
     week: 1,
     flowType: CampaignTaskType.phoneBanking,
-    deadline: 14,
     proRequired: true,
+    defaultAiTemplateId: '1HcpEmwIcXMCSW26ilxQP7',
   },
   {
     id: '1a9fcb0d-ce37-46a0-87e2-3e8c8bdcca5d',
@@ -47,6 +50,7 @@ const tasksWeek1: CampaignTask[] = [
     cta: 'Write Post',
     week: 1,
     flowType: CampaignTaskType.socialMedia,
+    defaultAiTemplateId: 'GpWsRql46Nif2wYroxj81',
   },
   {
     id: '62efdb34-5865-4c2d-85a0-c71d7650a8a7',

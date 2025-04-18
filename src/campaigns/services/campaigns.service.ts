@@ -24,6 +24,8 @@ import { CrmCampaignsService } from './crmCampaigns.service'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { CampaignEmailsService } from './campaignEmails.service'
+import { parseIsoDateString } from '../../shared/util/date.util'
+import { StripeService } from '../../stripe/services/stripe.service'
 
 enum CandidateVerification {
   yes = 'YES',
@@ -39,6 +41,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly crm: CrmCampaignsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly campaignEmails: CampaignEmailsService,
+    private readonly stripeService: StripeService,
   ) {
     super()
   }
@@ -114,83 +117,89 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
     const { data, details, pathToVictory, aiContent } = body
 
-    const updatedCampaign = await this.client.$transaction(async (tx) => {
-      this.logger.debug('Updating campaign json fields', { id, body })
-      const campaign = await tx.campaign.findFirst({
-        where: { id },
-        include: { pathToVictory: true },
-      })
+    const updatedCampaign = await this.client.$transaction(
+      async (tx) => {
+        this.logger.debug('Updating campaign json fields', { id, body })
+        const campaign = await tx.campaign.findFirst({
+          where: { id },
+          include: { pathToVictory: true },
+        })
 
-      if (!campaign) return false
+        if (!campaign) return false
 
-      // Handle data and details JSON fields
-      const campaignUpdateData: Prisma.CampaignUpdateInput = {}
-      if (data) {
-        campaignUpdateData.data = deepMerge(campaign.data as object, data)
-      }
-      if (details) {
-        const mergedDetails = deepMerge(
-          campaign.details as object,
-          details,
-        ) as PrismaJson.CampaignDetails
-        if (details?.customIssues) {
-          // If this isn't done, customIssues' entries duplicate
-          mergedDetails.customIssues = details.customIssues as Array<{
-            position: string
-            title: string
-          }>
+        // Handle data and details JSON fields
+        const campaignUpdateData: Prisma.CampaignUpdateInput = {}
+        if (data) {
+          campaignUpdateData.data = deepMerge(campaign.data as object, data)
         }
-        if (details.runningAgainst) {
-          // If this isn't done, runningAgainst's entries duplicate
-          mergedDetails.runningAgainst = details.runningAgainst as Array<{
-            name: string
-            party: string
-            description: string
-          }>
+        if (details) {
+          await this.handleSubscriptionCancelAtUpdate(campaign.details, details)
+          const mergedDetails = deepMerge(
+            campaign.details as object,
+            details,
+          ) as PrismaJson.CampaignDetails
+          if (details?.customIssues) {
+            // If this isn't done, customIssues' entries duplicate
+            mergedDetails.customIssues = details.customIssues as Array<{
+              position: string
+              title: string
+            }>
+          }
+          if (details.runningAgainst) {
+            // If this isn't done, runningAgainst's entries duplicate
+            mergedDetails.runningAgainst = details.runningAgainst as Array<{
+              name: string
+              party: string
+              description: string
+            }>
+          }
+          campaignUpdateData.details = mergedDetails
         }
-        campaignUpdateData.details = mergedDetails
-      }
-      if (objectNotEmpty(aiContent as object)) {
-        campaignUpdateData.aiContent = deepMerge(
-          (campaign.aiContent as object) || {},
-          aiContent,
-        ) as PrismaJson.CampaignAiContent
-      }
-
-      // Update the campaign with JSON fields
-      await tx.campaign.update({
-        where: { id: campaign.id },
-        data: campaignUpdateData,
-      })
-
-      // Handle pathToVictory relation separately if needed
-      if (objectNotEmpty(pathToVictory as object)) {
-        if (campaign.pathToVictory) {
-          await tx.pathToVictory.update({
-            where: { id: campaign.pathToVictory.id },
-            data: {
-              data: deepMerge(
-                (campaign.pathToVictory.data as object) || {},
-                pathToVictory,
-              ),
-            },
-          })
-        } else {
-          await tx.pathToVictory.create({
-            data: {
-              campaignId: campaign.id,
-              data: pathToVictory,
-            },
-          })
+        if (objectNotEmpty(aiContent as object)) {
+          campaignUpdateData.aiContent = deepMerge(
+            (campaign.aiContent as object) || {},
+            aiContent,
+          ) as PrismaJson.CampaignAiContent
         }
-      }
 
-      // Return the updated campaign with pathToVictory included
-      return tx.campaign.findFirst({
-        where: { id: campaign.id },
-        include: { pathToVictory: true },
-      })
-    })
+        // Update the campaign with JSON fields
+        await tx.campaign.update({
+          where: { id: campaign.id },
+          data: campaignUpdateData,
+        })
+
+        // Handle pathToVictory relation separately if needed
+        if (objectNotEmpty(pathToVictory as object)) {
+          if (campaign.pathToVictory) {
+            await tx.pathToVictory.update({
+              where: { id: campaign.pathToVictory.id },
+              data: {
+                data: deepMerge(
+                  (campaign.pathToVictory.data as object) || {},
+                  pathToVictory,
+                ),
+              },
+            })
+          } else {
+            await tx.pathToVictory.create({
+              data: {
+                campaignId: campaign.id,
+                data: pathToVictory,
+              },
+            })
+          }
+        }
+
+        // Return the updated campaign with pathToVictory included
+        return tx.campaign.findFirst({
+          where: { id: campaign.id },
+          include: { pathToVictory: true },
+        })
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    )
 
     if (updatedCampaign) {
       // Track campaign and user
@@ -202,11 +211,31 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return updatedCampaign
   }
 
+  private async handleSubscriptionCancelAtUpdate(
+    currentDetails: PrismaJson.CampaignDetails,
+    updateDetails: Partial<PrismaJson.CampaignDetails>,
+  ) {
+    const { subscriptionId } = currentDetails
+    const { electionDate: electionDateUpdateStr } = updateDetails
+
+    // If we're changing the electionDate and there's an existing subscriptionId,
+    //  then we need to also update the cancelAt date on the subscription
+    if (electionDateUpdateStr && subscriptionId) {
+      const electionDate = parseIsoDateString(electionDateUpdateStr)
+      await this.stripeService.setSubscriptionCancelAt(
+        subscriptionId,
+        electionDate,
+      )
+    }
+  }
+
   async patchCampaignDetails(
     campaignId: number,
     details: Partial<PrismaJson.CampaignDetails>,
   ) {
-    const currentCampaign = await this.findFirst({ where: { id: campaignId } })
+    const currentCampaign = await this.model.findFirst({
+      where: { id: campaignId },
+    })
     if (!currentCampaign?.details) {
       throw new InternalServerErrorException(
         `Campaign ${campaignId} has no details JSON`,
@@ -214,15 +243,22 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
     const { details: currentDetails } = currentCampaign
 
+    await this.handleSubscriptionCancelAtUpdate(currentDetails, details)
+
     const updatedDetails = {
       ...currentDetails,
       ...details,
     } as typeof currentDetails
-
-    return this.update({
-      where: { id: campaignId },
-      data: { details: updatedDetails },
-    })
+    return this.client.$transaction(
+      async (tx) =>
+        tx.campaign.update({
+          where: { id: campaignId },
+          data: { details: updatedDetails },
+        }),
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    )
   }
 
   async persistCampaignProCancellation(campaign: Campaign) {
@@ -235,14 +271,15 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async setIsPro(campaignId: number, isPro: boolean = true) {
-    await Promise.allSettled([
-      this.update({ where: { id: campaignId }, data: { isPro } }),
-      this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
-    ])
+    await this.update({ where: { id: campaignId }, data: { isPro } })
+    // Must be in serial so as to not overwrite campaign details w/ concurrent queries
+    await this.patchCampaignDetails(campaignId, {
+      isProUpdatedAt: Date.now(),
+    }) // TODO: this should be an ISO dateTime string, not a unix timestamp
     this.crm.trackCampaign(campaignId)
   }
 
-  async getStatus(user: User, campaign?: Campaign) {
+  async getStatus(campaign?: Campaign) {
     const timestamp = new Date().getTime()
 
     if (!campaign) {

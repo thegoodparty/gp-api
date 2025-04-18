@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { StripeSingleton } from './stripe.service'
+import { StripeService } from '../../stripe/services/stripe.service'
 import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
@@ -20,6 +20,7 @@ import { SlackChannel } from '../../shared/services/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
+import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -27,9 +28,8 @@ if (!STRIPE_WEBSOCKET_SECRET) {
 }
 
 @Injectable()
-export class StripeEventsService {
-  private readonly logger = new Logger(StripeEventsService.name)
-  private stripe = StripeSingleton
+export class PaymentEventsService {
+  private readonly logger = new Logger(PaymentEventsService.name)
 
   constructor(
     private readonly usersService: UsersService,
@@ -38,18 +38,13 @@ export class StripeEventsService {
     private readonly emailService: EmailService,
     private readonly crm: CrmCampaignsService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
+    private readonly stripeService: StripeService,
   ) {}
-
-  async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
-    return this.stripe.webhooks.constructEvent(
-      rawBody,
-      stripeSignature,
-      STRIPE_WEBSOCKET_SECRET as string,
-    )
-  }
 
   async handleEvent(event: Stripe.Event) {
     switch (event.type) {
+      case WebhookEventType.CustomerSubscriptionCreated:
+        return await this.customerSubscriptionCreatedHandler(event)
       case WebhookEventType.CheckoutSessionCompleted:
         return await this.checkoutSessionCompletedHandler(event)
       case WebhookEventType.CheckoutSessionExpired:
@@ -62,6 +57,40 @@ export class StripeEventsService {
         return await this.customerSubscriptionResumedHandler(event)
     }
     this.logger.warn(`Stripe Event type ${event.type} not handled`)
+  }
+
+  async customerSubscriptionCreatedHandler(
+    event: Stripe.CustomerSubscriptionCreatedEvent,
+  ) {
+    const { id: subscriptionId, customer: customerId } = event.data.object
+    if (!subscriptionId) {
+      throw new BadRequestException('No subscriptionId found in subscription')
+    }
+
+    const user = await this.usersService.findByCustomerId(customerId as string)
+    if (!user) {
+      throw new BadGatewayException(
+        'No user found with given subscription customerId',
+      )
+    }
+    const campaign = await this.campaignsService.findByUserId(user.id)
+    if (!campaign) {
+      throw new BadGatewayException(
+        'No campaign found associated with given customerId',
+      )
+    }
+
+    const { id: campaignId, details: campaignDetails } = campaign
+
+    return this.campaignsService.update({
+      where: { id: campaignId },
+      data: {
+        details: {
+          ...campaignDetails,
+          subscriptionId,
+        },
+      },
+    })
   }
 
   async customerSubscriptionResumedHandler(
@@ -88,12 +117,22 @@ export class StripeEventsService {
       )
     }
     const { id: campaignId } = campaign
+    const electionDate = parseCampaignElectionDate(campaign)
+
+    if (!electionDate || electionDate < new Date()) {
+      throw new BadGatewayException(
+        'No electionDate or electionDate is in the past',
+      )
+    }
+
+    // These have to happen in serial since setIsPro also mutates the JSONP details column
+    await this.campaignsService.patchCampaignDetails(campaignId, {
+      subscriptionId: subscriptionId as string,
+    })
+    await this.campaignsService.setIsPro(campaignId)
 
     await Promise.allSettled([
-      this.campaignsService.patchCampaignDetails(campaignId, {
-        subscriptionId: subscriptionId as string,
-      }),
-      this.campaignsService.setIsPro(campaignId),
+      this.stripeService.setSubscriptionCancelAt(subscriptionId, electionDate),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
@@ -138,9 +177,9 @@ export class StripeEventsService {
 
   async checkoutSessionCompletedHandler(
     event: Stripe.CheckoutSessionCompletedEvent,
-  ): Promise<void> {
+  ) {
     const session = event.data.object
-    const { customer: customerId, subscription } = session
+    const { customer: customerId, subscription: subscriptionId } = session
     if (!customerId) {
       throw new BadGatewayException('No customerId found in checkout session')
     }
@@ -169,16 +208,28 @@ export class StripeEventsService {
     }
 
     const { id: campaignId } = campaign
+    const electionDate = parseCampaignElectionDate(campaign)
+    if (!electionDate || electionDate < new Date()) {
+      throw new BadGatewayException(
+        'No electionDate or electionDate is in the past',
+      )
+    }
 
-    await Promise.allSettled([
+    // These have to happen in serial since setIsPro also mutates the JSONP details column
+    await this.campaignsService.patchCampaignDetails(campaignId, {
+      subscriptionId: subscriptionId as string,
+    })
+    await this.campaignsService.setIsPro(campaignId)
+
+    return await Promise.allSettled([
       this.usersService.patchUserMetaData(user.id, {
         customerId: customerId as string,
         checkoutSessionId: null,
       }),
-      this.campaignsService.patchCampaignDetails(campaignId, {
-        subscriptionId: subscription as string,
-      }),
-      this.campaignsService.setIsPro(campaignId),
+      this.stripeService.setSubscriptionCancelAt(
+        subscriptionId as string,
+        electionDate,
+      ),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),

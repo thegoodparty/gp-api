@@ -17,14 +17,19 @@ export const aiContentCategoriesTransformer: Transformer<
 
   for (const aiContent of aiContents) {
     const { order, title } = aiContent.data.category.fields
-    const { name } = aiContent.data
+    const { name, taskOnly } = aiContent.data
     const key = camelCase(name)
 
     if (!aiContentCategoriesHash[title]) {
       aiContentCategoriesHash[title] = []
       aiContentCategories.push({ title, order })
     }
-    aiContentCategoriesHash[title].push({ key, name })
+    aiContentCategoriesHash[title].push({
+      key,
+      name,
+      taskOnly,
+      id: aiContent.id,
+    })
   }
 
   return combineAiContentAndCategories(

@@ -5,10 +5,9 @@ const tasksWeek9: CampaignTask[] = [
     id: '9a1b2c3d-4e5f-6g7h-8i9j-0k1l2m3n4o5p',
     title: 'Review and complete your profile',
     description: 'A crucial step to build your campaign platform.',
-    cta: 'Profile',
+    cta: 'Review',
     week: 9,
     flowType: CampaignTaskType.education,
-    skipVoterCount: true,
     link: '/dashboard/campaign-details',
   },
   {
@@ -18,7 +17,6 @@ const tasksWeek9: CampaignTask[] = [
     cta: 'Join',
     week: 9,
     flowType: CampaignTaskType.education,
-    skipVoterCount: true,
     link: 'https://goodpartyorg.circle.so/join?invitation_token=cf9d15f0fb50e79770bc6f740406f63580acf703-5834c6b1-be0e-455f-bb7c-5cbc8049fa76',
   },
   {
@@ -28,7 +26,6 @@ const tasksWeek9: CampaignTask[] = [
     cta: 'Take the course',
     week: 9,
     flowType: CampaignTaskType.education,
-    skipVoterCount: true,
     link: 'https://goodpartyorg.circle.so/join?invitation_token=69acce7e89a1064e0fb78bb263ae0630a9d49569-fbb6cc8c-076e-44e6-a359-c0e95ec6d0a5',
   },
   {
@@ -38,7 +35,6 @@ const tasksWeek9: CampaignTask[] = [
     cta: 'Learn more',
     week: 9,
     flowType: CampaignTaskType.education,
-    skipVoterCount: true,
     link: 'https://goodparty.org/blog/article/how-to-win-local-election',
   },
   {
@@ -49,7 +45,6 @@ const tasksWeek9: CampaignTask[] = [
     cta: 'Learn more',
     week: 9,
     flowType: CampaignTaskType.education,
-    skipVoterCount: true,
     link: 'https://goodparty.org/blog/article/how-to-build-campaign-platform-independent',
   },
   {
@@ -60,7 +55,6 @@ const tasksWeek9: CampaignTask[] = [
     cta: 'Learn more',
     week: 9,
     flowType: CampaignTaskType.education,
-    skipVoterCount: true,
     link: 'https://goodparty.org/blog/article/setting-the-stage-awareness-phase-of-political-campaigns',
   },
 ]

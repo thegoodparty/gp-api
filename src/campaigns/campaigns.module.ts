@@ -21,6 +21,7 @@ import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { CampaignEmailsService } from './services/campaignEmails.service'
+import { StripeModule } from '../stripe/stripe.module'
 
 @Global()
 @Module({
@@ -33,6 +34,7 @@ import { CampaignEmailsService } from './services/campaignEmails.service'
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
+    StripeModule,
   ],
   controllers: [
     CampaignsController,
