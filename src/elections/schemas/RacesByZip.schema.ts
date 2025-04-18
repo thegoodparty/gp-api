@@ -10,7 +10,8 @@ export class RacesByZipSchema extends createZodDto(
       .string()
       .refine((val: string) => LEVELS.includes(val?.toUpperCase()), {
         message: 'invalid election level',
-      }),
+      })
+      .optional(),
     electionDate: z.string().date().optional(),
   }),
 ) {}

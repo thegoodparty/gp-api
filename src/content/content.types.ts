@@ -56,6 +56,7 @@ export type AIContentTemplateRaw = {
         title: string
       }
     }
+    taskOnly: boolean
     requiresAdditionalQuestions: boolean
   }
 }

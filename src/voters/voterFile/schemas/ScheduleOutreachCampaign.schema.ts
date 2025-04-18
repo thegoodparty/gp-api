@@ -4,6 +4,7 @@ import { CUSTOM_FILTERS, VoterFileType } from '../voterFile.types'
 import { isNumeric } from 'validator'
 import { parseJsonString } from 'src/shared/util/zod.util'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
+import { addDays, isAfter, startOfDay, parseISO } from 'date-fns'
 
 export class ScheduleOutreachCampaignSchema extends createZodDto(
   z.object({
@@ -25,7 +26,22 @@ export class ScheduleOutreachCampaignSchema extends createZodDto(
         .strict(),
     ),
     script: z.string(),
-    date: z.string().date(),
+    date: z
+      .string()
+      .date()
+      .refine(
+        (date) => {
+          const selectedDate = startOfDay(parseISO(date))
+          const minDate = startOfDay(addDays(new Date(), 3))
+          return (
+            isAfter(selectedDate, minDate) ||
+            selectedDate.getTime() === minDate.getTime()
+          )
+        },
+        {
+          message: 'Date must be at least 72 hours from now',
+        },
+      ),
     message: z.string(),
     voicemail: z.boolean().optional(),
     type: z.enum([

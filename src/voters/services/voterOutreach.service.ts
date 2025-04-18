@@ -49,7 +49,7 @@ export class VoterOutreachService {
       voicemail,
       type,
     }: ScheduleOutreachCampaignSchema,
-    imageUpload: FileUpload,
+    imageUpload?: FileUpload,
   ) {
     const { firstName, lastName, email, phone } = user
     const { data } = campaign
@@ -106,8 +106,11 @@ export class VoterOutreachService {
       .filter((val) => val != undefined)
 
     // Upload image
-    const bucket = `scheduled-campaign/${campaign.slug}/${type}/${date}`
-    const imageUrl = await this.filesService.uploadFile(imageUpload, bucket)
+    let imageUrl: string | null = null
+    if (imageUpload) {
+      const bucket = `scheduled-campaign/${campaign.slug}/${type}/${date}`
+      imageUrl = await this.filesService.uploadFile(imageUpload, bucket)
+    }
 
     const slackBlocks = buildSlackBlocks({
       name: `${firstName} ${lastName}`,
