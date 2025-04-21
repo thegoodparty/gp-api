@@ -46,7 +46,7 @@ const tasksWeek2: CampaignTask[] = [
     title: 'Post to social media answering common questions',
     description:
       'Mobilize your base and control the narrative about your campaign.',
-    cta: 'Write Post',
+    cta: 'Write post',
     week: 2,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: '2X5rPGVz0sneUZ06w0ezcl',
@@ -55,7 +55,7 @@ const tasksWeek2: CampaignTask[] = [
     id: '17a6ceb8-5f9d-4e83-80c7-2f8e41736104',
     title: 'Plan a GOTV event',
     description: 'Last opportunity to mobilize your volunteers and voters.',
-    cta: 'Get Guidance',
+    cta: 'Get guidance',
     week: 2,
     flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/how-to-organize-campaign-events',
