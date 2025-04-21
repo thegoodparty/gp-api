@@ -25,7 +25,7 @@ const tasksWeek3: CampaignTask[] = [
     id: 'b0c1d2e3-f4a5-6b7c-8d9e-0f1a2b3c4d5e',
     title: 'Post to social media talking about one of your top voter issues',
     description: 'Tell people you have solutions for their issues.',
-    cta: 'Write Post',
+    cta: 'Write post',
     week: 3,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: 'Xboqgh6Ye3SgSwO6moujw',

@@ -26,7 +26,7 @@ const tasksWeek8: CampaignTask[] = [
     title: 'Post to social media talking about your local community',
     description:
       'Get to know who your voters are and show them you are active in the community.',
-    cta: 'Write Post',
+    cta: 'Write post',
     week: 8,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: 'NogRPt7eIxTU3ZEIw87LA',
@@ -36,7 +36,7 @@ const tasksWeek8: CampaignTask[] = [
     title: 'Hold a volunteering event',
     description:
       'Start to recruit volunteers to help spread the word about your candidacy.',
-    cta: 'Get Guidance',
+    cta: 'Get guidance',
     week: 8,
     flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/volunteers-bridging-campaign-constituent',
@@ -46,7 +46,7 @@ const tasksWeek8: CampaignTask[] = [
     title: 'Make genuine connections with voters',
     description:
       'Learn how to engage voters and grow support for your campaign.',
-    cta: 'Learn More',
+    cta: 'Learn more',
     week: 8,
     flowType: CampaignTaskType.education,
     link: 'https://goodparty.org/blog/article/engaging-voters-contact-phase-of-a-political-campaign',
