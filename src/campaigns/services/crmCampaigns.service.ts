@@ -37,22 +37,6 @@ import { CampaignCreatedBy, OnboardingStep } from '../campaigns.types'
 
 const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 
-/// map of emails to slack ids for mentioning users
-const EMAIL_TO_SLACK_ID = {
-  'sanjeev@goodparty.org': 'U07GUGCQ88M',
-  // PA emails
-  'jared@goodparty.org': 'U01AY0VQFPE',
-  'ryan@goodparty.org': 'U06T7RGGHEZ',
-  'kyron.banks@goodparty.org': 'U07JWLYDDUH',
-  'alex.barrio@goodparty.org': 'U0748BRPPJQ',
-  'trey.stradling@goodparty.org': 'U06FPEP4QBZ',
-  'alex.gibson@goodparty.org': 'U079ASLQ9G8',
-  'dllane2012@gmail.com': 'U06U033GHDE',
-  'aaron.soriano@goodparty.org': 'U07QXHVNDEJ',
-  'nate.allen@goodparty.org': 'U07R9RNFTFX',
-  'julian@goodparty.org': 'U05B0CX71QB',
-}
-
 @Injectable()
 export class CrmCampaignsService {
   private readonly logger = new Logger(this.constructor.name)
@@ -115,12 +99,10 @@ export class CrmCampaignsService {
       const crmCompanyOwner = await this.getCompanyOwner(
         parseInt(crmCompany?.properties?.hubspot_owner_id as string),
       )
-      const { firstName, lastName, email } = crmCompanyOwner || {}
+      const { firstName, lastName } = crmCompanyOwner || {}
       crmCompanyOwnerName = `${firstName ? `${firstName} ` : ''}${
         lastName ? lastName : ''
-      } - <@${
-        EMAIL_TO_SLACK_ID[IS_PROD && email ? email : 'jared@goodparty.org']
-      }>`
+      }`
     } catch (e) {
       this.logger.error('error getting crm company owner', e)
     }
