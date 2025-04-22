@@ -33,7 +33,7 @@ export class MailgunService {
     }
 
     // Add tag header based on template name
-    if (emailData.template) {
+    if (emailData.template && process.env.TRACK_MAILGUN_EMAILS === 'true') {
       emailData['o:tag'] = emailData.template
     }
 

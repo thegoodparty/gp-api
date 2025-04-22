@@ -26,7 +26,7 @@ const tasksWeek7: CampaignTask[] = [
     title: 'Post to social media talking about your local community',
     description:
       'Get to know who your voters are and show them you are active in the community.',
-    cta: 'Write Post',
+    cta: 'Write post',
     week: 7,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: 'NogRPt7eIxTU3ZEIw87LA',

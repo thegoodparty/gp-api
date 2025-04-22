@@ -45,7 +45,7 @@ const tasksWeek4: CampaignTask[] = [
     id: '4b5c6d7e-8f9a-0b1c-2d3e-4f5a6b7c8d9e',
     title: 'Post to social media talking about one of your top voter issues',
     description: 'Tell people you have solutions for their issues.',
-    cta: 'Write Post',
+    cta: 'Write post',
     week: 4,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: 'Xboqgh6Ye3SgSwO6moujw',
@@ -55,7 +55,7 @@ const tasksWeek4: CampaignTask[] = [
     title: 'Turn support into victory',
     description:
       'Learn how to encourage your supporters to turn out to vote on election day.',
-    cta: 'Learn More',
+    cta: 'Learn more',
     week: 4,
     flowType: CampaignTaskType.education,
     link: 'https://goodparty.org/blog/article/turning-support-into-victory-vote-phase-of-a-political-campaign',
