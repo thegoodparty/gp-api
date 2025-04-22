@@ -191,7 +191,7 @@ export class VoterOutreachService {
     return true
   }
 
-  async sendSubmittedEmail(user: User, message: string, date: string) {
+  async sendSubmittedEmail(user: User, message: string = 'N/A', date: string) {
     await this.emailService.sendTemplateEmail({
       to: user.email,
       subject: 'Your Texting Campaign is Scheduled - Next Steps Inside',
