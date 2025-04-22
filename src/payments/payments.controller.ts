@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { Stripe } from 'stripe'
-import { PaymentEventsService } from './stripe/paymentEventsService'
+import { PaymentEventsService } from './services/paymentEventsService'
 import { StripeService } from '../stripe/services/stripe.service'
 
 @Controller('payments')
