@@ -161,7 +161,9 @@ export class PaymentEventsService {
     const user = (await this.usersService.findByCampaign(campaign)) as User
 
     const { details } = campaign
-    const isCancellationRequest = canceledAt && !details.subscriptionCanceledAt
+    const { subscriptionCancelAt } = details
+    const isCancellationRequest =
+      cancelAt && subscriptionCancelAt && subscriptionCancelAt > cancelAt
 
     await this.campaignsService.patchCampaignDetails(campaign.id, {
       subscriptionCanceledAt: canceledAt,
