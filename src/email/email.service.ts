@@ -78,11 +78,9 @@ export class EmailService {
       name: firstName,
       link,
     }
-    const subject = 'GoodParty.org: Access your free campaign resources!'
 
     return await this.sendTemplateEmail({
       to: email,
-      subject,
       template: EmailTemplateName.setPassword,
       variables,
     })
