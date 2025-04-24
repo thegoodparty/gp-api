@@ -161,13 +161,24 @@ export class PaymentEventsService {
     const user = (await this.usersService.findByCampaign(campaign)) as User
 
     const { details } = campaign
-    const { subscriptionCancelAt } = details
+    const { subscriptionCancelAt, subscriptionCanceledAt } = details
     const isCancellationRequest =
       cancelAt && subscriptionCancelAt && subscriptionCancelAt > cancelAt
 
+    // We only want to update these fields if they are not set yet, or the new date is earlier than the existing one
+    const shouldUpdateSubscriptionCanceledAt =
+      canceledAt &&
+      (!subscriptionCanceledAt || subscriptionCanceledAt > canceledAt)
+    const shouldUpdateSubscriptionCancelAt =
+      cancelAt && (!subscriptionCancelAt || subscriptionCancelAt > cancelAt)
+
     await this.campaignsService.patchCampaignDetails(campaign.id, {
-      subscriptionCanceledAt: canceledAt,
-      subscriptionCancelAt: cancelAt,
+      ...(shouldUpdateSubscriptionCanceledAt
+        ? { subscriptionCanceledAt: canceledAt }
+        : {}),
+      ...(shouldUpdateSubscriptionCancelAt
+        ? { shouldUpdateSubscriptionCancelAt: cancelAt }
+        : {}),
     })
 
     isCancellationRequest &&

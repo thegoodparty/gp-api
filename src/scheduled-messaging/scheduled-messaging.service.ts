@@ -4,6 +4,7 @@ import { ScheduledMessage } from '@prisma/client'
 import { EmailService } from '../email/email.service'
 import { ScheduledMessageTypes } from '../email/email.types'
 import { SlackService } from 'src/shared/services/slack.service'
+import { Interval, Timeout } from '@nestjs/schedule'
 
 const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
   .SCHEDULED_MESSAGING_INTERVAL_SECS
@@ -14,21 +15,29 @@ const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
 export class ScheduledMessagingService extends createPrismaBase(
   MODELS.ScheduledMessage,
 ) {
-  private readonly intervalId: NodeJS.Timeout
-
   constructor(
     private readonly emails: EmailService,
     private readonly slack: SlackService,
   ) {
     super()
-    this.processScheduledMessages = this.processScheduledMessages.bind(this)
-    this.intervalId = setInterval(
-      this.processScheduledMessages,
-      SCHEDULED_MESSAGING_INTERVAL_SECS * 1000,
-    )
+  }
+
+  @Timeout(0) // This will run immediately when the module is loaded
+  @Interval(SCHEDULED_MESSAGING_INTERVAL_SECS * 1000) // This will run based on the environment variable
+  private async processScheduledMessages() {
     this.logger.debug(
-      `Scheduled task running every ${SCHEDULED_MESSAGING_INTERVAL_SECS}s w/ id ${this.intervalId}`,
+      `ScheduledMessagingService::processScheduledMessages task running every ${SCHEDULED_MESSAGING_INTERVAL_SECS}s`,
     )
+    const messages: ScheduledMessage[] =
+      await this.queryScheduledMessagesAndFlag()
+
+    if (!messages?.length) {
+      return []
+    }
+
+    this.logger.debug(`Found ${messages.length} messages to send`, messages)
+
+    return this.sendMessagesAndUpdate(messages)
   }
 
   private async queryScheduledMessagesAndFlag() {
@@ -71,22 +80,11 @@ export class ScheduledMessagingService extends createPrismaBase(
     }
   }
 
-  private async processScheduledMessages() {
-    const messages: ScheduledMessage[] =
-      await this.queryScheduledMessagesAndFlag()
-
-    if (!messages?.length) {
-      return []
-    }
-
-    return this.sendMessagesAndUpdate(messages)
-  }
-
   private async sendMessagesAndUpdate(messages: ScheduledMessage[]) {
     const updatedMessages: ScheduledMessage[] = []
     this.logger.debug('Sending messages:', messages)
     await this.client.$transaction(async (tx) => {
-      for (let m of messages) {
+      for (const m of messages) {
         let updatedScheduledMsg: ScheduledMessage
 
         try {
@@ -145,10 +143,5 @@ export class ScheduledMessagingService extends createPrismaBase(
         scheduledAt: sendDate,
       },
     })
-  }
-
-  onModuleDestroy() {
-    this.logger.debug(`Cleaning up scheduled interval w/ id ${this.intervalId}`)
-    clearInterval(this.intervalId)
   }
 }

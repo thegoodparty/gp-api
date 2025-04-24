@@ -51,16 +51,6 @@ export const WEEKLY_COUNTDOWN_EMAIL_CONFIGS: CountdownEmailConfig[] = [
     template: EmailTemplateName.campaignCountdownWeek8,
   },
 ]
-export const DAILY_COUNTDOWN_EMAIL_CONFIGS: CountdownEmailConfig[] = [
-  {
-    daysBeforeElection: 5,
-    template: EmailTemplateName.campaignCountdown5Days,
-  },
-  {
-    daysBeforeElection: 4,
-    template: EmailTemplateName.campaignCountdown4Days,
-  },
-]
 
 @Injectable()
 export class CampaignEmailsService {
@@ -110,10 +100,7 @@ export class CampaignEmailsService {
     )
     const firstName = user.firstName || getUserFullName(user).split(' ')[0]
 
-    for (const config of [
-      ...WEEKLY_COUNTDOWN_EMAIL_CONFIGS,
-      // ...DAILY_COUNTDOWN_EMAIL_CONFIGS, // TODO: Uncomment this when ready to send daily countdown emails
-    ]) {
+    for (const config of [...WEEKLY_COUNTDOWN_EMAIL_CONFIGS]) {
       const sendDate: Date = config.week
         ? subWeeks(weekBeforeElection, config.week - 1)
         : subDays(electionDate, config.daysBeforeElection!)
