@@ -42,7 +42,7 @@ export class ScheduleOutreachCampaignSchema extends createZodDto(
           message: 'Date must be at least 72 hours from now',
         },
       ),
-    message: z.string(),
+    message: z.string().optional(),
     voicemail: z.boolean().optional(),
     type: z.enum([
       VoterFileType.sms,

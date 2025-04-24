@@ -112,7 +112,7 @@ export class CampaignEmailsService {
 
     for (const config of [
       ...WEEKLY_COUNTDOWN_EMAIL_CONFIGS,
-      ...DAILY_COUNTDOWN_EMAIL_CONFIGS,
+      // ...DAILY_COUNTDOWN_EMAIL_CONFIGS, // TODO: Uncomment this when ready to send daily countdown emails
     ]) {
       const sendDate: Date = config.week
         ? subWeeks(weekBeforeElection, config.week - 1)
