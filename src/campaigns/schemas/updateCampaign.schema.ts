@@ -15,29 +15,23 @@ const CampaignDetailsSchema = z
     pledged: z.boolean(),
     isProUpdatedAt: z.number(),
     customIssues: z.array(
-      z
-        .object({
-          title: z.string(),
-          position: z.string(),
-        })
-        .strict(),
+      z.object({
+        title: z.string(),
+        position: z.string(),
+      }),
     ),
     runningAgainst: z.array(
-      z
-        .object({
-          name: z.string(),
-          party: z.string(),
-          description: z.string(),
-        })
-        .strict(),
+      z.object({
+        name: z.string(),
+        party: z.string(),
+        description: z.string(),
+      }),
     ),
-    geoLocation: z
-      .object({
-        geoHash: z.string(),
-        lng: z.number(),
-        lat: z.number(),
-      })
-      .strict(),
+    geoLocation: z.object({
+      geoHash: z.string(),
+      lng: z.number(),
+      lat: z.number(),
+    }),
     geoLocationFailed: z.boolean(),
     city: z.string(),
     county: z.string(),
@@ -68,8 +62,8 @@ const CampaignDetailsSchema = z
     positionId: z.string(),
     tier: z.string(),
   })
-  .strict()
   .partial()
+  .passthrough()
 
 // TODO: make schemas data, pathToVictory, aiContent
 export class UpdateCampaignSchema extends createZodDto(
