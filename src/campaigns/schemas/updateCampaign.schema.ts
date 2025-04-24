@@ -71,7 +71,7 @@ const CampaignDetailsSchema = z
   .strict()
   .partial()
 
-// TODO: make schemas for the actual JSON content
+// TODO: make schemas data, pathToVictory, aiContent
 export class UpdateCampaignSchema extends createZodDto(
   z
     .object({
