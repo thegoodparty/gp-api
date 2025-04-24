@@ -142,12 +142,15 @@ export class PaymentEventsService {
   async customerSubscriptionUpdatedHandler(
     event: Stripe.CustomerSubscriptionUpdatedEvent,
   ): Promise<void> {
-    const subscription = event.data.object
+    const { previous_attributes: previousAttributes, object: subscription } =
+      event.data
     const {
       id: subscriptionId,
       canceled_at: canceledAt,
       cancel_at: cancelAt,
     } = subscription
+    const { cancel_at: previousCancelAt } = previousAttributes || {}
+
     if (!subscriptionId) {
       throw new BadRequestException('No subscriptionId found in subscription')
     }
@@ -158,18 +161,33 @@ export class PaymentEventsService {
       throw new BadGatewayException('No campaign found with given subscription')
     }
 
+    // The only way for us to determine if a user is resuming a subscription that
+    //  they previously requested to cancel, but haven't reached the end of
+    //  their pay period, is to do this check, and then reset the cancel_at date
+    //  to the election date for their campaign.
+    const isResumeEvent = !cancelAt && previousCancelAt
+    if (isResumeEvent) {
+      const electionDate = parseCampaignElectionDate(campaign)
+      if (!electionDate || electionDate < new Date()) {
+        throw new BadGatewayException(
+          'No electionDate or electionDate is in the past',
+        )
+      }
+
+      await this.stripeService.setSubscriptionCancelAt(
+        subscriptionId,
+        electionDate,
+      )
+    } else {
+      await this.campaignsService.patchCampaignDetails(campaign.id, {
+        subscriptionCanceledAt: canceledAt,
+        subscriptionCancelAt: cancelAt,
+      })
+    }
+
     const user = (await this.usersService.findByCampaign(campaign)) as User
-
-    const { details } = campaign
-    const { subscriptionCancelAt } = details
     const isCancellationRequest =
-      cancelAt && subscriptionCancelAt && subscriptionCancelAt > cancelAt
-
-    await this.campaignsService.patchCampaignDetails(campaign.id, {
-      subscriptionCanceledAt: canceledAt,
-      subscriptionCancelAt: cancelAt,
-    })
-
+      cancelAt && previousCancelAt && previousCancelAt > cancelAt
     isCancellationRequest &&
       (await this.emailService.sendCancellationRequestConfirmationEmail(
         user,

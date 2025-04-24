@@ -25,9 +25,11 @@ import { EcanvasserIntegrationModule } from './ecanvasserIntegration/ecanvasserI
 import { TextCampaignModule } from './textCampaign/textCampaign.module'
 import { SessionsService } from './users/services/sessions.service'
 import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messaging.module'
+import { ScheduleModule } from '@nestjs/schedule'
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     UsersModule,
     AuthenticationModule,
     ContentModule,
