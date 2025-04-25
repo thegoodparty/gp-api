@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackService } from '../../shared/services/slack.service'
-import { EnqueueService } from '../../queue/producer/enqueue.service'
+import {
+  EnqueueService,
+  MessageGroup,
+} from '../../queue/producer/enqueue.service'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
@@ -121,7 +124,7 @@ export class EnqueuePathToVictoryService {
       }
 
       this.logger.debug('queueing Message', queueMessage)
-      await this.queueService.sendMessage(queueMessage)
+      await this.queueService.sendMessage(queueMessage, MessageGroup.p2v)
       return { message: 'ok' }
     } catch (e) {
       this.logger.error('error at enqueue', e)

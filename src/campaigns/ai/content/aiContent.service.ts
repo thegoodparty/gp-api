@@ -5,7 +5,10 @@ import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { EnqueueService } from 'src/queue/producer/enqueue.service'
+import {
+  EnqueueService,
+  MessageGroup,
+} from 'src/queue/producer/enqueue.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
@@ -147,7 +150,7 @@ export class AiContentService {
       },
     }
 
-    await this.queue.sendMessage(queueMessage)
+    await this.queue.sendMessage(queueMessage, MessageGroup.content)
     await this.slack.aiMessage({
       message: 'Enqueued AI prompt',
       error: queueMessage,

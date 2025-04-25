@@ -4,6 +4,12 @@ import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
 import { queueConfig } from '../queue.config'
 
+export enum MessageGroup {
+  p2v = 'p2v',
+  content = 'content',
+  default = 'default',
+}
+
 const config: SQSClientConfig = {
   region: process.env.AWS_REGION || '',
 }
@@ -31,7 +37,7 @@ const producer = Producer.create({
 export class EnqueueService {
   private readonly logger = new Logger(EnqueueService.name)
   constructor() {}
-  async sendMessage(msg: any) {
+  async sendMessage(msg: any, group: MessageGroup = MessageGroup.default) {
     const body: any = JSON.stringify(msg)
 
     const uuid = Math.random().toString(36).substring(2, 12)
@@ -40,7 +46,7 @@ export class EnqueueService {
       id: uuid,
       body,
       deduplicationId: uuid, // Required for FIFO queues
-      groupId: 'gp-queue', // Required for FIFO queues
+      groupId: `gp-queue-${group}`, // Required for FIFO queues
     }
 
     try {
