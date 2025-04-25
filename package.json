@@ -50,6 +50,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-fastify": "^11.0.8",
+    "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.0.3",
     "@prisma/client": "^6.3.0",
     "@ssut/nestjs-sqs": "^3.0.1",

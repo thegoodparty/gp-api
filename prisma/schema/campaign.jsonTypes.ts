@@ -53,7 +53,7 @@ declare global {
       funFact?: string
       campaignCommittee?: string
       statementName?: string
-      subscriptionId?: string
+      subscriptionId?: string | null
       endOfElectionSubscriptionCanceled?: boolean
       subscriptionCanceledAt?: number | null
       subscriptionCancelAt?: number | null
