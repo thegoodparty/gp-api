@@ -194,6 +194,8 @@ export default $config({
       messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
       delaySeconds: 0,
       receiveWaitTimeSeconds: 0,
+      deduplicationScope: 'messageGroup',
+      fifoThroughputLimit: 'perMessageGroupId',
       redrivePolicy: pulumi.interpolate`{
         "deadLetterTargetArn": "${dlq.arn}",
         "maxReceiveCount": 3
