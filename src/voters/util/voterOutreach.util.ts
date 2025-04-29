@@ -348,7 +348,7 @@ export function buildSlackBlocks({
           elements: [
             {
               type: SlackMessageType.TEXT,
-              text: String(message),
+              text: message ? String(message) : 'N/A',
             },
           ],
         },
