@@ -19,7 +19,6 @@ import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
 import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
 import { CampaignUpdateHistoryService } from '../updateHistory/campaignUpdateHistory.service'
-import { IS_PROD } from '../../shared/util/appEnvironment.util'
 import { FullStoryService } from '../../fullStory/fullStory.service'
 import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
@@ -110,8 +109,6 @@ export class CrmCampaignsService {
   }
 
   private async createCompany(companyObj: CRMCompanyProperties) {
-    if (!IS_PROD) return
-
     let crmCompany: SimplePublicObject | null = null
     try {
       crmCompany = await this.hubspot.client.crm.companies.basicApi.create({
@@ -141,8 +138,6 @@ export class CrmCampaignsService {
     hubspotId: string,
     crmCompanyProperties: CRMCompanyProperties,
   ) {
-    if (!IS_PROD) return
-
     let crmCompany: SimplePublicObject
 
     try {

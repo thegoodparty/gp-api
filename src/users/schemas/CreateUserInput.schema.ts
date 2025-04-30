@@ -1,12 +1,17 @@
 import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import {
-  WriteEmailSchema,
   PasswordSchema,
-  ZipSchema,
   PhoneSchema,
   RolesSchema,
+  WriteEmailSchema,
+  ZipSchema,
 } from 'src/shared/schemas'
+
+export enum SIGN_UP_MODE {
+  CANDIDATE = 'candidate',
+  FACILITATED = 'facilitated',
+}
 
 export const CreateUserInputSchema = z.object({
   firstName: z.string().min(2),
@@ -17,5 +22,8 @@ export const CreateUserInputSchema = z.object({
   zip: ZipSchema.optional(),
   phone: PhoneSchema,
   roles: RolesSchema,
+  signUpMode: z
+    .enum([SIGN_UP_MODE.CANDIDATE, SIGN_UP_MODE.FACILITATED])
+    .optional(),
 })
 export class CreateUserInputDto extends createZodDto(CreateUserInputSchema) {}
