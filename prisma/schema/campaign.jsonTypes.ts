@@ -62,7 +62,8 @@ declare global {
       officeTermLength?: string
       partisanType?: string
       priorElectionDates?: string[]
-      positionId?: string
+      positionId?: string | null
+      electionId?: string | null
       tier?: string
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
