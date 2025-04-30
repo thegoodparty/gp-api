@@ -225,6 +225,12 @@ export class CrmUsersService {
     pageName: string,
     pageUri: string,
   ) {
+    if (!this.hubspot.client.config.accessToken) {
+      this.logger.debug(
+        'No API key found for HubSpot client skipping form submission',
+      )
+      return
+    }
     try {
       return await lastValueFrom(
         this.httpService.post(
