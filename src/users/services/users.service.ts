@@ -122,14 +122,16 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       ...(zip ? { zip } : {}),
     })
 
+    const userDataToPersist = {
+      ...restUserData,
+      ...trimmed,
+      ...(hashedPassword ? { password: hashedPassword } : {}),
+      hasPassword: !!hashedPassword,
+      name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
+    }
+
     const user = await this.model.create({
-      data: {
-        ...restUserData,
-        ...trimmed,
-        ...(hashedPassword ? { password: hashedPassword } : {}),
-        hasPassword: !!hashedPassword,
-        name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
-      },
+      data: userDataToPersist,
     })
 
     // We have to await this form post to ensure the user is created in CRM
