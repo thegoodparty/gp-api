@@ -59,7 +59,8 @@ const CampaignDetailsSchema = z
     officeTermLength: z.string(),
     partisanType: z.string(),
     priorElectionDates: z.array(z.string()),
-    positionId: z.string(),
+    positionId: z.string().nullish(),
+    electionId: z.string().nullish(),
     tier: z.string(),
   })
   .partial()
