@@ -5,7 +5,10 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { CreateUserInputDto } from '../schemas/CreateUserInput.schema'
+import {
+  CreateUserInputDto,
+  SIGN_UP_MODE,
+} from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { trimMany } from '../../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
@@ -90,8 +93,17 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   async createUser(
     userData: WithOptional<CreateUserInputDto, 'password' | 'phone'>,
   ): Promise<User> {
-    const { password, firstName, lastName, zip, phone, name } = userData
-    const email = userData.email?.toLowerCase()
+    const { signUpMode, ...restUserData } = userData
+    const {
+      password,
+      firstName,
+      lastName,
+      zip,
+      phone,
+      name,
+      email: unNormalizedEmail,
+    } = restUserData
+    const email = unNormalizedEmail
 
     const hashedPassword = password ? await hashPassword(password) : null
     const existingUser = await this.findUser({ email })
@@ -110,14 +122,16 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       ...(zip ? { zip } : {}),
     })
 
+    const userDataToPersist = {
+      ...restUserData,
+      ...trimmed,
+      ...(hashedPassword ? { password: hashedPassword } : {}),
+      hasPassword: !!hashedPassword,
+      name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
+    }
+
     const user = await this.model.create({
-      data: {
-        ...userData,
-        ...trimmed,
-        ...(hashedPassword ? { password: hashedPassword } : {}),
-        hasPassword: !!hashedPassword,
-        name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
-      },
+      data: userDataToPersist,
     })
 
     // We have to await this form post to ensure the user is created in CRM
@@ -130,6 +144,15 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         { name: 'email', value: email, objectTypeId: '0-1' },
         ...(phone
           ? [{ name: 'phone', value: phone, objectTypeId: '0-1' }]
+          : []),
+        ...(signUpMode
+          ? [
+              {
+                name: 'facilitated_signup',
+                value:
+                  signUpMode === SIGN_UP_MODE.FACILITATED ? 'true' : 'false',
+              },
+            ]
           : []),
       ],
       'registerPage',

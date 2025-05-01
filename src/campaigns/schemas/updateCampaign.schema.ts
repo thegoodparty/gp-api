@@ -45,7 +45,7 @@ const CampaignDetailsSchema = z
     level: z.nativeEnum(ElectionLevel),
     noNormalizedOffice: z.boolean(),
     website: z.string(),
-    pastExperience: z.string(),
+    pastExperience: z.union([z.string(), z.record(z.string(), z.string())]),
     occupation: z.string(),
     funFact: z.string(),
     campaignCommittee: z.string(),
@@ -59,7 +59,8 @@ const CampaignDetailsSchema = z
     officeTermLength: z.string(),
     partisanType: z.string(),
     priorElectionDates: z.array(z.string()),
-    positionId: z.string(),
+    positionId: z.string().nullish(),
+    electionId: z.string().nullish(),
     tier: z.string(),
   })
   .partial()

@@ -48,7 +48,7 @@ declare global {
       level?: ElectionLevel | null
       noNormalizedOffice?: boolean
       website?: string
-      pastExperience?: string
+      pastExperience?: string | Record<string, string>
       occupation?: string
       funFact?: string
       campaignCommittee?: string
@@ -62,7 +62,8 @@ declare global {
       officeTermLength?: string
       partisanType?: string
       priorElectionDates?: string[]
-      positionId?: string
+      positionId?: string | null
+      electionId?: string | null
       tier?: string
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
