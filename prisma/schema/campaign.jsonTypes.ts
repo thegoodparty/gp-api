@@ -48,7 +48,7 @@ declare global {
       level?: ElectionLevel | null
       noNormalizedOffice?: boolean
       website?: string
-      pastExperience?: string
+      pastExperience?: string | Record<string, string>
       occupation?: string
       funFact?: string
       campaignCommittee?: string

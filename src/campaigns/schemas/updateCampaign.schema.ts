@@ -45,7 +45,7 @@ const CampaignDetailsSchema = z
     level: z.nativeEnum(ElectionLevel),
     noNormalizedOffice: z.boolean(),
     website: z.string(),
-    pastExperience: z.string(),
+    pastExperience: z.union([z.string(), z.record(z.string(), z.string())]),
     occupation: z.string(),
     funFact: z.string(),
     campaignCommittee: z.string(),
