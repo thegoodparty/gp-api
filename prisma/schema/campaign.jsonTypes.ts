@@ -57,8 +57,8 @@ declare global {
       endOfElectionSubscriptionCanceled?: boolean
       subscriptionCanceledAt?: number | null
       subscriptionCancelAt?: number | null
-      filingPeriodsStart?: string
-      filingPeriodsEnd?: string
+      filingPeriodsStart?: string | null
+      filingPeriodsEnd?: string | null
       officeTermLength?: string
       partisanType?: string
       priorElectionDates?: string[]
