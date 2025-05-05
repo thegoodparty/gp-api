@@ -1,4 +1,4 @@
-export const formatDateForCRM = (date: string | number | undefined) => {
+export const formatDateForCRM = (date: string | number | undefined | null) => {
   if (!date) return undefined
   const dateObj = new Date(date)
   // Set to start of day in UTC

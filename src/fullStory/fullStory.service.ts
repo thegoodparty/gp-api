@@ -99,7 +99,7 @@ export class FullStoryService {
     const reportedVoterGoalsTotalCount =
       calculateVoterGoalsCount(reportedVoterGoals)
 
-    const getCRMMonthPropertyMonthDate = (date?: Date | string) =>
+    const getCRMMonthPropertyMonthDate = (date?: Date | string | null) =>
       date ? formatDate(date, DateFormats.crmPropertyMonthDate) : ''
 
     const electionDateMonth = getCRMMonthPropertyMonthDate(electionDate)
