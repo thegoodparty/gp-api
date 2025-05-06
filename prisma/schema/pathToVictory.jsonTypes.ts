@@ -1,23 +1,13 @@
-import { P2VStatus } from 'src/races/types/pathToVictory.types'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { ViabilityScore } from 'src/pathToVictory/types/pathToVictory.types'
 
 export {}
-
-interface P2VViability {
-  level?: string
-  score?: number
-  seats?: number
-  opponents?: number
-  candidates?: number
-  isPartisan?: boolean
-  isIncumbent?: boolean
-  isUncontested?: string
-  candidatesPerSeat?: number
-}
 
 declare global {
   export namespace PrismaJson {
     export type PathToVictoryData = {
       p2vStatus?: P2VStatus
+      p2vAttempts?: number
       p2vCompleteDate?: string
       completedBy?: number
       electionType?: string
@@ -26,7 +16,18 @@ declare global {
       winNumber?: number
       p2vNotNeeded?: boolean
       totalRegisteredVoters?: number
-      viability?: P2VViability
+      republicans?: number
+      democrats?: number
+      indies?: number
+      women?: number
+      men?: number
+      white?: number
+      asian?: number
+      africanAmerican?: number
+      hispanic?: number
+      averageTurnout?: number
+      projectedTurnout?: number
+      viability?: ViabilityScore
     }
   }
 }

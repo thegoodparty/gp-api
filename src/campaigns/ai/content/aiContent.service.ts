@@ -2,11 +2,13 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
-import { ContentService } from 'src/content/content.service'
-
+import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { EnqueueService } from 'src/queue/producer/enqueue.service'
+import {
+  EnqueueService,
+  MessageGroup,
+} from 'src/queue/producer/enqueue.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
@@ -17,11 +19,11 @@ export class AiContentService {
   private readonly logger = new Logger(AiContentService.name)
 
   constructor(
-    private campaignsService: CampaignsService,
-    private contentService: ContentService,
-    private aiService: AiService,
-    private slack: SlackService,
-    private queue: EnqueueService,
+    private readonly campaignsService: CampaignsService,
+    private readonly contentService: ContentService,
+    private readonly aiService: AiService,
+    private readonly slack: SlackService,
+    private readonly queue: EnqueueService,
   ) {}
 
   /** function to kickoff ai content generation and enqueue a message to run later */
@@ -147,7 +149,8 @@ export class AiContentService {
         regenerate,
       },
     }
-    await this.queue.sendMessage(queueMessage)
+
+    await this.queue.sendMessage(queueMessage, MessageGroup.content)
     await this.slack.aiMessage({
       message: 'Enqueued AI prompt',
       error: queueMessage,
@@ -170,7 +173,7 @@ export class AiContentService {
 
     let campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
-      include: { pathToVictory: true },
+      include: { pathToVictory: true, user: true },
     })
     let aiContent = campaign.aiContent
     const { prompt, existingChat, inputValues } =
@@ -226,7 +229,7 @@ export class AiContentService {
       campaign =
         (await this.campaignsService.findFirst({
           where: { slug },
-          include: { pathToVictory: true },
+          include: { pathToVictory: true, user: true },
         })) || campaign
       aiContent = campaign.aiContent
       let oldVersion

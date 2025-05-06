@@ -12,13 +12,17 @@ import {
 } from '@nestjs/common'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { Stripe } from 'stripe'
-import { StripeEventsService } from './stripe/stripeEvents.service'
+import { PaymentEventsService } from './services/paymentEventsService'
+import { StripeService } from '../stripe/services/stripe.service'
 
 @Controller('payments')
 export class PaymentsController {
   private logger = new Logger(PaymentsController.name)
 
-  constructor(private readonly stripeEvents: StripeEventsService) {}
+  constructor(
+    private readonly stripeService: StripeService,
+    private readonly stripeEvents: PaymentEventsService,
+  ) {}
 
   @Post('events')
   @PublicAccess()
@@ -34,7 +38,7 @@ export class PaymentsController {
 
     let event: Stripe.Event
     try {
-      event = await this.stripeEvents.parseWebhookEvent(
+      event = await this.stripeService.parseWebhookEvent(
         rawBody as Buffer,
         stripeSignature,
       )

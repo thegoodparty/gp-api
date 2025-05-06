@@ -22,5 +22,5 @@ phases:
     commands:
       - echo "Deploying SST app to stage $STAGE"
       - sst deploy --stage=$STAGE --verbose --print-logs
-      # - aws ecs wait services-stable --cluster $CLUSTER_NAME --services $SERVICE_NAME
+      - aws ecs wait services-stable --cluster $CLUSTER_NAME --services $SERVICE_NAME
       - echo "Done!"

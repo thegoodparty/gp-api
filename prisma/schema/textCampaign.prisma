@@ -1,0 +1,44 @@
+enum TextCampaignStatus {
+    pending
+    approved
+    denied
+    paid
+    in_progress
+    completed
+}
+
+model TextCampaign {
+    id                        Int                @id @default(autoincrement())
+    campaign                  Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+    campaignId                Int
+    projectId                 String?
+    name                      String?
+    message                   String?
+    status                    TextCampaignStatus @default(pending)
+    error                     String?
+    // Audience filters
+    audience_superVoters      Boolean?           @default(false)
+    audience_likelyVoters     Boolean?           @default(false)
+    audience_unreliableVoters Boolean?           @default(false)
+    audience_unlikelyVoters   Boolean?           @default(false)
+    audience_firstTimeVoters  Boolean?           @default(false)
+    party_independent         Boolean?           @default(false)
+    party_democrat            Boolean?           @default(false)
+    party_republican          Boolean?           @default(false)
+    age_18_25                 Boolean?           @default(false)
+    age_25_35                 Boolean?           @default(false)
+    age_35_50                 Boolean?           @default(false)
+    age_50_plus               Boolean?           @default(false)
+    gender_male               Boolean?           @default(false)
+    gender_female             Boolean?           @default(false)
+    gender_unknown            Boolean?           @default(false)
+    audience_request          String?
+    script                    String?            @db.Text
+    date                      DateTime?
+    imageUrl                  String?
+    createdAt                 DateTime           @default(now())
+    updatedAt                 DateTime           @updatedAt
+
+    @@index([campaignId])
+    @@map("text_campaign")
+}

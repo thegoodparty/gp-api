@@ -9,8 +9,8 @@ import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { SlackChannel } from '../shared/services/slackService.types'
 import {
   ChatCompletion,
+  ChatCompletionNamedToolChoice,
   ChatCompletionTool,
-  ChatCompletionToolChoiceOption,
 } from 'openai/resources/chat/completions'
 import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
 
@@ -29,7 +29,7 @@ type GetChatToolCompletionArgs = {
   temperature?: number
   topP?: number
   tool?: ChatCompletionTool // list of functions that could be called.
-  toolChoice?: ChatCompletionToolChoiceOption // force the function to be called on every generation if needed.
+  toolChoice?: ChatCompletionNamedToolChoice // force the function to be called on every generation if needed.
   timeout?: number // timeout request after 5 minutes
 }
 
@@ -182,46 +182,14 @@ export class AiService {
   }: GetChatToolCompletionArgs) {
     const models = AI_MODELS.split(',')
     for (const model of models) {
-      // Lama 3.1 supports native function calling
+      // Lama 3.3 supports native function calling
       // so we can modify the OpenAI base url to use the together.ai api
       this.logger.debug('model', model)
-      const togetherAi = model.includes('meta-llama')
+      const togetherAi = model.includes('meta-llama') || model.includes('Qwen')
       const client = new OpenAI({
         apiKey: togetherAi ? TOGETHER_AI_KEY : OPEN_AI_KEY,
         baseURL: togetherAi ? 'https://api.together.xyz/v1' : undefined,
       })
-
-      let toolPrompt = ''
-      if (model.includes('meta-llama')) {
-        // the native function calling in llama is not working as expected
-        // so we use this function prompt to get the same result
-        toolPrompt = `You have access to the following functions:
-
-      Use the function '${tool?.function?.name}' to '${tool?.function?.description}':
-      ${JSON.stringify(tool)}
-      
-      If you choose to call a function ONLY reply in the following format with no prefix or suffix:
-      
-      <function=example_function_name>{"example_name": "example_value"}</function>
-      
-      Reminder:
-      - Function calls MUST follow the specified format, start with <function= and end with </function>
-      - Required parameters MUST be specified
-      - Only call one function at a time
-      - Put the entire function call reply on one line
-      - If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls`
-
-        // add the tool prompt to the last system message
-        for (const message of messages) {
-          if (message.role === 'system') {
-            message.content += toolPrompt
-            break
-          }
-        }
-
-        tool = undefined
-        toolChoice = undefined
-      }
 
       this.logger.debug('toolChoice', toolChoice)
 
@@ -300,7 +268,8 @@ export class AiService {
       } catch (error) {
         this.logger.error('error', error)
         await this.slack.formattedMessage({
-          message: `Error in getChatToolCompletion. model: ${model} Error: ${error}`,
+          message: `Error in getChatToolCompletion. model: ${model}`,
+          error,
           channel: SlackChannel.botDev,
         })
       }

@@ -1,17 +1,19 @@
 import { CreateUserInputSchema } from './CreateUserInput.schema'
 import { z } from 'zod'
 import {
-  ZipSchema,
-  PhoneSchema,
   EmailSchema,
+  PhoneSchema,
   RolesSchema,
+  ZipSchema,
 } from 'src/shared/schemas'
+import { makeOptional } from 'src/shared/util/zod.util'
 
 export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   password: true,
 }).extend({
-  zip: ZipSchema.nullish(),
-  phone: PhoneSchema.nullish(),
+  name: z.string().nullish(),
+  zip: makeOptional(ZipSchema),
+  phone: makeOptional(PhoneSchema),
   id: z.number(),
   email: EmailSchema,
   avatar: z.string().nullish(),

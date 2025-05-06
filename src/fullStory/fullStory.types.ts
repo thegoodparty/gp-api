@@ -1,3 +1,5 @@
+import { VoterGoals } from 'src/campaigns/campaigns.types'
+
 export interface FullStoryUserResponse {
   data: {
     results: {
@@ -26,6 +28,8 @@ export interface TrackingProperties {
   currentStep?: string
   isVerified?: boolean | null
   isPro?: boolean | null
+  sessionCount?: number
+  createdByAdmin?: boolean
   aiContentCount?: number
   p2vStatus?: string
   electionDateStr?: string
@@ -38,8 +42,11 @@ export interface TrackingProperties {
   digitalAds?: number
   smsSent?: number
   events?: number
+  reportedVoterGoals?: VoterGoals
   reportedVoterGoalsTotalCount?: number
   voterContactGoal?: string | number
+  voterContactPercentage?: number | string
   hubSpotUpdates?: Record<string, any>
   aiContentTrackingFlags?: Record<string, any>
+  contentQuestionsAnswered?: number
 }

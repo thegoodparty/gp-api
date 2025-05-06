@@ -2,6 +2,12 @@ import { Prisma } from '@prisma/client'
 import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
+const WINNERS_ELECTION_YEAR = process.env.WINNERS_ELECTION_YEAR
+
+if (!WINNERS_ELECTION_YEAR) {
+  throw new Error('Please set WINNERS_ELECTION_YEAR in your .env')
+}
+
 interface FilterParams {
   partyFilter?: string
   stateFilter?: string
@@ -60,6 +66,13 @@ export function buildMapFilters(
     })
   }
 
+  andConditions.push({
+    details: {
+      path: ['electionDate'],
+      string_contains: `${WINNERS_ELECTION_YEAR}`,
+    },
+  })
+
   if (officeFilter) {
     const officeCondition = createJsonOrConditionString(officeFilter, [
       ['normalizedOffice'],
@@ -71,23 +84,11 @@ export function buildMapFilters(
     }
   }
 
-  if (IS_PROD) {
-    andConditions.push({
-      data: {
-        path: ['hubSpotUpdates', 'verified_candidates'],
-        equals: 'Yes',
-      },
-    })
-  }
-
-  // Exclude campaigns without ZIP and where didWin is false
+  // Exclude campaigns without ZIP
   andConditions.push({
     details: {
       path: ['zip'],
       not: { equals: null },
-    },
-    didWin: {
-      not: false,
     },
   })
 
@@ -97,6 +98,10 @@ export function buildMapFilters(
       'verified_candidates',
     ])
     if (isProdCondition) {
+      isProdCondition.OR.push({
+        isVerified: true,
+      })
+
       andConditions.push(isProdCondition)
     }
   }
@@ -107,7 +112,7 @@ export function buildMapFilters(
 function createJsonOrConditionString(
   filter: string,
   paths: string[] | string[][],
-): Prisma.CampaignWhereInput | null {
+): { OR: Prisma.CampaignWhereInput[] } | null {
   if (!filter) return null
 
   const filterUpper = capitalizeFirstLetter(filter).trim()
@@ -129,6 +134,12 @@ function createJsonOrConditionString(
         details: {
           path: path,
           string_contains: filterLower,
+        },
+      },
+      {
+        details: {
+          path: path,
+          string_contains: filter,
         },
       },
     ])

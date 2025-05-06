@@ -11,6 +11,7 @@ if (!API_KEY) {
 
 export type EmailData = MailgunMessageData & {
   variables?: Record<string, string | number | boolean>
+  template?: string
 }
 
 @Injectable()
@@ -29,6 +30,11 @@ export class MailgunService {
   sendMessage({ variables, ...emailData }: EmailData) {
     if (variables) {
       emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
+    }
+
+    // Add tag header based on template name
+    if (emailData.template && process.env.TRACK_MAILGUN_EMAILS === 'true') {
+      emailData['o:tag'] = emailData.template
     }
 
     if (process.env.MAILGUN_INTERCEPT_EMAIL) {

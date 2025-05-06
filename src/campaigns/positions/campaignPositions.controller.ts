@@ -35,8 +35,14 @@ export class CampaignPositionsController {
   }
 
   @Post()
-  create(@Body() body: CreateCampaignPositionSchema) {
-    return this.campaignPositionsService.create(body)
+  create(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: Omit<CreateCampaignPositionSchema, 'campaignId'>,
+  ) {
+    const fullBody: CreateCampaignPositionSchema = { ...body, campaignId: id }
+    // If campaignId is accepted in the body instead, any user can create campaignPositions for any campaign
+    // Thus, we add it into the body from the URL since that ID has already been checked by the CampaignOwnerOrAdminGuard
+    return this.campaignPositionsService.create(fullBody)
   }
 
   @Put(':positionId')

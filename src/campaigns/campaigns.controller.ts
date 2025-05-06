@@ -26,6 +26,11 @@ import { userHasRole } from 'src/users/util/users.util'
 import { SlackService } from 'src/shared/services/slack.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { CreateP2VSchema } from './schemas/createP2V.schema'
+import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
+import { CampaignEmailsService } from './services/campaignEmails.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -36,7 +41,62 @@ export class CampaignsController {
     private readonly campaigns: CampaignsService,
     private readonly planVersions: CampaignPlanVersionsService,
     private readonly slack: SlackService,
+    private readonly p2v: PathToVictoryService,
+    private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
+    private readonly campaignEmails: CampaignEmailsService,
   ) {}
+
+  // TODO: this is a placeholder, remove once actual implememntation is in place!!!
+  @Post('mine/path-to-victory')
+  @UseCampaign({ continueIfNotFound: true })
+  async createPathToVictory(
+    @Body() { slug }: CreateP2VSchema,
+    @ReqUser() user: User,
+    @ReqCampaign() campaign?: Campaign,
+  ) {
+    if (
+      typeof slug === 'string' &&
+      campaign?.slug !== slug &&
+      userHasRole(user, [UserRole.admin, UserRole.sales])
+    ) {
+      // if user has Admin or sales role, allow loading campaign by slug param
+      campaign = await this.campaigns.findUniqueOrThrow({
+        where: { slug },
+      })
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
+
+    const name = campaign?.data?.name
+    let p2vStatus = P2VStatus.waiting
+    if (name && name.toLowerCase().includes('test')) {
+      p2vStatus = P2VStatus.complete
+    }
+
+    let p2v = await this.p2v.findUnique({ where: { campaignId: campaign.id } })
+
+    if (!p2v) {
+      p2v = await this.p2v.create({
+        data: {
+          campaignId: campaign.id,
+          data: { p2vStatus },
+        },
+      })
+    } else {
+      await this.p2v.update({
+        where: {
+          id: p2v.id,
+        },
+        data: {
+          data: { ...p2v.data, p2vStatus, p2vAttempts: 0 },
+        },
+      })
+    }
+
+    if (p2vStatus === P2VStatus.waiting) {
+      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
+
+    return p2v
+  }
 
   @Roles(UserRole.admin)
   @Get()
@@ -72,11 +132,8 @@ export class CampaignsController {
 
   @Get('mine/status')
   @UseCampaign({ continueIfNotFound: true })
-  async getUserCampaignStatus(
-    @ReqUser() user: User,
-    @ReqCampaign() campaign?: Campaign,
-  ) {
-    return this.campaigns.getStatus(user, campaign)
+  async getUserCampaignStatus(@ReqCampaign() campaign?: Campaign) {
+    return this.campaigns.getStatus(campaign)
   }
 
   @Get('mine/plan-version')
@@ -130,6 +187,8 @@ export class CampaignsController {
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
+    this.logger.debug('Updating campaign', campaign, { slug, body })
+
     return this.campaigns.updateJsonFields(campaign.id, body)
   }
 
@@ -138,7 +197,13 @@ export class CampaignsController {
   @HttpCode(HttpStatus.OK)
   async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
     try {
-      return await this.campaigns.launch(user, campaign)
+      const launchResult = await this.campaigns.launch(user, campaign)
+      try {
+        this.campaignEmails.scheduleCampaignCountdownEmails(campaign)
+      } catch (error) {
+        this.logger.error('Error scheduling campaign countdown emails', error)
+      }
+      return launchResult
     } catch (e) {
       this.logger.error('Error at campaign launch', e)
       await this.slack.errorMessage({

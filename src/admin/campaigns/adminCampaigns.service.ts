@@ -4,17 +4,22 @@ import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { getUserFullName } from 'src/users/util/users.util'
-import { EmailTemplateNames } from 'src/email/email.types'
+import { EmailTemplateName } from 'src/email/email.types'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
-import { CampaignWith, OnboardingStep } from 'src/campaigns/campaigns.types'
+import {
+  CampaignCreatedBy,
+  CampaignWith,
+  OnboardingStep,
+} from 'src/campaigns/campaigns.types'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { formatDate } from 'date-fns'
-import { P2VStatus } from 'src/races/types/pathToVictory.types'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
+import { AuthenticationService } from 'src/authentication/authentication.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -25,10 +30,20 @@ export class AdminCampaignsService {
     private readonly adminP2V: AdminP2VService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly crm: CrmCampaignsService,
+    private readonly auth: AuthenticationService,
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
-    const { firstName, lastName, email, zip, phone, party, otherParty } = body
+    const {
+      firstName,
+      lastName,
+      email,
+      zip,
+      phone,
+      party,
+      otherParty,
+      adminUserEmail,
+    } = body
 
     // create new user
     const user = await this.users.createUser({
@@ -39,6 +54,10 @@ export class AdminCampaignsService {
       phone,
     })
 
+    const resetToken = this.auth.generatePasswordResetToken()
+    const updatedUser = await this.users.setResetToken(user.id, resetToken)
+    this.email.sendSetPasswordEmail(updatedUser)
+
     // find slug
     const slug = await this.campaigns.findSlug(user)
     const data = {
@@ -46,7 +65,8 @@ export class AdminCampaignsService {
       currentStep: OnboardingStep.complete,
       party,
       otherParty,
-      createdBy: 'admin',
+      createdBy: CampaignCreatedBy.ADMIN,
+      adminUserEmail,
     }
 
     // create new campaign
@@ -160,7 +180,7 @@ export class AdminCampaignsService {
 
     await this.adminP2V.completeP2V(user.id, pathToVictory)
 
-    if (campaign?.data?.createdBy !== 'admin') {
+    if (campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN) {
       const variables = {
         name: getUserFullName(user),
         link: `${WEBAPP_ROOT}/dashboard`,
@@ -169,7 +189,7 @@ export class AdminCampaignsService {
       await this.email.sendTemplateEmail({
         to: user.email,
         subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-        template: EmailTemplateNames.candidateVictoryReady,
+        template: EmailTemplateName.candidateVictoryReady,
         variables,
         from: 'jared@goodparty.org',
       })

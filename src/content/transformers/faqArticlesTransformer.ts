@@ -26,8 +26,10 @@ export const faqArticlesTransformer: Transformer<
       ...dataExcludingCategory,
       ...(firstCategory
         ? {
-            id: firstCategory.sys.id,
-            fields: firstCategory.fields,
+            category: {
+              id: firstCategory.sys.id,
+              fields: firstCategory.fields,
+            },
           }
         : {}),
     }

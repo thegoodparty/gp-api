@@ -31,6 +31,10 @@ model Campaign {
   campaignPositions     CampaignPosition[]
   campaignPlanVersion   CampaignPlanVersion?
   aiChats               AiChat[]
+  ecanvasser            Ecanvasser?
+  completedTaskIds      String[]                @default([]) @map("completed_task_ids")
+  ScheduledMessage      ScheduledMessage[]
+  TextCampaign          TextCampaign[]
 
   @@index([slug])
   @@map("campaign")

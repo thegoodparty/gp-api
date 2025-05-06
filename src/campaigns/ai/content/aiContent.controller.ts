@@ -19,16 +19,18 @@ import {
 import { AiContentService } from './aiContent.service'
 import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { Campaign, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '@prisma/client'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
 import { CampaignsService } from '../../services/campaigns.service'
 import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../decorators/UseCampaign.decorator'
 import { GetSystemPromptSchema } from './schemas/GetSystemPrompt.schema'
-import { ContentService } from 'src/content/content.service'
+import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { FullStoryService } from 'src/fullStory/fullStory.service'
 
 @Controller('campaigns/ai')
 @UseCampaign()
@@ -41,16 +43,25 @@ export class AiContentController {
     private readonly ai: AiService,
     private readonly campaigns: CampaignsService,
     private readonly content: ContentService,
+    private readonly fullstory: FullStoryService,
   ) {}
 
   @Post()
   async create(
     @Res({ passthrough: true }) res: FastifyReply,
+    @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
     @Body() body: CreateAiContentSchema,
   ) {
     try {
       const result = await this.aiContent.createContent(campaign, body)
+
+      // Don't need to await here, don't want to wait for this call
+      this.fullstory.trackEvent(user, 'Content Builder: Generation Started', {
+        slug: campaign.slug,
+        key: body.key,
+        regenerate: body.regenerate,
+      })
 
       if (result.created) {
         res.statusCode = HttpStatus.CREATED

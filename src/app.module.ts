@@ -9,7 +9,7 @@ import { DeclareModule } from './declare/declare.module'
 import { CampaignsModule } from './campaigns/campaigns.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { UsersModule } from './users/users.module'
-import { RacesModule } from './races/races.module'
+import { ElectionsModule } from './elections/elections.module'
 import { JwtAuthStrategy } from './authentication/auth-strategies/JwtAuth.strategy'
 import { JwtAuthGuard } from './authentication/guards/JwtAuth.guard'
 import { AdminModule } from './admin/admin.module'
@@ -21,9 +21,15 @@ import { VotersModule } from './voters/voters.module'
 import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
+import { EcanvasserIntegrationModule } from './ecanvasserIntegration/ecanvasserIntegration.module'
+import { TextCampaignModule } from './textCampaign/textCampaign.module'
+import { SessionsService } from './users/services/sessions.service'
+import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messaging.module'
+import { ScheduleModule } from '@nestjs/schedule'
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     UsersModule,
     AuthenticationModule,
     ContentModule,
@@ -33,7 +39,7 @@ import { SubscribeModule } from './subscribe/subscribe.module'
     JobsModule,
     DeclareModule,
     CampaignsModule,
-    RacesModule,
+    ElectionsModule,
     TopIssuesModule,
     AdminModule,
     QueueConsumerModule,
@@ -43,8 +49,12 @@ import { SubscribeModule } from './subscribe/subscribe.module'
     ErrorLoggerModule,
     CrmModule,
     SubscribeModule,
+    EcanvasserIntegrationModule,
+    ScheduledMessagingModule,
+    TextCampaignModule,
   ],
   providers: [
+    SessionsService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

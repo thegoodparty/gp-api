@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getUserFullName } from 'src/users/util/users.util'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
@@ -18,13 +17,20 @@ import {
   OnboardingStep,
   PlanVersion,
 } from '../campaigns.types'
-import { EmailService } from 'src/email/email.service'
-import { EmailTemplateNames } from 'src/email/email.types'
 import { UsersService } from 'src/users/services/users.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmCampaignsService } from './crmCampaigns.service'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
+import { objectNotEmpty } from 'src/shared/util/objects.util'
+import { CampaignEmailsService } from './campaignEmails.service'
+import { parseIsoDateString } from '../../shared/util/date.util'
+import { StripeService } from '../../stripe/services/stripe.service'
+
+enum CandidateVerification {
+  yes = 'YES',
+  no = 'NO',
+}
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
@@ -34,7 +40,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
     private planVersionService: CampaignPlanVersionsService,
-    private emailService: EmailService,
+    private readonly campaignEmails: CampaignEmailsService,
+    private readonly stripeService: StripeService,
   ) {
     super()
   }
@@ -50,10 +57,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
-    return this.model.create(args)
+    return await this.model.create(args)
   }
 
   // TODO: Find a way to make these JSON path lookups type-safe
+
   async findBySubscriptionId(subscriptionId: string) {
     return this.findFirst({
       where: {
@@ -64,8 +72,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-
   // TODO: Find a way to make these JSON path lookups type-safe
+
   async findByHubspotId(hubspotId: string) {
     return this.findFirst({
       where: {
@@ -76,11 +84,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-
   async createForUser(user: User) {
+    this.logger.debug('Creating campaign for user', user)
     const slug = await this.findSlug(user)
 
-    const newCampaign = await this.model.create({
+    const newCampaign = await this.create({
       data: {
         slug,
         isActive: false,
@@ -94,7 +102,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         },
       },
     })
-
+    this.logger.debug('Created campaign', newCampaign)
     this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
@@ -107,54 +115,127 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
-    const { data, details, pathToVictory } = body
+    const { data, details, pathToVictory, aiContent } = body
 
-    return this.client.$transaction(async (tx) => {
-      const campaign = await tx.campaign.findFirst({
-        where: { id },
-        include: { pathToVictory: true },
-      })
+    const updatedCampaign = await this.client.$transaction(
+      async (tx) => {
+        this.logger.debug('Updating campaign json fields', { id, body })
+        const campaign = await tx.campaign.findFirst({
+          where: { id },
+          include: { pathToVictory: true },
+        })
 
-      if (!campaign) return false
+        if (!campaign) return false
 
-      const updateData = {
-        data: data ? deepMerge(campaign.data as object, data) : undefined,
-        details: details
-          ? deepMerge(campaign.details as object, details)
-          : undefined,
-        ...(pathToVictory
-          ? {
-              pathToVictory: {
-                update: {
-                  data: {
-                    data: deepMerge(
-                      (campaign.pathToVictory?.data as object) || {},
-                      pathToVictory,
-                    ),
-                  },
-                },
+        // Handle data and details JSON fields
+        const campaignUpdateData: Prisma.CampaignUpdateInput = {}
+        if (data) {
+          campaignUpdateData.data = deepMerge(campaign.data as object, data)
+        }
+        if (details) {
+          await this.handleSubscriptionCancelAtUpdate(campaign.details, details)
+          const mergedDetails = deepMerge(
+            campaign.details as object,
+            details,
+          ) as PrismaJson.CampaignDetails
+          if (details?.customIssues) {
+            // If this isn't done, customIssues' entries duplicate
+            mergedDetails.customIssues = details.customIssues as Array<{
+              position: string
+              title: string
+            }>
+          }
+          if (details.runningAgainst) {
+            // If this isn't done, runningAgainst's entries duplicate
+            mergedDetails.runningAgainst = details.runningAgainst as Array<{
+              name: string
+              party: string
+              description: string
+            }>
+          }
+          campaignUpdateData.details = mergedDetails
+        }
+        if (objectNotEmpty(aiContent as object)) {
+          campaignUpdateData.aiContent = deepMerge(
+            (campaign.aiContent as object) || {},
+            aiContent,
+          ) as PrismaJson.CampaignAiContent
+        }
+
+        // Update the campaign with JSON fields
+        await tx.campaign.update({
+          where: { id: campaign.id },
+          data: campaignUpdateData,
+        })
+
+        // Handle pathToVictory relation separately if needed
+        if (objectNotEmpty(pathToVictory as object)) {
+          if (campaign.pathToVictory) {
+            await tx.pathToVictory.update({
+              where: { id: campaign.pathToVictory.id },
+              data: {
+                data: deepMerge(
+                  (campaign.pathToVictory.data as object) || {},
+                  pathToVictory,
+                ),
               },
-            }
-          : {}),
-      }
+            })
+          } else {
+            await tx.pathToVictory.create({
+              data: {
+                campaignId: campaign.id,
+                data: pathToVictory,
+              },
+            })
+          }
+        }
 
-      this.crm.trackCampaign(campaign.id)
+        // Return the updated campaign with pathToVictory included
+        return tx.campaign.findFirst({
+          where: { id: campaign.id },
+          include: { pathToVictory: true },
+        })
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    )
 
-      campaign.userId && this.usersService.trackUserById(campaign.userId)
+    if (updatedCampaign) {
+      // Track campaign and user
+      this.crm.trackCampaign(updatedCampaign.id)
+      updatedCampaign.userId &&
+        this.usersService.trackUserById(updatedCampaign.userId)
+    }
 
-      return tx.campaign.update({
-        where: { id: campaign.id },
-        data: updateData,
-        include: { pathToVictory: true },
-      })
-    })
+    return updatedCampaign
+  }
+
+  private async handleSubscriptionCancelAtUpdate(
+    currentDetails: PrismaJson.CampaignDetails,
+    updateDetails: Partial<PrismaJson.CampaignDetails>,
+  ) {
+    const { subscriptionId } = currentDetails
+    const { electionDate: electionDateUpdateStr } = updateDetails
+
+    // If we're changing the electionDate and there's an existing subscriptionId,
+    //  then we need to also update the cancelAt date on the subscription
+    if (electionDateUpdateStr && subscriptionId) {
+      const electionDate = parseIsoDateString(electionDateUpdateStr)
+      await this.stripeService.setSubscriptionCancelAt(
+        subscriptionId,
+        electionDate,
+      )
+    }
   }
 
   async patchCampaignDetails(
     campaignId: number,
     details: Partial<PrismaJson.CampaignDetails>,
   ) {
-    const currentCampaign = await this.findFirst({ where: { id: campaignId } })
+    const currentCampaign = await this.model.findFirst({
+      where: { id: campaignId },
+    })
     if (!currentCampaign?.details) {
       throw new InternalServerErrorException(
         `Campaign ${campaignId} has no details JSON`,
@@ -162,12 +243,22 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
     const { details: currentDetails } = currentCampaign
 
-    const updatedDetails = deepMerge(currentDetails, details)
+    await this.handleSubscriptionCancelAtUpdate(currentDetails, details)
 
-    return this.update({
-      where: { id: campaignId },
-      data: { details: updatedDetails },
-    })
+    const updatedDetails = {
+      ...currentDetails,
+      ...details,
+    } as typeof currentDetails
+    return this.client.$transaction(
+      async (tx) =>
+        tx.campaign.update({
+          where: { id: campaignId },
+          data: { details: updatedDetails },
+        }),
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    )
   }
 
   async persistCampaignProCancellation(campaign: Campaign) {
@@ -180,34 +271,20 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async setIsPro(campaignId: number, isPro: boolean = true) {
-    await Promise.allSettled([
-      this.update({ where: { id: campaignId }, data: { isPro } }),
-      this.patchCampaignDetails(campaignId, { isProUpdatedAt: Date.now() }), // TODO: this should be an ISO dateTime string, not a unix timestamp
-    ])
+    await this.update({ where: { id: campaignId }, data: { isPro } })
+    // Must be in serial so as to not overwrite campaign details w/ concurrent queries
+    await this.patchCampaignDetails(campaignId, {
+      isProUpdatedAt: Date.now(),
+    }) // TODO: this should be an ISO dateTime string, not a unix timestamp
     this.crm.trackCampaign(campaignId)
   }
 
-  async getStatus(user: User, campaign?: Campaign) {
+  async getStatus(campaign?: Campaign) {
     const timestamp = new Date().getTime()
 
-    await this.usersService.updateUser(
-      { id: user.id },
-      {
-        metaData: {
-          ...user.metaData,
-          lastVisited: timestamp,
-        },
-      },
-    )
-
     if (!campaign) {
-      let step = 'account-type'
-      if (user.metaData?.accountType === 'browsing') {
-        step = 'browsing'
-      }
       return {
         status: false,
-        step,
       }
     }
 
@@ -220,10 +297,16 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
+    const isVerified =
+      campaign.isVerified ||
+      data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
+        CandidateVerification.yes
+
     if (campaign.isActive) {
       return {
         status: CampaignStatus.candidate,
         slug,
+        isVerified,
       }
     }
     let step = 1
@@ -287,7 +370,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     this.crm.trackCampaign(campaign.id)
     this.usersService.trackUserById(campaign.userId)
 
-    await this.sendCampaignLaunchEmail(user)
+    await this.campaignEmails.sendCampaignLaunchEmail(user)
 
     return true
   }
@@ -422,91 +505,4 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     return true
   }
-
-  private async sendCampaignLaunchEmail(user: User) {
-    try {
-      await this.emailService.sendTemplateEmail({
-        to: user.email,
-        subject: 'Full Suite of AI Campaign Tools Now Available',
-        template: EmailTemplateNames.campaignLaunch,
-        variables: {
-          name: getUserFullName(user),
-          link: `${WEBAPP_ROOT}/dashboard`,
-        },
-      })
-    } catch (e) {
-      this.logger.error('Error sending campaign launch email', e)
-    }
-  }
 }
-
-// async function updatePathToVictory(campaign, columnKey, value) {
-//   try {
-//     const p2v = await PathToVictory.findOrCreate(
-//       {
-//         campaign: campaign.id,
-//       },
-//       {
-//         campaign: campaign.id,
-//       },
-//     )
-
-//     const data = p2v.data || {}
-//     const updatedData = {
-//       ...data,
-//       [columnKey]: value,
-//     }
-
-//     await PathToVictory.updateOne({ id: p2v.id }).set({
-//       data: updatedData,
-//     })
-
-//     if (!campaign.pathToVictory) {
-//       await Campaign.updateOne({ id: campaign.id }).set({
-//         pathToVictory: p2v.id,
-//       })
-//     }
-//   } catch (e) {
-//     console.log('Error at updatePathToVictory', e)
-//     await sails.helpers.slack.errorLoggerHelper(
-//       'Error at updatePathToVictory',
-//       e,
-//     )
-//   }
-// }
-
-// async function updateViability(campaign, columnKey, value) {
-//   try {
-//     const p2v = await PathToVictory.findOrCreate(
-//       {
-//         campaign: campaign.id,
-//       },
-//       {
-//         campaign: campaign.id,
-//       },
-//     )
-
-//     const data = p2v.data || {}
-//     const viability = data.viability || {}
-//     const updatedData = {
-//       ...data,
-//       viability: {
-//         ...viability,
-//         [columnKey]: value,
-//       },
-//     }
-
-//     await PathToVictory.updateOne({ id: p2v.id }).set({
-//       data: updatedData,
-//     })
-
-//     if (!campaign.pathToVictory) {
-//       await Campaign.updateOne({ id: campaign.id }).set({
-//         pathToVictory: p2v.id,
-//       })
-//     }
-//   } catch (e) {
-//     console.log('Error at updateViability', e)
-//     await sails.helpers.slack.errorLoggerHelper('Error at updateViability', e)
-//   }
-// }

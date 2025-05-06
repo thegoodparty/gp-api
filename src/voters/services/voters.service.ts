@@ -13,7 +13,6 @@ import { Prisma } from '@prisma/client'
 import { AxiosResponse } from 'axios'
 import { cloneDeep } from 'es-toolkit'
 import { SlackService } from 'src/shared/services/slack.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
 
 const API_BASE = 'https://api.l2datamapping.com/api/v2'
 const L2_DATA_KEY = process.env.L2_DATA_KEY
@@ -121,7 +120,8 @@ export class VotersService {
     }
 
     const foundColumns: VoterHistoryColumn[] = []
-    if (electionDates && electionDates.length > 0) {
+    if (electionDates && electionDates.length >= 3) {
+      // If we have less than 3, we won't get accurate turnout counts
       for (let y = 0; y < electionDates.length; y++) {
         // if we know the prior election Dates we use those,
         const columnResults = this.determineHistoryColumn(
@@ -129,7 +129,6 @@ export class VotersService {
           electionState,
           electionTerm * (y + 1),
           columns,
-          partisanRace,
           electionDates[y],
         )
         this.logger.debug('columnResults', columnResults)
@@ -145,7 +144,6 @@ export class VotersService {
           electionState,
           electionTerm * (y + 1),
           columns,
-          partisanRace,
           undefined,
         )
         this.logger.debug('columnResults', columnResults)
@@ -155,6 +153,10 @@ export class VotersService {
       }
     }
     this.logger.debug('foundColumns', foundColumns)
+
+    // we now have the columns for the last 3 elections.
+    // we store it on counts for debugging purposes.
+    counts.foundColumns = foundColumns
 
     // get the counts for each of the 3 years.
     const turnoutCounts: number[] = []
@@ -176,7 +178,7 @@ export class VotersService {
 
     // update counts with the average and projected turnouts.
     counts = this.getProjectedTurnout(counts, turnoutCounts)
-    // this.logger.debug('counts', counts);
+    this.logger.debug('counts', counts)
 
     return counts
   }
@@ -247,8 +249,8 @@ export class VotersService {
       const voterContactGoal: string = Math.ceil(
         parseFloat(winNumber) * 5,
       ).toFixed(2)
-      counts.winNumber = winNumber
-      counts.voterContactGoal = voterContactGoal
+      counts.winNumber = parseInt(winNumber)
+      counts.voterContactGoal = parseInt(voterContactGoal)
     }
     return counts
   }
@@ -364,7 +366,6 @@ export class VotersService {
     const searchUrl = `${API_BASE}/records/search/estimate/1OSR/VM_${electionState}?id=1OSR&apikey=${L2_DATA_KEY}`
     type ExpectedResponse = { results: { count: number } }
     let response: AxiosResponse<ExpectedResponse>
-    this.logger.debug('searchUrl', searchUrl, searchJson)
     try {
       response = await firstValueFrom(
         this.httpService.post<ExpectedResponse>(searchUrl, searchJson),
@@ -495,29 +496,11 @@ export class VotersService {
   }
 
   private getTurnoutDates(electionDate: string, yearOffset: number) {
-    // otherwise we have to guess on the prior election dates.
+    // Per Jared we only need specificity down to the month and day
+    // If necessary, we can later change this to calculate the date based on the law (ex: 2nd Tuesday after the first Sunday of August)
     const turnoutDateObj = new Date(electionDate)
     turnoutDateObj.setFullYear(turnoutDateObj.getFullYear() - yearOffset)
-    const turnoutDates: string[] = []
-    turnoutDates.push(
-      turnoutDateObj.toISOString().slice(0, 10).replace(/-/g, ''),
-    )
-
-    // get 3 calendar days before and after the turnoutDateObj
-    // and add them to turnOutDates array.
-    for (let i = 1; i < 4; i++) {
-      const turnoutDateObjBefore = new Date(turnoutDateObj)
-      const turnoutDateObjAfter = new Date(turnoutDateObj)
-      turnoutDateObjBefore.setDate(turnoutDateObjBefore.getDate() - i)
-      turnoutDateObjAfter.setDate(turnoutDateObjAfter.getDate() + i)
-      turnoutDates.push(
-        turnoutDateObjBefore.toISOString().slice(0, 10).replace(/-/g, ''),
-      )
-      turnoutDates.push(
-        turnoutDateObjAfter.toISOString().slice(0, 10).replace(/-/g, ''),
-      )
-    }
-    return turnoutDates
+    return turnoutDateObj.toISOString().slice(0, 7).replace(/-/g, '')
   }
 
   private determineHistoryColumn(
@@ -525,35 +508,25 @@ export class VotersService {
     electionState: string,
     yearOffset: number,
     columns: L2Column[],
-    partisanRace: boolean,
     priorElectionDate?: string,
   ): VoterHistoryColumn | undefined {
     const turnoutDateObj = new Date(electionDate)
     turnoutDateObj.setFullYear(turnoutDateObj.getFullYear() - yearOffset)
-    if (partisanRace) {
-      // partisan races are easy we use the General Election
-      const adjustedYear = turnoutDateObj.getFullYear()
-      const electionYear = `EG_${adjustedYear}`
-      return {
-        column: electionYear,
-        type: 'General Election',
-      }
-    }
 
-    let turnoutDates: string[] = []
+    let turnoutDate: string
     if (priorElectionDate) {
       // we know the exact election date so we do not have to guess.
       const priorElectionDateObj = new Date(priorElectionDate)
-      turnoutDates.push(
-        priorElectionDateObj.toISOString().slice(0, 10).replace(/-/g, ''),
-      )
+      turnoutDate = priorElectionDateObj
+        .toISOString()
+        .slice(0, 7)
+        .replace(/-/g, '')
     } else {
-      turnoutDates = this.getTurnoutDates(electionDate, yearOffset)
+      turnoutDate = this.getTurnoutDates(electionDate, yearOffset)
     }
 
     let yearColumn: string | undefined
     let yearColumnType: string | undefined
-    let yearIndex: number | undefined
     let dateKey: string | undefined
 
     for (const column of columns) {
@@ -569,29 +542,20 @@ export class VotersService {
             const electionSplit = electionKey.split('_')
             const electionKeyType = electionSplit[0]
             const electionKeyDate = electionSplit[1]
+            const electionKeyYearAndMonth = electionKeyDate.slice(0, 6)
+            // we skip primaries and runoffs.
             if (
-              electionKeyType !== 'EG' &&
-              electionKeyType !== 'ECG' &&
-              electionKeyType !== 'EL' &&
-              electionKeyType !== 'EP'
+              electionKeyType === 'EP' ||
+              electionKeyType === 'EPD' ||
+              electionKeyType === 'EPP' ||
+              electionKeyType === 'ER'
             ) {
               continue
             }
-            for (let x = 0; x < turnoutDates.length; x++) {
-              const turnoutDate = turnoutDates[x]
-              // if using turnoutDates (not electionDates)
-              // there is no way to know the exact date of the election,
-              // we prioritize elections that are closer to the electionDate
-              if (turnoutDate === electionKeyDate) {
-                if (!yearIndex || x < yearIndex) {
-                  yearColumn = column.id
-                  yearIndex = x
-                  dateKey = electionKeyDate
-                  yearColumnType =
-                    this.getElectionClassification(electionKeyType)
-                  break
-                }
-              }
+            if (turnoutDate === electionKeyYearAndMonth) {
+              yearColumn = column.id
+              dateKey = electionKeyDate
+              yearColumnType = this.getElectionClassification(electionKeyType)
             }
           }
         }

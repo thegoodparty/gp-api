@@ -47,8 +47,13 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+# Copy package files for production dependencies
+COPY package.json package-lock.json ./
+# Install only production dependencies
+RUN npm ci --only=production
+
 # Copy only necessary files to the runtime image
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/seed ./seed
@@ -60,4 +65,4 @@ COPY --from=builder /app/seed ./seed
 ENV NODE_ENV=production
 
 # Start the application
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main"]

@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common'
+import { forwardRef, Global, Module } from '@nestjs/common'
 import { CampaignsController } from './campaigns.controller'
 import { CampaignsService } from './services/campaigns.service'
 import { CampaignMapController } from './map/campaignMap.controller'
@@ -8,29 +8,40 @@ import { EmailModule } from 'src/email/email.module'
 import { CampaignPositionsController } from './positions/campaignPositions.controller'
 import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { GeocodingService } from './services/geocoding.service'
-import { RacesModule } from 'src/races/races.module'
 import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateHistory.controller'
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
-import { PathToVictoryService } from './services/pathToVictory.service'
 import { CrmModule } from '../crm/crmModule'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { FullStoryModule } from '../fullStory/fullStory.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
+import { ElectionsModule } from 'src/elections/elections.module'
+import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
+import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasserIntegration.module'
+import { CampaignTasksController } from './tasks/campaignTasksController'
+import { CampaignTasksService } from './tasks/campaignTasksService'
+import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
+import { CampaignEmailsService } from './services/campaignEmails.service'
+import { StripeModule } from '../stripe/stripe.module'
 
 @Global()
 @Module({
   imports: [
     EmailModule,
-    RacesModule,
     CampaignsAiModule,
     CrmModule,
     FullStoryModule,
+    ElectionsModule,
+    PathToVictoryModule,
+    forwardRef(() => EcanvasserIntegrationModule),
+    ScheduledMessagingModule,
+    StripeModule,
   ],
   controllers: [
     CampaignsController,
     CampaignPositionsController,
     CampaignMapController,
     CampaignUpdateHistoryController,
+    CampaignTasksController,
   ],
   providers: [
     CampaignsService,
@@ -39,12 +50,12 @@ import { CampaignsAiModule } from './ai/campaignsAi.module'
     CampaignMapService,
     GeocodingService,
     CampaignUpdateHistoryService,
-    PathToVictoryService,
     CrmCampaignsService,
+    CampaignTasksService,
+    CampaignEmailsService,
   ],
   exports: [
     CampaignsService,
-    PathToVictoryService,
     CampaignUpdateHistoryService,
     CrmCampaignsService,
   ],

@@ -5,26 +5,14 @@ import {
   getRecoverPasswordEmailContent,
 } from './util/content.util'
 import { User } from '@prisma/client'
-import { EmailTemplateNames } from './email.types'
+import {
+  EmailTemplateName,
+  SendEmailInput,
+  SendTemplateEmailInput,
+} from './email.types'
 import { getUserFullName } from '../users/util/users.util'
 import { DateFormats, formatDate } from '../shared/util/date.util'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-
-type SendEmailInput = {
-  to: string
-  subject: string
-  message: string
-  from?: string
-}
-
-type SendTemplateEmailInput = {
-  to: string
-  subject: string
-  template: EmailTemplateNames
-  variables?: object
-  from?: string
-  cc?: string
-}
 
 @Injectable()
 export class EmailService {
@@ -74,7 +62,7 @@ export class EmailService {
       `${WEBAPP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
-    const subject = 'Reset your password - The Good Party'
+    const subject = 'Reset your password - GoodParty.org'
     const message = getRecoverPasswordEmailContent(name, link)
 
     return await this.sendEmail({ to: user.email, subject, message })
@@ -90,12 +78,10 @@ export class EmailService {
       name: firstName,
       link,
     }
-    const subject = 'GoodParty.org: Access your free campaign resources!'
 
     return await this.sendTemplateEmail({
       to: email,
-      subject,
-      template: EmailTemplateNames.setPassword,
+      template: EmailTemplateName.setPassword,
       variables,
     })
   }
@@ -105,7 +91,7 @@ export class EmailService {
     await this.sendTemplateEmail({
       to: user.email,
       subject: `Your Pro Subscription is Ending Today`,
-      template: EmailTemplateNames.endOfProSubscription,
+      template: EmailTemplateName.endOfProSubscription,
       variables: {
         userFullName: getUserFullName(user),
         todayDateString: formatDate(today, DateFormats.usDate),
@@ -120,7 +106,7 @@ export class EmailService {
     await this.sendTemplateEmail({
       to: user.email,
       subject: `Your Cancellation Request Has Been Processed – Pro Access Until ${subscriptionEndDate}`,
-      template: EmailTemplateNames.subscriptionCancellationConfirmation,
+      template: EmailTemplateName.subscriptionCancellationConfirmation,
       variables: {
         userFullName: getUserFullName(user),
         subscriptionEndDate,

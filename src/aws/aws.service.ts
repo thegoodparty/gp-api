@@ -8,9 +8,9 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Upload } from '@aws-sdk/lib-storage'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
+import slugify from 'slugify'
 
 export type UploadOptions = {
-  accessControl?: ObjectCannedACL
   cacheControl?: string // Cache-Control header value
 }
 
@@ -49,7 +49,10 @@ export class AwsService {
     fileType: string,
     options?: UploadOptions,
   ) {
-    const filePath = `${bucket}/${encodeURIComponent(fileName)}`
+    const filePath = `${bucket}/${slugify(fileName, {
+      lower: true,
+      trim: true,
+    })}`
 
     try {
       const upload = new Upload({
@@ -59,8 +62,8 @@ export class AwsService {
           Key: filePath,
           Body: fileObject,
           ContentType: fileType,
-          ACL: options?.accessControl,
           CacheControl: options?.cacheControl,
+          ACL: ObjectCannedACL.public_read,
         },
       })
       const response = await upload.done()

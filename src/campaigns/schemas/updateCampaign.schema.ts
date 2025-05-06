@@ -1,14 +1,80 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
+import { ElectionLevel } from 'src/campaigns/campaigns.types'
 
-// TODO: make schemas for the actual JSON content
+// AI'ed from the CampaignDetails type
+const CampaignDetailsSchema = z
+  .object({
+    state: z.string(),
+    ballotLevel: z.string(),
+    electionDate: z.string(),
+    primaryElectionDate: z.string(),
+    zip: z.string(),
+    knowRun: z.enum(['yes']),
+    runForOffice: z.enum(['yes', 'no']),
+    pledged: z.boolean(),
+    isProUpdatedAt: z.number(),
+    customIssues: z.array(
+      z.object({
+        title: z.string(),
+        position: z.string(),
+      }),
+    ),
+    runningAgainst: z.array(
+      z.object({
+        name: z.string(),
+        party: z.string(),
+        description: z.string(),
+      }),
+    ),
+    geoLocation: z.object({
+      geoHash: z.string(),
+      lng: z.number(),
+      lat: z.number(),
+    }),
+    geoLocationFailed: z.boolean(),
+    city: z.string(),
+    county: z.string(),
+    normalizedOffice: z.string(),
+    otherOffice: z.string(),
+    office: z.string(),
+    party: z.string(),
+    otherParty: z.string(),
+    district: z.string(),
+    raceId: z.string(),
+    level: z.nativeEnum(ElectionLevel),
+    noNormalizedOffice: z.boolean(),
+    website: z.string(),
+    pastExperience: z.union([z.string(), z.record(z.string(), z.string())]),
+    occupation: z.string(),
+    funFact: z.string(),
+    campaignCommittee: z.string(),
+    statementName: z.string(),
+    subscriptionId: z.string().nullish(),
+    endOfElectionSubscriptionCanceled: z.boolean(),
+    subscriptionCanceledAt: z.number(),
+    subscriptionCancelAt: z.number(),
+    filingPeriodsStart: z.string().nullish(),
+    filingPeriodsEnd: z.string().nullish(),
+    officeTermLength: z.string(),
+    partisanType: z.string(),
+    priorElectionDates: z.array(z.string()),
+    positionId: z.string().nullish(),
+    electionId: z.string().nullish(),
+    tier: z.string(),
+  })
+  .partial()
+  .passthrough()
+
+// TODO: make schemas data, pathToVictory, aiContent
 export class UpdateCampaignSchema extends createZodDto(
   z
     .object({
       slug: z.string().optional(),
       data: z.record(z.string(), z.unknown()).optional(),
-      details: z.record(z.string(), z.unknown()).optional(),
+      details: CampaignDetailsSchema.optional(),
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
+      aiContent: z.record(z.string(), z.unknown()).optional(),
     })
     .strict(),
 ) {}

@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod'
-import { LEVELS } from 'src/shared/constants/governmentLevels'
 import { StateSchema } from 'src/shared/schemas'
 import { z } from 'zod'
+import { ElectionLevelSchema } from 'src/shared/schemas/ElectionLevel.schema'
 
 const STATUS_FILTERS = ['active', 'inactive'] as const
 
@@ -11,9 +11,9 @@ export class CampaignListSchema extends createZodDto(
     state: StateSchema()
       .transform((val) => val.toUpperCase())
       .optional(),
-    email: z.string().email().optional(),
+    email: z.string().optional(),
     slug: z.string().optional(),
-    level: z.enum(LEVELS).optional(),
+    level: ElectionLevelSchema.optional(),
     primaryElectionDateStart: z.string().date().optional(),
     primaryElectionDateEnd: z.string().date().optional(),
     campaignStatus: z.enum(STATUS_FILTERS).optional(),

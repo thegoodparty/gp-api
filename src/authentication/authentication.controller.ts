@@ -29,6 +29,9 @@ import { ReqUser } from './decorators/ReqUser.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 import { FastifyReply } from 'fastify'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
+import { CrmUsersService } from '../users/services/crmUsers.service'
+import { setTokenCookie } from './util/setTokenCookie.util'
+import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 
 @PublicAccess()
 @Controller('authentication')
@@ -40,35 +43,56 @@ export class AuthenticationController {
     private usersService: UsersService,
     private campaignsService: CampaignsService,
     private emailService: EmailService,
+    private readonly crmUsers: CrmUsersService,
   ) {}
 
   @Post('register')
-  async register(@Body() userData: RegisterUserInputDto) {
+  async register(
+    @Res({ passthrough: true }) response: FastifyReply,
+    @Body() userData: RegisterUserInputDto,
+  ) {
     const { token, user } = await this.authenticationService.register(userData)
+    setTokenCookie(response, token)
     return { user: ReadUserOutputSchema.parse(user), token }
   }
 
   @UseGuards(AuthGuard('local'))
   @Post('login')
-  async login(@ReqUser() user: User): Promise<LoginResult> {
-    return {
+  async login(
+    @Res({ passthrough: true }) response: FastifyReply,
+    @ReqUser() user: User,
+  ): Promise<LoginResult> {
+    const token = this.authenticationService.generateAuthToken({
+      email: user.email,
+      sub: user.id,
+    })
+    const result = {
       user: ReadUserOutputSchema.parse(user),
-      token: this.authenticationService.generateAuthToken({
-        email: user.email,
-        sub: user.id,
-      }),
+      token,
     }
+
+    setTokenCookie(response, token)
+
+    this.crmUsers.trackUserLogin(user)
+
+    return result
   }
 
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
   @Post('social-login/:socialProvider')
-  async socialLogin(@ReqUser() user: User): Promise<LoginResult> {
+  async socialLogin(
+    @Res({ passthrough: true }) response,
+    @ReqUser() user: User,
+  ): Promise<LoginResult> {
+    const token = this.authenticationService.generateAuthToken({
+      email: user.email,
+      sub: user.id,
+    })
+
+    setTokenCookie(response, token)
     return {
       user: ReadUserOutputSchema.parse(user),
-      token: this.authenticationService.generateAuthToken({
-        email: user.email,
-        sub: user.id,
-      }),
+      token,
     }
   }
 
@@ -126,7 +150,7 @@ export class AuthenticationController {
       // to automatically login after the password change
       const campaign = await this.campaignsService.findByUserId(user.id)
 
-      if (campaign?.data.createdBy !== 'admin') {
+      if (campaign?.data.createdBy !== CampaignCreatedBy.ADMIN) {
         // don't login just return
         return userOut
       }

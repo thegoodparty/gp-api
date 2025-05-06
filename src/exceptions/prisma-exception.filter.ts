@@ -20,7 +20,6 @@ export class PrismaExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(PrismaExceptionFilter.name)
 
   catch(exception: any, host: ArgumentsHost) {
-    console.dir(exception, { depth: 3, colors: true })
     const ctx = host.switchToHttp()
     const response = ctx.getResponse()
     const request = ctx.getRequest()
@@ -29,6 +28,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     let message: string | null = null
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      this.logger.error(exception, exception.meta)
       switch (exception.code) {
         case 'P2002': // Unique constraint violation
           statusCode = HttpStatus.CONFLICT

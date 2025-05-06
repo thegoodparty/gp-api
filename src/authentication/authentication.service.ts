@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotImplementedException,
   UnauthorizedException,
@@ -118,6 +119,11 @@ export class AuthenticationService {
     if (!this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider]) {
       throw new BadRequestException('Invalid social provider')
     }
+    this.logger.debug(`Validating user with ${socialProvider} token:`, {
+      socialToken,
+      socialPic,
+      email,
+    })
     const user = await this.usersService.findUser({
       email: await this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider](
         socialToken,
@@ -129,7 +135,7 @@ export class AuthenticationService {
       const msg = 'User not found by email'
       throw new UnauthorizedException(msg)
     }
-
+    this.logger.debug(`User found by email:`, user)
     return this.usersService.updateUser(
       {
         id: user.id,
@@ -162,7 +168,9 @@ export class AuthenticationService {
             : 'Invalid token',
         )
       }
-      throw e
+      throw new InternalServerErrorException('Failed to update password', {
+        cause: e,
+      })
     }
 
     return await this.usersService.updatePassword(user.id, password, true)

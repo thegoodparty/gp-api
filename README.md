@@ -1,11 +1,11 @@
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+  <a href="https://goodparty.org" target="blank"><img src="https://goodparty.org/images/logo-hologram-white.svg" width="120" alt="GoodParty.org Logo" /></a>
 </p>
 
 [circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
 [circleci-url]: https://circleci.com/gh/nestjs/nest
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+  <p align="center">The GoodParty.org API built on <a href="http://nodejs.org" target="_blank">Node.js</a>.</p>
     <p align="center">
 <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
 <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
@@ -24,22 +24,61 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+[GoodParty.org](https://goodparty.org) API
 
 ## Project setup
+
+### Prerequisites
+
+- Be sure to [install Node](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) if you haven't already.
+- You will need to be on node `22.12+`
+- If you have `nvm` installed, you can run `nvm use` to get the version from the `.nvmrc` file.
+
+### Setup
 
 ```bash
 $ npm install
 ```
 
-- Create a Postgres database for the project to connect to.
+- Create a Postgres database for the project to connect to. There are many ways to do this, below is an example using Homebrew on macOS:
+
+  ```sh
+  # install postgres
+  brew install postgresql
+
+  # start a postgres instance
+  brew services start postgresql
+
+  # connect to the local db
+  psql postgres
+  ```
+
+  Inside the psql prompt, create a new database:
+
+  ```sql
+  -- create a new database for app
+  CREATE DATABASE gpdb;
+  -- connect to the new database
+  \c gpdb;
+  -- create user and password
+  CREATE USER postgres WITH PASSWORD 'postgres';
+  -- grant all privileges to the user
+  GRANT ALL PRIVILEGES ON DATABASE gpdb TO postgres;
+  -- allow the user to create databases
+  ALTER USER postgres CREATEDB;
+  ```
+
+  Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
+
 - Copy `.env.example` to `.env` and fill in the necessary environment variables.
 - Run the following command to create the database tables:
 
 ```bash
-$ npx prisma generate --schema=./api/prisma/schema/schema.prisma
-$ npx prisma migrate dev  --schema=./api/prisma/schema/schema.prisma
+$ npm run migrate:dev
 ```
+
+- This also generates the Prisma Client and Typescript types.
+- This should also run seeds to populate your local DB with dummy data.
 
 ## Compile and run the project
 
@@ -75,16 +114,7 @@ You can run the tests in the Postman desktop app or you can run them using the P
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Check out the README in the [deploy](./deploy) directory for more information on how the project is deployed.
 
 ## Resources
 
