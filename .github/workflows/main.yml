@@ -3,6 +3,8 @@ name: Deploy and Test
 on:
   push:
     branches: ['develop', 'qa', 'master']
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   deploy:
@@ -43,15 +45,203 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  # tests:
-  #   needs: deploy
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v3
+  postman-tests:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-  #     - name: Run Playwright tests
-  #       # Example step to run your browser-based tests
-  #       run: |
-  #         npm install
-  #         npx playwright test
+      - name: Install Newman and Dependencies
+        run: |
+          npm install -g newman
+          npm install -g newman-reporter-htmlextra
+
+      - name: Create Test Environment
+        run: |
+          cp postman/environment.json test_env.json
+
+          # Determine host based on branch
+          if [[ "${{ github.ref_name }}" == "master" ]]; then
+            HOST="gp-api.goodparty.org"
+          elif [[ "${{ github.ref_name }}" == "qa" ]]; then
+            HOST="gp-api-qa.goodparty.org"
+          else
+            HOST="gp-api-dev.goodparty.org"
+          fi
+
+          jq --arg protocol "https" \
+             --arg host "$HOST" \
+             --arg port "" \
+             --arg email "${{ secrets.ADMIN_EMAIL }}" \
+             --arg password "${{ secrets.ADMIN_PASSWORD }}" \
+             '(.values[] | select(.key == "protocol").value) = $protocol |
+              (.values[] | select(.key == "host").value) = $host |
+              (.values[] | select(.key == "port").value) = $port |
+              (.values[] | select(.key == "testAdminUserEmail").value) = $email |
+              (.values[] | select(.key == "testUserPassword").value) = $password' \
+             test_env.json > updated_env.json
+
+      - name: Create Results Directory
+        run: mkdir -p testResults
+
+      - name: Run All Collections
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        shell: bash
+        run: |
+          touch test_summary.txt
+          
+          declare -A collections=(
+            ["Admin"]="${{ secrets.ADMIN_COLLECTION_ID }}"
+            ["Authentication"]="${{ secrets.AUTHENTICATION_COLLECTION_ID }}"
+            ["Authentication [Social OAuth]"]="${{ secrets.AUTHENTICATION_OAUTH_COLLECTION_ID }}"
+            ["Campaigns"]="${{ secrets.CAMPAIGNS_COLLECTION_ID }}"
+            ["CMS Content"]="${{ secrets.CMS_CONTENT_COLLECTION_ID }}"
+            ["Elections"]="${{ secrets.ELECTIONS_COLLECTION_ID }}"
+            ["Error Logger"]="${{ secrets.ERROR_LOGGER_COLLECTION_ID }}"
+            ["Generate Signed Upload Url"]="${{ secrets.GENERATE_SIGNED_UPLOAD_URL_COLLECTION_ID }}"
+            ["Health"]="${{ secrets.HEALTH_COLLECTION_ID }}"
+            ["Integrations"]="${{ secrets.INTEGRATIONS_COLLECTION_ID }}"
+            ["Jobs (Ashby)"]="${{ secrets.JOBS_ASHBY_COLLECTION_ID }}"
+            ["Payments"]="${{ secrets.PAYMENTS_COLLECTION_ID }}"
+            ["Subscribe"]="${{ secrets.SUBSCRIBE_COLLECTION_ID }}"
+            ["TopIssues"]="${{ secrets.TOP_ISSUES_COLLECTION_ID }}"
+            ["Users"]="${{ secrets.USERS_COLLECTION_ID }}"
+            ["VoterData"]="${{ secrets.VOTER_DATA_COLLECTION_ID }}"
+          )
+          
+          set +e
+          
+          total_passed=0
+          total_failed=0
+          
+          summary="*API Test Results*"
+          
+          branch="${{ github.head_ref || github.ref_name }}"
+          commit="${{ github.sha }}"
+          timestamp=$(date '+%Y-%m-%d %H:%M:%S UTC')
+          
+          summary+="\n📍 Branch: \`$branch\`"
+          summary+="\n📝 Commit: \`${commit:0:7}\`"
+          summary+="\n🕒 Time: \`$timestamp\`"
+          summary+="\n\n"
+          
+          for name in "${!collections[@]}"; do
+            collection_id=${collections[$name]}
+            echo "Running collection: $name"
+            
+            output=$(newman run "https://api.getpostman.com/collections/${collection_id}?apikey=$POSTMAN_API_KEY" \
+              -e updated_env.json \
+              --delay-request 3000 \
+              --timeout-request 120000 \
+              --timeout 300000 \
+              --timeout-script 60000 \
+              --reporters cli,json,htmlextra \
+              --reporter-json-export "testResults/${name// /_}-report.json" \
+              --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
+              2>&1) || true
+            
+            echo "$output"
+            
+            assertion_line=$(echo "$output" | grep "assertions" | grep "│" | tail -n 1)
+            
+            if [ ! -z "$assertion_line" ]; then
+              total_assertions=$(echo "$assertion_line" | awk -F'│' '{print $3}' | tr -d ' ')
+              failed_assertions=$(echo "$assertion_line" | awk -F'│' '{print $4}' | tr -d ' ')
+              
+              if [ -z "$total_assertions" ] || ! [[ "$total_assertions" =~ ^[0-9]+$ ]]; then
+                total_assertions=0
+              fi
+              if [ -z "$failed_assertions" ] || ! [[ "$failed_assertions" =~ ^[0-9]+$ ]]; then
+                failed_assertions=0
+              fi
+              
+              passed=$((total_assertions - failed_assertions))
+              
+              total_passed=$((total_passed + passed))
+              total_failed=$((total_failed + failed_assertions))
+              
+              if [ $failed_assertions -gt 0 ]; then
+                status="❌"
+              else
+                status="✅"
+              fi
+              
+              if [ $total_assertions -gt 0 ]; then
+                summary+="$status $name: $passed passed, $failed_assertions failed ($total_assertions total)\n"
+              fi
+            else
+              total_line=$(echo "$output" | grep -A5 "assertions.*executed.*failed" | grep "assertions")
+              if [ ! -z "$total_line" ]; then
+                total_assertions=$(echo "$total_line" | awk '{print $3}')
+                failed_assertions=$(echo "$total_line" | awk '{print $5}')
+                
+                if [ -z "$total_assertions" ] || ! [[ "$total_assertions" =~ ^[0-9]+$ ]]; then
+                  total_assertions=0
+                fi
+                if [ -z "$failed_assertions" ] || ! [[ "$failed_assertions" =~ ^[0-9]+$ ]]; then
+                  failed_assertions=0
+                fi
+                
+                passed=$((total_assertions - failed_assertions))
+                total_passed=$((total_passed + passed))
+                total_failed=$((total_failed + failed_assertions))
+                
+                if [ $failed_assertions -gt 0 ]; then
+                  status="❌"
+                else
+                  status="✅"
+                fi
+                
+                if [ $total_assertions -gt 0 ]; then
+                  summary+="$status $name: $passed passed, $failed_assertions failed ($total_assertions total)\n"
+                fi
+              else
+                echo "No test results found for $name"
+              fi
+            fi
+            
+            sleep 3
+          done
+          
+          summary+="\n---\n"
+          summary+="Total: $total_passed passed, $total_failed failed ($((total_passed + total_failed)) total)"
+
+          echo "summary_text=\`\`\`$summary\`\`\`" >> $GITHUB_ENV
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: testResults
+
+      - name: Send Slack Notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "${{ env.summary_text }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.summary_text }}\n\n👉 <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
