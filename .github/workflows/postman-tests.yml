@@ -1,20 +1,19 @@
 name: Postman Tests
 
 on:
-  pull_request:
+  workflow_run:
+    workflows: ["Deploy and Test"]
     types:
-      - opened
-      - synchronize
-      - reopened
+      - completed
   schedule:
     - cron: '0 0 * * *'  # Runs daily at midnight
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
   postman-tests:
+    # Only run if the deployment was successful
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    needs: deploy
-    # Add permissions for GITHUB_TOKEN if needed
     permissions:
       contents: read
       pull-requests: write
@@ -42,9 +41,18 @@ jobs:
           # Copy the existing environment file
           cp postman/environment.json test_env.json
 
+          # Determine host based on branch
+          if [[ "${{ github.event.workflow_run.head_branch }}" == "master" ]]; then
+            HOST="gp-api.goodparty.org"
+          elif [[ "${{ github.event.workflow_run.head_branch }}" == "qa" ]]; then
+            HOST="gp-api-qa.goodparty.org"
+          else
+            HOST="gp-api-dev.goodparty.org"
+          fi
+
           # Update the environment variables
           jq --arg protocol "https" \
-             --arg host "gp-api-dev.goodparty.org" \
+             --arg host "$HOST" \
              --arg port "" \
              --arg email "${{ secrets.ADMIN_EMAIL }}" \
              --arg password "${{ secrets.ADMIN_PASSWORD }}" \
