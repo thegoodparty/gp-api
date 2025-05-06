@@ -6,5 +6,5 @@ export const transformBlogArticleRelatedArticles = (
 ) =>
   relatedArticles.map((relatedArticle) => ({
     ...relatedArticle.fields,
-    mainImage: transformContentMedia(relatedArticle?.fields?.mainImage),
+    mainImage: transformContentMedia(relatedArticle.fields?.mainImage),
   }))
