@@ -83,14 +83,19 @@ jobs:
             HOST="gp-api-dev.goodparty.org"
           fi
 
+          # Construct the root URL directly
+          ROOT_URL="https://${HOST}/v1"
+          
           jq --arg protocol "https" \
              --arg host "$HOST" \
              --arg port "" \
+             --arg rootUrl "$ROOT_URL" \
              --arg email "${{ secrets.ADMIN_EMAIL }}" \
              --arg password "${{ secrets.ADMIN_PASSWORD }}" \
              '(.values[] | select(.key == "protocol").value) = $protocol |
               (.values[] | select(.key == "host").value) = $host |
               (.values[] | select(.key == "port").value) = $port |
+              (.values[] | select(.key == "rootUrl").value) = $rootUrl |
               (.values[] | select(.key == "testAdminUserEmail").value) = $email |
               (.values[] | select(.key == "testUserPassword").value) = $password' \
              test_env.json > updated_env.json
