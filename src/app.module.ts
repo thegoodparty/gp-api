@@ -26,6 +26,7 @@ import { TextCampaignModule } from './textCampaign/textCampaign.module'
 import { SessionsService } from './users/services/sessions.service'
 import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messaging.module'
 import { ScheduleModule } from '@nestjs/schedule'
+import { SegmentModule } from './segment/segment.module'
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { ScheduleModule } from '@nestjs/schedule'
     EcanvasserIntegrationModule,
     ScheduledMessagingModule,
     TextCampaignModule,
+    SegmentModule,
   ],
   providers: [
     SessionsService,
