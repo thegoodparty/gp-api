@@ -149,16 +149,37 @@ jobs:
             collection_id=${collections[$name]}
             echo "Running collection: $name"
             
-            output=$(newman run "https://api.getpostman.com/collections/${collection_id}?apikey=$POSTMAN_API_KEY" \
-              -e updated_env.json \
-              --delay-request 3000 \
-              --timeout-request 120000 \
-              --timeout 300000 \
-              --timeout-script 60000 \
-              --reporters cli,json,htmlextra \
-              --reporter-json-export "testResults/${name// /_}-report.json" \
-              --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
-              2>&1) || true
+            max_retries=3
+            retry_count=0
+            
+            while [ $retry_count -lt $max_retries ]; do
+              output=$(newman run "https://api.getpostman.com/collections/${collection_id}?apikey=$POSTMAN_API_KEY" \
+                -e updated_env.json \
+                --delay-request 3000 \
+                --timeout-request 120000 \
+                --timeout 300000 \
+                --timeout-script 60000 \
+                --reporters cli,json,htmlextra \
+                --reporter-json-export "testResults/${name// /_}-report.json" \
+                --reporter-htmlextra-export "testResults/${name// /_}-report.html" \
+                2>&1)
+              
+              # Check if the collection run was successful
+              if echo "$output" | grep -q "\"error\": null" || ! echo "$output" | grep -q "401 Unauthorized"; then
+                # Test run completed successfully or failed for non-auth reasons
+                break
+              fi
+              
+              echo "Authentication failed, attempt $((retry_count + 1)) of $max_retries"
+              retry_count=$((retry_count + 1))
+              
+              if [ $retry_count -lt $max_retries ]; then
+                # Clear any existing auth tokens before retry
+                jq 'del(.values[] | select(.key | contains("token")))' updated_env.json > temp_env.json
+                mv temp_env.json updated_env.json
+                sleep 5
+              fi
+            done
             
             echo "$output"
             
