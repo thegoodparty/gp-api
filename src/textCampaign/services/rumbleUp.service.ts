@@ -3,15 +3,15 @@
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
+  HttpStatus,
   Injectable,
   Logger,
-  HttpStatus,
 } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import {
   ApiRumbleUpProject,
   ApiRumbleUpResponse,
-} from '../types/textCampaign.types'
+} from '../types/outreach.types'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { EmailService } from 'src/email/email.service'
 import { ComplianceFormSchema } from '../schemas/complianceForm.schema'

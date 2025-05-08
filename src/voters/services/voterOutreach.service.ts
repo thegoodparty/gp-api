@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { ScheduleOutreachCampaignSchema } from '../voterFile/schemas/ScheduleOutreachCampaign.schema'
-import { Campaign, User, TextCampaignStatus } from '@prisma/client'
+import { Campaign, TextCampaignStatus, User } from '@prisma/client'
 import { buildSlackBlocks } from '../util/voterOutreach.util'
 import { FileUpload } from 'src/files/files.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -21,7 +21,7 @@ import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.servi
 import { getUserFullName } from 'src/users/util/users.util'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateName } from 'src/email/email.types'
-import { TextCampaignService } from 'src/textCampaign/services/textCampaign.service'
+import { OutreachService } from 'src/textCampaign/services/outreach.service'
 import { VoterFileType } from '../voterFile/voterFile.types'
 
 @Injectable()
@@ -34,7 +34,7 @@ export class VoterOutreachService {
     private readonly campaignsService: CampaignsService,
     private readonly crmCampaigns: CrmCampaignsService,
     private readonly emailService: EmailService,
-    private readonly textCampaignService: TextCampaignService,
+    private readonly textCampaignService: OutreachService,
   ) {}
 
   async scheduleOutreachCampaign(

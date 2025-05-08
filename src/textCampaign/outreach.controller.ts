@@ -7,7 +7,7 @@ import {
   Post,
   UsePipes,
 } from '@nestjs/common'
-import { TextCampaignService } from './services/textCampaign.service'
+import { OutreachService } from './services/outreach.service'
 import { CreateProjectSchema } from './schemas/createProject.schema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
@@ -24,11 +24,11 @@ import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorat
 
 @Controller('text-campaigns')
 @UsePipes(ZodValidationPipe)
-export class TextCampaignController {
-  private readonly logger = new Logger(TextCampaignController.name)
+export class OutreachController {
+  private readonly logger = new Logger(OutreachController.name)
 
   constructor(
-    private readonly textCampaignService: TextCampaignService,
+    private readonly textCampaignService: OutreachService,
     private readonly campaigns: CampaignsService,
   ) {}
 
