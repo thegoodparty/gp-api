@@ -55,17 +55,9 @@ export class TextCampaignController {
   ) {
     let submitSuccesful = false
     try {
-      this.logger.debug(
-        `Submitting compliance form for campaign ${campaign.id}`,
-        body,
-      )
       await this.textCampaignService.submitComplianceForm(campaign, body)
       submitSuccesful = true
-    } catch (e) {
-      this.logger.error(
-        `Failed to submit compliance form for campaign ${campaign.id}`,
-        e,
-      )
+    } catch (_e) {
       submitSuccesful = false
     }
 
@@ -76,7 +68,8 @@ export class TextCampaignController {
         data: true,
       },
     })
-    return await this.campaigns.update({
+
+    return this.campaigns.update({
       where: { id: campaign.id },
       data: {
         data: {
@@ -92,27 +85,43 @@ export class TextCampaignController {
     })
   }
 
-  // TODO: to be used for UI to submit pin
   @Post('compliance/pin')
   @UseCampaign()
   async submitCompliancePin(
     @ReqCampaign() campaign: Campaign,
     @Body() { pin }: CompliancePinSchema,
   ) {
-    await this.campaigns.update({
+    let submitSuccesful = false
+    try {
+      await this.textCampaignService.submitCompliancePin(campaign, pin)
+      submitSuccesful = true
+    } catch (_e) {
+      submitSuccesful = false
+    }
+
+    // need to reload campaign data just in case to avoid stale data
+    const reloadedCampaign = await this.campaigns.findUniqueOrThrow({
+      where: { id: campaign.id },
+      select: {
+        data: true,
+      },
+    })
+
+    return this.campaigns.update({
       where: { id: campaign.id },
       data: {
         data: {
+          ...reloadedCampaign.data,
           tcrComplianceInfo: {
-            ...(campaign.data.tcrComplianceInfo as TcrComplianceInfo),
+            ...(reloadedCampaign.data.tcrComplianceInfo as TcrComplianceInfo),
             pin,
-            status: TcrComplianceStatus.pending,
+            status: submitSuccesful
+              ? TcrComplianceStatus.pending
+              : TcrComplianceStatus.submitted,
           },
         },
-        ...campaign.data,
       },
     })
-    return this.textCampaignService.submitCompliancePin(campaign, pin)
   }
 
   // TODO: to be used for webhook from RumbleUp

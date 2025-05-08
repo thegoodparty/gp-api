@@ -32,7 +32,7 @@ export class TextCampaignService extends createPrismaBase(MODELS.TextCampaign) {
   async submitCompliancePin(campaign: Campaign, pin: string) {
     this.logger.debug(`Submitting compliance pin for campaign: ${campaign.id}`)
     try {
-      return await this.rumbleUpService.submitCompliancePin(pin)
+      return await this.rumbleUpService.submitCompliancePin(campaign, pin)
     } catch (error: any) {
       const msg = `Failed to submit compliance pin for campaign: ${campaign.id} | ${error?.message}`
       this.logger.error(msg, error)
