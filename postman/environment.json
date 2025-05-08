@@ -203,9 +203,75 @@
 			"value": "",
 			"type": "default",
 			"enabled": true
+		},
+		{
+			"key": "campaignTasksWeekNumber",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "campaignTasksDate",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "campaignTasksEndDate",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "adminAuthToken",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "tokenType",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "blogArticlesLimit",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "blogArticlesBySectionLimit",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "blogArticlesSectionSlug",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "testCampaignTaskId",
+			"value": "",
+			"type": "any",
+			"enabled": true
+		},
+		{
+			"key": "testSalesUserEmail",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "testSalesUserPassword",
+			"value": "",
+			"type": "default",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2025-03-26T03:30:01.393Z",
-	"_postman_exported_using": "Postman/11.37.5"
+	"_postman_exported_at": "2025-05-08T20:19:28.615Z",
+	"_postman_exported_using": "Postman/11.44.2"
 }
