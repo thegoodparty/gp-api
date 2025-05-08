@@ -2,7 +2,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import Analytics from '@segment/analytics-node'
 import { TrackingProperties } from 'src/fullStory/fullStory.types'
-import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class SegmentService {
@@ -10,9 +9,7 @@ export class SegmentService {
   private readonly logger = new Logger(SegmentService.name)
 
   constructor() {
-    const SEGMENT_WRITE_KEY = IS_PROD
-      ? process.env.SEGMENT_WRITE_KEY_PROD
-      : process.env.SEGMENT_WRITE_KEY_DEV
+    const SEGMENT_WRITE_KEY = process.env.SEGMENT_WRITE_KEY
     if (!SEGMENT_WRITE_KEY) {
       throw new Error(
         'SEGMENT_WRITE_KEY is not defined. Please add it to your .env',
