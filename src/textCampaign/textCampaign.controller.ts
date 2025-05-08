@@ -53,31 +53,43 @@ export class TextCampaignController {
     @ReqCampaign() campaign: Campaign,
     @Body() body: ComplianceFormSchema,
   ) {
-    const updatedCampaign = await this.campaigns.update({
-      where: { id: campaign.id },
-      data: {
-        data: {
-          ...campaign.data,
-          tcrComplianceInfo: { ...body, status: TcrComplianceStatus.submitted },
-        },
-      },
-    })
-
+    let submitSuccesful = false
     try {
       this.logger.debug(
         `Submitting compliance form for campaign ${campaign.id}`,
         body,
       )
-      await this.textCampaignService.submitComplianceForm(updatedCampaign, body)
+      await this.textCampaignService.submitComplianceForm(campaign, body)
+      submitSuccesful = true
     } catch (e) {
       this.logger.error(
         `Failed to submit compliance form for campaign ${campaign.id}`,
         e,
       )
-      throw e
+      submitSuccesful = false
     }
 
-    return updatedCampaign
+    // need to reload campaign data just in case to avoid stale data
+    const reloadedCampaign = await this.campaigns.findUniqueOrThrow({
+      where: { id: campaign.id },
+      select: {
+        data: true,
+      },
+    })
+    return await this.campaigns.update({
+      where: { id: campaign.id },
+      data: {
+        data: {
+          ...reloadedCampaign.data,
+          tcrComplianceInfo: {
+            ...body,
+            status: submitSuccesful
+              ? TcrComplianceStatus.submitted
+              : TcrComplianceStatus.error,
+          },
+        },
+      },
+    })
   }
 
   // TODO: to be used for UI to submit pin

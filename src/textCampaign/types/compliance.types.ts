@@ -7,6 +7,8 @@ export enum TcrComplianceStatus {
   approved = 'approved',
   /** Rejected */
   rejected = 'rejected',
+  /** Error */
+  error = 'error',
 }
 
 export type TcrComplianceInfo = {
