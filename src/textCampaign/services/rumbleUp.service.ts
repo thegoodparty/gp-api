@@ -16,9 +16,10 @@ import { Headers, MimeTypes } from 'http-constants-ts'
 import { EmailService } from 'src/email/email.service'
 import { ComplianceFormSchema } from '../schemas/complianceForm.schema'
 import { Campaign } from '@prisma/client'
+import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 
 // TODO: change this to the email we ultimately want to send to!
-const TCR_COMPLIANCE_EMAIL = 'tcr@goodparty.org'
+const TCR_COMPLIANCE_FALLBACK_EMAIL = 'politics@goodparty.org'
 
 @Injectable()
 export class RumbleUpService {
@@ -36,8 +37,9 @@ export class RumbleUpService {
 
   constructor(
     private readonly httpService: HttpService,
-    // TODO: this dependency is temporary until we can use rumble up's API
+    // TODO: These below dependencies are temporary until we can use rumble up's API!!!
     private readonly email: EmailService,
+    private readonly crmCampaigns: CrmCampaignsService,
   ) {
     if (!this.accountId || !this.apiKey) {
       throw new Error('RumbleUp credentials not properly configured')
@@ -62,13 +64,22 @@ export class RumbleUpService {
   }
 
   /** starts the compliance registration process */
-  submitComplianceForm(campaign: Campaign, body: ComplianceFormSchema) {
-    //TODO: this should be replaced with an API call to rumble up when its ready to integrate
+  async submitComplianceForm(campaign: Campaign, body: ComplianceFormSchema) {
+    //TODO: this email solution should be replaced with an API call to rumble up when its ready to integrate!!!
+    const crmCompanyOwner = campaign.data.hubspotId
+      ? await this.crmCampaigns.getCrmCompanyOwner(campaign.data.hubspotId)
+      : null
+
+    const email = crmCompanyOwner?.email || TCR_COMPLIANCE_FALLBACK_EMAIL
+
+    this.logger.debug(`Sending compliance form email to ${email}`)
+
     return this.email.sendEmail({
-      to: TCR_COMPLIANCE_EMAIL,
+      to: email,
       subject: 'TCR Compliance Form Submission',
       message: `
         <h2>Compliance Information for ${campaign.slug}</h2>
+        <a href="${process.env.WEBAPP_ROOT_URL}/admin/campaign-details/${campaign.slug}">View Campaign Details</a>
         <table style="border-collapse: collapse; width: 100%;">
           <tr>
             <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>EIN:</strong></td>
@@ -96,12 +107,30 @@ export class RumbleUpService {
   }
 
   /** submit the pin code to verify the campaign's compliance email */
-  async submitCompliancePin(pin: string) {
-    // TODO how to we send the pin to rumble up?
-    return {
-      pin,
-      success: true,
-    }
+  async submitCompliancePin(campaign: Campaign, pin: string) {
+    //TODO: this email solution should be replaced with an API call to rumble up when its ready to integrate!!!
+    const crmCompanyOwner = campaign.data.hubspotId
+      ? await this.crmCampaigns.getCrmCompanyOwner(campaign.data.hubspotId)
+      : null
+
+    const email = crmCompanyOwner?.email || TCR_COMPLIANCE_FALLBACK_EMAIL
+
+    this.logger.debug(`Sending compliance pin email to ${email}`)
+
+    return this.email.sendEmail({
+      to: email,
+      subject: 'TCR Compliance PIN Submission',
+      message: `
+        <h2>Compliance PIN for ${campaign.slug}</h2>
+        <a href="${process.env.WEBAPP_ROOT_URL}/admin/campaign-details/${campaign.slug}">View Campaign Details</a>
+        <table style="border-collapse: collapse; width: 100%;">
+          <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>PIN:</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">${pin}</td>
+          </tr>
+        </table>
+      `,
+    })
   }
 
   private handleResponseException(error: any): never {
