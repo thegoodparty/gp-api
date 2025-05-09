@@ -25,7 +25,7 @@ import {
   FullStoryUserResponse,
   SyncTrackingResultCounts,
   TrackingProperties,
-} from './fullStory.types'
+} from './analytics.types'
 import { reduce as reduceAsync } from 'async'
 import Bottleneck from 'bottleneck'
 import { PrimaryElectionResult } from '../crm/crm.types'
@@ -54,8 +54,8 @@ const limiter = new Bottleneck({
 })
 
 @Injectable()
-export class FullStoryService {
-  private readonly logger = new Logger(FullStoryService.name)
+export class AnalyticsService {
+  private readonly logger = new Logger(AnalyticsService.name)
   private readonly axiosConfig = {
     headers: {
       [CONTENT_TYPE]: APPLICATION_JSON,

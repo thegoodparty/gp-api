@@ -1,7 +1,7 @@
 // src/shared/segment/segment.service.ts
 import { Injectable, Logger } from '@nestjs/common'
 import Analytics from '@segment/analytics-node'
-import { TrackingProperties } from 'src/fullStory/fullStory.types'
+import { TrackingProperties } from 'src/analytics/analytics.types'
 
 @Injectable()
 export class SegmentService {
