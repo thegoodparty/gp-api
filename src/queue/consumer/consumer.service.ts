@@ -14,7 +14,7 @@ import {
   ViabilityScore,
 } from 'src/pathToVictory/types/pathToVictory.types'
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
-import { FullStoryService } from 'src/fullStory/fullStory.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
 @Injectable()
@@ -26,7 +26,7 @@ export class ConsumerService {
     private readonly slackService: SlackService,
     private readonly pathToVictoryService: PathToVictoryService,
     private readonly viabilityService: ViabilityService,
-    private readonly fullstory: FullStoryService,
+    private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
   ) {}
 
@@ -77,7 +77,7 @@ export class ConsumerService {
           include: { user: true },
         })
 
-        this.fullstory.trackEvent(
+        this.analytics.trackEvent(
           campaign.user as User,
           'Content Builder: Generation Completed',
           {

@@ -12,7 +12,7 @@ import {
 import { hashPassword } from '../util/passwords.util'
 import { trimMany } from '../../shared/util/strings.util'
 import { WithOptional } from 'src/shared/types/utility.types'
-import { FullStoryService } from '../../fullStory/fullStory.service'
+import { AnalyticsService } from '../../analytics/analytics.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmUsersService } from './crmUsers.service'
 
@@ -21,8 +21,8 @@ const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 @Injectable()
 export class UsersService extends createPrismaBase(MODELS.User) {
   constructor(
-    @Inject(forwardRef(() => FullStoryService))
-    private readonly fullstory: FullStoryService,
+    @Inject(forwardRef(() => AnalyticsService))
+    private readonly analytics: AnalyticsService,
     @Inject(forwardRef(() => CrmUsersService))
     private readonly crm: CrmUsersService,
   ) {
@@ -209,6 +209,6 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   }
 
   trackUserById(userId: number) {
-    return this.fullstory.trackUserById(userId)
+    return this.analytics.trackUserById(userId)
   }
 }

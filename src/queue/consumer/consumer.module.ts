@@ -5,7 +5,7 @@ import { queueConfig } from '../queue.config'
 import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
 import { PathToVictoryModule } from '../../pathToVictory/pathToVictory.module'
 import { ElectionsModule } from 'src/elections/elections.module'
-import { FullStoryModule } from 'src/fullStory/fullStory.module'
+import { AnalyticsModule } from 'src/analytics/analytics.module'
 
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { FullStoryModule } from 'src/fullStory/fullStory.module'
     CampaignsAiModule,
     PathToVictoryModule,
     ElectionsModule,
-    FullStoryModule,
+    AnalyticsModule,
   ],
   providers: [ConsumerService],
 })

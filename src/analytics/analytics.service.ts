@@ -25,12 +25,13 @@ import {
   FullStoryUserResponse,
   SyncTrackingResultCounts,
   TrackingProperties,
-} from './fullStory.types'
+} from './analytics.types'
 import { reduce as reduceAsync } from 'async'
 import Bottleneck from 'bottleneck'
 import { PrimaryElectionResult } from '../crm/crm.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
+import { SegmentService } from 'src/segment/segment.service'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
@@ -53,8 +54,8 @@ const limiter = new Bottleneck({
 })
 
 @Injectable()
-export class FullStoryService {
-  private readonly logger = new Logger(FullStoryService.name)
+export class AnalyticsService {
+  private readonly logger = new Logger(AnalyticsService.name)
   private readonly axiosConfig = {
     headers: {
       [CONTENT_TYPE]: APPLICATION_JSON,
@@ -70,6 +71,7 @@ export class FullStoryService {
     private readonly users: UsersService,
     private readonly httpService: HttpService,
     private readonly slack: SlackService,
+    private readonly segment: SegmentService,
   ) {}
 
   private getTrackingProperties(
@@ -205,6 +207,7 @@ export class FullStoryService {
   }
 
   async trackEvent(user: User, eventName: string, properties: any) {
+    this.segment.trackEvent(user.id, eventName, properties)
     if (this.disabled) {
       this.logger.warn(`FullStory is disabled`)
       return
@@ -228,6 +231,7 @@ export class FullStoryService {
     user: User,
     properties: TrackingProperties,
   ) {
+    this.segment.identify(user.id, properties)
     this.logger.debug(`this.disabled: ${this.disabled}`)
     if (this.disabled) {
       this.logger.warn(`FullStory is disabled`)
