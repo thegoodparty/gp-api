@@ -35,6 +35,7 @@ model Campaign {
   completedTaskIds      String[]                @default([]) @map("completed_task_ids")
   ScheduledMessage      ScheduledMessage[]
   TextCampaign          TextCampaign[]
+  TcrCompliance         TcrCompliance[]
 
   @@index([slug])
   @@map("campaign")

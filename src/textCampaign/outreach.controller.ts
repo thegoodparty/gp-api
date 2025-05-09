@@ -13,14 +13,11 @@ import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ComplianceFormSchema } from './schemas/complianceForm.schema'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import {
-  TcrComplianceInfo,
-  TcrComplianceStatus,
-} from './types/compliance.types'
+import { TcrComplianceStatus } from './types/compliance.types'
 import { CompliancePinSchema } from './schemas/compliancePin.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
+import { TcrComplianceService } from './services/tcrCompliance.service'
 
 @Controller('text-campaigns')
 @UsePipes(ZodValidationPipe)
@@ -29,7 +26,7 @@ export class OutreachController {
 
   constructor(
     private readonly textCampaignService: OutreachService,
-    private readonly campaigns: CampaignsService,
+    private readonly tcrComplianceService: TcrComplianceService,
   ) {}
 
   @Post()
@@ -68,28 +65,12 @@ export class OutreachController {
       )
       submitSuccesful = false
     }
-
     // need to reload campaign data just in case to avoid stale data
-    const reloadedCampaign = await this.campaigns.findUniqueOrThrow({
-      where: { id: campaign.id },
-      select: {
-        data: true,
-      },
-    })
-    return await this.campaigns.update({
-      where: { id: campaign.id },
-      data: {
-        data: {
-          ...reloadedCampaign.data,
-          tcrComplianceInfo: {
-            ...body,
-            status: submitSuccesful
-              ? TcrComplianceStatus.submitted
-              : TcrComplianceStatus.error,
-          },
-        },
-      },
-    })
+    return this.tcrComplianceService.upsertCompliance(
+      campaign.id,
+      body,
+      submitSuccesful,
+    )
   }
 
   // TODO: to be used for UI to submit pin
@@ -99,20 +80,8 @@ export class OutreachController {
     @ReqCampaign() campaign: Campaign,
     @Body() { pin }: CompliancePinSchema,
   ) {
-    await this.campaigns.update({
-      where: { id: campaign.id },
-      data: {
-        data: {
-          tcrComplianceInfo: {
-            ...(campaign.data.tcrComplianceInfo as TcrComplianceInfo),
-            pin,
-            status: TcrComplianceStatus.pending,
-          },
-        },
-        ...campaign.data,
-      },
-    })
-    return this.textCampaignService.submitCompliancePin(campaign, pin)
+    await this.textCampaignService.submitCompliancePin(campaign, pin)
+    return await this.tcrComplianceService.updatePin(campaign.id, pin)
   }
 
   // TODO: to be used for webhook from RumbleUp
@@ -130,29 +99,19 @@ export class OutreachController {
       `Received TCR compliance approval for Campaign: ${body.campaignId}, Status: ${status}`,
     )
     // TODO: how will we know what campaign to update?
-    const campaign = await this.campaigns.findUnique({
-      where: { id: body.campaignId },
-    })
+    const tcrCompliance = await this.tcrComplianceService.findByCampaignId(
+      body.campaignId,
+    )
 
-    if (!campaign) {
+    if (!tcrCompliance) {
       this.logger.error(
-        `Cannot find campaign with ID: ${body.campaignId} to approve compliance`,
+        `Cannot find TcrCompliance for campaign ID: ${body.campaignId} to approve compliance`,
       )
-      throw new NotFoundException('Campaign not found')
+      throw new NotFoundException('TcrCompliance not found')
     }
 
     try {
-      await this.campaigns.update({
-        where: { id: body.campaignId },
-        data: {
-          data: {
-            tcrComplianceInfo: {
-              ...(campaign.data.tcrComplianceInfo as TcrComplianceInfo),
-              status,
-            },
-          },
-        },
-      })
+      await this.tcrComplianceService.updateStatus(body.campaignId, status)
     } catch (e) {
       this.logger.error(
         `Failed to store compliance approval for campaign: ${body.campaignId}, Status: ${status}`,

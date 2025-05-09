@@ -5,11 +5,12 @@ import { RumbleUpService } from './services/rumbleUp.service'
 import { HttpModule } from '@nestjs/axios'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { EmailModule } from 'src/email/email.module'
+import { TcrComplianceService } from './services/tcrCompliance.service'
 
 @Module({
   imports: [forwardRef(() => CampaignsModule), HttpModule, EmailModule],
   controllers: [OutreachController],
-  providers: [OutreachService, RumbleUpService],
+  providers: [OutreachService, RumbleUpService, TcrComplianceService],
   exports: [OutreachService],
 })
 export class OutreachModule {}
