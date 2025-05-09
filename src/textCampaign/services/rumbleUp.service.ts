@@ -79,6 +79,7 @@ export class RumbleUpService {
       subject: 'TCR Compliance Form Submission',
       message: `
         <h2>Compliance Information for ${campaign.slug}</h2>
+        <a href="${process.env.WEBAPP_ROOT_URL}/admin/campaign-details/${campaign.slug}">View Campaign Details</a>
         <table style="border-collapse: collapse; width: 100%;">
           <tr>
             <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>EIN:</strong></td>
@@ -121,6 +122,7 @@ export class RumbleUpService {
       subject: 'TCR Compliance PIN Submission',
       message: `
         <h2>Compliance PIN for ${campaign.slug}</h2>
+        <a href="${process.env.WEBAPP_ROOT_URL}/admin/campaign-details/${campaign.slug}">View Campaign Details</a>
         <table style="border-collapse: collapse; width: 100%;">
           <tr>
             <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>PIN:</strong></td>
