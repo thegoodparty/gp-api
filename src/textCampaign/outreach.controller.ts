@@ -2,22 +2,23 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Logger,
-  NotFoundException,
   Post,
   UsePipes,
 } from '@nestjs/common'
 import { OutreachService } from './services/outreach.service'
 import { CreateProjectSchema } from './schemas/createProject.schema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
+import { Campaign, UserRole } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ComplianceFormSchema } from './schemas/complianceForm.schema'
 import { TcrComplianceStatus } from './types/compliance.types'
 import { CompliancePinSchema } from './schemas/compliancePin.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { TcrComplianceService } from './services/tcrCompliance.service'
+import { Roles } from 'src/authentication/decorators/Roles.decorator'
 
 @Controller('text-campaigns')
 @UsePipes(ZodValidationPipe)
@@ -52,43 +53,49 @@ export class OutreachController {
   ) {
     let submitSuccesful = false
     try {
-      this.logger.debug(
-        `Submitting compliance form for campaign ${campaign.id}`,
-        body,
-      )
       await this.textCampaignService.submitComplianceForm(campaign, body)
       submitSuccesful = true
-    } catch (e) {
-      this.logger.error(
-        `Failed to submit compliance form for campaign ${campaign.id}`,
-        e,
-      )
+    } catch (_e) {
       submitSuccesful = false
     }
-    // need to reload campaign data just in case to avoid stale data
     return this.tcrComplianceService.upsertCompliance(
       campaign.id,
       body,
-      submitSuccesful,
+      submitSuccesful
+        ? TcrComplianceStatus.submitted
+        : TcrComplianceStatus.error,
     )
   }
 
-  // TODO: to be used for UI to submit pin
   @Post('compliance/pin')
   @UseCampaign()
   async submitCompliancePin(
     @ReqCampaign() campaign: Campaign,
     @Body() { pin }: CompliancePinSchema,
   ) {
-    await this.textCampaignService.submitCompliancePin(campaign, pin)
-    return await this.tcrComplianceService.updatePin(campaign.id, pin)
+    let submitSuccesful = false
+    try {
+      await this.textCampaignService.submitCompliancePin(campaign, pin)
+      submitSuccesful = true
+    } catch (_e) {
+      submitSuccesful = false
+    }
+    return await this.tcrComplianceService.updatePin(
+      campaign.id,
+      pin,
+      submitSuccesful
+        ? TcrComplianceStatus.pending
+        : TcrComplianceStatus.submitted,
+    )
   }
 
-  // TODO: to be used for webhook from RumbleUp
+  // TODO: to be used for webhook from RumbleUp!!!
+  // currently used for interim admin UI manual approval
   @Post('compliance/approve')
-  @PublicAccess()
+  @Roles(UserRole.admin)
+  @HttpCode(HttpStatus.OK)
   async approveCompliance(
-    // TODO: what will the payload actually be?
+    // TODO: update payload to match the RumbleUp webhook payload
     @Body() body: { campaignId: number; approved: boolean },
   ) {
     const status = body.approved
@@ -99,16 +106,6 @@ export class OutreachController {
       `Received TCR compliance approval for Campaign: ${body.campaignId}, Status: ${status}`,
     )
     // TODO: how will we know what campaign to update?
-    const tcrCompliance = await this.tcrComplianceService.findByCampaignId(
-      body.campaignId,
-    )
-
-    if (!tcrCompliance) {
-      this.logger.error(
-        `Cannot find TcrCompliance for campaign ID: ${body.campaignId} to approve compliance`,
-      )
-      throw new NotFoundException('TcrCompliance not found')
-    }
 
     try {
       await this.tcrComplianceService.updateStatus(body.campaignId, status)
@@ -119,7 +116,5 @@ export class OutreachController {
       )
       throw e
     }
-
-    return status
   }
 }

@@ -10,38 +10,38 @@ export class TcrComplianceService extends createPrismaBase(
   async upsertCompliance(
     campaignId: number,
     body: ComplianceFormSchema,
-    submitSuccesful: boolean,
+    status: TcrComplianceStatus,
   ) {
     return this.model.upsert({
       where: { campaignId },
       update: {
         ...body,
-        status: submitSuccesful
-          ? TcrComplianceStatus.submitted
-          : TcrComplianceStatus.error,
+        status,
       },
       create: {
         campaignId,
         ...body,
-        status: submitSuccesful
-          ? TcrComplianceStatus.submitted
-          : TcrComplianceStatus.error,
+        status,
       },
     })
   }
 
-  async updatePin(campaignId: number, pin: string) {
+  async updatePin(
+    campaignId: number,
+    pin: string,
+    status: TcrComplianceStatus,
+  ) {
     return this.model.update({
       where: { campaignId },
       data: {
         pin,
-        status: TcrComplianceStatus.pending,
+        status,
       },
     })
   }
 
   async findByCampaignId(campaignId: number) {
-    return this.model.findUnique({
+    return this.model.findUniqueOrThrow({
       where: { campaignId },
     })
   }
