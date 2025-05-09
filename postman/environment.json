@@ -260,13 +260,13 @@
 		},
 		{
 			"key": "testSalesUserEmail",
-			"value": "",
+			"value": "dustin+sales@goodparty.org",
 			"type": "default",
 			"enabled": true
 		},
 		{
 			"key": "testSalesUserPassword",
-			"value": "",
+			"value": "Test123!",
 			"type": "default",
 			"enabled": true
 		}
