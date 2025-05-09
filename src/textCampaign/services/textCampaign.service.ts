@@ -19,7 +19,6 @@ export class TextCampaignService extends createPrismaBase(MODELS.TextCampaign) {
     try {
       this.logger.debug(
         `Submitting compliance form for campaign: ${campaign.id}`,
-        body,
       )
       return await this.rumbleUpService.submitComplianceForm(campaign, body)
     } catch (error: any) {
@@ -30,11 +29,11 @@ export class TextCampaignService extends createPrismaBase(MODELS.TextCampaign) {
   }
 
   async submitCompliancePin(campaign: Campaign, pin: string) {
-    this.logger.debug(`Submitting compliance pin for campaign: ${campaign.id}`)
+    this.logger.debug(`Submitting compliance PIN for campaign: ${campaign.id}`)
     try {
       return await this.rumbleUpService.submitCompliancePin(campaign, pin)
     } catch (error: any) {
-      const msg = `Failed to submit compliance pin for campaign: ${campaign.id} | ${error?.message}`
+      const msg = `Failed to submit compliance PIN for campaign: ${campaign.id} | ${error?.message}`
       this.logger.error(msg, error)
       throw new BadGatewayException(msg)
     }

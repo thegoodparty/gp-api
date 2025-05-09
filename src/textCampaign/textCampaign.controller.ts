@@ -2,15 +2,16 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Logger,
-  NotFoundException,
   Post,
   UsePipes,
 } from '@nestjs/common'
 import { TextCampaignService } from './services/textCampaign.service'
 import { CreateProjectSchema } from './schemas/createProject.schema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
+import { Campaign, UserRole } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ComplianceFormSchema } from './schemas/complianceForm.schema'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -20,7 +21,7 @@ import {
 } from './types/compliance.types'
 import { CompliancePinSchema } from './schemas/compliancePin.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
+import { Roles } from 'src/authentication/decorators/Roles.decorator'
 
 @Controller('text-campaigns')
 @UsePipes(ZodValidationPipe)
@@ -124,11 +125,14 @@ export class TextCampaignController {
     })
   }
 
-  // TODO: to be used for webhook from RumbleUp
+  // TODO: to be used for webhook from RumbleUp!!!
+  // currently used for interim admin UI manual approval
   @Post('compliance/approve')
-  @PublicAccess()
+  // @PublicAccess() // TODO: uncomment this when we have a webhook from RumbleUp
+  @Roles(UserRole.admin)
+  @HttpCode(HttpStatus.OK)
   async approveCompliance(
-    // TODO: what will the payload actually be?
+    // TODO: update payload to match the RumbleUp webhook payload
     @Body() body: { campaignId: number; approved: boolean },
   ) {
     const status = body.approved
@@ -138,23 +142,17 @@ export class TextCampaignController {
     this.logger.debug(
       `Received TCR compliance approval for Campaign: ${body.campaignId}, Status: ${status}`,
     )
-    // TODO: how will we know what campaign to update?
-    const campaign = await this.campaigns.findUnique({
+
+    const campaign = await this.campaigns.findUniqueOrThrow({
       where: { id: body.campaignId },
     })
 
-    if (!campaign) {
-      this.logger.error(
-        `Cannot find campaign with ID: ${body.campaignId} to approve compliance`,
-      )
-      throw new NotFoundException('Campaign not found')
-    }
-
     try {
-      await this.campaigns.update({
+      return await this.campaigns.update({
         where: { id: body.campaignId },
         data: {
           data: {
+            ...campaign.data,
             tcrComplianceInfo: {
               ...(campaign.data.tcrComplianceInfo as TcrComplianceInfo),
               status,
@@ -169,7 +167,5 @@ export class TextCampaignController {
       )
       throw e
     }
-
-    return status
   }
 }
