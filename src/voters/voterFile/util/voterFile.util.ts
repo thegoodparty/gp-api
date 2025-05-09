@@ -5,6 +5,7 @@ import {
   VoterFileType,
 } from '../voterFile.types'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 
 const logger = new Logger('Voter File Utils')
 
@@ -14,6 +15,7 @@ export function typeToQuery(
   customFilters?: Pick<CustomVoterFile, 'channel' | 'filters' | 'purpose'>,
   justCount?: boolean,
   fixColumns?: boolean,
+  selectedColumns?: GetVoterFileSchema['selectedColumns'],
 ) {
   const state = campaign.details.state
   let whereClause = ''
@@ -33,15 +35,18 @@ export function typeToQuery(
     whereClause += `("${l2ColumnName}" = '${cleanValue}' OR "${l2ColumnName}" = '${cleanValue} (EST.)') `
   }
 
-  let columns = `"LALVOTERID", 
-  "Voters_FirstName", 
-  "Voters_LastName", 
-  "Parties_Description",
-  "Voters_Gender",
-  "Voters_Age"`
-
-  if (type === 'full') {
-    columns += `, "Voters_VotingPerformanceEvenYearGeneral",
+  let columns: string
+  if (selectedColumns?.length) {
+    // Use selected columns
+    columns = selectedColumns.map(col => `"${col.db}"`).join(', ')
+  } else if (type === 'full') {
+    columns = `"LALVOTERID", 
+    "Voters_FirstName", 
+    "Voters_LastName", 
+    "Parties_Description",
+    "Voters_Gender",
+    "Voters_Age",
+    "Voters_VotingPerformanceEvenYearGeneral",
     "Voters_VotingPerformanceEvenYearPrimary", 
     "Voters_VotingPerformanceEvenYearGeneralAndPrimary",
     "Residence_Addresses_ApartmentType", 
@@ -90,67 +95,75 @@ export function typeToQuery(
     "Primary_2020",
     "Primary_2018",
     "Primary_2016"`
-  }
+  } else {
+    columns = `"LALVOTERID", 
+    "Voters_FirstName", 
+    "Voters_LastName", 
+    "Parties_Description",
+    "Voters_Gender",
+    "Voters_Age"`
 
-  if (type === 'doorKnocking') {
-    columns += `, "Residence_Addresses_Latitude", 
-    "Residence_Addresses_Longitude", 
-    "Residence_Addresses_AddressLine", 
-    "Residence_Addresses_ExtraAddressLine", 
-    "Residence_Addresses_HouseNumber",
-    "Residence_Addresses_City", 
-    "Residence_Addresses_State", 
-    "Residence_Addresses_Zip"`
-  }
+    if (type === 'doorKnocking') {
+      columns += `, "Residence_Addresses_Latitude", 
+      "Residence_Addresses_Longitude", 
+      "Residence_Addresses_AddressLine", 
+      "Residence_Addresses_ExtraAddressLine", 
+      "Residence_Addresses_HouseNumber",
+      "Residence_Addresses_City", 
+      "Residence_Addresses_State", 
+      "Residence_Addresses_Zip"`
+    }
 
-  if (type === 'sms') {
-    columns += `, "VoterTelephones_CellPhoneFormatted"`
-    if (whereClause) {
+    if (type === 'sms') {
+      columns += `, "VoterTelephones_CellPhoneFormatted"`
+      if (whereClause) {
+        whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
+      } else {
+        whereClause += `"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
+      }
+    }
+
+    if (type === 'digitalAds') {
+      columns += `, "VoterTelephones_CellPhoneFormatted",
+      "Residence_Addresses_AddressLine", 
+      "Residence_Addresses_ExtraAddressLine", 
+      "Residence_Addresses_HouseNumber",
+      "Residence_Addresses_City", 
+      "Residence_Addresses_State", 
+      "Residence_Addresses_Zip"`
+
       whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-    } else {
-      whereClause += `"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-    }
-  }
-  if (type === 'digitalAds') {
-    columns += `, "VoterTelephones_CellPhoneFormatted",
-    "Residence_Addresses_AddressLine", 
-    "Residence_Addresses_ExtraAddressLine", 
-    "Residence_Addresses_HouseNumber",
-    "Residence_Addresses_City", 
-    "Residence_Addresses_State", 
-    "Residence_Addresses_Zip"`
-
-    whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-  }
-
-  if (type === 'directMail') {
-    columns += `, "Mailing_Addresses_AddressLine", 
-    "Mailing_Addresses_ExtraAddressLine", 
-    "Mailing_Addresses_City", 
-    "Mailing_Addresses_State", 
-    "Mailing_Addresses_Zip", 
-    "Mailing_Addresses_ZipPlus4", 
-    "Mailing_Families_HHCount"`
-
-    nestedWhereClause = 'a'
-    if (whereClause !== '') {
-      whereClause += ' AND '
     }
 
-    whereClause += ` EXISTS (
-      SELECT 1
-      FROM public."Voter${state}" b
-      WHERE a."Mailing_Families_FamilyID" = b."Mailing_Families_FamilyID"
-      GROUP BY b."Mailing_Families_FamilyID"
-      HAVING COUNT(*) = 1
-    )`
-  }
+    if (type === 'directMail') {
+      columns += `, "Mailing_Addresses_AddressLine", 
+      "Mailing_Addresses_ExtraAddressLine", 
+      "Mailing_Addresses_City", 
+      "Mailing_Addresses_State", 
+      "Mailing_Addresses_Zip", 
+      "Mailing_Addresses_ZipPlus4", 
+      "Mailing_Families_HHCount"`
 
-  if (type === 'telemarketing') {
-    columns += `, "VoterTelephones_LandlineFormatted",
-    "Languages_Description"`
+      nestedWhereClause = 'a'
+      if (whereClause !== '') {
+        whereClause += ' AND '
+      }
 
-    whereClause += ` AND "VoterTelephones_LandlineFormatted" IS NOT NULL`
+      whereClause += ` EXISTS (
+        SELECT 1
+        FROM public."Voter${state}" b
+        WHERE a."Mailing_Families_FamilyID" = b."Mailing_Families_FamilyID"
+        GROUP BY b."Mailing_Families_FamilyID"
+        HAVING COUNT(*) = 1
+      )`
+    }
+
+    if (type === 'telemarketing') {
+      columns += `, "VoterTelephones_LandlineFormatted",
+      "Languages_Description"`
+
+      whereClause += ` AND "VoterTelephones_LandlineFormatted" IS NOT NULL`
+    }
   }
 
   if (customFilters?.filters && customFilters.filters.length > 0) {

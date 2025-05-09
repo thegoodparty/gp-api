@@ -9,6 +9,7 @@ import { to as copyTo } from 'pg-copy-streams'
 import { Transform } from 'stream'
 import { HEADER_MAPPING } from '../constants/headerMapping.const'
 import { SlackService } from 'src/shared/services/slack.service'
+import { GetVoterFileSchema } from '../voterFile/schemas/GetVoterFile.schema'
 
 const VOTER_DATASTORE = process.env.VOTER_DATASTORE as string
 
@@ -31,8 +32,22 @@ export class VoterDatabaseService implements OnModuleDestroy {
     return this.pool.query(queryString)
   }
 
-  async csvStream(queryString: string, fileName: string = 'people') {
+  async csvStream(
+    queryString: string,
+    fileName: string = 'people',
+    selectedColumns?: GetVoterFileSchema['selectedColumns'],
+  ) {
     const client = await this.pool.connect()
+
+    // Build the header mapping
+    const headerMapping = { ...HEADER_MAPPING }
+    if (selectedColumns?.length) {
+      selectedColumns.forEach((col) => {
+        if (col.label) {
+          headerMapping[col.db] = col.label
+        }
+      })
+    }
 
     // Define the mapping of old headers to new headers
     let isFirstChunk = true
@@ -43,7 +58,7 @@ export class VoterDatabaseService implements OnModuleDestroy {
         if (isFirstChunk) {
           isFirstChunk = false
           // Replace headers on the first chunk
-          for (const [oldHeader, newHeader] of Object.entries(HEADER_MAPPING)) {
+          for (const [oldHeader, newHeader] of Object.entries(headerMapping)) {
             data = data.replace(oldHeader, newHeader)
           }
         }

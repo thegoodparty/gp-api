@@ -72,3 +72,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # just junior dev stuff
 ztestfile
 
+# AI Tooling
+.ai
+CLAUDE.md
+repomix.config.json

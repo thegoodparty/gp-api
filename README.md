@@ -68,17 +68,19 @@ $ npm install
   ALTER USER postgres CREATEDB;
   ```
 
-  Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
-
 - Copy `.env.example` to `.env` and fill in the necessary environment variables.
 - Run the following command to create the database tables:
 
 ```bash
-$ npm run migrate:dev
+$ npm run migrate:reset
 ```
 
 - This also generates the Prisma Client and Typescript types.
 - This should also run seeds to populate your local DB with dummy data.
+
+### Database Stop & Cleanup
+
+  Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
 
 ## Compile and run the project
 

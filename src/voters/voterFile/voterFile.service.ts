@@ -30,7 +30,7 @@ export class VoterFileService {
 
   async getCsvOrCount(
     campaign: CampaignWith<'pathToVictory'>,
-    { type, countOnly, customFilters }: GetVoterFileSchema,
+    { type, countOnly, customFilters, selectedColumns }: GetVoterFileSchema,
   ) {
     // If type == custom, map the custom channel name to a VoterFileType
     // if type is a CampaignTaskType, map it to a VoterFileType
@@ -74,9 +74,10 @@ export class VoterFileService {
       customFilters,
       false,
       withFixColumns,
+      selectedColumns,
     )
     this.logger.debug('Constructed Query:', query)
-    return this.voterDb.csvStream(query)
+    return this.voterDb.csvStream(query, 'voters', selectedColumns)
   }
 
   wakeUp() {
