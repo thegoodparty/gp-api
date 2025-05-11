@@ -177,7 +177,6 @@ export class AiService {
     temperature = 0.1,
     topP = 0.1,
     tool = undefined, // list of functions that could be called.
-    toolChoice = undefined, // force the function to be called on every generation if needed.
     timeout = 300000, // timeout request after 5 minutes
   }: GetChatToolCompletionArgs) {
     const models = AI_MODELS.split(',')
@@ -191,7 +190,6 @@ export class AiService {
         baseURL: togetherAi ? 'https://api.together.xyz/v1' : undefined,
       })
 
-      this.logger.debug('toolChoice', toolChoice)
 
       let completion: ChatCompletion
       try {
@@ -203,7 +201,6 @@ export class AiService {
               top_p: topP,
               temperature: temperature,
               tools: [tool],
-              ...(toolChoice ? { tool_choice: toolChoice } : {}),
             },
             {
               timeout,
