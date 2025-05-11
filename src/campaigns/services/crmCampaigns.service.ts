@@ -87,25 +87,27 @@ export class CrmCampaignsService {
     }
   }
 
-  async getCrmCompanyOwnerName(crmCompanyId: string) {
+  async getCrmCompanyOwner(crmCompanyId: string) {
     const crmCompany = await this.getCrmCompanyById(crmCompanyId)
     if (!crmCompany?.properties) {
       this.logger.error('no properties found for crm company')
       return
     }
-    let crmCompanyOwnerName = ''
     try {
-      const crmCompanyOwner = await this.getCompanyOwner(
+      return await this.getCompanyOwner(
         parseInt(crmCompany?.properties?.hubspot_owner_id as string),
       )
-      const { firstName, lastName } = crmCompanyOwner || {}
-      crmCompanyOwnerName = `${firstName ? `${firstName} ` : ''}${
-        lastName ? lastName : ''
-      }`
     } catch (e) {
       this.logger.error('error getting crm company owner', e)
     }
-    return crmCompanyOwnerName
+  }
+
+  async getCrmCompanyOwnerName(crmCompanyId: string) {
+    const crmCompanyOwner = await this.getCrmCompanyOwner(crmCompanyId)
+
+    const { firstName, lastName } = crmCompanyOwner || {}
+
+    return `${firstName ? `${firstName} ` : ''}${lastName ? lastName : ''}`
   }
 
   private async createCompany(companyObj: CRMCompanyProperties) {
