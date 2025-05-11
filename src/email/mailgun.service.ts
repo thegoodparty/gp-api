@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import FormData from 'form-data'
 import Mailgun, { MailgunMessageData } from 'mailgun.js'
 import { IMailgunClient } from 'mailgun.js/Interfaces'
@@ -16,6 +16,7 @@ export type EmailData = MailgunMessageData & {
 
 @Injectable()
 export class MailgunService {
+  private logger = new Logger(MailgunService.name)
   private mailgun: Mailgun
   private client: IMailgunClient
 
@@ -39,6 +40,9 @@ export class MailgunService {
 
     if (process.env.MAILGUN_INTERCEPT_EMAIL) {
       // override to email address to send to MAILGUN_INTERCEPT_EMAIL
+      this.logger.debug(
+        `Intercepting email for ${emailData.to} - sending to ${process.env.MAILGUN_INTERCEPT_EMAIL}`,
+      )
       emailData.to = process.env.MAILGUN_INTERCEPT_EMAIL
     }
 
