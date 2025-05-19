@@ -73,17 +73,17 @@ export class OutreachController {
     @ReqCampaign() campaign: Campaign,
     @Body() { pin }: CompliancePinSchema,
   ) {
-    let submitSuccesful = false
+    let submitSuccessful: boolean
     try {
       await this.textCampaignService.submitCompliancePin(campaign, pin)
-      submitSuccesful = true
+      submitSuccessful = true
     } catch (_e) {
-      submitSuccesful = false
+      submitSuccessful = false
     }
     return await this.tcrComplianceService.updatePin(
       campaign.id,
       pin,
-      submitSuccesful
+      submitSuccessful
         ? TcrComplianceStatus.pending
         : TcrComplianceStatus.submitted,
     )
