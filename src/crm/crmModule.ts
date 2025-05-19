@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common'
 import { HubspotService } from './hubspot.service'
 import { HttpModule } from '@nestjs/axios'
-import { FullStoryModule } from '../fullStory/fullStory.module'
+import { AnalyticsModule } from '../analytics/analytics.module'
 import { CrmController } from './crm.controller'
 
 @Module({
   providers: [HubspotService],
-  imports: [FullStoryModule, HttpModule],
+  imports: [AnalyticsModule, HttpModule],
   exports: [HubspotService],
   controllers: [CrmController],
 })
