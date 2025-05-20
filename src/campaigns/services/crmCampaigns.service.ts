@@ -19,7 +19,7 @@ import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
 import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
 import { CampaignUpdateHistoryService } from '../updateHistory/campaignUpdateHistory.service'
-import { FullStoryService } from '../../fullStory/fullStory.service'
+import { AnalyticsService } from '../../analytics/analytics.service'
 import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -44,8 +44,8 @@ export class CrmCampaignsService {
     private readonly campaigns: CampaignsService,
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
-    @Inject(forwardRef(() => FullStoryService))
-    private readonly fullStory: FullStoryService,
+    @Inject(forwardRef(() => AnalyticsService))
+    private readonly analytics: AnalyticsService,
     private readonly hubspot: HubspotService,
     private readonly crmUsers: CrmUsersService,
     private readonly aiChat: AiChatService,
@@ -561,7 +561,7 @@ export class CrmCampaignsService {
       data: updatePayload,
     })
 
-    this.fullStory.trackUserById(campaign.userId)
+    this.analytics.trackUserById(campaign.userId)
   }
 
   /** Pushes campaign data to Hubspot record
