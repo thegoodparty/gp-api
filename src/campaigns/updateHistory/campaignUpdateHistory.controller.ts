@@ -1,16 +1,16 @@
 import {
+  Body,
   Controller,
-  UsePipes,
-  Get,
-  Post,
   Delete,
-  Query,
   ForbiddenException,
-  Param,
-  ParseIntPipe,
+  Get,
   HttpCode,
   HttpStatus,
-  Body,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UsePipes,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
@@ -35,11 +35,9 @@ export class CampaignUpdateHistoryController {
     if (typeof slug === 'string' && !isAdmin(user)) {
       throw new ForbiddenException()
     }
-
     const campaign = slug
       ? await this.campaigns.findFirstOrThrow({ where: { slug } })
       : await this.campaigns.findByUserId(user.id)
-
     const updateHistory = await this.updateHistory.findMany({
       where: {
         campaignId: campaign.id,

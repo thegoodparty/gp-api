@@ -96,8 +96,8 @@
       "state": "OH",
       "zip": "44101",
       "ballotLevel": "County",
-      "electionDate": "2026-05-01",
-      "primaryElectionDate": "2025-11-01",
+      "electionDate": "2025-11-01",
+      "primaryElectionDate": "2025-08-01",
       "geoLocation": {},
       "party": "Libertarian",
       "level": "County",
@@ -142,10 +142,10 @@
       "state": "PA",
       "zip": "19101",
       "ballotLevel": "County",
-      "electionDate": "2026-05-01",
-      "primaryElectionDate": "2025-11-01",
+      "electionDate": "2025-11-01",
+      "primaryElectionDate": "2025-08-01",
       "geoLocation": {},
-      "party": "Libertarian",
+      "party": "Independent",
       "level": "County",
       "office": "Commissioner"
     },
@@ -162,12 +162,16 @@
   },
   {
     "details": {
-      "state": "AZ",
-      "zip": "85001",
+      "state": "CA",
+      "zip": "94550",
       "ballotLevel": "State",
-      "electionDate": "2026-05-01",
-      "primaryElectionDate": "2025-11-01",
-      "geoLocation": {},
+      "electionDate": "2025-11-01",
+      "primaryElectionDate": "2025-05-01",
+      "geoLocation": {
+        "lat": 33.4507,
+        "lng": -112.0684
+      },
+      "geoLocationFailed": false,
       "party": "Communist",
       "level": "State",
       "office": "Attorney General"

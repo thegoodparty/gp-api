@@ -1,4 +1,5 @@
 import {
+  Campaign,
   CampaignUpdateHistoryType,
   Prisma,
   PrismaClient,
@@ -10,10 +11,10 @@ import { userFactory } from './factories/user.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { getUserFullName } from 'src/users/util/users.util'
-import { Campaign } from '@prisma/client'
 import fixedCampaigns from './fixedCampaigns.json'
 import 'prisma/schema/pathToVictory.jsonTypes'
 import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
+
 const NUM_GENERATED_CAMPAIGNS = 100
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =
