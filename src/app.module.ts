@@ -26,6 +26,8 @@ import { OutreachModule } from './textCampaign/outreach.module'
 import { SessionsService } from './users/services/sessions.service'
 import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messaging.module'
 import { ScheduleModule } from '@nestjs/schedule'
+import { SegmentModule } from './segment/segment.module'
+import { AnalyticsModule } from './analytics/analytics.module'
 
 @Module({
   imports: [
@@ -52,6 +54,8 @@ import { ScheduleModule } from '@nestjs/schedule'
     EcanvasserIntegrationModule,
     ScheduledMessagingModule,
     OutreachModule,
+    SegmentModule,
+    AnalyticsModule,
   ],
   providers: [
     SessionsService,
