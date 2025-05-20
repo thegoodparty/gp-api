@@ -1,44 +1,50 @@
-enum TextCampaignStatus {
-    pending
-    approved
-    denied
-    paid
-    in_progress
-    completed
+enum OutreachType {
+  p2pTexting
+  doorKnocking
+  phoneBanking
 }
 
-model TextCampaign {
-    id                        Int                @id @default(autoincrement())
-    campaign                  Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-    campaignId                Int
-    projectId                 String?
-    name                      String?
-    message                   String?
-    status                    TextCampaignStatus @default(pending)
-    error                     String?
-    // Audience filters
-    audience_superVoters      Boolean?           @default(false)
-    audience_likelyVoters     Boolean?           @default(false)
-    audience_unreliableVoters Boolean?           @default(false)
-    audience_unlikelyVoters   Boolean?           @default(false)
-    audience_firstTimeVoters  Boolean?           @default(false)
-    party_independent         Boolean?           @default(false)
-    party_democrat            Boolean?           @default(false)
-    party_republican          Boolean?           @default(false)
-    age_18_25                 Boolean?           @default(false)
-    age_25_35                 Boolean?           @default(false)
-    age_35_50                 Boolean?           @default(false)
-    age_50_plus               Boolean?           @default(false)
-    gender_male               Boolean?           @default(false)
-    gender_female             Boolean?           @default(false)
-    gender_unknown            Boolean?           @default(false)
-    audience_request          String?
-    script                    String?            @db.Text
-    date                      DateTime?
-    imageUrl                  String?
-    createdAt                 DateTime           @default(now())
-    updatedAt                 DateTime           @updatedAt
+enum OutreachStatus {
+  pending
+  approved
+  denied
+  paid
+  in_progress
+  completed
+}
 
-    @@index([campaignId])
-    @@map("text_campaign")
+model Outreach {
+  id                       Int             @id @default(autoincrement())
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  campaign                 Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId               Int
+  outreachType             OutreachType?   @default(p2pTexting)
+  projectId                String?
+  name                     String?
+  status                   OutreachStatus? @default(pending)
+  error                    String?
+  audienceSuperVoters      Boolean?        @default(false) @map("audience_superVoters")
+  audienceLikelyVoters     Boolean?        @default(false) @map("audience_likelyVoters")
+  audienceUnreliableVoters Boolean?        @default(false) @map("audience_unreliableVoters")
+  audienceUnlikelyVoters   Boolean?        @default(false) @map("audience_unlikelyVoters")
+  audienceFirstTimeVoters  Boolean?        @default(false) @map("audience_firstTimeVoters")
+  partyIndependent         Boolean?        @default(false) @map("party_independent")
+  partyDemocrat            Boolean?        @default(false) @map("party_democrat")
+  partyRepublican          Boolean?        @default(false) @map("party_republican")
+  age18_25                 Boolean?        @default(false) @map("age_18_25")
+  age25_35                 Boolean?        @default(false) @map("age_25_35")
+  age35_50                 Boolean?        @default(false) @map("age_35_50")
+  age50Plus                Boolean?        @default(false) @map("age_50_plus")
+  genderMale               Boolean?        @default(false) @map("gender_male")
+  genderFemale             Boolean?        @default(false) @map("gender_female")
+  genderUnknown            Boolean?        @default(false) @map("gender_unknown")
+  audienceRequest          String?         @map("audience_request")
+  script                   String?         @db.Text
+  message                  String?
+  date                     DateTime?
+  imageUrl                 String?
+
+  @@index([campaignId])
+  @@map("outreach")
 }

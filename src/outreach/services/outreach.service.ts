@@ -10,7 +10,7 @@ import { ComplianceFormSchema } from '../schemas/complianceForm.schema'
 import { Campaign } from '@prisma/client'
 
 @Injectable()
-export class OutreachService extends createPrismaBase(MODELS.TextCampaign) {
+export class OutreachService extends createPrismaBase(MODELS.Outreach) {
   constructor(private readonly rumbleUpService: RumbleUpService) {
     super()
   }

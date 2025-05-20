@@ -20,13 +20,13 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { TcrComplianceService } from './services/tcrCompliance.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 
-@Controller('text-campaigns')
+@Controller('outreach')
 @UsePipes(ZodValidationPipe)
 export class OutreachController {
   private readonly logger = new Logger(OutreachController.name)
 
   constructor(
-    private readonly textCampaignService: OutreachService,
+    private readonly outreachService: OutreachService,
     private readonly tcrComplianceService: TcrComplianceService,
   ) {}
 
@@ -36,13 +36,13 @@ export class OutreachController {
     @ReqCampaign() campaign: Campaign,
     @Body() createProjectDto: CreateProjectSchema,
   ) {
-    return this.textCampaignService.createProject(campaign.id, createProjectDto)
+    return this.outreachService.createProject(campaign.id, createProjectDto)
   }
 
   @Get()
   @UseCampaign()
   findAll(@ReqCampaign() campaign: Campaign) {
-    return this.textCampaignService.findByCampaignId(campaign.id)
+    return this.outreachService.findByCampaignId(campaign.id)
   }
 
   @Post('compliance')
@@ -53,7 +53,7 @@ export class OutreachController {
   ) {
     let submitSuccesful = false
     try {
-      await this.textCampaignService.submitComplianceForm(campaign, body)
+      await this.outreachService.submitComplianceForm(campaign, body)
       submitSuccesful = true
     } catch (_e) {
       submitSuccesful = false
@@ -75,7 +75,7 @@ export class OutreachController {
   ) {
     let submitSuccessful: boolean
     try {
-      await this.textCampaignService.submitCompliancePin(campaign, pin)
+      await this.outreachService.submitCompliancePin(campaign, pin)
       submitSuccessful = true
     } catch (_e) {
       submitSuccessful = false
