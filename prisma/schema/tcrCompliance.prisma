@@ -7,21 +7,18 @@ enum TcrComplianceStatus {
 }
 
 model TcrCompliance {
-  id               Int                  @id @default(autoincrement())
-  campaign         Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId       Int                  @map("campaign_id")
+  id               Int                 @id @default(autoincrement())
   ein              String
   address          String
   name             String
   website          String
   email            String
-  pin              String?              // optional
-  donationPlatform String?              @map("donation_platform")
+  pin              String? // optional
+  donationPlatform String?             @map("donation_platform")
   status           TcrComplianceStatus
-  createdAt        DateTime             @default(now()) @map("created_at")
-  updatedAt        DateTime             @updatedAt @map("updated_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  campaign         Campaign?
 
-  @@index([campaignId])
-  @@unique([campaignId])
   @@map("tcr_compliance")
-} 
+}
