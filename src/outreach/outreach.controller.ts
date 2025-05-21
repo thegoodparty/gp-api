@@ -51,17 +51,17 @@ export class OutreachController {
     @ReqCampaign() campaign: Campaign,
     @Body() body: ComplianceFormSchema,
   ) {
-    let submitSuccesful = false
+    let submitSuccessful = false
     try {
       await this.outreachService.submitComplianceForm(campaign, body)
-      submitSuccesful = true
+      submitSuccessful = true
     } catch (_e) {
-      submitSuccesful = false
+      submitSuccessful = false
     }
     return this.tcrComplianceService.upsertCompliance(
       campaign.id,
       body,
-      submitSuccesful
+      submitSuccessful
         ? TcrComplianceStatus.submitted
         : TcrComplianceStatus.error,
     )

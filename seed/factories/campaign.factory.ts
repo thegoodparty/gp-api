@@ -59,7 +59,6 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     },
     vendorTsData: {},
     completedTaskIds: [],
-    tcrComplianceId: null,
   }
 
   // NOTE: putting this in the object literal above gives a TS error on the generationStatus key
