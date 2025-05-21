@@ -35,8 +35,8 @@ model Campaign {
   completedTaskIds      String[]                @default([]) @map("completed_task_ids")
   ScheduledMessage      ScheduledMessage[]
   TextCampaign          Outreach[]
-  TcrCompliance         TcrCompliance           @relation(fields: [tcrComplianceId], references: [id], onDelete: Cascade)
-  tcrComplianceId       Int                     @unique @map("tcr_compliance_id")
+  TcrCompliance         TcrCompliance?          @relation(fields: [tcrComplianceId], references: [id], onDelete: Cascade)
+  tcrComplianceId       Int?                    @unique @map("tcr_compliance_id")
 
   @@index([slug])
   @@map("campaign")
