@@ -22,7 +22,7 @@ import { ErrorLoggerModule } from './errorLogger/errorLogger.module'
 import { CrmModule } from './crm/crmModule'
 import { SubscribeModule } from './subscribe/subscribe.module'
 import { EcanvasserIntegrationModule } from './ecanvasserIntegration/ecanvasserIntegration.module'
-import { TextCampaignModule } from './textCampaign/textCampaign.module'
+import { OutreachModule } from './outreach/outreach.module'
 import { SessionsService } from './users/services/sessions.service'
 import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messaging.module'
 import { ScheduleModule } from '@nestjs/schedule'
@@ -53,7 +53,7 @@ import { AnalyticsModule } from './analytics/analytics.module'
     SubscribeModule,
     EcanvasserIntegrationModule,
     ScheduledMessagingModule,
-    TextCampaignModule,
+    OutreachModule,
     SegmentModule,
     AnalyticsModule,
   ],

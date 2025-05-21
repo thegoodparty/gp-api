@@ -1,7 +1,7 @@
 import {
+  BadGatewayException,
   Injectable,
   NotFoundException,
-  BadGatewayException,
 } from '@nestjs/common'
 import { CreateProjectSchema } from '../schemas/createProject.schema'
 import { RumbleUpService } from './rumbleUp.service'
@@ -10,7 +10,7 @@ import { ComplianceFormSchema } from '../schemas/complianceForm.schema'
 import { Campaign } from '@prisma/client'
 
 @Injectable()
-export class TextCampaignService extends createPrismaBase(MODELS.TextCampaign) {
+export class OutreachService extends createPrismaBase(MODELS.Outreach) {
   constructor(private readonly rumbleUpService: RumbleUpService) {
     super()
   }

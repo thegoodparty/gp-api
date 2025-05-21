@@ -14,6 +14,8 @@ import { EmailService } from '../../email/email.service'
 import { Timeout } from '@nestjs/schedule'
 import { PrismaService } from 'src/prisma/prisma.service'
 
+const { LOG_SKIPPED_SCHEDULED_MESSAGES } = process.env
+
 type CountdownEmailConfig = {
   template: EmailTemplateName
   week?: number
@@ -173,11 +175,12 @@ export class CampaignEmailsService {
         : subDays(electionDate, config.daysBeforeElection!)
 
       if (sendDate < new Date()) {
-        this.logger.debug(`Skipping email as the send date is in the past`, {
-          campaignId: campaign.id,
-          sendDate,
-          config,
-        })
+        Boolean(LOG_SKIPPED_SCHEDULED_MESSAGES === 'true') &&
+          this.logger.debug(`Skipping email as the send date is in the past`, {
+            campaignId: campaign.id,
+            sendDate,
+            config,
+          })
         continue
       }
 
