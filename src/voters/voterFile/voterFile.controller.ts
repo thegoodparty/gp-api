@@ -2,10 +2,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
   Logger,
+  NotFoundException,
   Post,
   Query,
   UseGuards,
@@ -19,7 +21,7 @@ import { CanDownloadVoterFileGuard } from './guards/CanDownloadVoterFile.guard'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User, UserRole } from '@prisma/client'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
@@ -31,6 +33,8 @@ import { MimeTypes } from 'http-constants-ts'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { VoterFileType } from './voterFile.types'
+import { userHasRole } from 'src/users/util/users.util'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
 export const VOTER_FILE_ROUTE = 'voters/voter-file'
 
@@ -43,17 +47,33 @@ export class VoterFileController {
     private readonly voterFileService: VoterFileService,
     private readonly voterOutreachService: VoterOutreachService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
+    private readonly campaigns: CampaignsService,
   ) {}
 
   @Get()
   @UseCampaign({
     include: { pathToVictory: true },
+    continueIfNotFound: true,
   })
   @UseGuards(CanDownloadVoterFileGuard)
-  getVoterFile(
+  async getVoterFile(
+    @ReqUser() user: User,
     @ReqCampaign() campaign: CampaignWith<'pathToVictory'>,
-    @Query() query: GetVoterFileSchema,
+    @Query() { slug, ...query }: GetVoterFileSchema,
   ) {
+    if (typeof slug === 'string' && campaign?.slug !== slug) {
+      if (!userHasRole(user, [UserRole.admin])) {
+        throw new ForbiddenException(
+          'You are not authorized to access this campaign',
+        )
+      }
+
+      campaign = await this.campaigns.findFirstOrThrow({
+        where: { slug },
+        include: { pathToVictory: true },
+      })
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
+
     return this.voterFileService.getCsvOrCount(campaign, query)
   }
 

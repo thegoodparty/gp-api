@@ -30,7 +30,7 @@ import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { FullStoryService } from 'src/fullStory/fullStory.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @Controller('campaigns/ai')
 @UseCampaign()
@@ -43,7 +43,7 @@ export class AiContentController {
     private readonly ai: AiService,
     private readonly campaigns: CampaignsService,
     private readonly content: ContentService,
-    private readonly fullstory: FullStoryService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   @Post()
@@ -57,7 +57,7 @@ export class AiContentController {
       const result = await this.aiContent.createContent(campaign, body)
 
       // Don't need to await here, don't want to wait for this call
-      this.fullstory.trackEvent(user, 'Content Builder: Generation Started', {
+      this.analytics.trackEvent(user, 'Content Builder: Generation Started', {
         slug: campaign.slug,
         key: body.key,
         regenerate: body.regenerate,

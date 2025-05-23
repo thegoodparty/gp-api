@@ -60,5 +60,6 @@ export class GetVoterFileSchema extends createZodDto(
         .optional(),
     ),
     limit: z.coerce.number().optional(),
+    slug: z.string().optional(),
   }),
 ) {}

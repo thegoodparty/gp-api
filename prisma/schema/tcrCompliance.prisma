@@ -1,0 +1,25 @@
+enum TcrComplianceStatus {
+  submitted
+  pending
+  approved
+  rejected
+  error
+}
+
+model TcrCompliance {
+  id               Int                 @id @default(autoincrement())
+  ein              String
+  address          String
+  name             String
+  website          String
+  email            String
+  pin              String?
+  donationPlatform String?             @map("donation_platform")
+  status           TcrComplianceStatus
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  campaign         Campaign?           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId       Int?                @unique @map("campaign_id")
+
+  @@map("tcr_compliance")
+}

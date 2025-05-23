@@ -27,9 +27,10 @@ import { AdminImpersonateSchema } from './schemas/AdminImpersonate.schema'
 import { AuthenticationService } from 'src/authentication/authentication.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { ReadUserOutputSchema } from 'src/users/schemas/ReadUserOutput.schema'
+import { UserRole } from '@prisma/client'
 
 @Controller('admin/users')
-@Roles('admin')
+@Roles(UserRole.admin)
 @UsePipes(ZodValidationPipe)
 export class AdminUsersController {
   private readonly logger = new Logger(AdminUsersController.name)
@@ -59,6 +60,11 @@ export class AdminUsersController {
     }
 
     return this.usersService.findMany({ where: { createdAt: { gt: date } } })
+  }
+
+  @Get(':id')
+  async get(@Param('id', ParseIntPipe) id: number) {
+    return await this.usersService.findUniqueOrThrow({ where: { id } })
   }
 
   @Post()
