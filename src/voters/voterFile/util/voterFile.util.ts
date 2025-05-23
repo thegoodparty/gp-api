@@ -16,6 +16,7 @@ export function typeToQuery(
   justCount?: boolean,
   fixColumns?: boolean,
   selectedColumns?: GetVoterFileSchema['selectedColumns'],
+  limit?: number,
 ) {
   const state = campaign.details.state
   let whereClause = ''
@@ -38,7 +39,7 @@ export function typeToQuery(
   let columns: string
   if (selectedColumns?.length) {
     // Use selected columns
-    columns = selectedColumns.map(col => `"${col.db}"`).join(', ')
+    columns = selectedColumns.map((col) => `"${col.db}"`).join(', ')
   } else if (type === 'full') {
     columns = `"LALVOTERID", 
     "Voters_FirstName", 
@@ -175,15 +176,25 @@ export function typeToQuery(
     }
   }
 
-  if (justCount) {
-    return `SELECT COUNT(*) FROM public."Voter${state}" ${nestedWhereClause} ${
-      whereClause !== '' ? `WHERE ${whereClause}` : ''
-    }`
-  }
-
-  return `SELECT ${columns} FROM public."Voter${state}" ${nestedWhereClause} ${
-    whereClause !== '' ? `WHERE ${whereClause}` : ''
+  return `SELECT ${justCount ? 'COUNT(*)' : columns} FROM public."Voter${state}" ${nestedWhereClause} ${
+    whereClause !== ''
+      ? `WHERE ${whereClause} ${limit ? `LIMIT ${limit}` : ''}`
+      : ''
   }`
+
+  // if (justCount) {
+  //   return `SELECT COUNT(*) FROM public."Voter${state}" ${nestedWhereClause} ${
+  //     whereClause !== '' ? `WHERE ${whereClause} ${
+  //       limit ? `LIMIT ${limit}` : ''
+  //     }` : ''
+  //   }`
+  // }
+  //
+  // return `SELECT ${columns} FROM public."Voter${state}" ${nestedWhereClause} ${
+  //   whereClause !== '' ? `WHERE ${whereClause} ${
+  //     limit ? `LIMIT ${limit}` : ''
+  //   }` : ''
+  // }`
 }
 
 function extractLocation(input: string, fixColumns?: boolean) {

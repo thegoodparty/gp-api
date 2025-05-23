@@ -15,10 +15,15 @@ const LOWER_CASE_TYPE_MAP = {
 }
 
 const SelectedColumnSchema = z.object({
-  db: z.string().min(1, 'Column name cannot be empty').refine(
-    (val) => ALLOWED_COLUMNS.includes(val),
-    (val) => ({ message: `Invalid column name: ${val}. Must be one of the allowed columns.` })
-  ),
+  db: z
+    .string()
+    .min(1, 'Column name cannot be empty')
+    .refine(
+      (val) => ALLOWED_COLUMNS.includes(val),
+      (val) => ({
+        message: `Invalid column name: ${val}. Must be one of the allowed columns.`,
+      }),
+    ),
   label: z.string().optional(),
 })
 
@@ -44,14 +49,16 @@ export class GetVoterFileSchema extends createZodDto(
     countOnly: z.coerce.boolean().optional(),
     selectedColumns: z.preprocess(
       (val) => (typeof val === 'string' ? JSON.parse(val) : val),
-      z.array(SelectedColumnSchema)
+      z
+        .array(SelectedColumnSchema)
         .min(1, 'selectedColumns must contain at least one column')
         .max(50, 'Too many columns selected')
         .refine(
-          (cols) => new Set(cols.map(c => c.db)).size === cols.length,
-          'Duplicate column names are not allowed'
+          (cols) => new Set(cols.map((c) => c.db)).size === cols.length,
+          'Duplicate column names are not allowed',
         )
-        .optional()
+        .optional(),
     ),
+    limit: z.coerce.number().optional(),
   }),
 ) {}
