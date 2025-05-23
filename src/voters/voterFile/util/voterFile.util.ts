@@ -181,20 +181,6 @@ export function typeToQuery(
       ? `WHERE ${whereClause} ${limit ? `LIMIT ${limit}` : ''}`
       : ''
   }`
-
-  // if (justCount) {
-  //   return `SELECT COUNT(*) FROM public."Voter${state}" ${nestedWhereClause} ${
-  //     whereClause !== '' ? `WHERE ${whereClause} ${
-  //       limit ? `LIMIT ${limit}` : ''
-  //     }` : ''
-  //   }`
-  // }
-  //
-  // return `SELECT ${columns} FROM public."Voter${state}" ${nestedWhereClause} ${
-  //   whereClause !== '' ? `WHERE ${whereClause} ${
-  //     limit ? `LIMIT ${limit}` : ''
-  //   }` : ''
-  // }`
 }
 
 function extractLocation(input: string, fixColumns?: boolean) {
