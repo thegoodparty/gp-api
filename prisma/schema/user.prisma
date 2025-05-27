@@ -23,7 +23,7 @@ model User {
   /// [UserMetaData]
   metaData              Json?                   @map("meta_data") @db.JsonB
   campaignUpdateHistory CampaignUpdateHistory[]
-  campaigns             Campaign[]
+  campaigns             Campaign[] //TODO: Pretty sure this is supposed to be a 1-to-1 relation here
   passwordResetToken    String?                 @map("password_reset_token")
   aiChats               AiChat[]
 

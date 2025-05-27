@@ -12,7 +12,6 @@ import {
 } from 'src/campaigns/campaigns.types'
 import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
 import { HubSpot } from 'src/crm/crm.types'
-import { TcrComplianceInfo } from 'src/textCampaign/types/compliance.types'
 
 export {}
 
@@ -80,7 +79,6 @@ declare global {
       claimProfile?: string
       customVoterFiles?: CustomVoterFile[]
       reportedVoterGoals?: VoterGoals
-      tcrComplianceInfo?: TcrComplianceInfo
       textCampaignCount?: number
       lastStepDate?: string
       adminUserEmail?: string

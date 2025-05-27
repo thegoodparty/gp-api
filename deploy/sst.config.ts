@@ -291,7 +291,7 @@ export default $config({
       },
       image: {
         context: '../', // Set the context to the main app directory
-        dockerfile: './Dockerfile',
+        dockerfile: './deploy/Dockerfile',
         args: {
           DOCKER_BUILDKIT: '1',
           CACHEBUST: '1',
