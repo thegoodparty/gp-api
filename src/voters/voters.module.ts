@@ -8,10 +8,10 @@ import { VotersService } from './services/voters.service'
 import { HttpModule } from '@nestjs/axios'
 import { VotersController } from './voters.controller'
 import { EmailModule } from 'src/email/email.module'
-import { TextCampaignModule } from 'src/textCampaign/textCampaign.module'
+import { OutreachModule } from 'src/outreach/outreach.module'
 
 @Module({
-  imports: [FilesModule, HttpModule, EmailModule, TextCampaignModule],
+  imports: [FilesModule, HttpModule, EmailModule, OutreachModule],
   controllers: [VotersController, VoterFileController],
   providers: [
     VoterFileService,
