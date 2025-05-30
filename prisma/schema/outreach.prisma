@@ -44,6 +44,8 @@ model Outreach {
   message                  String?
   date                     DateTime?
   imageUrl                 String?         @map("image_url")
+  voterFileFilter          VoterFileFilter? @relation(fields: [voterFileFilterId], references: [id])
+  voterFileFilterId        Int?            @unique @map("voter_file_filter_id")
 
   @@index([campaignId])
   @@map("outreach")
