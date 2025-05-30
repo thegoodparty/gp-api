@@ -190,7 +190,6 @@ export class AiService {
         baseURL: togetherAi ? 'https://api.together.xyz/v1' : undefined,
       })
 
-
       let completion: ChatCompletion
       try {
         if (tool) {

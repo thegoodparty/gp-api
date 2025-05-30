@@ -30,7 +30,8 @@ export class GetVoterFileSchema extends createZodDto(
       z.union([z.nativeEnum(VoterFileType), z.nativeEnum(CampaignTaskType)]),
     ),
     customFilters: parseJsonString(
-      z.object({
+      z
+        .object({
           channel: z.enum(CUSTOM_CHANNELS).optional(),
           purpose: z.enum(CUSTOM_PURPOSES).optional(),
           filters: z.array(z.enum(CUSTOM_FILTERS)),
@@ -39,10 +40,11 @@ export class GetVoterFileSchema extends createZodDto(
     ),
     countOnly: z.coerce.boolean().optional(),
     selectedColumns: parseJsonString(
-      z.array(SelectedColumnSchema)
+      z
+        .array(SelectedColumnSchema)
         .min(1)
         .max(50)
-        .refine(cols => new Set(cols.map(c => c.db)).size === cols.length)
+        .refine((cols) => new Set(cols.map((c) => c.db)).size === cols.length)
         .optional(),
     ),
     limit: z.coerce.number().optional(),

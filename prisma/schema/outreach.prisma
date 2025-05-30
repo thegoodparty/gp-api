@@ -24,21 +24,6 @@ model Outreach {
   name                     String?
   status                   OutreachStatus? @default(pending)
   error                    String?
-  audienceSuperVoters      Boolean?        @default(false) @map("audience_superVoters")
-  audienceLikelyVoters     Boolean?        @default(false) @map("audience_likelyVoters")
-  audienceUnreliableVoters Boolean?        @default(false) @map("audience_unreliableVoters")
-  audienceUnlikelyVoters   Boolean?        @default(false) @map("audience_unlikelyVoters")
-  audienceFirstTimeVoters  Boolean?        @default(false) @map("audience_firstTimeVoters")
-  partyIndependent         Boolean?        @default(false) @map("party_independent")
-  partyDemocrat            Boolean?        @default(false) @map("party_democrat")
-  partyRepublican          Boolean?        @default(false) @map("party_republican")
-  age18_25                 Boolean?        @default(false) @map("age_18_25")
-  age25_35                 Boolean?        @default(false) @map("age_25_35")
-  age35_50                 Boolean?        @default(false) @map("age_35_50")
-  age50Plus                Boolean?        @default(false) @map("age_50_plus")
-  genderMale               Boolean?        @default(false) @map("gender_male")
-  genderFemale             Boolean?        @default(false) @map("gender_female")
-  genderUnknown            Boolean?        @default(false) @map("gender_unknown")
   audienceRequest          String?         @map("audience_request")
   script                   String?         @db.Text
   message                  String?
