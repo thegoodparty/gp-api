@@ -283,7 +283,7 @@ export default $config({
         ASSET_DOMAIN: bucketDomain,
         WEBAPP_ROOT_URL: webAppRootUrl,
         AI_MODELS:
-        'meta-llama/Llama-3.3-70B-Instruct-Turbo,Qwen/Qwen2.5-72B-Instruct-Turbo',
+          'meta-llama/Llama-3.3-70B-Instruct-Turbo,Qwen/Qwen2.5-72B-Instruct-Turbo',
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
@@ -291,7 +291,7 @@ export default $config({
       },
       image: {
         context: '../', // Set the context to the main app directory
-        dockerfile: './Dockerfile',
+        dockerfile: './deploy/Dockerfile',
         args: {
           DOCKER_BUILDKIT: '1',
           CACHEBUST: '1',
