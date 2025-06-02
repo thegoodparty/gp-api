@@ -194,8 +194,6 @@ export default $config({
       messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
       delaySeconds: 0,
       receiveWaitTimeSeconds: 0,
-      deduplicationScope: 'messageGroup',
-      fifoThroughputLimit: 'perMessageGroupId',
       redrivePolicy: pulumi.interpolate`{
         "deadLetterTargetArn": "${dlq.arn}",
         "maxReceiveCount": 3
@@ -283,7 +281,7 @@ export default $config({
         ASSET_DOMAIN: bucketDomain,
         WEBAPP_ROOT_URL: webAppRootUrl,
         AI_MODELS:
-          'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,Qwen/Qwen3-235B-A22B-fp8-tput',
+          'meta-llama/Llama-3.3-70B-Instruct-Turbo,Qwen/Qwen2.5-72B-Instruct-Turbo',
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
@@ -291,7 +289,7 @@ export default $config({
       },
       image: {
         context: '../', // Set the context to the main app directory
-        dockerfile: './deploy/Dockerfile',
+        dockerfile: './Dockerfile',
         args: {
           DOCKER_BUILDKIT: '1',
           CACHEBUST: '1',
@@ -426,6 +424,32 @@ export default $config({
       })
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
+
+      const voterCluster = new aws.rds.Cluster('voterCluster', {
+        clusterIdentifier: `gp-voter-db-${$app.stage}`,
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.2',
+        databaseName: voterDbName,
+        masterUsername: voterDbUser,
+        masterPassword: voterDbPassword,
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 16,
+          minCapacity: 0.5,
+        },
+      })
+
+      new aws.rds.ClusterInstance('voterInstance', {
+        clusterIdentifier: voterCluster.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: voterCluster.engineVersion,
+      })
     }
 
     new aws.rds.ClusterInstance('rdsInstance', {
