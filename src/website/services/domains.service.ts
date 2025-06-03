@@ -1,8 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { AwsRoute53Service } from 'src/aws/services/awsRoute53.service'
 import { WebsiteService } from './website.service'
 import { WebsiteStatus } from '@prisma/client'
 import { OperationStatus } from '@aws-sdk/client-route-53-domains'
+import { RRType } from '@aws-sdk/client-route-53'
+import { VercelService } from 'src/vercel/services/vercel.service'
+import { VERCEL_DNS_IP } from 'src/vercel/vercel.const'
 
 @Injectable()
 export class DomainsService {
@@ -11,6 +14,7 @@ export class DomainsService {
   constructor(
     private readonly route53: AwsRoute53Service,
     private readonly website: WebsiteService,
+    private readonly vercel: VercelService,
   ) {}
 
   async getDomainDetails(domainName: string) {
@@ -59,14 +63,40 @@ export class DomainsService {
 
     await this.website.model.update({
       where: { campaignId },
-      data: { operationId },
+      data: { operationId, status: WebsiteStatus.submitted },
     })
+
+    // TODO: how to handle for polling status on server side?
 
     return operationId
   }
 
-  async disableAutoRenew(domainName: string) {
-    await this.route53.disableAutoRenew(domainName)
+  async configureDomain(campaignId: number) {
+    const website = await this.website.model.findUniqueOrThrow({
+      where: { campaignId },
+    })
+
+    // can only turn off auto renew after registration
+    await this.route53.disableAutoRenew(website.domain)
+
+    const route53Response = await this.route53.setDnsRecords(
+      website.domain,
+      RRType.A,
+      VERCEL_DNS_IP, // point to Vercel's Anycast IP
+    )
+    this.logger.debug('Updated domain DNS record', route53Response.ChangeInfo)
+
+    const vercelResponse = await this.vercel.addDomainToProject(website.domain)
+    this.logger.debug('Added domain to Vercel project', vercelResponse)
+
+    if (!vercelResponse.verified) {
+      this.logger.warn(
+        `Domain ${website.domain} added to Vercel but requires verification`,
+        vercelResponse.verification,
+      )
+    }
+
+    return vercelResponse
   }
 
   async checkRegistrationStatus(campaignId: number) {
@@ -77,7 +107,7 @@ export class DomainsService {
     const operationId = website.operationId
 
     if (!operationId) {
-      throw new NotFoundException('Domain registration not found')
+      throw new BadRequestException('Domain registration not started')
     }
 
     const operation = await this.route53.getOperationDetail(operationId)
@@ -85,7 +115,7 @@ export class DomainsService {
     if (operation.Status === OperationStatus.SUCCESSFUL) {
       await this.website.model.update({
         where: { campaignId },
-        data: { status: WebsiteStatus.active },
+        data: { status: WebsiteStatus.registered },
       })
     }
 

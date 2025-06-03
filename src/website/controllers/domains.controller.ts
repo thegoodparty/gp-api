@@ -43,6 +43,7 @@ export class DomainsController {
 
   @Post('complete')
   @UseCampaign()
+  @HttpCode(HttpStatus.OK)
   async completeDomainRegistration(
     @ReqCampaign() { id: campaignId }: Campaign,
   ) {
@@ -55,9 +56,12 @@ export class DomainsController {
     return this.domains.checkRegistrationStatus(campaignId)
   }
 
-  @Post('disable-auto-renew')
+  // After domain is successfully registered, disable auto renew and configure DNS
+  // TODO: should be handled by a queued job instead of a controller
+  @Post('configure')
+  @UseCampaign()
   @HttpCode(HttpStatus.OK)
-  async disableAutoRenew(@Body() { domain }: SearchDomainSchema) {
-    return this.domains.disableAutoRenew(domain)
+  async configureDomain(@ReqCampaign() { id: campaignId }: Campaign) {
+    return this.domains.configureDomain(campaignId)
   }
 }
