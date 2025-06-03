@@ -28,8 +28,8 @@ if (!secretAccessKey) {
 }
 
 @Injectable()
-export class AwsService {
-  private readonly logger = new Logger(AwsService.name)
+export class AwsS3Service {
+  private readonly logger = new Logger(AwsS3Service.name)
   private readonly s3Client: S3Client
 
   constructor() {

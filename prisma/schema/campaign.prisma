@@ -36,6 +36,7 @@ model Campaign {
   ScheduledMessage      ScheduledMessage[]
   TextCampaign          Outreach[]
   TcrCompliance         TcrCompliance?
+  website               Website?
 
   @@index([slug])
   @@map("campaign")
