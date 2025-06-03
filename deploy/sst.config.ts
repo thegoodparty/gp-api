@@ -424,7 +424,7 @@ export default $config({
           minCapacity: 0.5,
         },
       })
-    } else {
+    } else if ($app.stage === 'develop') {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
 
       const voterCluster = new aws.rds.Cluster('voterCluster', {
@@ -452,6 +452,8 @@ export default $config({
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterCluster.engineVersion,
       })
+    } else {
+      rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
     }
 
     new aws.rds.ClusterInstance('rdsInstance', {
