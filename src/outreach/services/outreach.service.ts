@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { CreateProjectSchema } from '../schemas/createProject.schema'
+import { CreateOutreachSchema } from '../schemas/createOutreachSchema'
 import { RumbleUpService } from './rumbleUp.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ComplianceFormSchema } from '../schemas/complianceForm.schema'
@@ -39,43 +39,35 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     }
   }
 
-  async createProject(
-    campaignId: number,
-    createProjectDto: CreateProjectSchema,
-  ) {
-    // Format data for the RumbleUp API call
-    const rumbleUpProjectData = {
-      name: createProjectDto.name,
-      msg: createProjectDto.message,
-      areacode: createProjectDto.areaCode,
-      group: createProjectDto.groupId,
-      flags: createProjectDto.flags,
-      outsource_start: createProjectDto.outsourceStart,
-      outsource_end: createProjectDto.outsourceEnd,
-      outsource_email: createProjectDto.outsourceEmail,
-    }
+  async create(campaignId: number, createOutreachDto: CreateOutreachSchema) {
+    // TODO: implement actual outreach vendor logic once we have a vendor
+    // // Format data for the RumbleUp API call
+    // const rumbleUpProjectData = {
+    //   name: createOutreachDto.name,
+    //   msg: createOutreachDto.message,
+    //   areacode: createOutreachDto.areaCode,
+    //   group: createOutreachDto.groupId,
+    //   flags: createOutreachDto.flags,
+    //   outsource_start: createOutreachDto.outsourceStart,
+    //   outsource_end: createOutreachDto.outsourceEnd,
+    //   outsource_email: createOutreachDto.outsourceEmail,
+    // }
+    //
+    // // Call RumbleUp API to create the project
+    // const response =
+    //   await this.rumbleUpService.createProject(rumbleUpProjectData)
+    //
+    // if (!response.success) {
+    //   throw new BadGatewayException(
+    //     `Failed to create project in RumbleUp: ${response.error || response.message}`,
+    //   )
+    // }
 
-    // Call RumbleUp API to create the project
-    const response =
-      await this.rumbleUpService.createProject(rumbleUpProjectData)
-
-    if (!response.success) {
-      throw new BadGatewayException(
-        `Failed to create project in RumbleUp: ${response.error || response.message}`,
-      )
-    }
-
-    // Create a new TextCampaign record (no longer using upsert since we can have multiple per campaign)
-    const textCampaign = await this.model.create({
+    return await this.model.create({
       data: {
-        campaignId,
-        projectId: response.data?.id || null,
-        name: createProjectDto.name,
-        message: createProjectDto.message,
+        ...createOutreachDto,
       },
     })
-
-    return textCampaign
   }
 
   async findByCampaignId(campaignId: number) {

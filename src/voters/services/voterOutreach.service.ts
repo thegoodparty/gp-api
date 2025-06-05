@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { ScheduleOutreachCampaignSchema } from '../voterFile/schemas/ScheduleOutreachCampaign.schema'
-import { Campaign, OutreachStatus, User } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType, User } from '@prisma/client'
 import { buildSlackBlocks } from '../util/voterOutreach.util'
 import { FileUpload } from 'src/files/files.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -176,6 +176,7 @@ export class VoterOutreachService {
       await this.outreachService.model.create({
         data: {
           campaignId: campaign.id,
+          outreachType: OutreachType.text,
           name: `SMS Campaign ${new Date(date).toLocaleDateString()}`,
           message,
           status: OutreachStatus.pending,

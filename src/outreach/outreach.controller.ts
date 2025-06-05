@@ -6,10 +6,11 @@ import {
   HttpStatus,
   Logger,
   Post,
+  UnauthorizedException,
   UsePipes,
 } from '@nestjs/common'
 import { OutreachService } from './services/outreach.service'
-import { CreateProjectSchema } from './schemas/createProject.schema'
+import { CreateOutreachSchema } from './schemas/createOutreachSchema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign, UserRole } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
@@ -32,11 +33,14 @@ export class OutreachController {
 
   @Post()
   @UseCampaign()
-  createProject(
+  create(
     @ReqCampaign() campaign: Campaign,
-    @Body() createProjectDto: CreateProjectSchema,
+    @Body() createProjectDto: CreateOutreachSchema,
   ) {
-    return this.outreachService.createProject(campaign.id, createProjectDto)
+    if (campaign.id !== createProjectDto.campaignId) {
+      throw new UnauthorizedException('Campaign ID mismatch')
+    }
+    return this.outreachService.create(campaign.id, createProjectDto)
   }
 
   @Get()
