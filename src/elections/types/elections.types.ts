@@ -42,3 +42,31 @@ export enum OfficeLevel {
   LOCAL = 0,
   DEFAULT = 12,
 }
+
+enum ElectionCode {
+  EP, // Primary Election
+  EG, // General Election
+  EPP, // Presidential Preference Primary
+  ECP, // Consolidated Primary Election
+  ECG, // Consolidated General Election
+  EL, // Local Election
+  ES, // Special Election
+  ER, // Runoff Election
+  EPD, // Democratic Election Primary
+}
+
+export type ProjectedTurnout = {
+  id: string
+  brPositionId: string
+  createdAt: Date
+  updatedAt: Date
+  geoid: string
+  state: string
+  L2DistrictType: string
+  L2DistrictName: string
+  year: number
+  electionCode: ElectionCode
+  projectedTurnout: number
+  inferenceDate: Date
+  modelVersion: string
+}
