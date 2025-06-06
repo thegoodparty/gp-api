@@ -83,7 +83,7 @@ export class DomainsService {
     const operation = await this.route53.getOperationDetail(operationId)
 
     if (operation.Status === OperationStatus.SUCCESSFUL) {
-      return await this.website.model.update({
+      await this.website.model.update({
         where: { campaignId },
         data: { status: WebsiteStatus.active },
       })

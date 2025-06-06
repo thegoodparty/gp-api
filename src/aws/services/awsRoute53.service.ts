@@ -1,8 +1,6 @@
 import {
   Injectable,
-  Logger,
   BadRequestException,
-  ServiceUnavailableException,
   NotFoundException,
 } from '@nestjs/common'
 import {
@@ -18,18 +16,19 @@ import {
   DisableDomainAutoRenewCommand,
 } from '@aws-sdk/client-route-53-domains'
 import { Route53Client } from '@aws-sdk/client-route-53'
-import { handleAwsError } from '../util/awsError.util'
+import { AwsService } from './aws.service'
 
 const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
 const AWS_ROUTE_53_REGION = 'us-east-1'
 
 @Injectable()
-export class AwsRoute53Service {
-  private readonly logger = new Logger(AwsRoute53Service.name)
+export class AwsRoute53Service extends AwsService {
   private readonly domainsClient: Route53DomainsClient
   private readonly dnsClient: Route53Client
 
   constructor() {
+    super()
+
     if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
       throw new Error(
         'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are not set in ENV',
@@ -54,23 +53,24 @@ export class AwsRoute53Service {
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_CheckDomainAvailability.html}
    */
   async checkDomainAvailability(domainName: string) {
-    try {
+    return this.executeAwsOperation(async () => {
       const command = new CheckDomainAvailabilityCommand({
         DomainName: domainName,
       })
-      return await this.domainsClient.send(command)
-    } catch (error) {
-      if (error instanceof Route53DomainsServiceException) {
-        switch (error.name) {
+      const result = await this.domainsClient.send(command)
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
           case 'InvalidInput':
           case 'UnsupportedTLD':
-            throw new BadRequestException(error.message)
+            throw new BadRequestException(result.message)
           default:
-            handleAwsError(error, 'checkDomainAvailability')
+            throw result
         }
       }
-      handleAwsError(error, 'checkDomainAvailability')
-    }
+
+      return result
+    }, 'checkDomainAvailability')
   }
 
   /**
@@ -79,7 +79,7 @@ export class AwsRoute53Service {
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_RegisterDomain.html}
    */
   async registerDomain(domainName: string) {
-    try {
+    return this.executeAwsOperation(async () => {
       // TODO: who should this be? do we need to ask the user for this?
       const admin: ContactDetail = {
         FirstName: 'Jane',
@@ -112,24 +112,7 @@ export class AwsRoute53Service {
       )
 
       return response.OperationId
-    } catch (error) {
-      if (error instanceof Route53DomainsServiceException) {
-        switch (error.name) {
-          case 'InvalidInput':
-          case 'DomainLimitExceeded':
-          case 'DuplicateRequest':
-          case 'TLDRulesViolation':
-            throw new BadRequestException(error.message)
-          case 'ThrottlingException':
-            throw new ServiceUnavailableException(
-              'Request rate limit exceeded. Please try again later.',
-            )
-          default:
-            handleAwsError(error, 'registerDomain')
-        }
-      }
-      handleAwsError(error, 'registerDomain')
-    }
+    }, 'registerDomain')
   }
 
   /**
@@ -138,24 +121,25 @@ export class AwsRoute53Service {
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_DisableDomainAutoRenew.html}
    */
   async disableAutoRenew(domainName: string) {
-    try {
+    return this.executeAwsOperation(async () => {
       const command = new DisableDomainAutoRenewCommand({
         DomainName: domainName,
       })
-      return await this.domainsClient.send(command)
-    } catch (error) {
-      if (error instanceof Route53DomainsServiceException) {
-        switch (error.name) {
+      const result = await this.domainsClient.send(command)
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
           case 'InvalidInput':
-            throw new BadRequestException(error.message)
+            throw new BadRequestException(result.message)
           case 'DomainNotFound':
-            throw new NotFoundException(error.message)
+            throw new NotFoundException(result.message)
           default:
-            handleAwsError(error, 'disableAutoRenew')
+            throw result
         }
       }
-      handleAwsError(error, 'disableAutoRenew')
-    }
+
+      return result
+    }, 'disableAutoRenew')
   }
 
   /**
@@ -164,23 +148,24 @@ export class AwsRoute53Service {
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_GetOperationDetail.html}
    */
   async getOperationDetail(operationId: string) {
-    try {
-      return await this.domainsClient.send(
+    return this.executeAwsOperation(async () => {
+      const result = await this.domainsClient.send(
         new GetOperationDetailCommand({ OperationId: operationId }),
       )
-    } catch (error) {
-      if (error instanceof Route53DomainsServiceException) {
-        switch (error.name) {
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
           case 'InvalidInput':
-            throw new BadRequestException(error.message)
+            throw new BadRequestException(result.message)
           case 'OperationNotFound':
-            throw new NotFoundException(error.message)
+            throw new NotFoundException(result.message)
           default:
-            handleAwsError(error, 'getOperationDetail')
+            throw result
         }
       }
-      handleAwsError(error, 'getOperationDetail')
-    }
+
+      return result
+    }, 'getOperationDetail')
   }
 
   /**
@@ -189,24 +174,25 @@ export class AwsRoute53Service {
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_GetDomainDetail.html}
    */
   async getDomainDetails(domainName: string) {
-    try {
+    return this.executeAwsOperation(async () => {
       const command = new GetDomainDetailCommand({
         DomainName: domainName,
       })
-      return await this.domainsClient.send(command)
-    } catch (error) {
-      if (error instanceof Route53DomainsServiceException) {
-        switch (error.name) {
+      const result = await this.domainsClient.send(command)
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
           case 'InvalidInput':
-            throw new BadRequestException(error.message)
+            throw new BadRequestException(result.message)
           case 'DomainNotFound':
-            throw new NotFoundException(error.message)
+            throw new NotFoundException(result.message)
           default:
-            handleAwsError(error, 'getDomainDetails')
+            throw result
         }
       }
-      handleAwsError(error, 'getDomainDetails')
-    }
+
+      return result
+    }, 'getDomainDetails')
   }
 
   /**
@@ -216,24 +202,25 @@ export class AwsRoute53Service {
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_ListPrices.html}
    */
   async listPrices(tld?: string) {
-    try {
+    return this.executeAwsOperation(async () => {
       const command = new ListPricesCommand({
         MaxItems: 100,
         Tld: tld,
       })
-      return await this.domainsClient.send(command)
-    } catch (error) {
-      if (error instanceof Route53DomainsServiceException) {
-        switch (error.name) {
+      const result = await this.domainsClient.send(command)
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
           case 'InvalidInput':
           case 'UnsupportedTLD':
-            throw new BadRequestException(error.message)
+            throw new BadRequestException(result.message)
           default:
-            handleAwsError(error, 'listPrices')
+            throw result
         }
       }
-      handleAwsError(error, 'listPrices')
-    }
+
+      return result
+    }, 'listPrices')
   }
 
   /**
@@ -241,19 +228,20 @@ export class AwsRoute53Service {
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_ListDomains.html}
    */
   async listDomains() {
-    try {
+    return this.executeAwsOperation(async () => {
       const command = new ListDomainsCommand({})
-      return await this.domainsClient.send(command)
-    } catch (error) {
-      if (error instanceof Route53DomainsServiceException) {
-        switch (error.name) {
+      const result = await this.domainsClient.send(command)
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
           case 'InvalidInput':
-            throw new BadRequestException(error.message)
+            throw new BadRequestException(result.message)
           default:
-            handleAwsError(error, 'listDomains')
+            throw result
         }
       }
-      handleAwsError(error, 'listDomains')
-    }
+
+      return result
+    }, 'listDomains')
   }
 }
