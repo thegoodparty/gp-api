@@ -40,7 +40,7 @@ export class OutreachController {
     if (campaign.id !== createProjectDto.campaignId) {
       throw new UnauthorizedException('Campaign ID mismatch')
     }
-    return this.outreachService.create(campaign.id, createProjectDto)
+    return this.outreachService.create(createProjectDto)
   }
 
   @Get()

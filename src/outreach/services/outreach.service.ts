@@ -39,49 +39,31 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     }
   }
 
-  async create(campaignId: number, createOutreachDto: CreateOutreachSchema) {
-    // TODO: implement actual outreach vendor logic once we have a vendor
-    // // Format data for the RumbleUp API call
-    // const rumbleUpProjectData = {
-    //   name: createOutreachDto.name,
-    //   msg: createOutreachDto.message,
-    //   areacode: createOutreachDto.areaCode,
-    //   group: createOutreachDto.groupId,
-    //   flags: createOutreachDto.flags,
-    //   outsource_start: createOutreachDto.outsourceStart,
-    //   outsource_end: createOutreachDto.outsourceEnd,
-    //   outsource_email: createOutreachDto.outsourceEmail,
-    // }
-    //
-    // // Call RumbleUp API to create the project
-    // const response =
-    //   await this.rumbleUpService.createProject(rumbleUpProjectData)
-    //
-    // if (!response.success) {
-    //   throw new BadGatewayException(
-    //     `Failed to create project in RumbleUp: ${response.error || response.message}`,
-    //   )
-    // }
-
+  async create(createOutreachDto: CreateOutreachSchema) {
     return await this.model.create({
       data: {
         ...createOutreachDto,
+      },
+      include: {
+        voterFileFilter: true,
       },
     })
   }
 
   async findByCampaignId(campaignId: number) {
-    // Returns all text campaigns for the given campaign
-    const textCampaigns = await this.findMany({
+    const outreachCampaigns = await this.findMany({
       where: { campaignId },
+      include: {
+        voterFileFilter: true,
+      },
     })
 
-    if (!textCampaigns.length) {
+    if (!outreachCampaigns.length) {
       throw new NotFoundException(
         `No text campaigns found for campaign ID ${campaignId}`,
       )
     }
 
-    return textCampaigns
+    return outreachCampaigns
   }
 }

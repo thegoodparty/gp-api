@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { ScheduleOutreachCampaignSchema } from '../voterFile/schemas/ScheduleOutreachCampaign.schema'
-import { Campaign, OutreachStatus, OutreachType, User } from '@prisma/client'
+import {
+  Campaign,
+  Outreach,
+  OutreachStatus,
+  OutreachType,
+  User,
+} from '@prisma/client'
 import { buildSlackBlocks } from '../util/voterOutreach.util'
 import { FileUpload } from 'src/files/files.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -22,8 +28,8 @@ import { getUserFullName } from 'src/users/util/users.util'
 import { EmailService } from 'src/email/email.service'
 import { EmailTemplateName } from 'src/email/email.types'
 import { OutreachService } from 'src/outreach/services/outreach.service'
-import { VoterFileType } from '../voterFile/voterFile.types'
 import { VoterFileFilterService } from './voterFileFilter.service'
+import { CampaignTaskType } from '../../campaigns/tasks/campaignTasks.types'
 
 @Injectable()
 export class VoterOutreachService {
@@ -50,6 +56,7 @@ export class VoterOutreachService {
       message,
       voicemail,
       type,
+      voterCount,
     }: ScheduleOutreachCampaignSchema,
     imageUpload?: FileUpload,
   ) {
@@ -151,8 +158,9 @@ export class VoterOutreachService {
       audienceRequest: audience['audience_request'],
     })
 
+    let outreach: Outreach | null = null
     // If type is SMS, create a TextCampaign
-    if (type === VoterFileType.sms) {
+    if (type === CampaignTaskType.text) {
       const voterFileFilter = audience
         ? await this.voterFileFilterService.create(campaign.id, {
             name: `SMS Campaign ${new Date(date).toLocaleDateString()}`,
@@ -170,10 +178,11 @@ export class VoterOutreachService {
             age50Plus: age_50_plus,
             genderMale: gender_male,
             genderFemale: gender_female,
+            voterCount,
           })
         : null
 
-      await this.outreachService.model.create({
+      outreach = await this.outreachService.model.create({
         data: {
           campaignId: campaign.id,
           outreachType: OutreachType.text,
@@ -184,6 +193,9 @@ export class VoterOutreachService {
           date: new Date(date),
           imageUrl,
           ...(voterFileFilter && { voterFileFilterId: voterFileFilter.id }),
+        },
+        include: {
+          voterFileFilter: true,
         },
       })
 
@@ -210,7 +222,7 @@ export class VoterOutreachService {
 
     this.sendSubmittedEmail(user, message, date)
 
-    return true
+    return outreach ? outreach : true
   }
 
   async sendSubmittedEmail(user: User, message: string = 'N/A', date: string) {

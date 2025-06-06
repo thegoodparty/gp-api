@@ -4,7 +4,7 @@ import { CUSTOM_FILTERS, VoterFileType } from '../voterFile.types'
 import { isNumeric } from 'validator'
 import { parseJsonString } from 'src/shared/util/zod.util'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
-import { addDays, isAfter, startOfDay, parseISO } from 'date-fns'
+import { addDays, isAfter, parseISO, startOfDay } from 'date-fns'
 
 export class ScheduleOutreachCampaignSchema extends createZodDto(
   z.object({
@@ -50,5 +50,6 @@ export class ScheduleOutreachCampaignSchema extends createZodDto(
       CampaignTaskType.text,
       CampaignTaskType.robocall,
     ]),
+    voterCount: z.coerce.number().optional().default(0),
   }),
 ) {}
