@@ -1,5 +1,7 @@
 enum WebsiteStatus {
   pending // awaiting payment
+  submitted // sent to aws, waiting for registration to complete
+  registered // registered with aws, waiting for DNS to be configured
   active
   inactive
 }
