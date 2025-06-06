@@ -57,6 +57,7 @@
     "@prisma/client": "^6.3.0",
     "@segment/analytics-node": "^2.2.1",
     "@ssut/nestjs-sqs": "^3.0.1",
+    "@vercel/sdk": "^1.7.7",
     "async": "^3.2.6",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",

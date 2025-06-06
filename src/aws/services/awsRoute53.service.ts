@@ -14,9 +14,33 @@ import {
   ListPricesCommand,
   Route53DomainsServiceException,
   DisableDomainAutoRenewCommand,
+  ContactType,
 } from '@aws-sdk/client-route-53-domains'
-import { Route53Client } from '@aws-sdk/client-route-53'
 import { AwsService } from './aws.service'
+import {
+  Route53Client,
+  ChangeResourceRecordSetsCommand,
+  ResourceRecordSet,
+  Change,
+  ChangeAction,
+  ListHostedZonesByNameCommand,
+  Route53ServiceException,
+  RRType,
+} from '@aws-sdk/client-route-53'
+
+const DOMAIN_CONTACT: ContactDetail = {
+  FirstName: 'Victoria',
+  LastName: 'Mitchell',
+  ContactType: ContactType.COMPANY,
+  OrganizationName: 'Good Party LLC',
+  Email: 'accounts@goodparty.org',
+  PhoneNumber: '+13126851162',
+  AddressLine1: '916 Silver Spur Rd',
+  City: 'Rolling Hills Estates',
+  State: 'CA',
+  CountryCode: 'US',
+  ZipCode: '90274',
+}
 
 const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
 const AWS_ROUTE_53_REGION = 'us-east-1'
@@ -80,26 +104,12 @@ export class AwsRoute53Service extends AwsService {
    */
   async registerDomain(domainName: string) {
     return this.executeAwsOperation(async () => {
-      // TODO: who should this be? do we need to ask the user for this?
-      const admin: ContactDetail = {
-        FirstName: 'Jane',
-        LastName: 'Doe',
-        ContactType: 'PERSON',
-        Email: 'jane.doe@example.com',
-        PhoneNumber: '+1.5551234567',
-        AddressLine1: '123 Main St',
-        City: 'Atlanta',
-        State: 'GA',
-        CountryCode: 'US',
-        ZipCode: '30301',
-      }
-      // TODO: do we need different contact info for admin, registrant, & tech?
       const command = new RegisterDomainCommand({
         DomainName: domainName,
         DurationInYears: 1,
-        AdminContact: admin,
-        RegistrantContact: admin,
-        TechContact: admin,
+        AdminContact: DOMAIN_CONTACT,
+        RegistrantContact: DOMAIN_CONTACT,
+        TechContact: DOMAIN_CONTACT,
         PrivacyProtectAdminContact: true,
         PrivacyProtectRegistrantContact: true,
         PrivacyProtectTechContact: true,
@@ -140,6 +150,69 @@ export class AwsRoute53Service extends AwsService {
 
       return result
     }, 'disableAutoRenew')
+  }
+
+  async setDnsRecords(
+    domainName: string,
+    type: RRType,
+    value: string,
+    ttl: number = 300, // 5 minutes
+  ) {
+    return this.executeAwsOperation(async () => {
+      const { HostedZones } = await this.dnsClient.send(
+        new ListHostedZonesByNameCommand({
+          DNSName: domainName,
+          MaxItems: 1,
+        }),
+      )
+
+      const hostedZone = HostedZones?.[0]
+      if (!hostedZone?.Id) {
+        throw new NotFoundException(
+          `No hosted zone found for domain ${domainName}`,
+        )
+      }
+
+      const hostedZoneId = hostedZone?.Id?.replace('/hostedzone/', '')
+
+      const recordSet: ResourceRecordSet = {
+        Name: domainName,
+        Type: type,
+        TTL: ttl,
+        ResourceRecords: [
+          {
+            Value: value,
+          },
+        ],
+      }
+
+      const change: Change = {
+        Action: ChangeAction.UPSERT,
+        ResourceRecordSet: recordSet,
+      }
+
+      const command = new ChangeResourceRecordSetsCommand({
+        HostedZoneId: hostedZoneId,
+        ChangeBatch: {
+          Changes: [change],
+        },
+      })
+
+      const result = await this.dnsClient.send(command)
+
+      if (result instanceof Route53ServiceException) {
+        switch (result.name) {
+          case 'InvalidInput':
+            throw new BadRequestException(result.message)
+          case 'HostedZoneNotFound':
+            throw new NotFoundException(result.message)
+          default:
+            throw result
+        }
+      }
+
+      return result
+    }, 'setDnsRecords')
   }
 
   /**
