@@ -31,6 +31,7 @@ import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { CampaignEmailsService } from './services/campaignEmails.service'
+import { ElectionsService } from 'src/elections/services/elections.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -44,6 +45,7 @@ export class CampaignsController {
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly campaignEmails: CampaignEmailsService,
+    private readonly elections: ElectionsService,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -92,7 +94,25 @@ export class CampaignsController {
     }
 
     if (p2vStatus === P2VStatus.waiting) {
-      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      const brPositionId = campaign?.details?.positionId
+
+      if (!brPositionId) {
+        // Probably should send a slack message, shouldn't happen
+        this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+        return p2v
+      }
+
+      const raceTargetDetails =
+        await this.elections.buildRaceTargetDetails(brPositionId)
+
+      if (!raceTargetDetails) {
+        await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+        return p2v
+      }
+
+      await this.campaigns.updateJsonFields(campaign.id, {
+        pathToVictory: raceTargetDetails,
+      })
     }
 
     return p2v

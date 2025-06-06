@@ -70,3 +70,8 @@ export type ProjectedTurnout = {
   inferenceDate: Date
   modelVersion: string
 }
+
+export type RaceTargetMetrics = {
+  winNumber: number
+  voterContactGoal: number
+}
