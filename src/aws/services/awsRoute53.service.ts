@@ -14,6 +14,7 @@ import {
   ListPricesCommand,
   Route53DomainsServiceException,
   DisableDomainAutoRenewCommand,
+  ContactType,
 } from '@aws-sdk/client-route-53-domains'
 import { AwsService } from './aws.service'
 import {
@@ -26,6 +27,20 @@ import {
   Route53ServiceException,
   RRType,
 } from '@aws-sdk/client-route-53'
+
+const DOMAIN_CONTACT: ContactDetail = {
+  FirstName: 'Victoria',
+  LastName: 'Mitchell',
+  ContactType: ContactType.COMPANY,
+  OrganizationName: 'Good Party LLC',
+  Email: 'accounts@goodparty.org',
+  PhoneNumber: '+13126851162',
+  AddressLine1: '916 Silver Spur Rd',
+  City: 'Rolling Hills Estates',
+  State: 'CA',
+  CountryCode: 'US',
+  ZipCode: '90274',
+}
 
 const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
 const AWS_ROUTE_53_REGION = 'us-east-1'
@@ -89,26 +104,12 @@ export class AwsRoute53Service extends AwsService {
    */
   async registerDomain(domainName: string) {
     return this.executeAwsOperation(async () => {
-      // TODO: who should this be? do we need to ask the user for this?
-      const admin: ContactDetail = {
-        FirstName: 'Jane',
-        LastName: 'Doe',
-        ContactType: 'PERSON',
-        Email: 'jane.doe@example.com',
-        PhoneNumber: '+1.5551234567',
-        AddressLine1: '123 Main St',
-        City: 'Atlanta',
-        State: 'GA',
-        CountryCode: 'US',
-        ZipCode: '30301',
-      }
-      // TODO: do we need different contact info for admin, registrant, & tech?
       const command = new RegisterDomainCommand({
         DomainName: domainName,
         DurationInYears: 1,
-        AdminContact: admin,
-        RegistrantContact: admin,
-        TechContact: admin,
+        AdminContact: DOMAIN_CONTACT,
+        RegistrantContact: DOMAIN_CONTACT,
+        TechContact: DOMAIN_CONTACT,
         PrivacyProtectAdminContact: true,
         PrivacyProtectRegistrantContact: true,
         PrivacyProtectTechContact: true,
