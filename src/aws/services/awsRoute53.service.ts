@@ -111,7 +111,6 @@ export class AwsRoute53Service {
         response.OperationId,
       )
 
-      // TODO: store this domain + operationId in the database somewhere???
       return response.OperationId
     } catch (error) {
       if (error instanceof Route53DomainsServiceException) {
