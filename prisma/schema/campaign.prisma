@@ -37,6 +37,7 @@ model Campaign {
   TextCampaign          Outreach[]
   TcrCompliance         TcrCompliance?
   voterFileFilters      VoterFileFilter[]
+  website               Website?
 
   @@index([slug])
   @@map("campaign")

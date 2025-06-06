@@ -424,6 +424,34 @@ export default $config({
           minCapacity: 0.5,
         },
       })
+    } else if ($app.stage === 'develop') {
+      rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
+
+      const voterCluster = new aws.rds.Cluster('voterCluster', {
+        clusterIdentifier: `gp-voter-db-${$app.stage}`,
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.2',
+        databaseName: voterDbName,
+        masterUsername: voterDbUser,
+        masterPassword: voterDbPassword,
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 16,
+          minCapacity: 0.5,
+        },
+      })
+
+      new aws.rds.ClusterInstance('voterInstance', {
+        clusterIdentifier: voterCluster.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: voterCluster.engineVersion,
+      })
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
     }

@@ -1,0 +1,20 @@
+enum WebsiteStatus {
+  pending // awaiting payment
+  submitted // sent to aws, waiting for registration to complete
+  registered // registered with aws, waiting for DNS to be configured
+  active
+  inactive
+}
+
+model Website {
+  id          Int           @id @default(autoincrement())
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  domain      String        @unique
+  campaignId  Int           @unique @map("campaign_id")
+  campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status      WebsiteStatus @default(pending)
+  operationId String?       @map("operation_id")
+
+  @@map("website")
+}
