@@ -441,7 +441,7 @@ export default $config({
         deletionProtection: true,
         finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
         serverlessv2ScalingConfiguration: {
-          maxCapacity: 16,
+          maxCapacity: 64,
           minCapacity: 0.5,
         },
       })
