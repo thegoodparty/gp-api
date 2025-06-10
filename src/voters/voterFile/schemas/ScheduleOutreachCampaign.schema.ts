@@ -6,6 +6,24 @@ import { parseJsonString } from 'src/shared/util/zod.util'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { addDays, isAfter, parseISO, startOfDay } from 'date-fns'
 
+export type Audience = {
+  audience_superVoters: boolean
+  audience_likelyVoters: boolean
+  audience_unreliableVoters: boolean
+  audience_unlikelyVoters: boolean
+  audience_firstTimeVoters: boolean
+  party_independent: boolean
+  party_democrat: boolean
+  party_republican: boolean
+  age_18_25: boolean
+  age_25_35: boolean
+  age_35_50: boolean
+  age_50_plus: boolean
+  gender_male: boolean
+  gender_female: boolean
+  audience_request: string
+}
+
 export class ScheduleOutreachCampaignSchema extends createZodDto(
   z.object({
     budget: z.string().refine(isNumeric),

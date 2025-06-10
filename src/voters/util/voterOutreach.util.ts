@@ -3,6 +3,42 @@ import {
   SlackMessageType,
 } from 'src/shared/services/slackService.types'
 
+export type AudienceSlackBlock = {
+  type: SlackMessageType.RICH_TEXT_SECTION
+  elements: [
+    {
+      type: SlackMessageType.TEXT
+      text: string
+      style: {
+        bold: boolean
+      }
+    },
+    {
+      type: SlackMessageType.TEXT
+      text: string
+    },
+  ]
+}
+
+type SlackBlocksParams = {
+  name?: string
+  email?: string
+  phone?: string
+  assignedPa?: string
+  crmCompanyId?: string
+  voterFileUrl?: string
+  type: string
+  budget?: number
+  voicemail?: boolean
+  date?: string
+  script?: string
+  messagingScript?: string
+  imageUrl?: string
+  message?: string
+  formattedAudience: Array<AudienceSlackBlock>
+  audienceRequest?: string
+}
+
 export function buildSlackBlocks({
   name,
   email,
@@ -20,7 +56,7 @@ export function buildSlackBlocks({
   message,
   formattedAudience,
   audienceRequest,
-}) {
+}: SlackBlocksParams) {
   const blocks = [
     {
       type: SlackMessageType.HEADER,

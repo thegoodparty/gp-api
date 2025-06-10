@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
-import { ScheduleOutreachCampaignSchema } from '../voterFile/schemas/ScheduleOutreachCampaign.schema'
+import {
+  Audience,
+  ScheduleOutreachCampaignSchema,
+} from '../voterFile/schemas/ScheduleOutreachCampaign.schema'
 import {
   Campaign,
   Outreach,
@@ -8,7 +11,10 @@ import {
   OutreachType,
   User,
 } from '@prisma/client'
-import { buildSlackBlocks } from '../util/voterOutreach.util'
+import {
+  AudienceSlackBlock,
+  buildSlackBlocks,
+} from '../util/voterOutreach.util'
 import { FileUpload } from 'src/files/files.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import sanitizeHtml from 'sanitize-html'
@@ -30,6 +36,7 @@ import { EmailTemplateName } from 'src/email/email.types'
 import { OutreachService } from 'src/outreach/services/outreach.service'
 import { VoterFileFilterService } from './voterFileFilter.service'
 import { CampaignTaskType } from '../../campaigns/tasks/campaignTasks.types'
+import { VoterFileType } from '../voterFile/voterFile.types'
 
 @Injectable()
 export class VoterOutreachService {
@@ -45,12 +52,55 @@ export class VoterOutreachService {
     private readonly voterFileFilterService: VoterFileFilterService,
   ) {}
 
+  private formatAudienceFiltersForSlack(
+    audience: Partial<Audience>,
+  ): Array<AudienceSlackBlock> {
+    return Object.entries(audience)
+      .filter(([key]) => key !== 'audience_request')
+      .map(([key, value]) => ({
+        type: SlackMessageType.RICH_TEXT_SECTION,
+        elements: [
+          {
+            type: SlackMessageType.TEXT,
+            text: `${key}: `,
+            style: {
+              bold: true,
+            },
+          },
+          {
+            type: SlackMessageType.TEXT,
+            text: value ? '✅ Yes' : '❌ No',
+          },
+        ],
+      }))
+  }
+
+  private buildVoterFileUrl({
+    audience,
+    type,
+    campaignSlug,
+  }: {
+    audience: Omit<Audience, 'audience_request'>
+    type: CampaignTaskType | VoterFileType
+    campaignSlug: string
+  }): string {
+    const audienceFilters = Object.entries(audience).reduce(
+      (acc, [k, v]) => (v ? [...acc, k] : acc),
+      [] as string[],
+    )
+
+    const encodedFilters = audienceFilters
+      ? encodeURIComponent(JSON.stringify({ filters: audienceFilters }))
+      : null
+    return `${WEBAPP_ROOT}${WEBAPP_API_PATH}${VOTER_FILE_ROUTE}?type=${type}&slug=${campaignSlug}&customFilters=${encodedFilters}`
+  }
+
   async scheduleOutreachCampaign(
     user: User,
     campaign: Campaign,
     {
       budget,
-      audience,
+      audience = {},
       script,
       date,
       message,
@@ -60,9 +110,6 @@ export class VoterOutreachService {
     }: ScheduleOutreachCampaignSchema,
     imageUpload?: FileUpload,
   ) {
-    const { firstName, lastName, email, phone } = user
-    const { data } = campaign
-    const { hubspotId: crmCompanyId } = data
     const {
       audience_superVoters,
       audience_likelyVoters,
@@ -78,7 +125,7 @@ export class VoterOutreachService {
       age_50_plus,
       gender_male,
       gender_female,
-    } = audience || {}
+    }: Audience = audience as Audience
 
     const messagingScript: string = campaign.aiContent?.[script]?.content
       ? sanitizeHtml(campaign.aiContent?.[script]?.content, {
@@ -87,83 +134,39 @@ export class VoterOutreachService {
         })
       : script
 
-    // build Voter File URL
-    let voterFileUrl
-    try {
-      const filters: string[] = []
-      for (const key in audience) {
-        if (audience[key] === true) {
-          filters.push(key)
-        }
-      }
-      const encodedFilters = encodeURIComponent(JSON.stringify({ filters }))
-      voterFileUrl = `${WEBAPP_ROOT}${WEBAPP_API_PATH}${VOTER_FILE_ROUTE}?type=${type}&slug=${campaign.slug}&customFilters=${encodedFilters}`
-    } catch (e) {
-      this.logger.error('Error building voterFileUrl: ', e)
-      voterFileUrl = null
-    }
-
-    // format audience filters for slack message
-    const formattedAudience = Object.entries(audience)
-      .map(([key, value]) => {
-        if (key === 'audience_request') {
-          return
-        }
-
-        return {
-          type: SlackMessageType.RICH_TEXT_SECTION,
-          elements: [
-            {
-              type: SlackMessageType.TEXT,
-              text: `${key}: `,
-              style: {
-                bold: true,
-              },
-            },
-            {
-              type: SlackMessageType.TEXT,
-              text: value ? '✅ Yes' : '❌ No',
-            },
-          ],
-        }
-      })
-      // eslint-disable-next-line eqeqeq
-      .filter((val) => val != undefined)
-
-    // Upload image
-    let imageUrl: string | null = null
-    if (imageUpload) {
-      const bucket = `scheduled-campaign/${campaign.slug}/${type}/${date}`
-      imageUrl = await this.filesService.uploadFile(imageUpload, bucket)
-    }
-
-    const slackBlocks = buildSlackBlocks({
-      name: `${firstName} ${lastName}`,
-      email,
-      phone,
-      assignedPa: crmCompanyId
-        ? await this.crmCampaigns.getCrmCompanyOwnerName(crmCompanyId)
-        : '',
-      crmCompanyId,
-      voterFileUrl,
+    const voterFileUrl = this.buildVoterFileUrl({
+      audience: audience as Omit<Audience, 'audience_request'>,
       type,
-      budget,
-      voicemail,
-      date,
-      script,
-      messagingScript,
-      imageUrl,
-      message,
-      formattedAudience,
-      audienceRequest: audience['audience_request'],
+      campaignSlug: campaign.slug,
     })
 
+    // format audience filters for Slack message
+    const formattedAudience = this.formatAudienceFiltersForSlack(
+      audience as Partial<Audience>,
+    )
+
+    // Upload image
+    const imageUrl: string | null = imageUpload
+      ? await this.filesService.uploadFile(
+          imageUpload,
+          `scheduled-campaign/${campaign.slug}/${type}/${date}`,
+        )
+      : null
+
+    const OUTREACH_TYPES: string[] = [
+      CampaignTaskType.text,
+      CampaignTaskType.robocall,
+      CampaignTaskType.doorKnocking,
+      CampaignTaskType.phoneBanking,
+      CampaignTaskType.socialMedia,
+    ]
+
     let outreach: Outreach | null = null
-    // If type is SMS, create a TextCampaign
-    if (type === CampaignTaskType.text) {
+    if (OUTREACH_TYPES.includes(type)) {
+      const name = `${type} Campaign ${new Date(date).toLocaleDateString()}`
       const voterFileFilter = audience
         ? await this.voterFileFilterService.create(campaign.id, {
-            name: `SMS Campaign ${new Date(date).toLocaleDateString()}`,
+            name,
             audienceSuperVoters: audience_superVoters,
             audienceLikelyVoters: audience_likelyVoters,
             audienceUnreliableVoters: audience_unreliableVoters,
@@ -185,8 +188,8 @@ export class VoterOutreachService {
       outreach = await this.outreachService.model.create({
         data: {
           campaignId: campaign.id,
-          outreachType: OutreachType.text,
-          name: `SMS Campaign ${new Date(date).toLocaleDateString()}`,
+          outreachType: type as OutreachType,
+          name,
           message,
           status: OutreachStatus.pending,
           script: messagingScript,
@@ -202,10 +205,21 @@ export class VoterOutreachService {
       this.logger.debug(`Scheduled TextCampaign for campaign ${campaign.id}`)
     }
 
-    await this.slack.message(
-      slackBlocks,
-      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
-    )
+    await this.sendSlackOutreachMessage({
+      user,
+      campaign,
+      type,
+      date,
+      voterFileUrl,
+      budget,
+      voicemail,
+      script,
+      messagingScript,
+      imageUrl,
+      message: message ? sanitizeHtml(message) : '',
+      formattedAudience,
+      audienceRequest: audience['audience_request'] || '',
+    })
 
     // this is sent to hubspot on update
     await this.campaignsService.update({
@@ -223,6 +237,60 @@ export class VoterOutreachService {
     this.sendSubmittedEmail(user, message, date)
 
     return outreach ? outreach : true
+  }
+
+  private async sendSlackOutreachMessage({
+    user: { firstName, lastName, email, phone },
+    campaign: { data: { hubspotId: crmCompanyId } = {} },
+    type,
+    date,
+    voterFileUrl,
+    budget = '0',
+    voicemail = false,
+    script,
+    messagingScript,
+    imageUrl = null,
+    message = '',
+    formattedAudience = [],
+    audienceRequest = '',
+  }: {
+    user: User
+    campaign: Campaign
+    type: CampaignTaskType | VoterFileType
+    date: string
+    voterFileUrl: string
+    budget?: string
+    voicemail?: boolean
+    script: string
+    messagingScript: string
+    imageUrl?: string | null
+    message?: string
+    formattedAudience?: AudienceSlackBlock[]
+    audienceRequest: string
+  }) {
+    return await this.slack.message(
+      buildSlackBlocks({
+        name: `${firstName} ${lastName}`,
+        email,
+        ...(phone ? { phone } : {}),
+        assignedPa: crmCompanyId
+          ? await this.crmCampaigns.getCrmCompanyOwnerName(crmCompanyId)
+          : '',
+        crmCompanyId,
+        voterFileUrl,
+        type,
+        budget: Number(budget),
+        voicemail,
+        date,
+        script,
+        messagingScript,
+        ...(imageUrl ? { imageUrl } : {}),
+        message,
+        formattedAudience,
+        audienceRequest,
+      }),
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+    )
   }
 
   async sendSubmittedEmail(user: User, message: string = 'N/A', date: string) {
