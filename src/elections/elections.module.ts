@@ -23,7 +23,7 @@ import { ElectionsService } from './services/elections.service'
     BallotReadyService,
     ElectionsService,
   ],
-  exports: [RacesService],
+  exports: [RacesService, ElectionsService],
   imports: [
     AiModule,
     EmailModule,

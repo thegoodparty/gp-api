@@ -1,4 +1,4 @@
-import { BadGatewayException, Logger } from '@nestjs/common'
+import { BadGatewayException, Logger, NotFoundException } from '@nestjs/common'
 import { ProjectedTurnout, RaceTargetMetrics } from '../types/elections.types'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { P2VStatus } from '../types/pathToVictory.types'
@@ -17,13 +17,20 @@ export class ElectionsService {
   ): Promise<ProjectedTurnout | null> {
     try {
       const params = new URLSearchParams({ brPositionId })
-      const response = await fetch(`${ELECTION_API_URL}?${params.toString()}`)
+      const apiVersion = 'v1'
+      const response = await fetch(
+        `${ELECTION_API_URL}/${apiVersion}/projectedTurnout?${params.toString()}`,
+      )
       if (response.status === 404) {
-        return null
+        throw new NotFoundException(
+          'ElectionAPI did not have the projected turnout for brPositionId: ',
+          brPositionId,
+        )
       }
       if (!response.ok) throw new BadGatewayException()
       return (await response.json()) as ProjectedTurnout
-    } catch {
+    } catch (err) {
+      this.logger.warn(err)
       return null
     }
   }
@@ -32,7 +39,7 @@ export class ElectionsService {
     projectedTurnout: number,
   ): RaceTargetMetrics {
     return {
-      winNumber: projectedTurnout * WIN_NUMBER_MULTIPLIER,
+      winNumber: Math.ceil(projectedTurnout * WIN_NUMBER_MULTIPLIER),
       voterContactGoal: projectedTurnout * VOTER_CONTACT_MULTIPLIER,
     }
   }
@@ -48,7 +55,6 @@ export class ElectionsService {
     )
     const { L2DistrictType, L2DistrictName } = projectedTurnout
 
-    // Calculate viability score
     return {
       ...raceTargetMetrics,
       projectedTurnout: projectedTurnout.projectedTurnout,

@@ -106,6 +106,7 @@ export class CampaignsController {
         await this.elections.buildRaceTargetDetails(brPositionId)
 
       if (!raceTargetDetails) {
+        // Use existing P2V algorithm as a fallback
         await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
         return p2v
       }

@@ -22,6 +22,7 @@ import { CampaignTasksService } from './tasks/campaignTasksService'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { CampaignEmailsService } from './services/campaignEmails.service'
 import { StripeModule } from '../stripe/stripe.module'
+import { ElectionsService } from 'src/elections/services/elections.service'
 
 @Global()
 @Module({
@@ -31,6 +32,7 @@ import { StripeModule } from '../stripe/stripe.module'
     CrmModule,
     AnalyticsModule,
     ElectionsModule,
+    ElectionsService,
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
