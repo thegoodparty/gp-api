@@ -1,17 +1,14 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Post,
   Query,
   UseGuards,
-  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { VoterFileService } from './voterFile.service'
@@ -24,30 +21,27 @@ import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { Campaign, User, UserRole } from '@prisma/client'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
-import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
-import { FileUpload } from 'src/files/files.types'
-import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { VoterOutreachService } from '../services/voterOutreach.service'
-import { MimeTypes } from 'http-constants-ts'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
-import { VoterFileType } from './voterFile.types'
 import { userHasRole } from 'src/users/util/users.util'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { VoterFileFilterService } from '../services/voterFileFilter.service'
+import { CreateVoterFileFilterSchema } from '../schemas/CreateVoterFileFilterSchema'
+import { OutreachService } from '../../outreach/services/outreach.service'
 
 export const VOTER_FILE_ROUTE = 'voters/voter-file'
 
 @Controller(VOTER_FILE_ROUTE)
 @UsePipes(ZodValidationPipe)
 export class VoterFileController {
-  private readonly logger = new Logger(VoterFileController.name)
-
   constructor(
     private readonly voterFileService: VoterFileService,
     private readonly voterOutreachService: VoterOutreachService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly campaigns: CampaignsService,
+    private readonly voterFileFilterService: VoterFileFilterService,
+    private readonly outreachService: OutreachService,
   ) {}
 
   @Get()
@@ -83,35 +77,23 @@ export class VoterFileController {
   }
 
   // TODO: this should maybe live alongside future campaign planning feature
+  //  UPDATE: yes, it should. Move it to the OutreachController
   @Post('schedule')
   @UseCampaign()
   @UseGuards(CanDownloadVoterFileGuard)
-  @UseInterceptors(
-    FilesInterceptor('image', {
-      mode: 'buffer',
-      mimeTypes: [
-        MimeTypes.IMAGE_JPEG,
-        MimeTypes.IMAGE_GIF,
-        MimeTypes.IMAGE_PNG,
-      ],
-    }),
-  )
-  scheduleOutreachCampaign(
+  async scheduleOutreachCampaign(
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
-    @Body() body: ScheduleOutreachCampaignSchema,
-    @ReqFile() image?: FileUpload,
+    @Body() { outreachId }: ScheduleOutreachCampaignSchema,
   ) {
-    const imgRequired =
-      body.type === VoterFileType.sms || body.type === CampaignTaskType.text
-    if (!image && imgRequired)
-      throw new BadRequestException('No image file provided')
-
+    const outreach = await this.outreachService.model.findUniqueOrThrow({
+      where: { id: outreachId },
+      include: { voterFileFilter: true },
+    })
     return this.voterOutreachService.scheduleOutreachCampaign(
       user,
       campaign,
-      body,
-      image,
+      outreach,
     )
   }
 
@@ -134,5 +116,14 @@ export class VoterFileController {
     campaign?: CampaignWith<'pathToVictory'>,
   ) {
     return this.voterFileDownloadAccess.canDownload(campaign)
+  }
+
+  @Post('filter')
+  @UseCampaign()
+  createVoterFileFilter(
+    @ReqCampaign() campaign: Campaign,
+    @Body() voterFileFilter: CreateVoterFileFilterSchema,
+  ) {
+    return this.voterFileFilterService.create(campaign.id, voterFileFilter)
   }
 }

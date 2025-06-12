@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,6 +8,7 @@ import {
   Logger,
   Post,
   UnauthorizedException,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { OutreachService } from './services/outreach.service'
@@ -20,6 +22,12 @@ import { CompliancePinSchema } from './schemas/compliancePin.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { TcrComplianceService } from './services/tcrCompliance.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { ReqFile } from '../files/decorators/ReqFiles.decorator'
+import { FileUpload } from '../files/files.types'
+import { FilesService } from 'src/files/files.service'
+import { CampaignTaskType } from '../campaigns/tasks/campaignTasks.types'
+import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
+import { MimeTypes } from 'http-constants-ts'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -29,18 +37,46 @@ export class OutreachController {
   constructor(
     private readonly outreachService: OutreachService,
     private readonly tcrComplianceService: TcrComplianceService,
+    private readonly filesService: FilesService,
   ) {}
 
   @Post()
   @UseCampaign()
-  create(
+  @UseInterceptors(
+    FilesInterceptor('file', {
+      mode: 'buffer',
+      mimeTypes: [
+        MimeTypes.IMAGE_JPEG,
+        MimeTypes.IMAGE_GIF,
+        MimeTypes.IMAGE_PNG,
+      ],
+    }),
+  )
+  async create(
     @ReqCampaign() campaign: Campaign,
-    @Body() createProjectDto: CreateOutreachSchema,
+    @Body() createOutreachDto: CreateOutreachSchema,
+    @ReqFile() image?: FileUpload,
   ) {
-    if (campaign.id !== createProjectDto.campaignId) {
+    if (campaign.id !== createOutreachDto.campaignId) {
       throw new UnauthorizedException('Campaign ID mismatch')
     }
-    return this.outreachService.create(createProjectDto)
+
+    const { outreachType, date } = createOutreachDto
+
+    if (outreachType === CampaignTaskType.text && !image) {
+      throw new BadRequestException(
+        'image is required for text outreach campaigns',
+      )
+    }
+
+    const imageUrl =
+      image &&
+      (await this.filesService.uploadFile(
+        image,
+        `scheduled-campaign/${campaign.slug}/${outreachType}/${date}`,
+      ))
+
+    return this.outreachService.create(createOutreachDto, imageUrl)
   }
 
   @Get()

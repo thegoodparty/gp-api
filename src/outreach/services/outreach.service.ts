@@ -39,10 +39,11 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     }
   }
 
-  async create(createOutreachDto: CreateOutreachSchema) {
+  async create(createOutreachDto: CreateOutreachSchema, imageUrl?: string) {
     return await this.model.create({
       data: {
         ...createOutreachDto,
+        ...(imageUrl ? { imageUrl } : {}),
       },
       include: {
         voterFileFilter: true,
