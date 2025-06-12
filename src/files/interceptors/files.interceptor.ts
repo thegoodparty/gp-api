@@ -9,7 +9,7 @@ import { FastifyRequest } from 'fastify'
 import { FileUpload } from '../files.types'
 import { omit } from 'es-toolkit'
 import { PassThrough } from 'stream'
-import { MimeTypes, Headers } from 'http-constants-ts'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 type FilesInterceptorOpts = {
   /**
@@ -67,7 +67,7 @@ export function FilesInterceptor(
       >()
 
       // Check if the Content-Type is 'multipart/form-data', bail if not
-      const contentType = req.headers[Headers.CONTENT_TYPE]
+      const contentType = req.headers[Headers.CONTENT_TYPE.toLowerCase()]
       if (!contentType || !contentType.includes(MimeTypes.IMAGE_FORM_DATA)) {
         return next.handle()
       }
