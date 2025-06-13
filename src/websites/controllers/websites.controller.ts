@@ -6,6 +6,8 @@ import {
   Post,
   Put,
   UsePipes,
+  UseInterceptors,
+  Logger,
 } from '@nestjs/common'
 import { WebsitesService } from '../services/websites.service'
 import { Campaign, User } from '@prisma/client'
@@ -16,10 +18,17 @@ import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { ContactFormSchema } from '../schemas/ContactForm.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
+import { ReqFiles } from 'src/files/decorators/ReqFiles.decorator'
+import { FileUpload } from 'src/files/files.types'
+import { MimeTypes } from 'http-constants-ts'
+import { UpdateWebsiteSchema } from '../schemas/UpdateWebsite.schema'
 
 @Controller('websites')
 @UsePipes(ZodValidationPipe)
 export class WebsitesController {
+  private readonly logger = new Logger(WebsitesController.name)
+
   constructor(private readonly websites: WebsitesService) {}
 
   @Post()
@@ -49,13 +58,46 @@ export class WebsitesController {
 
   @Put('mine')
   @UseCampaign()
-  updateMyWebsite(
+  @UseInterceptors(
+    FilesInterceptor('files', {
+      mode: 'buffer',
+      numFiles: 2,
+      sizeLimit: 5_000_000, // 5MB max per file
+      mimeTypes: [
+        MimeTypes.IMAGE_JPEG,
+        MimeTypes.IMAGE_PNG,
+        MimeTypes.IMAGE_GIF,
+      ],
+    }),
+  )
+  async updateMyWebsite(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Body() data: any,
+    @Body() body: UpdateWebsiteSchema,
+    @ReqFiles() files?: FileUpload[],
   ) {
+    if (files && files.length > 0) {
+      // First file is logo, second file is hero
+      if (files.length >= 1) {
+        this.logger.log('logo', files[0])
+        // updateData.logo = files[0] // logo is first
+      }
+
+      if (files.length >= 2) {
+        this.logger.log('hero', files[1])
+        // updateData.main.image = files[1] // hero is second
+      }
+    }
+
+    const { content: currentContent } = await this.websites.findUniqueOrThrow({
+      where: { campaignId },
+      select: {
+        content: true,
+      },
+    })
+
     return this.websites.update({
       where: { campaignId },
-      data,
+      data: { content: { ...currentContent, ...body } },
     })
   }
 

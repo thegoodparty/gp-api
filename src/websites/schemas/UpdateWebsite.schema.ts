@@ -1,65 +1,36 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 
-export const UpdateWebsiteSchema = createZodDto(
+export class UpdateWebsiteSchema extends createZodDto(
   z.object({
-    hero: z
+    logo: z.string().optional(),
+    theme: z.string().optional(),
+    main: z
       .object({
-        title: z.string(),
-        tagline: z.string(),
-        logo: z.string(),
-        callToAction: z.string(),
-        ctaLink: z.string(),
-        heroImage: z.string(),
+        title: z.string().optional(),
+        tagline: z.string().optional(),
+        image: z.string().optional(),
       })
       .optional(),
     about: z
       .object({
-        bio: z.string(),
-        keyIssues: z.array(
-          z.object({
-            title: z.string(),
-            description: z.string(),
-          }),
-        ),
-      })
-      .optional(),
-    getInvolved: z
-      .object({
-        description: z.string(),
-        volunteer: z.object({
-          title: z.string(),
-          description: z.string(),
-          callToAction: z.string(),
-          ctaLink: z.string(),
-        }),
-        donate: z.object({
-          title: z.string(),
-          description: z.string(),
-          callToAction: z.string(),
-          ctaLink: z.string(),
-        }),
-        subscribe: z.object({
-          title: z.string(),
-          description: z.string(),
-          callToAction: z.string(),
-          ctaLink: z.string(),
-        }),
+        bio: z.string().optional(),
+        issues: z
+          .array(
+            z.object({
+              title: z.string().optional(),
+              description: z.string().optional(),
+            }),
+          )
+          .optional(),
       })
       .optional(),
     contact: z
       .object({
-        title: z.string(),
-        description: z.string(),
-        address: z.string(),
-        email: z.string(),
-        phone: z.string(),
-      })
-      .optional(),
-    privacy: z
-      .object({
-        showLink: z.boolean().optional(),
+        address: z.string().optional(),
+        email: z.string().optional(),
+        phone: z.string().optional(),
       })
       .optional(),
   }),
-)
+) {}
