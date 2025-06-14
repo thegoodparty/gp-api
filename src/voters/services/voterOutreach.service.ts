@@ -107,6 +107,7 @@ export class VoterOutreachService {
     return `${WEBAPP_ROOT}${WEBAPP_API_PATH}${VOTER_FILE_ROUTE}?type=${type}&slug=${campaignSlug}&customFilters=${encodedFilters}`
   }
 
+  // TODO: move this out to the OutreachService
   async scheduleOutreachCampaign(
     user: User,
     campaign: Campaign,
@@ -154,6 +155,7 @@ export class VoterOutreachService {
     return outreach ? outreach : true
   }
 
+  // TODO: move this out to the OutreachService
   private async sendSlackOutreachMessage({
     user: { firstName, lastName, email, phone },
     campaign: { data: { hubspotId: crmCompanyId } = {} },
@@ -188,6 +190,7 @@ export class VoterOutreachService {
     )
   }
 
+  // TODO: move this out to the OutreachService
   async sendSubmittedEmail(user: User, message: string = 'N/A', date: Date) {
     await this.email.sendTemplateEmail({
       to: user.email,
