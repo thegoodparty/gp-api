@@ -48,6 +48,7 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
+  // TODO: Fix the keys for the audience fields in the frontend so we don't have to do this mapping
   async voterFileFilterToAudience(idOrFilter: VoterFileFilter | number) {
     const {
       audienceSuperVoters: audience_superVoters,
