@@ -34,7 +34,7 @@ export interface OutreachSlackBlocksConfiguration {
   imageUrl?: string | null
   message?: string
   formattedAudience?: AudienceSlackBlock[]
-  audienceRequest: string
+  audienceRequest?: string
 }
 
 export type Audience = {
@@ -112,6 +112,7 @@ export class VoterOutreachService {
     user: User,
     campaign: Campaign,
     outreach: OutreachWithVoterFileFilter,
+    audienceRequest?: string,
   ) {
     const audience =
       await this.voterFileFilterService.voterFileFilterToAudience(
@@ -134,7 +135,7 @@ export class VoterOutreachService {
       imageUrl: outreach.imageUrl,
       message: outreach.message ? sanitizeHtml(outreach.message) : '',
       formattedAudience: this.formatAudienceFiltersForSlack(audience),
-      audienceRequest: audience['audience_request'] || '', // TODO: test to see if the this shit works
+      audienceRequest,
     })
 
     // this is sent to hubspot on update

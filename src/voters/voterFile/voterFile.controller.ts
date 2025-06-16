@@ -84,7 +84,7 @@ export class VoterFileController {
   async scheduleOutreachCampaign(
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
-    @Body() { outreachId }: ScheduleOutreachCampaignSchema,
+    @Body() { outreachId, audienceRequest }: ScheduleOutreachCampaignSchema,
   ) {
     const outreach = await this.outreachService.model.findUniqueOrThrow({
       where: { id: outreachId },
@@ -94,6 +94,7 @@ export class VoterFileController {
       user,
       campaign,
       outreach,
+      audienceRequest,
     )
   }
 
