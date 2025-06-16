@@ -5,9 +5,10 @@ import { RumbleUpService } from './services/rumbleUp.service'
 import { HttpModule } from '@nestjs/axios'
 import { EmailModule } from 'src/email/email.module'
 import { TcrComplianceService } from './services/tcrCompliance.service'
+import { FilesModule } from '../files/files.module'
 
 @Module({
-  imports: [HttpModule, EmailModule],
+  imports: [HttpModule, EmailModule, FilesModule],
   controllers: [OutreachController],
   providers: [OutreachService, RumbleUpService, TcrComplianceService],
   exports: [OutreachService],

@@ -1,14 +1,15 @@
 import {
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
   BadRequestException,
+  CallHandler,
+  ExecutionContext,
+  Logger,
+  NestInterceptor,
 } from '@nestjs/common'
 import { FastifyRequest } from 'fastify'
 import { FileUpload } from '../files.types'
 import { omit } from 'es-toolkit'
 import { PassThrough } from 'stream'
+import { Headers, MimeTypes } from 'http-constants-ts'
 
 type FilesInterceptorOpts = {
   /**
@@ -64,6 +65,12 @@ export function FilesInterceptor(
           body?: Record<string, any>
         }
       >()
+
+      // Check if the Content-Type is 'multipart/form-data', bail if not
+      const contentType = req.headers[Headers.CONTENT_TYPE.toLowerCase()]
+      if (!contentType || !contentType.includes(MimeTypes.IMAGE_FORM_DATA)) {
+        return next.handle()
+      }
 
       req.fileUploads = []
       req.body ??= {}
