@@ -36,7 +36,7 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
-  // TODO: Fix the keys for the audience fields in the frontend so we don't have to do this mapping
+  // TODO: Fix the keys for the audience fields in the frontend so we don't have to do this mapping: https://goodparty.atlassian.net/browse/WEB-4277
   async voterFileFilterToAudience(idOrFilter: VoterFileFilter | number) {
     const {
       audienceSuperVoters: audience_superVoters,
