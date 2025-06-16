@@ -8,18 +8,6 @@ export class VoterFileFilterService extends createPrismaBase(
 ) {
   readonly logger = new Logger(VoterFileFilterService.name)
 
-  async findByCampaignId(campaignId: number) {
-    const filters = await this.findMany({
-      where: { campaignId },
-    })
-
-    if (!filters.length) {
-      return []
-    }
-
-    return filters
-  }
-
   async create(
     campaignId: number,
     data: Omit<Prisma.VoterFileFilterCreateInput, 'campaign' | 'outreach'>,
