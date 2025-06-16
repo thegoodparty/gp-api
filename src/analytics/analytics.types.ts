@@ -45,6 +45,7 @@ export interface TrackingProperties {
   reportedVoterGoals?: VoterGoals
   reportedVoterGoalsTotalCount?: number
   voterContactGoal?: string | number
+  winNumber?: string | number
   voterContactPercentage?: number | string
   hubSpotUpdates?: Record<string, any>
   aiContentTrackingFlags?: Record<string, any>
