@@ -20,6 +20,7 @@ import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { AuthenticationService } from 'src/authentication/authentication.service'
+import { SegmentService } from 'src/segment/segment.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -31,6 +32,7 @@ export class AdminCampaignsService {
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly crm: CrmCampaignsService,
     private readonly auth: AuthenticationService,
+    private readonly segment: SegmentService,
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
@@ -57,6 +59,7 @@ export class AdminCampaignsService {
     const resetToken = this.auth.generatePasswordResetToken()
     const updatedUser = await this.users.setResetToken(user.id, resetToken)
     this.email.sendSetPasswordEmail(updatedUser)
+    this.segment.trackEvent(user.id, 'Onboarding - User Created')
 
     // find slug
     const slug = await this.campaigns.findSlug(user)
