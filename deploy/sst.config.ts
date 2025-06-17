@@ -498,7 +498,7 @@ export default $config({
           },
           {
             name: 'CACHEBUST',
-            value: process.env.CACHEBUST || '1',
+            value: secretsJson?.CACHEBUST || Date.now().toString(),
             type: 'PLAINTEXT',
           },
         ],
