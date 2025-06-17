@@ -33,8 +33,10 @@ type FilesInterceptorOpts = {
 /**
  * Interceptor to parse mulitpart form data and files from a request.
  * Fields are added to the request body, files are added to the request object
- * and can be accessed with '@ReqFile' or '@ReqFiles' param decorators
- * @param key The key on the body to look for files. Files found on other keys will be ignored.
+ * and can be accessed with '@ReqFile' or '@ReqFiles' param decorators.
+ * Nested fields using standard HTML bracket notation (e.g., 'user[name]')
+ * are automatically parsed into nested objects.
+ * @param key The key(s) on the body to look for files. Files found on other keys will be ignored. Can be a single string or array of strings.
  * @param {FilesInterceptorOpts} options Options for the interceptor
  * @example
  * \@Post('upload/documents')
@@ -45,9 +47,17 @@ type FilesInterceptorOpts = {
  *   }
  * }
  *
+ * \@Post('upload/multiple')
+ * \@UseInterceptors(FilesInterceptor(['images', 'documents'], { numFiles: 5 }))
+ * uploadMultiple(@ReqFiles() files?: FileUpload[]) {
+ *   if(files) {
+ *     // parser found files uploaded with either `images` or `documents` field names
+ *   }
+ * }
+ *
  */
 export function FilesInterceptor(
-  key: string = 'file',
+  key: string | string[] = 'file',
   {
     mode = 'buffer',
     numFiles,
@@ -79,11 +89,14 @@ export function FilesInterceptor(
         limits: { files: numFiles, fileSize: sizeLimit },
       })
 
+      // Convert key to array for easier checking
+      const keys = Array.isArray(key) ? key : [key]
+
       for await (const part of parts) {
         if (part.type === 'file') {
-          // Check that submitted file is using expected field name
+          // Check that submitted file is using one of the expected field names
           // or if bodyOnly mode, ignore any files
-          if (key !== part.fieldname || mode === 'bodyOnly') {
+          if (!keys.includes(part.fieldname) || mode === 'bodyOnly') {
             part.file.resume()
             continue
           }
@@ -109,12 +122,62 @@ export function FilesInterceptor(
             ...omit(part, ['file', 'toBuffer', 'type', 'fields']),
           })
         } else {
-          // set multipart fields directly on request body
-          req.body[part.fieldname] = part.value
+          // set multipart fields on request body, automatically parsing nested fields
+          if (part.fieldname.includes('[') && part.fieldname.includes(']')) {
+            setNestedProperty(req.body, part.fieldname, part.value)
+          } else {
+            req.body[part.fieldname] = part.value
+          }
         }
       }
 
       return next.handle()
     }
   }
+}
+
+/**
+ * Helper function to set nested object properties
+ * @param obj The object to set the property on
+ * @param path The field name with bracket notation (e.g., 'user[name]', 'items[0]')
+ * @param value The value to set
+ */
+function setNestedProperty(obj: any, path: string, value: any) {
+  // Parse bracket notation: user[name] -> ['user', 'name']
+  if (!path.includes('[') || !path.includes(']')) {
+    // No brackets, set directly
+    obj[path] = value
+    return
+  }
+
+  // Handle bracket notation: user[name][email] -> ['user', 'name', 'email']
+  const keys = path.split(/[\[\]]/).filter((key) => key !== '')
+
+  let current = obj
+
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i]
+    const nextKey = keys[i + 1]
+
+    // Check if we need an array or object
+    const isNextKeyNumeric = !isNaN(Number(nextKey))
+
+    if (!(key in current)) {
+      // Create new array or object based on next key
+      current[key] = isNextKeyNumeric ? [] : {}
+    } else if (typeof current[key] !== 'object') {
+      // Convert existing value to array or object
+      current[key] = isNextKeyNumeric ? [] : {}
+    } else if (isNextKeyNumeric && !Array.isArray(current[key])) {
+      // Convert object to array if next key is numeric
+      current[key] = []
+    } else if (!isNextKeyNumeric && Array.isArray(current[key])) {
+      // Convert array to object if next key is not numeric
+      current[key] = {}
+    }
+
+    current = current[key]
+  }
+
+  current[keys[keys.length - 1]] = value
 }

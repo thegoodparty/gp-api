@@ -23,13 +23,21 @@ import { ReqFiles } from 'src/files/decorators/ReqFiles.decorator'
 import { FileUpload } from 'src/files/files.types'
 import { MimeTypes } from 'http-constants-ts'
 import { UpdateWebsiteSchema } from '../schemas/UpdateWebsite.schema'
+import { FilesService } from 'src/files/files.service'
+import { merge } from 'es-toolkit'
+
+const LOGO_FIELDNAME = 'logoFile'
+const HERO_FIELDNAME = 'heroFile'
 
 @Controller('websites')
 @UsePipes(ZodValidationPipe)
 export class WebsitesController {
   private readonly logger = new Logger(WebsitesController.name)
 
-  constructor(private readonly websites: WebsitesService) {}
+  constructor(
+    private readonly websites: WebsitesService,
+    private readonly files: FilesService,
+  ) {}
 
   @Post()
   @UseCampaign({
@@ -59,10 +67,9 @@ export class WebsitesController {
   @Put('mine')
   @UseCampaign()
   @UseInterceptors(
-    FilesInterceptor('files', {
+    FilesInterceptor([LOGO_FIELDNAME, HERO_FIELDNAME], {
       mode: 'buffer',
       numFiles: 2,
-      sizeLimit: 5_000_000, // 5MB max per file
       mimeTypes: [
         MimeTypes.IMAGE_JPEG,
         MimeTypes.IMAGE_PNG,
@@ -70,23 +77,13 @@ export class WebsitesController {
       ],
     }),
   )
-  async updateMyWebsite(
+  async updateWebsite(
     @ReqCampaign() { id: campaignId }: Campaign,
     @Body() body: UpdateWebsiteSchema,
     @ReqFiles() files?: FileUpload[],
   ) {
-    if (files && files.length > 0) {
-      // First file is logo, second file is hero
-      if (files.length >= 1) {
-        this.logger.log('logo', files[0])
-        // updateData.logo = files[0] // logo is first
-      }
-
-      if (files.length >= 2) {
-        this.logger.log('hero', files[1])
-        // updateData.main.image = files[1] // hero is second
-      }
-    }
+    const logoFile = files?.find((file) => file.fieldname === LOGO_FIELDNAME)
+    const heroFile = files?.find((file) => file.fieldname === HERO_FIELDNAME)
 
     const { content: currentContent } = await this.websites.findUniqueOrThrow({
       where: { campaignId },
@@ -95,9 +92,27 @@ export class WebsitesController {
       },
     })
 
+    const updatedContent: PrismaJson.WebsiteContent = merge(
+      currentContent || {},
+      body,
+    )
+
+    const [logo, hero] = await Promise.all([
+      logoFile ? this.files.uploadFile(logoFile, 'uploads') : null,
+      heroFile ? this.files.uploadFile(heroFile, 'uploads') : null,
+    ])
+
+    if (logo) {
+      updatedContent.logo = logo
+    }
+    if (hero) {
+      updatedContent.main ||= {}
+      updatedContent.main.image = hero
+    }
+
     return this.websites.update({
       where: { campaignId },
-      data: { content: { ...currentContent, ...body } },
+      data: { content: updatedContent },
     })
   }
 
