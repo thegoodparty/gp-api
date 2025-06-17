@@ -79,7 +79,6 @@ export const CRMCompanyPropertiesSchema = z
       z.literal('Locked'),
       z.literal('Failed'),
     ]),
-    [HS_PROPS.seats_available]: intSchema,
     [HS_PROPS.totalregisteredvoters]: intSchema,
     [HS_PROPS.votegoal]: intSchema,
     [HS_PROPS.win_number]: intSchema,
