@@ -496,6 +496,11 @@ export default $config({
             value: `gp-api-${$app.stage}`,
             type: 'PLAINTEXT',
           },
+          {
+            name: 'CACHEBUST',
+            value: process.env.CACHEBUST || '1',
+            type: 'PLAINTEXT',
+          },
         ],
       },
       vpcConfig: {

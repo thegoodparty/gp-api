@@ -12,6 +12,7 @@ WORKDIR /app
 
 # Optionally bust the cache to force a rebuild of the following steps
 ARG CACHEBUST
+ENV CACHEBUST=${CACHEBUST:-1}
 
 # Install dependencies
 COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
