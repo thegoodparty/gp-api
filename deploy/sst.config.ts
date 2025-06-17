@@ -294,7 +294,7 @@ export default $config({
         dockerfile: './deploy/Dockerfile',
         args: {
           DOCKER_BUILDKIT: '1',
-          CACHEBUST: '1',
+          CACHEBUST: process.env.CACHEBUST ?? '1',
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
           DATABASE_URL: dbUrl, // so we can run migrations.
