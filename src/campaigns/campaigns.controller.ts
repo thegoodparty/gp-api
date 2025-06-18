@@ -31,6 +31,7 @@ import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { CampaignEmailsService } from './services/campaignEmails.service'
+import { SegmentService } from 'src/segment/segment.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -44,6 +45,7 @@ export class CampaignsController {
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly campaignEmails: CampaignEmailsService,
+    private readonly segment: SegmentService,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -185,6 +187,24 @@ export class CampaignsController {
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
+      const trackingTraits = {
+        ...(body?.details?.city && {
+          officeMunicipality: body.details.city,
+        }),
+        ...(body?.details?.office && {
+          officeName: body.details.office,
+        }),
+        ...(body?.details?.electionDate && {
+          officeElectionDate: body.details.electionDate,
+        }),
+        ...(body?.details?.party && {
+          affiliation: body.details.party,
+        }),
+        ...(body?.details?.pledged && {
+          pledged: body.details.pledged,
+        }),
+      }
+      this.segment.identify(campaign.userId, trackingTraits)
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
     this.logger.debug('Updating campaign', campaign, { slug, body })

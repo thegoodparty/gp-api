@@ -49,4 +49,8 @@ export interface TrackingProperties {
   hubSpotUpdates?: Record<string, any>
   aiContentTrackingFlags?: Record<string, any>
   contentQuestionsAnswered?: number
+  officeMunicipality?: string
+  officeName?: string
+  officeElectionDate?: string
+  affiliation?: string
 }
