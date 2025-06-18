@@ -294,7 +294,7 @@ export default $config({
         dockerfile: './deploy/Dockerfile',
         args: {
           DOCKER_BUILDKIT: '1',
-          CACHEBUST: '1',
+          CACHEBUST: secretsJson?.CACHEBUST || Date.now().toString(),
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
           DATABASE_URL: dbUrl, // so we can run migrations.
@@ -494,6 +494,11 @@ export default $config({
           {
             name: 'SERVICE_NAME',
             value: `gp-api-${$app.stage}`,
+            type: 'PLAINTEXT',
+          },
+          {
+            name: 'CACHEBUST',
+            value: secretsJson?.CACHEBUST || Date.now().toString(),
             type: 'PLAINTEXT',
           },
         ],
