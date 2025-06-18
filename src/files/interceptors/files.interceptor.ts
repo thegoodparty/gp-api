@@ -10,6 +10,7 @@ import { FileUpload } from '../files.types'
 import { omit } from 'es-toolkit'
 import { PassThrough } from 'stream'
 import { Headers, MimeTypes } from 'http-constants-ts'
+import { Prisma } from '@prisma/client'
 
 type FilesInterceptorOpts = {
   /**
@@ -76,7 +77,6 @@ export function FilesInterceptor(
         }
       >()
 
-      // Check if the Content-Type is 'multipart/form-data', bail if not
       const contentType = req.headers[Headers.CONTENT_TYPE.toLowerCase()]
       if (!contentType || !contentType.includes(MimeTypes.IMAGE_FORM_DATA)) {
         return next.handle()
@@ -89,19 +89,15 @@ export function FilesInterceptor(
         limits: { files: numFiles, fileSize: sizeLimit },
       })
 
-      // Convert key to array for easier checking
       const keys = Array.isArray(key) ? key : [key]
 
       for await (const part of parts) {
         if (part.type === 'file') {
-          // Check that submitted file is using one of the expected field names
-          // or if bodyOnly mode, ignore any files
           if (!keys.includes(part.fieldname) || mode === 'bodyOnly') {
             part.file.resume()
             continue
           }
 
-          // validate that file's mimetype is one of the accepted types if specified
           if (mimeTypes && !mimeTypes?.includes(part.mimetype)) {
             throw new BadRequestException(
               `Invalid file type. Must be one of: ${mimeTypes?.join(', ')}`,
@@ -122,11 +118,14 @@ export function FilesInterceptor(
             ...omit(part, ['file', 'toBuffer', 'type', 'fields']),
           })
         } else {
-          // set multipart fields on request body, automatically parsing nested fields
           if (part.fieldname.includes('[') && part.fieldname.includes(']')) {
-            setNestedProperty(req.body, part.fieldname, part.value)
+            setNestedProperty(
+              req.body,
+              part.fieldname,
+              part.value as Prisma.JsonValue,
+            )
           } else {
-            req.body[part.fieldname] = part.value
+            req.body[part.fieldname] = part.value as Prisma.JsonValue
           }
         }
       }
@@ -142,15 +141,16 @@ export function FilesInterceptor(
  * @param path The field name with bracket notation (e.g., 'user[name]', 'items[0]')
  * @param value The value to set
  */
-function setNestedProperty(obj: any, path: string, value: any) {
-  // Parse bracket notation: user[name] -> ['user', 'name']
+function setNestedProperty(
+  obj: Prisma.JsonObject,
+  path: string,
+  value: Prisma.JsonValue,
+) {
   if (!path.includes('[') || !path.includes(']')) {
-    // No brackets, set directly
     obj[path] = value
     return
   }
 
-  // Handle bracket notation: user[name][email] -> ['user', 'name', 'email']
   const keys = path.split(/[\[\]]/).filter((key) => key !== '')
 
   let current = obj
@@ -159,24 +159,19 @@ function setNestedProperty(obj: any, path: string, value: any) {
     const key = keys[i]
     const nextKey = keys[i + 1]
 
-    // Check if we need an array or object
     const isNextKeyNumeric = !isNaN(Number(nextKey))
 
     if (!(key in current)) {
-      // Create new array or object based on next key
       current[key] = isNextKeyNumeric ? [] : {}
     } else if (typeof current[key] !== 'object') {
-      // Convert existing value to array or object
       current[key] = isNextKeyNumeric ? [] : {}
     } else if (isNextKeyNumeric && !Array.isArray(current[key])) {
-      // Convert object to array if next key is numeric
       current[key] = []
     } else if (!isNextKeyNumeric && Array.isArray(current[key])) {
-      // Convert array to object if next key is not numeric
       current[key] = {}
     }
 
-    current = current[key]
+    current = current[key] as Prisma.JsonObject
   }
 
   current[keys[keys.length - 1]] = value

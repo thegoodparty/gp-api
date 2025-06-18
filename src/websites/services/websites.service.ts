@@ -19,6 +19,7 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
 
     const campaignName = campaign.data.name || user.name || 'Candidate Name'
 
+    // NOTE: this is in a WIP state, better default content generation TBD
     // TODO: generate AI content here for any missing fields
     return this.model.create({
       data: {
@@ -26,12 +27,9 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
         vanityPath: campaign.slug,
         content: {
           campaignName,
-          // logo: 'https://via.placeholder.com/150',
-          // theme: 'light',
           main: {
             title: `Vote For ${campaignName}`,
             tagline: 'Candidate Tagline',
-            // image: 'https://via.placeholder.com/150',
           },
           about: {
             bio: 'About the candidate',
