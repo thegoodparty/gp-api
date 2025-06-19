@@ -1,7 +1,7 @@
 // src/shared/segment/segment.service.ts
 import { Injectable, Logger } from '@nestjs/common'
 import Analytics from '@segment/analytics-node'
-import { TrackingProperties } from 'src/analytics/analytics.types'
+import { SegmentProperties } from './segment.types'
 
 @Injectable()
 export class SegmentService {
@@ -22,7 +22,7 @@ export class SegmentService {
   trackEvent(
     userId: number,
     event: string,
-    properties: Record<string, any> = {},
+    properties: SegmentProperties = {},
   ) {
     try {
       const stringId = String(userId)
@@ -36,7 +36,7 @@ export class SegmentService {
     }
   }
 
-  identify(userId: number, traits: TrackingProperties) {
+  identify(userId: number, traits: SegmentProperties) {
     try {
       const stringId = String(userId)
       this.analytics.identify({

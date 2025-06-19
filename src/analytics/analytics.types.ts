@@ -1,4 +1,5 @@
 import { VoterGoals } from 'src/campaigns/campaigns.types'
+import { SegmentProperties } from 'src/segment/segment.types'
 
 export interface FullStoryUserResponse {
   data: {
@@ -49,8 +50,8 @@ export interface TrackingProperties {
   hubSpotUpdates?: Record<string, any>
   aiContentTrackingFlags?: Record<string, any>
   contentQuestionsAnswered?: number
-  officeMunicipality?: string
-  officeName?: string
-  officeElectionDate?: string
-  affiliation?: string
 }
+
+export type FullStoryAndSegmentProperties = Partial<
+  TrackingProperties & SegmentProperties
+>
