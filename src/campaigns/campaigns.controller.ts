@@ -187,24 +187,27 @@ export class CampaignsController {
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
-      const trackingTraits = {
-        ...(body?.details?.city && {
-          officeMunicipality: body.details.city,
-        }),
-        ...(body?.details?.office && {
-          officeName: body.details.office,
-        }),
-        ...(body?.details?.electionDate && {
-          officeElectionDate: body.details.electionDate,
-        }),
-        ...(body?.details?.party && {
-          affiliation: body.details.party,
-        }),
-        ...(body?.details?.pledged && {
-          pledged: body.details.pledged,
-        }),
+      if (body?.details) {
+        const { city, office, electionDate, pledged, party } = body.details
+        const trackingTraits = {
+          ...(city && {
+            officeMunicipality: city,
+          }),
+          ...(office && {
+            officeName: office,
+          }),
+          ...(electionDate && {
+            officeElectionDate: electionDate,
+          }),
+          ...(party && {
+            affiliation: party,
+          }),
+          ...(pledged && {
+            pledged,
+          }),
+        }
+        this.segment.identify(campaign.userId, trackingTraits)
       }
-      this.segment.identify(campaign.userId, trackingTraits)
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
     this.logger.debug('Updating campaign', campaign, { slug, body })
