@@ -246,7 +246,10 @@ export class PaymentEventsService {
 
     // For Segment
     const sub = session.subscription as Stripe.Subscription
-    const price = sub.items.data[0].price
+    const item = sub.items.data[0]
+    const price = item?.price?.unit_amount_decimal
+      ? Number(item.price.unit_amount_decimal) / 100
+      : 0
     const intent = session.payment_intent as Stripe.PaymentIntent
     const pm = intent.payment_method as Stripe.PaymentMethod
 
@@ -254,7 +257,7 @@ export class PaymentEventsService {
       pm.type === 'card' ? (pm.card?.wallet?.type ?? 'credit card') : pm.type
 
     this.segment.trackEvent(user.id, EVENTS.Account.ProSubscriptionConfirmed, {
-      price: (price.unit_amount ?? 0) / 100,
+      price,
       paymentMethod,
       renewalDate: new Date(sub.current_period_end * 1000).toISOString(),
     })
