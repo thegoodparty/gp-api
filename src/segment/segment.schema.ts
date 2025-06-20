@@ -6,6 +6,7 @@ export const segmentSchema = z.object({
   officeElectionDate: z.string().optional(),
   affiliation: z.string().optional(),
   pledged: z.boolean().optional(),
+  isPro: z.boolean().optional(),
 })
 
 export type SegmentProperties = z.infer<typeof segmentSchema>

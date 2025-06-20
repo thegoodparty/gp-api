@@ -115,10 +115,19 @@ export class AdminCampaignsService {
       where: { id },
       data: attributes,
     })
-    if (attributes?.isPro === true) {
-      this.segment.trackEvent(id, EVENTS.Account.ProSubscriptionConfirmed, {
-        price: 0,
-        
+    if (isPro === true) {
+      this.segment.trackEvent(
+        updatedCampaign?.userId,
+        EVENTS.Account.ProSubscriptionConfirmed,
+        {
+          price: 0,
+          paymentMethod: 'admin',
+        },
+      )
+    }
+    if (typeof isPro !== 'undefined') {
+      this.segment.identify(updatedCampaign?.userId, {
+        isPro,
       })
     }
     this.crm.trackCampaign(updatedCampaign.id)
