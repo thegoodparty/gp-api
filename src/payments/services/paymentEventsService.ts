@@ -21,6 +21,8 @@ import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
+import { SegmentService } from 'src/segment/segment.service'
+import { EVENTS } from 'src/segment/segment.types'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -39,6 +41,7 @@ export class PaymentEventsService {
     private readonly crm: CrmCampaignsService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly stripeService: StripeService,
+    private readonly segment: SegmentService,
   ) {}
 
   async handleEvent(event: Stripe.Event) {
@@ -240,6 +243,23 @@ export class PaymentEventsService {
       subscriptionId: subscriptionId as string,
     })
     await this.campaignsService.setIsPro(campaignId)
+
+    // Segment
+    console.log('Stripe session: ')
+    console.dir(session, { depth: 10 })
+    const sub = session.subscription as Stripe.Subscription
+    const price = sub.items.data[0].price
+    const intent = session.payment_intent as Stripe.PaymentIntent
+    const pm = intent.payment_method as Stripe.PaymentMethod
+
+    const paymentMethod =
+      pm.type === 'card' ? (pm.card?.wallet?.type ?? 'credit card') : pm.type
+
+    this.segment.trackEvent(user.id, EVENTS.Account.ProSubscriptionConfirmed, {
+      price: (price.unit_amount ?? 0) / 100,
+      paymentMethod,
+      renewalDate: new Date(sub.current_period_end * 1000).toISOString(),
+    })
 
     return await Promise.allSettled([
       this.usersService.patchUserMetaData(user.id, {

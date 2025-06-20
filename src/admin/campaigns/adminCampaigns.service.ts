@@ -21,6 +21,7 @@ import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.servi
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { AuthenticationService } from 'src/authentication/authentication.service'
 import { SegmentService } from 'src/segment/segment.service'
+import { EVENTS } from 'src/segment/segment.types'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -59,7 +60,7 @@ export class AdminCampaignsService {
     const resetToken = this.auth.generatePasswordResetToken()
     const updatedUser = await this.users.setResetToken(user.id, resetToken)
     this.email.sendSetPasswordEmail(updatedUser)
-    this.segment.trackEvent(user.id, 'Onboarding - User Created')
+    this.segment.trackEvent(user.id, EVENTS.Onboarding.UserCreated)
 
     // find slug
     const slug = await this.campaigns.findSlug(user)
@@ -114,7 +115,12 @@ export class AdminCampaignsService {
       where: { id },
       data: attributes,
     })
-
+    if (attributes?.isPro === true) {
+      this.segment.trackEvent(id, EVENTS.Account.ProSubscriptionConfirmed, {
+        price: 0,
+        
+      })
+    }
     this.crm.trackCampaign(updatedCampaign.id)
 
     return updatedCampaign

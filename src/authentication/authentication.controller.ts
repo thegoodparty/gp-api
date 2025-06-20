@@ -33,6 +33,7 @@ import { CrmUsersService } from '../users/services/crmUsers.service'
 import { setTokenCookie } from './util/setTokenCookie.util'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 import { SegmentService } from 'src/segment/segment.service'
+import { EVENTS } from 'src/segment/segment.types'
 
 @PublicAccess()
 @Controller('authentication')
@@ -106,7 +107,7 @@ export class AuthenticationController {
       // don't want to expose that user with email doesn't exist
       return
     }
-    this.segment.trackEvent(user.id, 'Account - Forgot Password Requested')
+    this.segment.trackEvent(user.id, EVENTS.Account.PasswordResetRequested)
     // generate and set reset token on user
     const token = this.authenticationService.generatePasswordResetToken()
     user = await this.usersService.setResetToken(user.id, token)

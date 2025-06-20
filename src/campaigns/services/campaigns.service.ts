@@ -26,6 +26,7 @@ import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { CampaignEmailsService } from './campaignEmails.service'
 import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../stripe/services/stripe.service'
+import { SegmentService } from 'src/segment/segment.service'
 
 enum CandidateVerification {
   yes = 'YES',
@@ -42,6 +43,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private planVersionService: CampaignPlanVersionsService,
     private readonly campaignEmails: CampaignEmailsService,
     private readonly stripeService: StripeService,
+    private readonly segment: SegmentService,
   ) {
     super()
   }
@@ -111,6 +113,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async update(args: Prisma.CampaignUpdateArgs) {
     const campaign = await this.model.update(args)
     campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
+    const isPro = args?.data?.isPro
+    if (isPro) {
+      this.segment.identify(campaign?.userId, { isPro })
+    }
     return campaign
   }
 

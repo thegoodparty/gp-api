@@ -33,8 +33,6 @@ import { PrimaryElectionResult } from '../crm/crm.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { SegmentService } from 'src/segment/segment.service'
-import { pickKeys } from 'src/shared/util/objects.util'
-import { SEGMENT_KEYS } from 'src/segment/segment.schema'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
@@ -234,10 +232,6 @@ export class AnalyticsService {
     user: User,
     properties: FullStoryAndSegmentProperties,
   ) {
-    // Segment
-    const segmentProps = pickKeys(properties, SEGMENT_KEYS)
-    this.segment.identify(user.id, segmentProps)
-
     // Fullstory
     this.logger.debug(`this.disabled: ${this.disabled}`)
     if (this.disabled) {
