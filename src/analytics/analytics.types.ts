@@ -1,5 +1,4 @@
 import { VoterGoals } from 'src/campaigns/campaigns.types'
-import { SegmentProperties } from 'src/segment/segment.types'
 
 export interface FullStoryUserResponse {
   data: {
@@ -51,7 +50,3 @@ export interface TrackingProperties {
   aiContentTrackingFlags?: Record<string, any>
   contentQuestionsAnswered?: number
 }
-
-export type FullStoryAndSegmentProperties = Partial<
-  TrackingProperties & SegmentProperties
->

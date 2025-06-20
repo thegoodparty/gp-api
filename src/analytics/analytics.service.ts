@@ -22,7 +22,6 @@ import {
 } from './util/tracking.util'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
 import {
-  FullStoryAndSegmentProperties,
   FullStoryUserResponse,
   SyncTrackingResultCounts,
   TrackingProperties,
@@ -230,9 +229,8 @@ export class AnalyticsService {
 
   private async makeTrackingRequest(
     user: User,
-    properties: FullStoryAndSegmentProperties,
+    properties: TrackingProperties,
   ) {
-    // Fullstory
     this.logger.debug(`this.disabled: ${this.disabled}`)
     if (this.disabled) {
       this.logger.warn(`FullStory is disabled`)
