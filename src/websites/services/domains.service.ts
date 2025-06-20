@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { AwsRoute53Service } from 'src/aws/services/awsRoute53.service'
-import { WebsiteService } from './website.service'
-import { WebsiteStatus } from '@prisma/client'
+import { WebsitesService } from './websites.service'
+import { WebsiteDomainStatus } from '@prisma/client'
 import { OperationStatus } from '@aws-sdk/client-route-53-domains'
 import { RRType } from '@aws-sdk/client-route-53'
 import { VercelService } from 'src/vercel/services/vercel.service'
 import { VERCEL_DNS_IP } from 'src/vercel/vercel.const'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 @Injectable()
 export class DomainsService {
@@ -13,7 +14,7 @@ export class DomainsService {
 
   constructor(
     private readonly route53: AwsRoute53Service,
-    private readonly website: WebsiteService,
+    private readonly websites: WebsitesService,
     private readonly vercel: VercelService,
   ) {}
 
@@ -42,28 +43,42 @@ export class DomainsService {
     }
   }
 
-  // To be called after domain is selected, create website record in DB and await payment
+  // To be called after domain is selected, update website record in DB with desired domain and await payment
   async startDomainRegistration(campaignId: number, domainName: string) {
-    return await this.website.model.create({
-      data: {
-        domain: domainName,
-        status: WebsiteStatus.pending,
-        campaignId,
-      },
-    })
+    // TODO: create stripe invoice or something here
+    // OR: if we decide to eat the cost, this can merge with completeDomainRegistration
+    try {
+      return await this.websites.setDomain(campaignId, domainName)
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new BadRequestException(`Website not created yet`)
+      }
+
+      throw error
+    }
   }
 
   // To be called after payment is accepted, send registration request to AWS
   async completeDomainRegistration(campaignId: number) {
-    const website = await this.website.model.findUniqueOrThrow({
+    const website = await this.websites.findUniqueOrThrow({
       where: { campaignId },
     })
 
+    if (!website.domain) {
+      throw new BadRequestException('Domain not specified')
+    }
+
     const operationId = await this.route53.registerDomain(website.domain)
 
-    await this.website.model.update({
+    await this.websites.update({
       where: { campaignId },
-      data: { operationId, status: WebsiteStatus.submitted },
+      data: {
+        domainOperationId: operationId,
+        domainStatus: WebsiteDomainStatus.submitted,
+      },
     })
 
     // TODO: how to handle for polling status on server side?
@@ -72,9 +87,13 @@ export class DomainsService {
   }
 
   async configureDomain(campaignId: number) {
-    const website = await this.website.model.findUniqueOrThrow({
+    const website = await this.websites.findUniqueOrThrow({
       where: { campaignId },
     })
+
+    if (!website.domain) {
+      throw new BadRequestException('Domain not specified')
+    }
 
     // can only turn off auto renew after registration
     await this.route53.disableAutoRenew(website.domain)
@@ -100,11 +119,11 @@ export class DomainsService {
   }
 
   async checkRegistrationStatus(campaignId: number) {
-    const website = await this.website.model.findUniqueOrThrow({
+    const website = await this.websites.findUniqueOrThrow({
       where: { campaignId },
     })
 
-    const operationId = website.operationId
+    const operationId = website.domainOperationId
 
     if (!operationId) {
       throw new BadRequestException('Domain registration not started')
@@ -113,9 +132,9 @@ export class DomainsService {
     const operation = await this.route53.getOperationDetail(operationId)
 
     if (operation.Status === OperationStatus.SUCCESSFUL) {
-      await this.website.model.update({
+      await this.websites.update({
         where: { campaignId },
-        data: { status: WebsiteStatus.registered },
+        data: { domainStatus: WebsiteDomainStatus.registered },
       })
     }
 
