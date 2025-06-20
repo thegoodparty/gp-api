@@ -244,9 +244,7 @@ export class PaymentEventsService {
     })
     await this.campaignsService.setIsPro(campaignId)
 
-    // Segment
-    console.log('Stripe session: ')
-    console.dir(session, { depth: 10 })
+    // For Segment
     const sub = session.subscription as Stripe.Subscription
     const price = sub.items.data[0].price
     const intent = session.payment_intent as Stripe.PaymentIntent

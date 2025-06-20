@@ -125,11 +125,6 @@ export class AdminCampaignsService {
         },
       )
     }
-    if (typeof isPro !== 'undefined') {
-      this.segment.identify(updatedCampaign?.userId, {
-        isPro,
-      })
-    }
     this.crm.trackCampaign(updatedCampaign.id)
 
     return updatedCampaign
