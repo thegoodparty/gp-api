@@ -28,7 +28,7 @@ import { ScheduledMessagingModule } from './scheduled-messaging/scheduled-messag
 import { ScheduleModule } from '@nestjs/schedule'
 import { SegmentModule } from './segment/segment.module'
 import { AnalyticsModule } from './analytics/analytics.module'
-import { WebsiteModule } from './website/website.module'
+import { WebsitesModule } from './websites/websites.module'
 
 @Module({
   imports: [
@@ -57,7 +57,7 @@ import { WebsiteModule } from './website/website.module'
     OutreachModule,
     SegmentModule,
     AnalyticsModule,
-    WebsiteModule,
+    WebsitesModule,
   ],
   providers: [
     SessionsService,

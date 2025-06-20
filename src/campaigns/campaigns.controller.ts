@@ -30,7 +30,6 @@ import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.s
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
-import { CampaignEmailsService } from './services/campaignEmails.service'
 import { SegmentService } from 'src/segment/segment.service'
 
 @Controller('campaigns')
@@ -44,7 +43,6 @@ export class CampaignsController {
     private readonly slack: SlackService,
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
-    private readonly campaignEmails: CampaignEmailsService,
     private readonly segment: SegmentService,
   ) {}
 
@@ -221,11 +219,6 @@ export class CampaignsController {
   async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
     try {
       const launchResult = await this.campaigns.launch(user, campaign)
-      try {
-        this.campaignEmails.scheduleCampaignCountdownEmails(campaign)
-      } catch (error) {
-        this.logger.error('Error scheduling campaign countdown emails', error)
-      }
       return launchResult
     } catch (e) {
       this.logger.error('Error at campaign launch', e)

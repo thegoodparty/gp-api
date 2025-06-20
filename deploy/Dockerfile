@@ -48,15 +48,26 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+ARG CACHEBUST
+ENV CACHEBUST=${CACHEBUST:-1}
+
 # Copy package files for production dependencies
+RUN echo "Cache bust: $CACHEBUST - copying .package.json and package-lock.json"
 COPY package.json package-lock.json ./
 # Install only production dependencies
-RUN npm ci --only=production
+RUN echo "Cache bust: $CACHEBUST" && npm ci --only=production
 
 # Copy only necessary files to the runtime image
+RUN echo "Cache bust: $CACHEBUST - copying .prisma"
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+RUN echo "Cache bust: $CACHEBUST - copying dist"
 COPY --from=builder /app/dist ./dist
+
+RUN echo "Cache bust: $CACHEBUST - copying prisma"
 COPY --from=builder /app/prisma ./prisma
+
+RUN echo "Cache bust: $CACHEBUST - copying seed"
 COPY --from=builder /app/seed ./seed
 
 # Expose the application port

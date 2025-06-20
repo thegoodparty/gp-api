@@ -23,7 +23,6 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmCampaignsService } from './crmCampaigns.service'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
-import { CampaignEmailsService } from './campaignEmails.service'
 import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../stripe/services/stripe.service'
 import { SegmentService } from 'src/segment/segment.service'
@@ -41,7 +40,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
     private planVersionService: CampaignPlanVersionsService,
-    private readonly campaignEmails: CampaignEmailsService,
     private readonly stripeService: StripeService,
     private readonly segment: SegmentService,
   ) {
@@ -375,8 +373,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     this.crm.trackCampaign(campaign.id)
     this.usersService.trackUserById(campaign.userId)
-
-    await this.campaignEmails.sendCampaignLaunchEmail(user)
 
     return true
   }
