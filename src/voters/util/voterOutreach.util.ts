@@ -2,6 +2,40 @@ import {
   SlackMessageBlock,
   SlackMessageType,
 } from 'src/shared/services/slackService.types'
+import { OutreachType } from '@prisma/client'
+
+export type AudienceSlackBlock = {
+  type: SlackMessageType.RICH_TEXT_SECTION
+  elements: [
+    {
+      type: SlackMessageType.TEXT
+      text: string
+      style: {
+        bold: boolean
+      }
+    },
+    {
+      type: SlackMessageType.TEXT
+      text: string
+    },
+  ]
+}
+
+type SlackBlocksParams = {
+  name?: string
+  email?: string
+  phone?: string
+  assignedPa?: string
+  crmCompanyId?: string
+  voterFileUrl?: string
+  type: OutreachType
+  date?: Date
+  script?: string
+  imageUrl?: string
+  message?: string
+  formattedAudience: Array<AudienceSlackBlock>
+  audienceRequest?: string
+}
 
 export function buildSlackBlocks({
   name,
@@ -11,16 +45,13 @@ export function buildSlackBlocks({
   crmCompanyId,
   voterFileUrl,
   type,
-  budget,
-  voicemail,
   date,
   script,
-  messagingScript,
   imageUrl,
   message,
   formattedAudience,
   audienceRequest,
-}) {
+}: SlackBlocksParams) {
   const blocks = [
     {
       type: SlackMessageType.HEADER,
@@ -152,41 +183,6 @@ export function buildSlackBlocks({
               elements: [
                 {
                   type: SlackMessageType.TEXT,
-                  text: 'Budget: ',
-                  style: {
-                    bold: true,
-                  },
-                },
-                {
-                  type: SlackMessageType.TEXT,
-                  text: '$' + Number(budget).toLocaleString(),
-                },
-              ],
-            },
-            // eslint-disable-next-line eqeqeq
-            voicemail != undefined
-              ? {
-                  type: SlackMessageType.RICH_TEXT_SECTION,
-                  elements: [
-                    {
-                      type: SlackMessageType.TEXT,
-                      text: 'Voicemail: ',
-                      style: {
-                        bold: true,
-                      },
-                    },
-                    {
-                      type: SlackMessageType.TEXT,
-                      text: voicemail ? 'Yes' : 'No',
-                    },
-                  ],
-                }
-              : undefined,
-            {
-              type: SlackMessageType.RICH_TEXT_SECTION,
-              elements: [
-                {
-                  type: SlackMessageType.TEXT,
                   text: 'Scheduled Date: ',
                   style: {
                     bold: true,
@@ -203,7 +199,7 @@ export function buildSlackBlocks({
               elements: [
                 {
                   type: SlackMessageType.TEXT,
-                  text: 'Script Key: ',
+                  text: 'AI-Generated Script: ',
                   style: {
                     bold: true,
                   },
@@ -214,8 +210,7 @@ export function buildSlackBlocks({
                 },
               ],
             },
-            // eslint-disable-next-line eqeqeq
-          ].filter((elem) => elem != undefined),
+          ].filter((elem) => elem !== undefined),
         },
       ],
     },
@@ -290,36 +285,6 @@ export function buildSlackBlocks({
     },
     {
       type: SlackMessageType.DIVIDER,
-    },
-    {
-      type: SlackMessageType.RICH_TEXT,
-      elements: [
-        {
-          type: SlackMessageType.RICH_TEXT_SECTION,
-          elements: [
-            {
-              type: SlackMessageType.EMOJI,
-              name: 'scroll',
-            },
-            {
-              type: SlackMessageType.TEXT,
-              text: ' AI-Generated Script:',
-              style: {
-                bold: true,
-              },
-            },
-          ],
-        },
-        {
-          type: SlackMessageType.RICH_TEXT_PREFORMATTED,
-          elements: [
-            {
-              type: SlackMessageType.TEXT,
-              text: String(messagingScript),
-            },
-          ],
-        },
-      ],
     },
     {
       type: SlackMessageType.DIVIDER,
@@ -441,7 +406,6 @@ export function buildSlackBlocks({
   ]
 
   return {
-    // eslint-disable-next-line eqeqeq
-    blocks: blocks.filter((block) => block != undefined),
+    blocks: blocks.filter((block) => block !== undefined),
   } as { blocks: SlackMessageBlock[] }
 }

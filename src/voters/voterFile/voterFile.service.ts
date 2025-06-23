@@ -50,7 +50,13 @@ export class VoterFileService {
       return this.getVoterCount(resolvedType, campaign, customFilters)
     }
 
-    return this.getVoterCsv(resolvedType, campaign, customFilters, selectedColumns, limit)
+    return this.getVoterCsv(
+      resolvedType,
+      campaign,
+      customFilters,
+      selectedColumns,
+      limit,
+    )
   }
 
   private async getVoterCount(
@@ -59,20 +65,32 @@ export class VoterFileService {
     customFilters?: GetVoterFileSchema['customFilters'],
   ): Promise<number> {
     // Try regular count first
-    const countQuery = typeToQuery(resolvedType, campaign, customFilters, true, false)
+    const countQuery = typeToQuery(
+      resolvedType,
+      campaign,
+      customFilters,
+      true,
+      false,
+    )
     this.logger.debug('Count Query:', countQuery)
-    
+
     const sqlResponse = await this.voterDb.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
-    
+
     // If count is 0, try with fix columns as fallback
     if (count === 0) {
-      const countQueryWithFix = typeToQuery(resolvedType, campaign, customFilters, true, true)
+      const countQueryWithFix = typeToQuery(
+        resolvedType,
+        campaign,
+        customFilters,
+        true,
+        true,
+      )
       this.logger.debug('Count Query with Fix Columns:', countQueryWithFix)
       const sqlResponseWithFix = await this.voterDb.query(countQueryWithFix)
       return parseInt(sqlResponseWithFix.rows[0].count)
     }
-    
+
     return count
   }
 
@@ -84,13 +102,19 @@ export class VoterFileService {
     limit?: GetVoterFileSchema['limit'],
   ) {
     // Check if we need to use fixColumns by doing a quick count check
-    const countQuery = typeToQuery(resolvedType, campaign, customFilters, true, false)
+    const countQuery = typeToQuery(
+      resolvedType,
+      campaign,
+      customFilters,
+      true,
+      false,
+    )
     this.logger.debug('Count Query:', countQuery)
-    
+
     const sqlResponse = await this.voterDb.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
     const withFixColumns = count === 0
-    
+
     this.logger.debug('count', count)
 
     // Generate CSV with appropriate fixColumns setting

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import {
   ObjectCannedACL,
   PutObjectCommand,
@@ -7,8 +7,9 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Upload } from '@aws-sdk/lib-storage'
-import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import slugify from 'slugify'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
+import { AwsService } from './aws.service'
 
 export type UploadOptions = {
   cacheControl?: string // Cache-Control header value
@@ -28,11 +29,12 @@ if (!secretAccessKey) {
 }
 
 @Injectable()
-export class AwsService {
-  private readonly logger = new Logger(AwsService.name)
+export class AwsS3Service extends AwsService {
   private readonly s3Client: S3Client
 
   constructor() {
+    super()
+
     this.s3Client = new S3Client({
       region,
       credentials: {
@@ -54,7 +56,7 @@ export class AwsService {
       trim: true,
     })}`
 
-    try {
+    return this.executeAwsOperation(async () => {
       const upload = new Upload({
         client: this.s3Client,
         params: {
@@ -69,10 +71,7 @@ export class AwsService {
       const response = await upload.done()
 
       return `https://${ASSET_DOMAIN}/${response.Key || filePath}`
-    } catch (e) {
-      this.logger.error('Error uploading file to S3:', e)
-      throw e
-    }
+    }, 'uploadFile')
   }
 
   async getSignedS3Url(bucket: string, fileName: string, fileType: string) {
@@ -84,14 +83,16 @@ export class AwsService {
       ContentType: fileType,
     })
 
-    return await getSignedUrl(
-      this.s3Client,
-      new PutObjectCommand({
-        Bucket: ASSET_DOMAIN,
-        Key: filePath,
-        ContentType: fileType,
-      }),
-      { expiresIn: 3600 },
-    )
+    return this.executeAwsOperation(async () => {
+      return await getSignedUrl(
+        this.s3Client,
+        new PutObjectCommand({
+          Bucket: ASSET_DOMAIN,
+          Key: filePath,
+          ContentType: fileType,
+        }),
+        { expiresIn: 3600 },
+      )
+    }, 'getSignedS3Url')
   }
 }

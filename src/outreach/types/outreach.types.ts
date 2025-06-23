@@ -1,11 +1,4 @@
-export interface TextCampaignSummary {
-  projectId: string | null
-  name: string | null
-  message: string | null
-  campaignId: number | undefined
-  error: string | null
-  status?: string
-}
+import { Prisma } from '@prisma/client'
 
 export interface ApiRumbleUpProject {
   name: string
@@ -37,35 +30,8 @@ export interface ApiRumbleUpResponse {
   error_code?: string
 }
 
-export interface CreateProjectResponse {
-  success: boolean
-  data?: {
-    id: string
-    name: string
-    message: string
-    projectId: string
+export type OutreachWithVoterFileFilter = Prisma.OutreachGetPayload<{
+  include: {
+    voterFileFilter: true
   }
-  error?: string
-  message?: string
-}
-
-export interface PaginationParams {
-  limit?: number
-  order?: 'asc' | 'desc'
-  page?: number
-  offset?: number
-}
-
-export interface ProjectDto {
-  id: string
-  name: string
-  message: string
-  areaCode: string
-  groupId: string
-  flags: string
-  outsourceStart: string
-  outsourceEnd: string
-  outsourceEmail: string
-  createdAt: string
-  updatedAt: string
-}
+}>
