@@ -245,7 +245,7 @@ export class PaymentEventsService {
     await this.campaignsService.setIsPro(campaignId)
 
     // For Segment
-    const sub = session.subscription as Stripe.Subscription
+    const subscription = session.subscription as Stripe.Subscription
     const item = sub.items.data[0]
     const price = item?.price?.unit_amount_decimal
       ? Number(item.price.unit_amount_decimal) / 100
