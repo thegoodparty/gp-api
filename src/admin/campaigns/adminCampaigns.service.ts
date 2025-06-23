@@ -20,8 +20,8 @@ import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { AuthenticationService } from 'src/authentication/authentication.service'
-import { SegmentService } from 'src/segment/segment.service'
 import { EVENTS } from 'src/segment/segment.types'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -33,7 +33,7 @@ export class AdminCampaignsService {
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly crm: CrmCampaignsService,
     private readonly auth: AuthenticationService,
-    private readonly segment: SegmentService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   async create(body: AdminCreateCampaignSchema) {
@@ -60,7 +60,7 @@ export class AdminCampaignsService {
     const resetToken = this.auth.generatePasswordResetToken()
     const updatedUser = await this.users.setResetToken(user.id, resetToken)
     this.email.sendSetPasswordEmail(updatedUser)
-    this.segment.trackEvent(user.id, EVENTS.Onboarding.UserCreated)
+    this.analytics.track(user.id, EVENTS.Onboarding.UserCreated)
 
     // find slug
     const slug = await this.campaigns.findSlug(user)
@@ -116,7 +116,7 @@ export class AdminCampaignsService {
       data: attributes,
     })
     if (isPro === true) {
-      this.segment.trackEvent(
+      this.analytics.track(
         updatedCampaign?.userId,
         EVENTS.Account.ProSubscriptionConfirmed,
         {

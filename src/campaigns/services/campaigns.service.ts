@@ -25,7 +25,7 @@ import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../stripe/services/stripe.service'
-import { SegmentService } from 'src/segment/segment.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 enum CandidateVerification {
   yes = 'YES',
@@ -41,7 +41,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly crm: CrmCampaignsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
-    private readonly segment: SegmentService,
+    private readonly analytics: AnalyticsService,
   ) {
     super()
   }
@@ -113,7 +113,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
     const isPro = args?.data?.isPro
     if (isPro) {
-      this.segment.identify(campaign?.userId, { isPro })
+      this.analytics.identify(campaign?.userId, { isPro })
     }
     return campaign
   }

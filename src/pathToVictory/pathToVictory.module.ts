@@ -12,7 +12,7 @@ import { ViabilityService } from './services/viability.service'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { PathToVictoryController } from './pathToVictory.controller'
 import { ViabilityController } from './viability.controller'
-import { SegmentModule } from 'src/segment/segment.module'
+import { AnalyticsModule } from 'src/analytics/analytics.module'
 
 @Module({
   imports: [
@@ -22,7 +22,7 @@ import { SegmentModule } from 'src/segment/segment.module'
     VotersModule,
     EmailModule,
     QueueProducerModule,
-    SegmentModule,
+    AnalyticsModule,
   ],
   controllers: [PathToVictoryController, ViabilityController],
   providers: [

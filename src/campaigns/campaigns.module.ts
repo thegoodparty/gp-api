@@ -21,7 +21,6 @@ import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { StripeModule } from '../stripe/stripe.module'
-import { SegmentModule } from 'src/segment/segment.module'
 
 @Global()
 @Module({
@@ -35,7 +34,7 @@ import { SegmentModule } from 'src/segment/segment.module'
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
     StripeModule,
-    SegmentModule,
+    AnalyticsModule,
   ],
   controllers: [
     CampaignsController,

@@ -9,7 +9,7 @@ import { RolesGuard } from './guards/Roles.guard'
 import { LocalStrategy } from './auth-strategies/Local.strategy'
 import { EmailModule } from 'src/email/email.module'
 import { SocialLoginStrategy } from './auth-strategies/SocialLogin.strategy'
-import { SegmentModule } from 'src/segment/segment.module'
+import { AnalyticsModule } from 'src/analytics/analytics.module'
 
 const JWT_EXPIRATION = '1y'
 
@@ -39,7 +39,7 @@ if (!process.env.AUTH_SECRET) {
       signOptions: { expiresIn: JWT_EXPIRATION },
     }),
     EmailModule,
-    SegmentModule,
+    AnalyticsModule,
   ],
   exports: [AuthenticationService, JwtModule],
   controllers: [AuthenticationController],
