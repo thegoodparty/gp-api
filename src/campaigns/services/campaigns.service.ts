@@ -39,9 +39,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private usersService: UsersService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
+    @Inject(forwardRef(() => AnalyticsService))
+    private readonly analytics: AnalyticsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
-    private readonly analytics: AnalyticsService,
   ) {
     super()
   }

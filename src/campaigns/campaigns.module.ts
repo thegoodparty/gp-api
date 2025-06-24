@@ -28,7 +28,6 @@ import { StripeModule } from '../stripe/stripe.module'
     EmailModule,
     CampaignsAiModule,
     CrmModule,
-    AnalyticsModule,
     ElectionsModule,
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
