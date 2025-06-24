@@ -306,8 +306,6 @@ export class PaymentEventsService {
 
     await this.campaignsService.persistCampaignProCancellation(campaign)
     await this.sendProCancellationSlackMessage(user, campaign)
-
-    await this.emailService.sendProSubscriptionEndingEmail(user)
   }
 
   async sendProCancellationSlackMessage(user: User, campaign: Campaign) {

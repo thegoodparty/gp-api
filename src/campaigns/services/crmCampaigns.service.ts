@@ -351,8 +351,6 @@ export class CrmCampaignsService {
           ? Math.floor(score > 5 ? 5 : score)
           : undefined,
       p2v_status: p2v_status,
-      //NOTE: Older versions of these fields may be strings, so we need to convert to numbers in case
-      seats_available: seats ? Number(seats) : undefined,
       totalregisteredvoters: totalRegisteredVoters
         ? Number(totalRegisteredVoters)
         : undefined,

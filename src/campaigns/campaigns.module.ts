@@ -20,7 +20,6 @@ import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasser
 import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
-import { CampaignEmailsService } from './services/campaignEmails.service'
 import { StripeModule } from '../stripe/stripe.module'
 import { ElectionsService } from 'src/elections/services/elections.service'
 
@@ -54,7 +53,6 @@ import { ElectionsService } from 'src/elections/services/elections.service'
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTasksService,
-    CampaignEmailsService,
   ],
   exports: [
     CampaignsService,
