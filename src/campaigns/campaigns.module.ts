@@ -12,7 +12,6 @@ import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateH
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
 import { CrmModule } from '../crm/crmModule'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
-import { AnalyticsModule } from '../analytics/analytics.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
@@ -33,7 +32,6 @@ import { StripeModule } from '../stripe/stripe.module'
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
     StripeModule,
-    AnalyticsModule,
   ],
   controllers: [
     CampaignsController,

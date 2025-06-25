@@ -12,7 +12,6 @@ import { ViabilityService } from './services/viability.service'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { PathToVictoryController } from './pathToVictory.controller'
 import { ViabilityController } from './viability.controller'
-import { AnalyticsModule } from 'src/analytics/analytics.module'
 
 @Module({
   imports: [
@@ -22,7 +21,6 @@ import { AnalyticsModule } from 'src/analytics/analytics.module'
     VotersModule,
     EmailModule,
     QueueProducerModule,
-    AnalyticsModule,
   ],
   controllers: [PathToVictoryController, ViabilityController],
   providers: [

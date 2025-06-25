@@ -30,6 +30,7 @@ export class PathToVictoryService extends createPrismaBase(
     private emailService: EmailService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private crmService: CrmCampaignsService,
+    @Inject(forwardRef(() => AnalyticsService))
     private analytics: AnalyticsService,
   ) {
     super()

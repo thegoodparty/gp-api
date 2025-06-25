@@ -33,6 +33,7 @@ import { WebsitesModule } from './websites/websites.module'
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    AnalyticsModule,
     UsersModule,
     AuthenticationModule,
     ContentModule,
@@ -56,7 +57,6 @@ import { WebsitesModule } from './websites/websites.module'
     ScheduledMessagingModule,
     OutreachModule,
     SegmentModule,
-    AnalyticsModule,
     WebsitesModule,
   ],
   providers: [
