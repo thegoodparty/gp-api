@@ -44,15 +44,10 @@ export enum OfficeLevel {
 }
 
 enum ElectionCode {
-  EP, // Primary Election
-  EG, // General Election
-  EPP, // Presidential Preference Primary
-  ECP, // Consolidated Primary Election
-  ECG, // Consolidated General Election
-  EL, // Local Election
-  ES, // Special Election
-  ER, // Runoff Election
-  EPD, // Democratic Election Primary
+  // Should directly reflect ElectionCode in election-api/prisma/schema/projectedTurnout.prisma
+  General = 'General',
+  LocalOrMunicipal = 'LocalOrMunicipal',
+  ConsolidatedGeneral = 'ConsolidatedGeneral',
 }
 
 export type ProjectedTurnout = {

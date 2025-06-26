@@ -95,7 +95,6 @@ export class CampaignsController {
       const brPositionId = campaign?.details?.positionId
 
       if (!brPositionId) {
-        // Probably should send a slack message, shouldn't happen
         this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
         return p2v
       }
@@ -103,7 +102,7 @@ export class CampaignsController {
       const raceTargetDetails =
         await this.elections.buildRaceTargetDetails(brPositionId)
 
-      if (!raceTargetDetails) {
+      if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
         // Use existing P2V algorithm as a fallback
         await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
         return p2v
