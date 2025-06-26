@@ -10,9 +10,6 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Optionally bust the cache to force a rebuild of the following steps
-ARG CACHEBUST
-
 # Install dependencies
 COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 
@@ -23,20 +20,24 @@ COPY seed/ ./seed
 
 RUN npm install
 
+# Optionally bust the cache to force a rebuild of the following steps
+ARG CACHEBUST
+ENV CACHEBUST=${CACHEBUST:-1}
+
 # Set the docker build args into environment variables on runner.
 ARG STAGE
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 
 # Note: the CodeBuild project must be configured to be on the VPC.
-# Run the migrations for the database
-RUN npm run migrate:deploy
+# Force cache bust for these commands by echoing CACHEBUST
+RUN echo "Cache bust: $CACHEBUST" && npm run migrate:deploy
 
-# Generate Prisma client
-RUN npm run generate
+# Force cache bust for Prisma client generation
+RUN echo "Cache bust: $CACHEBUST" && npm run generate
 
 # Build the application (output in /dist)
-RUN npm run build
+RUN echo "Cache bust: $CACHEBUST" && npm run build
 
 # Stage 2: Create a minimal runtime image
 FROM public.ecr.aws/docker/library/node:22-alpine
@@ -47,15 +48,26 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+ARG CACHEBUST
+ENV CACHEBUST=${CACHEBUST:-1}
+
 # Copy package files for production dependencies
+RUN echo "Cache bust: $CACHEBUST - copying .package.json and package-lock.json"
 COPY package.json package-lock.json ./
 # Install only production dependencies
-RUN npm ci --only=production
+RUN echo "Cache bust: $CACHEBUST" && npm ci --only=production
 
 # Copy only necessary files to the runtime image
+RUN echo "Cache bust: $CACHEBUST - copying .prisma"
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+RUN echo "Cache bust: $CACHEBUST - copying dist"
 COPY --from=builder /app/dist ./dist
+
+RUN echo "Cache bust: $CACHEBUST - copying prisma"
 COPY --from=builder /app/prisma ./prisma
+
+RUN echo "Cache bust: $CACHEBUST - copying seed"
 COPY --from=builder /app/seed ./seed
 
 # Expose the application port

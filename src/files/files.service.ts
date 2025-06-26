@@ -3,7 +3,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { AwsService } from 'src/aws/aws.service'
+import { AwsS3Service } from 'src/aws/services/awsS3.service'
 import { CacheControls } from 'http-constants-ts'
 import { FileUpload, GenerateSignedUploadUrlArgs } from './files.types'
 
@@ -11,7 +11,7 @@ import { FileUpload, GenerateSignedUploadUrlArgs } from './files.types'
 export class FilesService {
   private readonly logger = new Logger(FilesService.name)
 
-  constructor(private readonly aws: AwsService) {}
+  constructor(private readonly aws: AwsS3Service) {}
 
   generateSignedUploadUrl({
     bucket,

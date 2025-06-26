@@ -34,8 +34,10 @@ model Campaign {
   ecanvasser            Ecanvasser?
   completedTaskIds      String[]                @default([]) @map("completed_task_ids")
   ScheduledMessage      ScheduledMessage[]
-  TextCampaign          Outreach[]
-  TcrCompliance         TcrCompliance?
+  tcrCompliance         TcrCompliance?
+  voterFileFilters      VoterFileFilter[]
+  website               Website?
+  outreach              Outreach[]
 
   @@index([slug])
   @@map("campaign")

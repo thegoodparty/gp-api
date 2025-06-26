@@ -294,7 +294,7 @@ export default $config({
         dockerfile: './deploy/Dockerfile',
         args: {
           DOCKER_BUILDKIT: '1',
-          CACHEBUST: '1',
+          CACHEBUST: secretsJson?.CACHEBUST || Date.now().toString(),
           DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
           DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
           DATABASE_URL: dbUrl, // so we can run migrations.
@@ -365,7 +365,7 @@ export default $config({
         clusterIdentifier: 'gp-api-db-prod',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.2',
+        engineVersion: '16.6',
         databaseName: dbName,
         masterUsername: dbUser,
         masterPassword: dbPassword,
@@ -384,7 +384,7 @@ export default $config({
         clusterIdentifier: 'gp-voter-db',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.2',
+        engineVersion: '16.6',
         databaseName: voterDbName,
         masterUsername: voterDbUser,
         masterPassword: voterDbPassword,
@@ -410,7 +410,7 @@ export default $config({
         clusterIdentifier: 'gp-api-db-qa',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.2',
+        engineVersion: '16.6',
         databaseName: dbName,
         masterUsername: dbUser,
         masterPassword: dbPassword,
@@ -423,6 +423,34 @@ export default $config({
           maxCapacity: 64,
           minCapacity: 0.5,
         },
+      })
+    } else if ($app.stage === 'develop') {
+      rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
+
+      const voterCluster = new aws.rds.Cluster('voterCluster', {
+        clusterIdentifier: `gp-voter-db-${$app.stage}`,
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.6',
+        databaseName: voterDbName,
+        masterUsername: voterDbUser,
+        masterPassword: voterDbPassword,
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 128,
+          minCapacity: 0.5,
+        },
+      })
+
+      new aws.rds.ClusterInstance('voterInstance', {
+        clusterIdentifier: voterCluster.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: voterCluster.engineVersion,
       })
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
@@ -466,6 +494,11 @@ export default $config({
           {
             name: 'SERVICE_NAME',
             value: `gp-api-${$app.stage}`,
+            type: 'PLAINTEXT',
+          },
+          {
+            name: 'CACHEBUST',
+            value: secretsJson?.CACHEBUST || Date.now().toString(),
             type: 'PLAINTEXT',
           },
         ],

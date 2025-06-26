@@ -11,7 +11,6 @@ import {
   SendTemplateEmailInput,
 } from './email.types'
 import { getUserFullName } from '../users/util/users.util'
-import { DateFormats, formatDate } from '../shared/util/date.util'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
@@ -83,19 +82,6 @@ export class EmailService {
       to: email,
       template: EmailTemplateName.setPassword,
       variables,
-    })
-  }
-
-  async sendProSubscriptionEndingEmail(user: User) {
-    const today = new Date()
-    await this.sendTemplateEmail({
-      to: user.email,
-      subject: `Your Pro Subscription is Ending Today`,
-      template: EmailTemplateName.endOfProSubscription,
-      variables: {
-        userFullName: getUserFullName(user),
-        todayDateString: formatDate(today, DateFormats.usDate),
-      },
     })
   }
 
