@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { WebsiteDomainStatus, Prisma, User } from '@prisma/client'
+import { Prisma, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 
 type PositionWithTopIssue = Prisma.CampaignPositionGetPayload<{
@@ -42,13 +42,6 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
           },
         },
       },
-    })
-  }
-
-  setDomain(campaignId: number, domain: string) {
-    return this.model.update({
-      where: { campaignId },
-      data: { domain, domainStatus: WebsiteDomainStatus.pending },
     })
   }
 

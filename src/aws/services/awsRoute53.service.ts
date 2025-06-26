@@ -15,6 +15,7 @@ import {
   Route53DomainsServiceException,
   DisableDomainAutoRenewCommand,
   ContactType,
+  GetDomainSuggestionsCommand,
 } from '@aws-sdk/client-route-53-domains'
 import { AwsService } from './aws.service'
 import {
@@ -28,7 +29,7 @@ import {
   RRType,
 } from '@aws-sdk/client-route-53'
 
-const DOMAIN_CONTACT: ContactDetail = {
+const GP_DOMAIN_CONTACT: ContactDetail = {
   FirstName: 'Victoria',
   LastName: 'Mitchell',
   ContactType: ContactType.COMPANY,
@@ -102,17 +103,19 @@ export class AwsRoute53Service extends AwsService {
    * @param domainName - The domain name to register (e.g. 'example.com')
    * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_RegisterDomain.html}
    */
-  async registerDomain(domainName: string) {
+  async registerDomain(domainName: string, ownerContact: ContactDetail) {
     return this.executeAwsOperation(async () => {
       const command = new RegisterDomainCommand({
         DomainName: domainName,
         DurationInYears: 1,
-        AdminContact: DOMAIN_CONTACT,
-        RegistrantContact: DOMAIN_CONTACT,
-        TechContact: DOMAIN_CONTACT,
+        AdminContact: ownerContact,
+        RegistrantContact: ownerContact,
+        TechContact: GP_DOMAIN_CONTACT,
+        BillingContact: GP_DOMAIN_CONTACT,
         PrivacyProtectAdminContact: true,
         PrivacyProtectRegistrantContact: true,
         PrivacyProtectTechContact: true,
+        PrivacyProtectBillingContact: true,
       })
 
       const response = await this.domainsClient.send(command)
@@ -277,7 +280,7 @@ export class AwsRoute53Service extends AwsService {
   async listPrices(tld?: string) {
     return this.executeAwsOperation(async () => {
       const command = new ListPricesCommand({
-        MaxItems: 100,
+        MaxItems: 1000,
         Tld: tld,
       })
       const result = await this.domainsClient.send(command)
@@ -294,6 +297,41 @@ export class AwsRoute53Service extends AwsService {
 
       return result
     }, 'listPrices')
+  }
+
+  /**
+   * Gets domain name suggestions based on a search term
+   * @param domainName - The domain name to get suggestions for (e.g. 'example')
+   * @param suggestionCount - Number of suggestions to return (default: 10, max: 50)
+   * @param onlyAvailable - Whether to return only available domains (default: true)
+   * @returns List of domain suggestions with availability and pricing
+   * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_GetDomainSuggestions.html}
+   */
+  async getDomainSuggestions(
+    domainName: string,
+    suggestionCount: number = 10,
+    onlyAvailable: boolean = true,
+  ) {
+    return this.executeAwsOperation(async () => {
+      const command = new GetDomainSuggestionsCommand({
+        DomainName: domainName,
+        SuggestionCount: Math.min(suggestionCount, 50), // AWS max is 50
+        OnlyAvailable: onlyAvailable,
+      })
+      const result = await this.domainsClient.send(command)
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
+          case 'InvalidInput':
+          case 'UnsupportedTLD':
+            throw new BadRequestException(result.message)
+          default:
+            throw result
+        }
+      }
+
+      return result
+    }, 'getDomainSuggestions')
   }
 
   /**

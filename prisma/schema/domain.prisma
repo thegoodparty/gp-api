@@ -1,0 +1,22 @@
+enum DomainStatus {
+  pending // awaiting payment
+  submitted // sent to aws, waiting for registration to complete
+  registered // registered with aws, waiting for DNS to be configured
+  active
+  inactive
+}
+
+model Domain {
+  id          Int          @id @default(autoincrement())
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  name        String       @unique
+  websiteId   Int          @unique @map("website_id")
+  website     Website      @relation(fields: [websiteId], references: [id])
+  status      DomainStatus @default(pending)
+  operationId String?      @map("operation_id")
+  price       Int?
+  paymentId   String?      @map("payment_id")
+
+  @@map("domain")
+}

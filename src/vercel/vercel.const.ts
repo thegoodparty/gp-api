@@ -1,1 +1,1 @@
-export const VERCEL_DNS_IP = '76.76.21.21'
+export const VERCEL_DNS_IP = '216.150.1.193'
