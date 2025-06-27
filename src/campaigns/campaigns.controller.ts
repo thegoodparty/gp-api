@@ -31,6 +31,7 @@ import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -44,6 +45,7 @@ export class CampaignsController {
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -204,6 +206,26 @@ export class CampaignsController {
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
+      if (body?.details) {
+        const { city, office, electionDate, pledged, party } = body.details
+        this.analytics.identify(campaign.userId, {
+          ...(city && {
+            officeMunicipality: city,
+          }),
+          ...(office && {
+            officeName: office,
+          }),
+          ...(electionDate && {
+            officeElectionDate: electionDate,
+          }),
+          ...(party && {
+            affiliation: party,
+          }),
+          ...(pledged && {
+            pledged,
+          }),
+        })
+      }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
     this.logger.debug('Updating campaign', campaign, { slug, body })
