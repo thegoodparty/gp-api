@@ -91,28 +91,30 @@ export class CampaignsController {
       })
     }
 
-    if (p2vStatus === P2VStatus.waiting) {
-      const ballotreadyPositionId = campaign?.details?.positionId
-
-      if (!ballotreadyPositionId) {
-        this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-      }
-
-      const raceTargetDetails = ballotreadyPositionId
-        ? await this.elections.buildRaceTargetDetails(ballotreadyPositionId)
-        : null
-
-      if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
-        // Use existing P2V algorithm as a fallback
-        await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-      } else {
-        await this.campaigns.updateJsonFields(campaign.id, {
-          pathToVictory: raceTargetDetails,
-        })
-      }
-    }
+    p2vStatus === P2VStatus.waiting && this.handleP2VWaiting(campaign)
 
     return p2v
+  }
+
+  private async handleP2VWaiting(campaign: Campaign) {
+    const ballotreadyPositionId = campaign?.details?.positionId
+
+    if (!ballotreadyPositionId) {
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
+
+    const raceTargetDetails = ballotreadyPositionId
+      ? await this.elections.buildRaceTargetDetails(ballotreadyPositionId)
+      : null
+
+    if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
+      // Use existing P2V algorithm as a fallback
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    } else {
+      await this.campaigns.updateJsonFields(campaign.id, {
+        pathToVictory: raceTargetDetails,
+      })
+    }
   }
 
   @Roles(UserRole.admin)
