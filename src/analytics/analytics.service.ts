@@ -32,6 +32,8 @@ import { PrimaryElectionResult } from '../crm/crm.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { SegmentService } from 'src/segment/segment.service'
+import Stripe from 'stripe'
+import { EVENTS } from 'src/segment/segment.types'
 
 const { CONTENT_TYPE, AUTHORIZATION } = Headers
 const { APPLICATION_JSON } = MimeTypes
@@ -206,6 +208,7 @@ export class AnalyticsService {
     }
   }
 
+  // TODO: Legacy method, rip out when we rip out Fullstory
   async trackEvent(user: User, eventName: string, properties: any) {
     this.segment.trackEvent(user.id, eventName, properties)
     if (this.disabled) {
@@ -227,11 +230,22 @@ export class AnalyticsService {
     return result
   }
 
+  track(
+    userId: number,
+    eventName: string,
+    properties?: Record<string, unknown>,
+  ) {
+    this.segment.trackEvent(userId, eventName, properties)
+  }
+
+  identify(userId: number, traits: Record<string, unknown>) {
+    this.segment.identify(userId, traits)
+  }
+
   private async makeTrackingRequest(
     user: User,
     properties: TrackingProperties,
   ) {
-    this.segment.identify(user.id, properties)
     this.logger.debug(`this.disabled: ${this.disabled}`)
     if (this.disabled) {
       this.logger.warn(`FullStory is disabled`)
@@ -331,5 +345,26 @@ export class AnalyticsService {
         ),
       ),
     )
+  }
+
+  async trackProPayment(userId: number, session: Stripe.Checkout.Session) {
+    const subscription = session.subscription as Stripe.Subscription
+    const item = subscription.items.data[0]
+    const price = item?.price?.unit_amount_decimal
+      ? Number(item.price.unit_amount_decimal) / 100
+      : 0
+    const intent = session.payment_intent as Stripe.PaymentIntent
+    const pm = intent.payment_method as Stripe.PaymentMethod
+
+    const paymentMethod =
+      pm.type === 'card' ? (pm.card?.wallet?.type ?? 'credit card') : pm.type
+
+    this.segment.trackEvent(userId, EVENTS.Account.ProSubscriptionConfirmed, {
+      price,
+      paymentMethod,
+      renewalDate: new Date(
+        subscription.current_period_end * 1000,
+      ).toISOString(),
+    })
   }
 }

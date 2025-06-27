@@ -1,7 +1,8 @@
 // src/shared/segment/segment.service.ts
 import { Injectable, Logger } from '@nestjs/common'
 import Analytics from '@segment/analytics-node'
-import { TrackingProperties } from 'src/analytics/analytics.types'
+import { pickKeys } from 'src/shared/util/objects.util'
+import { SEGMENT_KEYS } from './segment.schema'
 
 @Injectable()
 export class SegmentService {
@@ -22,7 +23,7 @@ export class SegmentService {
   trackEvent(
     userId: number,
     event: string,
-    properties: Record<string, any> = {},
+    properties: Record<string, unknown> = {},
   ) {
     try {
       const stringId = String(userId)
@@ -36,15 +37,9 @@ export class SegmentService {
     }
   }
 
-  identify(userId: number, traits: TrackingProperties) {
-    try {
-      const stringId = String(userId)
-      this.analytics.identify({
-        userId: stringId,
-        traits,
-      })
-    } catch (err) {
-      this.logger.error(`Failed to identify user: ${userId}`, err)
-    }
+  identify(userId: number, traits: Record<string, unknown>) {
+    const segmentProps = pickKeys(traits, SEGMENT_KEYS)
+    const stringId = String(userId)
+    this.analytics.identify({ userId: stringId, traits: segmentProps })
   }
 }

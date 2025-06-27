@@ -25,6 +25,7 @@ import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../stripe/services/stripe.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 enum CandidateVerification {
   yes = 'YES',
@@ -38,6 +39,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private usersService: UsersService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
+    @Inject(forwardRef(() => AnalyticsService))
+    private readonly analytics: AnalyticsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
   ) {
@@ -109,6 +112,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async update(args: Prisma.CampaignUpdateArgs) {
     const campaign = await this.model.update(args)
     campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
+    const isPro = args?.data?.isPro
+    if (isPro) {
+      this.analytics.identify(campaign?.userId, { isPro })
+    }
     return campaign
   }
 
