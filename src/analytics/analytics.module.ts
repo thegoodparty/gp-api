@@ -1,4 +1,4 @@
-import { forwardRef, Global, Module } from '@nestjs/common'
+import { Global, Module } from '@nestjs/common'
 import { AnalyticsService } from './analytics.service'
 import { HttpModule } from '@nestjs/axios'
 import { AnalyticsController } from './analytics.controller'
@@ -14,9 +14,9 @@ import { UsersModule } from 'src/users/users.module'
   imports: [
     HttpModule,
     SegmentModule,
-    forwardRef(() => SharedModule),
-    forwardRef(() => CampaignsModule),
-    forwardRef(() => UsersModule),
+    SharedModule,
+    CampaignsModule,
+    UsersModule,
   ],
   controllers: [AnalyticsController],
 })
