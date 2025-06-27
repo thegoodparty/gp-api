@@ -1,4 +1,4 @@
-import { forwardRef, Global, Module } from '@nestjs/common'
+import { Global, Module } from '@nestjs/common'
 import { UsersService } from './services/users.service'
 import { UsersController } from './users.controller'
 import { FilesModule } from 'src/files/files.module'
@@ -12,11 +12,6 @@ import { HttpModule } from '@nestjs/axios'
   controllers: [UsersController],
   providers: [UsersService, CrmUsersService],
   exports: [UsersService, CrmUsersService],
-  imports: [
-    FilesModule,
-    forwardRef(() => AuthenticationModule),
-    CrmModule,
-    HttpModule,
-  ],
+  imports: [FilesModule, AuthenticationModule, CrmModule, HttpModule],
 })
 export class UsersModule {}
