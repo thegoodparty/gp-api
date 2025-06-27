@@ -73,7 +73,7 @@ export class DomainsController {
       throw new BadRequestException('No website found for this campaign')
     }
 
-    // TODO: remove and use body
+    // TODO: remove and use body https://goodparty.atlassian.net/browse/WEB-4233
     const dummyContact: RegisterDomainSchema = {
       firstName: 'John',
       lastName: 'Doe',
@@ -96,7 +96,7 @@ export class DomainsController {
   }
 
   // After domain is successfully registered, disable auto renew and configure DNS
-  // TODO: should be handled by a queued job instead of a controller
+  // TODO: should be handled by a queued job instead of a controller https://goodparty.atlassian.net/browse/WEB-4233
   @Post('configure')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)
