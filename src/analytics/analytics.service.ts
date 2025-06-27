@@ -68,7 +68,6 @@ export class AnalyticsService {
     !enableFullStory && (!FULLSTORY_API_KEY || !IS_PROD)
 
   constructor(
-    @Inject(forwardRef(() => CampaignsService))
     private readonly campaigns: CampaignsService,
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,

@@ -6,12 +6,19 @@ import { AuthenticationModule } from '../authentication/authentication.module'
 import { CrmModule } from '../crm/crmModule'
 import { CrmUsersService } from './services/crmUsers.service'
 import { HttpModule } from '@nestjs/axios'
+import { AnalyticsModule } from '../analytics/analytics.module'
 
 @Global()
 @Module({
   controllers: [UsersController],
   providers: [UsersService, CrmUsersService],
   exports: [UsersService, CrmUsersService],
-  imports: [FilesModule, AuthenticationModule, CrmModule, HttpModule],
+  imports: [
+    FilesModule,
+    AuthenticationModule,
+    CrmModule,
+    HttpModule,
+    AnalyticsModule,
+  ],
 })
 export class UsersModule {}
