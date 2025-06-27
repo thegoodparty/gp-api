@@ -12,7 +12,7 @@ model Domain {
   updatedAt   DateTime     @updatedAt @map("updated_at")
   name        String       @unique
   websiteId   Int          @unique @map("website_id")
-  website     Website      @relation(fields: [websiteId], references: [id])
+  website     Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   status      DomainStatus @default(pending)
   operationId String?      @map("operation_id")
   price       Int?
