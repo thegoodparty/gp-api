@@ -20,10 +20,10 @@ export abstract class AwsService {
    * - Auth errors (401/403s) -> UnauthorizedException/ForbiddenException
    * - AWS service errors (500s) -> BadGatewayException
    * @param error - The AWS error to handle
-   * @param context - Additional context about where the error occurred (e.g. service name and operation)
+   * @param message - Optional message to add to the error log
    */
-  private handleAwsError(error: unknown, context: string): never {
-    this.logger.debug(`AWS error in ${context}:`, error)
+  private handleAwsError(error: unknown, message?: string): never {
+    this.logger.debug(`AWS error: ${message}`, error)
 
     if (error instanceof ServiceException) {
       // Handle user input validation errors (400s)
@@ -66,18 +66,18 @@ export abstract class AwsService {
   /**
    * Wraps an AWS service call with error handling
    * @param operation - The AWS operation to execute
-   * @param context - Context for error logging (e.g. method name)
+   * @param message - Optional message to add to the error log
    */
   protected async executeAwsOperation<T>(
     operation: () => Promise<T>,
-    context: string,
+    message?: string,
   ): Promise<T> {
     try {
       return await operation()
     } catch (error) {
       // If this is an AWS SDK v3 error, handle it
       if (error instanceof ServiceException) {
-        this.handleAwsError(error, context)
+        this.handleAwsError(error, message)
       }
 
       // If it's not an AWS error, rethrow it

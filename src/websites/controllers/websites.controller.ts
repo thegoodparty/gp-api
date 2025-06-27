@@ -61,6 +61,9 @@ export class WebsitesController {
   getMyWebsite(@ReqCampaign() { id: campaignId }: Campaign) {
     return this.websites.findUniqueOrThrow({
       where: { campaignId },
+      include: {
+        domain: true,
+      },
     })
   }
 
@@ -112,7 +115,12 @@ export class WebsitesController {
 
     return this.websites.update({
       where: { campaignId },
-      data: { content: updatedContent },
+      data: {
+        content: updatedContent,
+        ...(body.vanityPath !== undefined && {
+          vanityPath: body.vanityPath.toLowerCase(),
+        }),
+      },
     })
   }
 
