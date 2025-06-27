@@ -5,19 +5,12 @@ import { AnalyticsController } from './analytics.controller'
 import { SegmentModule } from 'src/segment/segment.module'
 import { SharedModule } from 'src/shared/shared.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
-import { UsersModule } from 'src/users/users.module'
 
 @Global()
 @Module({
   providers: [AnalyticsService],
   exports: [AnalyticsService],
-  imports: [
-    HttpModule,
-    SegmentModule,
-    SharedModule,
-    CampaignsModule,
-    UsersModule,
-  ],
+  imports: [HttpModule, SegmentModule, SharedModule, CampaignsModule],
   controllers: [AnalyticsController],
 })
 export class AnalyticsModule {}
