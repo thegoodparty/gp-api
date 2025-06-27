@@ -1,10 +1,15 @@
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { ViabilityScore } from 'src/pathToVictory/types/pathToVictory.types'
+import {
+  P2VSource,
+  ViabilityScore,
+} from 'src/pathToVictory/types/pathToVictory.types'
 
 export {}
 
 declare global {
   export namespace PrismaJson {
+    // New name for this will likely be "RaceTargetDetails" - which is currently reflected in elections.service functions
+    // TODO: Rename everything P2V
     export type PathToVictoryData = {
       p2vStatus?: P2VStatus
       p2vAttempts?: number
@@ -28,6 +33,7 @@ declare global {
       averageTurnout?: number
       projectedTurnout?: number
       viability?: ViabilityScore
+      source?: P2VSource
     }
   }
 }

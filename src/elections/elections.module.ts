@@ -10,6 +10,7 @@ import { AiModule } from '../ai/ai.module'
 import { EmailModule } from '../email/email.module'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { VotersModule } from '../voters/voters.module'
+import { ElectionsService } from './services/elections.service'
 
 @Module({
   controllers: [ElectionsController],
@@ -20,8 +21,9 @@ import { VotersModule } from '../voters/voters.module'
     CensusEntitiesService,
     ElectionTypeService,
     BallotReadyService,
+    ElectionsService,
   ],
-  exports: [RacesService],
+  exports: [RacesService, ElectionsService],
   imports: [
     AiModule,
     EmailModule,

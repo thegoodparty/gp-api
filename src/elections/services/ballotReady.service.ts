@@ -174,6 +174,7 @@ export class BallotReadyService {
             position {
               id
               appointed
+              geoId
               hasPrimary
               partisanType
               level
