@@ -6,8 +6,12 @@ import { P2VStatus } from '../types/pathToVictory.types'
 const VOTER_CONTACT_MULTIPLIER = 5
 const WIN_NUMBER_MULTIPLIER = 0.51
 
-const ELECTION_API_URL =
-  process.env.ELECTION_API_URL || 'https://election-api-dev.goodparty.org'
+const ELECTION_API_URL = process.env.ELECTION_API_URL
+if (!ELECTION_API_URL) {
+  throw new Error(`
+    'Please set ELECTION_API_URL in your .env. 
+    Recommendation is to point it at dev if you are developing`)
+}
 
 export class ElectionsService {
   private readonly logger = new Logger(ElectionsService.name)

@@ -111,7 +111,7 @@ export class CampaignsController {
       // Use existing P2V algorithm as a fallback
       this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
     } else {
-      await this.campaigns.updateJsonFields(campaign.id, {
+      this.campaigns.updateJsonFields(campaign.id, {
         pathToVictory: raceTargetDetails,
       })
     }
