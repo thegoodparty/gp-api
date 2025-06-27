@@ -71,6 +71,12 @@ export class StripeService {
         },
       ],
       mode: 'subscription',
+      // Expanding for Segment / analytics
+      expand: [
+        'subscription',
+        'subscription.items.data.price',
+        'payment_intent.payment_method',
+      ],
       success_url: `${WEBAPP_ROOT_URL}/dashboard/pro-sign-up/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${WEBAPP_ROOT_URL}/dashboard`,
     })

@@ -21,6 +21,7 @@ import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -39,6 +40,7 @@ export class PaymentEventsService {
     private readonly crm: CrmCampaignsService,
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly stripeService: StripeService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   async handleEvent(event: Stripe.Event) {
@@ -240,6 +242,8 @@ export class PaymentEventsService {
       subscriptionId: subscriptionId as string,
     })
     await this.campaignsService.setIsPro(campaignId)
+
+    this.analytics.trackProPayment(user.id, session)
 
     return await Promise.allSettled([
       this.usersService.patchUserMetaData(user.id, {

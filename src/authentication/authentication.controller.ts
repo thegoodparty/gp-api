@@ -32,6 +32,8 @@ import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strate
 import { CrmUsersService } from '../users/services/crmUsers.service'
 import { setTokenCookie } from './util/setTokenCookie.util'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { EVENTS } from 'src/segment/segment.types'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @PublicAccess()
 @Controller('authentication')
@@ -44,6 +46,7 @@ export class AuthenticationController {
     private campaignsService: CampaignsService,
     private emailService: EmailService,
     private readonly crmUsers: CrmUsersService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   @Post('register')
@@ -100,12 +103,11 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async sendRecoverPasswordEmail(@Body() { email }: RecoverPasswordSchema) {
     let user = await this.usersService.findUserByEmail(email)
-
     if (!user) {
       // don't want to expose that user with email doesn't exist
       return
     }
-
+    this.analytics.track(user.id, EVENTS.Account.PasswordResetRequested)
     // generate and set reset token on user
     const token = this.authenticationService.generatePasswordResetToken()
     user = await this.usersService.setResetToken(user.id, token)
