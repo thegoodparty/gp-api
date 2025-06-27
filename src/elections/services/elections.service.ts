@@ -1,4 +1,4 @@
-import { BadGatewayException, Logger, NotFoundException } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import { ProjectedTurnout, RaceTargetMetrics } from '../types/elections.types'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { P2VStatus } from '../types/pathToVictory.types'
@@ -15,22 +15,15 @@ export class ElectionsService {
   private async fetchProjectedTurnout(
     brPositionId: string,
   ): Promise<ProjectedTurnout | null> {
+    const params = new URLSearchParams({ brPositionId })
+    const apiVersion = 'v1'
     try {
-      const params = new URLSearchParams({ brPositionId })
-      const apiVersion = 'v1'
       const response = await fetch(
         `${ELECTION_API_URL}/${apiVersion}/projectedTurnout?${params.toString()}`,
       )
-      if (response.status === 404) {
-        throw new NotFoundException(
-          'ElectionAPI did not have the projected turnout for brPositionId: ',
-          brPositionId,
-        )
-      }
-      if (!response.ok) throw new BadGatewayException()
-      return (await response.json()) as ProjectedTurnout
+      return response.ok ? ((await response.json()) as ProjectedTurnout) : null
     } catch (err) {
-      this.logger.warn(err)
+      this.logger.debug(`Error: Couldn't fetch projected turnout - ${err}`)
       return null
     }
   }
@@ -45,24 +38,22 @@ export class ElectionsService {
   }
 
   async buildRaceTargetDetails(
-    brPositionId: string,
+    ballotreadyPositionId: string,
   ): Promise<PrismaJson.PathToVictoryData | null> {
-    const projectedTurnout = await this.fetchProjectedTurnout(brPositionId)
-    if (!projectedTurnout) return null
-
-    const raceTargetMetrics = this.calculateRaceTargetMetrics(
-      projectedTurnout.projectedTurnout,
+    const projectedTurnout = await this.fetchProjectedTurnout(
+      ballotreadyPositionId,
     )
-    const { L2DistrictType, L2DistrictName } = projectedTurnout
 
-    return {
-      ...raceTargetMetrics,
-      projectedTurnout: projectedTurnout.projectedTurnout,
-      source: P2VSource.ElectionApi,
-      electionType: L2DistrictType,
-      electionLocation: L2DistrictName,
-      p2vAttempts: 1,
-      p2vStatus: P2VStatus.complete,
-    }
+    return projectedTurnout
+      ? {
+          ...this.calculateRaceTargetMetrics(projectedTurnout.projectedTurnout),
+          projectedTurnout: projectedTurnout.projectedTurnout,
+          source: P2VSource.ElectionApi,
+          electionType: projectedTurnout.L2DistrictType,
+          electionLocation: projectedTurnout.L2DistrictName,
+          p2vAttempts: 1,
+          p2vStatus: P2VStatus.complete,
+        }
+      : null
   }
 }

@@ -92,25 +92,24 @@ export class CampaignsController {
     }
 
     if (p2vStatus === P2VStatus.waiting) {
-      const brPositionId = campaign?.details?.positionId
+      const ballotreadyPositionId = campaign?.details?.positionId
 
-      if (!brPositionId) {
+      if (!ballotreadyPositionId) {
         this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-        return p2v
       }
 
-      const raceTargetDetails =
-        await this.elections.buildRaceTargetDetails(brPositionId)
+      const raceTargetDetails = ballotreadyPositionId
+        ? await this.elections.buildRaceTargetDetails(ballotreadyPositionId)
+        : null
 
       if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
         // Use existing P2V algorithm as a fallback
         await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-        return p2v
+      } else {
+        await this.campaigns.updateJsonFields(campaign.id, {
+          pathToVictory: raceTargetDetails,
+        })
       }
-
-      await this.campaigns.updateJsonFields(campaign.id, {
-        pathToVictory: raceTargetDetails,
-      })
     }
 
     return p2v
