@@ -95,7 +95,7 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'checkDomainAvailability')
+    })
   }
 
   /**
@@ -125,7 +125,7 @@ export class AwsRoute53Service extends AwsService {
       )
 
       return response.OperationId
-    }, 'registerDomain')
+    })
   }
 
   /**
@@ -152,7 +152,7 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'disableAutoRenew')
+    })
   }
 
   async setDnsRecords(
@@ -215,7 +215,7 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'setDnsRecords')
+    })
   }
 
   /**
@@ -241,7 +241,7 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'getOperationDetail')
+    })
   }
 
   /**
@@ -268,7 +268,7 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'getDomainDetails')
+    })
   }
 
   /**
@@ -296,7 +296,7 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'listPrices')
+    })
   }
 
   /**
@@ -331,7 +331,7 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'getDomainSuggestions')
+    })
   }
 
   /**
@@ -340,7 +340,9 @@ export class AwsRoute53Service extends AwsService {
    */
   async listDomains() {
     return this.executeAwsOperation(async () => {
-      const command = new ListDomainsCommand({})
+      const command = new ListDomainsCommand({
+        MaxItems: 1000,
+      })
       const result = await this.domainsClient.send(command)
 
       if (result instanceof Route53DomainsServiceException) {
@@ -353,6 +355,6 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
-    }, 'listDomains')
+    })
   }
 }

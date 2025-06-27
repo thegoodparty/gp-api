@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   Injectable,
 } from '@nestjs/common'
 import { AwsRoute53Service } from 'src/aws/services/awsRoute53.service'
@@ -8,6 +9,7 @@ import { formatPhoneNumber } from 'src/aws/util/awsRoute53.util'
 import { DomainStatus, User } from '@prisma/client'
 import {
   ContactType,
+  CountryCode,
   DomainAvailability,
   OperationStatus,
 } from '@aws-sdk/client-route-53-domains'
@@ -87,7 +89,7 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     const searchResult = await this.searchForDomain(domainName)
 
     if (searchResult.availability !== DomainAvailability.AVAILABLE) {
-      throw new BadRequestException('Domain not available')
+      throw new ConflictException('Domain not available')
     }
 
     if (!searchResult.prices.registration) {
@@ -151,7 +153,7 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       AddressLine2: contact.addressLine2,
       City: contact.city,
       State: contact.state,
-      CountryCode: 'US',
+      CountryCode: CountryCode.US,
       ZipCode: contact.zipCode,
     })
 
@@ -166,13 +168,9 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
   }
 
   async configureDomain(websiteId: number) {
-    const domain = await this.findUnique({
+    const domain = await this.findUniqueOrThrow({
       where: { websiteId },
     })
-
-    if (!domain) {
-      throw new BadRequestException('Domain not set for this website')
-    }
 
     // can only turn off auto renew after registration
     await this.route53.disableAutoRenew(domain.name)
@@ -198,13 +196,9 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
   }
 
   async checkRegistrationStatus(websiteId: number) {
-    const domain = await this.findUnique({
+    const domain = await this.findUniqueOrThrow({
       where: { websiteId },
     })
-
-    if (!domain) {
-      throw new BadRequestException('Domain not set for this website')
-    }
 
     const operationId = domain.operationId
 
