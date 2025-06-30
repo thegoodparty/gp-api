@@ -8,9 +8,11 @@ import {
   UsePipes,
   UseInterceptors,
   Logger,
+  ForbiddenException,
+  Query,
 } from '@nestjs/common'
 import { WebsitesService } from '../services/websites.service'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, User, UserRole, WebsiteStatus } from '@prisma/client'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
@@ -25,6 +27,9 @@ import { MimeTypes } from 'http-constants-ts'
 import { UpdateWebsiteSchema } from '../schemas/UpdateWebsite.schema'
 import { FilesService } from 'src/files/files.service'
 import { merge } from 'es-toolkit'
+import { userHasRole } from 'src/users/util/users.util'
+import { WebsiteContactsService } from '../services/websiteContacts.service'
+import { GetWebsiteContactsSchema } from '../schemas/GetWebsiteContacts.schema'
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
@@ -36,6 +41,7 @@ export class WebsitesController {
 
   constructor(
     private readonly websites: WebsitesService,
+    private readonly contacts: WebsiteContactsService,
     private readonly files: FilesService,
   ) {}
 
@@ -65,6 +71,43 @@ export class WebsitesController {
         domain: true,
       },
     })
+  }
+
+  @Get('mine/contacts')
+  @UseCampaign()
+  async getMyWebsiteContacts(
+    @ReqCampaign() { id: campaignId }: Campaign,
+    @Query()
+    {
+      sortBy,
+      sortOrder = 'desc',
+      limit = 25,
+      page = 1,
+    }: GetWebsiteContactsSchema,
+  ) {
+    const website = await this.websites.findUniqueOrThrow({
+      where: { campaignId },
+    })
+
+    const [contacts, total] = await Promise.all([
+      this.contacts.findMany({
+        where: { websiteId: website.id },
+        orderBy: sortBy ? { [sortBy]: sortOrder } : undefined,
+        take: limit,
+        skip: (page - 1) * limit,
+      }),
+      this.contacts.count({
+        where: { websiteId: website.id },
+      }),
+    ])
+
+    return {
+      contacts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
   @Put('mine')
@@ -120,23 +163,64 @@ export class WebsitesController {
         ...(body.vanityPath !== undefined && {
           vanityPath: body.vanityPath.toLowerCase(),
         }),
+        ...(body.status !== undefined && {
+          status: body.status,
+        }),
       },
     })
   }
 
-  @Post('contact-form')
-  @PublicAccess()
-  contactForm(@Body() body: ContactFormSchema) {
-    return {
-      body,
-    }
-  }
-
-  @Get('preview/:vanityPath')
-  @PublicAccess()
-  previewWebsite(@Param('vanityPath') vanityPath: string) {
-    return this.websites.findUniqueOrThrow({
+  @Get(':vanityPath/preview')
+  @UseCampaign()
+  async previewWebsite(
+    @ReqUser() user: User,
+    @ReqCampaign() campaign: Campaign,
+    @Param('vanityPath') vanityPath: string,
+  ) {
+    const website = await this.websites.findUniqueOrThrow({
       where: { vanityPath },
     })
+
+    if (
+      website.campaignId !== campaign.id &&
+      !userHasRole(user, UserRole.admin)
+    ) {
+      throw new ForbiddenException(
+        'You are not authorized to preview this website',
+      )
+    }
+
+    return website
+  }
+
+  @Get(':vanityPath/view')
+  @PublicAccess()
+  async viewWebsite(@Param('vanityPath') vanityPath: string) {
+    const website = await this.websites.findUniqueOrThrow({
+      where: { vanityPath },
+    })
+
+    if (website.status !== WebsiteStatus.published) {
+      throw new ForbiddenException()
+    }
+
+    return website
+  }
+
+  @Post(':vanityPath/contact-form')
+  @PublicAccess()
+  async contactForm(
+    @Param('vanityPath') vanityPath: string,
+    @Body() body: ContactFormSchema,
+  ) {
+    const website = await this.websites.findUniqueOrThrow({
+      where: { vanityPath },
+    })
+
+    if (website.status !== WebsiteStatus.published) {
+      throw new ForbiddenException()
+    }
+
+    return await this.contacts.create(website.id, body)
   }
 }

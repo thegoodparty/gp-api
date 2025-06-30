@@ -5,7 +5,7 @@ import { parseArgs } from 'util'
 import seedCampaigns from './campaigns'
 import seedTopIssues from './topIssues'
 import seedUsers, { ADMIN_USER } from './users'
-
+import seedWebsiteContacts from './websiteContacts'
 // csv file seeds
 import seedElectionTypes from './electionTypes'
 import seedMtfcc from './mtfcc'
@@ -39,6 +39,7 @@ async function main() {
     const campaignIds = await seedCampaigns(prisma, users)
     await seedTopIssues(prisma, campaignIds)
     await seedEcanvasserDemoAccount(ADMIN_USER.email, prisma)
+    await seedWebsiteContacts(prisma)
   }
 }
 

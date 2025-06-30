@@ -1,8 +1,10 @@
+import { WebsiteStatus } from '@prisma/client'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 
 export class UpdateWebsiteSchema extends createZodDto(
   z.object({
+    status: z.nativeEnum(WebsiteStatus).optional(),
     vanityPath: z
       .string()
       .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, {
