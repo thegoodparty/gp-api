@@ -30,6 +30,7 @@ import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.s
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
+import { ElectionsService } from 'src/elections/services/elections.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @Controller('campaigns')
@@ -43,6 +44,7 @@ export class CampaignsController {
     private readonly slack: SlackService,
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
+    private readonly elections: ElectionsService,
     private readonly analytics: AnalyticsService,
   ) {}
 
@@ -91,11 +93,30 @@ export class CampaignsController {
       })
     }
 
-    if (p2vStatus === P2VStatus.waiting) {
-      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-    }
+    p2vStatus === P2VStatus.waiting && this.handleP2VWaiting(campaign)
 
     return p2v
+  }
+
+  private async handleP2VWaiting(campaign: Campaign) {
+    const ballotreadyPositionId = campaign?.details?.positionId
+
+    if (!ballotreadyPositionId) {
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
+
+    const raceTargetDetails = ballotreadyPositionId
+      ? await this.elections.buildRaceTargetDetails(ballotreadyPositionId)
+      : null
+
+    if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
+      // Use existing P2V algorithm as a fallback
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    } else {
+      this.campaigns.updateJsonFields(campaign.id, {
+        pathToVictory: raceTargetDetails,
+      })
+    }
   }
 
   @Roles(UserRole.admin)
