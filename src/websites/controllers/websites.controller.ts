@@ -81,7 +81,7 @@ export class WebsitesController {
     {
       sortBy,
       sortOrder = 'desc',
-      limit = 50,
+      limit = 25,
       page = 1,
     }: GetWebsiteContactsSchema,
   ) {
@@ -89,12 +89,25 @@ export class WebsitesController {
       where: { campaignId },
     })
 
-    return this.contacts.findMany({
-      where: { websiteId: website.id },
-      orderBy: sortBy ? { [sortBy]: sortOrder } : undefined,
-      take: limit,
-      skip: (page - 1) * limit,
-    })
+    const [contacts, total] = await Promise.all([
+      this.contacts.findMany({
+        where: { websiteId: website.id },
+        orderBy: sortBy ? { [sortBy]: sortOrder } : undefined,
+        take: limit,
+        skip: (page - 1) * limit,
+      }),
+      this.contacts.count({
+        where: { websiteId: website.id },
+      }),
+    ])
+
+    return {
+      contacts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
   @Put('mine')
@@ -208,6 +221,6 @@ export class WebsitesController {
       throw new ForbiddenException()
     }
 
-    return await this.contacts.createContact(website.id, body)
+    return await this.contacts.create(website.id, body)
   }
 }

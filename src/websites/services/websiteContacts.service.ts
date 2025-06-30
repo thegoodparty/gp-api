@@ -7,7 +7,7 @@ import { ContactFormSchema } from '../schemas/ContactForm.schema'
 export class WebsiteContactsService extends createPrismaBase(
   MODELS.WebsiteContact,
 ) {
-  createContact(websiteId: number, body: ContactFormSchema) {
+  create(websiteId: number, body: ContactFormSchema) {
     return this.model.create({
       data: {
         ...body,
