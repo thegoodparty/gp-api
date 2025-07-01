@@ -1,4 +1,4 @@
-enum Channel {
+enum IssueChannel {
   inPersonMeeting
   phoneCall
   email
@@ -7,7 +7,7 @@ enum Channel {
   other
 }
 
-enum Status {
+enum IssueStatus {
   newIssue
   accepted
   inProgress
@@ -16,15 +16,15 @@ enum Status {
 }
 
 model CommunityIssue {
-  id          Int      @id @default(autoincrement())
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id          Int          @id @default(autoincrement())
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
   title       String
   description String
-  status      Status
-  channel     Channel
-  attachments String[] @default([])
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status      IssueStatus
+  channel     IssueChannel
+  attachments String[]     @default([])
+  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId  Int
 
   @@map("community_issue")
