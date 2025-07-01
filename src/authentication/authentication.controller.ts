@@ -56,7 +56,15 @@ export class AuthenticationController {
   ) {
     const { token, user } = await this.authenticationService.register(userData)
     setTokenCookie(response, token)
-    return { user: ReadUserOutputSchema.parse(user), token }
+    const campaign = await this.campaignsService.createForUser(user)
+    return { user: ReadUserOutputSchema.parse(user), token, campaign }
+  }
+
+  private async reconcileCampaignForUser(
+    user: User,
+  ): Promise<LoginResult['campaign']> {
+    const existingCampaign = await this.campaignsService.findByUserId(user.id)
+    return existingCampaign || (await this.campaignsService.createForUser(user))
   }
 
   @UseGuards(AuthGuard('local'))
@@ -69,16 +77,16 @@ export class AuthenticationController {
       email: user.email,
       sub: user.id,
     })
-    const result = {
-      user: ReadUserOutputSchema.parse(user),
-      token,
-    }
 
     setTokenCookie(response, token)
 
     this.crmUsers.trackUserLogin(user)
 
-    return result
+    return {
+      user: ReadUserOutputSchema.parse(user),
+      campaign: await this.reconcileCampaignForUser(user),
+      token,
+    }
   }
 
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
@@ -95,6 +103,7 @@ export class AuthenticationController {
     setTokenCookie(response, token)
     return {
       user: ReadUserOutputSchema.parse(user),
+      campaign: await this.reconcileCampaignForUser(user),
       token,
     }
   }

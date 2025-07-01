@@ -1,6 +1,11 @@
 import { ReadUserOutput } from '../users/schemas/ReadUserOutput.schema'
+import { Campaign } from '@prisma/client'
 
-export type LoginResult = { user: ReadUserOutput; token: string }
+export type LoginResult = {
+  user: ReadUserOutput
+  campaign: Campaign
+  token: string
+}
 
 export enum SocialProvider {
   GOOGLE = 'google',
