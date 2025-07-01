@@ -79,7 +79,7 @@ export class RacesService {
         }
 
         iterationCount++
-        this.logger.log(
+        this.logger.debug(
           `Iteration ${iterationCount}: hasNextPage=${hasNextPage}, elections=${elections.length}`,
         )
 
@@ -95,7 +95,7 @@ export class RacesService {
           hasNextPage = races.pageInfo.hasNextPage
           const startCursor = races.pageInfo.endCursor ?? null
 
-          this.logger.log(`Iteration ${iterationCount}: pageInfo`, {
+          this.logger.debug(`Iteration ${iterationCount}: pageInfo`, {
             hasNextPage,
             endCursor: startCursor,
             edgesCount: races.edges.length,
@@ -125,7 +125,7 @@ export class RacesService {
       }
 
       const totalTime = Date.now() - startTime
-      this.logger.log(
+      this.logger.debug(
         `Completed: ${iterationCount} iterations, ${elections.length} elections in ${totalTime}ms`,
       )
 
