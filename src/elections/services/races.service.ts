@@ -58,6 +58,10 @@ export class RacesService {
         }
       > = {}
       let hasNextPage = true
+      let iterationCount = 0
+      const MAX_ITERATIONS = 50 // Safety limit to prevent infinite loops
+      const TIMEOUT_MS = 15 * 1000 // 15 second timeout
+      const startTime = Date.now()
 
       let nextRacesPromise = this.ballotReadyService.fetchRacesByZipcode(
         zipcode,
@@ -65,7 +69,20 @@ export class RacesService {
         electionDate,
       )
 
-      while (hasNextPage) {
+      while (hasNextPage && iterationCount < MAX_ITERATIONS) {
+        // Check timeout
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          this.logger.warn(
+            `Timeout reached (${TIMEOUT_MS}ms) for zipcode ${zipcode}. Returning ${elections.length} elections loaded so far.`,
+          )
+          break
+        }
+
+        iterationCount++
+        this.logger.log(
+          `Iteration ${iterationCount}: hasNextPage=${hasNextPage}, elections=${elections.length}`,
+        )
+
         // Wait for the API response
         const queryResponse = await nextRacesPromise
         if (!queryResponse) {
@@ -77,6 +94,13 @@ export class RacesService {
         if (races?.edges) {
           hasNextPage = races.pageInfo.hasNextPage
           const startCursor = races.pageInfo.endCursor ?? null
+
+          this.logger.log(`Iteration ${iterationCount}: pageInfo`, {
+            hasNextPage,
+            endCursor: startCursor,
+            edgesCount: races.edges.length,
+            totalElectionsSoFar: elections.length,
+          })
 
           // Start the next API request while parsing
           nextRacesPromise = hasNextPage
@@ -93,6 +117,17 @@ export class RacesService {
           hasNextPage = false
         }
       }
+
+      if (iterationCount >= MAX_ITERATIONS) {
+        this.logger.warn(
+          `Reached maximum iteration limit (${MAX_ITERATIONS}) for zipcode ${zipcode}. This may indicate a very large dataset or potential infinite loop.`,
+        )
+      }
+
+      const totalTime = Date.now() - startTime
+      this.logger.log(
+        `Completed: ${iterationCount} iterations, ${elections.length} elections in ${totalTime}ms`,
+      )
 
       return elections
     } catch (e) {
