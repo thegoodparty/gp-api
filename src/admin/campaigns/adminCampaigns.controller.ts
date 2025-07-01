@@ -53,11 +53,13 @@ export class AdminCampaignsController {
     const campaign = await this.campaigns.findUniqueOrThrow({
       where: { id },
     })
+    // Logging the deletion to Slack to track why campaigns are deleted:
+    //  https://goodparty.atlassian.net/browse/WEB-4324
     this.slack.message(
       {
         body: `Admin ${user.email} deleted campaign with ID ${id} related to userId: ${campaign.userId}`,
       },
-      SlackChannel.botDev,
+      SlackChannel.botDeletions,
     )
     return this.campaigns.delete({ where: { id } })
   }
