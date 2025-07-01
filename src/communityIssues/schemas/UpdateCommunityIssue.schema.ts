@@ -8,5 +8,6 @@ export class UpdateCommunityIssueSchema extends createZodDto(
     description: z.string().min(1, 'Description is required').optional(),
     status: z.nativeEnum(Status).optional(),
     channel: z.nativeEnum(Channel).optional(),
+    attachments: z.array(z.string().url('Must be a valid URL')).optional(),
   }),
 ) {}

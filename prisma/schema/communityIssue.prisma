@@ -8,10 +8,11 @@ enum Channel {
 }
 
 enum Status {
-  inReview
+  newIssue
+  accepted
   inProgress
-  resolved
-  deferred
+  wontDo
+  completed
 }
 
 model CommunityIssue {
@@ -22,6 +23,7 @@ model CommunityIssue {
   description String
   status      Status
   channel     Channel
+  attachments String[] @default([])
   campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId  Int
 
