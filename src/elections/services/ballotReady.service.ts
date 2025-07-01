@@ -133,7 +133,7 @@ export class BallotReadyService {
     } else {
       gt = new Date().toISOString().split('T')[0]
       const nextYear = new Date()
-      nextYear.setFullYear(nextYear.getFullYear() + 1)
+      nextYear.setFullYear(nextYear.getFullYear() + 2)
       lt = nextYear.toISOString().split('T')[0]
     }
     const state = zipcodes.lookup(zipcode)?.state
