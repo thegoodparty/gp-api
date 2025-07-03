@@ -30,6 +30,7 @@ import { merge } from 'es-toolkit'
 import { userHasRole } from 'src/users/util/users.util'
 import { WebsiteContactsService } from '../services/websiteContacts.service'
 import { GetWebsiteContactsSchema } from '../schemas/GetWebsiteContacts.schema'
+import { ValidateVanityPathSchema } from '../schemas/ValidateVanityPath.schema'
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
@@ -143,6 +144,12 @@ export class WebsitesController {
       body,
     )
 
+    // Handle array replacement for about.issues to prevent merging
+    if (body.about?.issues) {
+      updatedContent.about = updatedContent.about || {}
+      updatedContent.about.issues = body.about.issues
+    }
+
     const [logo, hero] = await Promise.all([
       logoFile ? this.files.uploadFile(logoFile, 'uploads') : null,
       heroFile ? this.files.uploadFile(heroFile, 'uploads') : null,
@@ -168,6 +175,21 @@ export class WebsitesController {
         }),
       },
     })
+  }
+
+  @Post('validate-vanity-path')
+  @UseCampaign()
+  async validateVanityPath(
+    @ReqCampaign() { id: campaignId }: Campaign,
+    @Body() body: ValidateVanityPathSchema,
+  ) {
+    const website = await this.websites.findUnique({
+      where: { vanityPath: body.vanityPath, NOT: { campaignId } },
+    })
+
+    return {
+      available: !website,
+    }
   }
 
   @Get(':vanityPath/preview')
