@@ -6,7 +6,7 @@ export class ContactFormSchema extends createZodDto(
   z.object({
     name: z.string(),
     email: EmailSchema,
-    phone: PhoneSchema,
+    phone: PhoneSchema.optional(),
     message: z.string(),
     smsConsent: z.boolean(),
   }),

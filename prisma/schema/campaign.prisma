@@ -38,6 +38,7 @@ model Campaign {
   voterFileFilters      VoterFileFilter[]
   website               Website?
   outreach              Outreach[]
+  communityIssue        CommunityIssue[]
 
   @@index([slug])
   @@map("campaign")

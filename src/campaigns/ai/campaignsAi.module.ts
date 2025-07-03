@@ -7,10 +7,9 @@ import { QueueProducerModule } from 'src/queue/producer/producer.module'
 import { AiChatController } from './chat/aiChat.controller'
 import { AiChatService } from './chat/aiChat.service'
 import { AiService } from '../../ai/ai.service'
-import { AnalyticsModule } from 'src/analytics/analytics.module'
 
 @Module({
-  imports: [ContentModule, AiModule, QueueProducerModule, AnalyticsModule],
+  imports: [ContentModule, AiModule, QueueProducerModule],
   controllers: [AiContentController, AiChatController],
   providers: [AiContentService, AiChatService, AiService],
   exports: [AiContentService, AiChatService],

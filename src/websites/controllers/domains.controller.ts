@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -13,13 +14,19 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole } from '@prisma/client'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { WebsitesService } from '../services/websites.service'
+import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 
 @Controller('domains')
 @UsePipes(ZodValidationPipe)
 export class DomainsController {
-  constructor(private readonly domains: DomainsService) {}
+  constructor(
+    private readonly domains: DomainsService,
+    private readonly websites: WebsitesService,
+  ) {}
 
   @Get()
   @Roles(UserRole.admin)
@@ -35,10 +42,20 @@ export class DomainsController {
   @Post()
   @UseCampaign()
   async registerDomain(
+    @ReqUser() user: User,
     @ReqCampaign() { id: campaignId }: Campaign,
     @Body() { domain }: SearchDomainSchema,
   ) {
-    return this.domains.startDomainRegistration(campaignId, domain)
+    const website = await this.websites.findUnique({
+      where: { campaignId },
+      select: { id: true },
+    })
+
+    if (!website) {
+      throw new BadRequestException('No website found for this campaign')
+    }
+
+    return this.domains.startDomainRegistration(user, website.id, domain)
   }
 
   @Post('complete')
@@ -47,7 +64,29 @@ export class DomainsController {
   async completeDomainRegistration(
     @ReqCampaign() { id: campaignId }: Campaign,
   ) {
-    return this.domains.completeDomainRegistration(campaignId)
+    const website = await this.websites.findUnique({
+      where: { campaignId },
+      select: { id: true },
+    })
+
+    if (!website) {
+      throw new BadRequestException('No website found for this campaign')
+    }
+
+    // TODO: remove and use body https://goodparty.atlassian.net/browse/WEB-4233
+    const dummyContact: RegisterDomainSchema = {
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'test@example.com',
+      phoneNumber: '1234567890',
+      addressLine1: '123 Main St',
+      addressLine2: 'Apt 1',
+      city: 'Anytown',
+      state: 'CA',
+      zipCode: '12345',
+    }
+
+    return this.domains.completeDomainRegistration(website.id, dummyContact)
   }
 
   @Get('status')
@@ -57,7 +96,7 @@ export class DomainsController {
   }
 
   // After domain is successfully registered, disable auto renew and configure DNS
-  // TODO: should be handled by a queued job instead of a controller
+  // TODO: should be handled by a queued job instead of a controller https://goodparty.atlassian.net/browse/WEB-4233
   @Post('configure')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)

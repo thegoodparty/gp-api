@@ -28,9 +28,20 @@ export class MailgunService {
     })
   }
 
-  sendMessage({ variables, ...emailData }: EmailData) {
+  async sendMessage({ variables, ...emailData }: EmailData) {
     if (variables) {
-      emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
+      try {
+        emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
+      } catch (_error) {
+        this.logger.error(
+          `Failed to stringify variables for email ${emailData.to}:`,
+          variables,
+        )
+        throw new Error(
+          `Failed to stringify variables for email: ${emailData.to}`,
+          variables,
+        )
+      }
     }
 
     // Add tag header based on template name
@@ -46,6 +57,6 @@ export class MailgunService {
       emailData.to = process.env.MAILGUN_INTERCEPT_EMAIL
     }
 
-    return this.client.messages.create(EMAIL_DOMAIN, emailData)
+    return await this.client.messages.create(EMAIL_DOMAIN, emailData)
   }
 }

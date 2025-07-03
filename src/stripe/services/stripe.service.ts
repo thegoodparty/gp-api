@@ -1,5 +1,7 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
+import { User } from '@prisma/client'
+import { PaymentIntentPayload, PaymentType } from 'src/payments/payments.types'
 
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
   process.env
@@ -27,6 +29,33 @@ export class StripeService {
     return price
   }
 
+  async createPaymentIntent<T extends PaymentType>(
+    user: User,
+    { amount, description, type, ...restMetadata }: PaymentIntentPayload<T>,
+  ) {
+    const userId = user.id
+    const customerId = user.metaData?.customerId
+
+    return await this.stripe.paymentIntents.create({
+      customer: customerId,
+      amount,
+      currency: 'usd',
+      description,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+      metadata: {
+        userId,
+        paymentType: type,
+        ...restMetadata,
+      },
+    })
+  }
+
+  async retrievePaymentIntent(paymentId: string) {
+    return await this.stripe.paymentIntents.retrieve(paymentId)
+  }
+
   async createCheckoutSession(userId: number) {
     const session = await this.stripe.checkout.sessions.create({
       metadata: {
@@ -42,6 +71,12 @@ export class StripeService {
         },
       ],
       mode: 'subscription',
+      // Expanding for Segment / analytics
+      expand: [
+        'subscription',
+        'subscription.items.data.price',
+        'payment_intent.payment_method',
+      ],
       success_url: `${WEBAPP_ROOT_URL}/dashboard/pro-sign-up/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${WEBAPP_ROOT_URL}/dashboard`,
     })

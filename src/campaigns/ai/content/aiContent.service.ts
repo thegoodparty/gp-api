@@ -64,7 +64,7 @@ export class AiContentService {
 
     // generating a new ai content here
     const cmsPrompts = await this.contentService.getAiContentPrompts()
-    const keyNoDigits = key.replace(/\d+/g, '') // we allow multiple keys like key1, key2
+    const keyNoDigits = key.replace(/\d+$/, '') // we allow multiple keys like key1, key2
     let prompt = cmsPrompts[keyNoDigits] as string
 
     const campaignWithRelations = (await this.campaignsService.findFirst({
