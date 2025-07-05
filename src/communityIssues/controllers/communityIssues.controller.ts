@@ -11,7 +11,8 @@ import {
   Logger,
 } from '@nestjs/common'
 import { CommunityIssuesService } from '../services/communityIssues.service'
-import { Campaign } from '@prisma/client'
+import { CommunityIssueStatusLogService } from '../services/communityIssueStatusLog.service'
+import { Campaign, IssueStatus } from '@prisma/client'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -25,15 +26,23 @@ export class CommunityIssuesController {
 
   constructor(
     private readonly communityIssuesService: CommunityIssuesService,
+    private readonly statusLogService: CommunityIssueStatusLogService,
   ) {}
 
   @Post()
   @UseCampaign()
-  createCommunityIssue(
+  async createCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
     @Body() body: CreateCommunityIssueSchema,
   ) {
-    return this.communityIssuesService.create(campaignId, body)
+    const issue = await this.communityIssuesService.create(campaignId, body)
+
+    await this.statusLogService.logInitialStatus(
+      issue.id,
+      body.status ?? IssueStatus.newIssue,
+    )
+
+    return issue
   }
 
   @Get()
@@ -55,17 +64,44 @@ export class CommunityIssuesController {
     })
   }
 
+  @Get(':id/status-history')
+  @UseCampaign()
+  async getCommunityIssueStatusHistory(
+    @ReqCampaign() { id: campaignId }: Campaign,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    // First verify the issue exists and belongs to the campaign
+    await this.communityIssuesService.findUniqueOrThrow({
+      where: { id, campaignId },
+    })
+    return this.statusLogService.getStatusHistory(id)
+  }
+
   @Put(':id')
   @UseCampaign()
-  updateCommunityIssue(
+  async updateCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateCommunityIssueSchema,
   ) {
-    return this.communityIssuesService.update({
+    const currentIssue = await this.communityIssuesService.findUniqueOrThrow({
+      where: { id, campaignId },
+    })
+
+    const updatedIssue = await this.communityIssuesService.update({
       where: { id, campaignId },
       data: body,
     })
+
+    if (body.status && currentIssue.status !== body.status) {
+      await this.statusLogService.createStatusLog(
+        id,
+        currentIssue.status,
+        body.status,
+      )
+    }
+
+    return updatedIssue
   }
 
   @Delete(':id')
