@@ -93,8 +93,8 @@ export class CommunityIssuesController {
       data: body,
     })
 
-    if (body.status) {
-      await this.statusLogService.logStatusChangeIfNeeded(
+    if (body.status && currentIssue.status !== body.status) {
+      await this.statusLogService.createStatusLog(
         id,
         currentIssue.status,
         body.status,

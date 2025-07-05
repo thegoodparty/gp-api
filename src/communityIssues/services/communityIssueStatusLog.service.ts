@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/prisma/prisma.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { IssueStatus } from '@prisma/client'
 
 @Injectable()
-export class CommunityIssueStatusLogService {
-  constructor(private readonly prisma: PrismaService) {}
-
+export class CommunityIssueStatusLogService extends createPrismaBase(
+  MODELS.CommunityIssueStatusLog,
+) {
   async createStatusLog(
     communityIssueId: number,
     fromStatus: IssueStatus | null,
     toStatus: IssueStatus,
   ) {
-    return this.prisma.communityIssueStatusLog.create({
+    return this.model.create({
       data: {
         communityIssueId,
         fromStatus,
@@ -21,7 +21,7 @@ export class CommunityIssueStatusLogService {
   }
 
   async getStatusHistory(communityIssueId: number) {
-    return this.prisma.communityIssueStatusLog.findMany({
+    return this.model.findMany({
       where: { communityIssueId },
       orderBy: { createdAt: 'asc' },
     })
@@ -29,16 +29,5 @@ export class CommunityIssueStatusLogService {
 
   async logInitialStatus(communityIssueId: number, status: IssueStatus) {
     return this.createStatusLog(communityIssueId, null, status)
-  }
-
-  async logStatusChangeIfNeeded(
-    communityIssueId: number,
-    oldStatus: IssueStatus,
-    newStatus: IssueStatus,
-  ) {
-    if (oldStatus !== newStatus) {
-      return this.createStatusLog(communityIssueId, oldStatus, newStatus)
-    }
-    return null
   }
 }
