@@ -7,10 +7,12 @@ import { AwsModule } from 'src/aws/aws.module'
 import { VercelModule } from 'src/vercel/vercel.module'
 import { WebsitesController } from './controllers/websites.controller'
 import { FilesModule } from 'src/files/files.module'
+import { PaymentsModule } from 'src/payments/payments.module'
+import { WebsiteContactsService } from './services/websiteContacts.service'
 
 @Module({
-  imports: [HttpModule, AwsModule, VercelModule, FilesModule],
+  imports: [HttpModule, AwsModule, VercelModule, FilesModule, PaymentsModule],
   controllers: [DomainsController, WebsitesController],
-  providers: [DomainsService, WebsitesService],
+  providers: [DomainsService, WebsitesService, WebsiteContactsService],
 })
 export class WebsitesModule {}

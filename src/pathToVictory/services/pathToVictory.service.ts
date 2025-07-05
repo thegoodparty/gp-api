@@ -16,7 +16,7 @@ import { EmailTemplateName } from '../../email/email.types'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
-import { SegmentService } from 'src/segment/segment.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @Injectable()
 export class PathToVictoryService extends createPrismaBase(
@@ -30,7 +30,8 @@ export class PathToVictoryService extends createPrismaBase(
     private emailService: EmailService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private crmService: CrmCampaignsService,
-    private segment: SegmentService,
+    @Inject(forwardRef(() => AnalyticsService))
+    private analytics: AnalyticsService,
   ) {
     super()
   }
@@ -412,7 +413,7 @@ export class PathToVictoryService extends createPrismaBase(
         },
       })
 
-      this.segment.identify(campaign.userId, {
+      this.analytics.identify(campaign.userId, {
         winNumber: pathToVictoryResponse.counts.winNumber,
       })
 

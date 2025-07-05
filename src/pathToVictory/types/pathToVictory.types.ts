@@ -48,3 +48,8 @@ export interface ViabilityScore {
   score: number
   probOfWin: number
 }
+
+export enum P2VSource {
+  GpApi = 'GpApi',
+  ElectionApi = 'ElectionApi',
+}

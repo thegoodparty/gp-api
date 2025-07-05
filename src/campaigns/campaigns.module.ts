@@ -12,7 +12,6 @@ import { CampaignUpdateHistoryController } from './updateHistory/campaignUpdateH
 import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHistory.service'
 import { CrmModule } from '../crm/crmModule'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
-import { AnalyticsModule } from '../analytics/analytics.module'
 import { CampaignsAiModule } from './ai/campaignsAi.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
@@ -21,6 +20,7 @@ import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { StripeModule } from '../stripe/stripe.module'
+import { ElectionsService } from 'src/elections/services/elections.service'
 
 @Global()
 @Module({
@@ -28,8 +28,8 @@ import { StripeModule } from '../stripe/stripe.module'
     EmailModule,
     CampaignsAiModule,
     CrmModule,
-    AnalyticsModule,
     ElectionsModule,
+    ElectionsService,
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,

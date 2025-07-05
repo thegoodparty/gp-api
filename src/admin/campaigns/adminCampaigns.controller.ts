@@ -17,7 +17,10 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Roles } from '../../authentication/decorators/Roles.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { UserRole } from '@prisma/client'
+import { User, UserRole } from '@prisma/client'
+import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
+import { SlackService } from '../../shared/services/slack.service'
+import { SlackChannel } from '../../shared/services/slackService.types'
 
 @Controller('admin/campaigns')
 @Roles(UserRole.admin)
@@ -26,6 +29,7 @@ export class AdminCampaignsController {
   constructor(
     private readonly adminCampaigns: AdminCampaignsService,
     private readonly campaigns: CampaignsService,
+    private readonly slack: SlackService,
   ) {}
 
   @Post()
@@ -45,7 +49,18 @@ export class AdminCampaignsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  delete(@Param('id', ParseIntPipe) id: number) {
+  async delete(@Param('id', ParseIntPipe) id: number, @ReqUser() user: User) {
+    const campaign = await this.campaigns.findUniqueOrThrow({
+      where: { id },
+    })
+    // Logging the deletion to Slack to track why campaigns are deleted:
+    //  https://goodparty.atlassian.net/browse/WEB-4324
+    this.slack.message(
+      {
+        body: `Admin ${user.email} deleted campaign with ID ${id} related to userId: ${campaign.userId}`,
+      },
+      SlackChannel.botDeletions,
+    )
     return this.campaigns.delete({ where: { id } })
   }
 

@@ -32,6 +32,8 @@ import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strate
 import { CrmUsersService } from '../users/services/crmUsers.service'
 import { setTokenCookie } from './util/setTokenCookie.util'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { EVENTS } from 'src/segment/segment.types'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @PublicAccess()
 @Controller('authentication')
@@ -44,6 +46,7 @@ export class AuthenticationController {
     private campaignsService: CampaignsService,
     private emailService: EmailService,
     private readonly crmUsers: CrmUsersService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   @Post('register')
@@ -53,7 +56,15 @@ export class AuthenticationController {
   ) {
     const { token, user } = await this.authenticationService.register(userData)
     setTokenCookie(response, token)
-    return { user: ReadUserOutputSchema.parse(user), token }
+    const campaign = await this.campaignsService.createForUser(user)
+    return { user: ReadUserOutputSchema.parse(user), token, campaign }
+  }
+
+  private async reconcileCampaignForUser(
+    user: User,
+  ): Promise<LoginResult['campaign']> {
+    const existingCampaign = await this.campaignsService.findByUserId(user.id)
+    return existingCampaign || (await this.campaignsService.createForUser(user))
   }
 
   @UseGuards(AuthGuard('local'))
@@ -66,16 +77,16 @@ export class AuthenticationController {
       email: user.email,
       sub: user.id,
     })
-    const result = {
-      user: ReadUserOutputSchema.parse(user),
-      token,
-    }
 
     setTokenCookie(response, token)
 
     this.crmUsers.trackUserLogin(user)
 
-    return result
+    return {
+      user: ReadUserOutputSchema.parse(user),
+      campaign: await this.reconcileCampaignForUser(user),
+      token,
+    }
   }
 
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
@@ -92,6 +103,7 @@ export class AuthenticationController {
     setTokenCookie(response, token)
     return {
       user: ReadUserOutputSchema.parse(user),
+      campaign: await this.reconcileCampaignForUser(user),
       token,
     }
   }
@@ -100,12 +112,11 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async sendRecoverPasswordEmail(@Body() { email }: RecoverPasswordSchema) {
     let user = await this.usersService.findUserByEmail(email)
-
     if (!user) {
       // don't want to expose that user with email doesn't exist
       return
     }
-
+    this.analytics.track(user.id, EVENTS.Account.PasswordResetRequested)
     // generate and set reset token on user
     const token = this.authenticationService.generatePasswordResetToken()
     user = await this.usersService.setResetToken(user.id, token)

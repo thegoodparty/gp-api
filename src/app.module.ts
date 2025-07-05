@@ -29,10 +29,12 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { SegmentModule } from './segment/segment.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { WebsitesModule } from './websites/websites.module'
+import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    AnalyticsModule,
     UsersModule,
     AuthenticationModule,
     ContentModule,
@@ -56,8 +58,8 @@ import { WebsitesModule } from './websites/websites.module'
     ScheduledMessagingModule,
     OutreachModule,
     SegmentModule,
-    AnalyticsModule,
     WebsitesModule,
+    CommunityIssuesModule,
   ],
   providers: [
     SessionsService,

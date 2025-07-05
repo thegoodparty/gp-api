@@ -15,6 +15,7 @@ import {
 } from '../types/ballotReady.types'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { ELECTION_LEVELS } from '../../shared/constants/governmentLevels'
+import zipcodes from 'zipcodes'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -135,6 +136,7 @@ export class BallotReadyService {
       nextYear.setFullYear(nextYear.getFullYear() + 2)
       lt = nextYear.toISOString().split('T')[0]
     }
+    const state = zipcodes.lookup(zipcode)?.state
 
     let levelWithTownship = level?.toUpperCase()
     if (levelWithTownship === ELECTION_LEVELS.Local) {
@@ -155,9 +157,11 @@ export class BallotReadyService {
             gte: "${gt}"
             lte: "${lt}"
           }
+          ${state ? `state: "${state}"` : ''}
           ${levelWithTownship ? `level: [${levelWithTownship}]` : ''}
         }
         after: ${startCursor ? `"${startCursor}"` : null}
+        first: 100
       ) {
         edges {
           node {
@@ -174,6 +178,7 @@ export class BallotReadyService {
             position {
               id
               appointed
+              geoId
               hasPrimary
               partisanType
               level
