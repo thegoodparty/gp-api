@@ -6,7 +6,6 @@ import {
   Param,
   Post,
   Put,
-  UsePipes,
   Logger,
 } from '@nestjs/common'
 import { CommunityIssuesService } from '../services/communityIssues.service'
@@ -19,7 +18,6 @@ import { CreateCommunityIssueSchema } from '../schemas/CreateCommunityIssue.sche
 import { UpdateCommunityIssueSchema } from '../schemas/UpdateCommunityIssue.schema'
 
 @Controller('community-issues')
-@UsePipes(ZodValidationPipe)
 export class CommunityIssuesController {
   private readonly logger = new Logger(CommunityIssuesController.name)
 
@@ -32,7 +30,7 @@ export class CommunityIssuesController {
   @UseCampaign()
   async createCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Body() body: CreateCommunityIssueSchema,
+    @Body(ZodValidationPipe) body: CreateCommunityIssueSchema,
   ) {
     const issue = await this.communityIssuesService.create(campaignId, body)
 
@@ -76,7 +74,7 @@ export class CommunityIssuesController {
   async updateCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
     @Param('uuid') uuid: string,
-    @Body() body: UpdateCommunityIssueSchema,
+    @Body(ZodValidationPipe) body: UpdateCommunityIssueSchema,
   ) {
     const currentIssue = await this.communityIssuesService.findByUuid(
       uuid,
