@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Post,
   Put,
   UsePipes,
@@ -53,49 +52,48 @@ export class CommunityIssuesController {
     })
   }
 
-  @Get(':id')
+  @Get(':uuid')
   @UseCampaign()
   getCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('uuid') uuid: string,
   ) {
-    return this.communityIssuesService.findUniqueOrThrow({
-      where: { id, campaignId },
-    })
+    return this.communityIssuesService.findByUuid(uuid, campaignId)
   }
 
-  @Get(':id/status-history')
+  @Get(':uuid/status-history')
   @UseCampaign()
   async getCommunityIssueStatusHistory(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('uuid') uuid: string,
   ) {
-    // First verify the issue exists and belongs to the campaign
-    await this.communityIssuesService.findUniqueOrThrow({
-      where: { id, campaignId },
-    })
-    return this.statusLogService.getStatusHistory(id)
+    const issue = await this.communityIssuesService.findByUuid(uuid, campaignId)
+    return this.statusLogService.getStatusHistory(issue.id)
   }
 
-  @Put(':id')
+  @Put(':uuid')
   @UseCampaign()
   async updateCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('uuid') uuid: string,
     @Body() body: UpdateCommunityIssueSchema,
   ) {
-    const currentIssue = await this.communityIssuesService.findUniqueOrThrow({
-      where: { id, campaignId },
-    })
+    const currentIssue = await this.communityIssuesService.findByUuid(
+      uuid,
+      campaignId,
+    )
 
     const updatedIssue = await this.communityIssuesService.update({
-      where: { id, campaignId },
+      where: {
+        uuid,
+        campaignId,
+      },
       data: body,
     })
 
     if (body.status && currentIssue.status !== body.status) {
       await this.statusLogService.createStatusLog(
-        id,
+        currentIssue.id,
         currentIssue.status,
         body.status,
       )
@@ -104,14 +102,17 @@ export class CommunityIssuesController {
     return updatedIssue
   }
 
-  @Delete(':id')
+  @Delete(':uuid')
   @UseCampaign()
   deleteCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('uuid') uuid: string,
   ) {
     return this.communityIssuesService.delete({
-      where: { id, campaignId },
+      where: {
+        uuid,
+        campaignId,
+      },
     })
   }
 }
