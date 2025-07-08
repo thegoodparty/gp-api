@@ -16,8 +16,7 @@ enum IssueStatus {
 }
 
 model CommunityIssue {
-  id          Int                       @id @default(autoincrement())
-  uuid        String                    @unique @default(cuid())
+  uuid        String                    @id @default(cuid())
   createdAt   DateTime                  @default(now()) @map("created_at")
   updatedAt   DateTime                  @updatedAt @map("updated_at")
   title       String
@@ -29,6 +28,5 @@ model CommunityIssue {
   campaignId  Int
   statusLogs  CommunityIssueStatusLog[]
 
-  @@index([uuid])
   @@map("community_issue")
 }

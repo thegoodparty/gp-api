@@ -7,27 +7,27 @@ export class CommunityIssueStatusLogService extends createPrismaBase(
   MODELS.CommunityIssueStatusLog,
 ) {
   async createStatusLog(
-    communityIssueId: number,
+    communityIssueUuid: string,
     fromStatus: IssueStatus | null,
     toStatus: IssueStatus,
   ) {
     return this.model.create({
       data: {
-        communityIssueId,
+        communityIssueUuid,
         fromStatus,
         toStatus,
       },
     })
   }
 
-  async getStatusHistory(communityIssueId: number) {
+  async getStatusHistory(communityIssueUuid: string) {
     return this.model.findMany({
-      where: { communityIssueId },
+      where: { communityIssueUuid },
       orderBy: { createdAt: 'asc' },
     })
   }
 
-  async logInitialStatus(communityIssueId: number, status: IssueStatus) {
-    return this.createStatusLog(communityIssueId, null, status)
+  async logInitialStatus(communityIssueUuid: string, status: IssueStatus) {
+    return this.createStatusLog(communityIssueUuid, null, status)
   }
 }

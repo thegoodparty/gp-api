@@ -35,7 +35,7 @@ export class CommunityIssuesController {
     const issue = await this.communityIssuesService.create(campaignId, body)
 
     await this.statusLogService.logInitialStatus(
-      issue.id,
+      issue.uuid,
       body.status ?? IssueStatus.newIssue,
     )
 
@@ -66,7 +66,7 @@ export class CommunityIssuesController {
     @Param('uuid') uuid: string,
   ) {
     const issue = await this.communityIssuesService.findByUuid(uuid, campaignId)
-    return this.statusLogService.getStatusHistory(issue.id)
+    return this.statusLogService.getStatusHistory(issue.uuid)
   }
 
   @Put(':uuid')
@@ -91,7 +91,7 @@ export class CommunityIssuesController {
 
     if (body.status && currentIssue.status !== body.status) {
       await this.statusLogService.createStatusLog(
-        currentIssue.id,
+        currentIssue.uuid,
         currentIssue.status,
         body.status,
       )
