@@ -15,6 +15,7 @@ model Website {
   content    Json?            @default("{}") @db.JsonB
   domain     Domain?
   contacts   WebsiteContact[]
+  views      WebsiteView[]
 
   @@map("website")
 }

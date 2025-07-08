@@ -31,6 +31,9 @@ import { userHasRole } from 'src/users/util/users.util'
 import { WebsiteContactsService } from '../services/websiteContacts.service'
 import { GetWebsiteContactsSchema } from '../schemas/GetWebsiteContacts.schema'
 import { ValidateVanityPathSchema } from '../schemas/ValidateVanityPath.schema'
+import { WebsiteViewsService } from '../services/websiteViews.service'
+import { TrackWebsiteViewSchema } from '../schemas/TrackWebsiteView.schema'
+import { GetWebsiteViewsSchema } from '../schemas/GetWebsiteViews.schema'
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
@@ -44,6 +47,7 @@ export class WebsitesController {
     private readonly websites: WebsitesService,
     private readonly contacts: WebsiteContactsService,
     private readonly files: FilesService,
+    private readonly siteViews: WebsiteViewsService,
   ) {}
 
   @Post()
@@ -109,6 +113,19 @@ export class WebsitesController {
       limit,
       totalPages: Math.ceil(total / limit),
     }
+  }
+
+  @Get('mine/views')
+  @UseCampaign()
+  async getMyWebsiteViews(
+    @ReqCampaign() { id: campaignId }: Campaign,
+    @Query() { startDate, endDate }: GetWebsiteViewsSchema,
+  ) {
+    const website = await this.websites.findUniqueOrThrow({
+      where: { campaignId },
+    })
+
+    return this.siteViews.getWebsiteViews(website.id, startDate, endDate)
   }
 
   @Put('mine')
@@ -244,5 +261,18 @@ export class WebsitesController {
     }
 
     return await this.contacts.create(website.id, body)
+  }
+
+  @Post(':vanityPath/track-view')
+  @PublicAccess()
+  async trackWebsiteView(
+    @Param('vanityPath') vanityPath: string,
+    @Body() { visitorId }: TrackWebsiteViewSchema,
+  ) {
+    const website = await this.websites.findUniqueOrThrow({
+      where: { vanityPath },
+    })
+
+    return this.siteViews.trackWebsiteView(website.id, visitorId)
   }
 }
