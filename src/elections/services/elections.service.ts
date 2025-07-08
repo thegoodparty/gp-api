@@ -85,6 +85,7 @@ export class ElectionsService {
   async getDistrictTypes(state: string, electionYear: string) {
     return await this.electionApiGet(ElectionApiRoutes.districts.types.path, {
       electionYear,
+      state,
     })
   }
 
