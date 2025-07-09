@@ -240,7 +240,7 @@ export class CampaignsController {
     }
   }
 
-  @Put('district')
+  @Put('mine/district')
   @UseCampaign()
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
