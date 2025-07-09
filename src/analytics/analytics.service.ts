@@ -9,7 +9,7 @@ import {
 import { HttpService } from '@nestjs/axios'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom, Observable } from 'rxjs'
-import axios, { AxiosResponse } from 'axios'
+import { AxiosResponse, isAxiosError } from 'axios'
 import { PathToVictory, User } from '@prisma/client'
 import { IS_PROD } from '../shared/util/appEnvironment.util'
 import { UsersService } from '../users/services/users.service'
@@ -186,7 +186,7 @@ export class AnalyticsService {
       }
     } catch (error) {
       if (
-        axios.isAxiosError(error) &&
+        isAxiosError(error) &&
         (error.response as AxiosResponse) &&
         error.response?.status === HttpStatus.NOT_FOUND
       ) {

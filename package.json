@@ -55,6 +55,7 @@
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.0.3",
     "@prisma/client": "^6.3.0",
+    "@redtea/format-axios-error": "^2.1.1",
     "@segment/analytics-node": "^2.2.1",
     "@ssut/nestjs-sqs": "^3.0.1",
     "@vercel/sdk": "^1.7.7",
