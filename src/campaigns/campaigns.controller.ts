@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
   Param,
@@ -18,7 +19,7 @@ import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Campaign, Prisma, User, UserRole } from '@prisma/client'
+import { Campaign, Prisma, User, UserRole, PathToVictory } from '@prisma/client'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
@@ -93,23 +94,30 @@ export class CampaignsController {
       })
     }
 
-    p2vStatus === P2VStatus.waiting && this.handleP2VWaiting(campaign)
+    p2vStatus === P2VStatus.waiting && this.handleP2VWaiting(campaign, p2v)
 
     return p2v
   }
 
-  private async handleP2VWaiting(campaign: Campaign) {
-    const ballotreadyPositionId = campaign?.details?.positionId
-
-    if (!ballotreadyPositionId) {
-      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+  private async handleP2VWaiting(campaign: Campaign, p2v: PathToVictory) {
+    const raceTargetDetailsInput = {
+      L2DistrictType: p2v.data.electionType || '',
+      L2DistrictName: p2v.data.electionLocation || '',
+      electionDate: campaign.details.electionDate || '',
+      state: campaign.details?.state || '',
     }
 
-    const raceTargetDetails = ballotreadyPositionId
-      ? await this.elections.buildRaceTargetDetails(ballotreadyPositionId)
+    const raceTargetDetails = raceTargetDetailsInput
+      ? await this.elections.buildRaceTargetDetails(raceTargetDetailsInput)
       : null
 
-    if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
+    if (raceTargetDetails?.projectedTurnout === 0) {
+      throw new InternalServerErrorException(
+        'Error: An invalid L2District was likely passed to the user and selected by the user',
+      )
+    }
+
+    if (!raceTargetDetails) {
       // Use existing P2V algorithm as a fallback
       this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
     } else {

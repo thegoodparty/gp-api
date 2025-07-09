@@ -1,8 +1,12 @@
 import { Logger } from '@nestjs/common'
-import { ProjectedTurnout, RaceTargetMetrics } from '../types/elections.types'
+import {
+  BuildRaceTargetDetailsInput,
+  ProjectedTurnout,
+  RaceTargetMetrics,
+} from '../types/elections.types'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { P2VStatus } from '../types/pathToVictory.types'
-import { ElectionApiRoutes } from '../types/elections.const'
+import { ElectionApiRoutes } from '../constants/elections.const'
 
 export class ElectionsService {
   private static readonly BASE_URL = process.env.ELECTION_API_URL
@@ -19,10 +23,10 @@ export class ElectionsService {
     }
   }
 
-  private async electionApiGet<T>(
+  private async electionApiGet<Res, Q extends object>(
     path: string,
-    query?: Record<string, string | number | undefined>,
-  ): Promise<T | null> {
+    query?: Q,
+  ): Promise<Res | null> {
     const url = new URL(
       `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
     )
@@ -43,7 +47,7 @@ export class ElectionsService {
         )
         return null
       }
-      return (await res.json()) as T
+      return (await res.json()) as Res
     } catch (error) {
       this.logger.error(`Election API GET ${path} failed: ${error}`)
       return null
@@ -63,11 +67,12 @@ export class ElectionsService {
   }
 
   async buildRaceTargetDetails(
-    ballotreadyPositionId: string,
+    data: BuildRaceTargetDetailsInput,
   ): Promise<PrismaJson.PathToVictoryData | null> {
-    const projectedTurnout = await this.electionApiGet<ProjectedTurnout>(
-      ballotreadyPositionId,
-    )
+    const projectedTurnout = await this.electionApiGet<
+      ProjectedTurnout,
+      BuildRaceTargetDetailsInput
+    >(ElectionApiRoutes.projectedTurnout.find.path, data)
 
     return projectedTurnout
       ? {
@@ -82,14 +87,15 @@ export class ElectionsService {
       : null
   }
 
-  async getDistrictTypes(state: string, electionYear: string) {
+  async getValidDistrictTypes(state: string, electionYear: string) {
     return await this.electionApiGet(ElectionApiRoutes.districts.types.path, {
       electionYear,
       state,
+      excludeInvalid: true,
     })
   }
 
-  async getDistrictNames(
+  async getValidDistrictNames(
     L2DistrictType: string,
     state?: string,
     electionYear?: string,
@@ -98,6 +104,7 @@ export class ElectionsService {
       L2DistrictType,
       state,
       electionYear,
+      excludeInvalid: true,
     })
   }
 }
