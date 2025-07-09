@@ -78,3 +78,11 @@ export class UpdateCampaignSchema extends createZodDto(
     })
     .strict(),
 ) {}
+
+export class SetDistrictDTO extends createZodDto(
+  z.object({
+    slug: z.string().optional(),
+    L2DistrictType: z.string(),
+    L2DistrictName: z.string(),
+  }),
+) {}

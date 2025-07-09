@@ -50,3 +50,8 @@ export enum ElectionLevel {
   federal = 'federal',
   city = 'city',
 }
+
+export type setDistrictAndGetTurnoutInput = {
+  L2DistrictType: string
+  L2DistrictName: string
+}

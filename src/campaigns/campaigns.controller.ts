@@ -15,11 +15,14 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { CampaignsService } from './services/campaigns.service'
-import { UpdateCampaignSchema } from './schemas/updateCampaign.schema'
+import {
+  SetDistrictDTO,
+  UpdateCampaignSchema,
+} from './schemas/updateCampaign.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Campaign, Prisma, User, UserRole, PathToVictory } from '@prisma/client'
+import { Campaign, PathToVictory, Prisma, User, UserRole } from '@prisma/client'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
@@ -100,30 +103,8 @@ export class CampaignsController {
   }
 
   private async handleP2VWaiting(campaign: Campaign, p2v: PathToVictory) {
-    const raceTargetDetailsInput = {
-      L2DistrictType: p2v.data.electionType || '',
-      L2DistrictName: p2v.data.electionLocation || '',
-      electionDate: campaign.details.electionDate || '',
-      state: campaign.details?.state || '',
-    }
-
-    const raceTargetDetails = raceTargetDetailsInput
-      ? await this.elections.buildRaceTargetDetails(raceTargetDetailsInput)
-      : null
-
-    if (raceTargetDetails?.projectedTurnout === 0) {
-      throw new InternalServerErrorException(
-        'Error: An invalid L2District was likely passed to the user and selected by the user',
-      )
-    }
-
-    if (!raceTargetDetails) {
-      // Use existing P2V algorithm as a fallback
+    if (!p2v.data?.electionType && !p2v.data?.electionLocation) {
       this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-    } else {
-      this.campaigns.updateJsonFields(campaign.id, {
-        pathToVictory: raceTargetDetails,
-      })
     }
   }
 
@@ -257,5 +238,50 @@ export class CampaignsController {
 
       throw e
     }
+  }
+
+  @Put('district')
+  @UseCampaign()
+  async setDistrict(
+    @ReqCampaign() campaign: Campaign,
+    @ReqUser() user: User,
+    @Body() { slug, L2DistrictType, L2DistrictName }: SetDistrictDTO,
+  ) {
+    if (
+      typeof slug === 'string' &&
+      campaign?.slug !== slug &&
+      userHasRole(user, [UserRole.admin, UserRole.sales])
+    ) {
+      // if user has Admin or Sales role, allow loading campaign by slug param
+      campaign = await this.campaigns.findFirstOrThrow({
+        where: { slug },
+      })
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
+
+    this.logger.debug('Updating campaign with district', campaign, {
+      slug,
+      L2DistrictType,
+      L2DistrictName,
+    })
+
+    const raceTargetDetails = await this.elections.buildRaceTargetDetails({
+      L2DistrictType,
+      L2DistrictName,
+      electionDate: campaign.details?.electionDate || '',
+      state: campaign.details?.state || '',
+    })
+
+    if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
+      throw new InternalServerErrorException(
+        'Error: An invalid L2District was likely passed to the user and selected by the user',
+      )
+    }
+    return this.campaigns.updateJsonFields(campaign.id, {
+      pathToVictory: {
+        ...raceTargetDetails,
+        electionType: L2DistrictType,
+        electionLocation: L2DistrictName,
+      },
+    })
   }
 }
