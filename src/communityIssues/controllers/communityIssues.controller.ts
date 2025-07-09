@@ -4,14 +4,13 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Post,
   Put,
-  UsePipes,
   Logger,
 } from '@nestjs/common'
 import { CommunityIssuesService } from '../services/communityIssues.service'
-import { Campaign } from '@prisma/client'
+import { CommunityIssueStatusLogService } from '../services/communityIssueStatusLog.service'
+import { Campaign, IssueStatus } from '@prisma/client'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -19,21 +18,28 @@ import { CreateCommunityIssueSchema } from '../schemas/CreateCommunityIssue.sche
 import { UpdateCommunityIssueSchema } from '../schemas/UpdateCommunityIssue.schema'
 
 @Controller('community-issues')
-@UsePipes(ZodValidationPipe)
 export class CommunityIssuesController {
   private readonly logger = new Logger(CommunityIssuesController.name)
 
   constructor(
     private readonly communityIssuesService: CommunityIssuesService,
+    private readonly statusLogService: CommunityIssueStatusLogService,
   ) {}
 
   @Post()
   @UseCampaign()
-  createCommunityIssue(
+  async createCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Body() body: CreateCommunityIssueSchema,
+    @Body(ZodValidationPipe) body: CreateCommunityIssueSchema,
   ) {
-    return this.communityIssuesService.create(campaignId, body)
+    const issue = await this.communityIssuesService.create(campaignId, body)
+
+    await this.statusLogService.logInitialStatus(
+      issue.uuid,
+      body.status ?? IssueStatus.newIssue,
+    )
+
+    return issue
   }
 
   @Get()
@@ -44,38 +50,67 @@ export class CommunityIssuesController {
     })
   }
 
-  @Get(':id')
+  @Get(':uuid')
   @UseCampaign()
   getCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('uuid') uuid: string,
   ) {
-    return this.communityIssuesService.findUniqueOrThrow({
-      where: { id, campaignId },
-    })
+    return this.communityIssuesService.findByUuid(uuid, campaignId)
   }
 
-  @Put(':id')
+  @Get(':uuid/status-history')
   @UseCampaign()
-  updateCommunityIssue(
+  async getCommunityIssueStatusHistory(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateCommunityIssueSchema,
+    @Param('uuid') uuid: string,
   ) {
-    return this.communityIssuesService.update({
-      where: { id, campaignId },
+    const issue = await this.communityIssuesService.findByUuid(uuid, campaignId)
+    return this.statusLogService.getStatusHistory(issue.uuid)
+  }
+
+  @Put(':uuid')
+  @UseCampaign()
+  async updateCommunityIssue(
+    @ReqCampaign() { id: campaignId }: Campaign,
+    @Param('uuid') uuid: string,
+    @Body(ZodValidationPipe) body: UpdateCommunityIssueSchema,
+  ) {
+    const currentIssue = await this.communityIssuesService.findByUuid(
+      uuid,
+      campaignId,
+    )
+
+    const updatedIssue = await this.communityIssuesService.update({
+      where: {
+        uuid,
+        campaignId,
+      },
       data: body,
     })
+
+    if (body.status && currentIssue.status !== body.status) {
+      await this.statusLogService.createStatusLog(
+        currentIssue.uuid,
+        currentIssue.status,
+        body.status,
+      )
+    }
+
+    return updatedIssue
   }
 
-  @Delete(':id')
+  @Delete(':uuid')
   @UseCampaign()
   deleteCommunityIssue(
     @ReqCampaign() { id: campaignId }: Campaign,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('uuid') uuid: string,
   ) {
     return this.communityIssuesService.delete({
-      where: { id, campaignId },
+      where: {
+        uuid,
+        campaignId,
+      },
     })
   }
 }

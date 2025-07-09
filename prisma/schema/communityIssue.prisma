@@ -16,16 +16,17 @@ enum IssueStatus {
 }
 
 model CommunityIssue {
-  id          Int          @id @default(autoincrement())
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  uuid        String                    @id @default(cuid())
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @updatedAt @map("updated_at")
   title       String
   description String
   status      IssueStatus
   channel     IssueChannel
-  attachments String[]     @default([])
-  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  attachments String[]                  @default([])
+  campaign    Campaign                  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId  Int
+  statusLogs  CommunityIssueStatusLog[]
 
   @@map("community_issue")
 }
