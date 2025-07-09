@@ -5,6 +5,9 @@ import {
   parse,
   startOfWeek,
   subWeeks,
+  subDays,
+  startOfDay,
+  endOfDay,
 } from 'date-fns'
 
 export enum DateFormats {
@@ -46,3 +49,16 @@ export const findPreviousWeekDay = (
 
 export const parseIsoDateString = (dateString: string) =>
   parse(dateString, DateFormats.isoDate, new Date())
+
+export const getDateRangeWithDefaults = (
+  startDate?: Date,
+  endDate?: Date,
+  defaultDaysBack: number = 6,
+) => {
+  return {
+    startDate: startDate
+      ? startOfDay(startDate)
+      : startOfDay(subDays(new Date(), defaultDaysBack)),
+    endDate: endDate ? endOfDay(endDate) : endOfDay(new Date()),
+  }
+}

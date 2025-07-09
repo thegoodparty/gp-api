@@ -9,10 +9,16 @@ import { WebsitesController } from './controllers/websites.controller'
 import { FilesModule } from 'src/files/files.module'
 import { PaymentsModule } from 'src/payments/payments.module'
 import { WebsiteContactsService } from './services/websiteContacts.service'
+import { WebsiteViewsService } from './services/websiteViews.service'
 
 @Module({
   imports: [HttpModule, AwsModule, VercelModule, FilesModule, PaymentsModule],
   controllers: [DomainsController, WebsitesController],
-  providers: [DomainsService, WebsitesService, WebsiteContactsService],
+  providers: [
+    DomainsService,
+    WebsitesService,
+    WebsiteContactsService,
+    WebsiteViewsService,
+  ],
 })
 export class WebsitesModule {}
