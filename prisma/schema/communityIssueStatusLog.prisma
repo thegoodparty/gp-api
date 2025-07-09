@@ -1,10 +1,10 @@
 model CommunityIssueStatusLog {
-  id               Int            @id @default(autoincrement())
-  createdAt        DateTime       @default(now()) @map("created_at")
-  fromStatus       IssueStatus?   @map("from_status")
-  toStatus         IssueStatus    @map("to_status")
-  communityIssue   CommunityIssue @relation(fields: [communityIssueId], references: [id], onDelete: Cascade)
-  communityIssueId Int            @map("community_issue_id")
+  id                 Int            @id @default(autoincrement())
+  createdAt          DateTime       @default(now()) @map("created_at")
+  fromStatus         IssueStatus?   @map("from_status")
+  toStatus           IssueStatus    @map("to_status")
+  communityIssue     CommunityIssue @relation(fields: [communityIssueUuid], references: [uuid], onDelete: Cascade)
+  communityIssueUuid String         @map("community_issue_uuid")
 
   @@map("community_issue_status_log")
 }
