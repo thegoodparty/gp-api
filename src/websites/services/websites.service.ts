@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { getUserFullName } from 'src/users/util/users.util'
 
 type PositionWithTopIssue = Prisma.CampaignPositionGetPayload<{
   include: { topIssue: true }
@@ -17,8 +18,6 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
       description: position.description ?? `Issue ${index + 1} description`,
     }))
 
-    const campaignName = campaign.data.name || user.name || 'Candidate Name'
-
     // NOTE: this is in a WIP state, better default content generation TBD
     // TODO: generate AI content here for any missing fields
     return this.model.create({
@@ -26,9 +25,8 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
         campaignId: campaign.id,
         vanityPath: campaign.slug,
         content: {
-          campaignName,
           main: {
-            title: `Vote For ${campaignName}`,
+            title: `Vote For ${getUserFullName(user)}`,
             tagline: 'Candidate Tagline',
           },
           about: {
@@ -38,7 +36,7 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
           contact: {
             address: '123 Main St, Anytown, USA',
             email: user.email,
-            phone: user.phone ?? '(555) 123-4567',
+            phone: user.phone ?? undefined,
           },
         },
       },

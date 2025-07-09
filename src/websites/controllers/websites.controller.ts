@@ -37,6 +37,19 @@ import { GetWebsiteViewsSchema } from '../schemas/GetWebsiteViews.schema'
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
+const WEBSITE_CONTENT_INCLUDES = {
+  campaign: {
+    select: {
+      details: true,
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  },
+}
 
 @Controller('websites')
 @UsePipes(ZodValidationPipe)
@@ -174,10 +187,16 @@ export class WebsitesController {
 
     if (logo) {
       updatedContent.logo = logo
+    } else if (body.logo === 'null') {
+      updatedContent.logo = undefined
     }
+
     if (hero) {
       updatedContent.main ||= {}
       updatedContent.main.image = hero
+    } else if (body.main?.image === 'null') {
+      updatedContent.main ||= {}
+      updatedContent.main.image = undefined
     }
 
     return this.websites.update({
@@ -218,6 +237,7 @@ export class WebsitesController {
   ) {
     const website = await this.websites.findUniqueOrThrow({
       where: { vanityPath },
+      include: WEBSITE_CONTENT_INCLUDES,
     })
 
     if (
@@ -237,6 +257,7 @@ export class WebsitesController {
   async viewWebsite(@Param('vanityPath') vanityPath: string) {
     const website = await this.websites.findUniqueOrThrow({
       where: { vanityPath },
+      include: WEBSITE_CONTENT_INCLUDES,
     })
 
     if (website.status !== WebsiteStatus.published) {

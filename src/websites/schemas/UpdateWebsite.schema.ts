@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 export class UpdateWebsiteSchema extends createZodDto(
   z.object({
+    logo: z.string().optional(),
     status: z.nativeEnum(WebsiteStatus).optional(),
     vanityPath: VanityPathSchema.optional(),
     theme: z.string().optional(),
@@ -12,6 +13,7 @@ export class UpdateWebsiteSchema extends createZodDto(
       .object({
         title: z.string().optional(),
         tagline: z.string().optional(),
+        image: z.string().optional(),
       })
       .optional(),
     about: z
