@@ -25,16 +25,15 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
         campaignId: campaign.id,
         vanityPath: campaign.slug,
         content: {
+          theme: 'light',
           main: {
             title: `Vote For ${getUserFullName(user)}`,
-            tagline: 'Candidate Tagline',
+            tagline: 'Local Solutions, Not Party Politics',
           },
           about: {
-            bio: 'About the candidate',
             issues,
           },
           contact: {
-            address: '123 Main St, Anytown, USA',
             email: user.email,
             phone: user.phone ?? undefined,
           },
