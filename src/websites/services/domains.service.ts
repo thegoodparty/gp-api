@@ -13,7 +13,7 @@ import {
   DomainAvailability,
   OperationStatus,
 } from '@aws-sdk/client-route-53-domains'
-import { RRType } from '@aws-sdk/client-route-53'
+import { CloudflareService } from 'src/cloudflare/services/cloudflare.service'
 import { VercelService } from 'src/vercel/services/vercel.service'
 import { VERCEL_DNS_IP } from 'src/vercel/vercel.const'
 import { PaymentsService } from 'src/payments/services/payments.service'
@@ -25,6 +25,7 @@ import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 export class DomainsService extends createPrismaBase(MODELS.Domain) {
   constructor(
     private readonly route53: AwsRoute53Service,
+    private readonly cloudflare: CloudflareService,
     private readonly vercel: VercelService,
     private readonly payments: PaymentsService,
   ) {
@@ -162,9 +163,45 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       data: { operationId, status: DomainStatus.submitted },
     })
 
-    // TODO: how to handle for polling status on server side?
+    // After successful Route53 registration, immediately set up Cloudflare zone
+    try {
+      await this.setupCloudflareZone(domain.name)
+      this.logger.debug(`Cloudflare zone setup initiated for ${domain.name}`)
+    } catch (error) {
+      this.logger.warn(
+        `Failed to setup Cloudflare zone for ${domain.name}:`,
+        error,
+      )
+      // Don't fail the registration if Cloudflare setup fails
+    }
 
     return operationId
+  }
+
+  /**
+   * Sets up a new Cloudflare zone for the domain
+   * @param domainName - The domain name to setup
+   * @returns The created Cloudflare zone
+   */
+  private async setupCloudflareZone(domainName: string) {
+    const { CLOUDFLARE_ACCOUNT_ID } = process.env
+
+    if (!CLOUDFLARE_ACCOUNT_ID) {
+      throw new Error('CLOUDFLARE_ACCOUNT_ID is not set in ENV')
+    }
+
+    // Create zone in Cloudflare
+    const zone = await this.cloudflare.createZone(
+      domainName,
+      CLOUDFLARE_ACCOUNT_ID,
+    )
+
+    this.logger.debug(`Created Cloudflare zone for ${domainName}`, {
+      zoneId: zone.id,
+      nameServers: zone.name_servers,
+    })
+
+    return zone
   }
 
   async configureDomain(websiteId: number) {
@@ -175,13 +212,25 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     // can only turn off auto renew after registration
     await this.route53.disableAutoRenew(domain.name)
 
-    const route53Response = await this.route53.setDnsRecords(
-      domain.name,
-      RRType.A,
-      VERCEL_DNS_IP, // point to Vercel's Anycast IP
-    )
-    this.logger.debug('Updated domain DNS record', route53Response.ChangeInfo)
+    // Get or create Cloudflare zone
+    let zone = await this.cloudflare.getZoneByName(domain.name)
 
+    if (!zone) {
+      this.logger.debug(`Zone not found for ${domain.name}, creating new zone`)
+      zone = await this.setupCloudflareZone(domain.name)
+    }
+
+    // Create A record pointing to Vercel
+    await this.cloudflare.createARecord(
+      zone.id,
+      domain.name, // Use full domain name for root record
+      VERCEL_DNS_IP,
+      300, // 5 minutes TTL
+    )
+
+    this.logger.debug(`Created A record for ${domain.name} -> ${VERCEL_DNS_IP}`)
+
+    // Add domain to Vercel project
     const vercelResponse = await this.vercel.addDomainToProject(domain.name)
     this.logger.debug('Added domain to Vercel project', vercelResponse)
 
@@ -192,7 +241,72 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       )
     }
 
-    return vercelResponse
+    return {
+      cloudflareZone: {
+        id: zone.id,
+        nameServers: zone.name_servers,
+        status: zone.status,
+      },
+      vercel: vercelResponse,
+    }
+  }
+
+  /**
+   * Creates domain masking/redirect rules using Cloudflare
+   * @param websiteId - The website ID
+   * @param redirectUrl - The URL to redirect to
+   * @param statusCode - HTTP status code for redirect (301 or 302)
+   */
+  async createDomainMasking(
+    websiteId: number,
+    redirectUrl: string,
+    statusCode: number = 301,
+  ) {
+    const domain = await this.findUniqueOrThrow({
+      where: { websiteId },
+    })
+
+    const zone = await this.cloudflare.getZoneByName(domain.name)
+
+    if (!zone) {
+      throw new BadRequestException(
+        `Cloudflare zone not found for domain ${domain.name}`,
+      )
+    }
+
+    // Create page rule for domain masking
+    const pageRule = await this.cloudflare.createPageRule(
+      zone.id,
+      `${domain.name}/*`,
+      redirectUrl,
+      statusCode,
+    )
+
+    this.logger.debug(
+      `Created domain masking rule for ${domain.name} -> ${redirectUrl}`,
+    )
+
+    return pageRule
+  }
+
+  /**
+   * Lists DNS records for the domain
+   * @param websiteId - The website ID
+   */
+  async listDNSRecords(websiteId: number) {
+    const domain = await this.findUniqueOrThrow({
+      where: { websiteId },
+    })
+
+    const zone = await this.cloudflare.getZoneByName(domain.name)
+
+    if (!zone) {
+      throw new BadRequestException(
+        `Cloudflare zone not found for domain ${domain.name}`,
+      )
+    }
+
+    return this.cloudflare.listDNSRecords(zone.id)
   }
 
   async checkRegistrationStatus(websiteId: number) {

@@ -4,6 +4,7 @@ import { DomainsController } from './controllers/domains.controller'
 import { DomainsService } from './services/domains.service'
 import { WebsitesService } from './services/websites.service'
 import { AwsModule } from 'src/aws/aws.module'
+import { CloudflareModule } from 'src/cloudflare/cloudflare.module'
 import { VercelModule } from 'src/vercel/vercel.module'
 import { WebsitesController } from './controllers/websites.controller'
 import { FilesModule } from 'src/files/files.module'
@@ -12,7 +13,14 @@ import { WebsiteContactsService } from './services/websiteContacts.service'
 import { WebsiteViewsService } from './services/websiteViews.service'
 
 @Module({
-  imports: [HttpModule, AwsModule, VercelModule, FilesModule, PaymentsModule],
+  imports: [
+    HttpModule,
+    AwsModule,
+    CloudflareModule,
+    VercelModule,
+    FilesModule,
+    PaymentsModule,
+  ],
   controllers: [DomainsController, WebsitesController],
   providers: [
     DomainsService,
