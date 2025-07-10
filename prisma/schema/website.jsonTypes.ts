@@ -3,7 +3,6 @@ export {}
 declare global {
   export namespace PrismaJson {
     export interface WebsiteContent {
-      campaignName?: string
       logo?: string
       theme?: string
       main?: {

@@ -30,6 +30,7 @@ import { SegmentModule } from './segment/segment.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { WebsitesModule } from './websites/websites.module'
 import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
+import { PeerlyModule } from './peerly/peerly.module'
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
     SegmentModule,
     WebsitesModule,
     CommunityIssuesModule,
+    PeerlyModule,
   ],
   providers: [
     SessionsService,
