@@ -39,14 +39,14 @@ Used for very basic tracking of visitor views. Frontend generates a UUID in loca
 - **Payload Structure:**
   ```typescript
   {
-    logo?: string | 'null'           // URL or 'null' to remove the image
+    logo?: string | 'null'           // 'null' to remove the image
     status?: 'published' | 'unpublished'
     vanityPath?: string              // URL-friendly path
     theme?: string                   // Themes are hardcoded on the frontend currently, see WEBSITE_THEMES constant
     main?: {
       title?: string
       tagline?: string
-      image?: string | 'null'        // URL or 'null' to remove the image
+      image?: string | 'null'        // 'null' to remove the image
     }
     about?: {
       bio?: string
@@ -62,6 +62,7 @@ Used for very basic tracking of visitor views. Frontend generates a UUID in loca
     }
   }
   ```
+- **NOTE: For the `logo` and `main.image` fields, you _could_ sent an external URL to use as the image path, but primarily images would be uploaded as files along with the request paylod. Currently, these fields are only used when removing the logo or main image from the content.** 
 - **File Uploads:** Also accepts logo and hero image uploads, by sending the image files in the `heroFile` and `logoFile` keys. 
 - **Content Merging:** Uses deep merge to combine updates with existing content.
 - **Array Handling:** Issues array is replaced entirely, to avoid merging an old array with the new value.
