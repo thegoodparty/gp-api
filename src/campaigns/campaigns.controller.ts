@@ -248,7 +248,7 @@ export class CampaignsController {
     @Body() { slug, L2DistrictType, L2DistrictName }: SetDistrictDTO,
   ) {
     if (
-      typeof slug === 'string' &&
+      slug &&
       campaign?.slug !== slug &&
       userHasRole(user, [UserRole.admin, UserRole.sales])
     ) {

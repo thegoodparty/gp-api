@@ -33,7 +33,7 @@ export class ElectionsController {
   async getValidDistrictTypes(@Query() dto: GetDistrictTypesDTO) {
     return await this.elections.getValidDistrictTypes(
       dto.state,
-      String(dto.electionYear),
+      dto.electionYear,
     )
   }
 
@@ -42,7 +42,7 @@ export class ElectionsController {
     return await this.elections.getValidDistrictNames(
       dto.L2DistrictType,
       dto.state,
-      String(dto.electionYear),
+      dto.electionYear,
     )
   }
 }

@@ -7,6 +7,8 @@ import {
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { P2VStatus } from '../types/pathToVictory.types'
 import { ElectionApiRoutes } from '../constants/elections.const'
+import { HttpService } from '@nestjs/axios'
+import { lastValueFrom } from 'rxjs'
 
 export class ElectionsService {
   private static readonly BASE_URL = process.env.ELECTION_API_URL
@@ -16,7 +18,9 @@ export class ElectionsService {
 
   private readonly logger = new Logger(ElectionsService.name)
 
-  constructor() {
+  constructor(
+    private readonly httpService: HttpService
+  ) {
     if (!ElectionsService.BASE_URL) {
       throw new Error(`Please set ELECTION_API_URL in your .env. 
         Recommendation is to point it at dev if you are developing`)
@@ -31,23 +35,23 @@ export class ElectionsService {
       `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
     )
 
-    if (query) {
-      for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined && value !== null) {
-          url.searchParams.set(key, String(value))
-        }
-      }
-    }
-
     try {
-      const res = await fetch(url.toString())
-      if (!res.ok) {
+      const { data, status } = await lastValueFrom(this.httpService.get(
+        `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
+        {
+          params: query,
+          paramsSerializer: params =>
+            Object.entries(params)
+              .filter(([, v]) => v !== undefined && v !== null)
+              .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+              .join('&'),
+        }
+      ))
+      if (status >= 200 && status < 300) return data
         this.logger.warn(
-          `Election API GET ${url.pathname} responded ${res.status}`,
+          `Election API GET ${path}} responded ${status}`,
         )
         return null
-      }
-      return (await res.json()) as Res
     } catch (error) {
       this.logger.error(`Election API GET ${path} failed: ${error}`)
       return null
@@ -57,12 +61,11 @@ export class ElectionsService {
   private calculateRaceTargetMetrics(
     projectedTurnout: number,
   ): RaceTargetMetrics {
+    const winNumber =
+      Math.ceil(projectedTurnout * ElectionsService.WIN_NUMBER_MULTIPLIER) + 1
     return {
-      winNumber:
-        Math.ceil(projectedTurnout * ElectionsService.WIN_NUMBER_MULTIPLIER) +
-        1,
-      voterContactGoal:
-        projectedTurnout * ElectionsService.VOTER_CONTACT_MULTIPLIER,
+      winNumber,
+      voterContactGoal: winNumber * ElectionsService.VOTER_CONTACT_MULTIPLIER,
     }
   }
 
@@ -87,7 +90,7 @@ export class ElectionsService {
       : null
   }
 
-  async getValidDistrictTypes(state: string, electionYear: string) {
+  async getValidDistrictTypes(state: string, electionYear: string | number) {
     return await this.electionApiGet(ElectionApiRoutes.districts.types.path, {
       electionYear,
       state,
@@ -98,7 +101,7 @@ export class ElectionsService {
   async getValidDistrictNames(
     L2DistrictType: string,
     state?: string,
-    electionYear?: string,
+    electionYear?: string | number,
   ) {
     return await this.electionApiGet(ElectionApiRoutes.districts.names.path, {
       L2DistrictType,
