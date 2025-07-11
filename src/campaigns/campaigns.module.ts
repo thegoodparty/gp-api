@@ -29,7 +29,6 @@ import { ElectionsService } from 'src/elections/services/elections.service'
     CampaignsAiModule,
     CrmModule,
     ElectionsModule,
-    ElectionsService,
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,

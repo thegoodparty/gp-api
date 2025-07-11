@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import {
   BuildRaceTargetDetailsInput,
   ProjectedTurnout,
@@ -10,6 +10,7 @@ import { ElectionApiRoutes } from '../constants/elections.const'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 
+@Injectable()
 export class ElectionsService {
   private static readonly BASE_URL = process.env.ELECTION_API_URL
   private static readonly VOTER_CONTACT_MULTIPLIER = 5
