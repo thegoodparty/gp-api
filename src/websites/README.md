@@ -66,6 +66,7 @@ Used for very basic tracking of visitor views. Frontend generates a UUID in loca
 - **File Uploads:** Also accepts logo and hero image uploads, by sending the image files in the `heroFile` and `logoFile` keys. 
 - **Content Merging:** Uses deep merge to combine updates with existing content.
 - **Array Handling:** Issues array is replaced entirely, to avoid merging an old array with the new value.
+
 > ⚠️ **NOTE:** For the `logo` and `main.image` fields, you _could_ sent an external URL to use as the image path, but primarily images would be uploaded as files along with the request paylod. Currently, these fields are only used when removing the logo or main image from the content.
 
 #### Retrieving Website Data
@@ -135,7 +136,7 @@ Used for very basic tracking of visitor views. Frontend generates a UUID in loca
   ```
 - Rate-limited to prevent refreshing spams (1 minute window per visitor) **Very flimsy limiting however**
 - No authentication required (public endpoint)
-- **This is implementation is good enough for the short term, but at some point a more robust site analytics tool could be used**
+> ⚠️ **NOTE:** This is implementation is good enough for the short term, but at some point a more robust site analytics tool could be used (Segment/Amplitude or similar)
 
 ### Domain Management (DomainsController)
 
