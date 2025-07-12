@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import {
   BuildRaceTargetDetailsInput,
   ProjectedTurnout,
@@ -32,10 +32,6 @@ export class ElectionsService {
     path: string,
     query?: Q,
   ): Promise<Res | null> {
-    const url = new URL(
-      `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
-    )
-
     try {
       const { data, status } = await lastValueFrom(this.httpService.get(
         `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
@@ -44,7 +40,7 @@ export class ElectionsService {
           paramsSerializer: params =>
             Object.entries(params)
               .filter(([, v]) => v !== undefined && v !== null)
-              .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
               .join('&'),
         }
       ))
@@ -55,7 +51,7 @@ export class ElectionsService {
         return null
     } catch (error) {
       this.logger.error(`Election API GET ${path} failed: ${error}`)
-      return null
+      throw new BadGatewayException(`Election API GET ${path} failed: ${error}`)
     }
   }
 
