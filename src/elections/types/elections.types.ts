@@ -43,7 +43,7 @@ export enum OfficeLevel {
   DEFAULT = 12,
 }
 
-enum ElectionCode {
+export enum ElectionCode {
   // Should directly reflect ElectionCode in election-api/prisma/schema/projectedTurnout.prisma
   General = 'General',
   LocalOrMunicipal = 'LocalOrMunicipal',
@@ -70,3 +70,45 @@ export type RaceTargetMetrics = {
   winNumber: number
   voterContactGoal: number
 }
+
+export enum ProjectedTurnoutSourceColumns {
+  id = 'id',
+  createdAt = 'createdAt',
+  updatedAt = 'updatedAt',
+  electionYear = 'electionYear',
+  electionCode = 'electionCode',
+  projectedTurnout = 'projectedTurnout',
+  inferenceAt = 'inferenceAt',
+  modelVersion = 'modelVersion',
+  districtId = 'districtId',
+}
+
+export enum DistrictSourceColumns {
+  id = 'id',
+  createdAt = 'createdAt',
+  updatedAt = 'updatedAt',
+  state = 'state',
+  L2DistrictType = 'L2DistrictType',
+  L2DistrictName = 'L2DistrictName',
+}
+
+interface DistrictInfo {
+  state: string
+  L2DistrictType: string
+  L2DistrictName: string
+}
+
+interface ByDate {
+  electionDate: string
+  electionYear?: never
+  electionCode?: never
+}
+
+interface ByYearAndCode {
+  electionDate?: never
+  electionYear: string
+  electionCode: string
+}
+
+export type BuildRaceTargetDetailsInput = DistrictInfo &
+  (ByDate | ByYearAndCode)

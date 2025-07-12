@@ -1,52 +1,78 @@
-import { Logger } from '@nestjs/common'
-import { ProjectedTurnout, RaceTargetMetrics } from '../types/elections.types'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BuildRaceTargetDetailsInput,
+  ProjectedTurnout,
+  RaceTargetMetrics,
+} from '../types/elections.types'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { P2VStatus } from '../types/pathToVictory.types'
+import { ElectionApiRoutes } from '../constants/elections.const'
+import { HttpService } from '@nestjs/axios'
+import { lastValueFrom } from 'rxjs'
 
-const VOTER_CONTACT_MULTIPLIER = 5
-const WIN_NUMBER_MULTIPLIER = 0.51
-
-const ELECTION_API_URL = process.env.ELECTION_API_URL
-if (!ELECTION_API_URL) {
-  throw new Error(`
-    'Please set ELECTION_API_URL in your .env. 
-    Recommendation is to point it at dev if you are developing`)
-}
-
+@Injectable()
 export class ElectionsService {
+  private static readonly BASE_URL = process.env.ELECTION_API_URL
+  private static readonly VOTER_CONTACT_MULTIPLIER = 5
+  private static readonly WIN_NUMBER_MULTIPLIER = 0.5
+  private static readonly API_VERSION = 'v1'
+
   private readonly logger = new Logger(ElectionsService.name)
 
-  private async fetchProjectedTurnout(
-    brPositionId: string,
-  ): Promise<ProjectedTurnout | null> {
-    const params = new URLSearchParams({ brPositionId })
-    const apiVersion = 'v1'
+  constructor(
+    private readonly httpService: HttpService
+  ) {
+    if (!ElectionsService.BASE_URL) {
+      throw new Error(`Please set ELECTION_API_URL in your .env. 
+        Recommendation is to point it at dev if you are developing`)
+    }
+  }
+
+  private async electionApiGet<Res, Q extends object>(
+    path: string,
+    query?: Q,
+  ): Promise<Res | null> {
     try {
-      const response = await fetch(
-        `${ELECTION_API_URL}/${apiVersion}/projectedTurnout?${params.toString()}`,
-      )
-      return response.ok ? ((await response.json()) as ProjectedTurnout) : null
-    } catch (err) {
-      this.logger.debug(`Error: Couldn't fetch projected turnout - ${err}`)
-      return null
+      const { data, status } = await lastValueFrom(this.httpService.get(
+        `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
+        {
+          params: query,
+          paramsSerializer: params =>
+            Object.entries(params)
+              .filter(([, v]) => v !== undefined && v !== null)
+              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+              .join('&'),
+        }
+      ))
+      if (status >= 200 && status < 300) return data
+        this.logger.warn(
+          `Election API GET ${path}} responded ${status}`,
+        )
+        return null
+    } catch (error) {
+      this.logger.error(`Election API GET ${path} failed: ${error}`)
+      throw new BadGatewayException(`Election API GET ${path} failed: ${error}`)
     }
   }
 
   private calculateRaceTargetMetrics(
     projectedTurnout: number,
   ): RaceTargetMetrics {
+    const winNumber =
+      Math.ceil(projectedTurnout * ElectionsService.WIN_NUMBER_MULTIPLIER) + 1
     return {
-      winNumber: Math.ceil(projectedTurnout * WIN_NUMBER_MULTIPLIER),
-      voterContactGoal: projectedTurnout * VOTER_CONTACT_MULTIPLIER,
+      winNumber,
+      voterContactGoal: winNumber * ElectionsService.VOTER_CONTACT_MULTIPLIER,
     }
   }
 
   async buildRaceTargetDetails(
-    ballotreadyPositionId: string,
+    data: BuildRaceTargetDetailsInput,
   ): Promise<PrismaJson.PathToVictoryData | null> {
-    const projectedTurnout = await this.fetchProjectedTurnout(
-      ballotreadyPositionId,
-    )
+    const projectedTurnout = await this.electionApiGet<
+      ProjectedTurnout,
+      BuildRaceTargetDetailsInput
+    >(ElectionApiRoutes.projectedTurnout.find.path, data)
 
     return projectedTurnout
       ? {
@@ -59,5 +85,26 @@ export class ElectionsService {
           p2vStatus: P2VStatus.complete,
         }
       : null
+  }
+
+  async getValidDistrictTypes(state: string, electionYear: string | number) {
+    return await this.electionApiGet(ElectionApiRoutes.districts.types.path, {
+      electionYear,
+      state,
+      excludeInvalid: true,
+    })
+  }
+
+  async getValidDistrictNames(
+    L2DistrictType: string,
+    state?: string,
+    electionYear?: string | number,
+  ) {
+    return await this.electionApiGet(ElectionApiRoutes.districts.names.path, {
+      L2DistrictType,
+      state,
+      electionYear,
+      excludeInvalid: true,
+    })
   }
 }
