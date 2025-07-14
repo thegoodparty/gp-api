@@ -32,7 +32,6 @@ import { PeerlyModule } from '../peerly/peerly.module'
     CampaignsAiModule,
     CrmModule,
     ElectionsModule,
-    ElectionsService,
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
