@@ -1,5 +1,6 @@
 enum TcrComplianceStatus {
   submitted
+  waitingOnPin
   pending
   approved
   rejected
@@ -7,19 +8,20 @@ enum TcrComplianceStatus {
 }
 
 model TcrCompliance {
-  id               Int                 @id @default(autoincrement())
+  id               String               @id @default(cuid())
   ein              String
   address          String
-  name             String
-  website          String
+  committeeName    String               @map("committee_name")
+  websiteDomain    String               @map("website_domain")
+  filingUrl        String               @map("filing_url")
   email            String
   pin              String?
-  donationPlatform String?             @map("donation_platform")
-  status           TcrComplianceStatus
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt @map("updated_at")
-  campaign         Campaign?           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId       Int?                @unique @map("campaign_id")
+  status           TcrComplianceStatus? @default(submitted)
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  campaign         Campaign?            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId       Int?                 @unique @map("campaign_id")
+  peerlyIdentityId String?              @unique @map("peerly_identity_id")
 
   @@map("tcr_compliance")
 }

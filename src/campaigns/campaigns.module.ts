@@ -21,6 +21,9 @@ import { CampaignTasksService } from './tasks/campaignTasksService'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { StripeModule } from '../stripe/stripe.module'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
+import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
+import { PeerlyModule } from '../peerly/peerly.module'
 
 @Global()
 @Module({
@@ -34,6 +37,7 @@ import { ElectionsService } from 'src/elections/services/elections.service'
     forwardRef(() => EcanvasserIntegrationModule),
     ScheduledMessagingModule,
     StripeModule,
+    PeerlyModule,
   ],
   controllers: [
     CampaignsController,
@@ -41,6 +45,7 @@ import { ElectionsService } from 'src/elections/services/elections.service'
     CampaignMapController,
     CampaignUpdateHistoryController,
     CampaignTasksController,
+    CampaignTcrComplianceController,
   ],
   providers: [
     CampaignsService,
@@ -51,11 +56,13 @@ import { ElectionsService } from 'src/elections/services/elections.service'
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTasksService,
+    CampaignTcrComplianceService,
   ],
   exports: [
     CampaignsService,
     CampaignUpdateHistoryService,
     CrmCampaignsService,
+    CampaignTcrComplianceService,
   ],
 })
 export class CampaignsModule {}

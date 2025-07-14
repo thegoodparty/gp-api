@@ -5,8 +5,7 @@ import { lastValueFrom } from 'rxjs'
 import { format } from '@redtea/format-axios-error'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { JwtService } from '@nestjs/jwt'
-
-const { PEERLY_MD5_EMAIL, PEERLY_MD5_PASSWORD } = process.env
+import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 
 interface DecodedPeerlyToken {
   email: string
@@ -16,9 +15,8 @@ interface DecodedPeerlyToken {
 }
 
 @Injectable()
-export class PeerlyAuthenticationService {
+export class PeerlyAuthenticationService extends PeerlyBaseConfig {
   private readonly logger = new Logger(PeerlyAuthenticationService.name)
-  private readonly baseUrl = 'https://app.peerly.com/api'
   private token: string | null = null
   private tokenExpiry: number | null = null
   private readonly tokenRenewalThreshold = 5 * 60 // 5 minutes in seconds
@@ -26,7 +24,9 @@ export class PeerlyAuthenticationService {
   constructor(
     private readonly httpService: HttpService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) {
+    super()
+  }
 
   private shouldRenewToken(): boolean {
     return Boolean(
@@ -41,8 +41,8 @@ export class PeerlyAuthenticationService {
     try {
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/token-auth`, {
-          email: PEERLY_MD5_EMAIL,
-          password: PEERLY_MD5_PASSWORD,
+          email: this.email,
+          password: this.password,
         }),
       )
       const { data } = response
@@ -88,5 +88,9 @@ export class PeerlyAuthenticationService {
   @Timeout(0)
   async authenticate() {
     await this.renewToken()
+  }
+
+  async getAuthorizationHeader() {
+    return { Authorization: `Jwt ${await this.getToken()}` }
   }
 }
