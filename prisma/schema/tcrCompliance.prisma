@@ -15,12 +15,11 @@ model TcrCompliance {
   websiteDomain    String               @map("website_domain")
   filingUrl        String               @map("filing_url")
   email            String
-  pin              String?
   status           TcrComplianceStatus? @default(submitted)
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
-  campaign         Campaign?            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId       Int?                 @unique @map("campaign_id")
+  campaign         Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId       Int                  @unique @map("campaign_id")
   peerlyIdentityId String?              @unique @map("peerly_identity_id")
 
   @@map("tcr_compliance")
