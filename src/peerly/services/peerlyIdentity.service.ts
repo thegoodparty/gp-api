@@ -119,8 +119,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               city: city.substring(0, 100), // Limit to 100 characters per Peerly API docs
               state,
               postalCode,
-              website: websiteDomain,
-              email,
+              website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
+              email: email.substring(0, 100), // Limit to 100 characters per Peerly API docs
             },
             { headers: await this.peerlyAuth.getAuthorizationHeader() },
           ),
