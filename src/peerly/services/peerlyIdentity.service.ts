@@ -111,8 +111,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               entityType: PEERLY_ENTITY_TYPE,
               vertical: PEERLY_USECASE,
               is_political: true,
-              displayName: campaignCommittee,
-              companyName: campaignCommittee,
+              displayName: (campaignCommittee || '').substring(0, 255), // Limit to 255 characters per Peerly API docs
+              companyName: (campaignCommittee || '').substring(0, 255), // Limit to 255 characters per Peerly API docs
               ein: einNumber,
               phone,
               street: streetLines.join(' ').substring(0, 100), // Limit to 100 characters per Peerly API docs
