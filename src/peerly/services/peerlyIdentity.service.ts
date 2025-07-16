@@ -106,7 +106,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
         await lastValueFrom(
           this.httpService.post(
-            `${this.baseUrl}/identities/${identityId}/submitProfile`,
+            `${this.baseUrl}/v2/tdlc/${identityId}/submit`,
             {
               entityType: PEERLY_ENTITY_TYPE,
               vertical: PEERLY_USECASE,
