@@ -6,6 +6,8 @@ import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { AxiosResponse } from 'axios'
+import { Campaign } from '@prisma/client'
+import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/campaignTcrCompliance.schema'
 
 type PeerlyIdentityCreateResponseBody = {
   Data: {
@@ -15,6 +17,14 @@ type PeerlyIdentityCreateResponseBody = {
     account_id: string
     tcr_identity_status: string | null
   }
+}
+
+type PeerlySubmitIdentityProfileResponseBody = {
+  link: string
+}
+
+type Peerly10DLCBrandSubmitResponseBody = {
+  submission_key: string
 }
 
 @Injectable()
@@ -53,6 +63,69 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { Data: identity } = data
       this.logger.debug('Successfully created identity', identity)
       return identity
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async submitIdentityProfile(identityId: string) {
+    try {
+      const response: AxiosResponse<PeerlySubmitIdentityProfileResponseBody> =
+        await lastValueFrom(
+          this.httpService.post(
+            `${this.baseUrl}/identities/${identityId}/submitProfile`,
+            {
+              entityType: 'NON_PROFIT',
+              is_political: true,
+              usecases: ['POLITICAL'],
+            },
+            { headers: await this.peerlyAuth.getAuthorizationHeader() },
+          ),
+        )
+      const { data } = response
+      const { link } = data
+      this.logger.debug('Successfully submitted identity profile')
+      return link
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async submit10DlcBrand(
+    identityId: string,
+    tcrComplianceDto: CreateTcrComplianceDto,
+    { details: campaignDetails }: Campaign,
+  ) {
+    const { phone, postalAddress, websiteDomain, email } = tcrComplianceDto
+    const { streetLines, city, state, postalCode } = postalAddress
+    const { campaignCommittee, einNumber } = campaignDetails
+    try {
+      const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
+        await lastValueFrom(
+          this.httpService.post(
+            `${this.baseUrl}/identities/${identityId}/submitProfile`,
+            {
+              entityType: 'NON_PROFIT',
+              vertical: 'POLITICAL',
+              is_political: true,
+              displayName: campaignCommittee,
+              companyName: campaignCommittee,
+              ein: einNumber,
+              phone,
+              street: streetLines.join(' ').substring(0, 100), // Limit to 100 characters per Peerly API docs
+              city: city.substring(0, 100), // Limit to 100 characters per Peerly API docs
+              state,
+              postalCode,
+              website: websiteDomain,
+              email,
+            },
+            { headers: await this.peerlyAuth.getAuthorizationHeader() },
+          ),
+        )
+      const { data } = response
+      const { submission_key: submissionKey } = data
+      this.logger.debug('Successfully submitted identity profile')
+      return submissionKey
     } catch (error) {
       this.handleApiError(error)
     }

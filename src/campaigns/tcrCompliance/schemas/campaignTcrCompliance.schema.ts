@@ -1,16 +1,21 @@
 import { z } from 'zod'
 import {
-  EIN_PATTERN_FULL,
-  WEB_DOMAIN_PATTERN,
-} from '../campaignTcrCompliance.consts'
+  DomainSchema,
+  EinSchema,
+  PhoneSchema,
+  WriteEmailSchema,
+} from '../../../shared/schemas'
+import { PostalAddressSchema } from '../../../shared/schemas/PostalAddress.schema'
+import { createZodDto } from 'nestjs-zod'
 
-export const CreateTcrComplianceDto = z.object({
-  ein: z.string().regex(EIN_PATTERN_FULL),
-  address: z.string(),
-  committeeName: z.string(),
-  websiteDomain: z.string().regex(WEB_DOMAIN_PATTERN),
-  filingUrl: z.string().url(),
-  email: z.string().email(),
-})
-
-export type CreateTcrComplianceDto = z.infer<typeof CreateTcrComplianceDto>
+export class CreateTcrComplianceDto extends createZodDto(
+  z.object({
+    ein: EinSchema,
+    postalAddress: PostalAddressSchema.required(),
+    committeeName: z.string(),
+    websiteDomain: DomainSchema,
+    filingUrl: z.string().url(),
+    email: WriteEmailSchema,
+    phone: PhoneSchema,
+  }),
+) {}
