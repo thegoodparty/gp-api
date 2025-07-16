@@ -9,6 +9,9 @@ import { AxiosResponse } from 'axios'
 import { Campaign } from '@prisma/client'
 import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/campaignTcrCompliance.schema'
 
+const { PEERLY_HTTP_TIMEOUT = '10000' } = process.env
+const PEERLY_HTTP_TIMEOUT_MS = parseInt(PEERLY_HTTP_TIMEOUT, 10)
+
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
 
@@ -48,6 +51,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }
 
+  // TODO: move this out to a base service or utility once we have more than one
+  //  service that needs it
+  private async getBaseHttpHeaders() {
+    return {
+      headers: await this.peerlyAuth.getAuthorizationHeader(),
+      timeout: PEERLY_HTTP_TIMEOUT_MS,
+    }
+  }
+
   async createIdentity(identityName: string) {
     try {
       const response: AxiosResponse<PeerlyIdentityCreateResponseBody> =
@@ -59,7 +71,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               identity_name: identityName,
               usecases: [PEERLY_USECASE],
             },
-            { headers: await this.peerlyAuth.getAuthorizationHeader() },
+            await this.getBaseHttpHeaders(),
           ),
         )
       const { data } = response
@@ -82,7 +94,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               is_political: true,
               usecases: [PEERLY_USECASE],
             },
-            { headers: await this.peerlyAuth.getAuthorizationHeader() },
+            await this.getBaseHttpHeaders(),
           ),
         )
       const { data } = response
@@ -122,7 +134,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
               email: email.substring(0, 100), // Limit to 100 characters per Peerly API docs
             },
-            { headers: await this.peerlyAuth.getAuthorizationHeader() },
+            await this.getBaseHttpHeaders(),
           ),
         )
       const { data } = response

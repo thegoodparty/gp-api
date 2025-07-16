@@ -3,7 +3,10 @@ import {
   ConflictException,
   Controller,
   Delete,
+  ForbiddenException,
   InternalServerErrorException,
+  NotFoundException,
+  Param,
   Post,
   UsePipes,
 } from '@nestjs/common'
@@ -61,7 +64,23 @@ export class CampaignTcrComplianceController {
 
   @Delete(':id')
   @UseCampaign()
-  async deleteTcrCompliance(@ReqCampaign() campaign: Campaign) {
+  async deleteTcrCompliance(
+    @Param('id') id: string,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const tcrCompliance = await this.tcrComplianceService.fetchByCampaignId(
+      campaign.id,
+    )
+    if (!tcrCompliance) {
+      throw new NotFoundException(
+        'TCR compliance does not exist for this campaign',
+      )
+    }
+    if (tcrCompliance.id !== id) {
+      throw new ForbiddenException(
+        'TCR compliance ID does not match the campaign ID',
+      )
+    }
     return this.tcrComplianceService.delete(campaign.id)
   }
 }
