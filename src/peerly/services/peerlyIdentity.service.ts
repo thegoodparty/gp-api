@@ -9,6 +9,9 @@ import { AxiosResponse } from 'axios'
 import { Campaign } from '@prisma/client'
 import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/campaignTcrCompliance.schema'
 
+const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
+const PEERLY_USECASE = 'POLITICAL'
+
 type PeerlyIdentityCreateResponseBody = {
   Data: {
     identity_id: string
@@ -54,7 +57,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
             {
               account_id: this.accountNumber,
               identity_name: identityName,
-              usecases: ['POLITICAL'],
+              usecases: [PEERLY_USECASE],
             },
             { headers: await this.peerlyAuth.getAuthorizationHeader() },
           ),
@@ -75,9 +78,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           this.httpService.post(
             `${this.baseUrl}/identities/${identityId}/submitProfile`,
             {
-              entityType: 'NON_PROFIT',
+              entityType: PEERLY_ENTITY_TYPE,
               is_political: true,
-              usecases: ['POLITICAL'],
+              usecases: [PEERLY_USECASE],
             },
             { headers: await this.peerlyAuth.getAuthorizationHeader() },
           ),
@@ -105,8 +108,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           this.httpService.post(
             `${this.baseUrl}/identities/${identityId}/submitProfile`,
             {
-              entityType: 'NON_PROFIT',
-              vertical: 'POLITICAL',
+              entityType: PEERLY_ENTITY_TYPE,
+              vertical: PEERLY_USECASE,
               is_political: true,
               displayName: campaignCommittee,
               companyName: campaignCommittee,

@@ -9,8 +9,6 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 
 const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
 
-console.log(`EXPLICITLY_LOG_PEERLY_TOKEN =>`, EXPLICITLY_LOG_PEERLY_TOKEN)
-
 interface DecodedPeerlyToken {
   email: string
   username: string
