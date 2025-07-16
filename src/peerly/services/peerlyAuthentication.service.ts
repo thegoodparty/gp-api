@@ -7,6 +7,8 @@ import { isAxiosResponse } from '../../shared/util/http.util'
 import { JwtService } from '@nestjs/jwt'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 
+const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
+
 interface DecodedPeerlyToken {
   email: string
   username: string
@@ -57,7 +59,11 @@ export class PeerlyAuthenticationService extends PeerlyBaseConfig {
         ) {
           this.token = data.token
           this.tokenExpiry = decodedToken.exp as number
-          this.logger.debug('Successfully renewed Peerly token')
+          this.logger.debug(
+            `Successfully renewed Peerly token${
+              EXPLICITLY_LOG_PEERLY_TOKEN === 'true' ? ` => ${this.token}` : ''
+            }`,
+          )
         } else {
           this.logger.error('Token renewal response did not contain expiry')
           throw new Error('Peerly token renewal failed: No expiry received')
