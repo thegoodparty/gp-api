@@ -3,6 +3,7 @@ import {
   ConflictException,
   Controller,
   Delete,
+  InternalServerErrorException,
   Post,
   UsePipes,
 } from '@nestjs/common'
@@ -37,13 +38,25 @@ export class CampaignTcrComplianceController {
       )
     }
     const user = await this.userService.findByCampaign(campaign)
-    await this.campaignsService.updateJsonFields(campaign.id, {
-      details: {
-        einNumber: tcrComplianceDto.ein,
+    const updatedCampaign = await this.campaignsService.updateJsonFields(
+      campaign.id,
+      {
+        details: {
+          einNumber: tcrComplianceDto.ein,
+        },
       },
-    })
-    campaign.details.einNumber = tcrComplianceDto.ein
-    return this.tcrComplianceService.create(user!, campaign, tcrComplianceDto)
+    )
+    if (!updatedCampaign) {
+      throw new InternalServerErrorException(
+        'Failed to update campaign details',
+      )
+    }
+
+    return this.tcrComplianceService.create(
+      user!,
+      updatedCampaign,
+      tcrComplianceDto,
+    )
   }
 
   @Delete(':id')

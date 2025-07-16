@@ -125,6 +125,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const updatedCampaign = await this.client.$transaction(
       async (tx) => {
         this.logger.debug('Updating campaign json fields', { id, body })
+        // TODO: This should be .findUniqueOrThrow which would remove the need
+        //  for the null check below and subsequently simplify the return
+        //  signature of this method
         const campaign = await tx.campaign.findFirst({
           where: { id },
           include: { pathToVictory: true },
@@ -196,6 +199,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         }
 
         // Return the updated campaign with pathToVictory included
+        // TODO: Also should be .findUniqueOrThrow
         return tx.campaign.findFirst({
           where: { id: campaign.id },
           include: { pathToVictory: true },
@@ -206,6 +210,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     )
 
+    // TODO: this should throw an exception if the update failed
     if (updatedCampaign) {
       // Track campaign and user
       this.crm.trackCampaign(updatedCampaign.id)
@@ -213,7 +218,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         this.usersService.trackUserById(updatedCampaign.userId)
     }
 
-    return updatedCampaign
+    return updatedCampaign ? updatedCampaign : null
   }
 
   private async handleSubscriptionCancelAtUpdate(
