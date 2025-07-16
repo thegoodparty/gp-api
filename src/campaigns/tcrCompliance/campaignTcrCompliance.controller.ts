@@ -32,7 +32,7 @@ export class CampaignTcrComplianceController {
     tcrComplianceDto: CreateTcrComplianceDto,
   ) {
     if (await this.tcrComplianceService.fetchByCampaignId(campaign.id)) {
-      return new ConflictException(
+      throw new ConflictException(
         'TCR compliance already exists for this campaign',
       )
     }
