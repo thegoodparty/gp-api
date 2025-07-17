@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CreateTcrComplianceDto } from '../schemas/campaignTcrCompliance.schema'
+import { CreateTcrComplianceDto } from '../schemas/createTcrComplianceDto.schema'
 import { PeerlyIdentityService } from '../../../peerly/services/peerlyIdentity.service'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, TcrCompliance, User } from '@prisma/client'
 import { getTCRIdentityName } from '../util/trcCompliance.util'
 import { getUserFullName } from '../../../users/util/users.util'
 import { postalAddressToString } from '../../../shared/util/postalAddresses.util'
@@ -45,6 +45,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         campaign,
       )
 
+    // TODO: Do whatever Peerly API dance is needed to start Campaign Verify
+    //  process once we have those endpoints from Peerly
+
     const newTcrCompliance = {
       ...tcrCompliance,
       postalAddress: postalAddressToString(tcrCompliance.postalAddress),
@@ -61,9 +64,38 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
   }
 
-  async delete(campaignId: number) {
+  async delete(id: string) {
     return this.model.delete({
-      where: { campaignId },
+      where: { id },
     })
+  }
+
+  async retrieveCampaignVerifyToken(
+    pin: number,
+    { peerlyIdentityId }: TcrCompliance,
+  ) {
+    if (!peerlyIdentityId) {
+      throw new BadRequestException(
+        'TCR compliance does not have a Peerly identity ID',
+      )
+    }
+    // TODO: talk to Peerly service to retrieve the campaign verify token
+    // This is a placeholder implementation. Replace with actual logic to retrieve the token.
+    return (async (pin) =>
+      Promise.resolve(
+        `dummy-campaign-verify-token-${pin}-${peerlyIdentityId}`,
+      ))(pin)
+  }
+
+  async submitCampaignVerifyToken(
+    user: User,
+    tcrCompliance: TcrCompliance,
+    campaignVerifyToken: string,
+  ) {
+    return this.peerlyIdentityService.approve10DLCBrand(
+      user,
+      tcrCompliance,
+      campaignVerifyToken,
+    )
   }
 }
