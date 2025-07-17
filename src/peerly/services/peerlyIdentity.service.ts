@@ -6,32 +6,21 @@ import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { AxiosResponse } from 'axios'
-import { Campaign } from '@prisma/client'
-import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/campaignTcrCompliance.schema'
+import { Campaign, TcrCompliance, User } from '@prisma/client'
+import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/createTcrComplianceDto.schema'
+import { getUserFullName } from '../../users/util/users.util'
+import {
+  Approve10DLCBrandResponse,
+  Peerly10DLCBrandSubmitResponseBody,
+  PeerlyIdentityCreateResponseBody,
+  PeerlySubmitIdentityProfileResponseBody,
+} from '../peerly.types'
 
 const { PEERLY_HTTP_TIMEOUT = '10000' } = process.env
 const PEERLY_HTTP_TIMEOUT_MS = parseInt(PEERLY_HTTP_TIMEOUT, 10)
 
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
-
-type PeerlyIdentityCreateResponseBody = {
-  Data: {
-    identity_id: string
-    identity_name: string
-    start_date: string
-    account_id: string
-    tcr_identity_status: string | null
-  }
-}
-
-type PeerlySubmitIdentityProfileResponseBody = {
-  link: string
-}
-
-type Peerly10DLCBrandSubmitResponseBody = {
-  submission_key: string
-}
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -141,6 +130,38 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { submission_key: submissionKey } = data
       this.logger.debug('Successfully submitted identity profile')
       return submissionKey
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async approve10DLCBrand(
+    user: User,
+    { committeeName, peerlyIdentityId }: TcrCompliance,
+    campaignVerifyToken: string = '',
+  ) {
+    try {
+      const response: AxiosResponse<Approve10DLCBrandResponse> =
+        await lastValueFrom(
+          this.httpService.post(
+            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit`,
+            {
+              campaign_verify_token: campaignVerifyToken,
+              entity_type: PEERLY_ENTITY_TYPE,
+              usecase: PEERLY_USECASE,
+              sample1: `Hello {first_name}, this is ${getUserFullName(user)} from ${committeeName}. Sample message content. Reply STOP to opt-out`,
+              sample2: `Hello {first_name}, this is ${getUserFullName(user)} from ${committeeName}. More sample message content. Reply STOP to opt-out`,
+            },
+            await this.getBaseHttpHeaders(),
+          ),
+        )
+
+      const {
+        data: { campaign_verify_token, ...identityBrand },
+      } = response
+      this.logger.debug('Successfully approved 10DLC Brand', identityBrand)
+
+      return identityBrand
     } catch (error) {
       this.handleApiError(error)
     }

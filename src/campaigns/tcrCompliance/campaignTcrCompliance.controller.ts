@@ -1,9 +1,12 @@
 import {
+  BadGatewayException,
   Body,
   ConflictException,
   Controller,
   Delete,
   ForbiddenException,
+  HttpCode,
+  HttpStatus,
   InternalServerErrorException,
   NotFoundException,
   Param,
@@ -11,13 +14,15 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
-import { CreateTcrComplianceDto } from './schemas/campaignTcrCompliance.schema'
+import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import { UsersService } from '../../users/services/users.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
+import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
+import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -62,12 +67,10 @@ export class CampaignTcrComplianceController {
     )
   }
 
-  @Delete(':id')
-  @UseCampaign()
-  async deleteTcrCompliance(
-    @Param('id') id: string,
-    @ReqCampaign() campaign: Campaign,
-  ) {
+  private readonly retrievedTcrCompliance = async (
+    tcrComplianceId: string,
+    campaign: Campaign,
+  ) => {
     const tcrCompliance = await this.tcrComplianceService.fetchByCampaignId(
       campaign.id,
     )
@@ -76,11 +79,56 @@ export class CampaignTcrComplianceController {
         'TCR compliance does not exist for this campaign',
       )
     }
-    if (tcrCompliance.id !== id) {
+    if (tcrCompliance.id !== tcrComplianceId) {
       throw new ForbiddenException(
         'TCR compliance ID does not match the campaign ID',
       )
     }
-    return this.tcrComplianceService.delete(campaign.id)
+    return tcrCompliance
+  }
+
+  @Post(':id/submit-cv-pin')
+  @UseCampaign()
+  @HttpCode(HttpStatus.OK)
+  async submitCampaignVerifyPIN(
+    @Param('id') tcrComplianceId: string,
+    @Body() { pin }: submitCampaignVerifyPinDto,
+    @ReqUser() user: User,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const tcrCompliance = await this.retrievedTcrCompliance(
+      tcrComplianceId,
+      campaign,
+    )
+
+    const campaignVerifyToken =
+      await this.tcrComplianceService.retrieveCampaignVerifyToken(
+        pin,
+        tcrCompliance,
+      )
+    if (!campaignVerifyToken) {
+      throw new BadGatewayException(
+        'Campaign verify token could not be retrieved',
+      )
+    }
+
+    return this.tcrComplianceService.submitCampaignVerifyToken(
+      user,
+      tcrCompliance,
+      campaignVerifyToken,
+    )
+  }
+
+  @Delete(':id')
+  @UseCampaign()
+  async deleteTcrCompliance(
+    @Param('id') tcrComplianceId: string,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const tcrCompliance = await this.retrievedTcrCompliance(
+      tcrComplianceId,
+      campaign,
+    )
+    return this.tcrComplianceService.delete(tcrCompliance.id)
   }
 }
