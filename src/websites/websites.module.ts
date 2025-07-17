@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { DomainsController } from './controllers/domains.controller'
 import { DomainsService } from './services/domains.service'
@@ -12,7 +12,13 @@ import { WebsiteContactsService } from './services/websiteContacts.service'
 import { WebsiteViewsService } from './services/websiteViews.service'
 
 @Module({
-  imports: [HttpModule, AwsModule, VercelModule, FilesModule, PaymentsModule],
+  imports: [
+    HttpModule,
+    AwsModule,
+    VercelModule,
+    FilesModule,
+    forwardRef(() => PaymentsModule),
+  ],
   controllers: [DomainsController, WebsitesController],
   providers: [
     DomainsService,
@@ -20,5 +26,6 @@ import { WebsiteViewsService } from './services/websiteViews.service'
     WebsiteContactsService,
     WebsiteViewsService,
   ],
+  exports: [DomainsService],
 })
 export class WebsitesModule {}

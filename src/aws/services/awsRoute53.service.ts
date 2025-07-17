@@ -35,7 +35,7 @@ const GP_DOMAIN_CONTACT: ContactDetail = {
   ContactType: ContactType.COMPANY,
   OrganizationName: 'Good Party LLC',
   Email: 'accounts@goodparty.org',
-  PhoneNumber: '+13126851162',
+  PhoneNumber: '+1.3126851162',
   AddressLine1: '916 Silver Spur Rd',
   City: 'Rolling Hills Estates',
   State: 'CA',
@@ -108,8 +108,14 @@ export class AwsRoute53Service extends AwsService {
       const command = new RegisterDomainCommand({
         DomainName: domainName,
         DurationInYears: 1,
-        AdminContact: ownerContact,
-        RegistrantContact: ownerContact,
+        AdminContact: {
+          ...ownerContact,
+          PhoneNumber: `+1.${ownerContact.PhoneNumber?.replace(/\D/g, '')}`,
+        },
+        RegistrantContact: {
+          ...ownerContact,
+          PhoneNumber: `+1.${ownerContact.PhoneNumber?.replace(/\D/g, '')}`,
+        },
         TechContact: GP_DOMAIN_CONTACT,
         BillingContact: GP_DOMAIN_CONTACT,
         PrivacyProtectAdminContact: true,

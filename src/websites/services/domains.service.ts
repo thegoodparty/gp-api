@@ -11,7 +11,6 @@ import {
   ContactType,
   CountryCode,
   DomainAvailability,
-  OperationStatus,
 } from '@aws-sdk/client-route-53-domains'
 import { RRType } from '@aws-sdk/client-route-53'
 import { VercelService } from 'src/vercel/services/vercel.service'
@@ -20,6 +19,34 @@ import { PaymentsService } from 'src/payments/services/payments.service'
 import { PaymentType } from 'src/payments/payments.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
+
+// Enum for payment statuses (based on Stripe Payment Intent statuses)
+export enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD = 'requires_payment_method',
+  REQUIRES_CONFIRMATION = 'requires_confirmation',
+  REQUIRES_ACTION = 'requires_action',
+  PROCESSING = 'processing',
+  REQUIRES_CAPTURE = 'requires_capture',
+  CANCELED = 'canceled',
+  SUCCEEDED = 'succeeded',
+}
+
+// Enum for AWS Route53 operation statuses with custom NO_DOMAIN status
+export enum AwsOperationStatus {
+  NO_DOMAIN = 'NO_DOMAIN',
+  SUBMITTED = 'SUBMITTED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  ERROR = 'ERROR',
+  SUCCESSFUL = 'SUCCESSFUL',
+  FAILED = 'FAILED',
+}
+
+// Return type for domain status check
+export interface DomainStatusResponse {
+  message: AwsOperationStatus
+  paymentStatus: PaymentStatus | null
+  operationDetail?: any
+}
 
 @Injectable()
 export class DomainsService extends createPrismaBase(MODELS.Domain) {
@@ -195,26 +222,46 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     return vercelResponse
   }
 
-  async checkRegistrationStatus(websiteId: number) {
+  // Data operation methods - focused on retrieving data only
+  async getDomainWithPayment(websiteId: number) {
+    return this.findFirst({
+      where: { websiteId },
+    })
+  }
+
+  async getPaymentStatus(paymentId: string) {
+    try {
+      const paymentIntent = await this.payments.retrievePayment(paymentId)
+      return paymentIntent.status as PaymentStatus
+    } catch (error) {
+      this.logger.warn(
+        `Failed to retrieve payment status for payment ${paymentId}`,
+        error,
+      )
+      return null
+    }
+  }
+
+  async getAwsOperationDetail(operationId: string) {
+    return this.route53.getOperationDetail(operationId)
+  }
+
+  async updateDomainStatusToRegistered(domainId: number) {
+    return this.model.update({
+      where: { id: domainId },
+      data: { status: DomainStatus.registered },
+    })
+  }
+
+  async deleteDomain(websiteId: number) {
     const domain = await this.findUniqueOrThrow({
       where: { websiteId },
     })
 
-    const operationId = domain.operationId
+    await this.model.delete({
+      where: { id: domain.id },
+    })
 
-    if (!operationId) {
-      throw new BadRequestException('Domain registration not started')
-    }
-
-    const operation = await this.route53.getOperationDetail(operationId)
-
-    if (operation.Status === OperationStatus.SUCCESSFUL) {
-      await this.model.update({
-        where: { id: domain.id },
-        data: { status: DomainStatus.registered },
-      })
-    }
-
-    return operation
+    return { message: 'Domain deleted successfully' }
   }
 }
