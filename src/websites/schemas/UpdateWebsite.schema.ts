@@ -27,6 +27,7 @@ export class UpdateWebsiteSchema extends createZodDto(
             }),
           )
           .optional(),
+        committee: z.string().optional(),
       })
       .optional(),
     contact: z
