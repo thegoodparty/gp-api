@@ -41,7 +41,6 @@ export enum AwsOperationStatus {
   FAILED = 'FAILED',
 }
 
-// Return type for domain status check
 export interface DomainStatusResponse {
   message: AwsOperationStatus
   paymentStatus: PaymentStatus | null
@@ -189,7 +188,6 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       data: { operationId, status: DomainStatus.submitted },
     })
 
-    // TODO: how to handle for polling status on server side?
 
     return operationId
   }
@@ -199,13 +197,12 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       where: { websiteId },
     })
 
-    // can only turn off auto renew after registration
     await this.route53.disableAutoRenew(domain.name)
 
     const route53Response = await this.route53.setDnsRecords(
       domain.name,
       RRType.A,
-      VERCEL_DNS_IP, // point to Vercel's Anycast IP
+      VERCEL_DNS_IP, 
     )
     this.logger.debug('Updated domain DNS record', route53Response.ChangeInfo)
 
@@ -222,7 +219,6 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     return vercelResponse
   }
 
-  // Data operation methods - focused on retrieving data only
   async getDomainWithPayment(websiteId: number) {
     return this.findFirst({
       where: { websiteId },

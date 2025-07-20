@@ -85,7 +85,6 @@ export class DomainPurchaseHandler implements PurchaseHandler {
       },
     })
 
-    // Build contact information for domain registration
     const contactInfo = this.buildContactInfo(user)
 
     try {
