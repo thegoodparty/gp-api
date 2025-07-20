@@ -17,14 +17,10 @@ export type PaymentIntentPayload<T extends PaymentType> = {
    * The amount to charge the user in cents
    */
   amount: number
-  /**
-   * The description of the payment
-   */
   description?: string
 } & (T extends PaymentType.DOMAIN_REGISTRATION
   ? {
-      // type specific metadata to send along with the payment intent
       domainName: string
-      domainId: number
+      domainId?: number 
     }
   : never)

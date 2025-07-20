@@ -41,10 +41,13 @@ export const formatPhoneNumber = (
   } else if (cleanedNumber.length === 11 && cleanedNumber.startsWith('1')) {
     return `+1.${cleanedNumber.substring(1)}`
   } else if (cleanedNumber.length > 11) {
-    if (cleanedNumber.startsWith('1')) {
+    if (
+      cleanedNumber.startsWith('1') &&
+      cleanedNumber.substring(1).length === 10
+    ) {
       return `+1.${cleanedNumber.substring(1)}`
     } else {
-      // Non-US number, use fallback
+      // Non-US number or invalid format, use fallback
       if (fallbackNumber) {
         return fallbackNumber
       }

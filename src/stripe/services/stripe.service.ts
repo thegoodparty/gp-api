@@ -36,6 +36,11 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
+    // Filter out undefined values from metadata as Stripe doesn't accept them
+    const filteredMetadata = Object.fromEntries(
+      Object.entries(restMetadata).filter(([_, value]) => value !== undefined),
+    )
+
     return await this.stripe.paymentIntents.create({
       customer: customerId,
       amount,
@@ -47,7 +52,7 @@ export class StripeService {
       metadata: {
         userId,
         paymentType: type,
-        ...restMetadata,
+        ...filteredMetadata,
       },
     })
   }
