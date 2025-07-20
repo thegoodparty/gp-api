@@ -188,7 +188,6 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       data: { operationId, status: DomainStatus.submitted },
     })
 
-
     return operationId
   }
 
@@ -202,7 +201,7 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     const route53Response = await this.route53.setDnsRecords(
       domain.name,
       RRType.A,
-      VERCEL_DNS_IP, 
+      VERCEL_DNS_IP,
     )
     this.logger.debug('Updated domain DNS record', route53Response.ChangeInfo)
 
