@@ -5,6 +5,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common'
+import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { PurchaseHandler, PurchaseMetadata } from '../purchase.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import { PaymentsService } from '../services/payments.service'
@@ -29,7 +30,7 @@ export class DomainPurchaseHandler implements PurchaseHandler {
 
     const searchResult = await this.domainsService.searchForDomain(domainName)
 
-    if (searchResult.availability !== 'AVAILABLE') {
+    if (searchResult.availability !== DomainAvailability.AVAILABLE) {
       throw new ConflictException('Domain not available')
     }
   }
