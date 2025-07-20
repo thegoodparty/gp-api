@@ -6,6 +6,7 @@ import {
   forwardRef,
 } from '@nestjs/common'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
+import { DomainStatus } from '@prisma/client'
 import { PurchaseHandler, PurchaseMetadata } from '../purchase.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import { PaymentsService } from '../services/payments.service'
@@ -20,6 +21,25 @@ export class DomainPurchaseHandler implements PurchaseHandler {
     private readonly paymentsService: PaymentsService,
     private readonly usersService: UsersService,
   ) {}
+
+  private convertWebsiteIdToNumber(
+    websiteId: number | string | undefined,
+  ): number {
+    if (websiteId === undefined || websiteId === null) {
+      throw new BadRequestException('Website ID is required')
+    }
+
+    if (typeof websiteId === 'number') {
+      return websiteId
+    }
+
+    const parsedId = parseInt(websiteId, 10)
+    if (isNaN(parsedId)) {
+      throw new BadRequestException('Invalid website ID format')
+    }
+
+    return parsedId
+  }
 
   async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
     const { domainName, websiteId } = metadata
@@ -75,14 +95,15 @@ export class DomainPurchaseHandler implements PurchaseHandler {
       throw new BadRequestException('User not found for payment')
     }
 
+    const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
+
     const domain = await this.domainsService.model.create({
       data: {
-        websiteId:
-          typeof websiteId === 'string' ? parseInt(websiteId) : websiteId!,
+        websiteId: validWebsiteId,
         name: domainName!,
         price: paymentIntent.amount / 100,
         paymentId: paymentIntentId,
-        status: 'pending',
+        status: DomainStatus.pending,
       },
     })
 
@@ -90,7 +111,7 @@ export class DomainPurchaseHandler implements PurchaseHandler {
 
     try {
       const operationId = await this.domainsService.completeDomainRegistration(
-        typeof websiteId === 'string' ? parseInt(websiteId) : websiteId!,
+        validWebsiteId,
         contactInfo,
       )
 
@@ -102,7 +123,7 @@ export class DomainPurchaseHandler implements PurchaseHandler {
     } catch (error) {
       await this.domainsService.model.update({
         where: { id: domain.id },
-        data: { status: 'inactive' },
+        data: { status: DomainStatus.inactive },
       })
 
       throw new BadRequestException(
