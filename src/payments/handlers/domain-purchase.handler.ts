@@ -12,6 +12,7 @@ import { DomainsService } from '../../websites/services/domains.service'
 import { PaymentsService } from '../services/payments.service'
 import { UsersService } from '../../users/services/users.service'
 import { RegisterDomainSchema } from '../../websites/schemas/RegisterDomain.schema'
+import { GP_DOMAIN_CONTACT } from '../../aws/services/awsRoute53.service'
 
 @Injectable()
 export class DomainPurchaseHandler implements PurchaseHandler {
@@ -133,17 +134,17 @@ export class DomainPurchaseHandler implements PurchaseHandler {
   }
 
   private buildContactInfo(user: any): RegisterDomainSchema {
-    // Use available user information, fallback to defaults for missing required fields
+    // Use available user information, fallback to GP_DOMAIN_CONTACT for missing required fields
     return {
-      firstName: user.firstName || 'Default',
-      lastName: user.lastName || 'User',
+      firstName: user.firstName || GP_DOMAIN_CONTACT.FirstName!,
+      lastName: user.lastName || GP_DOMAIN_CONTACT.LastName!,
       email: user.email,
-      phoneNumber: user.phone || '0000000000', // Default phone if not provided
-      addressLine1: '123 Default St', // TODO: Should be collected during purchase or from user profile
+      phoneNumber: user.phone || GP_DOMAIN_CONTACT.PhoneNumber!,
+      addressLine1: user.address || GP_DOMAIN_CONTACT.AddressLine1!,
       addressLine2: '',
-      city: 'Default City', // TODO: Should be collected during purchase or from user profile
-      state: 'CA', // TODO: Should be collected during purchase or from user profile
-      zipCode: user.zip || '00000',
+      city: user.city || GP_DOMAIN_CONTACT.City!,
+      state: user.state || GP_DOMAIN_CONTACT.State!,
+      zipCode: user.zip || GP_DOMAIN_CONTACT.ZipCode!,
     }
   }
 }

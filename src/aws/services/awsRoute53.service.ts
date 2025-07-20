@@ -30,7 +30,7 @@ import {
 } from '@aws-sdk/client-route-53'
 import { formatPhoneNumber } from 'src/shared/util/numbers.util'
 
-const GP_DOMAIN_CONTACT: ContactDetail = {
+export const GP_DOMAIN_CONTACT: ContactDetail = {
   FirstName: 'Victoria',
   LastName: 'Mitchell',
   ContactType: ContactType.COMPANY,
