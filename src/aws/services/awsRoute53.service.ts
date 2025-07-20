@@ -28,6 +28,7 @@ import {
   Route53ServiceException,
   RRType,
 } from '@aws-sdk/client-route-53'
+import { formatPhoneNumber } from 'src/shared/util/numbers.util'
 
 const GP_DOMAIN_CONTACT: ContactDetail = {
   FirstName: 'Victoria',
@@ -110,11 +111,17 @@ export class AwsRoute53Service extends AwsService {
         DurationInYears: 1,
         AdminContact: {
           ...ownerContact,
-          PhoneNumber: `+1.${ownerContact.PhoneNumber?.replace(/\D/g, '')}`,
+          PhoneNumber: formatPhoneNumber(
+            ownerContact.PhoneNumber,
+            GP_DOMAIN_CONTACT.PhoneNumber,
+          ),
         },
         RegistrantContact: {
           ...ownerContact,
-          PhoneNumber: `+1.${ownerContact.PhoneNumber?.replace(/\D/g, '')}`,
+          PhoneNumber: formatPhoneNumber(
+            ownerContact.PhoneNumber,
+            GP_DOMAIN_CONTACT.PhoneNumber,
+          ),
         },
         TechContact: GP_DOMAIN_CONTACT,
         BillingContact: GP_DOMAIN_CONTACT,
