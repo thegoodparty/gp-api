@@ -1,8 +1,7 @@
 import { z } from 'zod'
+import { isFQDN } from 'validator'
 
-export const DomainSchema = z
-  .string()
-  .regex(
-    /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/,
+export const DomainSchema = z.string().refine((v) => isFQDN(v), {
+  message:
     'Invalid domain name format. Must be a root domain (e.g., example.com)',
-  )
+})
