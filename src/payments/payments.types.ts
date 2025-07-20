@@ -21,6 +21,6 @@ export type PaymentIntentPayload<T extends PaymentType> = {
 } & (T extends PaymentType.DOMAIN_REGISTRATION
   ? {
       domainName: string
-      domainId?: number 
+      domainId?: number
     }
   : never)
