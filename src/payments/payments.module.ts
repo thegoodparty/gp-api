@@ -7,6 +7,7 @@ import { DomainPurchaseHandler } from './handlers/domain-purchase.handler'
 import { EmailModule } from '../email/email.module'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { WebsitesModule } from '../websites/websites.module'
+import { UsersModule } from '../users/users.module'
 import { StripeModule } from 'src/stripe/stripe.module'
 import { PaymentsService } from './services/payments.service'
 
@@ -22,6 +23,7 @@ import { PaymentsService } from './services/payments.service'
     EmailModule,
     CampaignsModule,
     forwardRef(() => WebsitesModule),
+    UsersModule,
     StripeModule,
   ],
   exports: [PaymentsService],

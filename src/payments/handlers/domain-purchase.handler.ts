@@ -8,6 +8,8 @@ import {
 import { PurchaseHandler, PurchaseMetadata } from '../purchase.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import { PaymentsService } from '../services/payments.service'
+import { UsersService } from '../../users/services/users.service'
+import { RegisterDomainSchema } from '../../websites/schemas/RegisterDomain.schema'
 
 @Injectable()
 export class DomainPurchaseHandler implements PurchaseHandler {
@@ -15,6 +17,7 @@ export class DomainPurchaseHandler implements PurchaseHandler {
     @Inject(forwardRef(() => DomainsService))
     private readonly domainsService: DomainsService,
     private readonly paymentsService: PaymentsService,
+    private readonly usersService: UsersService,
   ) {}
 
   async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
@@ -58,9 +61,23 @@ export class DomainPurchaseHandler implements PurchaseHandler {
       )
     }
 
+    const userId = paymentIntent.metadata?.userId
+    if (!userId) {
+      throw new BadRequestException('No userId found in payment metadata')
+    }
+
+    const user = await this.usersService.findUser({
+      id: parseInt(userId),
+    })
+
+    if (!user) {
+      throw new BadRequestException('User not found for payment')
+    }
+
     const domain = await this.domainsService.model.create({
       data: {
-        websiteId: websiteId!,
+        websiteId:
+          typeof websiteId === 'string' ? parseInt(websiteId) : websiteId!,
         name: domainName!,
         price: paymentIntent.amount / 100,
         paymentId: paymentIntentId,
@@ -68,6 +85,44 @@ export class DomainPurchaseHandler implements PurchaseHandler {
       },
     })
 
-    return { domain, message: 'Domain registration initiated' }
+    // Build contact information for domain registration
+    const contactInfo = this.buildContactInfo(user)
+
+    try {
+      const operationId = await this.domainsService.completeDomainRegistration(
+        typeof websiteId === 'string' ? parseInt(websiteId) : websiteId!,
+        contactInfo,
+      )
+
+      return {
+        domain,
+        operationId,
+        message: 'Domain registration initiated with AWS',
+      }
+    } catch (error) {
+      await this.domainsService.model.update({
+        where: { id: domain.id },
+        data: { status: 'inactive' },
+      })
+
+      throw new BadRequestException(
+        `Failed to register domain with AWS: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+  }
+
+  private buildContactInfo(user: any): RegisterDomainSchema {
+    // Use available user information, fallback to defaults for missing required fields
+    return {
+      firstName: user.firstName || 'Default',
+      lastName: user.lastName || 'User',
+      email: user.email,
+      phoneNumber: user.phone || '0000000000', // Default phone if not provided
+      addressLine1: '123 Default St', // TODO: Should be collected during purchase or from user profile
+      addressLine2: '',
+      city: 'Default City', // TODO: Should be collected during purchase or from user profile
+      state: 'CA', // TODO: Should be collected during purchase or from user profile
+      zipCode: user.zip || '00000',
+    }
   }
 }

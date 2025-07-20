@@ -50,18 +50,13 @@ export class PurchaseService {
     }
   }
 
-  async completePurchase(
-    dto: CompletePurchaseDto,
-  ): Promise<{ success: boolean; data?: any }> {
+  async completePurchase(dto: CompletePurchaseDto): Promise<any> {
     const paymentIntent = await this.paymentsService.retrievePayment(
       dto.paymentIntentId,
     )
 
     if (paymentIntent.status !== 'succeeded') {
-      return {
-        success: false,
-        data: { error: `Payment not completed: ${paymentIntent.status}` },
-      }
+      throw new Error(`Payment not completed: ${paymentIntent.status}`)
     }
 
     const purchaseType = this.mapPaymentTypeToPurchaseType(
@@ -70,26 +65,14 @@ export class PurchaseService {
     const handler = this.handlers.get(purchaseType)
 
     if (!handler) {
-      return {
-        success: false,
-        data: { error: 'No handler found for this purchase type' },
-      }
+      throw new Error('No handler found for this purchase type')
     }
 
-    try {
-      const result = await handler.executePostPurchase(
-        dto.paymentIntentId,
-        paymentIntent.metadata as any,
-      )
-      return { success: true, data: result }
-    } catch (error) {
-      return {
-        success: false,
-        data: {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        },
-      }
-    }
+    const result = await handler.executePostPurchase(
+      dto.paymentIntentId,
+      paymentIntent.metadata as any,
+    )
+    return result
   }
 
   private buildPaymentMetadata(
@@ -103,6 +86,7 @@ export class PurchaseService {
           type: PaymentType.DOMAIN_REGISTRATION,
           amount,
           domainName: metadata.domainName,
+          websiteId: metadata.websiteId,
           domainId: 0,
         }
       default:
