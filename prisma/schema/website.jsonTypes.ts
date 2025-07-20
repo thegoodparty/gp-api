@@ -16,6 +16,7 @@ declare global {
           title?: string
           description?: string
         }>
+        committee?: string
       }
       contact?: {
         address?: string

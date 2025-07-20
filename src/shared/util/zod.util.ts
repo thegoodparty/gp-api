@@ -1,29 +1,7 @@
-import { STATES, STATE_CODES } from '../constants/states'
 import { z } from 'zod'
 
 export function makeOptional<T>(schema: z.ZodType<T>) {
   return z.union([z.null(), z.undefined(), z.literal(''), schema])
-}
-
-/**
- * State validation function intended to be used in a zod schema
- * @example
- * const schema = z.object({
- *   name: z.string().optional(),
- *   state: isState().optional() /// etc
- * })
- */
-export function isState(stateLength: 'long' | 'short' = 'short') {
-  return z.string().refine(
-    (value) => {
-      const input = value.toLowerCase()
-
-      return (stateLength === 'short' ? STATE_CODES : STATES).some(
-        (state) => state.toLowerCase() === input,
-      )
-    },
-    { message: 'Must be a valid state' },
-  )
 }
 
 /**

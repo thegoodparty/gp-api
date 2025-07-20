@@ -7,6 +7,7 @@ export const getRandomInt = (min: number, max: number = LARGEST_SAFE_INTEGER) =>
 export const getRandomPercentage = () =>
   faker.number.float({ min: 0, max: 100, fractionDigits: 2 })
 
+
 export const getRandomElementFromArray = (array: any[]) =>
   array[getRandomInt(0, array.length - 1)]
 
@@ -61,3 +62,4 @@ export const formatPhoneNumber = (
     throw new Error('Invalid phone number length and no fallback available')
   }
 }
+

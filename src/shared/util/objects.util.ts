@@ -9,11 +9,6 @@ export function flip(obj: Record<any, any>): Record<any, any> {
   return ret
 }
 
-/** helper to check if a value is an object */
-export function isObject(value: unknown): value is object {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 /**
  * helper to get an object from a subset of another object's keys
  * @param {object} obj Source object
