@@ -41,11 +41,9 @@ export const formatPhoneNumber = (
   } else if (cleanedNumber.length === 11 && cleanedNumber.startsWith('1')) {
     return `+1.${cleanedNumber.substring(1)}`
   } else if (cleanedNumber.length > 11) {
-    if (
-      cleanedNumber.startsWith('1') &&
-      cleanedNumber.substring(1).length === 10
-    ) {
-      return `+1.${cleanedNumber.substring(1)}`
+    // Check if the first 11 digits form a valid US number
+    if (cleanedNumber.startsWith('1')) {
+      return `+1.${cleanedNumber.substring(1, 11)}`
     } else {
       // Non-US number or invalid format, use fallback
       if (fallbackNumber) {

@@ -60,7 +60,7 @@ export class PurchaseService {
     }
 
     const purchaseType = this.mapPaymentTypeToPurchaseType(
-      paymentIntent.metadata?.type as string,
+      paymentIntent.metadata?.paymentType as string,
     )
     const handler = this.handlers.get(purchaseType)
 
@@ -86,7 +86,7 @@ export class PurchaseService {
           type: PaymentType.DOMAIN_REGISTRATION,
           amount,
           domainName: metadata.domainName,
-          websiteId: metadata.websiteId,
+          domainId: metadata.websiteId,
         }
       default:
         throw new Error(`Unsupported purchase type: ${type}`)
