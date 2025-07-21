@@ -86,7 +86,7 @@ export class PurchaseService {
           type: PaymentType.DOMAIN_REGISTRATION,
           amount,
           domainName: metadata.domainName,
-          domainId: metadata.websiteId,
+          websiteId: metadata.websiteId,
         }
       default:
         throw new Error(`Unsupported purchase type: ${type}`)
