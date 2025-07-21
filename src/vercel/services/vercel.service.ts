@@ -9,6 +9,18 @@ if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   )
 }
 
+export const GP_DOMAIN_CONTACT = {
+  firstName: 'Victoria',
+  lastName: 'Mitchell',
+  email: 'accounts@goodparty.org',
+  phoneNumber: '+1.3126851162',
+  addressLine1: '916 Silver Spur Rd',
+  addressLine2: '',
+  city: 'Rolling Hills Estates',
+  state: 'CA',
+  zipCode: '90274',
+}
+
 @Injectable()
 export class VercelService {
   private readonly logger = new Logger(VercelService.name)
@@ -23,9 +35,53 @@ export class VercelService {
           name: domainName,
         },
       })
-    } catch (error: any) {
-      this.logger.error('Error adding domain:', error)
-      throw error
+    } catch (error) {
+      this.logger.error(`Error adding domain ${domainName} to project:`, error)
+      throw new Error(`Failed to add domain to Vercel project: ${error}`)
+    }
+  }
+
+  async removeDomainFromProject(domainName: string) {
+    try {
+      return await this.client.projects.removeProjectDomain({
+        idOrName: VERCEL_PROJECT_ID!,
+        domain: domainName,
+        teamId: VERCEL_TEAM_ID,
+      })
+    } catch (error) {
+      this.logger.error(
+        `Error removing domain ${domainName} from project:`,
+        error,
+      )
+      throw new Error(`Failed to remove domain from Vercel project: ${error}`)
+    }
+  }
+
+  async verifyProjectDomain(domainName: string) {
+    try {
+      return await this.client.projects.verifyProjectDomain({
+        idOrName: VERCEL_PROJECT_ID!,
+        domain: domainName,
+        teamId: VERCEL_TEAM_ID,
+      })
+    } catch (error) {
+      this.logger.error(`Error verifying domain ${domainName}:`, error)
+      throw new Error(`Failed to verify domain: ${error}`)
+    }
+  }
+
+  async checkDomainPrice(domainName: string) {
+    try {
+      const result = await this.client.domains.checkDomainPrice({
+        name: domainName,
+        teamId: VERCEL_TEAM_ID,
+      })
+
+      this.logger.debug(`Price check for ${domainName}:`, result)
+      return result
+    } catch (error) {
+      this.logger.error(`Error checking price for domain ${domainName}:`, error)
+      throw new Error(`Failed to check domain price: ${error}`)
     }
   }
 
@@ -54,133 +110,58 @@ export class VercelService {
     try {
       this.logger.debug(`Purchasing domain ${domainName} through Vercel`)
 
+      const finalContact = {
+        firstName: contact.firstName || GP_DOMAIN_CONTACT.firstName,
+        lastName: contact.lastName || GP_DOMAIN_CONTACT.lastName,
+        email: contact.email || GP_DOMAIN_CONTACT.email,
+        phone: contact.phoneNumber || GP_DOMAIN_CONTACT.phoneNumber,
+        address1: contact.addressLine1 || GP_DOMAIN_CONTACT.addressLine1,
+        city: contact.city || GP_DOMAIN_CONTACT.city,
+        state: contact.state || GP_DOMAIN_CONTACT.state,
+        postalCode: contact.zipCode || GP_DOMAIN_CONTACT.zipCode,
+      }
+
       const result = await this.client.domains.buyDomain({
         teamId: VERCEL_TEAM_ID,
         requestBody: {
           name: domainName,
-          expectedPrice: expectedPrice,
+          expectedPrice,
           country: 'US',
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-          email: contact.email,
-          phone: contact.phoneNumber,
-          address1: contact.addressLine1,
-          city: contact.city,
-          state: contact.state,
-          postalCode: contact.zipCode,
+          ...finalContact,
         },
       })
 
-      this.logger.debug('Domain purchase initiated through Vercel', result)
+      this.logger.debug(`Domain purchase result for ${domainName}:`, result)
       return result
-    } catch (error: any) {
-      this.logger.error('Error purchasing domain through Vercel:', error)
-      throw error
+    } catch (error) {
+      this.logger.error(`Error purchasing domain ${domainName}:`, error)
+      throw new Error(`Failed to register domain with Vercel: ${error}`)
     }
   }
 
-  /**
-   * Check domain price through Vercel
-   * @param domainName - The domain name to check price for
-   * @returns Domain pricing information
-   */
-  async checkDomainPrice(domainName: string) {
-    try {
-      return await this.client.domains.checkDomainPrice({
-        name: domainName,
-        teamId: VERCEL_TEAM_ID,
-      })
-    } catch (error: any) {
-      this.logger.error('Error checking domain price:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Get domain details from Vercel
-   * @param domainName - The domain name to get details for
-   * @returns Domain details
-   */
   async getDomainDetails(domainName: string) {
     try {
       return await this.client.domains.getDomain({
         domain: domainName,
         teamId: VERCEL_TEAM_ID,
       })
-    } catch (error: any) {
-      this.logger.error('Error getting domain details:', error)
-      throw error
+    } catch (error) {
+      this.logger.error(
+        `Error getting domain details for ${domainName}:`,
+        error,
+      )
+      throw new Error(`Failed to get domain details: ${error}`)
     }
   }
 
-  /**
-   * List all domains registered through Vercel
-   * @returns List of domains
-   */
   async listDomains() {
     try {
       return await this.client.domains.getDomains({
         teamId: VERCEL_TEAM_ID,
       })
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Error listing domains:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Remove domain from project
-   * @param domainName - The domain name to remove
-   * @returns Operation result
-   */
-  async removeDomainFromProject(domainName: string) {
-    try {
-      return await this.client.projects.removeProjectDomain({
-        idOrName: VERCEL_PROJECT_ID!,
-        domain: domainName,
-        teamId: VERCEL_TEAM_ID,
-      })
-    } catch (error: any) {
-      this.logger.error('Error removing domain from project:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Update project domain settings
-   * @param domainName - The domain name to update
-   * @param settings - Domain settings to update
-   * @returns Operation result
-   */
-  async updateProjectDomain(domainName: string, settings: any) {
-    try {
-      return await this.client.projects.updateProjectDomain({
-        idOrName: VERCEL_PROJECT_ID!,
-        domain: domainName,
-        teamId: VERCEL_TEAM_ID,
-        requestBody: settings,
-      })
-    } catch (error: any) {
-      this.logger.error('Error updating project domain:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Verify project domain
-   * @param domainName - The domain name to verify
-   * @returns Verification result
-   */
-  async verifyProjectDomain(domainName: string) {
-    try {
-      return await this.client.projects.verifyProjectDomain({
-        idOrName: VERCEL_PROJECT_ID!,
-        domain: domainName,
-        teamId: VERCEL_TEAM_ID,
-      })
-    } catch (error: any) {
-      this.logger.error('Error verifying project domain:', error)
-      throw error
+      throw new Error(`Failed to list domains: ${error}`)
     }
   }
 }

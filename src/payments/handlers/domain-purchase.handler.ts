@@ -13,6 +13,7 @@ import { PaymentsService } from '../services/payments.service'
 import { UsersService } from '../../users/services/users.service'
 import { WebsitesService } from '../../websites/services/websites.service'
 import { RegisterDomainSchema } from '../../websites/schemas/RegisterDomain.schema'
+import { GP_DOMAIN_CONTACT } from '../../vercel/services/vercel.service'
 
 @Injectable()
 export class DomainPurchaseHandler implements PurchaseHandler {
@@ -40,20 +41,19 @@ export class DomainPurchaseHandler implements PurchaseHandler {
     user: any,
     websiteContent: any,
   ): RegisterDomainSchema {
-    // Extract address from website content if available
-    const address = websiteContent?.address as any
+    const contact = websiteContent?.contact as any
 
     return {
       firstName: user.firstName || user.name?.split(' ')[0] || 'Unknown',
       lastName:
         user.lastName || user.name?.split(' ').slice(1).join(' ') || 'User',
       email: user.email,
-      phoneNumber: address?.phone || '+1-555-000-0000', // Default phone if not available
-      addressLine1: address?.address1 || '123 Main St', // Default address if not available
-      addressLine2: address?.address2,
-      city: address?.city || 'San Francisco',
-      state: address?.state || 'CA',
-      zipCode: address?.zip || '94102',
+      phoneNumber: contact?.phone || GP_DOMAIN_CONTACT.phoneNumber,
+      addressLine1: contact?.address1 || GP_DOMAIN_CONTACT.addressLine1,
+      addressLine2: contact?.address2,
+      city: contact?.city || GP_DOMAIN_CONTACT.city,
+      state: contact?.state || GP_DOMAIN_CONTACT.state,
+      zipCode: contact?.zip || GP_DOMAIN_CONTACT.zipCode,
     }
   }
 
@@ -138,7 +138,6 @@ export class DomainPurchaseHandler implements PurchaseHandler {
     const contactInfo = this.buildContactInfo(user, website.content)
 
     try {
-      // Use the new Vercel-based domain registration
       const registrationResult =
         await this.domainsService.completeDomainRegistration(
           validWebsiteId,

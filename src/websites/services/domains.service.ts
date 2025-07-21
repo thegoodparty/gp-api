@@ -131,9 +131,13 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       },
     })
 
+    if (!domain.price) {
+      throw new BadGatewayException('Domain price not available')
+    }
+
     const paymentIntent = await this.payments.createPayment(user, {
       type: PaymentType.DOMAIN_REGISTRATION,
-      amount: domain.price!.toNumber() * 100, // convert to cents
+      amount: domain.price.toNumber() * 100, // convert to cents
       domainName,
       domainId: domain.id,
     })
@@ -170,6 +174,10 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       )
     }
 
+    if (!domain.price) {
+      throw new BadRequestException('Domain price not available')
+    }
+
     try {
       const vercelResult = await this.vercel.purchaseDomain(
         domain.name,
@@ -184,7 +192,7 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
           state: contact.state,
           zipCode: contact.zipCode,
         },
-        domain.price!.toNumber(),
+        domain.price.toNumber(),
       )
 
       const projectResult = await this.vercel.addDomainToProject(domain.name)
@@ -227,7 +235,6 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       const verifyResult = await this.vercel.verifyProjectDomain(domain.name)
       this.logger.debug('Domain verification result:', verifyResult)
 
-      // Update domain status to registered (active)
       await this.model.update({
         where: { id: domain.id },
         data: { status: DomainStatus.registered },
@@ -249,14 +256,21 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     }
   }
 
-  // Remove the legacy getAwsOperationDetail method entirely
-  async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
-    const paymentIntent = await this.payments.retrievePayment(paymentId)
-    return paymentIntent.status as PaymentStatus
+  async getPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
+    try {
+      const paymentIntent = await this.payments.retrievePayment(paymentId)
+      return paymentIntent.status as PaymentStatus
+    } catch (error) {
+      this.logger.warn(
+        `Failed to retrieve payment status for ${paymentId}:`,
+        error,
+      )
+      return null
+    }
   }
 
   async getDomainWithPayment(websiteId: number) {
-    return this.findUnique({
+    return this.findFirst({
       where: { websiteId },
       select: {
         id: true,
@@ -292,7 +306,6 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
         this.logger.warn(
           `Failed to remove domain from Vercel project: ${error}`,
         )
-        // Continue with deletion even if Vercel removal fails
       }
     }
 
