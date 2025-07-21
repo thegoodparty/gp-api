@@ -26,6 +26,6 @@ import { WebsiteViewsService } from './services/websiteViews.service'
     WebsiteContactsService,
     WebsiteViewsService,
   ],
-  exports: [DomainsService],
+  exports: [DomainsService, WebsitesService],
 })
 export class WebsitesModule {}

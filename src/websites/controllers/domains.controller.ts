@@ -13,7 +13,7 @@ import {
   DomainsService,
   DomainStatusResponse,
   PaymentStatus,
-  AwsOperationStatus,
+  DomainOperationStatus,
 } from '../services/domains.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
@@ -60,7 +60,7 @@ export class DomainsController {
 
     if (!domain) {
       return {
-        message: AwsOperationStatus.NO_DOMAIN,
+        message: DomainOperationStatus.NO_DOMAIN,
         paymentStatus: null,
       }
     }
@@ -70,27 +70,35 @@ export class DomainsController {
       paymentStatus = await this.domains.getPaymentStatus(domain.paymentId)
     }
 
-    if (!domain.operationId) {
-      return {
-        message: AwsOperationStatus.NO_DOMAIN,
-        paymentStatus,
-      }
-    }
-
-    const operation = await this.domains.getAwsOperationDetail(
-      domain.operationId,
-    )
-
-    const message = operation.Status as AwsOperationStatus
-
-    if (message === AwsOperationStatus.SUCCESSFUL) {
-      await this.domains.updateDomainStatusToRegistered(domain.id)
+    // With Vercel, we can directly use the domain status from our database
+    // since Vercel operations are processed immediately
+    let message: DomainOperationStatus
+    switch (domain.status) {
+      case DomainStatus.pending:
+        message = DomainOperationStatus.SUBMITTED
+        break
+      case DomainStatus.submitted:
+        message = DomainOperationStatus.IN_PROGRESS
+        break
+      case DomainStatus.registered:
+        message = DomainOperationStatus.SUCCESSFUL
+        break
+      case DomainStatus.inactive:
+        message = DomainOperationStatus.ERROR
+        break
+      default:
+        message = DomainOperationStatus.ERROR
     }
 
     return {
       message,
       paymentStatus,
-      operationDetail: operation,
+      operationDetail: {
+        operationId: domain.operationId,
+        status: message,
+        type: 'RegisterDomain',
+        submittedDate: new Date(), // Could use domain creation date if needed
+      },
     }
   }
 

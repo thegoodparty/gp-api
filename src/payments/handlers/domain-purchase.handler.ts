@@ -11,35 +11,50 @@ import { PurchaseHandler, PurchaseMetadata } from '../purchase.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import { PaymentsService } from '../services/payments.service'
 import { UsersService } from '../../users/services/users.service'
+import { WebsitesService } from '../../websites/services/websites.service'
 import { RegisterDomainSchema } from '../../websites/schemas/RegisterDomain.schema'
-import { GP_DOMAIN_CONTACT } from '../../aws/services/awsRoute53.service'
 
 @Injectable()
 export class DomainPurchaseHandler implements PurchaseHandler {
   constructor(
     @Inject(forwardRef(() => DomainsService))
     private readonly domainsService: DomainsService,
+    @Inject(forwardRef(() => PaymentsService))
     private readonly paymentsService: PaymentsService,
     private readonly usersService: UsersService,
+    private readonly websitesService: WebsitesService,
   ) {}
 
-  private convertWebsiteIdToNumber(
-    websiteId: number | string | undefined,
-  ): number {
-    if (websiteId === undefined || websiteId === null) {
-      throw new BadRequestException('Website ID is required')
+  private convertWebsiteIdToNumber(websiteId: string | number): number {
+    if (typeof websiteId === 'string') {
+      const parsed = parseInt(websiteId, 10)
+      if (isNaN(parsed)) {
+        throw new BadRequestException('Invalid website ID format')
+      }
+      return parsed
     }
+    return websiteId
+  }
 
-    if (typeof websiteId === 'number') {
-      return websiteId
+  private buildContactInfo(
+    user: any,
+    websiteContent: any,
+  ): RegisterDomainSchema {
+    // Extract address from website content if available
+    const address = websiteContent?.address as any
+
+    return {
+      firstName: user.firstName || user.name?.split(' ')[0] || 'Unknown',
+      lastName:
+        user.lastName || user.name?.split(' ').slice(1).join(' ') || 'User',
+      email: user.email,
+      phoneNumber: address?.phone || '+1-555-000-0000', // Default phone if not available
+      addressLine1: address?.address1 || '123 Main St', // Default address if not available
+      addressLine2: address?.address2,
+      city: address?.city || 'San Francisco',
+      state: address?.state || 'CA',
+      zipCode: address?.zip || '94102',
     }
-
-    const parsedId = parseInt(websiteId, 10)
-    if (isNaN(parsedId)) {
-      throw new BadRequestException('Invalid website ID format')
-    }
-
-    return parsedId
   }
 
   async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
@@ -88,6 +103,12 @@ export class DomainPurchaseHandler implements PurchaseHandler {
       throw new BadRequestException('No userId found in payment metadata')
     }
 
+    if (!websiteId) {
+      throw new BadRequestException(
+        'Website ID is required for domain registration',
+      )
+    }
+
     const user = await this.usersService.findUser({
       id: parseInt(userId),
     })
@@ -97,6 +118,12 @@ export class DomainPurchaseHandler implements PurchaseHandler {
     }
 
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
+
+    // Retrieve website content to get address information
+    const website = await this.websitesService.findUniqueOrThrow({
+      where: { id: validWebsiteId },
+      select: { content: true },
+    })
 
     const domain = await this.domainsService.model.create({
       data: {
@@ -108,18 +135,20 @@ export class DomainPurchaseHandler implements PurchaseHandler {
       },
     })
 
-    const contactInfo = this.buildContactInfo(user)
+    const contactInfo = this.buildContactInfo(user, website.content)
 
     try {
-      const operationId = await this.domainsService.completeDomainRegistration(
-        validWebsiteId,
-        contactInfo,
-      )
+      // Use the new Vercel-based domain registration
+      const registrationResult =
+        await this.domainsService.completeDomainRegistration(
+          validWebsiteId,
+          contactInfo,
+        )
 
       return {
         domain,
-        operationId,
-        message: 'Domain registration initiated with AWS',
+        registrationResult,
+        message: 'Domain registration initiated with Vercel',
       }
     } catch (error) {
       await this.domainsService.model.update({
@@ -128,23 +157,8 @@ export class DomainPurchaseHandler implements PurchaseHandler {
       })
 
       throw new BadRequestException(
-        `Failed to register domain with AWS: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to register domain with Vercel: ${error instanceof Error ? error.message : 'Unknown error'}`,
       )
-    }
-  }
-
-  private buildContactInfo(user: any): RegisterDomainSchema {
-    // Use available user information, fallback to GP_DOMAIN_CONTACT for missing required fields
-    return {
-      firstName: user.firstName || GP_DOMAIN_CONTACT.FirstName!,
-      lastName: user.lastName || GP_DOMAIN_CONTACT.LastName!,
-      email: user.email,
-      phoneNumber: user.phone || GP_DOMAIN_CONTACT.PhoneNumber!,
-      addressLine1: user.address || GP_DOMAIN_CONTACT.AddressLine1!,
-      addressLine2: '',
-      city: user.city || GP_DOMAIN_CONTACT.City!,
-      state: user.state || GP_DOMAIN_CONTACT.State!,
-      zipCode: user.zip || GP_DOMAIN_CONTACT.ZipCode!,
     }
   }
 }

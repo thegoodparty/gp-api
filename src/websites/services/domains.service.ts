@@ -5,16 +5,9 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { AwsRoute53Service } from 'src/aws/services/awsRoute53.service'
-import { formatPhoneNumber } from 'src/aws/util/awsRoute53.util'
 import { DomainStatus, User } from '@prisma/client'
-import {
-  ContactType,
-  CountryCode,
-  DomainAvailability,
-} from '@aws-sdk/client-route-53-domains'
-import { RRType } from '@aws-sdk/client-route-53'
+import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { VercelService } from 'src/vercel/services/vercel.service'
-import { VERCEL_DNS_IP } from 'src/vercel/vercel.const'
 import { PaymentsService } from 'src/payments/services/payments.service'
 import { PaymentType } from 'src/payments/payments.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -31,18 +24,17 @@ export enum PaymentStatus {
   SUCCEEDED = 'succeeded',
 }
 
-// Enum for AWS Route53 operation statuses with custom NO_DOMAIN status
-export enum AwsOperationStatus {
-  NO_DOMAIN = 'NO_DOMAIN',
+// Enum for domain operation statuses
+export enum DomainOperationStatus {
   SUBMITTED = 'SUBMITTED',
   IN_PROGRESS = 'IN_PROGRESS',
-  ERROR = 'ERROR',
   SUCCESSFUL = 'SUCCESSFUL',
-  FAILED = 'FAILED',
+  ERROR = 'ERROR',
+  NO_DOMAIN = 'NO_DOMAIN',
 }
 
 export interface DomainStatusResponse {
-  message: AwsOperationStatus
+  message: DomainOperationStatus
   paymentStatus: PaymentStatus | null
   operationDetail?: any
 }
@@ -58,50 +50,59 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
   }
 
   async getDomainDetails(domainName: string) {
-    return this.route53.getDomainDetails(domainName)
+    return this.vercel.getDomainDetails(domainName)
   }
 
   async searchForDomain(domainName: string) {
-    const [availabilityResp, suggestionsResp, allPricesResp] =
-      await Promise.all([
-        this.route53.checkDomainAvailability(domainName),
-        this.route53.getDomainSuggestions(domainName),
-        this.route53.listPrices(),
-      ])
+    // Use AWS Route53 for domain availability and suggestions, but Vercel for pricing
+    const [availabilityResp, suggestionsResp] = await Promise.all([
+      this.route53.checkDomainAvailability(domainName),
+      this.route53.getDomainSuggestions(domainName),
+    ])
 
-    const allPricesMap = new Map()
-    allPricesResp?.Prices?.forEach((price) => {
-      if (price.Name && price.RegistrationPrice?.Price) {
-        allPricesMap.set(price.Name, {
-          registrationPrice: price.RegistrationPrice.Price,
-          renewalPrice: price.RenewalPrice?.Price,
-        })
-      }
-    })
-
-    const searchedTld = domainName.split('.').at(-1)
-    const searchedTldPrices = allPricesMap.get(searchedTld)
+    // Get pricing from Vercel for the main domain
+    let searchedDomainPrice: number | undefined
+    try {
+      const vercelPrice = await this.vercel.checkDomainPrice(domainName)
+      searchedDomainPrice = vercelPrice.price
+    } catch (error) {
+      this.logger.warn(`Could not get Vercel price for ${domainName}:`, error)
+    }
 
     const suggestions = suggestionsResp.SuggestionsList || []
-    const suggestionsWithPrices = suggestions.map((suggestion) => {
-      const suggestionTld = suggestion.DomainName?.split('.').at(-1)
-      const prices = allPricesMap.get(suggestionTld)
+    const suggestionsWithPrices = await Promise.all(
+      suggestions.map(async (suggestion) => {
+        let price: number | undefined
+        try {
+          if (suggestion.DomainName) {
+            const vercelPrice = await this.vercel.checkDomainPrice(
+              suggestion.DomainName,
+            )
+            price = vercelPrice.price
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Could not get Vercel price for ${suggestion.DomainName}:`,
+            error,
+          )
+        }
 
-      return {
-        ...suggestion,
-        prices: {
-          registration: prices?.registrationPrice,
-          renewal: prices?.renewalPrice,
-        },
-      }
-    })
+        return {
+          ...suggestion,
+          prices: {
+            registration: price,
+            renewal: price,
+          },
+        }
+      }),
+    )
 
     return {
       domainName,
       availability: availabilityResp.Availability,
       prices: {
-        registration: searchedTldPrices?.registrationPrice,
-        renewal: searchedTldPrices?.renewalPrice,
+        registration: searchedDomainPrice,
+        renewal: searchedDomainPrice,
       },
       suggestions: suggestionsWithPrices,
     }
@@ -132,7 +133,7 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
 
     const paymentIntent = await this.payments.createPayment(user, {
       type: PaymentType.DOMAIN_REGISTRATION,
-      amount: domain.price! * 100, // convert to cents
+      amount: domain.price!.toNumber() * 100, // convert to cents
       domainName,
       domainId: domain.id,
     })
@@ -148,7 +149,7 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     }
   }
 
-  // called after payment is accepted, send registration request to AWS
+  // called after payment is accepted, send registration request to Vercel
   async completeDomainRegistration(
     websiteId: number,
     contact: RegisterDomainSchema,
@@ -169,26 +170,52 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       )
     }
 
-    const operationId = await this.route53.registerDomain(domain.name, {
-      FirstName: contact.firstName,
-      LastName: contact.lastName,
-      ContactType: ContactType.PERSON,
-      Email: contact.email,
-      PhoneNumber: formatPhoneNumber(contact.phoneNumber),
-      AddressLine1: contact.addressLine1,
-      AddressLine2: contact.addressLine2,
-      City: contact.city,
-      State: contact.state,
-      CountryCode: CountryCode.US,
-      ZipCode: contact.zipCode,
-    })
+    try {
+      const vercelResult = await this.vercel.purchaseDomain(
+        domain.name,
+        {
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phoneNumber: contact.phoneNumber,
+          addressLine1: contact.addressLine1,
+          addressLine2: contact.addressLine2,
+          city: contact.city,
+          state: contact.state,
+          zipCode: contact.zipCode,
+        },
+        domain.price!.toNumber(),
+      )
 
-    await this.model.update({
-      where: { id: domain.id },
-      data: { operationId, status: DomainStatus.submitted },
-    })
+      const projectResult = await this.vercel.addDomainToProject(domain.name)
 
-    return operationId
+      await this.model.update({
+        where: { id: domain.id },
+        data: {
+          operationId: `vercel-${domain.name}-${Date.now()}`,
+          status: DomainStatus.submitted,
+        },
+      })
+
+      return {
+        vercelResult,
+        projectResult,
+        message: 'Domain registration completed with Vercel',
+      }
+    } catch (error) {
+      this.logger.error('Error registering domain with Vercel:', error)
+
+      await this.model.update({
+        where: { id: domain.id },
+        data: { status: DomainStatus.inactive },
+      })
+
+      throw new BadRequestException(
+        `Failed to register domain with Vercel: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
   }
 
   async configureDomain(websiteId: number) {
@@ -196,49 +223,50 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
       where: { websiteId },
     })
 
-    await this.route53.disableAutoRenew(domain.name)
+    try {
+      const verifyResult = await this.vercel.verifyProjectDomain(domain.name)
+      this.logger.debug('Domain verification result:', verifyResult)
 
-    const route53Response = await this.route53.setDnsRecords(
-      domain.name,
-      RRType.A,
-      VERCEL_DNS_IP,
-    )
-    this.logger.debug('Updated domain DNS record', route53Response.ChangeInfo)
+      // Update domain status to registered (active)
+      await this.model.update({
+        where: { id: domain.id },
+        data: { status: DomainStatus.registered },
+      })
 
-    const vercelResponse = await this.vercel.addDomainToProject(domain.name)
-    this.logger.debug('Added domain to Vercel project', vercelResponse)
-
-    if (!vercelResponse.verified) {
-      this.logger.warn(
-        `Domain ${domain.name} added to Vercel but requires verification`,
-        vercelResponse.verification,
+      return {
+        domain: domain.name,
+        verified: verifyResult,
+        status: 'configured',
+        message: 'Domain configured successfully with Vercel',
+      }
+    } catch (error) {
+      this.logger.error('Error configuring domain:', error)
+      throw new BadRequestException(
+        `Failed to configure domain: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       )
     }
+  }
 
-    return vercelResponse
+  // Remove the legacy getAwsOperationDetail method entirely
+  async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
+    const paymentIntent = await this.payments.retrievePayment(paymentId)
+    return paymentIntent.status as PaymentStatus
   }
 
   async getDomainWithPayment(websiteId: number) {
-    return this.findFirst({
+    return this.findUnique({
       where: { websiteId },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        status: true,
+        paymentId: true,
+        operationId: true,
+      },
     })
-  }
-
-  async getPaymentStatus(paymentId: string) {
-    try {
-      const paymentIntent = await this.payments.retrievePayment(paymentId)
-      return paymentIntent.status as PaymentStatus
-    } catch (error) {
-      this.logger.warn(
-        `Failed to retrieve payment status for payment ${paymentId}`,
-        error,
-      )
-      return null
-    }
-  }
-
-  async getAwsOperationDetail(operationId: string) {
-    return this.route53.getOperationDetail(operationId)
   }
 
   async updateDomainStatusToRegistered(domainId: number) {
@@ -252,6 +280,21 @@ export class DomainsService extends createPrismaBase(MODELS.Domain) {
     const domain = await this.findUniqueOrThrow({
       where: { websiteId },
     })
+
+    // Remove domain from Vercel project if it's active
+    if (
+      domain.status === DomainStatus.registered ||
+      domain.status === DomainStatus.submitted
+    ) {
+      try {
+        await this.vercel.removeDomainFromProject(domain.name)
+      } catch (error) {
+        this.logger.warn(
+          `Failed to remove domain from Vercel project: ${error}`,
+        )
+        // Continue with deletion even if Vercel removal fails
+      }
+    }
 
     await this.model.delete({
       where: { id: domain.id },

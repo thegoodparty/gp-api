@@ -16,6 +16,7 @@ import {
   DisableDomainAutoRenewCommand,
   ContactType,
   GetDomainSuggestionsCommand,
+  UpdateDomainNameserversCommand,
 } from '@aws-sdk/client-route-53-domains'
 import { AwsService } from './aws.service'
 import {
@@ -165,6 +166,37 @@ export class AwsRoute53Service extends AwsService {
       }
 
       return result
+    })
+  }
+
+  /**
+   * Updates the name servers for a domain
+   * @param domainName - The domain name to update name servers for (e.g. 'example.com')
+   * @param nameServers - Array of name server hostnames
+   * @see {@link https://docs.aws.amazon.com/Route53/latest/APIReference/API_domains_UpdateDomainNameservers.html}
+   */
+  async updateDomainNameservers(domainName: string, nameServers: string[]) {
+    return this.executeAwsOperation(async () => {
+      const command = new UpdateDomainNameserversCommand({
+        DomainName: domainName,
+        Nameservers: nameServers.map((nameServer) => ({
+          Name: nameServer,
+        })),
+      })
+      const result = await this.domainsClient.send(command)
+
+      if (result instanceof Route53DomainsServiceException) {
+        switch (result.name) {
+          case 'InvalidInput':
+            throw new BadRequestException(result.message)
+          case 'DomainNotFound':
+            throw new NotFoundException(result.message)
+          default:
+            throw result
+        }
+      }
+
+      return result.OperationId
     })
   }
 
