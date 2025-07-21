@@ -2,25 +2,24 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
-  Inject,
-  forwardRef,
 } from '@nestjs/common'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { DomainStatus } from '@prisma/client'
-import { PurchaseHandler, PurchaseMetadata } from '../purchase.types'
-import { DomainsService } from '../../websites/services/domains.service'
-import { PaymentsService } from '../services/payments.service'
+import {
+  PurchaseHandler,
+  PurchaseMetadata,
+} from '../../payments/purchase.types'
+import { DomainsService } from '../services/domains.service'
+import { PaymentsService } from '../../payments/services/payments.service'
 import { UsersService } from '../../users/services/users.service'
-import { WebsitesService } from '../../websites/services/websites.service'
-import { RegisterDomainSchema } from '../../websites/schemas/RegisterDomain.schema'
+import { WebsitesService } from '../services/websites.service'
+import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from '../../vercel/services/vercel.service'
 
 @Injectable()
 export class DomainPurchaseHandler implements PurchaseHandler {
   constructor(
-    @Inject(forwardRef(() => DomainsService))
     private readonly domainsService: DomainsService,
-    @Inject(forwardRef(() => PaymentsService))
     private readonly paymentsService: PaymentsService,
     private readonly usersService: UsersService,
     private readonly websitesService: WebsitesService,
@@ -41,19 +40,17 @@ export class DomainPurchaseHandler implements PurchaseHandler {
     user: any,
     websiteContent: any,
   ): RegisterDomainSchema {
-    const contact = websiteContent?.contact as any
-
+    const address = websiteContent?.contact?.address
     return {
-      firstName: user.firstName || user.name?.split(' ')[0] || 'Unknown',
-      lastName:
-        user.lastName || user.name?.split(' ').slice(1).join(' ') || 'User',
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
-      phoneNumber: contact?.phone || GP_DOMAIN_CONTACT.phoneNumber,
-      addressLine1: contact?.address1 || GP_DOMAIN_CONTACT.addressLine1,
-      addressLine2: contact?.address2,
-      city: contact?.city || GP_DOMAIN_CONTACT.city,
-      state: contact?.state || GP_DOMAIN_CONTACT.state,
-      zipCode: contact?.zip || GP_DOMAIN_CONTACT.zipCode,
+      phoneNumber: user.phone || '+1.0000000000',
+      addressLine1: address?.addressLine1 || GP_DOMAIN_CONTACT.addressLine1,
+      addressLine2: address?.addressLine2 || GP_DOMAIN_CONTACT.addressLine2,
+      city: address?.city || GP_DOMAIN_CONTACT.city,
+      state: address?.state || GP_DOMAIN_CONTACT.state,
+      zipCode: address?.zipCode || GP_DOMAIN_CONTACT.zipCode,
     }
   }
 
@@ -74,7 +71,11 @@ export class DomainPurchaseHandler implements PurchaseHandler {
   async calculateAmount(metadata: PurchaseMetadata): Promise<number> {
     const { domainName } = metadata
 
-    const searchResult = await this.domainsService.searchForDomain(domainName!)
+    if (!domainName) {
+      throw new BadRequestException('Domain name is required')
+    }
+
+    const searchResult = await this.domainsService.searchForDomain(domainName)
 
     if (!searchResult.prices.registration) {
       throw new BadRequestException('Could not get price for domain')

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Inject, forwardRef } from '@nestjs/common'
 import { User } from '@prisma/client'
 import {
   PurchaseType,
@@ -6,7 +6,7 @@ import {
   CreatePurchaseIntentDto,
   CompletePurchaseDto,
 } from '../purchase.types'
-import { DomainPurchaseHandler } from '../handlers/domain-purchase.handler'
+import { DomainPurchaseHandler } from '../../websites/handlers/domain-purchase.handler'
 import { PaymentsService } from './payments.service'
 import { PaymentType } from '../payments.types'
 
@@ -16,6 +16,7 @@ export class PurchaseService {
 
   constructor(
     private readonly paymentsService: PaymentsService,
+    @Inject(forwardRef(() => DomainPurchaseHandler))
     private readonly domainPurchaseHandler: DomainPurchaseHandler,
   ) {
     this.handlers.set(PurchaseType.DOMAIN_REGISTRATION, domainPurchaseHandler)

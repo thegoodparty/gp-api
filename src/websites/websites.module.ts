@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common'
+import { Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { DomainsController } from './controllers/domains.controller'
 import { DomainsService } from './services/domains.service'
@@ -8,8 +8,10 @@ import { VercelModule } from 'src/vercel/vercel.module'
 import { WebsitesController } from './controllers/websites.controller'
 import { FilesModule } from 'src/files/files.module'
 import { PaymentsModule } from 'src/payments/payments.module'
+import { UsersModule } from 'src/users/users.module'
 import { WebsiteContactsService } from './services/websiteContacts.service'
 import { WebsiteViewsService } from './services/websiteViews.service'
+import { DomainPurchaseHandler } from './handlers/domain-purchase.handler'
 
 @Module({
   imports: [
@@ -17,7 +19,8 @@ import { WebsiteViewsService } from './services/websiteViews.service'
     AwsModule,
     VercelModule,
     FilesModule,
-    forwardRef(() => PaymentsModule),
+    PaymentsModule,
+    UsersModule,
   ],
   controllers: [DomainsController, WebsitesController],
   providers: [
@@ -25,7 +28,8 @@ import { WebsiteViewsService } from './services/websiteViews.service'
     WebsitesService,
     WebsiteContactsService,
     WebsiteViewsService,
+    DomainPurchaseHandler,
   ],
-  exports: [DomainsService, WebsitesService],
+  exports: [DomainsService, WebsitesService, DomainPurchaseHandler],
 })
 export class WebsitesModule {}
