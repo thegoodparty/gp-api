@@ -13,10 +13,10 @@ import {
 import {
   DomainsService,
   DomainStatusResponse,
-  PaymentStatus,
   DomainOperationStatus,
   DomainOperationType,
 } from '../services/domains.service'
+import { PaymentStatus } from 'src/payments/payments.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
