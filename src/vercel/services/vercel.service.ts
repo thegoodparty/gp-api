@@ -9,18 +9,6 @@ if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   )
 }
 
-export const GP_DOMAIN_CONTACT = {
-  firstName: 'Victoria',
-  lastName: 'Mitchell',
-  email: 'accounts@goodparty.org',
-  phoneNumber: '+1.3126851162',
-  addressLine1: '916 Silver Spur Rd',
-  addressLine2: '',
-  city: 'Rolling Hills Estates',
-  state: 'CA',
-  zipCode: '90274',
-}
-
 @Injectable()
 export class VercelService {
   private readonly logger = new Logger(VercelService.name)
@@ -110,24 +98,20 @@ export class VercelService {
     try {
       this.logger.debug(`Purchasing domain ${domainName} through Vercel`)
 
-      const finalContact = {
-        firstName: contact.firstName || GP_DOMAIN_CONTACT.firstName,
-        lastName: contact.lastName || GP_DOMAIN_CONTACT.lastName,
-        email: contact.email || GP_DOMAIN_CONTACT.email,
-        phone: contact.phoneNumber || GP_DOMAIN_CONTACT.phoneNumber,
-        address1: contact.addressLine1 || GP_DOMAIN_CONTACT.addressLine1,
-        city: contact.city || GP_DOMAIN_CONTACT.city,
-        state: contact.state || GP_DOMAIN_CONTACT.state,
-        postalCode: contact.zipCode || GP_DOMAIN_CONTACT.zipCode,
-      }
-
       const result = await this.client.domains.buyDomain({
         teamId: VERCEL_TEAM_ID,
         requestBody: {
           name: domainName,
           expectedPrice,
           country: 'US',
-          ...finalContact,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phone: contact.phoneNumber,
+          address1: contact.addressLine1,
+          city: contact.city,
+          state: contact.state,
+          postalCode: contact.zipCode,
         },
       })
 

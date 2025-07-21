@@ -1,14 +1,49 @@
-// assumes US phone number, formats with +1 prefix for sending to AWS Route 53
-export const formatPhoneNumber = (phone: string): string => {
-  if (phone.startsWith('+')) {
-    return phone
+/**
+ * Formats a phone number for AWS Route53 domain registration
+ * @param phoneNumber - The phone number to format
+ * @param fallbackNumber - Optional fallback number to use if phoneNumber is invalid
+ * @returns Properly formatted phone number in +1.XXXXXXXXXX format
+ */
+export const formatPhoneNumber = (
+  phoneNumber?: string,
+  fallbackNumber?: string,
+): string => {
+  if (!phoneNumber || phoneNumber.trim() === '') {
+    if (fallbackNumber) {
+      return fallbackNumber
+    }
+    throw new Error('No phone number provided and no fallback available')
   }
 
-  const digits = phone.replace(/\D/g, '')
+  const cleanedNumber = phoneNumber.replace(/\D/g, '')
 
-  if (digits.length >= 11) {
-    return `+${digits}`
+  if (cleanedNumber === '') {
+    if (fallbackNumber) {
+      return fallbackNumber
+    }
+    throw new Error('Invalid phone number format and no fallback available')
+  }
+
+  if (cleanedNumber.length === 10) {
+    return `+1.${cleanedNumber}`
+  } else if (cleanedNumber.length === 11 && cleanedNumber.startsWith('1')) {
+    return `+1.${cleanedNumber.substring(1)}`
+  } else if (cleanedNumber.length > 11) {
+    // Check if the first 11 digits form a valid US number
+    if (cleanedNumber.startsWith('1')) {
+      return `+1.${cleanedNumber.substring(1, 11)}`
+    } else {
+      // Non-US number or invalid format, use fallback
+      if (fallbackNumber) {
+        return fallbackNumber
+      }
+      throw new Error('Non-US phone number and no fallback available')
+    }
   } else {
-    return `+1${digits}`
+    // Invalid length, use fallback
+    if (fallbackNumber) {
+      return fallbackNumber
+    }
+    throw new Error('Invalid phone number length and no fallback available')
   }
 }

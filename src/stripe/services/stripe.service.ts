@@ -36,10 +36,15 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
-    // Filter out undefined values from metadata as Stripe doesn't accept them
-    const filteredMetadata = Object.fromEntries(
-      Object.entries(restMetadata).filter(([_, value]) => value !== undefined),
-    )
+    // Validate that no undefined values are passed to Stripe metadata
+    const undefinedKeys = Object.entries(restMetadata)
+      .filter(([_, value]) => value === undefined)
+      .map(([key]) => key)
+    if (undefinedKeys.length > 0) {
+      throw new Error(
+        `Cannot pass undefined values to Stripe metadata. Found undefined values for: ${undefinedKeys.join(', ')}`,
+      )
+    }
 
     return await this.stripe.paymentIntents.create({
       customer: customerId,
@@ -52,7 +57,7 @@ export class StripeService {
       metadata: {
         userId,
         paymentType: type,
-        ...filteredMetadata,
+        ...(restMetadata as Record<string, string | number>),
       },
     })
   }

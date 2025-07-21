@@ -12,6 +12,8 @@ import { PaymentsService } from 'src/payments/services/payments.service'
 import { PaymentType } from 'src/payments/payments.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
+import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
+import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 
 // Enum for payment statuses (based on Stripe Payment Intent statuses)
 export enum PaymentStatus {
@@ -40,13 +42,138 @@ export interface DomainStatusResponse {
 }
 
 @Injectable()
-export class DomainsService extends createPrismaBase(MODELS.Domain) {
+export class DomainsService
+  extends createPrismaBase(MODELS.Domain)
+  implements PurchaseHandler
+{
   constructor(
     private readonly route53: AwsRoute53Service,
     private readonly vercel: VercelService,
     private readonly payments: PaymentsService,
   ) {
     super()
+  }
+
+  async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
+    const { domainName, websiteId } = metadata
+
+    if (!domainName || !websiteId) {
+      throw new BadRequestException('Domain name and website ID are required')
+    }
+
+    const searchResult = await this.searchForDomain(domainName)
+
+    if (searchResult.availability !== DomainAvailability.AVAILABLE) {
+      throw new ConflictException('Domain not available')
+    }
+  }
+
+  async calculateAmount(metadata: PurchaseMetadata): Promise<number> {
+    const { domainName } = metadata
+
+    if (!domainName) {
+      throw new BadRequestException('Domain name is required')
+    }
+
+    const searchResult = await this.searchForDomain(domainName)
+
+    if (!searchResult.prices.registration) {
+      throw new BadRequestException('Could not get price for domain')
+    }
+
+    return searchResult.prices.registration * 100
+  }
+
+  async executePostPurchase(
+    paymentIntentId: string,
+    metadata: PurchaseMetadata,
+  ): Promise<any> {
+    return this.handleDomainPostPurchase(paymentIntentId, metadata)
+  }
+
+  async handleDomainPostPurchase(
+    paymentIntentId: string,
+    metadata: any,
+  ): Promise<any> {
+    const { domainName, websiteId } = metadata
+    if (!websiteId) {
+      throw new BadRequestException(
+        'Website ID is required for domain registration',
+      )
+    }
+
+    const { paymentIntent, user } =
+      await this.payments.getValidatedPaymentUser(paymentIntentId)
+
+    const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
+
+    const website = await this.client.website.findUniqueOrThrow({
+      where: { id: validWebsiteId },
+      select: { content: true },
+    })
+
+    const domain = await this.model.create({
+      data: {
+        websiteId: validWebsiteId,
+        name: domainName!,
+        price: paymentIntent.amount / 100,
+        paymentId: paymentIntentId,
+        status: DomainStatus.pending,
+      },
+    })
+
+    const contactInfo = this.buildContactInfo(user, website.content)
+
+    try {
+      const registrationResult = await this.completeDomainRegistration(
+        validWebsiteId,
+        contactInfo,
+      )
+
+      return {
+        domain,
+        registrationResult,
+        message: 'Domain registration initiated with Vercel',
+      }
+    } catch (error) {
+      await this.model.update({
+        where: { id: domain.id },
+        data: { status: DomainStatus.inactive },
+      })
+
+      throw new BadRequestException(
+        `Failed to register domain with Vercel: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+  }
+
+  private convertWebsiteIdToNumber(websiteId: string | number): number {
+    if (typeof websiteId === 'string') {
+      const parsed = parseInt(websiteId, 10)
+      if (isNaN(parsed)) {
+        throw new BadRequestException('Invalid website ID format')
+      }
+      return parsed
+    }
+    return websiteId
+  }
+
+  private buildContactInfo(
+    user: any,
+    websiteContent: any,
+  ): RegisterDomainSchema {
+    const address = websiteContent?.contact?.address
+    return {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phoneNumber: user.phone || '+1.0000000000',
+      addressLine1: address?.addressLine1 || GP_DOMAIN_CONTACT.addressLine1,
+      addressLine2: address?.addressLine2 || GP_DOMAIN_CONTACT.addressLine2,
+      city: address?.city || GP_DOMAIN_CONTACT.city,
+      state: address?.state || GP_DOMAIN_CONTACT.state,
+      zipCode: address?.zipCode || GP_DOMAIN_CONTACT.zipCode,
+    }
   }
 
   async getDomainDetails(domainName: string) {

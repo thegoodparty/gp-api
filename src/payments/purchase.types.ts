@@ -21,6 +21,11 @@ export interface CompletePurchaseDto {
   paymentIntentId: string
 }
 
+export type PostPurchaseHandler = (
+  paymentIntentId: string,
+  metadata: PurchaseMetadata,
+) => Promise<any>
+
 export interface PurchaseHandler {
   validatePurchase(metadata: PurchaseMetadata): Promise<void>
   calculateAmount(metadata: PurchaseMetadata): Promise<number>

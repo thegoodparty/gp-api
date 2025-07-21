@@ -11,7 +11,8 @@ import { PaymentsModule } from 'src/payments/payments.module'
 import { UsersModule } from 'src/users/users.module'
 import { WebsiteContactsService } from './services/websiteContacts.service'
 import { WebsiteViewsService } from './services/websiteViews.service'
-import { DomainPurchaseHandler } from './handlers/domain-purchase.handler'
+import { PurchaseService } from 'src/payments/services/purchase.service'
+import { PurchaseType } from 'src/payments/purchase.types'
 
 @Module({
   imports: [
@@ -28,8 +29,22 @@ import { DomainPurchaseHandler } from './handlers/domain-purchase.handler'
     WebsitesService,
     WebsiteContactsService,
     WebsiteViewsService,
-    DomainPurchaseHandler,
   ],
-  exports: [DomainsService, WebsitesService, DomainPurchaseHandler],
+  exports: [DomainsService, WebsitesService],
 })
-export class WebsitesModule {}
+export class WebsitesModule {
+  constructor(
+    private readonly purchaseService: PurchaseService,
+    private readonly domainsService: DomainsService,
+  ) {
+    this.purchaseService.registerPurchaseHandler(
+      PurchaseType.DOMAIN_REGISTRATION,
+      this.domainsService,
+    )
+
+    this.purchaseService.registerPostPurchaseHandler(
+      PurchaseType.DOMAIN_REGISTRATION,
+      this.domainsService.handleDomainPostPurchase.bind(this.domainsService),
+    )
+  }
+}
