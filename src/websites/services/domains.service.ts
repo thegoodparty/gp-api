@@ -9,22 +9,11 @@ import { DomainStatus, User } from '@prisma/client'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { VercelService } from 'src/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
-import { PaymentType } from 'src/payments/payments.types'
+import { PaymentType, PaymentStatus } from 'src/payments/payments.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
-
-// Enum for payment statuses (based on Stripe Payment Intent statuses)
-export enum PaymentStatus {
-  REQUIRES_PAYMENT_METHOD = 'requires_payment_method',
-  REQUIRES_CONFIRMATION = 'requires_confirmation',
-  REQUIRES_ACTION = 'requires_action',
-  PROCESSING = 'processing',
-  REQUIRES_CAPTURE = 'requires_capture',
-  CANCELED = 'canceled',
-  SUCCEEDED = 'succeeded',
-}
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -33,6 +22,11 @@ export enum DomainOperationStatus {
   SUCCESSFUL = 'SUCCESSFUL',
   ERROR = 'ERROR',
   NO_DOMAIN = 'NO_DOMAIN',
+}
+
+// Enum for domain operation types
+export enum DomainOperationType {
+  REGISTER_DOMAIN = 'RegisterDomain',
 }
 
 export interface DomainStatusResponse {
@@ -77,11 +71,11 @@ export class DomainsService
 
     const searchResult = await this.searchForDomain(domainName)
 
-    if (!searchResult.prices.registration) {
+    if (!searchResult.price) {
       throw new BadRequestException('Could not get price for domain')
     }
 
-    return searchResult.prices.registration * 100
+    return searchResult.price * 100
   }
 
   async executePostPurchase(
@@ -141,7 +135,7 @@ export class DomainsService
         data: { status: DomainStatus.inactive },
       })
 
-      throw new BadRequestException(
+      throw new BadGatewayException(
         `Failed to register domain with Vercel: ${error instanceof Error ? error.message : 'Unknown error'}`,
       )
     }
@@ -167,7 +161,7 @@ export class DomainsService
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      phoneNumber: user.phone || '+1.0000000000',
+      phoneNumber: user.phone || GP_DOMAIN_CONTACT.phoneNumber,
       addressLine1: address?.addressLine1 || GP_DOMAIN_CONTACT.addressLine1,
       addressLine2: address?.addressLine2 || GP_DOMAIN_CONTACT.addressLine2,
       city: address?.city || GP_DOMAIN_CONTACT.city,
@@ -216,10 +210,7 @@ export class DomainsService
 
         return {
           ...suggestion,
-          prices: {
-            registration: price,
-            renewal: price,
-          },
+          price: price,
         }
       }),
     )
@@ -227,10 +218,7 @@ export class DomainsService
     return {
       domainName,
       availability: availabilityResp.Availability,
-      prices: {
-        registration: searchedDomainPrice,
-        renewal: searchedDomainPrice,
-      },
+      price: searchedDomainPrice,
       suggestions: suggestionsWithPrices,
     }
   }
@@ -246,7 +234,7 @@ export class DomainsService
       throw new ConflictException('Domain not available')
     }
 
-    if (!searchResult.prices.registration) {
+    if (!searchResult.price) {
       throw new BadGatewayException('Could not get price for domain')
     }
 
@@ -254,7 +242,7 @@ export class DomainsService
       data: {
         websiteId,
         name: domainName,
-        price: searchResult.prices.registration,
+        price: searchResult.price,
       },
     })
 
@@ -305,8 +293,10 @@ export class DomainsService
       throw new BadRequestException('Domain price not available')
     }
 
+    let vercelResult, projectResult
+
     try {
-      const vercelResult = await this.vercel.purchaseDomain(
+      vercelResult = await this.vercel.purchaseDomain(
         domain.name,
         {
           firstName: contact.firstName,
@@ -322,21 +312,7 @@ export class DomainsService
         domain.price.toNumber(),
       )
 
-      const projectResult = await this.vercel.addDomainToProject(domain.name)
-
-      await this.model.update({
-        where: { id: domain.id },
-        data: {
-          operationId: `vercel-${domain.name}-${Date.now()}`,
-          status: DomainStatus.submitted,
-        },
-      })
-
-      return {
-        vercelResult,
-        projectResult,
-        message: 'Domain registration completed with Vercel',
-      }
+      projectResult = await this.vercel.addDomainToProject(domain.name)
     } catch (error) {
       this.logger.error('Error registering domain with Vercel:', error)
 
@@ -345,11 +321,25 @@ export class DomainsService
         data: { status: DomainStatus.inactive },
       })
 
-      throw new BadRequestException(
+      throw new BadGatewayException(
         `Failed to register domain with Vercel: ${
           error instanceof Error ? error.message : 'Unknown error'
         }`,
       )
+    }
+
+    await this.model.update({
+      where: { id: domain.id },
+      data: {
+        operationId: `vercel-${domain.name}-${Date.now()}`,
+        status: DomainStatus.submitted,
+      },
+    })
+
+    return {
+      vercelResult,
+      projectResult,
+      message: 'Domain registration completed with Vercel',
     }
   }
 
@@ -358,28 +348,30 @@ export class DomainsService
       where: { websiteId },
     })
 
+    let verifyResult
+
     try {
-      const verifyResult = await this.vercel.verifyProjectDomain(domain.name)
+      verifyResult = await this.vercel.verifyProjectDomain(domain.name)
       this.logger.debug('Domain verification result:', verifyResult)
-
-      await this.model.update({
-        where: { id: domain.id },
-        data: { status: DomainStatus.registered },
-      })
-
-      return {
-        domain: domain.name,
-        verified: verifyResult,
-        status: 'configured',
-        message: 'Domain configured successfully with Vercel',
-      }
     } catch (error) {
       this.logger.error('Error configuring domain:', error)
-      throw new BadRequestException(
+      throw new BadGatewayException(
         `Failed to configure domain: ${
           error instanceof Error ? error.message : 'Unknown error'
         }`,
       )
+    }
+
+    await this.model.update({
+      where: { id: domain.id },
+      data: { status: DomainStatus.registered },
+    })
+
+    return {
+      domain: domain.name,
+      verified: verifyResult,
+      status: 'configured',
+      message: 'Domain configured successfully with Vercel',
     }
   }
 
@@ -392,7 +384,49 @@ export class DomainsService
         `Failed to retrieve payment status for ${paymentId}:`,
         error,
       )
-      return null
+
+      // Handle different error types appropriately
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+
+        // Stripe returns specific error types for different scenarios
+        if (
+          errorMessage.includes('no such payment_intent') ||
+          errorMessage.includes('not found') ||
+          (error as any).code === 'resource_missing'
+        ) {
+          // Payment doesn't exist - this might be acceptable in some cases
+          // Return null to maintain backward compatibility for now
+          return null
+        }
+
+        // Network/service issues with Stripe
+        if (
+          errorMessage.includes('network') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('service') ||
+          (error as any).code === 'api_connection_error'
+        ) {
+          throw new BadGatewayException(
+            `Stripe service unavailable: ${error.message}`,
+          )
+        }
+
+        // Invalid payment ID format
+        if (
+          errorMessage.includes('invalid') ||
+          (error as any).code === 'invalid_request_error'
+        ) {
+          throw new BadRequestException(
+            `Invalid payment ID format: ${error.message}`,
+          )
+        }
+      }
+
+      // For any other unknown errors, treat as gateway issue
+      throw new BadGatewayException(
+        `Unable to retrieve payment status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
     }
   }
 

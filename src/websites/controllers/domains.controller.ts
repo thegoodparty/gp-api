@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Post,
   Query,
   UsePipes,
@@ -14,6 +15,7 @@ import {
   DomainStatusResponse,
   PaymentStatus,
   DomainOperationStatus,
+  DomainOperationType,
 } from '../services/domains.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
@@ -53,7 +55,7 @@ export class DomainsController {
     })
 
     if (!website) {
-      throw new BadRequestException('No website found for this campaign')
+      throw new NotFoundException('No website found for this campaign')
     }
 
     const domain = await this.domains.getDomainWithPayment(website.id)
@@ -70,8 +72,6 @@ export class DomainsController {
       paymentStatus = await this.domains.getPaymentStatus(domain.paymentId)
     }
 
-    // With Vercel, we can directly use the domain status from our database
-    // since Vercel operations are processed immediately
     let message: DomainOperationStatus
     switch (domain.status) {
       case DomainStatus.pending:
@@ -96,7 +96,7 @@ export class DomainsController {
       operationDetail: {
         operationId: domain.operationId,
         status: message,
-        type: 'RegisterDomain',
+        type: DomainOperationType.REGISTER_DOMAIN,
         submittedDate: new Date(), // Could use domain creation date if needed
       },
     }
@@ -124,11 +124,11 @@ export class DomainsController {
     })
 
     if (!website) {
-      throw new BadRequestException('No website found for this campaign')
+      throw new NotFoundException('No website found for this campaign')
     }
 
     if (!website.domain) {
-      throw new BadRequestException('No domain found for this campaign')
+      throw new NotFoundException('No domain found for this campaign')
     }
 
     // Only allow deletion if domain is pending or inactive

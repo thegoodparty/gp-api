@@ -5,7 +5,7 @@ export const generateAllSectionsResponseData = (
   sections: BlogArticlesSectionAugmented[],
   blogArticleMetas: BlogArticleMeta[],
 ) => {
-  let hero: BlogSectionHero = blogArticleMetas[0]
+  const hero: BlogSectionHero = blogArticleMetas[0]
 
   const result: BlogArticlesSectionAugmented[] = []
   let sectionIndex = 0

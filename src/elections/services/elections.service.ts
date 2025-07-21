@@ -19,9 +19,7 @@ export class ElectionsService {
 
   private readonly logger = new Logger(ElectionsService.name)
 
-  constructor(
-    private readonly httpService: HttpService
-  ) {
+  constructor(private readonly httpService: HttpService) {
     if (!ElectionsService.BASE_URL) {
       throw new Error(`Please set ELECTION_API_URL in your .env. 
         Recommendation is to point it at dev if you are developing`)
@@ -33,22 +31,22 @@ export class ElectionsService {
     query?: Q,
   ): Promise<Res | null> {
     try {
-      const { data, status } = await lastValueFrom(this.httpService.get(
-        `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
-        {
-          params: query,
-          paramsSerializer: params =>
-            Object.entries(params)
-              .filter(([, v]) => v !== undefined && v !== null)
-              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-              .join('&'),
-        }
-      ))
+      const { data, status } = await lastValueFrom(
+        this.httpService.get(
+          `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
+          {
+            params: query,
+            paramsSerializer: (params) =>
+              Object.entries(params)
+                .filter(([, v]) => v !== undefined && v !== null)
+                .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+                .join('&'),
+          },
+        ),
+      )
       if (status >= 200 && status < 300) return data
-        this.logger.warn(
-          `Election API GET ${path}} responded ${status}`,
-        )
-        return null
+      this.logger.warn(`Election API GET ${path}} responded ${status}`)
+      return null
     } catch (error) {
       this.logger.error(`Election API GET ${path} failed: ${error}`)
       throw new BadGatewayException(`Election API GET ${path} failed: ${error}`)
