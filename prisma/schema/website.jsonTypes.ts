@@ -1,5 +1,7 @@
 export {}
 
+import { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
+
 declare global {
   export namespace PrismaJson {
     export interface WebsiteContent {
@@ -20,6 +22,7 @@ declare global {
       }
       contact?: {
         address?: string
+        addressPlace?: GooglePlacesApiResponse
         email?: string
         phone?: string
       }

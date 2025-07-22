@@ -1,14 +1,17 @@
-import { BadRequestException, Controller, Post } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
 import { StripeService } from '../stripe/services/stripe.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Prisma, User } from '@prisma/client'
 import { UsersService } from '../users/services/users.service'
+import { PurchaseService } from './services/purchase.service'
+import { CreatePurchaseIntentDto, CompletePurchaseDto } from './purchase.types'
 
 @Controller('payments/purchase')
 export class PurchaseController {
   constructor(
     private readonly stripeService: StripeService,
     private readonly usersService: UsersService,
+    private readonly purchaseService: PurchaseService,
   ) {}
 
   @Post('checkout-session')
@@ -42,5 +45,18 @@ export class PurchaseController {
     const { url: redirectUrl } =
       await this.stripeService.createPortalSession(customerId)
     return { redirectUrl }
+  }
+
+  @Post('create-intent')
+  async createPurchaseIntent(
+    @ReqUser() user: User,
+    @Body() dto: CreatePurchaseIntentDto,
+  ) {
+    return this.purchaseService.createPurchaseIntent(user, dto)
+  }
+
+  @Post('complete')
+  async completePurchase(@Body() dto: CompletePurchaseDto) {
+    return this.purchaseService.completePurchase(dto)
   }
 }

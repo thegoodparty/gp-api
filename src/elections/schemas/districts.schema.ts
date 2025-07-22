@@ -17,16 +17,16 @@ export const projectedTurnoutColumns = Object.values(
 const getDistrictTypesSchema = z.object({
   state: z
     .string()
-    .transform(v => v.toUpperCase())
-    .refine(v => STATE_CODES.includes(v), 'Invalid state code'),
+    .transform((v) => v.toUpperCase())
+    .refine((v) => STATE_CODES.includes(v), 'Invalid state code'),
   electionYear: z.coerce.number().int(),
 })
 
 const getDistrictNamesSchema = z.object({
   state: z
     .string()
-    .transform(v => v.toUpperCase())
-    .refine(v => STATE_CODES.includes(v), 'Invalid state code'),
+    .transform((v) => v.toUpperCase())
+    .refine((v) => STATE_CODES.includes(v), 'Invalid state code'),
   electionYear: z.coerce.number().int(),
   L2DistrictType: z.string(),
 })

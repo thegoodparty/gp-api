@@ -15,7 +15,7 @@ model Domain {
   website     Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   status      DomainStatus @default(pending)
   operationId String?      @map("operation_id")
-  price       Int?
+  price       Decimal?
   paymentId   String?      @map("payment_id")
 
   @@map("domain")
