@@ -29,10 +29,17 @@ export enum DomainOperationType {
   REGISTER_DOMAIN = 'RegisterDomain',
 }
 
+export interface DomainOperationDetail {
+  operationId: string | null
+  status: DomainOperationStatus
+  type: DomainOperationType
+  submittedDate: Date
+}
+
 export interface DomainStatusResponse {
   message: DomainOperationStatus
   paymentStatus: PaymentStatus | null
-  operationDetail?: any
+  operationDetail?: DomainOperationDetail
 }
 
 @Injectable()
@@ -96,7 +103,7 @@ export class DomainsService
       )
     }
 
-    const { paymentIntent, user } =
+    const { paymentIntent: _paymentIntent, user } =
       await this.payments.getValidatedPaymentUser(paymentIntentId)
 
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
@@ -106,11 +113,17 @@ export class DomainsService
       select: { content: true },
     })
 
+    const searchResult = await this.searchForDomain(domainName!)
+
+    if (!searchResult.price) {
+      throw new BadRequestException('Could not get price for domain')
+    }
+
     const domain = await this.model.create({
       data: {
         websiteId: validWebsiteId,
         name: domainName!,
-        price: paymentIntent.amount / 100,
+        price: searchResult.price,
         paymentId: paymentIntentId,
         status: DomainStatus.pending,
       },
@@ -153,20 +166,30 @@ export class DomainsService
   }
 
   private buildContactInfo(
-    user: any,
-    websiteContent: any,
+    user: User,
+    websiteContent: PrismaJson.WebsiteContent | null,
   ): RegisterDomainSchema {
-    const address = websiteContent?.contact?.address
+    const addressPlace = websiteContent?.contact?.addressPlace
     return {
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
+      firstName: user.firstName || GP_DOMAIN_CONTACT.firstName,
+      lastName: user.lastName || GP_DOMAIN_CONTACT.lastName,
+      email: user.email || GP_DOMAIN_CONTACT.email,
       phoneNumber: user.phone || GP_DOMAIN_CONTACT.phoneNumber,
-      addressLine1: address?.addressLine1 || GP_DOMAIN_CONTACT.addressLine1,
-      addressLine2: address?.addressLine2 || GP_DOMAIN_CONTACT.addressLine2,
-      city: address?.city || GP_DOMAIN_CONTACT.city,
-      state: address?.state || GP_DOMAIN_CONTACT.state,
-      zipCode: address?.zipCode || GP_DOMAIN_CONTACT.zipCode,
+      addressLine1:
+        addressPlace?.formatted_address || GP_DOMAIN_CONTACT.addressLine1,
+      addressLine2: GP_DOMAIN_CONTACT.addressLine2,
+      city:
+        addressPlace?.address_components?.find((c) =>
+          c.types.includes('locality'),
+        )?.long_name || GP_DOMAIN_CONTACT.city,
+      state:
+        addressPlace?.address_components?.find((c) =>
+          c.types.includes('administrative_area_level_1'),
+        )?.short_name || GP_DOMAIN_CONTACT.state,
+      zipCode:
+        addressPlace?.address_components?.find((c) =>
+          c.types.includes('postal_code'),
+        )?.long_name || GP_DOMAIN_CONTACT.zipCode,
     }
   }
 
@@ -252,7 +275,7 @@ export class DomainsService
 
     const paymentIntent = await this.payments.createPayment(user, {
       type: PaymentType.DOMAIN_REGISTRATION,
-      amount: domain.price.toNumber() * 100, // convert to cents
+      amount: domain.price.toNumber() * 100,
       domainName,
       domainId: domain.id,
     })
