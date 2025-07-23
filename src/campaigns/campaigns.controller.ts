@@ -97,15 +97,11 @@ export class CampaignsController {
       })
     }
 
-    p2vStatus === P2VStatus.waiting && this.handleP2VWaiting(campaign, p2v)
+    if (p2vStatus === P2VStatus.waiting) {
+      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
 
     return p2v
-  }
-
-  private async handleP2VWaiting(campaign: Campaign, p2v: PathToVictory) {
-    if (!p2v.data?.electionType && !p2v.data?.electionLocation) {
-      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-    }
   }
 
   @Roles(UserRole.admin)
