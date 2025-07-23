@@ -63,17 +63,17 @@ export interface GooglePlusCode {
 
 export interface GooglePlacesApiResponse {
   address_components: GoogleAddressComponent[]
-  adr_address: string
-  formatted_address: string
+  adr_address?: string
+  formatted_address?: string
   geometry?: GooglePlaceGeometry
   icon?: string
   icon_background_color?: string
   icon_mask_base_uri?: string
-  name: string
-  place_id: string
+  name?: string
+  place_id?: string
   plus_code?: GooglePlusCode
   reference?: string
-  types: GoogleAddressPlace[]
+  types?: GoogleAddressPlace[]
   url?: string
   utc_offset?: number | string
   vicinity?: string
