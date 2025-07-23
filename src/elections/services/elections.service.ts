@@ -10,6 +10,9 @@ import { ElectionApiRoutes } from '../constants/elections.const'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 
+// TODO: Revisit this file after the stakeholders decide on the direction we're going...
+// ...for the win number / p2v solution. Remove any unneeded code at that time.
+
 @Injectable()
 export class ElectionsService {
   private static readonly BASE_URL = process.env.ELECTION_API_URL
