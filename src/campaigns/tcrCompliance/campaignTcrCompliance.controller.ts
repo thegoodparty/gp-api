@@ -5,6 +5,7 @@ import {
   Controller,
   Delete,
   ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
   InternalServerErrorException,
@@ -32,6 +33,20 @@ export class CampaignTcrComplianceController {
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly campaignsService: CampaignsService,
   ) {}
+
+  @Get('mine')
+  @UseCampaign()
+  async getMyTcrCompliance(@ReqCampaign() campaign: Campaign) {
+    const tcrCompliance = await this.tcrComplianceService.fetchByCampaignId(
+      campaign.id,
+    )
+    if (!tcrCompliance) {
+      throw new NotFoundException(
+        'TCR compliance does not exist for this campaign',
+      )
+    }
+    return tcrCompliance
+  }
 
   @Post()
   @UseCampaign()
@@ -67,7 +82,7 @@ export class CampaignTcrComplianceController {
     )
   }
 
-  private readonly retrievedTcrCompliance = async (
+  private readonly retrieveTcrCompliance = async (
     tcrComplianceId: string,
     campaign: Campaign,
   ) => {
@@ -96,7 +111,7 @@ export class CampaignTcrComplianceController {
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
   ) {
-    const tcrCompliance = await this.retrievedTcrCompliance(
+    const tcrCompliance = await this.retrieveTcrCompliance(
       tcrComplianceId,
       campaign,
     )
@@ -125,7 +140,7 @@ export class CampaignTcrComplianceController {
     @Param('id') tcrComplianceId: string,
     @ReqCampaign() campaign: Campaign,
   ) {
-    const tcrCompliance = await this.retrievedTcrCompliance(
+    const tcrCompliance = await this.retrieveTcrCompliance(
       tcrComplianceId,
       campaign,
     )

@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { isFQDN } from 'validator'
+import { isFQDN, isURL } from 'validator'
 
-export const DomainSchema = z.string().refine((v) => isFQDN(v), {
+export const DomainSchema = z.string().refine((v) => isFQDN(v) || isURL(v), {
   message:
-    'Invalid domain name format. Must be a root domain (e.g., example.com)',
+    'Invalid website address format. Must be either a URL or a domain name (e.g., https://example.com or example.com)',
 })

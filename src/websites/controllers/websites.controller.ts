@@ -12,7 +12,7 @@ import {
   Query,
 } from '@nestjs/common'
 import { WebsitesService } from '../services/websites.service'
-import { Campaign, User, UserRole, WebsiteStatus } from '@prisma/client'
+import { Campaign, User, WebsiteStatus } from '@prisma/client'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
@@ -27,7 +27,6 @@ import { MimeTypes } from 'http-constants-ts'
 import { UpdateWebsiteSchema } from '../schemas/UpdateWebsite.schema'
 import { FilesService } from 'src/files/files.service'
 import { merge } from 'es-toolkit'
-import { userHasRole } from 'src/users/util/users.util'
 import { WebsiteContactsService } from '../services/websiteContacts.service'
 import { GetWebsiteContactsSchema } from '../schemas/GetWebsiteContacts.schema'
 import { ValidateVanityPathSchema } from '../schemas/ValidateVanityPath.schema'
@@ -226,30 +225,6 @@ export class WebsitesController {
     return {
       available: !website,
     }
-  }
-
-  @Get(':vanityPath/preview')
-  @UseCampaign()
-  async previewWebsite(
-    @ReqUser() user: User,
-    @ReqCampaign() campaign: Campaign,
-    @Param('vanityPath') vanityPath: string,
-  ) {
-    const website = await this.websites.findUniqueOrThrow({
-      where: { vanityPath },
-      include: WEBSITE_CONTENT_INCLUDES,
-    })
-
-    if (
-      website.campaignId !== campaign.id &&
-      !userHasRole(user, UserRole.admin)
-    ) {
-      throw new ForbiddenException(
-        'You are not authorized to preview this website',
-      )
-    }
-
-    return website
   }
 
   @Get(':vanityPath/view')
