@@ -8,11 +8,21 @@ import { VercelModule } from 'src/vercel/vercel.module'
 import { WebsitesController } from './controllers/websites.controller'
 import { FilesModule } from 'src/files/files.module'
 import { PaymentsModule } from 'src/payments/payments.module'
+import { UsersModule } from 'src/users/users.module'
 import { WebsiteContactsService } from './services/websiteContacts.service'
 import { WebsiteViewsService } from './services/websiteViews.service'
+import { PurchaseService } from 'src/payments/services/purchase.service'
+import { PurchaseType } from 'src/payments/purchase.types'
 
 @Module({
-  imports: [HttpModule, AwsModule, VercelModule, FilesModule, PaymentsModule],
+  imports: [
+    HttpModule,
+    AwsModule,
+    VercelModule,
+    FilesModule,
+    PaymentsModule,
+    UsersModule,
+  ],
   controllers: [DomainsController, WebsitesController],
   providers: [
     DomainsService,
@@ -20,5 +30,21 @@ import { WebsiteViewsService } from './services/websiteViews.service'
     WebsiteContactsService,
     WebsiteViewsService,
   ],
+  exports: [DomainsService, WebsitesService],
 })
-export class WebsitesModule {}
+export class WebsitesModule {
+  constructor(
+    private readonly purchaseService: PurchaseService,
+    private readonly domainsService: DomainsService,
+  ) {
+    this.purchaseService.registerPurchaseHandler(
+      PurchaseType.DOMAIN_REGISTRATION,
+      this.domainsService,
+    )
+
+    this.purchaseService.registerPostPurchaseHandler(
+      PurchaseType.DOMAIN_REGISTRATION,
+      this.domainsService.handleDomainPostPurchase.bind(this.domainsService),
+    )
+  }
+}

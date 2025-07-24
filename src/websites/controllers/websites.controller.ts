@@ -296,4 +296,11 @@ export class WebsitesController {
 
     return this.siteViews.trackWebsiteView(website.id, visitorId)
   }
+
+  // this is used from candidates.goodparty.org
+  @Get('by-domain/:domain')
+  @PublicAccess()
+  async getWebsiteByDomain(@Param('domain') domain: string) {
+    return this.websites.findByDomainName(domain, WEBSITE_CONTENT_INCLUDES)
+  }
 }

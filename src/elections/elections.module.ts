@@ -11,6 +11,7 @@ import { EmailModule } from '../email/email.module'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { VotersModule } from '../voters/voters.module'
 import { ElectionsService } from './services/elections.service'
+import { HttpModule } from '@nestjs/axios'
 
 @Module({
   controllers: [ElectionsController],
@@ -29,6 +30,7 @@ import { ElectionsService } from './services/elections.service'
     EmailModule,
     VotersModule,
     forwardRef(() => CampaignsModule),
+    HttpModule,
   ],
 })
 export class ElectionsModule {}

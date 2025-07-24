@@ -7,6 +7,16 @@ export enum WebhookEventType {
   CustomerSubscriptionResumed = 'customer.subscription.resumed',
 }
 
+export enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD = 'requires_payment_method',
+  REQUIRES_CONFIRMATION = 'requires_confirmation',
+  REQUIRES_ACTION = 'requires_action',
+  PROCESSING = 'processing',
+  REQUIRES_CAPTURE = 'requires_capture',
+  CANCELED = 'canceled',
+  SUCCEEDED = 'succeeded',
+}
+
 export enum PaymentType {
   DOMAIN_REGISTRATION = 'domain_registration',
 }
@@ -17,14 +27,10 @@ export type PaymentIntentPayload<T extends PaymentType> = {
    * The amount to charge the user in cents
    */
   amount: number
-  /**
-   * The description of the payment
-   */
   description?: string
 } & (T extends PaymentType.DOMAIN_REGISTRATION
   ? {
-      // type specific metadata to send along with the payment intent
       domainName: string
-      domainId: number
+      domainId?: number
     }
   : never)
