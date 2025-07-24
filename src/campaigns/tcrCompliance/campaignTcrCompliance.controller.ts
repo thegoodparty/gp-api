@@ -128,7 +128,7 @@ export class CampaignTcrComplianceController {
     }
 
     const campaignVerifyBrand =
-      this.tcrComplianceService.submitCampaignVerifyToken(
+      await this.tcrComplianceService.submitCampaignVerifyToken(
         user,
         tcrCompliance,
         campaignVerifyToken,
