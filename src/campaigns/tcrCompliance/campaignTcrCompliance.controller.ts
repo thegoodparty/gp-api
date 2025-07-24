@@ -18,7 +18,7 @@ import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.s
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
 import { UsersService } from '../../users/services/users.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
@@ -127,11 +127,21 @@ export class CampaignTcrComplianceController {
       )
     }
 
-    return this.tcrComplianceService.submitCampaignVerifyToken(
-      user,
-      tcrCompliance,
-      campaignVerifyToken,
-    )
+    const campaignVerifyBrand =
+      this.tcrComplianceService.submitCampaignVerifyToken(
+        user,
+        tcrCompliance,
+        campaignVerifyToken,
+      )
+
+    await this.tcrComplianceService.model.update({
+      where: { id: tcrCompliance.id },
+      data: {
+        status: TcrComplianceStatus.pending,
+      },
+    })
+
+    return campaignVerifyBrand
   }
 
   @Delete(':id')
