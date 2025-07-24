@@ -1,6 +1,5 @@
 enum TcrComplianceStatus {
   submitted
-  waitingOnPin
   pending
   approved
   rejected
