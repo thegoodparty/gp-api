@@ -8,6 +8,7 @@ export enum VoterFileType {
   directMail = 'directMail',
   telemarketing = 'telemarketing',
   custom = 'custom',
+  robocall = CampaignTaskType.robocall,
 }
 
 // TODO: these should be cleaned up to only be what is currently used
@@ -39,7 +40,7 @@ export const TASK_TO_TYPE_MAP: {
   [CampaignTaskType.doorKnocking]: VoterFileType.doorKnocking,
   [CampaignTaskType.phoneBanking]: VoterFileType.telemarketing,
   [CampaignTaskType.socialMedia]: VoterFileType.full, // TODO: check if voter file type is correct, should it be digitalAds?
-  [CampaignTaskType.robocall]: VoterFileType.sms,
+  [CampaignTaskType.robocall]: VoterFileType.robocall,
   [CampaignTaskType.text]: VoterFileType.sms,
   // These maybe won't be used?, putting here for completeness
   [CampaignTaskType.events]: VoterFileType.full,
