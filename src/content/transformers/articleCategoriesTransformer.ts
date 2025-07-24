@@ -33,6 +33,7 @@ export const articleCategoriesTransformer: Transformer<
             {
               title: input.data.title,
               id: input.id,
+              order: input.data.order || 9999,
             },
           ],
           order: categoryFields.order || 9999,
@@ -41,6 +42,7 @@ export const articleCategoriesTransformer: Transformer<
         foundCategory.articles.push({
           title: input.data.title,
           id: input.id,
+          order: input.data.order || 9999,
         })
       }
     } else if (input.type === TYPE_ARTICLE_CATEGORY) {
@@ -67,6 +69,10 @@ export const articleCategoriesTransformer: Transformer<
   }
 
   articleCategories.sort(compareArticleCategories)
+
+  articleCategories.forEach((category) => {
+    category.articles.sort((a, b) => (a.order || 9999) - (b.order || 9999))
+  })
 
   return articleCategories
 }
