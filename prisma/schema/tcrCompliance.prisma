@@ -16,7 +16,7 @@ model TcrCompliance {
   phone         String
   email         String
   status        TcrComplianceStatus? @default(submitted)
-  tdlcNumber    BigInt?              @map("tdlc_number")
+  tdlcNumber    String?              @map("tdlc_number")
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
   campaign      Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
