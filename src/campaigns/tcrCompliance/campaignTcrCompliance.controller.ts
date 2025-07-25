@@ -138,6 +138,8 @@ export class CampaignTcrComplianceController {
       where: { id: tcrCompliance.id },
       data: {
         status: TcrComplianceStatus.pending,
+        // TODO: also update w/ the tdlcNumber once we figure out where it's
+        //  coming' from
       },
     })
 
