@@ -380,7 +380,7 @@ export default $config({
         },
       })
 
-      const voterCluster = new aws.rds.Cluster('voterCluster', {
+      const voterDbProdConfig = {
         clusterIdentifier: 'gp-voter-db',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
@@ -397,7 +397,8 @@ export default $config({
           maxCapacity: 128,
           minCapacity: 0.5,
         },
-      })
+      }
+      const voterCluster = new aws.rds.Cluster('voterCluster', voterDbProdConfig)
 
       new aws.rds.ClusterInstance('voterInstance', {
         clusterIdentifier: voterCluster.id,
@@ -408,22 +409,9 @@ export default $config({
 
       // Second voter cluster for database swap operation
       const voterClusterSwap = new aws.rds.Cluster('voterClusterSwap', {
-        clusterIdentifier: 'gp-voter-db-swap',
-        engine: aws.rds.EngineType.AuroraPostgresql,
-        engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.6',
-        databaseName: `${voterDbName}_swap`,
-        masterUsername: voterDbUser,
-        masterPassword: voterDbPassword,
-        dbSubnetGroupName: subnetGroup.name,
-        vpcSecurityGroupIds: [rdsSecurityGroup.id],
-        storageEncrypted: true,
-        deletionProtection: true,
-        finalSnapshotIdentifier: `gp-voter-db-swap-${$app.stage}-final-snapshot`,
-        serverlessv2ScalingConfiguration: {
-          maxCapacity: 128,
-          minCapacity: 0.5,
-        },
+        ...voterDbProdConfig,
+        clusterIdentifier: 'gp-voter-db-20250728',
+        databaseName: `${voterDbName}_20250728`,
       })
 
       new aws.rds.ClusterInstance('voterInstanceSwap', {
