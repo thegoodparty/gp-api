@@ -408,17 +408,17 @@ export default $config({
       })
 
       // Second voter cluster for database swap operation
-      const voterClusterSwap = new aws.rds.Cluster('voterClusterSwap', {
+      const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
         ...voterDbProdConfig,
         clusterIdentifier: 'gp-voter-db-20250728',
         databaseName: `${voterDbName}_20250728`,
       })
 
       new aws.rds.ClusterInstance('voterInstanceSwap', {
-        clusterIdentifier: voterClusterSwap.id,
+        clusterIdentifier: voterClusterLatest.id,
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
-        engineVersion: voterClusterSwap.engineVersion,
+        engineVersion: voterClusterLatest.engineVersion,
       })
 
     } else if ($app.stage === 'qa') {
