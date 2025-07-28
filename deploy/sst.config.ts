@@ -412,7 +412,7 @@ export default $config({
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
         engineVersion: '16.6',
-        databaseName: `${voterDbName}-swap`,
+        databaseName: `${voterDbName}_swap`,
         masterUsername: voterDbUser,
         masterPassword: voterDbPassword,
         dbSubnetGroupName: subnetGroup.name,
