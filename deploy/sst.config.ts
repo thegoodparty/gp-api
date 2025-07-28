@@ -405,6 +405,34 @@ export default $config({
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterCluster.engineVersion,
       })
+
+      // Second voter cluster for database swap operation
+      const voterClusterSwap = new aws.rds.Cluster('voterClusterSwap', {
+        clusterIdentifier: 'gp-voter-db-swap',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.6',
+        databaseName: `${voterDbName}-swap`,
+        masterUsername: voterDbUser,
+        masterPassword: voterDbPassword,
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-voter-db-swap-${$app.stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 128,
+          minCapacity: 0.5,
+        },
+      })
+
+      new aws.rds.ClusterInstance('voterInstanceSwap', {
+        clusterIdentifier: voterClusterSwap.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: voterClusterSwap.engineVersion,
+      })
+
     } else if ($app.stage === 'qa') {
       rdsCluster = new aws.rds.Cluster('rdsCluster', {
         clusterIdentifier: 'gp-api-db-qa',
