@@ -414,7 +414,7 @@ export default $config({
         databaseName: `${voterDbName}_20250728`,
       })
 
-      new aws.rds.ClusterInstance('voterInstanceSwap', {
+      new aws.rds.ClusterInstance('voterInstanceLatest', {
         clusterIdentifier: voterClusterLatest.id,
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
