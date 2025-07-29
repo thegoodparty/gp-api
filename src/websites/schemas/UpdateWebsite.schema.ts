@@ -10,6 +10,7 @@ export class UpdateWebsiteSchema extends createZodDto(
     status: z.nativeEnum(WebsiteStatus).optional(),
     vanityPath: VanityPathSchema.optional(),
     theme: z.string().optional(),
+    createStep: z.string().optional(),
     main: z
       .object({
         title: z.string().optional(),
