@@ -1,5 +1,6 @@
 export * from './Email.schema'
 export * from './Ein.schema'
+export * from './GooglePlaces.schema'
 export * from './Password.schema'
 export * from './Phone.schema'
 export * from './Roles.schema'

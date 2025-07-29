@@ -45,4 +45,17 @@ export class WebsitesService extends createPrismaBase(MODELS.Website) {
   update(args: Prisma.WebsiteUpdateArgs) {
     return this.model.update(args)
   }
+
+  async findByDomainName(domainName: string, include?: Prisma.WebsiteInclude) {
+    const domainRecord = await this.client.domain.findUniqueOrThrow({
+      where: { name: domainName },
+      include: {
+        website: {
+          include,
+        },
+      },
+    })
+
+    return domainRecord.website
+  }
 }

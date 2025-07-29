@@ -1,7 +1,7 @@
 enum DomainStatus {
-  pending // awaiting payment
-  submitted // sent to aws, waiting for registration to complete
-  registered // registered with aws, waiting for DNS to be configured
+  pending
+  submitted
+  registered
   active
   inactive
 }
@@ -15,7 +15,7 @@ model Domain {
   website     Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   status      DomainStatus @default(pending)
   operationId String?      @map("operation_id")
-  price       Int?
+  price       Decimal?
   paymentId   String?      @map("payment_id")
 
   @@map("domain")

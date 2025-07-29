@@ -2,6 +2,7 @@ import { WebsiteStatus } from '@prisma/client'
 import { VanityPathSchema } from './VanityPath.schema'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
+import { GooglePlacesApiResponseSchema } from 'src/shared/schemas'
 
 export class UpdateWebsiteSchema extends createZodDto(
   z.object({
@@ -9,6 +10,7 @@ export class UpdateWebsiteSchema extends createZodDto(
     status: z.nativeEnum(WebsiteStatus).optional(),
     vanityPath: VanityPathSchema.optional(),
     theme: z.string().optional(),
+    createStep: z.string().optional(),
     main: z
       .object({
         title: z.string().optional(),
@@ -33,6 +35,7 @@ export class UpdateWebsiteSchema extends createZodDto(
     contact: z
       .object({
         address: z.string().optional(),
+        addressPlace: GooglePlacesApiResponseSchema.optional(),
         email: z.string().optional(),
         phone: z.string().optional(),
       })

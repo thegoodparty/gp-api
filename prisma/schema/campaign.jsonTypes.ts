@@ -65,6 +65,7 @@ declare global {
       positionId?: string | null
       electionId?: string | null
       tier?: string
+      einNumber?: string | null
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
     //  No reason to have both.
