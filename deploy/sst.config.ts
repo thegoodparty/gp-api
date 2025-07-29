@@ -411,7 +411,7 @@ export default $config({
       const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
         ...voterDbProdConfig,
         clusterIdentifier: 'gp-voter-db-20250728',
-        databaseName: `${voterDbName}_20250728`,
+        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-20250728-final-snapshot`,
       })
 
       new aws.rds.ClusterInstance('voterInstanceLatest', {
