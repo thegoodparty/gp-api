@@ -1,6 +1,5 @@
 enum TcrComplianceStatus {
   submitted
-  waitingOnPin
   pending
   approved
   rejected
@@ -17,6 +16,7 @@ model TcrCompliance {
   phone         String
   email         String
   status        TcrComplianceStatus? @default(submitted)
+  tdlcNumber    String?              @map("tdlc_number")
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
   campaign      Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)

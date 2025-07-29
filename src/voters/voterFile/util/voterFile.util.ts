@@ -159,7 +159,7 @@ export function typeToQuery(
       )`
     }
 
-    if (type === 'telemarketing') {
+    if (type === 'telemarketing' || type === 'robocall') {
       columns += `, "VoterTelephones_LandlineFormatted",
       "Languages_Description"`
 
