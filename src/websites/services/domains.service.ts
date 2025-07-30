@@ -60,14 +60,13 @@ export class DomainsService
   }
 
   private shouldEnableDomainPurchase(): boolean {
-    return !this.stripe.isTestMode()
+    return !this.stripe.isTestMode
   }
 
   private getDomainPurchaseStatus(): string {
-    if (this.stripe.isTestMode()) {
-      return 'disabled because Stripe is in test mode'
-    }
-    return 'enabled'
+    return this.stripe.isTestMode 
+      ? 'disabled because Stripe is in test mode'
+      : 'enabled'
   }
 
   async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
@@ -381,8 +380,8 @@ export class DomainsService
     })
 
     const message = this.shouldEnableDomainPurchase()
-      ? 'Domain registration completed with Vercel'
-      : `Domain registration simulated - ${this.getDomainPurchaseStatus()}`
+      ? 'Enabled'
+      : `Disabled - Stripe is in test mode`
 
     return {
       vercelResult,
