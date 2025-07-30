@@ -2,7 +2,12 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CreateTcrComplianceDto } from '../schemas/createTcrComplianceDto.schema'
 import { PeerlyIdentityService } from '../../../peerly/services/peerlyIdentity.service'
-import { Campaign, TcrCompliance, User } from '@prisma/client'
+import {
+  Campaign,
+  TcrCompliance,
+  TcrComplianceStatus,
+  User,
+} from '@prisma/client'
 import { getTCRIdentityName } from '../util/trcCompliance.util'
 import { getUserFullName } from '../../../users/util/users.util'
 import { postalAddressToString } from '../../../shared/util/postalAddresses.util'
@@ -97,5 +102,24 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       tcrCompliance,
       campaignVerifyToken,
     )
+  }
+
+  async syncComplianceStatuses() {
+    const compliances = await this.model.findMany({
+      where: {
+        status: TcrComplianceStatus.pending,
+        peerlyIdentityId: { not: null },
+      },
+    })
+    this.logger.debug('Sync Compliance Statuses:', compliances)
+    for (const compliance of compliances) {
+      const useCases = await this.peerlyIdentityService.getIdentityUseCases(
+        compliance.peerlyIdentityId!,
+      )
+      this.logger.debug(
+        `Use cases for compliance ID ${compliance.id}:`,
+        useCases,
+      )
+    }
   }
 }

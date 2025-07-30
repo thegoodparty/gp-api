@@ -25,3 +25,9 @@ export type AiContentData = {
   updatedAt: number
   inputValues?: AiContentInputValues
 }
+
+export type AIQueueMessageData = {
+  slug: string
+  key: string
+  regenerate: boolean | undefined
+}

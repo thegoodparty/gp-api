@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
-import { GenerateAiContentMessage, QueueMessage } from '../queue.types'
+import {
+  GenerateAiContentMessage,
+  QUEUE_MESSAGE_TYPE,
+  QueueMessage,
+} from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Campaign, PathToVictory, User } from '@prisma/client'
@@ -16,6 +20,7 @@ import {
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 
 @Injectable()
 export class ConsumerService {
@@ -28,10 +33,12 @@ export class ConsumerService {
     private readonly viabilityService: ViabilityService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
+    private readonly campaignTcrComplianceService: CampaignTcrComplianceService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
+    this.logger.debug('received queue message: ', message)
     const shouldRequeue = await this.handleMessageAndMaybeRequeue(message)
     // Return a rejected promise if requeue is needed without throwing an error
     if (shouldRequeue) {
@@ -52,7 +59,6 @@ export class ConsumerService {
   }
 
   async processMessage(message: Message) {
-    // console.log(`consumer received message: ${message.Body}`);
     if (!message) {
       return
     }
@@ -60,12 +66,21 @@ export class ConsumerService {
     if (!body) {
       return
     }
-    const queueMessage: QueueMessage = JSON.parse(body)
+    let queueMessage: QueueMessage
+    try {
+      queueMessage = JSON.parse(body)
+    } catch (e) {
+      this.logger.error('error parsing queue message', e)
+      await this.slackService.errorMessage({
+        message: `error parsing queue message body: ${body}`,
+        error: e,
+      })
+      return
+    }
     this.logger.log('processing queue message type ', queueMessage.type)
 
     switch (queueMessage.type) {
-      case 'generateAiContent':
-        this.logger.log('received generateAiContent message')
+      case QUEUE_MESSAGE_TYPE.aiContentGeneration:
         const generateAiContentMessage =
           queueMessage.data as GenerateAiContentMessage
         await this.aiContentService.handleGenerateAiContent(
@@ -87,10 +102,16 @@ export class ConsumerService {
           },
         )
         break
-      case 'pathToVictory':
-        this.logger.log('received pathToVictory message')
+      case QUEUE_MESSAGE_TYPE.pathToVictory:
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         await this.handlePathToVictoryMessage(pathToVictoryMessage)
+        break
+      case QUEUE_MESSAGE_TYPE.tcrComplianceSync:
+        this.logger.log('processing tcrComplianceSync message')
+        this.campaignTcrComplianceService.syncComplianceStatuses()
+        break
+      default:
+        this.logger.warn(`Unknown queue message type: ${queueMessage.type}`)
         break
     }
   }
@@ -182,22 +203,6 @@ export class ConsumerService {
         SlackChannel.botPathToVictory,
       )
     }
-
-    // This is disabled until we have a process to load the data from the sheet
-    // and a place to store the data since BallotCandidate was deprecated.
-    // const isProd = WEBAPP_ROOT === 'https://goodparty.org'
-    // // Send the candidate to google sheets for techspeed on production
-    // if (isProd) {
-    //   try {
-    //     await this.crmService.techspeedAppendSheets(message.campaignId)
-    //   } catch (e) {
-    //     this.logger.error('error in techspeedAppendSheets', e)
-    //     await this.slackService.errorMessage({
-    //       message: 'error in techspeedAppendSheets',
-    //       error: e,
-    //     })
-    //   }
-    // }
   }
 
   private async handlePathToVictoryFailure(campaign: Campaign) {

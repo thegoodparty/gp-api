@@ -1,9 +1,5 @@
 import { VoterCounts } from 'src/voters/voters.types'
-
-export interface PathToVictoryQueueMessage {
-  type: 'pathToVictory'
-  data: PathToVictoryInput
-}
+import { QUEUE_MESSAGE_TYPE } from '../../queue/queue.types'
 
 export interface PathToVictoryInput {
   slug: string
@@ -21,6 +17,11 @@ export interface PathToVictoryInput {
   priorElectionDates: string[]
   electionType?: string
   electionLocation?: string
+}
+
+export interface PathToVictoryQueueMessage {
+  type: QUEUE_MESSAGE_TYPE
+  data: PathToVictoryInput
 }
 
 export interface PathToVictoryResponse {

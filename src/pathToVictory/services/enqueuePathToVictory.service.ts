@@ -9,6 +9,7 @@ import { SlackChannel } from '../../shared/services/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
 import { PathToVictoryQueueMessage } from '../types/pathToVictory.types'
+import { QUEUE_MESSAGE_TYPE } from '../../queue/queue.types'
 
 @Injectable()
 export class EnqueuePathToVictoryService {
@@ -67,10 +68,9 @@ export class EnqueuePathToVictoryService {
         }
 
         this.logger.debug('race data', raceData)
-        // queueMessage.data = { campaignId, ...raceData }
 
         queueMessage = {
-          type: 'pathToVictory',
+          type: QUEUE_MESSAGE_TYPE.pathToVictory,
           data: {
             campaignId: campaignId.toString(),
             ...raceData,

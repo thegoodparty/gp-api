@@ -3,6 +3,8 @@ import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
 import { queueConfig } from '../queue.config'
+import { v4 as uuidv4 } from 'uuid'
+import { QueueMessage } from '../queue.types'
 
 export enum MessageGroup {
   p2v = 'p2v',
@@ -37,20 +39,23 @@ const producer = Producer.create({
 export class EnqueueService {
   private readonly logger = new Logger(EnqueueService.name)
   constructor() {}
-  async sendMessage(msg: any, group: MessageGroup = MessageGroup.default) {
-    const body: any = JSON.stringify(msg)
+  async sendMessage(
+    msg: QueueMessage,
+    group: MessageGroup = MessageGroup.default,
+  ) {
+    const body = JSON.stringify(msg)
 
-    const uuid = Math.random().toString(36).substring(2, 12)
+    const id = uuidv4()
 
     const message: Message = {
-      id: uuid,
+      id,
       body,
-      deduplicationId: uuid, // Required for FIFO queues
+      deduplicationId: id, // Required for FIFO queues
       groupId: `gp-queue-${group}`, // Required for FIFO queues
     }
 
     try {
-      await producer.send(message)
+      return await producer.send(message)
     } catch (error) {
       this.logger.error('error queueing message', error)
     }

@@ -128,7 +128,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         )
       const { data } = response
       const { submission_key: submissionKey } = data
-      this.logger.debug('Successfully submitted identity profile')
+      this.logger.debug('Successfully submitted identity 10DLC Brand', data)
       return submissionKey
     } catch (error) {
       this.handleApiError(error)
@@ -144,10 +144,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const response: AxiosResponse<Approve10DLCBrandResponse> =
         await lastValueFrom(
           this.httpService.post(
-            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit`,
+            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/approve`,
             {
               campaign_verify_token: campaignVerifyToken,
-              entity_type: PEERLY_ENTITY_TYPE,
               usecase: PEERLY_USECASE,
               sample1: `Hello {first_name}, this is ${getUserFullName(user)} from ${committeeName}. Sample message content. Reply STOP to opt-out`,
               sample2: `Hello {first_name}, this is ${getUserFullName(user)} from ${committeeName}. More sample message content. Reply STOP to opt-out`,
@@ -162,6 +161,23 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug('Successfully approved 10DLC Brand', identityBrand)
 
       return identityBrand
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async getIdentityUseCases(identityId: string) {
+    try {
+      const response: AxiosResponse<{ usecases: string[] }> =
+        await lastValueFrom(
+          this.httpService.get(
+            `${this.baseUrl}/v2/tdlc/${identityId}/get_usecases`,
+            await this.getBaseHttpHeaders(),
+          ),
+        )
+      const { data } = response
+      this.logger.debug('Successfully retrieved identity use cases', data)
+      return data
     } catch (error) {
       this.handleApiError(error)
     }

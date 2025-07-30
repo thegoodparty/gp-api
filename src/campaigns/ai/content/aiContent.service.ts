@@ -13,6 +13,7 @@ import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../shared/services/slackService.types'
+import { QUEUE_MESSAGE_TYPE } from '../../../queue/queue.types'
 
 @Injectable()
 export class AiContentService {
@@ -142,7 +143,7 @@ export class AiContentService {
     }
 
     const queueMessage = {
-      type: 'generateAiContent',
+      type: QUEUE_MESSAGE_TYPE.aiContentGeneration,
       data: {
         slug,
         key,
