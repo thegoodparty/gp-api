@@ -284,6 +284,6 @@ export class CampaignsController {
   @Put('update-missing-win-numbers')
   updateMissingWinNumbers() {
     // No need to await
-     
+     this.campaigns.updateMissingWinNumbers()
   }
 }
