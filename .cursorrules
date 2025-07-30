@@ -130,7 +130,7 @@ CRITICAL REQUIREMENT:
 IMPLEMENTATION:
 
 - Check the `package.json` for available libraries before implementing new functionality
-- Use the library's documentation to integrate it effectively into the codebase
+- Use the library's documentation for the version `package-lock.json` specifies to integrate it effectively into the codebase
 
 ## Rule 7: NestJS Services Directory Structure
 
