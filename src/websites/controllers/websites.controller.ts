@@ -165,6 +165,7 @@ export class WebsitesController {
       where: { campaignId },
       select: {
         content: true,
+        domain: true,
       },
     })
 
@@ -208,6 +209,9 @@ export class WebsitesController {
         ...(body.status !== undefined && {
           status: body.status,
         }),
+      },
+      include: {
+        domain: true,
       },
     })
   }
