@@ -22,6 +22,10 @@ const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 export class StripeService {
   private stripe = new Stripe(STRIPE_SECRET_KEY as string)
 
+  isTestMode(): boolean {
+    return !STRIPE_SECRET_KEY?.includes('live')
+  }
+
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
       STRIPE_SECRET_KEY?.includes('live') ? LIVE_PRODUCT_ID : TEST_PRODUCT_ID,
