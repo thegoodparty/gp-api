@@ -380,7 +380,7 @@ export default $config({
         },
       })
 
-      const voterCluster = new aws.rds.Cluster('voterCluster', {
+      const voterDbProdConfig = {
         clusterIdentifier: 'gp-voter-db',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
@@ -397,7 +397,8 @@ export default $config({
           maxCapacity: 128,
           minCapacity: 0.5,
         },
-      })
+      }
+      const voterCluster = new aws.rds.Cluster('voterCluster', voterDbProdConfig)
 
       new aws.rds.ClusterInstance('voterInstance', {
         clusterIdentifier: voterCluster.id,
@@ -405,6 +406,21 @@ export default $config({
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterCluster.engineVersion,
       })
+
+      // Second voter cluster for database swap operation
+      const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
+        ...voterDbProdConfig,
+        clusterIdentifier: 'gp-voter-db-20250728',
+        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-20250728-final-snapshot`,
+      })
+
+      new aws.rds.ClusterInstance('voterInstanceLatest', {
+        clusterIdentifier: voterClusterLatest.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: voterClusterLatest.engineVersion,
+      })
+
     } else if ($app.stage === 'qa') {
       rdsCluster = new aws.rds.Cluster('rdsCluster', {
         clusterIdentifier: 'gp-api-db-qa',

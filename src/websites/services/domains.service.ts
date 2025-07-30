@@ -15,6 +15,10 @@ import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 
+const enableDomainPurchase = Boolean(
+  process.env.ENABLE_DOMAIN_PURCHASE === 'true',
+)
+
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
   SUBMITTED = 'SUBMITTED',
@@ -319,23 +323,25 @@ export class DomainsService
     let vercelResult, projectResult
 
     try {
-      vercelResult = await this.vercel.purchaseDomain(
-        domain.name,
-        {
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-          email: contact.email,
-          phoneNumber: contact.phoneNumber,
-          addressLine1: contact.addressLine1,
-          addressLine2: contact.addressLine2,
-          city: contact.city,
-          state: contact.state,
-          zipCode: contact.zipCode,
-        },
-        domain.price.toNumber(),
-      )
+      if (enableDomainPurchase) {
+        vercelResult = await this.vercel.purchaseDomain(
+          domain.name,
+          {
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            phoneNumber: contact.phoneNumber,
+            addressLine1: contact.addressLine1,
+            addressLine2: contact.addressLine2,
+            city: contact.city,
+            state: contact.state,
+            zipCode: contact.zipCode,
+          },
+          domain.price.toNumber(),
+        )
 
-      projectResult = await this.vercel.addDomainToProject(domain.name)
+        projectResult = await this.vercel.addDomainToProject(domain.name)
+      }
     } catch (error) {
       this.logger.error('Error registering domain with Vercel:', error)
 
