@@ -1,0 +1,530 @@
+# Cursor Rules for GP-API
+
+## Rule 1: Exception Handling
+
+External service calls (e.g., Vercel) should be wrapped in try-catch and throw BadGateway on failure; DB updates have Prisma exception handling and should not be caught; use BadRequestExceptions for client request errors.
+
+## Rule 2: Prisma Service Pattern
+
+When creating or modifying Prisma model services:
+
+1. **Use createPrismaBase pattern**: All Prisma model services MUST extend `createPrismaBase(MODELS.ModelName)`
+   - Import: `import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'`
+   - Class declaration: `export class ServiceName extends createPrismaBase(MODELS.ModelName)`
+   - Call `super()` in constructor if one exists
+2. **Access Prisma models**: Use `this.model` to access the Prisma model instead of directly injecting PrismaService
+   - ✅ Good: `this.model.create(args)`
+   - ❌ Bad: `this.prisma.modelName.create(args)`
+3. **Available methods**: The base class provides these methods automatically:
+   - `findMany`, `findFirst`, `findFirstOrThrow`, `findUnique`, `findUniqueOrThrow`, `count`
+   - Access the raw client with `this.client`
+4. **Example pattern**:
+
+```typescript
+import { Injectable } from '@nestjs/common'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { Prisma } from '@prisma/client'
+@Injectable()
+export class MyModelService extends createPrismaBase(MODELS.MyModel) {
+  constructor(
+    // other dependencies
+  ) {
+    super()
+  }
+  customMethod() {
+    return this.model.create({ data: {...} })
+  }
+}
+```
+
+5. **Service logic**: Keep services focused on data operations. Business logic should be in controllers.
+   - ✅ Good: `createStatusLog(id, fromStatus, toStatus)`
+   - ❌ Bad: `logStatusChangeIfNeeded(id, oldStatus, newStatus)` - the "if needed" logic belongs in controller
+
+## Rule 3: Exception Handling Pattern
+
+When choosing between different HTTP exception types:
+
+1. **Use BadRequestException (400)** for client-side errors:
+   - Invalid input data or parameters
+   - Validation failures
+   - Missing required fields
+   - Malformed requests
+   - Business logic violations caused by user input
+   - ✅ Example: `throw new BadRequestException('Domain name is required')`
+2. **Use BadGatewayException (502)** for external service failures:
+   - Third-party API failures (Vercel, AWS, Stripe, etc.)
+   - External service timeouts or connectivity issues
+   - Upstream service errors that are not user-caused
+   - Infrastructure/network problems
+   - ✅ Example: `throw new BadGatewayException('Failed to register domain with Vercel')`
+3. **Use ConflictException (409)** for resource conflicts:
+   - Duplicate entries
+   - Resource state conflicts
+   - ✅ Example: `throw new ConflictException('Domain not available')`
+4. **Use NotFoundException (404)** for missing resources:
+   - Resource doesn't exist
+   - ✅ Example: `throw new NotFoundException('Domain not found')`
+
+### Try-Catch Block Pattern
+
+- Only wrap external service calls in try-catch blocks, not database operations
+- Database operations should rely on Prisma's built-in exception handling
+- Handle external service failures separately from internal logic
+
+```typescript
+// ✅ Good
+let externalResult
+try {
+  externalResult = await this.externalService.doSomething()
+} catch (error) {
+  throw new BadGatewayException('External service failed')
+}
+// Continue with database operations outside try-catch
+await this.model.update(...)
+
+// ❌ Bad - includes DB operations in try-catch
+try {
+  const result = await this.externalService.doSomething()
+  await this.model.update(...)
+} catch (error) {
+  // This catches both external and DB errors
+}
+```
+
+## Rule 4: Code Style
+
+Do not add comments to code, ever.
+
+## Rule 5: Strict Implementation Scope
+
+CRITICAL REQUIREMENT:
+
+- Only create or implement EXACTLY what the user explicitly requests
+- Do NOT add any additional files, features, or functionality beyond the specific request
+
+PROHIBITED:
+
+- Creating controllers when only asked for a module
+- Creating services when only asked for a module
+- Creating DTOs, guards, or any other files not explicitly requested
+- Adding imports or dependencies not explicitly requested
+- Implementing CRUD operations or any logic not explicitly requested
+- Creating directory structures beyond what's needed for the requested files
+- Making assumptions about what the user "might want"
+
+REQUIRED BEHAVIOR:
+
+- If asked to create a module, create ONLY the module file
+- If asked to create a service, create ONLY the service file
+- Wait for explicit instructions before adding any additional functionality
+- Ask for clarification if the scope is unclear rather than assuming
+
+## Rule 6: Use Available Libraries
+
+CRITICAL REQUIREMENT:
+
+- Always attempt to use libraries that are listed in the `package.json` for relevant functionality
+- Avoid implementing custom solutions when a library can provide the needed functionality
+
+IMPLEMENTATION:
+
+- Check the `package.json` for available libraries before implementing new functionality
+- Use the library's documentation to integrate it effectively into the codebase
+
+## Rule 7: NestJS Services Directory Structure
+
+CRITICAL REQUIREMENT:
+
+- Every `*.service.ts` file MUST reside in a `services/` subdirectory within its module folder
+- This rule applies consistently across ALL modules in ANY NestJS application
+
+EXPECTED STRUCTURE:
+
+```
+src/module-name/
+  module-name.module.ts
+  module-name.controller.ts
+  services/
+    module-name.service.ts
+    other-service.service.ts
+```
+
+PROHIBITED:
+
+- Placing service files directly in module root
+- Creating service files outside a `services/` folder
+- Having multiple `services/` folders per module
+- Any exceptions or deviations from this pattern
+
+## Rule 8: Use http-constants-ts for MIME Types
+
+CRITICAL REQUIREMENT:
+
+- Always use the `http-constants-ts` library for MIME type constants
+- Avoid using string literals for MIME types in the codebase
+
+IMPLEMENTATION:
+
+- Import the necessary MIME type constants from `http-constants-ts`
+- Replace any existing string literals representing MIME types with the corresponding constants from the library
+
+## Rule 9: Consume Provided Documentation Links
+
+CRITICAL REQUIREMENT:
+
+- Always read and utilize documentation links provided by the user
+- Ensure that the information from the links is accurately reflected in the code changes or responses
+
+IMPLEMENTATION:
+
+- Thoroughly review the content of any documentation links provided by the user
+- Apply the information from the documentation to the task at hand, ensuring accuracy and relevance
+
+## Rule 10: Mandatory Rule Compliance
+
+CRITICAL REQUIREMENT:
+ALL rules, both global and project-specific, MUST be followed with ZERO exceptions.
+
+REQUIRED BEHAVIOR:
+
+```javascript
+// Rule compliance is MANDATORY
+const beforeAnyAction = () => {
+  checkAllGlobalRules()
+  checkAllProjectRules()
+  verifyExplicitPermissions()
+  if (!allRulesFollowed || !explicitPermission) {
+    HALT_IMMEDIATELY()
+  }
+}
+```
+
+VERIFICATION CHECKLIST:
+
+1. ✓ Verify compliance with ALL global rules
+2. ✓ Verify compliance with ALL project rules
+3. ✓ Confirm EXPLICIT permission exists
+4. ✓ Cross-reference against ALL rules
+5. ✓ If ANY uncertainty exists, STOP
+
+STRICTLY PROHIBITED:
+
+- Creating ANY files without EXPLICIT permission
+- Modifying ANY directories without EXPLICIT permission
+- Ignoring or bypassing ANY rules
+- Making assumptions about rule flexibility
+- Proceeding with unclear rule compliance
+- Creating exceptions to ANY rules
+
+## Rule 11: No Redundant Application Prompts
+
+- If the user has explicitly instructed you to make a change, DO NOT ask for confirmation or permission to apply it
+- IMMEDIATELY proceed to apply the change as instructed
+- Only ask for clarification if the instruction is ambiguous or incomplete
+
+RATIONALE:
+
+- Respects user intent and time
+- Prevents unnecessary interruptions and frustration
+
+## Rule 12: Ternary Expression Preference
+
+When assigning a value or returning from a function based on a condition:
+
+- **ALWAYS** use a ternary expression instead of an if-then-else statement when the result is a single value (assignment or return)
+- **AVOID** using if-then-else statements for simple value selection or return
+
+EXAMPLES:
+
+**PREFER:**
+
+```javascript
+const result = condition ? valueIfTrue : valueIfFalse
+
+return isValid ? successValue : errorValue
+```
+
+**AVOID:**
+
+```javascript
+let result
+if (condition) {
+  result = valueIfTrue
+} else {
+  result = valueIfFalse
+}
+
+if (isValid) {
+  return successValue
+} else {
+  return errorValue
+}
+```
+
+EXCEPTIONS:
+
+- When the condition or values are very complex
+- When you need to perform multiple operations in each branch
+- When you need to handle more than two cases (use switch or if-else-if)
+
+## Rule 13: No Redundant Variables for Direct Returns
+
+- When writing or refactoring code, do NOT create a variable just to immediately return its value
+- If a function/method call (async or sync) is the final result, return it directly
+- Do NOT use the `await` keyword if you are simply returning the result of an async function call (i.e., use `return someAsyncFunction()` instead of `return await someAsyncFunction()`)
+- Only assign to a variable if you need to use the value for additional logic before returning
+
+EXAMPLES:
+
+PREFER:
+
+```typescript
+return someAsyncFunction()
+```
+
+AVOID:
+
+```typescript
+const result = await someAsyncFunction()
+return result
+```
+
+## Rule 14: Never Delete Existing Comments
+
+CRITICAL REQUIREMENT:
+
+- You MUST NOT delete, modify, or alter any comments that already exist in the codebase, regardless of their content, style, or location
+
+REQUIRED BEHAVIOR:
+
+- When editing code, you may add, update, or remove your own AI-generated comments (if allowed by other rules), but you MUST NOT touch any pre-existing comments
+- If you encounter a scenario where a comment must be changed or removed, you MUST halt and request explicit user permission before proceeding
+
+STRICTLY PROHIBITED:
+
+- Deleting any comment that was present in the codebase before your edit
+- Modifying the content of any existing comment
+- Reformatting, moving, or altering the position of any existing comment
+- Removing comments as part of code refactoring, cleanup, or formatting
+
+## Rule 15: Git Command Output Format
+
+CRITICAL REQUIREMENT:
+All git commit commands MUST be output within a bash code block.
+
+REQUIRED FORMAT:
+
+```bash
+git commit -a -m "commit message"
+```
+
+PROHIBITED:
+
+- Outputting git commit commands without code block formatting
+- Using any other code block language than 'bash'
+- Outputting the command as plain text
+
+EXAMPLES:
+✅ CORRECT:
+
+```bash
+git commit -a -m "feat: add new feature"
+```
+
+❌ INCORRECT:
+git commit -a -m "feat: add new feature"
+
+```sh
+git commit -a -m "feat: add new feature"
+```
+
+## Rule 16: Project Rule Application Requirements
+
+CRITICAL REQUIREMENT:
+All project-specific rules (rules in .cursor/rules/) MUST have alwaysApply set to true in their frontmatter.
+
+REQUIRED FRONTMATTER FORMAT:
+
+```yaml
+---
+description: [Rule description]
+globs: [Optional glob patterns]
+alwaysApply: true # This MUST be present and set to true
+---
+```
+
+PROHIBITED:
+
+- Creating project rules without alwaysApply: true
+- Defaulting to rules that require explicit inclusion
+- Omitting the alwaysApply field in frontmatter
+- Setting alwaysApply to false for project rules
+
+## Rule 17: Rule Creation Permission Requirements
+
+CRITICAL REQUIREMENT:
+DO NOT create any new .cursor/rules/\*.mdc files unless EXPLICITLY instructed to do so.
+
+EXPLICIT PERMISSION MEANS:
+
+- User specifically uses the word "create" in their request
+- User specifically asks to "make a new rule file"
+- User specifically asks to "add a rule file"
+
+PROHIBITED:
+
+- Creating rule files when only asked to "write" a rule
+- Creating rule files when only asked to "describe" a rule
+- Creating rule files when only asked to "explain" a rule
+- Creating rule files proactively or preemptively
+- Creating rule files without direct instruction
+
+When asked to "write" a rule without explicit creation permission:
+
+- Only output the rule content in the conversation
+- Wait for explicit instruction to create the actual file
+
+## Rule 18: File Deletion Requirements
+
+When attempting to delete files:
+
+REQUIRED STEPS:
+
+1. ALWAYS verify file existence first:
+
+   - Use `list_dir` to check directory contents
+   - Use `file_search` to confirm exact path if needed
+   - Use `grep_search` to verify file contents if relevant
+
+2. DELETION HIERARCHY:
+
+   - First attempt: Use `delete_file` tool with relative path
+   - If failed: Use `delete_file` tool with absolute path
+   - If still failed: Use terminal `rm` command as last resort
+
+3. VERIFICATION:
+   - MUST verify deletion success using `list_dir` afterward
+   - MUST confirm to user that deletion was successful
+   - MUST report any issues or failures clearly
+
+PROHIBITED:
+
+- Never assume file deletion succeeded without verification
+- Never make multiple unsuccessful deletion attempts without changing approach
+- Never leave files in an uncertain state
+
+## Rule 19: Git Commit Flag Requirements
+
+When providing git commit commands:
+
+MUST INCLUDE:
+
+- Always use the `-a` flag with git commit commands
+- Format should be: `git commit -a -m "commit message"`
+
+PROHIBITED:
+
+- Never output a git commit command without the `-a` flag
+- Do not use `git commit -m` alone
+
+EXAMPLES:
+✅ CORRECT:
+
+```bash
+git commit -a -m "feat: add new feature"
+git commit -a -m "fix: resolve bug"
+```
+
+❌ INCORRECT:
+
+```bash
+git commit -m "feat: add new feature"
+git commit -m "fix: resolve bug"
+```
+
+## Rule 20: Remove Code Completely
+
+When removing or replacing code:
+
+MUST DO:
+
+- Delete code completely when it's no longer needed
+- Remove all associated code that becomes unused as a result
+- Never leave commented-out blocks of old code
+- Check for and remove any imports that are no longer used
+
+VERIFICATION STEPS:
+
+1. Confirm the code is truly obsolete before removing
+2. Use search tools to find any other code that might depend on it
+3. Ensure tests still pass after complete removal
+4. Remove any associated imports, comments, or dependencies
+5. Verify the codebase is cleaner and more maintainable after the removal
+
+## Rule 21: Follow SOLID Principles
+
+When designing and implementing code:
+
+SOLID PRINCIPLES:
+
+- Single Responsibility: Each class/module should have only one reason to change
+- Open/Closed: Classes/modules should be open for extension but closed for modification
+- Liskov Substitution: Derived classes must be substitutable for their base classes
+- Interface Segregation: Make fine-grained interfaces specific to clients
+- Dependency Inversion: Depend on abstractions, not concretions
+
+IMPLEMENTATION GUIDELINES:
+
+1. Analyze each class/function to ensure it has a single, well-defined purpose
+2. Design for extension through inheritance, interfaces, or composition
+3. Maintain consistent behavior when extending or implementing base classes
+4. Create specific, focused interfaces rather than large, general-purpose ones
+5. Inject dependencies rather than creating them within classes
+
+## Rule 22: Apply DRY Principle
+
+When writing or modifying code:
+
+DRY GUIDELINES:
+
+- Abstract repeated code into reusable functions, classes, or modules
+- Isolate concerns and responsibilities into separate units of code
+- Identify and eliminate duplicate logic across the codebase
+- Create shared utilities for common operations
+- Use composition and inheritance appropriately to avoid duplication
+
+IMPLEMENTATION STEPS:
+
+1. Identify patterns or repeated logic in the code
+2. Extract common functionality into well-named functions or classes
+3. Consider creating utilities, hooks, or higher-order components for shared behavior
+4. Ensure abstractions are at the right level (not too specific, not too general)
+5. Use parameters and configuration to adapt shared code to different contexts
+
+## Rule 23: Import/Export Verification
+
+When modifying, deleting, or adding code that involves imports or exports:
+
+MUST DO:
+
+- Before removing any file, check for all imports of that file across the codebase
+- Before removing any exported function, class, or variable, check for all imports of that specific export
+- After renaming a file, update all imports that reference it
+- When adding an import, verify that the imported path and exported items actually exist
+- After changing an export, verify all files that import it still work correctly
+
+VERIFICATION STEPS:
+
+1. Use grep or codebase search to find all imports of the file you're modifying
+2. Check each import to ensure it's still valid after your changes
+3. For any import that's no longer valid, either update it or remove it
+4. Pay special attention to utilities that might be widely used across the codebase
+5. If adding a new import, double-check that the file and export exist
+
+## General NestJS Patterns
+
+- Follow established patterns in the codebase
+- Use proper decorators and validation
+- Keep controllers focused on HTTP concerns and business logic
+- Keep services focused on data operations
