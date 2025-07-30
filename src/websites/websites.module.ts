@@ -13,6 +13,7 @@ import { WebsiteContactsService } from './services/websiteContacts.service'
 import { WebsiteViewsService } from './services/websiteViews.service'
 import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
+import { StripeModule } from 'src/stripe/stripe.module'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PurchaseType } from 'src/payments/purchase.types'
     FilesModule,
     PaymentsModule,
     UsersModule,
+    StripeModule,
   ],
   controllers: [DomainsController, WebsitesController],
   providers: [
