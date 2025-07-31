@@ -42,14 +42,11 @@ export class SlackService {
   async message(message: SlackMessage, channel: SlackChannel) {
     const { channelId, channelToken } = this.getChannelConfig(channel)
 
-    // Convert the message to proper Slack webhook format
-    const slackPayload = this.formatSlackMessage(message)
-
     try {
       const { data } = await lastValueFrom(
         this.httpService.post(
           `https://hooks.slack.com/services/${SLACK_APP_ID}/${channelId}/${channelToken}`,
-          slackPayload,
+          message,
           {
             headers: {
               [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
@@ -59,33 +56,7 @@ export class SlackService {
       )
       return data
     } catch (e: unknown) {
-      this.logger.error(`Failed to send slack message to channel ${channel}!`, {
-        error: e,
-        payload: slackPayload,
-        channel,
-      })
-      throw e // Re-throw the error so calling code can handle it
-    }
-  }
-
-  private formatSlackMessage(message: SlackMessage) {
-    // If message has blocks, use them directly
-    if (message.blocks && message.blocks.length > 0) {
-      return {
-        blocks: message.blocks,
-      }
-    }
-
-    // If message has body, convert it to text format
-    if (message.body) {
-      return {
-        text: message.body,
-      }
-    }
-
-    // Fallback to empty text
-    return {
-      text: 'No message content provided',
+      this.logger.error(`Failed to send slack message!`, e)
     }
   }
 
