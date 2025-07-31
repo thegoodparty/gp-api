@@ -281,7 +281,7 @@ export class CampaignsController {
     })
   }
 
-  // TODO: Rip this out when no longer needed
+  // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
   @Post('missing-win-numbers/update')
   @Roles(UserRole.admin)
   updateMissingWinNumbers(

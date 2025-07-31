@@ -529,6 +529,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return true
   }
 
+  // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
   async updateMissingWinNumbers(pageSize = 500, loopLimit = 1000) {
     let lastId: number | null = null
     const counts = {
