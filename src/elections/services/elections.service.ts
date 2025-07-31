@@ -113,6 +113,7 @@ export class ElectionsService {
   }
 
   private cleanDistrictName(L2DistrictName: string) {
-    return L2DistrictName.split('##', 2)[1]
+    const parts = L2DistrictName.split('##', 2)
+    return parts.length > 1 ? parts[1] : L2DistrictName
   }
 }

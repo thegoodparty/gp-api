@@ -529,14 +529,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return true
   }
 
-  async updateMissingWinNumbers(pageSize = 500) {
+  async updateMissingWinNumbers(pageSize = 500, loopLimit = 1000) {
     let lastId: number | null = null
     const counts = {
       successful: 0,
       failed: 0,
     }
 
-    while (true) {
+    for (let loopCount = 0; loopCount > loopLimit; ++loopCount) {
       const batch: CampaignWith<'pathToVictory'>[] = await this.model.findMany({
         include: { pathToVictory: true },
         where: {
