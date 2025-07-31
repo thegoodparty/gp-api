@@ -1,14 +1,14 @@
+import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { lastValueFrom } from 'rxjs'
+import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
+import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
   ProjectedTurnout,
   RaceTargetMetrics,
 } from '../types/elections.types'
-import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { P2VStatus } from '../types/pathToVictory.types'
-import { ElectionApiRoutes } from '../constants/elections.const'
-import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
 
 // TODO: Revisit this file after the stakeholders decide on the direction we're going...
 // ...for the win number / p2v solution. Remove any unneeded code at that time.
@@ -70,10 +70,14 @@ export class ElectionsService {
   async buildRaceTargetDetails(
     data: BuildRaceTargetDetailsInput,
   ): Promise<PrismaJson.PathToVictoryData | null> {
+    const query = {
+      ...data,
+      L2DistrictName: this.cleanDistrictName(data.L2DistrictName),
+    }
     const projectedTurnout = await this.electionApiGet<
       ProjectedTurnout,
       BuildRaceTargetDetailsInput
-    >(ElectionApiRoutes.projectedTurnout.find.path, data)
+    >(ElectionApiRoutes.projectedTurnout.find.path, query)
 
     return projectedTurnout
       ? {
@@ -82,7 +86,6 @@ export class ElectionsService {
           source: P2VSource.ElectionApi,
           electionType: projectedTurnout.L2DistrictType,
           electionLocation: projectedTurnout.L2DistrictName,
-          p2vAttempts: 1,
           p2vStatus: P2VStatus.complete,
         }
       : null
@@ -107,5 +110,9 @@ export class ElectionsService {
       electionYear,
       excludeInvalid: true,
     })
+  }
+
+  private cleanDistrictName(L2DistrictName: string) {
+    return L2DistrictName.split('##', 2)[1]
   }
 }

@@ -11,6 +11,9 @@ import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { SlackService } from 'src/shared/services/slack.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
+import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
@@ -51,6 +54,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
     private readonly elections: ElectionsService,
+    private readonly slack: SlackService,
   ) {
     super()
   }
@@ -527,6 +531,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
   async updateMissingWinNumbers(pageSize = 500) {
     let lastId: number | null = null
+    const counts = {
+      successful: 0,
+      failed: 0,
+    }
 
     while (true) {
       const batch: CampaignWith<'pathToVictory'>[] = await this.model.findMany({
@@ -578,21 +586,50 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       await Promise.allSettled(
         batch.map((r) =>
           limiter.schedule(async () => {
-            const raceTargetDetails =
-              await this.elections.buildRaceTargetDetails({
-                L2DistrictType: r.pathToVictory?.data.electionType ?? '',
-                L2DistrictName: r.pathToVictory?.data.electionLocation ?? '',
-                electionDate: r.details.electionDate ?? '',
-                state: r.details.state ?? '',
-              })
-            raceTargetDetails &&
-              (await this.updateJsonFields(r.id, {
+            try {
+              const raceTargetDetails =
+                await this.elections.buildRaceTargetDetails({
+                  L2DistrictType: r.pathToVictory?.data.electionType ?? '',
+                  L2DistrictName: r.pathToVictory?.data.electionLocation ?? '',
+                  electionDate: r.details.electionDate ?? '',
+                  state: r.details.state ?? '',
+                })
+              if (!raceTargetDetails || !raceTargetDetails?.winNumber) {
+                ++counts.failed
+                return
+              }
+              await this.updateJsonFields(r.id, {
                 pathToVictory: raceTargetDetails,
-              }))
+              })
+              ++counts.successful
+            } catch (error) {
+              this.logger.error(
+                `Failed to update missing win number for campaignId: ${r.id}`,
+                error,
+              )
+              ++counts.failed
+            }
           }),
         ),
       )
       lastId = batch[batch.length - 1].id
+    }
+    try {
+      await this.slack.message(
+        {
+          body: `Finished updating win numbers in the ${CURRENT_ENVIRONMENT} environment.\n\n Successful: ${counts.successful} \n\n Failed: ${counts.failed}`,
+        },
+        SlackChannel.botDev,
+      )
+    } catch (error) {
+      this.logger.error(
+        'Failed to send Slack notification about win numbers update',
+        {
+          error,
+          counts,
+          environment: CURRENT_ENVIRONMENT,
+        },
+      )
     }
   }
 }

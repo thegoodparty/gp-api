@@ -14,28 +14,28 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignsService } from './services/campaigns.service'
+import { Campaign, Prisma, User, UserRole } from '@prisma/client'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { ElectionsService } from 'src/elections/services/elections.service'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
+import { SlackService } from 'src/shared/services/slack.service'
+import { userHasRole } from 'src/users/util/users.util'
+import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
+import { Roles } from '../authentication/decorators/Roles.decorator'
+import { ReqCampaign } from './decorators/ReqCampaign.decorator'
+import { UseCampaign } from './decorators/UseCampaign.decorator'
+import { CampaignListSchema } from './schemas/campaignList.schema'
+import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   SetDistrictDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
-import { CampaignListSchema } from './schemas/campaignList.schema'
-import { ZodValidationPipe } from 'nestjs-zod'
-import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Campaign, PathToVictory, Prisma, User, UserRole } from '@prisma/client'
-import { Roles } from '../authentication/decorators/Roles.decorator'
-import { ReqCampaign } from './decorators/ReqCampaign.decorator'
-import { UseCampaign } from './decorators/UseCampaign.decorator'
-import { userHasRole } from 'src/users/util/users.util'
-import { SlackService } from 'src/shared/services/slack.service'
-import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
-import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { CreateP2VSchema } from './schemas/createP2V.schema'
-import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
-import { ElectionsService } from 'src/elections/services/elections.service'
-import { AnalyticsService } from 'src/analytics/analytics.service'
+import { CampaignsService } from './services/campaigns.service'
+import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -281,9 +281,10 @@ export class CampaignsController {
     })
   }
 
-  @Put('update-missing-win-numbers')
-  updateMissingWinNumbers() {
+  @Post('missing-win-numbers/update')
+  @Roles(UserRole.admin)
+  updateMissingWinNumbers(@Body() body?: { pageSize?: number }) {
     // No need to await
-     this.campaigns.updateMissingWinNumbers()
+    this.campaigns.updateMissingWinNumbers(body?.pageSize ?? 500)
   }
 }

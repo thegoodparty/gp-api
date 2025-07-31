@@ -1,9 +1,11 @@
+import { HttpService } from '@nestjs/axios'
 import {
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { HttpService } from '@nestjs/axios'
+import { Headers, MimeTypes } from 'http-constants-ts'
+import { lastValueFrom } from 'rxjs'
 import { SLACK_CHANNEL_IDS } from './slackService.config'
 import {
   FormattedSlackMessageArgs,
@@ -12,8 +14,6 @@ import {
   SlackMessageType,
   VanitySlackMethodArgs,
 } from './slackService.types'
-import { lastValueFrom } from 'rxjs'
-import { Headers, MimeTypes } from 'http-constants-ts'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
@@ -42,11 +42,14 @@ export class SlackService {
   async message(message: SlackMessage, channel: SlackChannel) {
     const { channelId, channelToken } = this.getChannelConfig(channel)
 
+    // Convert the message to proper Slack webhook format
+    const slackPayload = this.formatSlackMessage(message)
+
     try {
       const { data } = await lastValueFrom(
         this.httpService.post(
           `https://hooks.slack.com/services/${SLACK_APP_ID}/${channelId}/${channelToken}`,
-          message,
+          slackPayload,
           {
             headers: {
               [Headers.CONTENT_TYPE]: MimeTypes.APPLICATION_JSON,
@@ -56,7 +59,33 @@ export class SlackService {
       )
       return data
     } catch (e: unknown) {
-      this.logger.error(`Failed to send slack message!`, e)
+      this.logger.error(`Failed to send slack message to channel ${channel}!`, {
+        error: e,
+        payload: slackPayload,
+        channel,
+      })
+      throw e // Re-throw the error so calling code can handle it
+    }
+  }
+
+  private formatSlackMessage(message: SlackMessage) {
+    // If message has blocks, use them directly
+    if (message.blocks && message.blocks.length > 0) {
+      return {
+        blocks: message.blocks,
+      }
+    }
+
+    // If message has body, convert it to text format
+    if (message.body) {
+      return {
+        text: message.body,
+      }
+    }
+
+    // Fallback to empty text
+    return {
+      text: 'No message content provided',
     }
   }
 
