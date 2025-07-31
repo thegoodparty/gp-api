@@ -536,7 +536,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       failed: 0,
     }
 
-    for (let loopCount = 0; loopCount > loopLimit; ++loopCount) {
+    for (let loopCount = 0; loopCount < loopLimit; ++loopCount) {
       const batch: CampaignWith<'pathToVictory'>[] = await this.model.findMany({
         include: { pathToVictory: true },
         where: {
