@@ -20,6 +20,7 @@ export const CRMCompanyPropertiesSchema = z
     [HS_PROPS.online_impressions]: intSchema,
     [HS_PROPS.yard_signs_impressions]: intSchema,
     [HS_PROPS.ecanvasser_contacts_count]: intSchema,
+    [HS_PROPS.ecanvasser_houses_count]: intSchema,
 
     // candidate details
     [HS_PROPS.candidate_district]: z.string(),
