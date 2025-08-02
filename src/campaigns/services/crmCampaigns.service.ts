@@ -195,7 +195,7 @@ export class CrmCampaignsService {
     })
     const p2vData = pathToVictory?.data || {}
 
-    const updateHistoryCount = await this.campaignUpdateHistory.count({
+    const _updateHistoryCount = await this.campaignUpdateHistory.count({
       where: {
         campaignId,
       },
@@ -207,7 +207,13 @@ export class CrmCampaignsService {
       winNumber,
       p2vNotNeeded,
       totalRegisteredVoters,
-      viability: { candidates, isIncumbent, seats, score, isPartisan } = {},
+      viability: {
+        candidates: _candidates,
+        isIncumbent: _isIncumbent,
+        seats: _seats,
+        score,
+        isPartisan: _isPartisan,
+      } = {},
     } = p2vData || {}
 
     const {
@@ -223,21 +229,21 @@ export class CrmCampaignsService {
       party,
       office,
       ballotLevel,
-      level,
+      level: _level,
       state,
       pledged,
-      campaignCommittee,
+      campaignCommittee: _campaignCommittee,
       otherOffice,
       district,
       city,
-      website,
+      website: _website,
       runForOffice,
       electionDate,
       primaryElectionDate,
       filingPeriodsStart,
       filingPeriodsEnd,
       isProUpdatedAt,
-      subscriptionCanceledAt,
+      subscriptionCanceledAt: _subscriptionCanceledAt,
     } = campaignDetails || {}
 
     const canDownloadVoterFile = this.voterFile.canDownload({
@@ -252,7 +258,7 @@ export class CrmCampaignsService {
     const electionDateMs = formatDateForCRM(electionDate)
     const primaryElectionDateMs = formatDateForCRM(primaryElectionDate)
     const isProUpdatedAtMs = formatDateForCRM(isProUpdatedAt)
-    const p2vCompleteDateMs = formatDateForCRM(p2vCompleteDate)
+    const _p2vCompleteDateMs = formatDateForCRM(p2vCompleteDate)
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
@@ -616,53 +622,162 @@ export class CrmCampaignsService {
    * Updates Hubspot company records for all campaigns with a Hubspot ID.
    *
    * @param fields - An array of property names to refresh. Pass ['all'] to refresh all properties.
+   * @param batchSize - Number of campaigns to process per batch (default: 100)
    */
   async massRefreshCompanies(
     fields: Array<keyof CRMCompanyProperties | 'all'>,
+    batchSize: number = 100,
   ) {
-    const campaigns = await this.campaigns.findMany({
+    const HUBSPOT_BATCH_LIMIT = 100
+    const actualBatchSize = Math.min(batchSize, HUBSPOT_BATCH_LIMIT)
+
+    let totalUpdated = 0
+    let offset = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const campaigns = await this.fetchCampaignBatch(actualBatchSize, offset)
+
+      if (campaigns.length === 0) {
+        hasMore = false
+        break
+      }
+
+      this.logBatchProgress(offset, actualBatchSize, campaigns.length)
+
+      const companyUpdateObjects = await this.processCampaignBatch(
+        campaigns,
+        fields,
+      )
+
+      const updatedCount =
+        await this.updateHubSpotCompaniesBatch(companyUpdateObjects)
+      totalUpdated += updatedCount
+
+      hasMore = campaigns.length >= actualBatchSize
+      offset += actualBatchSize
+
+      await this.performBatchCleanup()
+    }
+
+    return {
+      message: `OK: ${totalUpdated} companies updated in total`,
+      totalUpdated,
+    }
+  }
+
+  private async fetchCampaignBatch(batchSize: number, offset: number) {
+    return this.campaigns.findMany({
       where: {
         data: {
           path: ['hubspotId'],
           not: Prisma.AnyNull,
         },
       },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: batchSize,
+      skip: offset,
     })
+  }
 
-    const companyUpdateObjects = await Promise.all(
-      campaigns.map(async (campaign) => {
-        const id = campaign.data.hubspotId as string
-        const crmCompanyProperties =
-          await this.calculateCRMCompanyProperties(campaign)
-        if (!crmCompanyProperties) {
-          return { id, properties: {} } as SimplePublicObjectBatchInput
+  private logBatchProgress(offset: number, batchSize: number, count: number) {
+    const batchNumber = Math.floor(offset / batchSize) + 1
+    this.logger.log(`Processing batch ${batchNumber}: ${count} campaigns`)
+  }
+
+  private async processCampaignBatch(
+    campaigns: Campaign[],
+    fields: Array<keyof CRMCompanyProperties | 'all'>,
+  ): Promise<SimplePublicObjectBatchInput[]> {
+    const companyUpdateObjects: SimplePublicObjectBatchInput[] = []
+
+    for (const campaign of campaigns) {
+      try {
+        const updateObject = await this.processSingleCampaignForBatchUpdate(
+          campaign,
+          fields,
+        )
+        if (updateObject) {
+          companyUpdateObjects.push(updateObject)
         }
+      } catch (error) {
+        this.logger.error(`Error processing campaign ${campaign.id}:`, error)
+      }
+    }
 
-        const includeAll = fields.length === 1 && fields.includes('all')
+    return companyUpdateObjects
+  }
 
-        const properties = includeAll
-          ? crmCompanyProperties
-          : fields.reduce((acc, field) => {
-              if (
-                crmCompanyProperties[field] ||
-                crmCompanyProperties[field] === null
-              ) {
-                acc[field] = crmCompanyProperties[field]
-              }
-              return acc
-            }, {})
+  private async processSingleCampaignForBatchUpdate(
+    campaign: Campaign,
+    fields: Array<keyof CRMCompanyProperties | 'all'>,
+  ): Promise<SimplePublicObjectBatchInput | null> {
+    const id = campaign.data.hubspotId as string
+    const crmCompanyProperties =
+      await this.calculateCRMCompanyProperties(campaign)
 
-        return { id, properties } as SimplePublicObjectBatchInput
-      }),
+    if (!crmCompanyProperties) {
+      return null
+    }
+
+    const properties = this.filterPropertiesForUpdate(
+      crmCompanyProperties,
+      fields,
     )
 
-    const updates = await this.hubspot.client.crm.companies.batchApi.update({
-      inputs: companyUpdateObjects,
-    })
+    return { id, properties } as SimplePublicObjectBatchInput
+  }
 
-    return {
-      message: `OK: ${updates?.results?.length} companies updated`,
+  private filterPropertiesForUpdate(
+    crmCompanyProperties: CRMCompanyProperties,
+    fields: Array<keyof CRMCompanyProperties | 'all'>,
+  ) {
+    const includeAll = fields.length === 1 && fields.includes('all')
+
+    return includeAll
+      ? crmCompanyProperties
+      : fields.reduce((acc, field) => {
+          if (
+            crmCompanyProperties[field] ||
+            crmCompanyProperties[field] === null
+          ) {
+            acc[field] = crmCompanyProperties[field]
+          }
+          return acc
+        }, {})
+  }
+
+  private async updateHubSpotCompaniesBatch(
+    companyUpdateObjects: SimplePublicObjectBatchInput[],
+  ): Promise<number> {
+    if (companyUpdateObjects.length === 0) {
+      return 0
     }
+
+    try {
+      const updates = await this.hubspot.client.crm.companies.batchApi.update({
+        inputs: companyUpdateObjects,
+      })
+      const updatedCount = updates?.results?.length || 0
+      this.logger.log(`Batch completed: ${updatedCount} companies updated`)
+      return updatedCount
+    } catch (error) {
+      this.logger.error('Error updating batch in HubSpot:', error)
+      await this.slack.errorMessage({
+        message: `Error updating batch of ${companyUpdateObjects.length} companies in HubSpot`,
+        error,
+      })
+      return 0
+    }
+  }
+
+  private async performBatchCleanup() {
+    if (global.gc) {
+      global.gc()
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
   /** Pulls Hubspot data and updates campaign
@@ -670,73 +785,74 @@ export class CrmCampaignsService {
    * @param campaignId - The unique identifier of the campaign to sync. If provided, only that campaign is processed;
    *                     otherwise, all campaigns are processed.
    * @param resync - If false, skips campaigns that already have HubSpot updates.
+   * @param batchSize - Number of campaigns to process per batch when syncing all campaigns (default: 100)
    */
-  async syncCampaign(campaignId?: number, resync: boolean = false) {
+  async syncCampaign(
+    campaignId?: number,
+    resync: boolean = false,
+    batchSize: number = 100,
+  ) {
     let updated = 0
 
-    const campaigns = campaignId
-      ? [await this.campaigns.findFirst({ where: { id: campaignId } })]
-      : await this.campaigns.findMany()
+    if (campaignId) {
+      const campaign = await this.campaigns.findFirst({
+        where: { id: campaignId },
+      })
+      if (campaign) {
+        await this.processSingleCampaignSync(campaign, resync)
+        updated = 1
+      }
+    } else {
+      let offset = 0
+      let hasMore = true
 
-    for (let i = 0; i < campaigns.length; i++) {
-      const campaign = campaigns[i]
-      try {
-        const { id: campaignId } = campaign!
-        if (campaign?.data?.hubSpotUpdates && !resync) {
-          this.logger.log(`Skipping resync - ${campaignId}`)
-          continue
-        }
-        const { data: campaignData } = campaign || {}
-        const { hubspotId } = campaignData || {}
-        const company = hubspotId
-          ? await this.getCrmCompanyById(hubspotId)
-          : null
-        if (!company) {
-          this.logger.error(`No company found - ${campaignId}`)
-          continue
-        }
-
-        this.logger.log(`Syncing - ${campaignId}`)
-
-        const hubSpotUpdates = pick(
-          company.properties,
-          HUBSPOT_COMPANY_PROPERTIES,
-        ) as Partial<Record<HubSpot.IncomingProperty, string>>
-
-        const updatedCampaign: Prisma.CampaignUpdateInput = {
-          data: campaign?.data,
-        }
-
-        if (
-          String(hubSpotUpdates.verified_candidates).toLowerCase() ===
-          HubSpot.VerifiedCandidate.YES
-        ) {
-          updatedCampaign.isVerified = true
-        }
-
-        if (
-          String(hubSpotUpdates.election_results).toLowerCase() ===
-          HubSpot.ElectionResult.WON_GENERAL
-        ) {
-          updatedCampaign.didWin = true
-        }
-
-        await this.campaigns.update({
-          where: { id: campaignId },
-          data: updatedCampaign,
-        })
-        await this.campaigns.updateJsonFields(campaignId, {
-          data: {
-            hubSpotUpdates,
+      while (hasMore) {
+        const campaigns = await this.campaigns.findMany({
+          orderBy: {
+            createdAt: 'desc',
           },
+          take: batchSize,
+          skip: offset,
         })
-        updated++
-      } catch (error) {
-        this.logger.error('error at crm/sync', error)
-        this.slack.errorMessage({
-          message: `error at crm/sync - campaignSlug: ${campaign?.slug}}`,
-          error,
-        })
+
+        if (campaigns.length === 0) {
+          hasMore = false
+          break
+        }
+
+        this.logger.log(
+          `Syncing batch ${Math.floor(offset / batchSize) + 1}: ${campaigns.length} campaigns`,
+        )
+
+        for (const campaign of campaigns) {
+          try {
+            const syncResult = await this.processSingleCampaignSync(
+              campaign,
+              resync,
+            )
+            if (syncResult) {
+              updated++
+            }
+          } catch (error) {
+            this.logger.error('error at crm/sync', error)
+            this.slack.errorMessage({
+              message: `error at crm/sync - campaignSlug: ${campaign?.slug}`,
+              error,
+            })
+          }
+        }
+
+        if (campaigns.length < batchSize) {
+          hasMore = false
+        } else {
+          offset += batchSize
+        }
+
+        if (global.gc) {
+          global.gc()
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100))
       }
     }
 
@@ -749,5 +865,64 @@ export class CrmCampaignsService {
       message: 'ok',
       updated,
     }
+  }
+
+  private async processSingleCampaignSync(
+    campaign: Campaign,
+    resync: boolean,
+  ): Promise<boolean> {
+    const { id: campaignId } = campaign
+
+    if (campaign?.data?.hubSpotUpdates && !resync) {
+      this.logger.log(`Skipping resync - ${campaignId}`)
+      return false
+    }
+
+    const { data: campaignData } = campaign || {}
+    const { hubspotId } = campaignData || {}
+    const company = hubspotId ? await this.getCrmCompanyById(hubspotId) : null
+
+    if (!company) {
+      this.logger.error(`No company found - ${campaignId}`)
+      return false
+    }
+
+    this.logger.log(`Syncing - ${campaignId}`)
+
+    const hubSpotUpdates = pick(
+      company.properties,
+      HUBSPOT_COMPANY_PROPERTIES,
+    ) as Partial<Record<HubSpot.IncomingProperty, string>>
+
+    const updatedCampaign: Prisma.CampaignUpdateInput = {
+      data: campaign?.data,
+    }
+
+    if (
+      String(hubSpotUpdates.verified_candidates).toLowerCase() ===
+      HubSpot.VerifiedCandidate.YES
+    ) {
+      updatedCampaign.isVerified = true
+    }
+
+    if (
+      String(hubSpotUpdates.election_results).toLowerCase() ===
+      HubSpot.ElectionResult.WON_GENERAL
+    ) {
+      updatedCampaign.didWin = true
+    }
+
+    await this.campaigns.update({
+      where: { id: campaignId },
+      data: updatedCampaign,
+    })
+
+    await this.campaigns.updateJsonFields(campaignId, {
+      data: {
+        hubSpotUpdates,
+      },
+    })
+
+    return true
   }
 }
