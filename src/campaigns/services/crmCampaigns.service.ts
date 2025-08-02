@@ -195,19 +195,13 @@ export class CrmCampaignsService {
     })
     const p2vData = pathToVictory?.data || {}
 
-    const updateHistoryCount = await this.campaignUpdateHistory.count({
-      where: {
-        campaignId,
-      },
-    })
-
     const {
       p2vStatus,
       p2vCompleteDate,
       winNumber,
       p2vNotNeeded,
       totalRegisteredVoters,
-      viability: { candidates, isIncumbent, seats, score, isPartisan } = {},
+      viability: { score } = {},
     } = p2vData || {}
 
     const {
@@ -223,21 +217,17 @@ export class CrmCampaignsService {
       party,
       office,
       ballotLevel,
-      level,
       state,
       pledged,
-      campaignCommittee,
       otherOffice,
       district,
       city,
-      website,
       runForOffice,
       electionDate,
       primaryElectionDate,
       filingPeriodsStart,
       filingPeriodsEnd,
       isProUpdatedAt,
-      subscriptionCanceledAt,
     } = campaignDetails || {}
 
     const canDownloadVoterFile = this.voterFile.canDownload({
@@ -252,7 +242,6 @@ export class CrmCampaignsService {
     const electionDateMs = formatDateForCRM(electionDate)
     const primaryElectionDateMs = formatDateForCRM(primaryElectionDate)
     const isProUpdatedAtMs = formatDateForCRM(isProUpdatedAt)
-    const p2vCompleteDateMs = formatDateForCRM(p2vCompleteDate)
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
