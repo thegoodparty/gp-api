@@ -10,7 +10,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     from: faker.date.past(),
     to: faker.date.future(),
   })
-  const campaign: Omit<Campaign, 'id' | 'userId'> = {
+  const campaign = {
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
     slug: faker.lorem.words(5),
@@ -21,6 +21,8 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     didWin: faker.datatype.boolean(0.5),
     dateVerified: null,
     tier: faker.helpers.arrayElement(Object.values(CampaignTier)),
+    formattedAddress: null,
+    placeId: null,
     data: {
       hubSpotUpdates: {
         election_results: faker.lorem.word(),
@@ -73,5 +75,5 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     },
   }
 
-  return campaign
+  return campaign as Omit<Campaign, 'id' | 'userId'>
 })
