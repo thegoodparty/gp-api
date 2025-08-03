@@ -270,9 +270,9 @@ export class CrmCampaignsService {
     if (ecanvasser) {
       // get count of contacts and interactions
       const { contacts, interactions } = ecanvasser
-      ecanvasserCount = contacts.length
-      ecanvasserInteractionsCount = interactions.length
-      ecanvasserHousesCount = ecanvasser.houses.length
+      ecanvasserCount = contacts?.length
+      ecanvasserInteractionsCount = interactions?.length
+      ecanvasserHousesCount = ecanvasser.houses?.length
     }
 
     const fieldsToSync: Record<
