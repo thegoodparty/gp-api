@@ -1,0 +1,47 @@
+{
+	"info": {
+		"_postman_id": "d52193d5-a2fb-4985-b6c0-5d213f366a5b",
+		"name": "Health",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "40398491",
+		"_collection_link": "https://goodpartyorg.postman.co/workspace/GP-API~66e2b59d-bf6a-4380-81c2-1cbf2d01bddf/collection/34024107-d52193d5-a2fb-4985-b6c0-5d213f366a5b?action=share&source=collection_link&creator=40398491"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status code is 200', () => {",
+							"    const { response } = pm",
+							"    return response.to.have.status(200)",
+							"})",
+							"pm.test('Body is OK', () => {",
+							"    pm.expect(pm.response.text()).eq('OK')",
+							"})",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{rootUrl}}/health",
+					"host": [
+						"{{rootUrl}}"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
