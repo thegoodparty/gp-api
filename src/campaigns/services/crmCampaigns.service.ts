@@ -549,8 +549,6 @@ export class CrmCampaignsService {
       where: { id: campaign.id },
       data: updatePayload,
     })
-
-    this.analytics.trackUserById(campaign.userId)
   }
 
   /** Pushes campaign data to Hubspot record
