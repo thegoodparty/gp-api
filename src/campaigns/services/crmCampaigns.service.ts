@@ -195,19 +195,13 @@ export class CrmCampaignsService {
     })
     const p2vData = pathToVictory?.data || {}
 
-    const updateHistoryCount = await this.campaignUpdateHistory.count({
-      where: {
-        campaignId,
-      },
-    })
-
     const {
       p2vStatus,
       p2vCompleteDate,
       winNumber,
       p2vNotNeeded,
       totalRegisteredVoters,
-      viability: { candidates, isIncumbent, seats, score, isPartisan } = {},
+      viability: { score } = {},
     } = p2vData || {}
 
     const {
@@ -223,21 +217,17 @@ export class CrmCampaignsService {
       party,
       office,
       ballotLevel,
-      level,
       state,
       pledged,
-      campaignCommittee,
       otherOffice,
       district,
       city,
-      website,
       runForOffice,
       electionDate,
       primaryElectionDate,
       filingPeriodsStart,
       filingPeriodsEnd,
       isProUpdatedAt,
-      subscriptionCanceledAt,
     } = campaignDetails || {}
 
     const canDownloadVoterFile = this.voterFile.canDownload({
@@ -252,7 +242,6 @@ export class CrmCampaignsService {
     const electionDateMs = formatDateForCRM(electionDate)
     const primaryElectionDateMs = formatDateForCRM(primaryElectionDate)
     const isProUpdatedAtMs = formatDateForCRM(isProUpdatedAt)
-    const p2vCompleteDateMs = formatDateForCRM(p2vCompleteDate)
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
@@ -276,12 +265,14 @@ export class CrmCampaignsService {
 
     const ecanvasser = await this.ecanvasser.findByCampaignId(campaignId)
     let ecanvasserCount = 0
+    let ecanvasserHousesCount = 0
     let ecanvasserInteractionsCount = 0
     if (ecanvasser) {
       // get count of contacts and interactions
       const { contacts, interactions } = ecanvasser
-      ecanvasserCount = contacts.length
-      ecanvasserInteractionsCount = interactions.length
+      ecanvasserCount = contacts?.length
+      ecanvasserInteractionsCount = interactions?.length
+      ecanvasserHousesCount = ecanvasser.houses?.length
     }
 
     const fieldsToSync: Record<
@@ -298,7 +289,7 @@ export class CrmCampaignsService {
       yard_signs_impressions: reportedVoterGoals?.yardSigns,
       // p2p_texts: reportedVoterGoals?.text, TODO: we need a new field in HS for sms text contact numbers!!!
       ecanvasser_contacts_count: ecanvasserCount,
-
+      ecanvasser_houses_count: ecanvasserHousesCount,
       // candidate details
       candidate_district: district,
       candidate_email: user?.email,
