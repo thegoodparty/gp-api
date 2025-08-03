@@ -171,10 +171,6 @@ export default $config({
       throw new Error('DATABASE_URL, VPC_CIDR keys must be set in the secret.')
     }
 
-    let enableFullstory = false
-    if ($app.stage === 'master') {
-      enableFullstory = true
-    }
 
     const sqsQueueName = `${$app.stage}-Queue.fifo`
     const sqsDlqName = `${$app.stage}-DLQ.fifo`
@@ -279,7 +275,6 @@ export default $config({
         CORS_ORIGIN:
           $app.stage === 'master' ? 'goodparty.org' : 'dev.goodparty.org',
         AWS_REGION: 'us-west-2',
-        ENABLE_FULLSTORY: enableFullstory ? 'true' : 'false',
         ASSET_DOMAIN: bucketDomain,
         WEBAPP_ROOT_URL: webAppRootUrl,
         AI_MODELS:
