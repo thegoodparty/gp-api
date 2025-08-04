@@ -23,6 +23,7 @@ import { StripeModule } from '../stripe/stripe.module'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
 import { PeerlyModule } from '../peerly/peerly.module'
+import { GoogleModule } from '../vendors/google/google.module'
 
 @Global()
 @Module({
@@ -36,6 +37,7 @@ import { PeerlyModule } from '../peerly/peerly.module'
     ScheduledMessagingModule,
     StripeModule,
     PeerlyModule,
+    GoogleModule,
   ],
   controllers: [
     CampaignsController,

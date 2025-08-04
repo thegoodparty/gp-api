@@ -207,8 +207,4 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       },
     })
   }
-
-  trackUserById(userId: number) {
-    return this.analytics.trackUserById(userId)
-  }
 }
