@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { Client } from '@hubspot/api-client'
+import {
+  MockApi,
+  MockBaseDiscovery,
+  MockBatchApi,
+  MockHubspotClient,
+} from './crm.types'
+
 const { HUBSPOT_TOKEN } = process.env
 
 @Injectable()
@@ -15,20 +22,26 @@ export class HubspotService {
   }
 
   get client(): Client {
-    return this.isTokenAvailable() ? this._client : this.createMockClient()
+    return this.isTokenAvailable()
+      ? this._client
+      : (this.createMockClient() as unknown as Client)
   }
 
-  private createMockClient(): Client {
+  private createMockClient(): MockHubspotClient {
     const mockResponse = () => Promise.resolve(undefined)
-    const mockApi = {
+    const mockApi: MockApi = {
       getById: mockResponse,
       create: mockResponse,
       update: mockResponse,
       doSearch: mockResponse,
     }
-    const mockBatchApi = {
+    const mockBatchApi: MockBatchApi = {
       create: mockResponse,
       update: mockResponse,
+    }
+
+    const mockBaseDiscovery: MockBaseDiscovery = {
+      config: { accessToken: null },
     }
 
     return {
@@ -51,6 +64,35 @@ export class HubspotService {
           },
         },
       },
-    } as any
+      automation: {
+        ...mockBaseDiscovery,
+        actions: mockBaseDiscovery,
+      },
+      cms: {
+        ...mockBaseDiscovery,
+        auditLogs: mockBaseDiscovery,
+        blogs: mockBaseDiscovery,
+        domains: mockBaseDiscovery,
+        hubdb: mockBaseDiscovery,
+        pages: mockBaseDiscovery,
+        performance: mockBaseDiscovery,
+        siteSearch: mockBaseDiscovery,
+        sourceCode: mockBaseDiscovery,
+        urlRedirects: mockBaseDiscovery,
+      },
+      communicationPreferences: mockBaseDiscovery,
+      conversations: mockBaseDiscovery,
+      events: mockBaseDiscovery,
+      files: mockBaseDiscovery,
+      marketing: mockBaseDiscovery,
+      oauth: mockBaseDiscovery,
+      settings: mockBaseDiscovery,
+      webhooks: mockBaseDiscovery,
+      init: () => {},
+      setAccessToken: () => {},
+      setApiKey: () => {},
+      setDeveloperApiKey: () => {},
+      apiRequest: () => Promise.resolve({} as Response),
+    }
   }
 }
