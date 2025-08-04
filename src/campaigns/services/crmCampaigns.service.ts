@@ -195,15 +195,8 @@ export class CrmCampaignsService {
     })
     const p2vData = pathToVictory?.data || {}
 
-    const _updateHistoryCount = await this.campaignUpdateHistory.count({
-      where: {
-        campaignId,
-      },
-    })
-
     const {
       p2vStatus,
-      p2vCompleteDate,
       winNumber,
       p2vNotNeeded,
       totalRegisteredVoters,
@@ -258,7 +251,6 @@ export class CrmCampaignsService {
     const electionDateMs = formatDateForCRM(electionDate)
     const primaryElectionDateMs = formatDateForCRM(primaryElectionDate)
     const isProUpdatedAtMs = formatDateForCRM(isProUpdatedAt)
-    const _p2vCompleteDateMs = formatDateForCRM(p2vCompleteDate)
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
