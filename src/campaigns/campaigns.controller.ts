@@ -24,7 +24,6 @@ import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.s
 import { SlackService } from 'src/shared/services/slack.service'
 import { userHasRole } from 'src/users/util/users.util'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
