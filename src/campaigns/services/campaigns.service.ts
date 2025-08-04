@@ -29,13 +29,6 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { PlacesService } from 'src/shared/services/places.service'
 import { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
 
-type CampaignUpdateData = Prisma.CampaignUncheckedUpdateInput & {
-  formattedAddress: string
-  placeId: string
-}
-
-type CampaignSelectPlaceId = { placeId: string | null }
-
 enum CandidateVerification {
   yes = 'YES',
   no = 'NO',
@@ -548,24 +541,27 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     formattedAddress: string,
     placeId: string,
   ) {
-    const updateData: CampaignUpdateData = {
-      formattedAddress,
-      placeId,
-    }
-
     return this.model.update({
       where: { id: campaignId },
-      data: updateData,
+      data: {
+        formattedAddress,
+        placeId,
+      } as Prisma.CampaignUpdateInput & {
+        formattedAddress: string
+        placeId: string
+      },
     })
   }
 
   async getCampaignFullAddress(
     campaignId: number,
   ): Promise<GooglePlacesApiResponse | null> {
-    const campaign = (await this.model.findUnique({
+    const campaign = await this.model.findUnique({
       where: { id: campaignId },
-      select: { placeId: true } as Prisma.CampaignSelect,
-    })) as CampaignSelectPlaceId | null
+      select: { placeId: true } as Prisma.CampaignSelect & {
+        placeId: true
+      },
+    })
 
     return campaign?.placeId
       ? this.places.getAddressByPlaceId(campaign.placeId)
