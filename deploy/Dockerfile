@@ -55,7 +55,7 @@ ENV CACHEBUST=${CACHEBUST:-1}
 RUN echo "Cache bust: $CACHEBUST - copying .package.json and package-lock.json"
 COPY package.json package-lock.json ./
 # Install only production dependencies
-RUN echo "Cache bust: $CACHEBUST" && npm ci --only=production
+RUN echo "Cache bust: $CACHEBUST" && npm ci --omit=dev
 
 # Copy only necessary files to the runtime image
 RUN echo "Cache bust: $CACHEBUST - copying .prisma"
