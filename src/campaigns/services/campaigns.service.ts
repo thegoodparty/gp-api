@@ -26,7 +26,7 @@ import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../stripe/services/stripe.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { PlacesService } from 'src/shared/services/places.service'
+import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
 
 enum CandidateVerification {
@@ -45,7 +45,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly analytics: AnalyticsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
-    private readonly places: PlacesService,
+    private readonly googlePlaces: GooglePlacesService,
   ) {
     super()
   }
@@ -564,7 +564,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
 
     return campaign?.placeId
-      ? this.places.getAddressByPlaceId(campaign.placeId)
+      ? this.googlePlaces.getAddressByPlaceId(campaign.placeId)
       : null
   }
 }

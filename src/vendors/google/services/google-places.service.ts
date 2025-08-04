@@ -1,6 +1,6 @@
 import { Injectable, BadGatewayException } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
-import { GooglePlacesApiResponse } from '../types/GooglePlaces.types'
+import { GooglePlacesApiResponse } from '../../../shared/types/GooglePlaces.types'
 import { firstValueFrom } from 'rxjs'
 
 const googleApiKey = process.env.GOOGLE_API_KEY
@@ -10,7 +10,7 @@ if (!googleApiKey) {
 }
 
 @Injectable()
-export class PlacesService {
+export class GooglePlacesService {
   constructor(private readonly httpService: HttpService) {}
 
   async getAddressByPlaceId(placeId: string): Promise<GooglePlacesApiResponse> {
@@ -34,6 +34,7 @@ export class PlacesService {
 
       return response.data.result
     } catch (error) {
+      console.error(error)
       throw new BadGatewayException(
         'Failed to fetch address from Google Places API',
       )
