@@ -16,6 +16,8 @@ model Campaign {
   didWin                Boolean?                @map("did_win")
   dateVerified          DateTime?               @map("date_verified")
   tier                  CampaignTier?
+  formattedAddress      String?                 @map("formatted_address")
+  placeId               String?                 @map("place_id")
   /// [CampaignData]
   data                  Json                    @default("{}") @db.JsonB
   /// [CampaignDetails]

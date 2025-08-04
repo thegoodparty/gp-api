@@ -14,6 +14,7 @@ import { WebsiteViewsService } from './services/websiteViews.service'
 import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { StripeModule } from 'src/stripe/stripe.module'
+import { CampaignsModule } from 'src/campaigns/campaigns.module'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { StripeModule } from 'src/stripe/stripe.module'
     PaymentsModule,
     UsersModule,
     StripeModule,
+    CampaignsModule,
   ],
   controllers: [DomainsController, WebsitesController],
   providers: [
