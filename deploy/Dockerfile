@@ -10,7 +10,7 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies  
 COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 
 # Copy application source files, prisma files, and seed data
