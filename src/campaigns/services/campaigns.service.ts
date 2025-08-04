@@ -5,21 +5,31 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common'
-import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { Campaign, Prisma, User } from '@prisma/client'
+import Bottleneck from 'bottleneck'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { ElectionsService } from 'src/elections/services/elections.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { SlackService } from 'src/shared/services/slack.service'
+import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
+import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
+import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
-import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
+import { parseIsoDateString } from '../../shared/util/date.util'
+import { StripeService } from '../../stripe/services/stripe.service'
+import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
   CampaignLaunchStatus,
   CampaignPlanVersionData,
   CampaignStatus,
+  CampaignWith,
   OnboardingStep,
   PlanVersion,
 } from '../campaigns.types'
-import { UsersService } from 'src/users/services/users.service'
-import { AiContentInputValues } from '../ai/content/aiContent.types'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
+import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
@@ -28,6 +38,12 @@ import { StripeService } from '../../stripe/services/stripe.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
+
+
+const limiter = new Bottleneck({
+  maxConcurrent: 10,
+})
+
 
 enum CandidateVerification {
   yes = 'YES',
@@ -46,6 +62,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
     private readonly googlePlaces: GooglePlacesService,
+    private readonly elections: ElectionsService,
+    private readonly slack: SlackService,
   ) {
     super()
   }
@@ -566,5 +584,104 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return campaign?.placeId
       ? this.googlePlaces.getAddressByPlaceId(campaign.placeId)
       : null
+}
+  // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
+  async updateMissingWinNumbers(pageSize = 500, loopLimit = 1000) {
+    let lastId: number | null = null
+    const counts = {
+      successful: 0,
+      failed: 0,
+    }
+
+    for (let loopCount = 0; loopCount < loopLimit; ++loopCount) {
+      const batch: CampaignWith<'pathToVictory'>[] = await this.model.findMany({
+        include: { pathToVictory: true },
+        where: {
+          pathToVictory: {
+            // Summary of this spaghetti query is: where they don't have a win number, but they...
+            // ... DO have an electionType and electionLocation
+            is: {
+              AND: [
+                {
+                  OR: [
+                    { data: { path: ['winNumber'], equals: Prisma.AnyNull } },
+                    {
+                      data: {
+                        path: ['winNumber'],
+                        not: { path: ['winNumber'] },
+                      },
+                    },
+                    { data: { path: ['winNumber'], not: '' } },
+                  ],
+                },
+                {
+                  data: {
+                    path: ['electionType'],
+                    not: { path: ['electionType'] },
+                  },
+                },
+                { data: { path: ['electionType'], not: Prisma.AnyNull } },
+                { data: { path: ['electionType'], not: '' } },
+                {
+                  data: {
+                    path: ['electionType'],
+                    not: { path: ['electionType'] },
+                  },
+                },
+                { data: { path: ['electionLocation'], not: Prisma.AnyNull } },
+                { data: { path: ['electionLocation'], not: '' } },
+              ],
+            },
+          },
+          ...(lastId ? { id: { gt: lastId } } : {}),
+        },
+        orderBy: { id: Prisma.SortOrder.asc },
+        take: pageSize,
+      })
+      if (batch.length === 0) break
+
+      await Promise.allSettled(
+        batch.map((r) =>
+          limiter.schedule(async () => {
+            try {
+              const raceTargetDetails =
+                await this.elections.buildRaceTargetDetails({
+                  L2DistrictType: r.pathToVictory?.data.electionType ?? '',
+                  L2DistrictName: r.pathToVictory?.data.electionLocation ?? '',
+                  electionDate: r.details.electionDate ?? '',
+                  state: r.details.state ?? '',
+                })
+              if (!raceTargetDetails || !raceTargetDetails?.winNumber) {
+                ++counts.failed
+                return
+              }
+              await this.updateJsonFields(r.id, {
+                pathToVictory: raceTargetDetails,
+              })
+              ++counts.successful
+            } catch (error) {
+              // Extract clean error information
+              let errorMessage: string
+              if (error instanceof Error) {
+                errorMessage = error.message
+              } else {
+                errorMessage = String(error)
+              }
+
+              this.logger.error(
+                `Failed to update missing win number for campaignId: ${r.id}`,
+                { error: errorMessage, campaignId: r.id },
+              )
+              ++counts.failed
+            }
+          }),
+        ),
+      )
+      lastId = batch[batch.length - 1].id
+    }
+    await this.slack.errorMessage({
+      message: `Finished updating win numbers in the ${CURRENT_ENVIRONMENT} environment. Successful: ${counts.successful} Failed: ${counts.failed}`,
+      error: null,
+    })
   }
 }

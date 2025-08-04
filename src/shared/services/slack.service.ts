@@ -1,9 +1,11 @@
+import { HttpService } from '@nestjs/axios'
 import {
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { HttpService } from '@nestjs/axios'
+import { Headers, MimeTypes } from 'http-constants-ts'
+import { lastValueFrom } from 'rxjs'
 import { SLACK_CHANNEL_IDS } from './slackService.config'
 import {
   FormattedSlackMessageArgs,
@@ -12,8 +14,6 @@ import {
   SlackMessageType,
   VanitySlackMethodArgs,
 } from './slackService.types'
-import { lastValueFrom } from 'rxjs'
-import { Headers, MimeTypes } from 'http-constants-ts'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
