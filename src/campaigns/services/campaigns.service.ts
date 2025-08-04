@@ -158,10 +158,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         if (!campaign) return false
 
         // Handle data and details JSON fields
-        const campaignUpdateData = {} as Prisma.CampaignUpdateInput & {
-          formattedAddress?: string
-          placeId?: string
-        }
+        const campaignUpdateData = {} as Prisma.CampaignUpdateInput
         if (data) {
           campaignUpdateData.data = deepMerge(campaign.data as object, data)
         }
