@@ -11,7 +11,7 @@ const { HUBSPOT_TOKEN } = process.env
 
 @Injectable()
 export class HubspotService {
-  private _client: Client
+  private readonly _client: Client
 
   constructor() {
     this._client = new Client({ accessToken: HUBSPOT_TOKEN })
