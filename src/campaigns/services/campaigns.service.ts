@@ -12,7 +12,6 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { SlackService } from 'src/shared/services/slack.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
 import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
@@ -604,9 +603,17 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
               })
               ++counts.successful
             } catch (error) {
+              // Extract clean error information
+              let errorMessage: string
+              if (error instanceof Error) {
+                errorMessage = error.message
+              } else {
+                errorMessage = String(error)
+              }
+
               this.logger.error(
                 `Failed to update missing win number for campaignId: ${r.id}`,
-                error,
+                { error: errorMessage, campaignId: r.id },
               )
               ++counts.failed
             }
@@ -615,22 +622,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       )
       lastId = batch[batch.length - 1].id
     }
-    try {
-      await this.slack.message(
-        {
-          body: `Finished updating win numbers in the ${CURRENT_ENVIRONMENT} environment.\n\n Successful: ${counts.successful} \n\n Failed: ${counts.failed}`,
-        },
-        SlackChannel.botDev,
-      )
-    } catch (error) {
-      this.logger.error(
-        'Failed to send Slack notification about win numbers update',
-        {
-          error,
-          counts,
-          environment: CURRENT_ENVIRONMENT,
-        },
-      )
-    }
+    await this.slack.errorMessage({
+      message: `Finished updating win numbers in the ${CURRENT_ENVIRONMENT} environment. Successful: ${counts.successful} Failed: ${counts.failed}`,
+      error: null,
+    })
   }
 }
