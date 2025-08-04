@@ -130,7 +130,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
-    const { data, details, pathToVictory, aiContent } = body
+    const {
+      data,
+      details,
+      pathToVictory,
+      aiContent,
+      formattedAddress,
+      placeId,
+    } = body
 
     const updatedCampaign = await this.client.$transaction(
       async (tx) => {
@@ -147,9 +154,18 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         if (!campaign) return false
 
         // Handle data and details JSON fields
-        const campaignUpdateData: Prisma.CampaignUpdateInput = {}
+        const campaignUpdateData = {} as Prisma.CampaignUpdateInput & {
+          formattedAddress?: string
+          placeId?: string
+        }
         if (data) {
           campaignUpdateData.data = deepMerge(campaign.data as object, data)
+        }
+        if (formattedAddress !== undefined) {
+          campaignUpdateData.formattedAddress = formattedAddress
+        }
+        if (placeId !== undefined) {
+          campaignUpdateData.placeId = placeId
         }
         if (details) {
           await this.handleSubscriptionCancelAtUpdate(campaign.details, details)

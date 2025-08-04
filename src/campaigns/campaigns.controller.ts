@@ -22,7 +22,7 @@ import {
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Campaign, PathToVictory, Prisma, User, UserRole } from '@prisma/client'
+import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
