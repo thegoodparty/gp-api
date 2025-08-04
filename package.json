@@ -25,7 +25,8 @@
     "codegen": "graphql-codegen"
   },
   "prisma": {
-    "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts",
+    "schema": "prisma/schema"
   },
   "dependencies": {
     "@aws-sdk/client-route-53": "^3.812.0",
