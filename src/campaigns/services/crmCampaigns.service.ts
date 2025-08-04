@@ -200,13 +200,7 @@ export class CrmCampaignsService {
       winNumber,
       p2vNotNeeded,
       totalRegisteredVoters,
-      viability: {
-        candidates: _candidates,
-        isIncumbent: _isIncumbent,
-        seats: _seats,
-        score,
-        isPartisan: _isPartisan,
-      } = {},
+      viability: { score } = {},
     } = p2vData || {}
 
     const {
