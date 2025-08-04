@@ -11,12 +11,12 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Install dependencies
-COPY ../package.json ../package-lock.json ../tsconfig.json ../tsconfig.build.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 
 # Copy application source files, prisma files, and seed data
-COPY ../src/ ./src
-COPY ../prisma/ ./prisma
-COPY ../seed/ ./seed
+COPY src/ ./src
+COPY prisma/ ./prisma
+COPY seed/ ./seed
 
 RUN npm install
 
@@ -53,7 +53,7 @@ ENV CACHEBUST=${CACHEBUST:-1}
 
 # Copy package files for production dependencies
 RUN echo "Cache bust: $CACHEBUST - copying .package.json and package-lock.json"
-COPY ../package.json ../package-lock.json ./
+COPY package.json package-lock.json ./
 RUN echo "Package files copied at: $(date)"
 # Install only production dependencies
 RUN echo "Cache bust: $CACHEBUST" && npm ci --omit=dev
