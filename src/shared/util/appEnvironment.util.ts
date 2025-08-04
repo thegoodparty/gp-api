@@ -16,3 +16,5 @@ export const IS_DEV = isEnvironment(AppEnv.DEV)
 function isEnvironment(env: AppEnv) {
   return CURRENT_ENV === env
 }
+
+export const CURRENT_ENVIRONMENT = CURRENT_ENV as AppEnv
