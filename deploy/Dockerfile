@@ -54,6 +54,7 @@ ENV CACHEBUST=${CACHEBUST:-1}
 # Copy package files for production dependencies
 RUN echo "Cache bust: $CACHEBUST - copying .package.json and package-lock.json"
 COPY package.json package-lock.json ./
+RUN echo "Package files copied at: $(date)"
 # Install only production dependencies
 RUN echo "Cache bust: $CACHEBUST" && npm ci --omit=dev
 
