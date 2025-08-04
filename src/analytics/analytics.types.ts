@@ -1,13 +1,5 @@
 import { VoterGoals } from 'src/campaigns/campaigns.types'
 
-export interface FullStoryUserResponse {
-  data: {
-    results: {
-      id: string
-    }[]
-  }
-}
-
 export type SyncTrackingResultCounts = {
   updated: number
   skipped: number

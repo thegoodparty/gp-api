@@ -125,7 +125,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
   async update(args: Prisma.CampaignUpdateArgs) {
     const campaign = await this.model.update(args)
-    campaign?.userId && (await this.usersService.trackUserById(campaign.userId))
     const isPro = args?.data?.isPro
     if (isPro) {
       this.analytics.identify(campaign?.userId, { isPro })
@@ -244,8 +243,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (updatedCampaign) {
       // Track campaign and user
       this.crm.trackCampaign(updatedCampaign.id)
-      updatedCampaign.userId &&
-        this.usersService.trackUserById(updatedCampaign.userId)
     }
 
     return updatedCampaign ? updatedCampaign : null
@@ -408,7 +405,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
 
     this.crm.trackCampaign(campaign.id)
-    this.usersService.trackUserById(campaign.userId)
 
     return true
   }
