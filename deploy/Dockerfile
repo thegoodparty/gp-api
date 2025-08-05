@@ -2,7 +2,7 @@
 FROM public.ecr.aws/vend/moby/buildkit:buildx-stable-1 AS buildkit
 
 # Stage 1: Install dependencies and build application
-FROM public.ecr.aws/docker/library/node:22-alpine AS builder
+FROM public.ecr.aws/docker/library/node:22.12.0-alpine AS builder
 
 RUN apk add --no-cache \
   libc6-compat \
@@ -18,7 +18,7 @@ COPY src/ ./src
 COPY prisma/ ./prisma
 COPY seed/ ./seed
 
-RUN npm install
+RUN npm ci
 
 # Optionally bust the cache to force a rebuild of the following steps
 ARG CACHEBUST
@@ -40,7 +40,7 @@ RUN echo "Cache bust: $CACHEBUST" && npx prisma generate --schema=prisma/schema
 RUN echo "Cache bust: $CACHEBUST" && npm run build
 
 # Stage 2: Create a minimal runtime image
-FROM public.ecr.aws/docker/library/node:22-alpine
+FROM public.ecr.aws/docker/library/node:22.12.0-alpine
 
 RUN apk add --no-cache \
   libc6-compat \
@@ -52,7 +52,7 @@ ARG CACHEBUST
 ENV CACHEBUST=${CACHEBUST:-1}
 
 # Copy package files for production dependencies
-RUN echo "Cache bust: $CACHEBUST - copying .package.json and package-lock.json"
+RUN echo "Cache bust: $CACHEBUST - copying package.json and package-lock.json"
 COPY package.json package-lock.json ./
 RUN echo "Package files copied at: $(date)"
 # Install only production dependencies
