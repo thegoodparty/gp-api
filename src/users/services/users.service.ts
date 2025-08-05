@@ -93,7 +93,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   async createUser(
     userData: WithOptional<CreateUserInputDto, 'password' | 'phone'>,
   ): Promise<User> {
-    const { signUpMode, ...restUserData } = userData
+    const { signUpMode, allowTexts, ...restUserData } = userData
     const {
       password,
       firstName,
@@ -122,12 +122,17 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       ...(zip ? { zip } : {}),
     })
 
+    const metaData = {
+      textNotifications: allowTexts,
+    }
+
     const userDataToPersist = {
       ...restUserData,
       ...trimmed,
       ...(hashedPassword ? { password: hashedPassword } : {}),
       hasPassword: !!hashedPassword,
       name: name?.trim() || `${firstNameTrimmed} ${lastNameTrimmed}`,
+      metaData,
     }
 
     const user = await this.model.create({
