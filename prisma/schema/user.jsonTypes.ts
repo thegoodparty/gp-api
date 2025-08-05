@@ -20,6 +20,7 @@ declare global {
       whyBrowsing?: WhyBrowsing
       hubspotId?: string
       profile_updated_count?: number
+      textNotifications?: boolean
     } | null
   }
 }
