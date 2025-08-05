@@ -28,6 +28,10 @@
     "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts",
     "schema": "prisma/schema"
   },
+  "engines": {
+    "node": "22.12.0",
+    "npm": ">=10.9.0"
+  },
   "dependencies": {
     "@aws-sdk/client-route-53": "^3.812.0",
     "@aws-sdk/client-route-53-domains": "^3.812.0",
