@@ -3,7 +3,4 @@ import { z } from 'zod'
 
 export const PhoneSchema = z
   .string()
-  .refine(
-    (val) => val === '' || isMobilePhone(val),
-    'Must be valid phone number',
-  )
+  .refine((val) => isMobilePhone(val), 'Must be valid phone number')
