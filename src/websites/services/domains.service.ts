@@ -16,8 +16,6 @@ import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 
-
-
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
   SUBMITTED = 'SUBMITTED',
@@ -64,7 +62,7 @@ export class DomainsService
   }
 
   private getDomainPurchaseStatus(): string {
-    return this.stripe.isTestMode 
+    return this.stripe.isTestMode
       ? 'disabled because Stripe is in test mode'
       : 'enabled'
   }

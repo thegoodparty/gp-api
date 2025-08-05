@@ -39,3 +39,38 @@ export type Approve10DLCBrandResponse = {
   sample2: string
   campaign_verify_token: string
 }
+
+// P2P SMS API types
+export type PhoneListUploadResponse = {
+  token: string
+}
+
+export type PhoneListStatusResponse = {
+  list_status: string
+  list_id?: number
+}
+
+export type MediaCreateResponse = {
+  media_id: string
+  status?: string
+  error?: string
+}
+
+export type P2pJobCreateResponse = {
+  job_id: string
+}
+
+export type P2pTemplate = {
+  title: string
+  text: string
+  is_default?: boolean
+  advanced?: {
+    media: {
+      media_id: string
+      media_type: 'IMAGE' | 'VIDEO'
+      preview_url?: string
+      thumbnail_url?: string
+      title?: string
+    }
+  }
+}
