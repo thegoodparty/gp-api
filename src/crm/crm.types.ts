@@ -145,6 +145,7 @@ export namespace HubSpot {
     yard_signs_impressions = 'yard_signs_impressions',
     // p2p_texts = 'p2p_texts', TODO: we need a new field in HS for sms text contact numbers
     ecanvasser_contacts_count = 'ecanvasser_contacts_count',
+    ecanvasser_houses_count = 'ecanvasser_houses_count',
 
     // candidate details
     candidate_district = 'candidate_district',
@@ -192,4 +193,75 @@ export namespace HubSpot {
     votegoal = 'votegoal',
     win_number = 'win_number',
   }
+}
+export type MockApi = {
+  getById: () => Promise<undefined>
+  create: () => Promise<undefined>
+  update: () => Promise<undefined>
+  doSearch: () => Promise<undefined>
+}
+export type MockBatchApi = {
+  create: () => Promise<undefined>
+  update: () => Promise<undefined>
+}
+export type MockBaseDiscovery = {
+  config: { accessToken: null }
+}
+type MockAutomationDiscovery = MockBaseDiscovery & {
+  actions: MockBaseDiscovery
+}
+type MockCmsDiscovery = MockBaseDiscovery & {
+  auditLogs: MockBaseDiscovery
+  blogs: MockBaseDiscovery
+  domains: MockBaseDiscovery
+  hubdb: MockBaseDiscovery
+  pages: MockBaseDiscovery
+  performance: MockBaseDiscovery
+  siteSearch: MockBaseDiscovery
+  sourceCode: MockBaseDiscovery
+  urlRedirects: MockBaseDiscovery
+}
+type MockCommunicationPreferencesDiscovery = MockBaseDiscovery
+type MockConversationsDiscovery = MockBaseDiscovery
+type MockEventsDiscovery = MockBaseDiscovery
+type MockFilesDiscovery = MockBaseDiscovery
+type MockMarketingDiscovery = MockBaseDiscovery
+type MockOauthDiscovery = MockBaseDiscovery
+type MockSettingsDiscovery = MockBaseDiscovery
+type MockWebhooksDiscovery = MockBaseDiscovery
+export type MockHubspotClient = {
+  config: { accessToken: null }
+  crm: {
+    companies: {
+      basicApi: MockApi
+      batchApi: MockBatchApi
+    }
+    contacts: {
+      basicApi: MockApi
+      searchApi: MockApi
+    }
+    owners: {
+      ownersApi: MockApi
+    }
+    associations: {
+      v4: {
+        batchApi: MockBatchApi
+      }
+    }
+  }
+  automation: MockAutomationDiscovery
+  cms: MockCmsDiscovery
+  communicationPreferences: MockCommunicationPreferencesDiscovery
+  conversations: MockConversationsDiscovery
+  events: MockEventsDiscovery
+  files: MockFilesDiscovery
+  marketing: MockMarketingDiscovery
+  oauth: MockOauthDiscovery
+  settings: MockSettingsDiscovery
+  webhooks: MockWebhooksDiscovery
+  init: () => void
+  setAccessToken: (token: string) => void
+  setApiKey: (apiKey: string) => void
+  setDeveloperApiKey: (developerApiKey: string) => void
+  apiRequest: (opts?: Record<string, unknown>) => Promise<Response>
 }

@@ -21,6 +21,7 @@ const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 @Injectable()
 export class StripeService {
   private stripe = new Stripe(STRIPE_SECRET_KEY as string)
+  readonly isTestMode = !STRIPE_SECRET_KEY?.includes('live')
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
