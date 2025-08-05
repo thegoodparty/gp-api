@@ -25,5 +25,6 @@ export const CreateUserInputSchema = z.object({
   signUpMode: z
     .enum([SIGN_UP_MODE.CANDIDATE, SIGN_UP_MODE.FACILITATED])
     .optional(),
+  allowTexts: z.boolean().optional(),
 })
 export class CreateUserInputDto extends createZodDto(CreateUserInputSchema) {}
