@@ -28,6 +28,7 @@ const UserMetaDataSchema = z
 
 export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   password: true,
+  allowTexts: true,
 }).extend({
   name: z.string().nullish(),
   zip: makeOptional(ZipSchema),
