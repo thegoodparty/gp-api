@@ -20,7 +20,7 @@ export const CreateUserInputSchema = z.object({
   password: PasswordSchema.optional(),
   name: z.string().optional(),
   zip: ZipSchema.optional(),
-  phone: PhoneSchema,
+  phone: PhoneSchema.optional(),
   roles: RolesSchema,
   signUpMode: z
     .enum([SIGN_UP_MODE.CANDIDATE, SIGN_UP_MODE.FACILITATED])
