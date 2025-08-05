@@ -31,10 +31,10 @@ ENV DATABASE_URL=$DATABASE_URL
 
 # Note: the CodeBuild project must be configured to be on the VPC.
 # Force cache bust for these commands by echoing CACHEBUST
-RUN echo "Cache bust: $CACHEBUST" && npm run migrate:deploy
+RUN echo "Cache bust: $CACHEBUST" && npx prisma migrate deploy --schema=prisma/schema
 
 # Force cache bust for Prisma client generation
-RUN echo "Cache bust: $CACHEBUST" && npm run generate
+RUN echo "Cache bust: $CACHEBUST" && npx prisma generate --schema=prisma/schema
 
 # Build the application (output in /dist)
 RUN echo "Cache bust: $CACHEBUST" && npm run build
