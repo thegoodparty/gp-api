@@ -18,7 +18,7 @@ COPY src/ ./src
 COPY prisma/ ./prisma
 COPY seed/ ./seed
 
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Optionally bust the cache to force a rebuild of the following steps
 ARG CACHEBUST
@@ -56,7 +56,7 @@ RUN echo "Cache bust: $CACHEBUST - copying package.json and package-lock.json"
 COPY package.json package-lock.json ./
 RUN echo "Package files copied at: $(date)"
 # Install only production dependencies
-RUN echo "Cache bust: $CACHEBUST" && npm ci --omit=dev
+RUN echo "Cache bust: $CACHEBUST" && npm ci --omit=dev --legacy-peer-deps
 
 # Copy only necessary files to the runtime image
 RUN echo "Cache bust: $CACHEBUST - copying .prisma"

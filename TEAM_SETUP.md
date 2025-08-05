@@ -42,11 +42,13 @@ npm --version   # Should show: 10.9.0 (or higher)
 ### 3. Install Dependencies
 
 ```bash
-# Install project dependencies
-npm install
+# Install project dependencies (using legacy peer deps to resolve conflicts)
+npm install --legacy-peer-deps
 
-# This will use the existing package-lock.json to ensure
-# everyone has identical dependency versions
+# For subsequent installs, use:
+npm ci --legacy-peer-deps
+
+# This resolves peer dependency conflicts that modern npm can't handle
 ```
 
 ### 4. IDE Configuration
@@ -90,18 +92,18 @@ nvm use 22.12.0
 ### Issue: "npm ci fails in Docker"
 
 ```bash
-# This usually means package-lock.json was generated with wrong Node version
-# Solution: Regenerate with correct version
+# This usually means package-lock.json was generated with wrong Node version or peer dependency conflicts
+# Solution: Regenerate with correct version and legacy peer deps
 nvm use 22.12.0
 rm package-lock.json
-npm install
+npm install --legacy-peer-deps
 ```
 
 ### Issue: "Different dependency versions between developers"
 
 ```bash
 # Solution: Use npm ci instead of npm install
-npm ci  # Uses exact versions from package-lock.json
+npm ci --legacy-peer-deps  # Uses exact versions from package-lock.json
 ```
 
 ## Important Notes
@@ -116,7 +118,7 @@ npm ci  # Uses exact versions from package-lock.json
 
 1. **Pull latest code**: `git pull`
 2. **Check Node version**: `nvm use` (uses `.nvmrc`)
-3. **Install dependencies**: `npm ci` (fast, exact versions)
+3. **Install dependencies**: `npm ci --legacy-peer-deps` (fast, exact versions)
 4. **Start development**: `npm run start:dev`
 
 This ensures everyone on the team has **identical environments** locally and in production! 🎯

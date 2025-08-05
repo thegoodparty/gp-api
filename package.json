@@ -22,7 +22,9 @@
     "seed:csv": "npx prisma db seed -- --type csv",
     "generate": "npx prisma generate",
     "prisma-format": "for file in prisma/schema/*.prisma; do npx prisma-case-format -c prisma/.prisma-case-format.yaml -f \"$file\"; done",
-    "codegen": "graphql-codegen"
+    "codegen": "graphql-codegen",
+    "install:clean": "rm -rf node_modules package-lock.json && npm install --legacy-peer-deps",
+    "postinstall": "echo 'Note: This project requires --legacy-peer-deps flag due to peer dependency conflicts'"
   },
   "prisma": {
     "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts",
