@@ -682,7 +682,7 @@ export class CrmCampaignsService {
     campaigns: Campaign[],
     fields: Array<keyof CRMCompanyProperties | 'all'>,
   ): Promise<SimplePublicObjectBatchInput[]> {
-    const companyUpdateObjects: SimplePublicObjectBatchInput[] = []
+    const companyUpdateMap = new Map<string, SimplePublicObjectBatchInput>()
 
     for (const campaign of campaigns) {
       try {
@@ -691,14 +691,14 @@ export class CrmCampaignsService {
           fields,
         )
         if (updateObject) {
-          companyUpdateObjects.push(updateObject)
+          companyUpdateMap.set(updateObject.id, updateObject)
         }
       } catch (error) {
         this.logger.error(`Error processing campaign ${campaign.id}:`, error)
       }
     }
 
-    return companyUpdateObjects
+    return Array.from(companyUpdateMap.values())
   }
 
   private async processSingleCampaignForBatchUpdate(
