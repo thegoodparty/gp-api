@@ -314,7 +314,7 @@ export class CrmCampaignsService {
         createdBy === CampaignCreatedBy.ADMIN
           ? HubSpot.CreatedByAdmin.YES
           : HubSpot.CreatedByAdmin.NO,
-      admin_user: adminUserEmail,
+      admin_user: adminEmail,
       pledge_status: pledged
         ? HubSpot.PledgeStatus.YES
         : HubSpot.PledgeStatus.NO,
