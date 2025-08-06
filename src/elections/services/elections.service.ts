@@ -110,6 +110,7 @@ export class ElectionsService {
           electionType: projectedTurnout.L2DistrictType,
           electionLocation: projectedTurnout.L2DistrictName,
           p2vStatus: P2VStatus.complete,
+          p2vCompleteDate: new Date().toISOString().slice(0, 10),
         }
       : null
   }

@@ -279,6 +279,7 @@ export class CampaignsController {
         ...raceTargetDetails,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
+        districtManuallySet: true,
       },
     })
   }
@@ -304,7 +305,7 @@ export class CampaignsController {
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
-    return await this.campaigns.updateJsonFields(campaign.id, {
+    return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
@@ -315,6 +316,7 @@ export class CampaignsController {
         source: P2VSource.ElectionApi,
         p2vStatus: P2VStatus.complete,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
+        districtManuallySet: false,
       },
     })
   }
