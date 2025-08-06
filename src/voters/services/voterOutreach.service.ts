@@ -23,9 +23,9 @@ import { EmailService } from 'src/email/email.service'
 import { EmailTemplateName } from 'src/email/email.types'
 import { VoterFileFilterService } from './voterFileFilter.service'
 import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types'
-import { PhoneListService } from '../../peerly/services/phoneList.service'
-import { MediaService } from '../../peerly/services/media.service'
-import { P2pSmsService } from '../../peerly/services/p2pSms.service'
+import { PeerlyPhoneListService } from '../../peerly/services/peerlyPhoneList.service'
+import { PeerlyMediaService } from '../../peerly/services/peerlyMedia.service'
+import { PeerlyP2pSmsService } from '../../peerly/services/peerlyP2pSms.service'
 import { PollingUtil } from '../../peerly/utils/polling.util'
 import { VoterFileService } from '../voterFile/voterFile.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
@@ -107,9 +107,9 @@ export class VoterOutreachService {
     private readonly crmCampaigns: CrmCampaignsService,
     private readonly email: EmailService,
     private readonly voterFileFilterService: VoterFileFilterService,
-    private readonly phoneListService: PhoneListService,
-    private readonly mediaService: MediaService,
-    private readonly p2pSmsService: P2pSmsService,
+    private readonly phoneListService: PeerlyPhoneListService,
+    private readonly mediaService: PeerlyMediaService,
+    private readonly p2pSmsService: PeerlyP2pSmsService,
     private readonly voterFileService: VoterFileService,
   ) {}
 

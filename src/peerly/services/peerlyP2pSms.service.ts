@@ -5,10 +5,9 @@ import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
-import { CreateJobResponseDto } from '../schemas/p2pSms.schema'
+import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 
-const { PEERLY_HTTP_TIMEOUT = '10000' } = process.env
-const PEERLY_HTTP_TIMEOUT_MS = parseInt(PEERLY_HTTP_TIMEOUT, 10)
+const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 10 second timeout
 
 interface Template {
   title: string
@@ -29,8 +28,8 @@ interface CreateJobParams {
 }
 
 @Injectable()
-export class P2pSmsService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(P2pSmsService.name)
+export class PeerlyP2pSmsService extends PeerlyBaseConfig {
+  private readonly logger: Logger = new Logger(PeerlyP2pSmsService.name)
 
   constructor(
     private readonly httpService: HttpService,
@@ -109,4 +108,4 @@ export class P2pSmsService extends PeerlyBaseConfig {
       this.handleApiError(error)
     }
   }
-}
+} 

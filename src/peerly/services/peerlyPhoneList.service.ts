@@ -15,25 +15,11 @@ import FormData from 'form-data'
 import {
   UploadPhoneListResponseDto,
   PhoneListStatusResponseDto,
-} from '../schemas/phoneList.schema'
+} from '../schemas/peerlyPhoneList.schema'
 
-const { PEERLY_HTTP_TIMEOUT = '10000' } = process.env
-const PEERLY_HTTP_TIMEOUT_MS = parseInt(PEERLY_HTTP_TIMEOUT, 10)
-
-// P2P Configuration Constants
-const P2P_SUPPRESS_CELL_PHONES = parseInt(
-  process.env.PEERLY_P2P_SUPPRESS_CELL_PHONES || '4',
-  10,
-)
-const P2P_SPLIT_TIMEZONES = parseInt(
-  process.env.PEERLY_P2P_SPLIT_TIMEZONES || '1',
-  10,
-)
-const P2P_USE_NAT_DNC = parseInt(process.env.PEERLY_P2P_USE_NAT_DNC || '0', 10)
-const MAX_FILE_SIZE = parseInt(
-  process.env.PEERLY_MAX_FILE_SIZE || '104857600',
-  10,
-) // 100MB
+const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 10 second timeout
+const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
+const MAX_FILE_SIZE = 104857600 // 100MB
 
 interface UploadPhoneListParams {
   listName: string
@@ -43,8 +29,8 @@ interface UploadPhoneListParams {
 }
 
 @Injectable()
-export class PhoneListService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(PhoneListService.name)
+export class PeerlyPhoneListService extends PeerlyBaseConfig {
+  private readonly logger: Logger = new Logger(PeerlyPhoneListService.name)
 
   constructor(
     private readonly httpService: HttpService,
@@ -100,11 +86,7 @@ export class PhoneListService extends PeerlyBaseConfig {
     form.append('account', this.accountNumber)
     if (identityId) form.append('identity_id', identityId)
     form.append('list_name', listName)
-    form.append('suppress_cell_phones', P2P_SUPPRESS_CELL_PHONES.toString())
-    form.append('split_timezones', P2P_SPLIT_TIMEZONES.toString())
-    form.append('use_nat_dnc', P2P_USE_NAT_DNC.toString())
-
-    // For P2P, we don't need opt-in parameters
+    form.append('suppress_cell_phones', P2P_SUPPRESS_CELL_PHONES)
     form.append('file', csvStream, {
       filename: 'voters.csv',
       contentType: 'text/csv',
@@ -148,4 +130,4 @@ export class PhoneListService extends PeerlyBaseConfig {
       this.handleApiError(error)
     }
   }
-}
+} 

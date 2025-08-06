@@ -7,4 +7,4 @@ const createJobResponseSchema = z.object({
 
 export class CreateJobResponseDto extends createZodDto(
   createJobResponseSchema,
-) {}
+) {} 

@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { PeerlyAuthenticationService } from './services/peerlyAuthentication.service'
 import { PeerlyIdentityService } from './services/peerlyIdentity.service'
-import { PhoneListService } from './services/phoneList.service'
-import { MediaService } from './services/media.service'
-import { P2pSmsService } from './services/p2pSms.service'
+import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
+import { PeerlyMediaService } from './services/peerlyMedia.service'
+import { PeerlyP2pSmsService } from './services/peerlyP2pSms.service'
 import { VotersModule } from '../voters/voters.module'
 
 @Module({
@@ -12,16 +12,16 @@ import { VotersModule } from '../voters/voters.module'
   providers: [
     PeerlyAuthenticationService,
     PeerlyIdentityService,
-    PhoneListService,
-    MediaService,
-    P2pSmsService,
+    PeerlyPhoneListService,
+    PeerlyMediaService,
+    PeerlyP2pSmsService,
   ],
   exports: [
     PeerlyAuthenticationService,
     PeerlyIdentityService,
-    PhoneListService,
-    MediaService,
-    P2pSmsService,
+    PeerlyPhoneListService,
+    PeerlyMediaService,
+    PeerlyP2pSmsService,
   ],
 })
 export class PeerlyModule {}

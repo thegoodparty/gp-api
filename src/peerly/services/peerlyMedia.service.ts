@@ -12,23 +12,18 @@ import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { Readable } from 'stream'
 import FormData from 'form-data'
-import { CreateMediaResponseDto } from '../schemas/media.schema'
+import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
+import { MimeTypes } from 'http-constants-ts'
 
-const { PEERLY_HTTP_TIMEOUT = '10000' } = process.env
-const PEERLY_HTTP_TIMEOUT_MS = parseInt(PEERLY_HTTP_TIMEOUT, 10)
+const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 10 second timeout
+
+const MAX_FILE_SIZE = 512000 // 500KB
 
 const ALLOWED_MEDIA_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'video/mp4',
+  MimeTypes.IMAGE_JPEG,
+  MimeTypes.IMAGE_PNG,
+  MimeTypes.IMAGE_GIF,
 ]
-
-// File size configuration
-const MAX_FILE_SIZE = parseInt(
-  process.env.PEERLY_MAX_FILE_SIZE || '104857600',
-  10,
-) // 100MB
 
 interface CreateMediaParams {
   identityId: string
@@ -39,8 +34,8 @@ interface CreateMediaParams {
 }
 
 @Injectable()
-export class MediaService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(MediaService.name)
+export class PeerlyMediaService extends PeerlyBaseConfig {
+  private readonly logger: Logger = new Logger(PeerlyMediaService.name)
 
   constructor(
     private readonly httpService: HttpService,
@@ -106,18 +101,12 @@ export class MediaService extends PeerlyBaseConfig {
           maxContentLength: MAX_FILE_SIZE,
         }),
       )
-
-      const validated = this.validateCreateResponse(response.data)
-
-      if (validated.status === 'ERROR') {
-        throw new BadGatewayException(
-          `Media creation failed: ${validated.error}`,
-        )
-      }
-
-      return validated.media_id
+      const { data } = response
+      const validatedData = this.validateCreateResponse(data)
+      this.logger.debug('Successfully created media', validatedData)
+      return validatedData.media_id
     } catch (error) {
       this.handleApiError(error)
     }
   }
-}
+} 
