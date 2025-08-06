@@ -2,6 +2,7 @@ export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
   PRO_SUBSCRIPTION = 'PRO_SUBSCRIPTION',
   ADDITIONAL_FEATURES = 'ADDITIONAL_FEATURES',
+  OUTREACH = 'OUTREACH',
 }
 
 export interface PurchaseMetadata {
@@ -10,6 +11,13 @@ export interface PurchaseMetadata {
   planType?: string
   duration?: string
   features?: string[]
+  campaignId?: number
+  outreachType?: string
+  audienceSize?: number
+  audienceRequest?: string
+  script?: string
+  message?: string
+  date?: string
 }
 
 export interface CreatePurchaseIntentDto {

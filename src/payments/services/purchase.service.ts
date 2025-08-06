@@ -89,6 +89,8 @@ export class PurchaseService {
     switch (purchaseType) {
       case PurchaseType.DOMAIN_REGISTRATION:
         return PaymentType.DOMAIN_REGISTRATION
+      case PurchaseType.OUTREACH:
+        return PaymentType.OUTREACH_PURCHASE
       default:
         throw new Error(`No payment type mapping for: ${purchaseType}`)
     }
