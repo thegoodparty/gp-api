@@ -16,7 +16,8 @@ export class VoterFileDownloadAccessService {
     if (
       campaign.details.ballotLevel &&
       campaign.details.ballotLevel !== 'FEDERAL' &&
-      campaign.details.ballotLevel !== 'STATE'
+      campaign.details.ballotLevel !== 'STATE' &&
+      !campaign.canDownloadFederal
     ) {
       // not required for state/federal races
       // so we can fall back to the whole state.

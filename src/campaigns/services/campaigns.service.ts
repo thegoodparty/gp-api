@@ -140,6 +140,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       aiContent,
       formattedAddress,
       placeId,
+      canDownloadFederal,
     } = body
 
     const updatedCampaign = await this.client.$transaction(
@@ -166,6 +167,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         }
         if (placeId !== undefined) {
           campaignUpdateData.placeId = placeId
+        }
+        if (canDownloadFederal !== undefined) {
+          campaignUpdateData.canDownloadFederal = canDownloadFederal
         }
         if (details) {
           await this.handleSubscriptionCancelAtUpdate(campaign.details, details)

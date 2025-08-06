@@ -2,6 +2,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -191,7 +192,13 @@ export class CampaignsController {
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
+      if (body.canDownloadFederal && !userHasRole(user, [UserRole.admin])) {
+        throw new ForbiddenException(
+          'User does not have permission to download federal data',
+        )
+      }
       if (body?.details) {
+        const { canDownloadFederal } = body
         const { city, office, electionDate, pledged, party } = body.details
         this.analytics.identify(campaign.userId, {
           ...(city && {
