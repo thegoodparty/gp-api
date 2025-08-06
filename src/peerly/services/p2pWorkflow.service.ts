@@ -2,13 +2,29 @@ import { Injectable, Logger } from '@nestjs/common'
 import { PhoneListService } from './phoneList.service'
 import { MediaService } from './media.service'
 import { P2pSmsService } from './p2pSms.service'
-import { PeerlyConfigService } from '../config/peerlyConfig.service'
 import { PollingUtil } from '../utils/polling.util'
 import { VoterFileService } from '../../voters/voterFile/voterFile.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
 import { VoterFileType } from '../../voters/voterFile/voterFile.types'
 import { Readable } from 'stream'
 import { StreamableFile } from '@nestjs/common'
+
+// Polling Configuration Constants
+const POLLING_MAX_ATTEMPTS = parseInt(
+  process.env.PEERLY_POLLING_MAX_ATTEMPTS || '60',
+  10,
+)
+const POLLING_INITIAL_DELAY_MS = parseInt(
+  process.env.PEERLY_POLLING_INITIAL_DELAY_MS || '5000',
+  10,
+)
+const POLLING_MAX_DELAY_MS = parseInt(
+  process.env.PEERLY_POLLING_MAX_DELAY_MS || '30000',
+  10,
+)
+const POLLING_BACKOFF_MULTIPLIER = parseFloat(
+  process.env.PEERLY_POLLING_BACKOFF_MULTIPLIER || '1.5',
+)
 
 interface CreateP2pCampaignParams {
   campaign: CampaignWith<'pathToVictory'>
@@ -47,7 +63,6 @@ export class P2pWorkflowService {
     private readonly phoneListService: PhoneListService,
     private readonly mediaService: MediaService,
     private readonly p2pSmsService: P2pSmsService,
-    private readonly peerlyConfig: PeerlyConfigService,
     private readonly voterFileService: VoterFileService,
   ) {}
 
@@ -107,7 +122,12 @@ export class P2pWorkflowService {
       const listStatus = await PollingUtil.pollWithBackoff(
         () => this.phoneListService.checkPhoneListStatus(listToken),
         (status) => status.list_status === 'ACTIVE' && !!status.list_id,
-        this.peerlyConfig.pollingConfig,
+        {
+          maxAttempts: POLLING_MAX_ATTEMPTS,
+          initialDelayMs: POLLING_INITIAL_DELAY_MS,
+          maxDelayMs: POLLING_MAX_DELAY_MS,
+          backoffMultiplier: POLLING_BACKOFF_MULTIPLIER,
+        },
       )
 
       if (!listStatus.list_id) {

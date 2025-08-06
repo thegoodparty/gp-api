@@ -8,7 +8,6 @@ import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { PeerlyConfigService } from '../config/peerlyConfig.service'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { Readable } from 'stream'
@@ -25,6 +24,12 @@ const ALLOWED_MEDIA_TYPES = [
   'video/mp4',
 ]
 
+// File size configuration
+const MAX_FILE_SIZE = parseInt(
+  process.env.PEERLY_MAX_FILE_SIZE || '104857600',
+  10,
+) // 100MB
+
 interface CreateMediaParams {
   identityId: string
   fileStream: Readable
@@ -40,7 +45,6 @@ export class MediaService extends PeerlyBaseConfig {
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
-    private readonly peerlyConfig: PeerlyConfigService,
   ) {
     super()
   }
@@ -66,7 +70,6 @@ export class MediaService extends PeerlyBaseConfig {
 
   async createMedia(params: CreateMediaParams): Promise<string> {
     const { identityId, fileStream, fileName, mimeType, fileSize } = params
-    const { maxFileSize } = this.peerlyConfig.p2pDefaults
 
     // Validate mime type
     if (!ALLOWED_MEDIA_TYPES.includes(mimeType)) {
@@ -76,9 +79,9 @@ export class MediaService extends PeerlyBaseConfig {
     }
 
     // Validate file size if provided
-    if (fileSize && fileSize > maxFileSize) {
+    if (fileSize && fileSize > MAX_FILE_SIZE) {
       throw new BadRequestException(
-        `File size exceeds maximum allowed size of ${maxFileSize} bytes`,
+        `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`,
       )
     }
 
@@ -99,8 +102,8 @@ export class MediaService extends PeerlyBaseConfig {
         this.httpService.post(`${this.baseUrl}/api/v2/media`, form, {
           headers,
           timeout: PEERLY_HTTP_TIMEOUT_MS,
-          maxBodyLength: maxFileSize,
-          maxContentLength: maxFileSize,
+          maxBodyLength: MAX_FILE_SIZE,
+          maxContentLength: MAX_FILE_SIZE,
         }),
       )
 

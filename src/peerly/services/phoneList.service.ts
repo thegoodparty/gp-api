@@ -8,7 +8,6 @@ import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { PeerlyConfigService } from '../config/peerlyConfig.service'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { Readable } from 'stream'
@@ -20,6 +19,21 @@ import {
 
 const { PEERLY_HTTP_TIMEOUT = '10000' } = process.env
 const PEERLY_HTTP_TIMEOUT_MS = parseInt(PEERLY_HTTP_TIMEOUT, 10)
+
+// P2P Configuration Constants
+const P2P_SUPPRESS_CELL_PHONES = parseInt(
+  process.env.PEERLY_P2P_SUPPRESS_CELL_PHONES || '4',
+  10,
+)
+const P2P_SPLIT_TIMEZONES = parseInt(
+  process.env.PEERLY_P2P_SPLIT_TIMEZONES || '1',
+  10,
+)
+const P2P_USE_NAT_DNC = parseInt(process.env.PEERLY_P2P_USE_NAT_DNC || '0', 10)
+const MAX_FILE_SIZE = parseInt(
+  process.env.PEERLY_MAX_FILE_SIZE || '104857600',
+  10,
+) // 100MB
 
 interface UploadPhoneListParams {
   listName: string
@@ -35,7 +49,6 @@ export class PhoneListService extends PeerlyBaseConfig {
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
-    private readonly peerlyConfig: PeerlyConfigService,
   ) {
     super()
   }
@@ -75,12 +88,11 @@ export class PhoneListService extends PeerlyBaseConfig {
 
   async uploadPhoneList(params: UploadPhoneListParams): Promise<string> {
     const { listName, csvStream, identityId, fileSize } = params
-    const { suppressCellPhones, maxFileSize } = this.peerlyConfig.p2pDefaults
 
     // Validate file size if provided
-    if (fileSize && fileSize > maxFileSize) {
+    if (fileSize && fileSize > MAX_FILE_SIZE) {
       throw new BadRequestException(
-        `File size exceeds maximum allowed size of ${maxFileSize} bytes`,
+        `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`,
       )
     }
 
@@ -88,15 +100,9 @@ export class PhoneListService extends PeerlyBaseConfig {
     form.append('account', this.accountNumber)
     if (identityId) form.append('identity_id', identityId)
     form.append('list_name', listName)
-    form.append('suppress_cell_phones', suppressCellPhones.toString())
-    form.append(
-      'split_timezones',
-      this.peerlyConfig.p2pDefaults.splitTimezones.toString(),
-    )
-    form.append(
-      'use_nat_dnc',
-      this.peerlyConfig.p2pDefaults.useNatDnc.toString(),
-    )
+    form.append('suppress_cell_phones', P2P_SUPPRESS_CELL_PHONES.toString())
+    form.append('split_timezones', P2P_SPLIT_TIMEZONES.toString())
+    form.append('use_nat_dnc', P2P_USE_NAT_DNC.toString())
 
     // For P2P, we don't need opt-in parameters
     form.append('file', csvStream, {
@@ -113,8 +119,8 @@ export class PhoneListService extends PeerlyBaseConfig {
         this.httpService.post(`${this.baseUrl}/api/phonelists`, form, {
           headers,
           timeout: PEERLY_HTTP_TIMEOUT_MS,
-          maxBodyLength: maxFileSize,
-          maxContentLength: maxFileSize,
+          maxBodyLength: MAX_FILE_SIZE,
+          maxContentLength: MAX_FILE_SIZE,
         }),
       )
 
