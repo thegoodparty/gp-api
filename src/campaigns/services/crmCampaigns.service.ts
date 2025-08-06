@@ -211,6 +211,11 @@ export class CrmCampaignsService {
       adminUserEmail,
     } = campaignData || {}
 
+    let adminEmail = adminUserEmail
+    if (adminEmail === '') {
+      adminEmail = undefined
+    }
+
     const {
       zip,
       party,
@@ -286,10 +291,10 @@ export class CrmCampaignsService {
       calls_made: reportedVoterGoals?.calls,
       direct_mail_sent: reportedVoterGoals?.directMail,
       event_impressions: reportedVoterGoals?.events,
-      knocked_doors: ecanvasserInteractionsCount || 0, // TODO: remove/rename one of these two doorknock fields?
-      doors_knocked: reportedVoterGoals?.doorKnocking || 0, // TODO: remove/rename one of these two doorknock fields?
-      online_impressions: reportedVoterGoals?.digitalAds || 0,
-      yard_signs_impressions: reportedVoterGoals?.yardSigns || 0,
+      knocked_doors: ecanvasserInteractionsCount || undefined, // TODO: remove/rename one of these two doorknock fields?
+      doors_knocked: reportedVoterGoals?.doorKnocking || undefined, // TODO: remove/rename one of these two doorknock fields?
+      online_impressions: reportedVoterGoals?.digitalAds || undefined,
+      yard_signs_impressions: reportedVoterGoals?.yardSigns || undefined,
       // p2p_texts: reportedVoterGoals?.text, TODO: we need a new field in HS for sms text contact numbers!!!
       ecanvasser_contacts_count: ecanvasserCount,
       ecanvasser_houses_count: ecanvasserHousesCount,
@@ -309,7 +314,7 @@ export class CrmCampaignsService {
         createdBy === CampaignCreatedBy.ADMIN
           ? HubSpot.CreatedByAdmin.YES
           : HubSpot.CreatedByAdmin.NO,
-      admin_user: adminUserEmail,
+      admin_user: adminEmail,
       pledge_status: pledged
         ? HubSpot.PledgeStatus.YES
         : HubSpot.PledgeStatus.NO,

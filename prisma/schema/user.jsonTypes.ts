@@ -12,12 +12,12 @@ declare global {
     export type UserMetaData = {
       customerId?: string
       checkoutSessionId?: string | null
-      accountType?: string
+      accountType?: string | null
       lastVisited?: number
       sessionCount?: number
       isDeleted?: boolean
       fsUserId?: string
-      whyBrowsing?: WhyBrowsing
+      whyBrowsing?: WhyBrowsing | null
       hubspotId?: string
       profile_updated_count?: number
       textNotifications?: boolean
