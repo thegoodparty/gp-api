@@ -109,4 +109,4 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       this.handleApiError(error)
     }
   }
-} 
+}

@@ -63,10 +63,21 @@ export type Audience = {
 }
 
 // Polling Configuration Constants for P2P SMS
-const POLLING_MAX_ATTEMPTS = parseInt(process.env.PEERLY_POLLING_MAX_ATTEMPTS || '60', 10)
-const POLLING_INITIAL_DELAY_MS = parseInt(process.env.PEERLY_POLLING_INITIAL_DELAY_MS || '5000', 10)
-const POLLING_MAX_DELAY_MS = parseInt(process.env.PEERLY_POLLING_MAX_DELAY_MS || '30000', 10)
-const POLLING_BACKOFF_MULTIPLIER = parseFloat(process.env.PEERLY_POLLING_BACKOFF_MULTIPLIER || '1.5')
+const POLLING_MAX_ATTEMPTS = parseInt(
+  process.env.PEERLY_POLLING_MAX_ATTEMPTS || '60',
+  10,
+)
+const POLLING_INITIAL_DELAY_MS = parseInt(
+  process.env.PEERLY_POLLING_INITIAL_DELAY_MS || '5000',
+  10,
+)
+const POLLING_MAX_DELAY_MS = parseInt(
+  process.env.PEERLY_POLLING_MAX_DELAY_MS || '30000',
+  10,
+)
+const POLLING_BACKOFF_MULTIPLIER = parseFloat(
+  process.env.PEERLY_POLLING_BACKOFF_MULTIPLIER || '1.5',
+)
 
 // P2P SMS interfaces
 interface CreateP2pCampaignParams {

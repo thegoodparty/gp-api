@@ -9,4 +9,4 @@ const createMediaResponseSchema = z.object({
 
 export class CreateMediaResponseDto extends createZodDto(
   createMediaResponseSchema,
-) {} 
+) {}

@@ -15,4 +15,4 @@ export class UploadPhoneListResponseDto extends createZodDto(
 ) {}
 export class PhoneListStatusResponseDto extends createZodDto(
   phoneListStatusResponseSchema,
-) {} 
+) {}
