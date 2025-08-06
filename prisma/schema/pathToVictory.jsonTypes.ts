@@ -34,6 +34,7 @@ declare global {
       projectedTurnout?: number
       viability?: ViabilityScore
       source?: P2VSource
+      districtId?: string
     }
   }
 }
