@@ -75,6 +75,8 @@ export class UpdateCampaignSchema extends createZodDto(
       details: CampaignDetailsSchema.optional(),
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
       aiContent: z.record(z.string(), z.unknown()).optional(),
+      formattedAddress: z.string().optional(),
+      placeId: z.string().optional(),
     })
     .strict(),
 ) {}

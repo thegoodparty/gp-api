@@ -1,15 +1,38 @@
 [
   {
     "details": {
-      "state": "CA",
-      "zip": "90001",
-      "ballotLevel": "State",
-      "electionDate": "2026-08-01",
-      "primaryElectionDate": "2026-02-01",
-      "geoLocation": {},
+      "zip": "49286",
+      "city": "Tecumseh",
+      "tier": 4,
+      "level": "city",
       "party": "Libertarian",
-      "level": "State",
-      "office": "Governor"
+      "state": "MI",
+      "county": "Lenawee County",
+      "office": "Other",
+      "raceId": "Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb25FbGVjdGlvbi8yMjM4Mjk1",
+      "knowRun": "yes",
+      "pledged": false,
+      "electionId": "Z2lkOi8vYmFsbG90LWZhY3RvcnkvRWxlY3Rpb24vNTk4OQ==",
+      "hasPrimary": true,
+      "positionId": "Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMjIwMDg1",
+      "ballotLevel": "CITY",
+      "geoLocation": {},
+      "otherOffice": "Tecumseh City Mayor",
+      "electionDate": "2026-11-03",
+      "partisanType": "nonpartisan",
+      "runForOffice": "no",
+      "filingPeriodsEnd": "2026-07-16",
+      "officeTermLength": 2,
+      "filingPeriodsStart": "2026-01-02",
+      "priorElectionDates": [
+        "2018-11-06",
+        "2020-11-03",
+        "2022-11-08",
+        "2024-11-05",
+        "2022-08-02",
+        "2024-08-06"
+      ],
+      "primaryElectionDate": "2024-08-02"
     },
     "data": {
       "hubSpotUpdates": {

@@ -10,14 +10,13 @@ import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { VercelService } from 'src/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
 import { PaymentType, PaymentStatus } from 'src/payments/payments.types'
+import { StripeService } from 'src/stripe/services/stripe.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 
-const enableDomainPurchase = Boolean(
-  process.env.ENABLE_DOMAIN_PURCHASE === 'true',
-)
+
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -55,8 +54,19 @@ export class DomainsService
     private readonly route53: AwsRoute53Service,
     private readonly vercel: VercelService,
     private readonly payments: PaymentsService,
+    private readonly stripe: StripeService,
   ) {
     super()
+  }
+
+  private shouldEnableDomainPurchase(): boolean {
+    return !this.stripe.isTestMode
+  }
+
+  private getDomainPurchaseStatus(): string {
+    return this.stripe.isTestMode 
+      ? 'disabled because Stripe is in test mode'
+      : 'enabled'
   }
 
   async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
@@ -323,7 +333,7 @@ export class DomainsService
     let vercelResult, projectResult
 
     try {
-      if (enableDomainPurchase) {
+      if (this.shouldEnableDomainPurchase()) {
         vercelResult = await this.vercel.purchaseDomain(
           domain.name,
           {
@@ -341,6 +351,10 @@ export class DomainsService
         )
 
         projectResult = await this.vercel.addDomainToProject(domain.name)
+      } else {
+        this.logger.debug(
+          `Skipping domain purchase for ${domain.name} - ${this.getDomainPurchaseStatus()}`,
+        )
       }
     } catch (error) {
       this.logger.error('Error registering domain with Vercel:', error)
@@ -365,10 +379,14 @@ export class DomainsService
       },
     })
 
+    const message = this.shouldEnableDomainPurchase()
+      ? 'Enabled'
+      : `Disabled - Stripe is in test mode`
+
     return {
       vercelResult,
       projectResult,
-      message: 'Domain registration completed with Vercel',
+      message,
     }
   }
 
