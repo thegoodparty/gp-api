@@ -7,6 +7,7 @@ import { queueConfig } from '../queue.config'
 export enum MessageGroup {
   p2v = 'p2v',
   content = 'content',
+  peerly = 'peerly',
   default = 'default',
 }
 

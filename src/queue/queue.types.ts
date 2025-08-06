@@ -8,3 +8,24 @@ export type GenerateAiContentMessage = {
   key: string
   regenerate: boolean
 }
+
+export type PeerlyPhoneListPollingMessage = {
+  listToken: string
+  campaignId: string
+  jobName: string
+  messageTemplates: Array<{
+    title: string
+    text: string
+    mediaStream?: {
+      stream: string // Base64 encoded stream for queue serialization
+      fileName: string
+      mimeType: string
+      fileSize?: number
+    }
+  }>
+  didState: string
+  identityId?: string
+  attempt: number
+  maxAttempts: number
+  delayMs: number
+}
