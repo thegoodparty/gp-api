@@ -40,6 +40,19 @@ export type Approve10DLCBrandResponse = {
   campaign_verify_token: string
 }
 
+// Media status enum
+export enum MediaStatus {
+  ERROR = 'ERROR',
+  SUCCESS = 'SUCCESS', // Inferred - likely success status
+  PROCESSING = 'PROCESSING', // Inferred - likely processing status
+}
+
+// Media type enum
+export enum MediaType {
+  IMAGE = 'IMAGE',
+  VIDEO = 'VIDEO',
+}
+
 // P2P SMS API types
 export type PhoneListUploadResponse = {
   token: string
@@ -52,7 +65,7 @@ export type PhoneListStatusResponse = {
 
 export type MediaCreateResponse = {
   media_id: string
-  status?: string
+  status?: MediaStatus
   error?: string
 }
 
@@ -67,7 +80,7 @@ export type P2pTemplate = {
   advanced?: {
     media: {
       media_id: string
-      media_type: 'IMAGE' | 'VIDEO'
+      media_type: MediaType
       preview_url?: string
       thumbnail_url?: string
       title?: string

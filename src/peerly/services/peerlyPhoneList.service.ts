@@ -17,7 +17,6 @@ import {
   PhoneListStatusResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
 
-const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 15 second timeout
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB
 
@@ -50,7 +49,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   private async getBaseHttpHeaders() {
     return {
       headers: await this.peerlyAuth.getAuthorizationHeader(),
-      timeout: PEERLY_HTTP_TIMEOUT_MS,
+      timeout: this.httpTimeoutMs,
     }
   }
 
@@ -100,7 +99,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/api/phonelists`, form, {
           headers,
-          timeout: PEERLY_HTTP_TIMEOUT_MS,
+          timeout: this.httpTimeoutMs,
           maxBodyLength: MAX_FILE_SIZE,
           maxContentLength: MAX_FILE_SIZE,
         }),

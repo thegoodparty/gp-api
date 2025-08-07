@@ -13,9 +13,9 @@ import { format } from '@redtea/format-axios-error'
 import { Readable } from 'stream'
 import FormData from 'form-data'
 import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
+import { MediaStatus } from '../peerly.types'
 import { MimeTypes } from 'http-constants-ts'
 
-const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 15 second timeout
 
 const MAX_FILE_SIZE = 512000 // 500KB
 
@@ -98,7 +98,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/api/v2/media`, form, {
           headers,
-          timeout: PEERLY_HTTP_TIMEOUT_MS,
+          timeout: this.httpTimeoutMs,
           maxBodyLength: MAX_FILE_SIZE,
           maxContentLength: MAX_FILE_SIZE,
         }),
@@ -106,7 +106,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       const { data } = response
       const validatedData = this.validateCreateResponse(data)
       
-      if (validatedData.status === 'ERROR') {
+      if (validatedData.status === MediaStatus.ERROR) {
         const errorMessage = validatedData.error || 'Media creation failed'
         this.logger.error('Media creation failed:', errorMessage)
         throw new BadGatewayException(`Media creation failed: ${errorMessage}`)

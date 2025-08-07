@@ -6,8 +6,8 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
+import { MediaType } from '../peerly.types'
 
-const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 15 second timeout
 
 interface Template {
   title: string
@@ -15,7 +15,7 @@ interface Template {
   advanced?: {
     media: {
       media_id: string
-      media_type: 'IMAGE' | 'VIDEO'
+      media_type: MediaType
     }
   }
 }
@@ -49,7 +49,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   private async getBaseHttpHeaders() {
     return {
       headers: await this.peerlyAuth.getAuthorizationHeader(),
-      timeout: PEERLY_HTTP_TIMEOUT_MS,
+      timeout: this.httpTimeoutMs,
     }
   }
 

@@ -26,6 +26,7 @@ import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types
 import { PeerlyPhoneListService } from '../../peerly/services/peerlyPhoneList.service'
 import { PeerlyMediaService } from '../../peerly/services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from '../../peerly/services/peerlyP2pSms.service'
+import { MediaType } from '../../peerly/peerly.types'
 import { VoterFileService } from '../voterFile/voterFile.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
 import { VoterFileType } from '../voterFile/voterFile.types'
@@ -303,8 +304,8 @@ export class VoterOutreachService {
               media: {
                 media_id: mediaId,
                 media_type: template.mediaStream.mimeType.startsWith('video/')
-                  ? ('VIDEO' as const)
-                  : ('IMAGE' as const),
+                  ? MediaType.VIDEO
+                  : MediaType.IMAGE,
               },
             },
           }),
