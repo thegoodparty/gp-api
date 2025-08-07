@@ -75,11 +75,14 @@ export class ElectionsService {
   ) {
     const positionWithDistrict = await this.electionApiGet<
       PositionWithMatchedDistrict,
-      { brPositionId: string; electionDate: string }
-    >(ElectionApiRoutes.positions.findByBrId.path, {
-      brPositionId: ballotreadyPositionId,
-      electionDate,
-    })
+      { electionDate: string; includeDistrict: boolean }
+    >(
+      ElectionApiRoutes.positions.findByBrId.path + `/${ballotreadyPositionId}`,
+      {
+        electionDate,
+        includeDistrict: true,
+      },
+    )
 
     return positionWithDistrict
       ? {

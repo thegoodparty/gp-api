@@ -1,22 +1,23 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
-import { VotersService } from '../../voters/services/voters.service'
-import { OfficeMatchService } from './officeMatch.service'
-import { SlackService } from '../../shared/services/slack.service'
-import { EmailService } from '../../email/email.service'
-import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { SlackChannel } from 'src/shared/services/slackService.types'
+import { VoterCounts } from 'src/voters/voters.types'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { P2VStatus } from '../../elections/types/pathToVictory.types'
+import { EmailService } from '../../email/email.service'
+import { EmailTemplateName } from '../../email/email.types'
+import { PrismaService } from '../../prisma/prisma.service'
+import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
+import { SlackService } from '../../shared/services/slack.service'
+import { VotersService } from '../../voters/services/voters.service'
 import {
+  P2VSource,
   PathToVictoryInput,
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
-import { VoterCounts } from 'src/voters/voters.types'
-import { EmailTemplateName } from '../../email/email.types'
-import { SlackChannel } from 'src/shared/services/slackService.types'
-import { P2VStatus } from '../../elections/types/pathToVictory.types'
-import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
-import { AnalyticsService } from 'src/analytics/analytics.service'
+import { OfficeMatchService } from './officeMatch.service'
 
 @Injectable()
 export class PathToVictoryService extends createPrismaBase(
@@ -409,6 +410,7 @@ export class PathToVictoryService extends createPrismaBase(
             electionLocation: pathToVictoryResponse.electionLocation,
             p2vCompleteDate: new Date().toISOString().slice(0, 10),
             p2vStatus,
+            source: P2VSource.GpApi,
           },
         },
       })
