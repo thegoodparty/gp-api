@@ -7,27 +7,37 @@ export interface BasePurchaseMetadata {
   campaignId?: number
 }
 
-export type PurchaseMetadata<T = BasePurchaseMetadata> = T
+export type PurchaseMetadata<
+  T extends BasePurchaseMetadata = BasePurchaseMetadata,
+> = T
 
-export interface CreatePurchaseIntentDto {
+export interface CreatePurchaseIntentDto<
+  T extends BasePurchaseMetadata = BasePurchaseMetadata,
+> {
   type: PurchaseType
-  metadata: PurchaseMetadata<any>
+  metadata: PurchaseMetadata<T>
 }
 
 export interface CompletePurchaseDto {
   paymentIntentId: string
 }
 
-export type PostPurchaseHandler = (
+export type PostPurchaseHandler<
+  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
+  TResult = unknown,
+> = (
   paymentIntentId: string,
-  metadata: PurchaseMetadata<any>,
-) => Promise<any>
+  metadata: PurchaseMetadata<TMetadata>,
+) => Promise<TResult>
 
-export interface PurchaseHandler<T = BasePurchaseMetadata> {
-  validatePurchase(metadata: PurchaseMetadata<T>): Promise<void>
-  calculateAmount(metadata: PurchaseMetadata<T>): Promise<number>
+export interface PurchaseHandler<
+  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
+  TResult = unknown,
+> {
+  validatePurchase(metadata: PurchaseMetadata<TMetadata>): Promise<void>
+  calculateAmount(metadata: PurchaseMetadata<TMetadata>): Promise<number>
   executePostPurchase?(
     paymentIntentId: string,
-    metadata: PurchaseMetadata<T>,
-  ): Promise<any>
+    metadata: PurchaseMetadata<TMetadata>,
+  ): Promise<TResult>
 }
