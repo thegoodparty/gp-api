@@ -72,7 +72,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     }
   }
 
-  async uploadPhoneList(params: UploadPhoneListParams): Promise<string> {
+  async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {
     const { listName, csvStream, identityId, fileSize } = params
 
     // Validate file size if provided
@@ -111,6 +111,11 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     } catch (error) {
       this.handleApiError(error)
     }
+  }
+
+  async uploadPhoneList(params: UploadPhoneListParams): Promise<PhoneListStatusResponseDto> {
+    const token = await this.uploadPhoneListToken(params)
+    return this.checkPhoneListStatus(token)
   }
 
   async checkPhoneListStatus(

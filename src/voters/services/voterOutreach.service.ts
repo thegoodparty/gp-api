@@ -26,7 +26,6 @@ import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types
 import { PeerlyPhoneListService } from '../../peerly/services/peerlyPhoneList.service'
 import { PeerlyMediaService } from '../../peerly/services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from '../../peerly/services/peerlyP2pSms.service'
-import { PollingUtil } from '../../peerly/utils/polling.util'
 import { VoterFileService } from '../voterFile/voterFile.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
 import { VoterFileType } from '../voterFile/voterFile.types'
@@ -62,22 +61,6 @@ export type Audience = {
   gender_female?: boolean | null
 }
 
-// Polling Configuration Constants for P2P SMS
-const POLLING_MAX_ATTEMPTS = parseInt(
-  process.env.PEERLY_POLLING_MAX_ATTEMPTS || '60',
-  10,
-)
-const POLLING_INITIAL_DELAY_MS = parseInt(
-  process.env.PEERLY_POLLING_INITIAL_DELAY_MS || '5000',
-  10,
-)
-const POLLING_MAX_DELAY_MS = parseInt(
-  process.env.PEERLY_POLLING_MAX_DELAY_MS || '30000',
-  10,
-)
-const POLLING_BACKOFF_MULTIPLIER = parseFloat(
-  process.env.PEERLY_POLLING_BACKOFF_MULTIPLIER || '1.5',
-)
 
 // P2P SMS interfaces
 interface CreateP2pCampaignParams {
@@ -296,29 +279,14 @@ export class VoterOutreachService {
       }
 
       this.logger.log('Uploading phone list...')
-      const listToken = await this.phoneListService.uploadPhoneList({
+      const listStatus = await this.phoneListService.uploadPhoneList({
         listName: `${jobName} - ${new Date().toISOString()}`,
         csvStream,
         identityId,
       })
 
-      // Step 3: Poll for list completion
-      this.logger.log('Waiting for phone list processing...')
-      const listStatus = await PollingUtil.pollWithBackoff(
-        () => this.phoneListService.checkPhoneListStatus(listToken),
-        (status) => status.list_status === 'ACTIVE' && !!status.list_id,
-        {
-          maxAttempts: POLLING_MAX_ATTEMPTS,
-          initialDelayMs: POLLING_INITIAL_DELAY_MS,
-          maxDelayMs: POLLING_MAX_DELAY_MS,
-          backoffMultiplier: POLLING_BACKOFF_MULTIPLIER,
-        },
-      )
-
       if (!listStatus.list_id) {
-        throw new Error(
-          'Phone list processing completed but no list_id returned',
-        )
+        throw new Error('Phone list upload failed - no list_id returned')
       }
 
       // Step 4: Create P2P job with templates
