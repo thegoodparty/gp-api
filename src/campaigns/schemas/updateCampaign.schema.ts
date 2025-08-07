@@ -77,6 +77,7 @@ export class UpdateCampaignSchema extends createZodDto(
       aiContent: z.record(z.string(), z.unknown()).optional(),
       formattedAddress: z.string().optional(),
       placeId: z.string().optional(),
+      canDownloadFederal: z.boolean().optional(),
     })
     .strict(),
 ) {}

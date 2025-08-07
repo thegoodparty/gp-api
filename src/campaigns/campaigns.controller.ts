@@ -2,6 +2,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -182,6 +183,11 @@ export class CampaignsController {
     @ReqCampaign() campaign: Campaign,
     @Body() { slug, ...body }: UpdateCampaignSchema,
   ) {
+    if (body.canDownloadFederal && !userHasRole(user, [UserRole.admin])) {
+      throw new ForbiddenException(
+        'User does not have permission to download federal data',
+      )
+    }
     if (
       typeof slug === 'string' &&
       campaign?.slug !== slug &&
@@ -191,6 +197,7 @@ export class CampaignsController {
       campaign = await this.campaigns.findFirstOrThrow({
         where: { slug },
       })
+
       if (body?.details) {
         const { city, office, electionDate, pledged, party } = body.details
         this.analytics.identify(campaign.userId, {
