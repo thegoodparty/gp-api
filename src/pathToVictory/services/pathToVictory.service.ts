@@ -2,7 +2,9 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { ElectionsService } from 'src/elections/services/elections.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
+import { VotersService } from 'src/voters/services/voters.service'
 import { VoterCounts } from 'src/voters/voters.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
@@ -11,7 +13,6 @@ import { EmailTemplateName } from '../../email/email.types'
 import { PrismaService } from '../../prisma/prisma.service'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { SlackService } from '../../shared/services/slack.service'
-import { VotersService } from '../../voters/services/voters.service'
 import {
   P2VSource,
   PathToVictoryInput,
@@ -33,6 +34,7 @@ export class PathToVictoryService extends createPrismaBase(
     private crmService: CrmCampaignsService,
     @Inject(forwardRef(() => AnalyticsService))
     private analytics: AnalyticsService,
+    private elections: ElectionsService,
   ) {
     super()
   }
@@ -150,21 +152,56 @@ export class PathToVictoryService extends createPrismaBase(
             ? 'US'
             : input.electionState
 
-        const counts = await this.votersService.getVoterCounts(
-          input.electionTerm,
-          input.electionDate || new Date().toISOString().slice(0, 10),
-          state,
-          electionType,
-          electionLocation,
-          input.partisanType,
-          input.priorElectionDates,
-        )
+        // const counts = await this.votersService.getVoterCounts(
+        //   input.electionTerm,
+        //   input.electionDate || new Date().toISOString().slice(0, 10),
+        //   state,
+        //   electionType,
+        //   electionLocation,
+        //   input.partisanType,
+        //   input.priorElectionDates,
+        // )
 
-        if (counts?.total && counts.total > 0) {
-          pathToVictoryResponse.electionType = electionType
-          pathToVictoryResponse.electionLocation = electionLocation
-          pathToVictoryResponse.counts = counts
+        // if (counts?.total && counts.total > 0) {
+        //   pathToVictoryResponse.electionType = electionType
+        //   pathToVictoryResponse.electionLocation = electionLocation
+        //   pathToVictoryResponse.counts = counts
+        //   break
+        // }
+
+        const raceTargetDetails = await this.elections.buildRaceTargetDetails({
+          L2DistrictType: electionType,
+          L2DistrictName: electionLocation,
+          electionDate: input.electionDate,
+          state,
+        })
+        if (!raceTargetDetails || !raceTargetDetails?.projectedTurnout) {
+          const counts = await this.votersService.getVoterCounts(
+            input.electionTerm,
+            input.electionDate || new Date().toISOString().slice(0, 10),
+            state,
+            electionType,
+            electionLocation,
+            input.partisanType,
+            input.priorElectionDates,
+          )
+
+          if (counts?.total && counts.total > 0) {
+            pathToVictoryResponse.electionType = electionType
+            pathToVictoryResponse.electionLocation = electionLocation
+            pathToVictoryResponse.counts = counts
+          }
           break
+        }
+        const { projectedTurnout, winNumber, voterContactGoal } =
+          raceTargetDetails
+
+        pathToVictoryResponse.electionType = electionType
+        pathToVictoryResponse.electionLocation = electionLocation
+        pathToVictoryResponse.counts = {
+          projectedTurnout,
+          winNumber,
+          voterContactGoal,
         }
 
         if (++attempts > 10) break
