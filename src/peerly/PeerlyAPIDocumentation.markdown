@@ -19,13 +19,6 @@ Peerly expects the user e-mail and password to be sent **as MD5 hashes**—sendi
   "password": "<md5(password)>"
 }
 ```
-Example:
-```json
-{
-  "email": "d54b8886ae0b63d8f582f9d4cb78beb5",
-  "password": "eb869bc52b0566d34815c27771cc2972"
-}
-```
 
 ### Successful Response (`200`)
 ```json
