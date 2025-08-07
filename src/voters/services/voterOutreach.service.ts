@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger, StreamableFile } from '@nestjs/common'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Campaign, OutreachType, User } from '@prisma/client'
 import {
@@ -23,6 +23,14 @@ import { EmailService } from 'src/email/email.service'
 import { EmailTemplateName } from 'src/email/email.types'
 import { VoterFileFilterService } from './voterFileFilter.service'
 import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types'
+import { PeerlyPhoneListService } from '../../peerly/services/peerlyPhoneList.service'
+import { PeerlyMediaService } from '../../peerly/services/peerlyMedia.service'
+import { PeerlyP2pSmsService } from '../../peerly/services/peerlyP2pSms.service'
+import { MediaType } from '../../peerly/peerly.types'
+import { VoterFileService } from '../voterFile/voterFile.service'
+import { CampaignWith } from '../../campaigns/campaigns.types'
+import { VoterFileType } from '../voterFile/voterFile.types'
+import { Readable } from 'stream'
 
 export interface OutreachSlackBlocksConfiguration {
   user: User
@@ -54,14 +62,50 @@ export type Audience = {
   gender_female?: boolean | null
 }
 
+
+// P2P SMS interfaces
+interface CreateP2pCampaignParams {
+  campaign: CampaignWith<'pathToVictory'>
+  jobName: string
+  messageTemplates: Array<{
+    title: string
+    text: string
+    mediaStream?: {
+      stream: Readable
+      fileName: string
+      mimeType: string
+      fileSize?: number
+    }
+  }>
+  didState: string
+  identityId?: string
+  voterFileParams: {
+    type: VoterFileType
+    customFilters?: any
+    selectedColumns?: Array<{ db: string; label?: string }>
+    limit?: number
+  }
+}
+
+interface P2pCampaignResult {
+  jobId: string
+  listId: number
+  mediaIds: string[]
+}
+
 @Injectable()
 export class VoterOutreachService {
+  private readonly logger = new Logger(VoterOutreachService.name)
   constructor(
     private readonly slack: SlackService,
     private readonly campaignsService: CampaignsService,
     private readonly crmCampaigns: CrmCampaignsService,
     private readonly email: EmailService,
     private readonly voterFileFilterService: VoterFileFilterService,
+    private readonly phoneListService: PeerlyPhoneListService,
+    private readonly mediaService: PeerlyMediaService,
+    private readonly p2pSmsService: PeerlyP2pSmsService,
+    private readonly voterFileService: VoterFileService,
   ) {}
 
   private formatAudienceFiltersForSlack(
@@ -189,6 +233,109 @@ export class VoterOutreachService {
       }),
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
+  }
+
+  private async createP2pCampaign(
+    params: CreateP2pCampaignParams,
+  ): Promise<P2pCampaignResult> {
+    const {
+      campaign,
+      jobName,
+      messageTemplates,
+      didState,
+      identityId,
+      voterFileParams,
+    } = params
+
+    try {
+      // Step 1: Upload media files if present
+      const templateMediaMap = new Map<number, string>()
+      for (let i = 0; i < messageTemplates.length; i++) {
+        const template = messageTemplates[i]
+        if (template.mediaStream) {
+          this.logger.log(`Uploading media for template: ${template.title}`)
+          const mediaId = await this.mediaService.createMedia({
+            identityId: identityId || campaign.id.toString(),
+            fileStream: template.mediaStream.stream,
+            fileName: template.mediaStream.fileName,
+            mimeType: template.mediaStream.mimeType,
+            fileSize: template.mediaStream.fileSize,
+          })
+          templateMediaMap.set(i, mediaId)
+        }
+      }
+
+      // Step 2: Generate and upload phone list
+      this.logger.log('Generating voter CSV...')
+      const csvResult = await this.voterFileService.getCsvOrCount(campaign, {
+        ...voterFileParams,
+        countOnly: false,
+      })
+
+      // Extract the stream from StreamableFile
+      let csvStream: Readable
+      if (csvResult instanceof StreamableFile) {
+        csvStream = csvResult.getStream() as Readable
+      } else {
+        throw new Error('Expected StreamableFile from voter file service')
+      }
+
+      this.logger.log('Uploading phone list...')
+      const listStatus = await this.phoneListService.uploadPhoneList({
+        listName: `${jobName} - ${new Date().toISOString()}`,
+        csvStream,
+        identityId,
+      })
+
+      const listId = listStatus.Data.list_id
+      if (!listId) {
+        throw new Error('Phone list upload failed - no list_id returned')
+      }
+
+      // Step 4: Create P2P job with templates
+      this.logger.log('Creating P2P job...')
+      const templates = messageTemplates.map((template, index) => {
+        const mediaId = templateMediaMap.get(index)
+        return {
+          title: template.title,
+          text: template.text,
+          ...(mediaId && template.mediaStream && {
+            advanced: {
+              media: {
+                media_id: mediaId,
+                media_type: template.mediaStream.mimeType.startsWith('video/')
+                  ? MediaType.VIDEO
+                  : MediaType.IMAGE,
+              },
+            },
+          }),
+        }
+      })
+
+      const jobId = await this.p2pSmsService.createJob({
+        name: jobName,
+        templates,
+        didState,
+        identityId,
+      })
+
+      // Step 5: Assign list to job
+      this.logger.log('Assigning phone list to job...')
+      await this.p2pSmsService.assignListToJob(jobId, listId)
+
+      this.logger.log(
+        `P2P campaign created successfully. Job ID: ${jobId}, List ID: ${listId}`,
+      )
+
+      return {
+        jobId,
+        listId,
+        mediaIds: Array.from(templateMediaMap.values()),
+      }
+    } catch (error) {
+      this.logger.error('Failed to create P2P campaign:', error)
+      throw error
+    }
   }
 
   // TODO: move this out to the OutreachService
