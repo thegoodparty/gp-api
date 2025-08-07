@@ -9,12 +9,13 @@ import { DomainStatus, User } from '@prisma/client'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { VercelService } from 'src/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
-import { PaymentType, PaymentStatus } from 'src/payments/payments.types'
+import { PaymentStatus, PaymentType } from 'src/payments/payments.types'
 import { StripeService } from 'src/stripe/services/stripe.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import { DomainPurchaseMetadata } from '../domains.types' // Enum for domain operation statuses
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -46,7 +47,7 @@ export interface DomainStatusResponse {
 @Injectable()
 export class DomainsService
   extends createPrismaBase(MODELS.Domain)
-  implements PurchaseHandler
+  implements PurchaseHandler<DomainPurchaseMetadata>
 {
   constructor(
     private readonly route53: AwsRoute53Service,
@@ -67,7 +68,9 @@ export class DomainsService
       : 'enabled'
   }
 
-  async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
+  async validatePurchase(
+    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+  ): Promise<void> {
     const { domainName, websiteId } = metadata
 
     if (!domainName || !websiteId) {
@@ -81,7 +84,9 @@ export class DomainsService
     }
   }
 
-  async calculateAmount(metadata: PurchaseMetadata): Promise<number> {
+  async calculateAmount(
+    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+  ): Promise<number> {
     const { domainName } = metadata
 
     if (!domainName) {
@@ -99,7 +104,7 @@ export class DomainsService
 
   async executePostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata,
+    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
   ): Promise<any> {
     return this.handleDomainPostPurchase(paymentIntentId, metadata)
   }

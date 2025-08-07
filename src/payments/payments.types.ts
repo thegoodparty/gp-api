@@ -19,6 +19,7 @@ export enum PaymentStatus {
 
 export enum PaymentType {
   DOMAIN_REGISTRATION = 'domain_registration',
+  OUTREACH_PURCHASE = 'outreach_purchase',
 }
 
 export type PaymentIntentPayload<T extends PaymentType> = {
