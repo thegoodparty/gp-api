@@ -21,7 +21,7 @@ export class OutreachModule {
     private readonly outreachPurchaseHandler: OutreachPurchaseHandlerService,
   ) {
     this.purchaseService.registerPurchaseHandler(
-      PurchaseType.OUTREACH,
+      PurchaseType.TEXT,
       this.outreachPurchaseHandler,
     )
   }

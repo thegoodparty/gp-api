@@ -1,6 +1,6 @@
 export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
-  OUTREACH = 'OUTREACH',
+  TEXT = 'TEXT',
 }
 
 export interface BasePurchaseMetadata {
