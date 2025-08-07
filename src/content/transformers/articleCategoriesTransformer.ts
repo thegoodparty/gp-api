@@ -7,6 +7,8 @@ import {
   TYPE_FAQ_ARTICLE,
 } from '../content.types'
 
+const DEFAULT_ORDER = 9999
+
 export const articleCategoriesTransformer: Transformer<
   FaqArticleContentRaw,
   ArticleCategories
@@ -25,7 +27,7 @@ export const articleCategoriesTransformer: Transformer<
         articleCategories.push({
           fields: {
             name: categoryFields.name,
-            order: categoryFields.order ?? 9999,
+            order: categoryFields.order ?? DEFAULT_ORDER,
           },
           name: categoryFields.name,
           id: null,
@@ -33,16 +35,16 @@ export const articleCategoriesTransformer: Transformer<
             {
               title: input.data.title,
               id: input.id,
-              order: input.data.order ?? 9999,
+              order: input.data.order ?? DEFAULT_ORDER,
             },
           ],
-          order: categoryFields.order ?? 9999,
+          order: categoryFields.order ?? DEFAULT_ORDER,
         } as ArticleCategories)
       } else if (categoryFields && foundCategory) {
         foundCategory.articles.push({
           title: input.data.title,
           id: input.id,
-          order: input.data.order ?? 9999,
+          order: input.data.order ?? DEFAULT_ORDER,
         })
       }
     } else if (input.type === TYPE_ARTICLE_CATEGORY) {
@@ -71,15 +73,15 @@ export const articleCategoriesTransformer: Transformer<
   articleCategories.sort(compareArticleCategories)
 
   articleCategories.forEach((category) => {
-    category.articles.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999))
+    category.articles.sort((a, b) => (a.order ?? DEFAULT_ORDER) - (b.order ?? DEFAULT_ORDER))
   })
 
   return articleCategories
 }
 
 function compareArticleCategories(a: ArticleCategories, b: ArticleCategories) {
-  const orderA = a.fields.order ?? 9999
-  const orderB = b.fields.order ?? 9999
+  const orderA = a.fields.order ?? DEFAULT_ORDER
+  const orderB = b.fields.order ?? DEFAULT_ORDER
   if (orderA > orderB) {
     return 1
   }
