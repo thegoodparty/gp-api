@@ -9,16 +9,13 @@ import { DomainStatus, User } from '@prisma/client'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { VercelService } from 'src/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
-import { PaymentType, PaymentStatus } from 'src/payments/payments.types'
+import { PaymentStatus, PaymentType } from 'src/payments/payments.types'
 import { StripeService } from 'src/stripe/services/stripe.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
-import {
-  PurchaseHandler,
-  PurchaseMetadata,
-  DomainPurchaseMetadata,
-} from 'src/payments/purchase.types'
+import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import { DomainPurchaseMetadata } from '../domains.types' // Enum for domain operation statuses
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {

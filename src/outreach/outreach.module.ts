@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common'
 import { OutreachController } from './outreach.controller'
 import { OutreachService } from './services/outreach.service'
-import {
-  OutreachPurchaseHandlerService
-} from './services/outreachPurchase.service'
+import { OutreachPurchaseHandlerService } from './services/outreachPurchase.service'
 import { HttpModule } from '@nestjs/axios'
 import { EmailModule } from 'src/email/email.module'
 import { FilesModule } from '../files/files.module'
@@ -25,13 +23,6 @@ export class OutreachModule {
     this.purchaseService.registerPurchaseHandler(
       PurchaseType.OUTREACH,
       this.outreachPurchaseHandler,
-    )
-
-    this.purchaseService.registerPostPurchaseHandler(
-      PurchaseType.OUTREACH,
-      this.outreachPurchaseHandler.executePostPurchase.bind(
-        this.outreachPurchaseHandler,
-      ),
     )
   }
 }
