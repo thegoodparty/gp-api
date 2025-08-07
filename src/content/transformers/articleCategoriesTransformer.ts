@@ -77,7 +77,7 @@ export const articleCategoriesTransformer: Transformer<
   return articleCategories
 }
 
-function compareArticleCategories(a, b) {
+function compareArticleCategories(a: ArticleCategories, b: ArticleCategories) {
   const orderA = a.fields.order || 9999
   const orderB = b.fields.order || 9999
   if (orderA > orderB) {
