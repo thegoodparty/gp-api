@@ -176,8 +176,7 @@ export class WebsitesController {
       body,
     )
 
-    // Handle array replacement for about.issues to prevent merging
-    if (body.about?.issues) {
+    if (body.about?.issues !== undefined) {
       updatedContent.about = updatedContent.about || {}
       updatedContent.about.issues = body.about.issues
     }
