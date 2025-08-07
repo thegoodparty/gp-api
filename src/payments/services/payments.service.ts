@@ -28,6 +28,7 @@ export class PaymentsService {
 
   async getValidatedPaymentUser(
     paymentIntentId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ paymentIntent: any; user: User }> {
     const paymentIntent = await this.retrievePayment(paymentIntentId)
 

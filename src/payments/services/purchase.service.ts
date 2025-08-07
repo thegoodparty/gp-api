@@ -61,6 +61,7 @@ export class PurchaseService {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async completePurchase(dto: CompletePurchaseDto): Promise<any> {
     const paymentIntent = await this.paymentsService.retrievePayment(
       dto.paymentIntentId,

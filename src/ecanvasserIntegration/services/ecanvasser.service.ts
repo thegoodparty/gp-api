@@ -177,6 +177,7 @@ export class EcanvasserService {
     apiKey: string,
     options: {
       method?: Methods
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data?: any
       params?: PaginationParams
     } = {},
