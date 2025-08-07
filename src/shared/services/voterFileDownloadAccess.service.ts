@@ -16,11 +16,18 @@ export class VoterFileDownloadAccessService {
     if (
       campaign.details.ballotLevel &&
       campaign.details.ballotLevel !== 'FEDERAL' &&
-      campaign.details.ballotLevel !== 'STATE' &&
-      !campaign.canDownloadFederal
+      campaign.details.ballotLevel !== 'STATE'
     ) {
-      // not required for state/federal races
+      // not required for local races
       // so we can fall back to the whole state.
+      electionTypeRequired = false
+    } else if (
+      campaign.details.ballotLevel &&
+      (campaign.details.ballotLevel === 'FEDERAL' ||
+        campaign.details.ballotLevel === 'STATE') &&
+      campaign.canDownloadFederal
+    ) {
+      // not required for federal/state races with canDownloadFederal flag
       electionTypeRequired = false
     }
     if (
