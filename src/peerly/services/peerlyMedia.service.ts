@@ -31,6 +31,7 @@ interface CreateMediaParams {
   fileName: string
   mimeType: string
   fileSize?: number
+  title?: string
 }
 
 @Injectable()
@@ -64,16 +65,14 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
   }
 
   async createMedia(params: CreateMediaParams): Promise<string> {
-    const { identityId, fileStream, fileName, mimeType, fileSize } = params
+    const { identityId, fileStream, fileName, mimeType, fileSize, title } = params
 
-    // Validate mime type
     if (!ALLOWED_MEDIA_TYPES.includes(mimeType)) {
       throw new BadRequestException(
         `Invalid media type: ${mimeType}. Allowed types: ${ALLOWED_MEDIA_TYPES.join(', ')}`,
       )
     }
 
-    // Validate file size if provided
     if (fileSize && fileSize > MAX_FILE_SIZE) {
       throw new BadRequestException(
         `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`,
@@ -83,6 +82,9 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
     const form = new FormData()
     form.append('account_id', this.accountNumber)
     form.append('identity_id', identityId)
+    if (title) {
+      form.append('title', title)
+    }
     form.append('initial_file_upload', fileStream, {
       filename: fileName,
       contentType: mimeType,
@@ -103,6 +105,13 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       )
       const { data } = response
       const validatedData = this.validateCreateResponse(data)
+      
+      if (validatedData.status === 'ERROR') {
+        const errorMessage = validatedData.error || 'Media creation failed'
+        this.logger.error('Media creation failed:', errorMessage)
+        throw new BadGatewayException(`Media creation failed: ${errorMessage}`)
+      }
+      
       this.logger.debug('Successfully created media', validatedData)
       return validatedData.media_id
     } catch (error) {

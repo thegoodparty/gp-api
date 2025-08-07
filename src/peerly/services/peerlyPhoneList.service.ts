@@ -107,7 +107,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       )
 
       const validated = this.validateUploadResponse(response.data)
-      return validated.token
+      return validated.Data.token
     } catch (error) {
       this.handleApiError(error)
     }

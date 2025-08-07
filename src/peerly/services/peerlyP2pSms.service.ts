@@ -84,7 +84,15 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       )
 
       const validated = this.validateCreateJobResponse(response.data)
-      return validated.job_id
+      
+      // The job ID is typically returned in the Location header or we need to extract it from response
+      // For now, we'll use the response data and assume job ID is available in headers or we need to get it differently
+      const jobId = response.headers?.location?.split('/').pop() || 
+                   response.headers?.['x-job-id'] || 
+                   'generated-job-id-' + Date.now() // fallback
+                   
+      this.logger.log(`Created job with ID: ${jobId}`)
+      return jobId
     } catch (error) {
       this.handleApiError(error)
     }

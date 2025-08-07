@@ -285,7 +285,8 @@ export class VoterOutreachService {
         identityId,
       })
 
-      if (!listStatus.list_id) {
+      const listId = listStatus.Data.list_id
+      if (!listId) {
         throw new Error('Phone list upload failed - no list_id returned')
       }
 
@@ -315,15 +316,15 @@ export class VoterOutreachService {
 
       // Step 5: Assign list to job
       this.logger.log('Assigning phone list to job...')
-      await this.p2pSmsService.assignListToJob(jobId, listStatus.list_id)
+      await this.p2pSmsService.assignListToJob(jobId, listId)
 
       this.logger.log(
-        `P2P campaign created successfully. Job ID: ${jobId}, List ID: ${listStatus.list_id}`,
+        `P2P campaign created successfully. Job ID: ${jobId}, List ID: ${listId}`,
       )
 
       return {
         jobId,
-        listId: listStatus.list_id,
+        listId,
         mediaIds,
       }
     } catch (error) {
