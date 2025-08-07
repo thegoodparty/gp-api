@@ -16,8 +16,6 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
 } from '../peerly.types'
 
-const { PEERLY_HTTP_TIMEOUT = '10000' } = process.env
-const PEERLY_HTTP_TIMEOUT_MS = parseInt(PEERLY_HTTP_TIMEOUT, 10)
 
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
@@ -45,7 +43,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   private async getBaseHttpHeaders() {
     return {
       headers: await this.peerlyAuth.getAuthorizationHeader(),
-      timeout: PEERLY_HTTP_TIMEOUT_MS,
+      timeout: this.httpTimeoutMs,
     }
   }
 

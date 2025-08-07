@@ -3,6 +3,7 @@ const {
   PEERLY_MD5_PASSWORD,
   PEERLY_API_BASE_URL,
   PEERLY_ACCOUNT_NUMBER,
+  PEERLY_HTTP_TIMEOUT = '15000', // 15 seconds default
 } = process.env
 
 if (!PEERLY_API_BASE_URL) {
@@ -22,4 +23,5 @@ export class PeerlyBaseConfig {
   readonly email = PEERLY_MD5_EMAIL
   readonly password = PEERLY_MD5_PASSWORD
   readonly accountNumber = PEERLY_ACCOUNT_NUMBER
+  readonly httpTimeoutMs = parseInt(PEERLY_HTTP_TIMEOUT, 10)
 }
