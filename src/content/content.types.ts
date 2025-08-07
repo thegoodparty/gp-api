@@ -139,6 +139,7 @@ export type ArticleCategories = {
 type ArticleFields = {
   title: string
   id: string
+  order?: number
 }
 
 export type ArticleCategoryRaw = {
@@ -405,6 +406,7 @@ type FaqArticleContentRawData = {
   data: {
     title: string
     category?: FaqArticleCategoryRaw[]
+    order?: number
   }
 }
 
@@ -412,6 +414,7 @@ export type FaqArticleContentRaw = ContentRaw<FaqArticleContentRawData>
 
 export type FaqArticleContentAugmented = ContentAugmented<
   Partial<Content> & {
+    order?: number
     category?: {
       id: string
       fields: {

@@ -207,6 +207,11 @@ export class CrmCampaignsService {
       adminUserEmail,
     } = campaignData || {}
 
+    let adminEmail = adminUserEmail
+    if (adminEmail === '') {
+      adminEmail = undefined
+    }
+
     const {
       zip,
       party,
@@ -237,8 +242,8 @@ export class CrmCampaignsService {
     const lastPortalVisit = formatDateForCRM(user.metaData?.lastVisited)
     const sessionCount = user.metaData?.sessionCount
     const name = getUserFullName(user as User)
-
     const electionDateMs = formatDateForCRM(electionDate)
+
     const primaryElectionDateMs = formatDateForCRM(primaryElectionDate)
     const isProUpdatedAtMs = formatDateForCRM(isProUpdatedAt)
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
@@ -282,10 +287,10 @@ export class CrmCampaignsService {
       calls_made: reportedVoterGoals?.calls,
       direct_mail_sent: reportedVoterGoals?.directMail,
       event_impressions: reportedVoterGoals?.events,
-      knocked_doors: ecanvasserInteractionsCount, // TODO: remove/rename one of these two doorknock fields?
-      doors_knocked: reportedVoterGoals?.doorKnocking, // TODO: remove/rename one of these two doorknock fields?
-      online_impressions: reportedVoterGoals?.digitalAds,
-      yard_signs_impressions: reportedVoterGoals?.yardSigns,
+      knocked_doors: ecanvasserInteractionsCount || undefined, // TODO: remove/rename one of these two doorknock fields?
+      doors_knocked: reportedVoterGoals?.doorKnocking || undefined, // TODO: remove/rename one of these two doorknock fields?
+      online_impressions: reportedVoterGoals?.digitalAds || undefined,
+      yard_signs_impressions: reportedVoterGoals?.yardSigns || undefined,
       // p2p_texts: reportedVoterGoals?.text, TODO: we need a new field in HS for sms text contact numbers!!!
       ecanvasser_contacts_count: ecanvasserCount,
       ecanvasser_houses_count: ecanvasserHousesCount,
@@ -305,7 +310,7 @@ export class CrmCampaignsService {
         createdBy === CampaignCreatedBy.ADMIN
           ? HubSpot.CreatedByAdmin.YES
           : HubSpot.CreatedByAdmin.NO,
-      admin_user: adminUserEmail,
+      admin_user: adminEmail,
       pledge_status: pledged
         ? HubSpot.PledgeStatus.YES
         : HubSpot.PledgeStatus.NO,
@@ -359,7 +364,7 @@ export class CrmCampaignsService {
 
     if (!validated.success) {
       // Handle validation errors
-      const msg = 'CRM Push cancelled - validation failed'
+      const msg = `CRM Push cancelled - validation failed for campaign slug: ${campaign.slug}.`
       this.logger.error(msg, {
         errors: validated.error.errors,
         fields: fieldsToSync,
@@ -673,7 +678,7 @@ export class CrmCampaignsService {
     campaigns: Campaign[],
     fields: Array<keyof CRMCompanyProperties | 'all'>,
   ): Promise<SimplePublicObjectBatchInput[]> {
-    const companyUpdateObjects: SimplePublicObjectBatchInput[] = []
+    const companyUpdateMap = new Map<string, SimplePublicObjectBatchInput>()
 
     for (const campaign of campaigns) {
       try {
@@ -682,14 +687,14 @@ export class CrmCampaignsService {
           fields,
         )
         if (updateObject) {
-          companyUpdateObjects.push(updateObject)
+          companyUpdateMap.set(updateObject.id, updateObject)
         }
       } catch (error) {
         this.logger.error(`Error processing campaign ${campaign.id}:`, error)
       }
     }
 
-    return companyUpdateObjects
+    return Array.from(companyUpdateMap.values())
   }
 
   private async processSingleCampaignForBatchUpdate(
