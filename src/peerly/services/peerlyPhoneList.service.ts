@@ -17,7 +17,7 @@ import {
   PhoneListStatusResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
 
-const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 10 second timeout
+const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 15 second timeout
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB
 

@@ -248,8 +248,9 @@ export class VoterOutreachService {
 
     try {
       // Step 1: Upload media files if present
-      const mediaIds: string[] = []
-      for (const template of messageTemplates) {
+      const templateMediaMap = new Map<number, string>()
+      for (let i = 0; i < messageTemplates.length; i++) {
+        const template = messageTemplates[i]
         if (template.mediaStream) {
           this.logger.log(`Uploading media for template: ${template.title}`)
           const mediaId = await this.mediaService.createMedia({
@@ -259,7 +260,7 @@ export class VoterOutreachService {
             mimeType: template.mediaStream.mimeType,
             fileSize: template.mediaStream.fileSize,
           })
-          mediaIds.push(mediaId)
+          templateMediaMap.set(i, mediaId)
         }
       }
 
@@ -292,20 +293,23 @@ export class VoterOutreachService {
 
       // Step 4: Create P2P job with templates
       this.logger.log('Creating P2P job...')
-      const templates = messageTemplates.map((template, index) => ({
-        title: template.title,
-        text: template.text,
-        ...(mediaIds[index] && {
-          advanced: {
-            media: {
-              media_id: mediaIds[index],
-              media_type: template.mediaStream!.mimeType.startsWith('video/')
-                ? ('VIDEO' as const)
-                : ('IMAGE' as const),
+      const templates = messageTemplates.map((template, index) => {
+        const mediaId = templateMediaMap.get(index)
+        return {
+          title: template.title,
+          text: template.text,
+          ...(mediaId && template.mediaStream && {
+            advanced: {
+              media: {
+                media_id: mediaId,
+                media_type: template.mediaStream.mimeType.startsWith('video/')
+                  ? ('VIDEO' as const)
+                  : ('IMAGE' as const),
+              },
             },
-          },
-        }),
-      }))
+          }),
+        }
+      })
 
       const jobId = await this.p2pSmsService.createJob({
         name: jobName,
@@ -325,7 +329,7 @@ export class VoterOutreachService {
       return {
         jobId,
         listId,
-        mediaIds,
+        mediaIds: Array.from(templateMediaMap.values()),
       }
     } catch (error) {
       this.logger.error('Failed to create P2P campaign:', error)

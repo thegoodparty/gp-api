@@ -15,7 +15,7 @@ import FormData from 'form-data'
 import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
 import { MimeTypes } from 'http-constants-ts'
 
-const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 10 second timeout
+const PEERLY_HTTP_TIMEOUT_MS = 15 * 1000 // 15 second timeout
 
 const MAX_FILE_SIZE = 512000 // 500KB
 
