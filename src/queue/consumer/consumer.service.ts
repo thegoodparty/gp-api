@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
-import { GenerateAiContentMessage, QueueMessage, PeerlyPhoneListPollingMessage } from '../queue.types'
+import { GenerateAiContentMessage, QueueMessage } from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Campaign, PathToVictory, User } from '@prisma/client'
@@ -16,7 +16,6 @@ import {
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { PeerlyPollingService } from 'src/peerly/services/peerlyPolling.service'
 
 @Injectable()
 export class ConsumerService {
@@ -29,7 +28,6 @@ export class ConsumerService {
     private readonly viabilityService: ViabilityService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
-    private readonly peerlyPollingService: PeerlyPollingService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -93,11 +91,6 @@ export class ConsumerService {
         this.logger.log('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         await this.handlePathToVictoryMessage(pathToVictoryMessage)
-        break
-      case 'peerlyPhoneListPolling':
-        this.logger.log('received peerlyPhoneListPolling message')
-        const peerlyPollingMessage = queueMessage.data as PeerlyPhoneListPollingMessage
-        await this.peerlyPollingService.handlePhoneListPolling(peerlyPollingMessage)
         break
     }
   }
