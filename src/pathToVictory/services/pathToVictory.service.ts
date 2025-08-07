@@ -152,23 +152,6 @@ export class PathToVictoryService extends createPrismaBase(
             ? 'US'
             : input.electionState
 
-        // const counts = await this.votersService.getVoterCounts(
-        //   input.electionTerm,
-        //   input.electionDate || new Date().toISOString().slice(0, 10),
-        //   state,
-        //   electionType,
-        //   electionLocation,
-        //   input.partisanType,
-        //   input.priorElectionDates,
-        // )
-
-        // if (counts?.total && counts.total > 0) {
-        //   pathToVictoryResponse.electionType = electionType
-        //   pathToVictoryResponse.electionLocation = electionLocation
-        //   pathToVictoryResponse.counts = counts
-        //   break
-        // }
-
         const raceTargetDetails = await this.elections.buildRaceTargetDetails({
           L2DistrictType: electionType,
           L2DistrictName: electionLocation,
