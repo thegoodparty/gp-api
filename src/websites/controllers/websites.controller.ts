@@ -10,11 +10,9 @@ import {
   Logger,
   ForbiddenException,
   Query,
-  HttpCode,
-  HttpStatus,
 } from '@nestjs/common'
 import { WebsitesService } from '../services/websites.service'
-import { Campaign, User, WebsiteStatus, UserRole, Prisma } from '@prisma/client'
+import { Campaign, User, WebsiteStatus } from '@prisma/client'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
@@ -35,7 +33,6 @@ import { ValidateVanityPathSchema } from '../schemas/ValidateVanityPath.schema'
 import { WebsiteViewsService } from '../services/websiteViews.service'
 import { TrackWebsiteViewSchema } from '../schemas/TrackWebsiteView.schema'
 import { GetWebsiteViewsSchema } from '../schemas/GetWebsiteViews.schema'
-import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
 const LOGO_FIELDNAME = 'logoFile'
@@ -286,52 +283,5 @@ export class WebsitesController {
   @PublicAccess()
   async getWebsiteByDomain(@Param('domain') domain: string) {
     return this.websites.findByDomainName(domain, WEBSITE_CONTENT_INCLUDES)
-  }
-
-  // TODO: Remove this once we've migrated all the placeIds to the campaign
-  @Post('admin/migrate-addresses')
-  @Roles(UserRole.admin)
-  @HttpCode(HttpStatus.OK)
-  async migrateAddresses() {
-    const websites = await this.websites.findMany({
-      where: {
-        content: {
-          path: ['contact', 'addressPlace'],
-          not: Prisma.DbNull,
-        },
-      },
-      include: {
-        campaign: true,
-      },
-    })
-
-    const results: any[] = []
-    for (const website of websites) {
-      const content = website.content as PrismaJson.WebsiteContent
-      const addressPlace = content?.contact?.addressPlace
-      const formattedAddress = content?.contact?.address
-
-      if (addressPlace?.place_id) {
-        await this.campaigns.update({
-          where: { id: website.campaignId },
-          data: {
-            placeId: addressPlace.place_id,
-            formattedAddress:
-              formattedAddress || addressPlace.formatted_address,
-          } as any,
-        })
-
-        results.push({
-          campaignId: website.campaignId,
-          placeId: addressPlace.place_id,
-          formattedAddress: formattedAddress || addressPlace.formatted_address,
-        })
-      }
-    }
-
-    return {
-      message: `Migrated ${results.length} addresses`,
-      results,
-    }
   }
 }
