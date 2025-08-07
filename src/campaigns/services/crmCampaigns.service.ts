@@ -18,8 +18,6 @@ import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/
 import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
 import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
-import { CampaignUpdateHistoryService } from '../updateHistory/campaignUpdateHistory.service'
-import { AnalyticsService } from '../../analytics/analytics.service'
 import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -44,13 +42,11 @@ export class CrmCampaignsService {
     private readonly campaigns: CampaignsService,
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
-    @Inject(forwardRef(() => AnalyticsService))
-    private readonly analytics: AnalyticsService,
     private readonly hubspot: HubspotService,
+    @Inject(forwardRef(() => CrmUsersService))
     private readonly crmUsers: CrmUsersService,
     private readonly aiChat: AiChatService,
     private readonly pathToVictory: PathToVictoryService,
-    private readonly campaignUpdateHistory: CampaignUpdateHistoryService,
     private readonly voterFile: VoterFileDownloadAccessService,
     private readonly slack: SlackService,
     private readonly ecanvasser: EcanvasserIntegrationService,

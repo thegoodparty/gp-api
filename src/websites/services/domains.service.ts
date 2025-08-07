@@ -14,7 +14,11 @@ import { StripeService } from 'src/stripe/services/stripe.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
-import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import {
+  PurchaseHandler,
+  PurchaseMetadata,
+  DomainPurchaseMetadata,
+} from 'src/payments/purchase.types'
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -46,7 +50,7 @@ export interface DomainStatusResponse {
 @Injectable()
 export class DomainsService
   extends createPrismaBase(MODELS.Domain)
-  implements PurchaseHandler
+  implements PurchaseHandler<DomainPurchaseMetadata>
 {
   constructor(
     private readonly route53: AwsRoute53Service,
@@ -67,7 +71,9 @@ export class DomainsService
       : 'enabled'
   }
 
-  async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
+  async validatePurchase(
+    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+  ): Promise<void> {
     const { domainName, websiteId } = metadata
 
     if (!domainName || !websiteId) {
@@ -81,7 +87,9 @@ export class DomainsService
     }
   }
 
-  async calculateAmount(metadata: PurchaseMetadata): Promise<number> {
+  async calculateAmount(
+    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+  ): Promise<number> {
     const { domainName } = metadata
 
     if (!domainName) {
@@ -99,7 +107,7 @@ export class DomainsService
 
   async executePostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata,
+    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
   ): Promise<any> {
     return this.handleDomainPostPurchase(paymentIntentId, metadata)
   }

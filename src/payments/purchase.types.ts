@@ -5,24 +5,42 @@ export enum PurchaseType {
   OUTREACH = 'OUTREACH',
 }
 
-export interface PurchaseMetadata {
-  domainName?: string
-  websiteId?: number
-  planType?: string
-  duration?: string
-  features?: string[]
+export interface BasePurchaseMetadata {
   campaignId?: number
-  outreachType?: string
-  audienceSize?: number
+}
+
+export interface DomainPurchaseMetadata extends BasePurchaseMetadata {
+  domainName: string
+  websiteId: number
+}
+
+export interface OutreachPurchaseMetadata extends BasePurchaseMetadata {
+  contactCount: number
+  pricePerContact: number
+  outreachType: string
+  audienceSize: number
   audienceRequest?: string
   script?: string
   message?: string
   date?: string
 }
 
+export interface SubscriptionPurchaseMetadata extends BasePurchaseMetadata {
+  planType: string
+  duration: string
+  features?: string[]
+}
+
+export interface FeaturesPurchaseMetadata extends BasePurchaseMetadata {
+  features: string[]
+  websiteId?: number
+}
+
+export type PurchaseMetadata<T = BasePurchaseMetadata> = T
+
 export interface CreatePurchaseIntentDto {
   type: PurchaseType
-  metadata: PurchaseMetadata
+  metadata: PurchaseMetadata<any>
 }
 
 export interface CompletePurchaseDto {
@@ -31,14 +49,14 @@ export interface CompletePurchaseDto {
 
 export type PostPurchaseHandler = (
   paymentIntentId: string,
-  metadata: PurchaseMetadata,
+  metadata: PurchaseMetadata<any>,
 ) => Promise<any>
 
-export interface PurchaseHandler {
-  validatePurchase(metadata: PurchaseMetadata): Promise<void>
-  calculateAmount(metadata: PurchaseMetadata): Promise<number>
+export interface PurchaseHandler<T = BasePurchaseMetadata> {
+  validatePurchase(metadata: PurchaseMetadata<T>): Promise<void>
+  calculateAmount(metadata: PurchaseMetadata<T>): Promise<number>
   executePostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata,
+    metadata: PurchaseMetadata<T>,
   ): Promise<any>
 }

@@ -1,32 +1,38 @@
-import { Injectable, BadRequestException } from '@nestjs/common'
-import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import { BadRequestException, Injectable } from '@nestjs/common'
+import {
+  PurchaseHandler,
+  PurchaseMetadata,
+  OutreachPurchaseMetadata,
+} from 'src/payments/purchase.types'
 import { OutreachService } from './outreach.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
-import { OutreachType, OutreachStatus } from '@prisma/client'
+import { OutreachStatus, OutreachType } from '@prisma/client'
 
 @Injectable()
-export class OutreachPurchaseHandlerService implements PurchaseHandler {
+export class OutreachPurchaseHandlerService
+  implements PurchaseHandler<OutreachPurchaseMetadata>
+{
   constructor(
     private readonly outreachService: OutreachService,
     private readonly paymentsService: PaymentsService,
   ) {}
 
-  async validatePurchase(metadata: PurchaseMetadata): Promise<void> {
-    const { campaignId, outreachType } = metadata as any
-
-    if (!campaignId) {
-      throw new BadRequestException('Campaign ID is required')
+  async validatePurchase({
+    contactCount,
+    pricePerContact,
+  }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<void> {
+    if (!contactCount) {
+      throw new BadRequestException('contactCount is required')
     }
 
-    if (!outreachType || !Object.values(OutreachType).includes(outreachType)) {
-      throw new BadRequestException('Valid outreach type is required')
+    if (pricePerContact) {
+      throw new BadRequestException('pricePerContact is required')
     }
-
-    // Additional validation could be added here
-    // e.g., checking if campaign exists, user has permission, etc.
   }
 
-  async calculateAmount(metadata: PurchaseMetadata): Promise<number> {
+  async calculateAmount(
+    metadata: PurchaseMetadata<OutreachPurchaseMetadata>,
+  ): Promise<number> {
     const { outreachType, audienceSize } = metadata as any
 
     // Define pricing based on outreach type
@@ -47,7 +53,7 @@ export class OutreachPurchaseHandlerService implements PurchaseHandler {
 
   async executePostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata,
+    metadata: PurchaseMetadata<OutreachPurchaseMetadata>,
   ): Promise<any> {
     const { campaignId, outreachType, audienceRequest, script, message, date } =
       metadata as any

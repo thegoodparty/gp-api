@@ -24,6 +24,8 @@ import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrComp
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
 import { PeerlyModule } from '../peerly/peerly.module'
 import { GoogleModule } from '../vendors/google/google.module'
+import { AnalyticsModule } from '../analytics/analytics.module'
+import { UsersModule } from 'src/users/users.module'
 
 @Global()
 @Module({
@@ -38,6 +40,8 @@ import { GoogleModule } from '../vendors/google/google.module'
     StripeModule,
     PeerlyModule,
     GoogleModule,
+    AnalyticsModule,
+    UsersModule,
   ],
   controllers: [
     CampaignsController,
