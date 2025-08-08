@@ -57,7 +57,7 @@ export class PurchaseService {
 
     return {
       clientSecret: paymentIntent.client_secret!,
-      amount: amount / 100,
+      amount: paymentIntent.amount / 100,
     }
   }
 

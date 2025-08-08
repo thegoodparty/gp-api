@@ -44,7 +44,7 @@ export class StripeService {
 
     return await this.stripe.paymentIntents.create({
       customer: customerId,
-      amount,
+      amount: Math.floor(amount), // Stripe expects an integer of cents
       currency: 'usd',
       description,
       automatic_payment_methods: {
