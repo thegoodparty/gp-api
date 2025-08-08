@@ -39,6 +39,7 @@ export type SlackMessage = {
 
 export type FormattedSlackMessageArgs = {
   message: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error?: any // due to this value being sent directly into JSON.stringify with is an any type
   channel: SlackChannel
 }

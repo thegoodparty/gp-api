@@ -15,6 +15,7 @@ export function flip(obj: Record<any, any>): Record<any, any> {
  * @param {string[]} keys Array of keys to pick
  * @returns {object}
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const pick = (obj: { [key: string]: any }, keys: string[]): object => {
   if (typeof obj !== 'object' || obj === null || !Array.isArray(keys)) {
     throw new Error('invalid args')

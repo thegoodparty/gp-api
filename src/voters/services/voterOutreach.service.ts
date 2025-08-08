@@ -81,6 +81,7 @@ interface CreateP2pCampaignParams {
   identityId?: string
   voterFileParams: {
     type: VoterFileType
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     customFilters?: any
     selectedColumns?: Array<{ db: string; label?: string }>
     limit?: number

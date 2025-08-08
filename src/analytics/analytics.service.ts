@@ -10,6 +10,7 @@ export class AnalyticsService {
 
   constructor(private readonly segment: SegmentService) {}
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async trackEvent(user: User, eventName: string, properties: any) {
     return this.segment.trackEvent(user.id, eventName, properties)
   }

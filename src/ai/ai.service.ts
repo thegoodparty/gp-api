@@ -141,6 +141,7 @@ export class AiService {
     let completion
     try {
       completion = await modelWithFallback.invoke(sanitizedMessages)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       this.logger.error('Error in utils/ai/llmChatCompletion', error)
       this.logger.error('error response', error?.response)

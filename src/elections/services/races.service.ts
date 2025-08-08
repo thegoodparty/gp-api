@@ -217,10 +217,12 @@ export class RacesService {
     zip?: string | null,
     findElectionDates = true,
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = {}
 
     this.logger.debug(slug, 'getting race from ballotReady api...')
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let race: any
     try {
       race = await this.getRaceById(raceId)
@@ -278,6 +280,7 @@ export class RacesService {
         : undefined
     const electionState = race?.election?.state
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let locationResp: any
     let county: string | undefined
     let city: string | undefined
@@ -287,6 +290,7 @@ export class RacesService {
       // and a more accurate electionLevel
       this.logger.debug(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const geoData: any = await this.resolveMtfcc(mtfcc, geoId)
         this.logger.debug(slug, 'geoData', geoData)
         if (geoData?.city) {
@@ -451,6 +455,7 @@ export class RacesService {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tool: any = {
       type: 'function',
       function: {
@@ -511,6 +516,7 @@ export class RacesService {
       },
     ]
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const toolChoice: any = {
       type: 'function',
       function: { name: 'extractLocation' },
@@ -527,6 +533,7 @@ export class RacesService {
     )
 
     const content = completion?.content
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let decodedContent: any = {}
     try {
       decodedContent = JSON.parse(content)
