@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -22,6 +23,7 @@ import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
+import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { SlackService } from 'src/shared/services/slack.service'
 import { userHasRole } from 'src/users/util/users.util'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
@@ -284,6 +286,44 @@ export class CampaignsController {
         ...raceTargetDetails,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
+        districtManuallySet: true,
+      },
+    })
+  }
+
+  @Put('mine/race-target-details')
+  @UseCampaign()
+  async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
+    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+      throw new BadRequestException(
+        `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
+      )
+    }
+    const raceTargetDetails =
+      await this.elections.getBallotReadyMatchedRaceTargetDetails(
+        campaign.details.positionId,
+        campaign.details.electionDate,
+      )
+    if (!raceTargetDetails) {
+      throw new NotFoundException(
+        'Failed to fetch the raceTargetDetails for the requested campaign',
+      )
+    }
+    const { district, winNumber, voterContactGoal, projectedTurnout } =
+      raceTargetDetails
+    const { L2DistrictType, L2DistrictName } = district
+    return this.campaigns.updateJsonFields(campaign.id, {
+      pathToVictory: {
+        districtId: district.id,
+        electionType: L2DistrictType,
+        electionLocation: L2DistrictName,
+        winNumber,
+        voterContactGoal,
+        projectedTurnout,
+        source: P2VSource.ElectionApi,
+        p2vStatus: P2VStatus.complete,
+        p2vCompleteDate: new Date().toISOString().slice(0, 10),
+        districtManuallySet: false,
       },
     })
   }

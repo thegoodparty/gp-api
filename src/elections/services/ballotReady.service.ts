@@ -4,8 +4,11 @@ import {
   Logger,
 } from '@nestjs/common'
 import { gql, GraphQLClient } from 'graphql-request'
-import { truncateZip } from 'src/shared/util/zipcodes.util'
+import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
+import { truncateZip } from 'src/shared/util/zipcodes.util'
+import zipcodes from 'zipcodes'
+import { ELECTION_LEVELS } from '../../shared/constants/governmentLevels'
 import {
   RacesByIdNode,
   RacesByZipcode,
@@ -13,9 +16,6 @@ import {
   RaceWithOfficeHolders,
   RaceWithOfficeHoldersNode,
 } from '../types/ballotReady.types'
-import { Headers, MimeTypes } from 'http-constants-ts'
-import { ELECTION_LEVELS } from '../../shared/constants/governmentLevels'
-import zipcodes from 'zipcodes'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY

@@ -69,6 +69,7 @@ export type ProjectedTurnout = {
 export type RaceTargetMetrics = {
   winNumber: number
   voterContactGoal: number
+  projectedTurnout: number
 }
 
 export enum ProjectedTurnoutSourceColumns {
@@ -112,3 +113,27 @@ interface ByYearAndCode {
 
 export type BuildRaceTargetDetailsInput = DistrictInfo &
   (ByDate | ByYearAndCode)
+
+export type PositionWithMatchedDistrict = {
+  positionId: string
+  brPositionId: string
+  brDatabaseId: string
+  district: {
+    id: string
+    L2DistrictType: string
+    L2DistrictName: string
+    projectedTurnout: SourceProjectedTurnout
+  }
+}
+
+type SourceProjectedTurnout = {
+  id: string
+  createdAt: Date
+  updatedAt: Date
+  electionYear: number
+  electionCode: ElectionCode
+  projectedTurnout: number
+  inferenceAt: Date
+  modelVersion: string
+  districtId: string
+}
