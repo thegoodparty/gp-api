@@ -29,6 +29,7 @@ model Campaign {
   campaignUpdateHistory CampaignUpdateHistory[]
   user                  User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId                Int                     @map("user_id")
+  canDownloadFederal    Boolean                 @default(false) @map("can_download_federal")
   topIssues             TopIssue[]
   campaignPositions     CampaignPosition[]
   campaignPlanVersion   CampaignPlanVersion?

@@ -14,7 +14,7 @@ export const faqArticlesTransformer: Transformer<
       createdAt,
       updatedAt,
       type,
-      data: { category, ...dataExcludingCategory },
+      data: { category, order, ...dataExcludingCategory },
     } = entry
     const firstCategory = category?.[0]
 
@@ -23,6 +23,7 @@ export const faqArticlesTransformer: Transformer<
       createdAt,
       updatedAt,
       type,
+      order,
       ...dataExcludingCategory,
       ...(firstCategory
         ? {
