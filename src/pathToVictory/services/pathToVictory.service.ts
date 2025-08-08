@@ -158,7 +158,20 @@ export class PathToVictoryService extends createPrismaBase(
           electionDate: input.electionDate,
           state,
         })
-        if (!raceTargetDetails || !raceTargetDetails?.projectedTurnout) {
+
+        if (raceTargetDetails?.projectedTurnout) {
+          const { projectedTurnout, winNumber, voterContactGoal } =
+            raceTargetDetails
+
+          pathToVictoryResponse.electionType = electionType
+          pathToVictoryResponse.electionLocation = electionLocation
+          pathToVictoryResponse.counts = {
+            projectedTurnout,
+            winNumber,
+            voterContactGoal,
+          }
+          break
+        } else {
           const counts = await this.votersService.getVoterCounts(
             input.electionTerm,
             input.electionDate || new Date().toISOString().slice(0, 10),
@@ -173,18 +186,8 @@ export class PathToVictoryService extends createPrismaBase(
             pathToVictoryResponse.electionType = electionType
             pathToVictoryResponse.electionLocation = electionLocation
             pathToVictoryResponse.counts = counts
+            break
           }
-          break
-        }
-        const { projectedTurnout, winNumber, voterContactGoal } =
-          raceTargetDetails
-
-        pathToVictoryResponse.electionType = electionType
-        pathToVictoryResponse.electionLocation = electionLocation
-        pathToVictoryResponse.counts = {
-          projectedTurnout,
-          winNumber,
-          voterContactGoal,
         }
 
         if (++attempts > 10) break

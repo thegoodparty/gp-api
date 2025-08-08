@@ -298,7 +298,7 @@ export class CampaignsController {
         campaign.details.electionDate,
       )
     if (!raceTargetDetails) {
-      throw new InternalServerErrorException(
+      throw new NotFoundException(
         'Failed to fetch the raceTargetDetails for the requested campaign',
       )
     }
