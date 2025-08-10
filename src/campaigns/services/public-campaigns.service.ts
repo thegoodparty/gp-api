@@ -65,7 +65,7 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
 
       const lastNameSlug = this.createCandidateSlug('', lastName)
       const campaignsWithLastName = campaigns.filter((campaign) =>
-        campaign.slug.includes(lastNameSlug.replace('-', '')),
+        this.matchesCandidateName(campaign.slug, lastNameSlug),
       )
 
       if (campaignsWithLastName.length === 0) {
@@ -78,14 +78,12 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
 
       const firstNameSlug = this.createCandidateSlug(firstName, '')
       const campaignsWithBothNames = campaignsWithLastName.filter((campaign) =>
-        campaign.slug.includes(firstNameSlug.replace('-', '')),
+        this.matchesCandidateName(campaign.slug, firstNameSlug),
       )
 
-      if (campaignsWithBothNames.length > 0) {
-        return campaignsWithBothNames[0]
-      }
-
-      return campaignsWithLastName[0]
+      return campaignsWithBothNames.length > 0
+        ? campaignsWithBothNames[0]
+        : campaignsWithLastName[0]
     } catch (error) {
       this.logger.error('Error in findCampaignByRaceId:', error)
       return null
@@ -97,5 +95,21 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
       lower: true,
       strict: true,
     })
+  }
+
+  private matchesCandidateName(
+    campaignSlug: string,
+    nameSlug: string,
+  ): boolean {
+    if (!nameSlug.trim()) {
+      return true
+    }
+
+    const normalizedCampaignSlug = campaignSlug.replace(/-/g, '')
+    const normalizedNameSlug = nameSlug.replace(/-/g, '')
+
+    const slugParts = normalizedCampaignSlug.split(/[^a-z0-9]/i)
+
+    return slugParts.some((part) => part === normalizedNameSlug)
   }
 }
