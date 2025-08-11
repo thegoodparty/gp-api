@@ -5,9 +5,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { PublicAccess } from '../../authentication/decorators/PublicAccess.decorator'
+import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { FindByRaceIdDto } from '../schemas/public/FindByRaceId.schema'
-import { FindByRaceIdResponse } from '../schemas/public/FindByRaceIdResponse.schema'
+import { FindByRaceIdResponseDto } from '../schemas/public/FindByRaceIdResponse.schema'
 import { PublicCampaignsService } from '../services/public-campaigns.service'
 
 @Controller('public-campaigns')
@@ -22,7 +22,7 @@ export class PublicCampaignsController {
   @Get()
   async findByRaceId(
     @Query() dto: FindByRaceIdDto,
-  ): Promise<FindByRaceIdResponse> {
+  ): Promise<FindByRaceIdResponseDto> {
     this.logger.debug(
       `Finding campaign by race ID: ${dto.raceId}, name: ${dto.firstName} ${dto.lastName}`,
     )

@@ -29,7 +29,14 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
           updatedAt: true,
 
           website: {
-            include: {
+            select: {
+              id: true,
+              createdAt: true,
+              updatedAt: true,
+              campaignId: true,
+              status: true,
+              vanityPath: true,
+              content: true,
               domain: {
                 select: {
                   name: true,
@@ -63,9 +70,8 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
         return null
       }
 
-      const lastNameSlug = this.createCandidateSlug('', lastName)
       const campaignsWithLastName = campaigns.filter((campaign) =>
-        this.matchesCandidateName(campaign.slug, lastNameSlug),
+        this.matchesCandidateName(campaign.slug, '', lastName),
       )
 
       if (campaignsWithLastName.length === 0) {
@@ -76,9 +82,8 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
         return campaignsWithLastName[0]
       }
 
-      const firstNameSlug = this.createCandidateSlug(firstName, '')
       const campaignsWithBothNames = campaignsWithLastName.filter((campaign) =>
-        this.matchesCandidateName(campaign.slug, firstNameSlug),
+        this.matchesCandidateName(campaign.slug, firstName, lastName),
       )
 
       return campaignsWithBothNames.length > 0
@@ -90,26 +95,41 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
   }
 
-  private createCandidateSlug(firstName: string, lastName: string): string {
-    return slugify(`${firstName} ${lastName}`, {
-      lower: true,
-      strict: true,
-    })
+  private normalizeToTokens(value: string): string[] {
+    return slugify(value, { lower: true, strict: true })
+      .split('-')
+      .filter(Boolean)
+  }
+
+  private slugHasAllTokens(
+    campaignSlug: string,
+    requiredTokens: string[],
+  ): boolean {
+    const campaignTokens = campaignSlug.split('-').filter(Boolean)
+    const set = new Set(campaignTokens)
+    return requiredTokens.every((token) => set.has(token))
   }
 
   private matchesCandidateName(
     campaignSlug: string,
-    nameSlug: string,
+    firstName: string,
+    lastName: string,
   ): boolean {
-    if (!nameSlug.trim()) {
-      return true
+    const lastTokens = this.normalizeToTokens(lastName)
+    if (lastTokens.length && !this.slugHasAllTokens(campaignSlug, lastTokens)) {
+      return false
     }
 
-    const normalizedCampaignSlug = campaignSlug.replace(/-/g, '')
-    const normalizedNameSlug = nameSlug.replace(/-/g, '')
+    if (firstName) {
+      const firstTokens = this.normalizeToTokens(firstName)
+      if (
+        firstTokens.length &&
+        !this.slugHasAllTokens(campaignSlug, firstTokens)
+      ) {
+        return false
+      }
+    }
 
-    const slugParts = normalizedCampaignSlug.split(/[^a-z0-9]/i)
-
-    return slugParts.some((part) => part === normalizedNameSlug)
+    return true
   }
 }
