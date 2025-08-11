@@ -1,6 +1,8 @@
 import { forwardRef, Global, Module } from '@nestjs/common'
 import { CampaignsController } from './campaigns.controller'
+import { PublicCampaignsController } from './controllers/public-campaigns.controller'
 import { CampaignsService } from './services/campaigns.service'
+import { PublicCampaignsService } from './services/public-campaigns.service'
 import { CampaignMapController } from './map/campaignMap.controller'
 import { CampaignMapService } from './map/campaignMap.service'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
@@ -45,6 +47,7 @@ import { UsersModule } from 'src/users/users.module'
   ],
   controllers: [
     CampaignsController,
+    PublicCampaignsController,
     CampaignPositionsController,
     CampaignMapController,
     CampaignUpdateHistoryController,
@@ -53,6 +56,7 @@ import { UsersModule } from 'src/users/users.module'
   ],
   providers: [
     CampaignsService,
+    PublicCampaignsService,
     CampaignPlanVersionsService,
     CampaignPositionsService,
     CampaignMapService,
