@@ -86,6 +86,7 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.create(campaign, body)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       this.logger.error('Error generating AI chat', e)
       await this.slack.errorMessage({
@@ -121,6 +122,7 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.update(threadId, campaign, body)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       this.logger.error('Error generating AI chat', e)
       await this.slack.errorMessage({
@@ -158,6 +160,7 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.feedback(user, threadId, body)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       this.logger.error('Error giving AI chat feedback', e)
       await this.slack.errorMessage({

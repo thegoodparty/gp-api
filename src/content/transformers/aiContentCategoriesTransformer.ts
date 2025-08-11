@@ -13,6 +13,7 @@ export const aiContentCategoriesTransformer: Transformer<
   AIContentCategories
 > = (aiContents: AIContentTemplateRaw[]): AIContentCategories[] => {
   const aiContentCategoriesHash = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const aiContentCategories: any = []
 
   for (const aiContent of aiContents) {

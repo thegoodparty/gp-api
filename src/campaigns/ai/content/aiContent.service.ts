@@ -290,6 +290,7 @@ export class AiContentService {
           error: chatResponse,
         })
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       this.logger.error('error at consumer', e)
       this.logger.error('messages', messages)

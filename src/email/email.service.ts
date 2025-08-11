@@ -104,6 +104,7 @@ export class EmailService {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
         return await this.mailgun.sendMessage(emailData)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         if (error.status === 429) {
           // Rate limit exceeded

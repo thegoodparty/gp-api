@@ -105,13 +105,16 @@ export class DomainsService
   async executePostPurchase(
     paymentIntentId: string,
     metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any> {
     return this.handleDomainPostPurchase(paymentIntentId, metadata)
   }
 
   async handleDomainPostPurchase(
     paymentIntentId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     metadata: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any> {
     const { domainName, websiteId } = metadata
     if (!websiteId) {
