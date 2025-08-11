@@ -4,6 +4,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
+import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { VotersService } from 'src/voters/services/voters.service'
 import { VoterCounts } from 'src/voters/voters.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -431,7 +432,7 @@ export class PathToVictoryService extends createPrismaBase(
             voterContactGoal: pathToVictoryResponse.counts.voterContactGoal,
             electionType: pathToVictoryResponse.electionType,
             electionLocation: pathToVictoryResponse.electionLocation,
-            p2vCompleteDate: new Date().toISOString().slice(0, 10),
+            p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
             p2vStatus,
             source: P2VSource.GpApi,
           },

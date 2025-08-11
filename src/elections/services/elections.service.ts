@@ -2,6 +2,7 @@ import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
+import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
@@ -113,7 +114,7 @@ export class ElectionsService {
           electionType: projectedTurnout.L2DistrictType,
           electionLocation: projectedTurnout.L2DistrictName,
           p2vStatus: P2VStatus.complete,
-          p2vCompleteDate: new Date().toISOString().slice(0, 10),
+          p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
         }
       : null
   }
