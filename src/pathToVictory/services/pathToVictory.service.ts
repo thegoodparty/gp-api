@@ -1,22 +1,25 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
-import { VotersService } from '../../voters/services/voters.service'
-import { OfficeMatchService } from './officeMatch.service'
-import { SlackService } from '../../shared/services/slack.service'
-import { EmailService } from '../../email/email.service'
-import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { ElectionsService } from 'src/elections/services/elections.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
+import { DateFormats, formatDate } from 'src/shared/util/date.util'
+import { VotersService } from 'src/voters/services/voters.service'
+import { VoterCounts } from 'src/voters/voters.types'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { P2VStatus } from '../../elections/types/pathToVictory.types'
+import { EmailService } from '../../email/email.service'
+import { EmailTemplateName } from '../../email/email.types'
+import { PrismaService } from '../../prisma/prisma.service'
+import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
+import { SlackService } from '../../shared/services/slack.service'
 import {
+  P2VSource,
   PathToVictoryInput,
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
-import { VoterCounts } from 'src/voters/voters.types'
-import { EmailTemplateName } from '../../email/email.types'
-import { SlackChannel } from 'src/shared/services/slackService.types'
-import { P2VStatus } from '../../elections/types/pathToVictory.types'
-import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
-import { AnalyticsService } from 'src/analytics/analytics.service'
+import { OfficeMatchService } from './officeMatch.service'
 
 @Injectable()
 export class PathToVictoryService extends createPrismaBase(
@@ -32,6 +35,7 @@ export class PathToVictoryService extends createPrismaBase(
     private crmService: CrmCampaignsService,
     @Inject(forwardRef(() => AnalyticsService))
     private analytics: AnalyticsService,
+    private elections: ElectionsService,
   ) {
     super()
   }
@@ -149,21 +153,42 @@ export class PathToVictoryService extends createPrismaBase(
             ? 'US'
             : input.electionState
 
-        const counts = await this.votersService.getVoterCounts(
-          input.electionTerm,
-          input.electionDate || new Date().toISOString().slice(0, 10),
+        const raceTargetDetails = await this.elections.buildRaceTargetDetails({
+          L2DistrictType: electionType,
+          L2DistrictName: electionLocation,
+          electionDate: input.electionDate,
           state,
-          electionType,
-          electionLocation,
-          input.partisanType,
-          input.priorElectionDates,
-        )
+        })
 
-        if (counts?.total && counts.total > 0) {
+        if (raceTargetDetails?.projectedTurnout) {
+          const { projectedTurnout, winNumber, voterContactGoal } =
+            raceTargetDetails
+
           pathToVictoryResponse.electionType = electionType
           pathToVictoryResponse.electionLocation = electionLocation
-          pathToVictoryResponse.counts = counts
+          pathToVictoryResponse.counts = {
+            projectedTurnout,
+            winNumber,
+            voterContactGoal,
+          }
           break
+        } else {
+          const counts = await this.votersService.getVoterCounts(
+            input.electionTerm,
+            input.electionDate || new Date().toISOString().slice(0, 10),
+            state,
+            electionType,
+            electionLocation,
+            input.partisanType,
+            input.priorElectionDates,
+          )
+
+          if (counts?.total && counts.total > 0) {
+            pathToVictoryResponse.electionType = electionType
+            pathToVictoryResponse.electionLocation = electionLocation
+            pathToVictoryResponse.counts = counts
+            break
+          }
         }
 
         if (++attempts > 10) break
@@ -407,8 +432,9 @@ export class PathToVictoryService extends createPrismaBase(
             voterContactGoal: pathToVictoryResponse.counts.voterContactGoal,
             electionType: pathToVictoryResponse.electionType,
             electionLocation: pathToVictoryResponse.electionLocation,
-            p2vCompleteDate: new Date().toISOString().slice(0, 10),
+            p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
             p2vStatus,
+            source: P2VSource.GpApi,
           },
         },
       })

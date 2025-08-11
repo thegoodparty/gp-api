@@ -2,9 +2,11 @@ import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
+import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
+  PositionWithMatchedDistrict,
   ProjectedTurnout,
   RaceTargetMetrics,
 } from '../types/elections.types'
@@ -64,7 +66,33 @@ export class ElectionsService {
     return {
       winNumber,
       voterContactGoal: winNumber * ElectionsService.VOTER_CONTACT_MULTIPLIER,
+      projectedTurnout,
     }
+  }
+
+  async getBallotReadyMatchedRaceTargetDetails(
+    ballotreadyPositionId: string,
+    electionDate: string,
+  ) {
+    const positionWithDistrict = await this.electionApiGet<
+      PositionWithMatchedDistrict,
+      { electionDate: string; includeDistrict: boolean }
+    >(
+      ElectionApiRoutes.positions.findByBrId.path + `/${ballotreadyPositionId}`,
+      {
+        electionDate,
+        includeDistrict: true,
+      },
+    )
+
+    return positionWithDistrict
+      ? {
+          ...this.calculateRaceTargetMetrics(
+            positionWithDistrict?.district.projectedTurnout.projectedTurnout,
+          ),
+          district: positionWithDistrict.district,
+        }
+      : null
   }
 
   async buildRaceTargetDetails(
@@ -82,11 +110,11 @@ export class ElectionsService {
     return projectedTurnout
       ? {
           ...this.calculateRaceTargetMetrics(projectedTurnout.projectedTurnout),
-          projectedTurnout: projectedTurnout.projectedTurnout,
           source: P2VSource.ElectionApi,
           electionType: projectedTurnout.L2DistrictType,
           electionLocation: projectedTurnout.L2DistrictName,
           p2vStatus: P2VStatus.complete,
+          p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
         }
       : null
   }
