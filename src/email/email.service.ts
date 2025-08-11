@@ -14,6 +14,8 @@ import { getUserFullName } from '../users/util/users.util'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { isTestEmail } from './util/testEmailValidator.util'
 
+const SKIPPED_EMAIL_STATUS = { status: 'test-email-skipped', id: 'test-email' }
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name)
@@ -21,7 +23,7 @@ export class EmailService {
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
     if (isTestEmail(to)) {
-      return
+      return SKIPPED_EMAIL_STATUS
     }
     return await this.sendEmailWithRetry({
       from: from || 'GoodParty.org <noreply@goodparty.org>',
@@ -41,7 +43,7 @@ export class EmailService {
     cc,
   }: SendTemplateEmailInput) {
     if (isTestEmail(to)) {
-      return
+      return SKIPPED_EMAIL_STATUS
     }
 
     const data: EmailData = {
