@@ -15,4 +15,9 @@ export const ElectionApiRoutes = {
       path: 'projectedTurnout',
     },
   },
+  positions: {
+    findByBrId: {
+      path: 'positions/by-ballotready-id',
+    },
+  },
 }

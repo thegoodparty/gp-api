@@ -1,36 +1,43 @@
 export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
-  PRO_SUBSCRIPTION = 'PRO_SUBSCRIPTION',
-  ADDITIONAL_FEATURES = 'ADDITIONAL_FEATURES',
+  TEXT = 'TEXT',
 }
 
-export interface PurchaseMetadata {
-  domainName?: string
-  websiteId?: number
-  planType?: string
-  duration?: string
-  features?: string[]
+export interface BasePurchaseMetadata {
+  campaignId?: number
 }
 
-export interface CreatePurchaseIntentDto {
+export type PurchaseMetadata<
+  T extends BasePurchaseMetadata = BasePurchaseMetadata,
+> = T
+
+export interface CreatePurchaseIntentDto<
+  T extends BasePurchaseMetadata = BasePurchaseMetadata,
+> {
   type: PurchaseType
-  metadata: PurchaseMetadata
+  metadata: PurchaseMetadata<T>
 }
 
 export interface CompletePurchaseDto {
   paymentIntentId: string
 }
 
-export type PostPurchaseHandler = (
+export type PostPurchaseHandler<
+  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
+  TResult = unknown,
+> = (
   paymentIntentId: string,
-  metadata: PurchaseMetadata,
-) => Promise<any>
+  metadata: PurchaseMetadata<TMetadata>,
+) => Promise<TResult>
 
-export interface PurchaseHandler {
-  validatePurchase(metadata: PurchaseMetadata): Promise<void>
-  calculateAmount(metadata: PurchaseMetadata): Promise<number>
-  executePostPurchase(
+export interface PurchaseHandler<
+  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
+  TResult = unknown,
+> {
+  validatePurchase(metadata: PurchaseMetadata<TMetadata>): Promise<void>
+  calculateAmount(metadata: PurchaseMetadata<TMetadata>): Promise<number>
+  executePostPurchase?(
     paymentIntentId: string,
-    metadata: PurchaseMetadata,
-  ): Promise<any>
+    metadata: PurchaseMetadata<TMetadata>,
+  ): Promise<TResult>
 }
