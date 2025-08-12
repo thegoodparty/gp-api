@@ -96,5 +96,5 @@ export enum CampaignVerificationStatus {
 export type PeerlyVerifyCVPinResponse = {
   message: string
   verification_id: string
-  cv_verification_status: CampaignVerificationStatus.VERIFIED
+  cv_verification_status: CampaignVerificationStatus
 }
