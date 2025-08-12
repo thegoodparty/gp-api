@@ -7,7 +7,9 @@ import { format } from '@redtea/format-axios-error'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { AxiosResponse } from 'axios'
 import { Campaign, TcrCompliance, User } from '@prisma/client'
-import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/createTcrComplianceDto.schema'
+import {
+  CreateTcrComplianceDto
+} from '../../campaigns/tcrCompliance/schemas/createTcrComplianceDto.schema'
 import { getUserFullName } from '../../users/util/users.util'
 import {
   Approve10DLCBrandResponse,
@@ -17,8 +19,12 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
-import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
+import {
+  GooglePlacesService
+} from '../../vendors/google/services/google-places.service'
+import {
+  extractAddressComponents
+} from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
@@ -128,9 +134,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               ein: einNumber,
               phone,
               street: street?.substring(0, 100), // Limit to 100 characters per Peerly API docs
-              city: city?.long_name.substring(0, 100), // Limit to 100 characters per Peerly API docs
-              state,
-              postalCode,
+              city: city?.long_name?.substring(0, 100), // Limit to 100 characters per Peerly API docs
+              state: state?.short_name,
+              postalCode: postalCode?.long_name,
               website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
               email: email.substring(0, 100), // Limit to 100 characters per Peerly API docs
             },
@@ -215,7 +221,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
             ),
             filing_address_line1,
             filing_city: city?.long_name,
-            filing_state: state?.long_name,
+            filing_state: state?.short_name,
             filing_zip: postalCode?.long_name,
           },
           await this.getBaseHttpHeaders(),
