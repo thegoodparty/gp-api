@@ -128,6 +128,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (isPro) {
       this.analytics.identify(campaign?.userId, { isPro })
     }
+    this.crm.trackCampaign(campaign.id)
     return campaign
   }
 
