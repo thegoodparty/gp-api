@@ -87,3 +87,14 @@ export type P2pTemplate = {
     }
   }
 }
+export enum CampaignVerificationStatus {
+  PENDING = 'PENDING',
+  VERIFIED = 'VERIFIED',
+  FAILED = 'FAILED',
+}
+
+export type PeerlyVerifyCVPinResponse = {
+  message: string
+  verification_id: string
+  cv_verification_status: CampaignVerificationStatus.VERIFIED
+}

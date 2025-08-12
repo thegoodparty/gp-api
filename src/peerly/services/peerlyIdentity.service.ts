@@ -11,14 +11,24 @@ import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/cr
 import { getUserFullName } from '../../users/util/users.util'
 import {
   Approve10DLCBrandResponse,
+  CampaignVerificationStatus,
   Peerly10DLCBrandSubmitResponseBody,
   PeerlyIdentityCreateResponseBody,
   PeerlySubmitIdentityProfileResponseBody,
+  PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-
+import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
+import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
+import { DateFormats, formatDate } from '../../shared/util/date.util'
 
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
+enum PEERLY_COMMITTEE_TYPE {
+  Candidate = 'CA',
+}
+enum PEERLY_CV_VERIFICATION_TYPE {
+  StateLocal = 'state_local',
+}
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -26,6 +36,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
+    private readonly placesService: GooglePlacesService,
   ) {
     super()
   }
@@ -86,7 +97,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         )
       const { data } = response
       const { link } = data
-      this.logger.debug('Successfully submitted identity profile')
+      this.logger.debug('Successfully submitted identity profile', data)
       return link
     } catch (error) {
       this.handleApiError(error)
@@ -96,10 +107,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async submit10DlcBrand(
     identityId: string,
     tcrComplianceDto: CreateTcrComplianceDto,
-    { details: campaignDetails }: Campaign,
+    { details: campaignDetails, placeId }: Campaign,
   ) {
-    const { phone, postalAddress, websiteDomain, email } = tcrComplianceDto
-    const { streetLines, city, state, postalCode } = postalAddress
+    const { phone, websiteDomain, email } = tcrComplianceDto
+    const { street, city, state, postalCode } = extractAddressComponents(
+      await this.placesService.getAddressByPlaceId(placeId!),
+    )
     const { campaignCommittee, einNumber } = campaignDetails
     try {
       const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
@@ -114,8 +127,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               companyName: (campaignCommittee || '').substring(0, 255), // Limit to 255 characters per Peerly API docs
               ein: einNumber,
               phone,
-              street: streetLines.join(' ').substring(0, 100), // Limit to 100 characters per Peerly API docs
-              city: city.substring(0, 100), // Limit to 100 characters per Peerly API docs
+              street: street?.substring(0, 100), // Limit to 100 characters per Peerly API docs
+              city: city?.long_name.substring(0, 100), // Limit to 100 characters per Peerly API docs
               state,
               postalCode,
               website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
@@ -126,7 +139,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         )
       const { data } = response
       const { submission_key: submissionKey } = data
-      this.logger.debug('Successfully submitted identity profile')
+      this.logger.debug('Successfully submitted 10DLC brand', data)
       return submissionKey
     } catch (error) {
       this.handleApiError(error)
@@ -164,4 +177,98 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.handleApiError(error)
     }
   }
+
+  async submitCampaignVerifyRequest(
+    {
+      email,
+      ein,
+      peerlyIdentityId,
+      filingUrl,
+    }: Pick<TcrCompliance, 'ein' | 'peerlyIdentityId' | 'filingUrl' | 'email'>,
+    user: User,
+    campaign: Campaign,
+  ) {
+    const { details: campaignDetails, placeId } = campaign
+    const { electionDate } = campaignDetails
+    const {
+      street: filing_address_line1,
+      city,
+      state,
+      postalCode,
+    } = extractAddressComponents(
+      await this.placesService.getAddressByPlaceId(placeId!),
+    )
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit_cv`,
+          {
+            name: getUserFullName(user),
+            general_campaign_email: email,
+            verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+            filing_url: filingUrl,
+            committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
+            committee_ein: ein,
+            election_date: formatDate(
+              new Date(electionDate!),
+              DateFormats.isoDate,
+            ),
+            filing_address_line1,
+            filing_city: city?.long_name,
+            filing_state: state?.long_name,
+            filing_zip: postalCode?.long_name,
+          },
+          await this.getBaseHttpHeaders(),
+        ),
+      )
+      const { data } = response
+      this.logger.debug('Successfully submitted CV request', data)
+      return data
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async verifyCampaignVerifyPin(peerlyIdentityId: string, pin: number) {
+    try {
+      const response: AxiosResponse<PeerlyVerifyCVPinResponse> =
+        await lastValueFrom(
+          this.httpService.post(
+            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/verify_pin`,
+            {
+              code: pin,
+            },
+            await this.getBaseHttpHeaders(),
+          ),
+        )
+      const { data } = response
+      const { cv_verification_status } = data
+      return cv_verification_status === CampaignVerificationStatus.VERIFIED
+    } catch (e) {
+      this.handleApiError(e)
+    }
+  }
+
+  async createCampaignVerifyToken(peerlyIdentityId: string) {
+    try {
+      const response: AxiosResponse<PeerlyCreateCVTokenResponse> =
+        await lastValueFrom(
+          this.httpService.post(
+            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/create_cv_token`,
+            null,
+            await this.getBaseHttpHeaders(),
+          ),
+        )
+      const { data } = response
+      const { campaign_verify_token } = data
+      return campaign_verify_token
+    } catch (e) {
+      this.handleApiError(e)
+    }
+  }
+}
+
+type PeerlyCreateCVTokenResponse = {
+  message: string
+  campaign_verify_token: string
 }
