@@ -46,6 +46,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         campaign,
       )
 
+    // TODO: determine if we need to do anything with this data once we can
+    //  actually get a valid response from Peerly
     const campaignVerifySubmissionData =
       await this.peerlyIdentityService.submitCampaignVerifyRequest(
         {
