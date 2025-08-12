@@ -289,7 +289,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       ...currentDetails,
       ...details,
     } as typeof currentDetails
-    return this.client.$transaction(
+    const updatedCampaign = await this.client.$transaction(
       async (tx) =>
         tx.campaign.update({
           where: { id: campaignId },
@@ -299,6 +299,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       },
     )
+
+    this.crm.trackCampaign(campaignId)
+    return updatedCampaign
   }
 
   async persistCampaignProCancellation(campaign: Campaign) {
@@ -308,6 +311,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
     await this.setIsPro(campaign.id, false)
+    this.crm.trackCampaign(campaign.id)
   }
 
   async setIsPro(campaignId: number, isPro: boolean = true) {
