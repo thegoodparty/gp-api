@@ -234,7 +234,7 @@ export class EcanvasserIntegrationService extends createPrismaBase(
       }
 
       // Create or update records
-      const updated = this.model.update({
+      const updated = await this.model.update({
         where: { id: ecanvasser.id },
         data: {
           contacts: {
@@ -282,7 +282,7 @@ export class EcanvasserIntegrationService extends createPrismaBase(
           error: null,
         },
       })
-      this.crm.trackCampaign(campaignId)
+      await this.crm.trackCampaign(campaignId)
       return updated
     } catch (error) {
       this.logger.error('Failed to sync with ecanvasserIntegration', error)
