@@ -12,6 +12,9 @@ import {
 } from './email.types'
 import { getUserFullName } from '../users/util/users.util'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { isTestEmail } from './util/testEmailValidator.util'
+
+const SKIPPED_EMAIL_STATUS = { status: 'test-email-skipped', id: 'test-email' }
 
 @Injectable()
 export class EmailService {
@@ -19,6 +22,9 @@ export class EmailService {
   constructor(private mailgun: MailgunService) {}
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
+    if (isTestEmail(to)) {
+      return SKIPPED_EMAIL_STATUS
+    }
     return await this.sendEmailWithRetry({
       from: from || 'GoodParty.org <noreply@goodparty.org>',
       to,
@@ -36,6 +42,10 @@ export class EmailService {
     from,
     cc,
   }: SendTemplateEmailInput) {
+    if (isTestEmail(to)) {
+      return SKIPPED_EMAIL_STATUS
+    }
+
     const data: EmailData = {
       from: from || 'GoodParty.org <noreply@goodparty.org>',
       to,
@@ -91,7 +101,7 @@ export class EmailService {
   ) {
     await this.sendTemplateEmail({
       to: user.email,
-      subject: `Your Cancellation Request Has Been Processed – Pro Access Until ${subscriptionEndDate}`,
+      subject: `Your Cancellation Request Has Been Processed - Pro Access Until ${subscriptionEndDate}`,
       template: EmailTemplateName.subscriptionCancellationConfirmation,
       variables: {
         userFullName: getUserFullName(user),
@@ -104,6 +114,7 @@ export class EmailService {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
         return await this.mailgun.sendMessage(emailData)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         if (error.status === 429) {
           // Rate limit exceeded

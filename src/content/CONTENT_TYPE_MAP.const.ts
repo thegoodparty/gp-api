@@ -36,6 +36,7 @@ export enum InferredContentTypes {
 export const CONTENT_TYPE_MAP: {
   [key in ContentType | InferredContentTypes]: {
     name: ContentType | InferredContentTypes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     transformer: any
     inferredFrom?: ContentType | ContentType[]
   }

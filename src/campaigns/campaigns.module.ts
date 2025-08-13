@@ -1,6 +1,8 @@
 import { forwardRef, Global, Module } from '@nestjs/common'
 import { CampaignsController } from './campaigns.controller'
+import { PublicCampaignsController } from './controllers/public-campaigns.controller'
 import { CampaignsService } from './services/campaigns.service'
+import { PublicCampaignsService } from './services/public-campaigns.service'
 import { CampaignMapController } from './map/campaignMap.controller'
 import { CampaignMapService } from './map/campaignMap.service'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
@@ -24,6 +26,8 @@ import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrComp
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
 import { PeerlyModule } from '../peerly/peerly.module'
 import { GoogleModule } from '../vendors/google/google.module'
+import { AnalyticsModule } from '../analytics/analytics.module'
+import { UsersModule } from 'src/users/users.module'
 
 @Global()
 @Module({
@@ -38,9 +42,12 @@ import { GoogleModule } from '../vendors/google/google.module'
     StripeModule,
     PeerlyModule,
     GoogleModule,
+    AnalyticsModule,
+    UsersModule,
   ],
   controllers: [
     CampaignsController,
+    PublicCampaignsController,
     CampaignPositionsController,
     CampaignMapController,
     CampaignUpdateHistoryController,
@@ -49,6 +56,7 @@ import { GoogleModule } from '../vendors/google/google.module'
   ],
   providers: [
     CampaignsService,
+    PublicCampaignsService,
     CampaignPlanVersionsService,
     CampaignPositionsService,
     CampaignMapService,

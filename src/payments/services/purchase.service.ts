@@ -1,17 +1,18 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { User } from '@prisma/client'
 import {
-  PurchaseType,
-  PurchaseHandler,
-  CreatePurchaseIntentDto,
   CompletePurchaseDto,
+  CreatePurchaseIntentDto,
   PostPurchaseHandler,
+  PurchaseHandler,
+  PurchaseType,
 } from '../purchase.types'
 import { PaymentsService } from './payments.service'
 import { PaymentType } from '../payments.types'
 
 @Injectable()
 export class PurchaseService {
+  private readonly logger = new Logger('PurchaseService')
   private handlers: Map<PurchaseType, PurchaseHandler> = new Map()
   private postPurchaseHandlers: Map<PurchaseType, PostPurchaseHandler> =
     new Map()
@@ -38,6 +39,7 @@ export class PurchaseService {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
     }
 
+    this.logger.debug('Creating purchase intent', dto)
     await handler.validatePurchase(dto.metadata)
     const amount = await handler.calculateAmount(dto.metadata)
 
@@ -55,10 +57,11 @@ export class PurchaseService {
 
     return {
       clientSecret: paymentIntent.client_secret!,
-      amount: amount / 100,
+      amount: paymentIntent.amount / 100,
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async completePurchase(dto: CompletePurchaseDto): Promise<any> {
     const paymentIntent = await this.paymentsService.retrievePayment(
       dto.paymentIntentId,
@@ -89,6 +92,8 @@ export class PurchaseService {
     switch (purchaseType) {
       case PurchaseType.DOMAIN_REGISTRATION:
         return PaymentType.DOMAIN_REGISTRATION
+      case PurchaseType.TEXT:
+        return PaymentType.OUTREACH_PURCHASE
       default:
         throw new Error(`No payment type mapping for: ${purchaseType}`)
     }

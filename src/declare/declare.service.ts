@@ -32,6 +32,7 @@ export class DeclareService {
           },
         ),
       )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       this.logger.error(
         `Failed to fetch data from HubSpot API: ${error.message}`,

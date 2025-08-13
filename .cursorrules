@@ -1,4 +1,43 @@
+---
+description: Cursor rules for GP-API TypeScript/NestJS project. Enforce type safety, Prisma patterns, exception handling, and coding standards.
+globs: ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx"]
+alwaysApply: true
+---
+
 # Cursor Rules for GP-API
+
+## Rule 0: Type Safety
+
+NEVER use the `any` type in new code. Always use proper TypeScript types:
+
+- ✅ Good: `user: User`, `data: { id: string; name: string }`, `error: Error`
+- ❌ Bad: `user: any`, `data: any`, `error: any`
+
+For complex external API responses, create proper interfaces:
+```typescript
+interface ApiResponse {
+  data: { id: string; name: string }
+  status: 'success' | 'error'
+}
+```
+
+For catch blocks, use `Error` type or create specific error types:
+```typescript
+try {
+  // code
+} catch (error: Error) {
+  // handle error
+}
+```
+
+For function parameters where the type is truly unknown, use generics or unions:
+```typescript
+function processData<T>(data: T): T { return data }
+// or
+function handleValue(value: string | number | boolean): void {}
+```
+
+Pre-existing `any` types have been marked with `// eslint-disable-next-line @typescript-eslint/no-explicit-any` for gradual migration.
 
 ## Rule 1: Exception Handling
 

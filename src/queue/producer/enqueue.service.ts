@@ -39,7 +39,9 @@ const producer = Producer.create({
 export class EnqueueService {
   private readonly logger = new Logger(EnqueueService.name)
   constructor() {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async sendMessage(msg: any, group: MessageGroup = MessageGroup.default) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = JSON.stringify(msg)
 
     const uuid = Math.random().toString(36).substring(2, 12)
