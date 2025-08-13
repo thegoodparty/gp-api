@@ -567,3 +567,27 @@ VERIFICATION STEPS:
 - Use proper decorators and validation
 - Keep controllers focused on HTTP concerns and business logic
 - Keep services focused on data operations
+
+## Rule 24: Testing Maintenance & Conventions
+
+CRITICAL REQUIREMENT:
+
+- Maintain existing tests when applicable. Do not delete or substantially rewrite existing test cases unless they are truly obsolete or incorrect.
+- When changing behavior, update affected tests accordingly and ensure coverage does not regress for impacted modules.
+- When implementing new functionality, write tests following the conventions in `TESTING.md`.
+
+IMPLEMENTATION:
+
+- Use `TESTING.md` as the canonical reference for:
+  - Colocation of `*.spec.ts` files under `src/**`
+  - Prisma service testing with `_prisma` injection and `onModuleInit()` passthrough binding
+  - HTTP service testing with `HttpService` mocks and `rxjs` `lastValueFrom` stubbing (preserve other rxjs internals)
+  - Exception handling patterns (only external calls wrapped; Prisma not wrapped)
+  - Using `http-constants-ts` for MIME types
+  - Running tests with `TZ=UTC` for deterministic date behavior
+
+PROHIBITED:
+
+- Introducing `any` in new tests
+- Removing tests without a clear, documented reason
+- Modifying runtime code solely to accommodate tests; prefer boundary mocking per `TESTING.md`
