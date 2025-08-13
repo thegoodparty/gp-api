@@ -132,7 +132,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return campaign
   }
 
-  async updateJsonFields(id: number, body: Omit<UpdateCampaignSchema, 'slug'>) {
+  async updateJsonFields(
+    id: number,
+    body: Omit<UpdateCampaignSchema, 'slug'>,
+    trackCampaign: boolean = true,
+  ) {
     const {
       data,
       details,
@@ -244,7 +248,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     // TODO: this should throw an exception if the update failed
     //  https://goodparty.atlassian.net/browse/WEB-4384
-    if (updatedCampaign) {
+    if (updatedCampaign && trackCampaign) {
       // Track campaign and user
       this.crm.trackCampaign(updatedCampaign.id)
     }
@@ -301,27 +305,44 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     )
 
-    this.crm.trackCampaign(campaignId)
     return updatedCampaign
   }
 
   async persistCampaignProCancellation(campaign: Campaign) {
-    await this.updateJsonFields(campaign.id, {
-      details: {
-        subscriptionId: null,
+    await this.updateJsonFields(
+      campaign.id,
+      {
+        details: {
+          subscriptionId: null,
+        },
       },
-    })
-    await this.setIsPro(campaign.id, false)
+      false,
+    )
+    await this.setIsPro(campaign.id, false, false)
     this.crm.trackCampaign(campaign.id)
   }
 
-  async setIsPro(campaignId: number, isPro: boolean = true) {
-    await this.update({ where: { id: campaignId }, data: { isPro } })
+  async setIsPro(
+    campaignId: number,
+    isPro: boolean = true,
+    trackCampaign: boolean = true,
+  ) {
+    const campaign = await this.model.update({
+      where: { id: campaignId },
+      data: { isPro },
+    })
     // Must be in serial so as to not overwrite campaign details w/ concurrent queries
     await this.patchCampaignDetails(campaignId, {
       isProUpdatedAt: Date.now(),
     }) // TODO: this should be an ISO dateTime string, not a unix timestamp
-    this.crm.trackCampaign(campaignId)
+
+    if (trackCampaign) {
+      const updatedIsPro = campaign?.isPro
+      if (updatedIsPro) {
+        this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
+      }
+      this.crm.trackCampaign(campaignId)
+    }
   }
 
   async getStatus(campaign?: Campaign) {
