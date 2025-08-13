@@ -129,7 +129,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
     }
     try {
-      console.log(`state =>`, state)
       const submitBrandData = {
         entityType: PEERLY_ENTITY_TYPE,
         vertical: PEERLY_USECASE,
@@ -236,6 +235,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     if (!ballotLevel) {
       throw new BadRequestException(
         'Campaign must have ballotLevel to submit CV request',
+      )
+    }
+    if (!electionDate) {
+      throw new BadRequestException(
+        'Campaign must have electionDate to submit CV request',
       )
     }
     const peerlyLocale = getPeerlyLocalFromBallotLevel(ballotLevel)
