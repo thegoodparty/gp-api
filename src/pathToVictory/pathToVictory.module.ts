@@ -23,7 +23,6 @@ import { ViabilityController } from './viability.controller'
     EmailModule,
     QueueProducerModule,
     SegmentModule,
-    ElectionsModule,
   ],
   controllers: [PathToVictoryController, ViabilityController],
   providers: [
