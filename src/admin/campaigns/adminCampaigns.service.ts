@@ -88,7 +88,7 @@ export class AdminCampaignsService {
       },
     })
 
-    this.crm.trackCampaign(newCampaign.id)
+    await this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
@@ -125,7 +125,7 @@ export class AdminCampaignsService {
         },
       )
     }
-    this.crm.trackCampaign(updatedCampaign.id)
+    await this.crm.trackCampaign(updatedCampaign.id)
 
     return updatedCampaign
   }

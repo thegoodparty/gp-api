@@ -117,7 +117,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
     this.logger.debug('Created campaign', newCampaign)
-    this.crm.trackCampaign(newCampaign.id)
+    await this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
@@ -128,7 +128,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (isPro) {
       this.analytics.identify(campaign?.userId, { isPro })
     }
-    this.crm.trackCampaign(campaign.id)
+    await this.crm.trackCampaign(campaign.id)
     return campaign
   }
 
@@ -250,7 +250,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     //  https://goodparty.atlassian.net/browse/WEB-4384
     if (updatedCampaign && trackCampaign) {
       // Track campaign and user
-      this.crm.trackCampaign(updatedCampaign.id)
+      await this.crm.trackCampaign(updatedCampaign.id)
     }
 
     return updatedCampaign ? updatedCampaign : null
@@ -319,7 +319,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       false,
     )
     await this.setIsPro(campaign.id, false, false)
-    this.crm.trackCampaign(campaign.id)
+    await this.crm.trackCampaign(campaign.id)
   }
 
   async setIsPro(
@@ -341,7 +341,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       if (updatedIsPro) {
         this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
       }
-      this.crm.trackCampaign(campaignId)
+      await this.crm.trackCampaign(campaignId)
     }
   }
 
@@ -433,7 +433,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
 
-    this.crm.trackCampaign(campaign.id)
+    await this.crm.trackCampaign(campaign.id)
 
     return true
   }
