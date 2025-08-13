@@ -9,8 +9,9 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  UnprocessableEntityException,
 } from '@nestjs/common'
-import { AxiosResponse } from 'axios'
+import { AxiosResponse, isAxiosError } from 'axios'
 import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
 import { getUserFullName } from '../../users/util/users.util'
 import {
@@ -22,12 +23,18 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
-import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
+import {
+  GooglePlacesService
+} from '../../vendors/google/services/google-places.service'
+import {
+  extractAddressComponents
+} from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
-import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import {
+  CreateTcrCompliancePayload
+} from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
@@ -296,6 +303,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { cv_verification_status } = data
       return cv_verification_status === CampaignVerificationStatus.VERIFIED
     } catch (e) {
+      if (isAxiosError(e) && e.status === 400) {
+        this.logger.warn(
+          'Peerly API returned 400 Bad Request when verifying CV PIN. This is likely due to an invalid PIN. ',
+          format(e),
+        )
+        throw new UnprocessableEntityException('PIN could not be validated')
+      }
       this.handleApiError(e)
     }
   }
