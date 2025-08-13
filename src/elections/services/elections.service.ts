@@ -1,5 +1,6 @@
 import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
@@ -35,26 +36,37 @@ export class ElectionsService {
     path: string,
     query?: Q,
   ): Promise<Res | null> {
+    const fullUrl = `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`
+    console.log('query: ', query)
     try {
       const { data, status } = await lastValueFrom(
-        this.httpService.get(
-          `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`,
-          {
-            params: query,
-            paramsSerializer: (params) =>
-              Object.entries(params)
-                .filter(([, v]) => v !== undefined && v !== null)
-                .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-                .join('&'),
-          },
-        ),
+        this.httpService.get(fullUrl, {
+          params: query,
+          paramsSerializer: (params) =>
+            Object.entries(params)
+              .filter(([, v]) => v !== undefined && v !== null)
+              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+              .join('&'),
+        }),
       )
       if (status >= 200 && status < 300) return data
       this.logger.warn(`Election API GET ${path}} responded ${status}`)
       return null
-    } catch (error) {
-      this.logger.error(`Election API GET ${path} failed: ${error}`)
-      throw new BadGatewayException(`Election API GET ${path} failed: ${error}`)
+    } catch (error: unknown) {
+      const baseMessage = `Election API GET ${path} failed`
+      if (isAxiosError(error)) {
+        const data = error.response?.data as Record<string, unknown> | undefined
+        const apiMessage =
+          typeof data?.message === 'string' ? data.message : undefined
+        const finalMessage = apiMessage
+          ? `${baseMessage}: ${apiMessage}`
+          : `${baseMessage}: ${error.message}`
+        this.logger.error(finalMessage)
+        throw new BadGatewayException(finalMessage)
+      }
+      const finalMessage = `${baseMessage}: ${String(error)}`
+      this.logger.error(`Election API GET ${fullUrl} failed: ${String(error)}`)
+      throw new BadGatewayException(finalMessage)
     }
   }
 
@@ -74,6 +86,8 @@ export class ElectionsService {
     ballotreadyPositionId: string,
     electionDate: string,
   ) {
+    console.log('brPositionId: ', ballotreadyPositionId)
+    console.log('electionDate: ', electionDate)
     const positionWithDistrict = await this.electionApiGet<
       PositionWithMatchedDistrict,
       { electionDate: string; includeDistrict: boolean }
@@ -84,6 +98,8 @@ export class ElectionsService {
         includeDistrict: true,
       },
     )
+
+    console.log('positionWithDistrict: ', positionWithDistrict)
 
     return positionWithDistrict
       ? {
