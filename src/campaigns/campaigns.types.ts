@@ -50,3 +50,13 @@ export enum ElectionLevel {
   federal = 'federal',
   city = 'city',
 }
+
+export enum BallotReadyPositionLevel {
+  CITY = 'CITY',
+  COUNTY = 'COUNTY',
+  FEDERAL = 'FEDERAL',
+  LOCAL = 'LOCAL',
+  REGIONAL = 'REGIONAL',
+  STATE = 'STATE',
+  TOWNSHIP = 'TOWNSHIP',
+}

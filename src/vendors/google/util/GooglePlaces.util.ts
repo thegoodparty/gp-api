@@ -11,7 +11,7 @@ export const extractAddressComponent = (
   const typeArray = Array.isArray(types) ? types : [types]
   return (
     address_components.find((comp) =>
-      typeArray.some((type) => comp.types.includes(type)),
+      typeArray.every((type) => comp.types.includes(type)),
     ) || null
   )
 }
@@ -64,10 +64,15 @@ export const extractNeighborhood = (place: GooglePlacesApiResponse) =>
   extractAddressComponent(place, 'neighborhood')
 
 export const extractCity = (place: GooglePlacesApiResponse) =>
-  extractAddressComponent(place, ['locality', 'neighborhood'])
+  // For some cities, the types are different, so we check for both
+  extractAddressComponent(place, ['locality', 'political']) ||
+  extractAddressComponent(place, ['neighborhood', 'political'])
+
+export const extractCounty = (place: GooglePlacesApiResponse) =>
+  extractAddressComponent(place, ['administrative_area_level_2', 'political'])
 
 export const extractState = (place: GooglePlacesApiResponse) =>
-  extractAddressComponent(place, ['locality', 'political'])
+  extractAddressComponent(place, ['administrative_area_level_1', 'political'])
 
 export const extractPremise = (place: GooglePlacesApiResponse) =>
   extractAddressComponent(place, 'premise')
@@ -142,9 +147,11 @@ export const extractAddressComponents = (
   city: GoogleAddressComponent | null
   state: GoogleAddressComponent | null
   postalCode: GoogleAddressComponent | null
+  county: GoogleAddressComponent | null
 } => ({
   street: extractStreetLine(place),
   city: extractCity(place), // Limit to 100 characters per Peerly API docs
   state: extractState(place),
+  county: extractCounty(place),
   postalCode: extractPostalCode(place),
 })

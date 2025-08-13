@@ -98,3 +98,61 @@ export type PeerlyVerifyCVPinResponse = {
   verification_id: string
   cv_verification_status: CampaignVerificationStatus
 }
+
+export type PeerlyTcrCampaign = {
+  account_id: string
+  ageGated: string | null
+  att_msg_class: string | null
+  att_status: string | null
+  att_tpm: string | null
+  autoRenewal: number
+  create_date: string
+  description: string
+  directLending: string | null
+  embeddedLink: string | null
+  embeddedPhone: string | null
+  helpMessage: string | null
+  is_expired: number
+  is_suspended: number
+  messageFlow: string | null
+  numberPool: string | null
+  sample1: string | null
+  sample1_media: string | null
+  sample2: string | null
+  sample2_media: string | null
+  sample3: string | null
+  sample3_media: string | null
+  sample4: string | null
+  sample4_media: string | null
+  sample5: string | null
+  sample5_media: string | null
+  subUsecases: string | null
+  subscriberHelp: string | null
+  subscriberOptin: string | null
+  subscriberOptout: string | null
+  tcr_brand_id: string
+  tcr_campaign_id: string
+  tmo_brand_daily_cap: string | null
+  tmo_brand_tier: string | null
+  tmo_status: string | null
+  usc_status: string | null
+  usecase: string
+  vertical: string
+  vz_status: string | null
+}
+
+export type PeerlyGetIdentityBrandInfoResponse = {
+  account_id: string
+  aegis_vetting_score: string
+  aegis_vetting_status: string
+  cv_vetting_status: string | null
+  tcr_brand_id: string
+  tcr_campaigns: PeerlyTcrCampaign[]
+  tcr_entity_type: string
+  tcr_identity_status: string
+  tcr_vertical: string
+}
+export type PeerlyCreateCVTokenResponse = {
+  message: string
+  campaign_verify_token: string
+}

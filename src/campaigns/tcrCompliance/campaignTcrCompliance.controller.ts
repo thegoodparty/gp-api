@@ -14,7 +14,9 @@ import {
   Post,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
+import {
+  CampaignTcrComplianceService
+} from './services/campaignTcrCompliance.service'
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
@@ -22,7 +24,9 @@ import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
 import { UsersService } from '../../users/services/users.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
-import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
+import {
+  submitCampaignVerifyPinDto
+} from './schemas/submitCampaignVerifyPinDto.schema'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
 
 @Controller('campaigns/tcr-compliance')
@@ -60,7 +64,9 @@ export class CampaignTcrComplianceController {
         'TCR compliance already exists for this campaign',
       )
     }
-    const { ein, placeId, formattedAddress } = tcrComplianceDto
+    const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
+      tcrComplianceDto
+    const { ein } = tcrComplianceCreatePayload
     const user = await this.userService.findByCampaign(campaign)
     const updatedCampaign = await this.campaignsService.updateJsonFields(
       campaign.id,
@@ -82,7 +88,7 @@ export class CampaignTcrComplianceController {
     return this.tcrComplianceService.create(
       user!,
       updatedCampaign,
-      tcrComplianceDto,
+      tcrComplianceCreatePayload,
     )
   }
 

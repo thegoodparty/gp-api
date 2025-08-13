@@ -4,15 +4,20 @@ import { lastValueFrom } from 'rxjs'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  Logger,
+} from '@nestjs/common'
 import { AxiosResponse } from 'axios'
-import { Campaign, TcrCompliance, User } from '@prisma/client'
-import { CreateTcrComplianceDto } from '../../campaigns/tcrCompliance/schemas/createTcrComplianceDto.schema'
+import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
 import { getUserFullName } from '../../users/util/users.util'
 import {
   Approve10DLCBrandResponse,
   CampaignVerificationStatus,
   Peerly10DLCBrandSubmitResponseBody,
+  PeerlyCreateCVTokenResponse,
   PeerlyIdentityCreateResponseBody,
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
@@ -20,6 +25,9 @@ import {
 import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
 import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
+import { parsePhoneNumberWithError } from 'libphonenumber-js'
+import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
+import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
@@ -106,34 +114,42 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
 
   async submit10DlcBrand(
     identityId: string,
-    tcrComplianceDto: CreateTcrComplianceDto,
+    tcrCompliancePayload: CreateTcrCompliancePayload,
     { details: campaignDetails, placeId }: Campaign,
   ) {
-    const { phone, websiteDomain, email } = tcrComplianceDto
+    const { phone, websiteDomain, email, ein } = tcrCompliancePayload
     const { street, city, state, postalCode } = extractAddressComponents(
       await this.placesService.getAddressByPlaceId(placeId!),
     )
-    const { campaignCommittee, einNumber } = campaignDetails
+    const { campaignCommittee } = campaignDetails
+    if (!campaignCommittee) {
+      throw new BadRequestException(
+        'Campaign committee is required to submit 10DLC brand',
+      )
+    }
     try {
+      console.log(`state =>`, state)
+      const submitBrandData = {
+        entityType: PEERLY_ENTITY_TYPE,
+        vertical: PEERLY_USECASE,
+        is_political: true,
+        displayName: campaignCommittee.substring(0, 255), // Limit to 255 characters per Peerly API docs
+        companyName: campaignCommittee.substring(0, 255), // Limit to 255 characters per Peerly API docs
+        ein,
+        phone: parsePhoneNumberWithError(phone, 'US').number,
+        street: street?.substring(0, 100), // Limit to 100 characters per Peerly API docs
+        city: city?.long_name?.substring(0, 100), // Limit to 100 characters per Peerly API docs
+        state: state?.short_name,
+        postalCode: postalCode?.long_name,
+        website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
+        email: email.substring(0, 100), // Limit to 100 characters per Peerly API docs
+      }
+      this.logger.debug('Submitting 10DLC brand with data:', submitBrandData)
       const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
         await lastValueFrom(
           this.httpService.post(
             `${this.baseUrl}/v2/tdlc/${identityId}/submit`,
-            {
-              entityType: PEERLY_ENTITY_TYPE,
-              vertical: PEERLY_USECASE,
-              is_political: true,
-              displayName: (campaignCommittee || '').substring(0, 255), // Limit to 255 characters per Peerly API docs
-              companyName: (campaignCommittee || '').substring(0, 255), // Limit to 255 characters per Peerly API docs
-              ein: einNumber,
-              phone,
-              street: street?.substring(0, 100), // Limit to 100 characters per Peerly API docs
-              city: city?.long_name?.substring(0, 100), // Limit to 100 characters per Peerly API docs
-              state: state?.short_name,
-              postalCode: postalCode?.long_name,
-              website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
-              email: email.substring(0, 100), // Limit to 100 characters per Peerly API docs
-            },
+            submitBrandData,
             await this.getBaseHttpHeaders(),
           ),
         )
@@ -141,6 +157,22 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { submission_key: submissionKey } = data
       this.logger.debug('Successfully submitted 10DLC brand', data)
       return submissionKey
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async getIdentityBrandInfo(peerlyIdentityId: string) {
+    try {
+      const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
+        await lastValueFrom(
+          this.httpService.get(
+            `${this.baseUrl}/identities/${peerlyIdentityId}/getAccountIdentityInfo`,
+            await this.getBaseHttpHeaders(),
+          ),
+        )
+      const { data } = response
+      const { submission_key: submissionKey } = data
     } catch (error) {
       this.handleApiError(error)
     }
@@ -187,37 +219,56 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }: Pick<TcrCompliance, 'ein' | 'peerlyIdentityId' | 'filingUrl' | 'email'>,
     user: User,
     campaign: Campaign,
+    domain: Domain,
   ) {
     const { details: campaignDetails, placeId } = campaign
-    const { electionDate } = campaignDetails
+    const { electionDate, ballotLevel } = campaignDetails
     const {
       street: filing_address_line1,
       city,
       state,
+      county,
       postalCode,
     } = extractAddressComponents(
       await this.placesService.getAddressByPlaceId(placeId!),
     )
+    if (!ballotLevel) {
+      throw new BadRequestException(
+        'Campaign must have ballotLevel to submit CV request',
+      )
+    }
+    const peerlyLocale = getPeerlyLocalFromBallotLevel(ballotLevel)
     try {
+      const submitCVData = {
+        name: getUserFullName(user),
+        general_campaign_email: email,
+        verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+        filing_url: filingUrl,
+        committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
+        committee_ein: ein,
+        election_date: formatDate(new Date(electionDate!), DateFormats.isoDate),
+        filing_address_line1,
+        filing_city: city?.long_name,
+        filing_state: state?.short_name,
+        filing_zip: postalCode?.long_name,
+        filing_email: email,
+        locality: peerlyLocale,
+        state: state?.short_name,
+        campaign_website: `https://${domain?.name}`,
+        ...(peerlyLocale === PEERLY_LOCALITIES.local
+          ? {
+              city_county:
+                ballotLevel === BallotReadyPositionLevel.COUNTY
+                  ? county?.long_name
+                  : city?.long_name,
+            }
+          : {}),
+      }
+      this.logger.debug('Submitting CV request with data:', submitCVData)
       const response = await lastValueFrom(
         this.httpService.post(
           `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit_cv`,
-          {
-            name: getUserFullName(user),
-            general_campaign_email: email,
-            verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-            filing_url: filingUrl,
-            committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
-            committee_ein: ein,
-            election_date: formatDate(
-              new Date(electionDate!),
-              DateFormats.isoDate,
-            ),
-            filing_address_line1,
-            filing_city: city?.long_name,
-            filing_state: state?.short_name,
-            filing_zip: postalCode?.long_name,
-          },
+          submitCVData,
           await this.getBaseHttpHeaders(),
         ),
       )
@@ -229,7 +280,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
   }
 
-  async verifyCampaignVerifyPin(peerlyIdentityId: string, pin: number) {
+  async verifyCampaignVerifyPin(peerlyIdentityId: string, pin: string) {
     try {
       const response: AxiosResponse<PeerlyVerifyCVPinResponse> =
         await lastValueFrom(
@@ -268,7 +319,25 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   }
 }
 
-type PeerlyCreateCVTokenResponse = {
-  message: string
-  campaign_verify_token: string
+enum PEERLY_LOCALITIES {
+  local = 'local',
+  state = 'state',
 }
+
+const PEERLY_LOCALITY_CATEGORIES = {
+  [PEERLY_LOCALITIES.local]: [
+    BallotReadyPositionLevel.CITY,
+    BallotReadyPositionLevel.COUNTY,
+    BallotReadyPositionLevel.LOCAL,
+    BallotReadyPositionLevel.REGIONAL,
+    BallotReadyPositionLevel.TOWNSHIP,
+  ],
+  [PEERLY_LOCALITIES.state]: [BallotReadyPositionLevel.STATE],
+}
+
+export const getPeerlyLocalFromBallotLevel = (
+  ballotLevel: BallotReadyPositionLevel,
+) =>
+  Object.keys(PEERLY_LOCALITY_CATEGORIES).find((key) =>
+    PEERLY_LOCALITY_CATEGORIES[key].includes(ballotLevel),
+  )

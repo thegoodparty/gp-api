@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { DomainsController } from './controllers/domains.controller'
 import { DomainsService } from './services/domains.service'
@@ -25,7 +25,7 @@ import { CampaignsModule } from 'src/campaigns/campaigns.module'
     PaymentsModule,
     UsersModule,
     StripeModule,
-    CampaignsModule,
+    forwardRef(() => CampaignsModule),
   ],
   controllers: [DomainsController, WebsitesController],
   providers: [
