@@ -1,5 +1,10 @@
 import { HttpService } from '@nestjs/axios'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common'
 import { isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
@@ -128,15 +133,16 @@ export class ElectionsService {
           includeDistrict: true,
         },
       )
+      if (!positionWithDistrict) {
+        throw new NotFoundException('No positionWithDistrict found')
+      }
 
-      return positionWithDistrict
-        ? {
-            ...this.calculateRaceTargetMetrics(
-              positionWithDistrict?.district.projectedTurnout.projectedTurnout,
-            ),
-            district: positionWithDistrict.district,
-          }
-        : null
+      return {
+        ...this.calculateRaceTargetMetrics(
+          positionWithDistrict?.district.projectedTurnout.projectedTurnout,
+        ),
+        district: positionWithDistrict.district,
+      }
     } catch (error) {
       const message = this.buildSlackErrorMessage(
         'Election API error: getBallotReadyMatchedRaceTargetDetails',
@@ -148,7 +154,7 @@ export class ElectionsService {
         error,
         channel: SlackChannel.botPathToVictoryIssues,
       })
-      throw error
+      return null
     }
   }
 
@@ -165,18 +171,18 @@ export class ElectionsService {
         BuildRaceTargetDetailsInput
       >(ElectionApiRoutes.projectedTurnout.find.path, query)
 
-      return projectedTurnout
-        ? {
-            ...this.calculateRaceTargetMetrics(
-              projectedTurnout.projectedTurnout,
-            ),
-            source: P2VSource.ElectionApi,
-            electionType: projectedTurnout.L2DistrictType,
-            electionLocation: projectedTurnout.L2DistrictName,
-            p2vStatus: P2VStatus.complete,
-            p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
-          }
-        : null
+      if (!projectedTurnout) {
+        throw new NotFoundException('No projectedTurnout found')
+      }
+
+      return {
+        ...this.calculateRaceTargetMetrics(projectedTurnout.projectedTurnout),
+        source: P2VSource.ElectionApi,
+        electionType: projectedTurnout.L2DistrictType,
+        electionLocation: projectedTurnout.L2DistrictName,
+        p2vStatus: P2VStatus.complete,
+        p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
+      }
     } catch (error) {
       const {
         state,
@@ -203,7 +209,7 @@ export class ElectionsService {
         error,
         channel: SlackChannel.botPathToVictoryIssues,
       })
-      throw error
+      return null
     }
   }
 
