@@ -3,6 +3,8 @@ import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
+import { SlackService } from 'src/shared/services/slack.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
@@ -25,7 +27,10 @@ export class ElectionsService {
 
   private readonly logger = new Logger(ElectionsService.name)
 
-  constructor(private readonly httpService: HttpService) {
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly slack: SlackService,
+  ) {
     if (!ElectionsService.BASE_URL) {
       throw new Error(`Please set ELECTION_API_URL in your .env. 
         Recommendation is to point it at dev if you are developing`)
@@ -70,6 +75,32 @@ export class ElectionsService {
     }
   }
 
+  private buildSlackErrorMessage(
+    title: string,
+    context: Record<string, string | number | boolean | null | undefined>,
+    error: unknown,
+  ): string {
+    const contextLines = Object.entries(context)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => `- *${key}*: ${String(value)}`)
+      .join('\n')
+
+    const errorDetails = isAxiosError(error)
+      ? JSON.stringify(
+          {
+            status: error.response?.status,
+            data: error.response?.data,
+          },
+          null,
+          2,
+        )
+      : error instanceof Error
+        ? error.message
+        : String(error)
+
+    return `*${title}*\n${contextLines}\n\n\`\`\`\n${errorDetails}\n\`\`\``
+  }
+
   private calculateRaceTargetMetrics(
     projectedTurnout: number,
   ): RaceTargetMetrics {
@@ -86,29 +117,40 @@ export class ElectionsService {
     ballotreadyPositionId: string,
     electionDate: string,
   ) {
-    console.log('brPositionId: ', ballotreadyPositionId)
-    console.log('electionDate: ', electionDate)
-    const positionWithDistrict = await this.electionApiGet<
-      PositionWithMatchedDistrict,
-      { electionDate: string; includeDistrict: boolean }
-    >(
-      ElectionApiRoutes.positions.findByBrId.path + `/${ballotreadyPositionId}`,
-      {
-        electionDate,
-        includeDistrict: true,
-      },
-    )
+    try {
+      const positionWithDistrict = await this.electionApiGet<
+        PositionWithMatchedDistrict,
+        { electionDate: string; includeDistrict: boolean }
+      >(
+        ElectionApiRoutes.positions.findByBrId.path +
+          `/${ballotreadyPositionId}`,
+        {
+          electionDate,
+          includeDistrict: true,
+        },
+      )
 
-    console.log('positionWithDistrict: ', positionWithDistrict)
-
-    return positionWithDistrict
-      ? {
-          ...this.calculateRaceTargetMetrics(
-            positionWithDistrict?.district.projectedTurnout.projectedTurnout,
-          ),
-          district: positionWithDistrict.district,
-        }
-      : null
+      return positionWithDistrict
+        ? {
+            ...this.calculateRaceTargetMetrics(
+              positionWithDistrict?.district.projectedTurnout.projectedTurnout,
+            ),
+            district: positionWithDistrict.district,
+          }
+        : null
+    } catch (error) {
+      const message = this.buildSlackErrorMessage(
+        'Election API error: getBallotReadyMatchedRaceTargetDetails',
+        { ballotreadyPositionId, electionDate },
+        error,
+      )
+      await this.slack.formattedMessage({
+        message,
+        error,
+        channel: SlackChannel.botPathToVictoryIssues,
+      })
+      throw error
+    }
   }
 
   async buildRaceTargetDetails(
@@ -118,21 +160,52 @@ export class ElectionsService {
       ...data,
       L2DistrictName: this.cleanDistrictName(data.L2DistrictName),
     }
-    const projectedTurnout = await this.electionApiGet<
-      ProjectedTurnout,
-      BuildRaceTargetDetailsInput
-    >(ElectionApiRoutes.projectedTurnout.find.path, query)
+    try {
+      const projectedTurnout = await this.electionApiGet<
+        ProjectedTurnout,
+        BuildRaceTargetDetailsInput
+      >(ElectionApiRoutes.projectedTurnout.find.path, query)
 
-    return projectedTurnout
-      ? {
-          ...this.calculateRaceTargetMetrics(projectedTurnout.projectedTurnout),
-          source: P2VSource.ElectionApi,
-          electionType: projectedTurnout.L2DistrictType,
-          electionLocation: projectedTurnout.L2DistrictName,
-          p2vStatus: P2VStatus.complete,
-          p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
-        }
-      : null
+      return projectedTurnout
+        ? {
+            ...this.calculateRaceTargetMetrics(
+              projectedTurnout.projectedTurnout,
+            ),
+            source: P2VSource.ElectionApi,
+            electionType: projectedTurnout.L2DistrictType,
+            electionLocation: projectedTurnout.L2DistrictName,
+            p2vStatus: P2VStatus.complete,
+            p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
+          }
+        : null
+    } catch (error) {
+      const {
+        state,
+        L2DistrictType,
+        L2DistrictName,
+        electionCode,
+        electionDate,
+        electionYear,
+      } = data
+      const message = this.buildSlackErrorMessage(
+        'Election API error: buildRaceTargetDetails',
+        {
+          state,
+          L2DistrictType,
+          L2DistrictName,
+          electionCode,
+          electionDate,
+          electionYear,
+        },
+        error,
+      )
+      await this.slack.formattedMessage({
+        message,
+        error,
+        channel: SlackChannel.botPathToVictoryIssues,
+      })
+      throw error
+    }
   }
 
   async getValidDistrictTypes(state: string, electionYear: string | number) {
