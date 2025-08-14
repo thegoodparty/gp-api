@@ -23,12 +23,18 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
-import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
+import {
+  GooglePlacesService
+} from '../../vendors/google/services/google-places.service'
+import {
+  extractAddressComponents
+} from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
-import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import {
+  CreateTcrCompliancePayload
+} from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
@@ -259,7 +265,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         filing_email: email,
         locality: peerlyLocale,
         state: state?.short_name,
-        campaign_website: `https://${domain?.name}`,
+        campaign_website: domain ? `https://${domain?.name}` : undefined,
         ...(peerlyLocale === PEERLY_LOCALITIES.local
           ? {
               city_county:
