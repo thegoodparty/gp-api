@@ -4,6 +4,7 @@ import {
   AiContentGenerationStatus,
 } from 'src/campaigns/ai/content/aiContent.types'
 import {
+  BallotReadyPositionLevel,
   CampaignCreatedBy,
   CampaignLaunchStatus,
   ElectionLevel,
@@ -20,7 +21,7 @@ declare global {
     // Take care not to duplicate a field on both details and data
     export type CampaignDetails = {
       state?: string
-      ballotLevel?: string
+      ballotLevel?: BallotReadyPositionLevel
       electionDate?: string
       primaryElectionDate?: string
       zip?: User['zip']

@@ -1,12 +1,15 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { ElectionLevel } from 'src/campaigns/campaigns.types'
+import {
+  BallotReadyPositionLevel,
+  ElectionLevel,
+} from 'src/campaigns/campaigns.types'
 
 // AI'ed from the CampaignDetails type
 const CampaignDetailsSchema = z
   .object({
     state: z.string(),
-    ballotLevel: z.string(),
+    ballotLevel: z.nativeEnum(BallotReadyPositionLevel),
     electionDate: z.string(),
     primaryElectionDate: z.string(),
     zip: z.string(),

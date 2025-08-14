@@ -1,5 +1,3 @@
-import { RaceNode } from './ballotReady.types'
-
 export type BDElection = {
   id: string
   electionDay: string
@@ -9,10 +7,6 @@ export type BDElection = {
   timezone: string
   primaryElectionDate?: string
   primaryElectionId?: string
-}
-
-export type RacesByYear = {
-  [key: string]: RaceNode[]
 }
 
 export type PrimaryElectionDates = {

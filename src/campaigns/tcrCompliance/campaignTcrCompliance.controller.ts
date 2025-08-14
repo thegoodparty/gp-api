@@ -60,15 +60,21 @@ export class CampaignTcrComplianceController {
         'TCR compliance already exists for this campaign',
       )
     }
+    const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
+      tcrComplianceDto
+    const { ein } = tcrComplianceCreatePayload
     const user = await this.userService.findByCampaign(campaign)
     const updatedCampaign = await this.campaignsService.updateJsonFields(
       campaign.id,
       {
         details: {
-          einNumber: tcrComplianceDto.ein,
+          einNumber: ein,
         },
+        placeId,
+        formattedAddress,
       },
     )
+
     if (!updatedCampaign) {
       throw new InternalServerErrorException(
         'Failed to update campaign details',
@@ -78,7 +84,7 @@ export class CampaignTcrComplianceController {
     return this.tcrComplianceService.create(
       user!,
       updatedCampaign,
-      tcrComplianceDto,
+      tcrComplianceCreatePayload,
     )
   }
 
@@ -121,6 +127,7 @@ export class CampaignTcrComplianceController {
         pin,
         tcrCompliance,
       )
+
     if (!campaignVerifyToken) {
       throw new BadGatewayException(
         'Campaign verify token could not be retrieved',
@@ -138,8 +145,6 @@ export class CampaignTcrComplianceController {
       where: { id: tcrCompliance.id },
       data: {
         status: TcrComplianceStatus.pending,
-        // TODO: also update w/ the tdlcNumber once we figure out where it's
-        //  coming' from
       },
     })
 
