@@ -8,7 +8,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common'
-import { CampaignTasksService } from './campaignTasksService'
+import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
@@ -45,6 +45,6 @@ export class CampaignTasksController {
 
   @Post('generate')
   async generateTasks(@ReqCampaign() campaign: Campaign) {
-    return this.tasksService.generateTasks(campaign.id)
+    return this.tasksService.generateTasks(campaign)
   }
 }

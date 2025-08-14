@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
 import { parse, differenceInWeeks } from 'date-fns'
-import { DateFormats } from '../../shared/util/date.util'
+import { DateFormats } from '../../../shared/util/date.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
+import { CampaignTask } from '../campaignTasks.types'
 
 const MAX_WEEK_NUMBER = 9
 
@@ -10,7 +12,9 @@ const MAX_WEEK_NUMBER = 9
 export class CampaignTasksService extends createPrismaBase(
   MODELS.CampaignTask,
 ) {
-  constructor() {
+  constructor(
+    private readonly aiCampaignManagerIntegration: AiCampaignManagerIntegrationService,
+  ) {
     super()
   }
 
@@ -90,7 +94,51 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async generateTasks(_campaignId: number) {
-    return []
+  async generateTasks(campaign: Campaign) {
+    // Generate tasks using AI integration
+    const generatedTasks =
+      await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
+
+    // Save tasks to database
+    return this.saveTasks(campaign.id, generatedTasks)
+  }
+
+  async saveTasks(campaignId: number, tasks: CampaignTask[]) {
+    // Clear existing tasks for this campaign
+    await this.model.deleteMany({
+      where: { campaignId },
+    })
+
+    // Create new tasks
+    const tasksToCreate = tasks.map((task) => ({
+      taskId: task.id,
+      campaignId,
+      title: task.title,
+      description: task.description,
+      cta: task.cta,
+      flowType: task.flowType,
+      week: task.week,
+      link: task.link,
+      proRequired: task.proRequired || false,
+      deadline: task.deadline,
+      defaultAiTemplateId: task.defaultAiTemplateId,
+      completed: false,
+    }))
+
+    const createdTasks = await this.model.createMany({
+      data: tasksToCreate,
+    })
+
+    // Return the created tasks
+    return this.model.findMany({
+      where: { campaignId },
+      orderBy: { week: 'desc' },
+    })
+  }
+
+  async clearTasks(campaignId: number): Promise<void> {
+    await this.model.deleteMany({
+      where: { campaignId },
+    })
   }
 }

@@ -1,4 +1,5 @@
 import { forwardRef, Global, Module } from '@nestjs/common'
+import { HttpModule } from '@nestjs/axios'
 import { CampaignsController } from './campaigns.controller'
 import { PublicCampaignsController } from './controllers/public-campaigns.controller'
 import { CampaignsService } from './services/campaigns.service'
@@ -19,7 +20,9 @@ import { ElectionsModule } from 'src/elections/elections.module'
 import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 import { EcanvasserIntegrationModule } from '../ecanvasserIntegration/ecanvasserIntegration.module'
 import { CampaignTasksController } from './tasks/campaignTasksController'
-import { CampaignTasksService } from './tasks/campaignTasksService'
+import { CampaignTasksService } from './tasks/services/campaignTasks.service'
+import { AiCampaignManagerService } from './tasks/services/aiCampaignManager.service'
+import { AiCampaignManagerIntegrationService } from './tasks/services/aiCampaignManagerIntegration.service'
 import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { StripeModule } from '../stripe/stripe.module'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
@@ -32,6 +35,7 @@ import { UsersModule } from 'src/users/users.module'
 @Global()
 @Module({
   imports: [
+    HttpModule,
     EmailModule,
     CampaignsAiModule,
     CrmModule,
@@ -64,6 +68,8 @@ import { UsersModule } from 'src/users/users.module'
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTasksService,
+    AiCampaignManagerService,
+    AiCampaignManagerIntegrationService,
     CampaignTcrComplianceService,
   ],
   exports: [
