@@ -1,84 +1,96 @@
 import { Injectable } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign, Prisma } from '@prisma/client'
 import { parse, differenceInWeeks } from 'date-fns'
 import { DateFormats } from '../../shared/util/date.util'
-import { STATIC_CAMPAIGN_TASKS } from './campaignTasks.consts'
-import { CampaignsService } from '../services/campaigns.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const MAX_WEEK_NUMBER = 9
 
 @Injectable()
-export class CampaignTasksService {
-  private readonly fullTasksList = STATIC_CAMPAIGN_TASKS
+export class CampaignTasksService extends createPrismaBase(
+  MODELS.CampaignTask,
+) {
+  constructor() {
+    super()
+  }
 
-  constructor(private readonly campaigns: CampaignsService) {}
-
-  listCampaignTasks(
-    { details, completedTaskIds }: Campaign,
+  async listCampaignTasks(
+    { id: campaignId, details }: Campaign,
     currentDate?: Date,
     endDate?: Date,
   ) {
-    if (!currentDate) {
-      return this.getListOfTasks()
+    const where: Prisma.CampaignTaskWhereInput = { campaignId }
+
+    if (currentDate) {
+      const { electionDate: electionDateStr } = details
+      const electionDate =
+        endDate || parse(electionDateStr!, DateFormats.isoDate, currentDate)
+
+      const weekNumber = Math.min(
+        Math.max(1, differenceInWeeks(electionDate, currentDate)),
+        MAX_WEEK_NUMBER,
+      )
+
+      where.week = weekNumber
     }
-    const { electionDate: electionDateStr } = details
-    const electionDate =
-      endDate || parse(electionDateStr!, DateFormats.isoDate, currentDate)
 
-    const weekNumber = Math.min(
-      Math.max(1, differenceInWeeks(electionDate, currentDate)),
-      MAX_WEEK_NUMBER,
-    )
-
-    const tasks = this.getListOfTasks(weekNumber)
-    return tasks.map((task) => ({
-      ...task,
-      completed: Boolean(completedTaskIds.includes(task.id)),
-    }))
+    return this.model.findMany({ where })
   }
 
-  private getListOfTasks(weekNumber?: number) {
-    return weekNumber
-      ? this.fullTasksList.filter(({ week }) => week === weekNumber)
-      : this.fullTasksList
-  }
-
-  getCampaignTaskById(taskId: string, completedTaskIds?: string[]) {
-    return {
-      ...this.fullTasksList.find(({ id }) => id === taskId)!,
-      ...(completedTaskIds
-        ? { completed: Boolean(completedTaskIds.includes(taskId)) }
-        : {}),
-    }
-  }
-
-  async completeTask({ id, completedTaskIds }: Campaign, taskId: string) {
-    const updatedCompletedTaskIds = [...new Set([...completedTaskIds, taskId])]
-    const updatedCampaign = await this.campaigns.update({
+  async getCampaignTaskById(campaignId: number, taskId: string) {
+    return this.model.findFirst({
       where: {
-        id,
+        campaignId,
+        taskId,
       },
-      data: {
-        completedTaskIds: updatedCompletedTaskIds,
+    })
+  }
+
+  async completeTask({ id: campaignId }: Campaign, taskId: string) {
+    const task = await this.model.findFirst({
+      where: {
+        campaignId,
+        taskId,
       },
     })
 
-    return this.getCampaignTaskById(taskId, updatedCampaign.completedTaskIds)
-  }
+    if (!task) {
+      return null
+    }
 
-  async unCompleteTask({ id, completedTaskIds }: Campaign, taskId: string) {
-    const updatedCompletedTaskIds = completedTaskIds.filter(
-      (id) => id !== taskId,
-    )
-    const updatedCampaign = await this.campaigns.update({
+    return this.model.update({
       where: {
-        id,
+        id: task.id,
       },
       data: {
-        completedTaskIds: updatedCompletedTaskIds,
+        completed: true,
+      },
+    })
+  }
+
+  async unCompleteTask({ id: campaignId }: Campaign, taskId: string) {
+    const task = await this.model.findFirst({
+      where: {
+        campaignId,
+        taskId,
       },
     })
 
-    return this.getCampaignTaskById(taskId, updatedCampaign.completedTaskIds)
+    if (!task) {
+      return null
+    }
+
+    return this.model.update({
+      where: {
+        id: task.id,
+      },
+      data: {
+        completed: false,
+      },
+    })
+  }
+
+  async generateTasks(_campaignId: number) {
+    return []
   }
 }

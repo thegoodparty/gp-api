@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseDatePipe,
+  Post,
   Put,
   Query,
 } from '@nestjs/common'
@@ -40,5 +41,10 @@ export class CampaignTasksController {
     @Param('taskId') taskId: string,
   ) {
     return this.tasksService.unCompleteTask(campaign, taskId)
+  }
+
+  @Post('generate')
+  async generateTasks(@ReqCampaign() campaign: Campaign) {
+    return this.tasksService.generateTasks(campaign.id)
   }
 }

@@ -42,6 +42,7 @@ model Campaign {
   website               Website?
   outreach              Outreach[]
   communityIssue        CommunityIssue[]
+  campaignTasks         CampaignTask[]
 
   @@index([slug])
   @@map("campaign")
