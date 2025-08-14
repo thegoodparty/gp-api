@@ -42,7 +42,6 @@ export class ElectionsService {
     query?: Q,
   ): Promise<Res | null> {
     const fullUrl = `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`
-    console.log('query: ', query)
     try {
       const { data, status } = await lastValueFrom(
         this.httpService.get(fullUrl, {
