@@ -5,13 +5,13 @@ import {
   PhoneSchema,
   WriteEmailSchema,
 } from '../../../shared/schemas'
-import { PostalAddressSchema } from '../../../shared/schemas/PostalAddress.schema'
 import { createZodDto } from 'nestjs-zod'
 
 export class CreateTcrComplianceDto extends createZodDto(
   z.object({
     ein: EinSchema,
-    postalAddress: PostalAddressSchema.required(),
+    placeId: z.string(),
+    formattedAddress: z.string(),
     committeeName: z.string(),
     websiteDomain: DomainSchema,
     filingUrl: z.string().url(),

@@ -28,6 +28,7 @@ import { PeerlyModule } from '../peerly/peerly.module'
 import { GoogleModule } from '../vendors/google/google.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { UsersModule } from 'src/users/users.module'
+import { WebsitesModule } from '../websites/websites.module'
 
 @Global()
 @Module({
@@ -44,6 +45,7 @@ import { UsersModule } from 'src/users/users.module'
     GoogleModule,
     AnalyticsModule,
     UsersModule,
+    WebsitesModule,
   ],
   controllers: [
     CampaignsController,

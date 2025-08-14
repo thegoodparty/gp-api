@@ -32,7 +32,6 @@ import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
-import { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
 
 const limiter = new Bottleneck({
   maxConcurrent: 10,
@@ -586,20 +585,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
   }
 
-  async getCampaignFullAddress(
-    campaignId: number,
-  ): Promise<GooglePlacesApiResponse | null> {
-    const campaign = await this.model.findUnique({
-      where: { id: campaignId },
-      select: { placeId: true } as Prisma.CampaignSelect & {
-        placeId: true
-      },
-    })
-
-    return campaign?.placeId
-      ? this.googlePlaces.getAddressByPlaceId(campaign.placeId)
-      : null
-  }
   // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
   async updateMissingWinNumbers(pageSize = 500, loopLimit = 1000) {
     let lastId: number | null = null
