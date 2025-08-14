@@ -12,11 +12,13 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { SlackService } from 'src/shared/services/slack.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
 import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
+import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
@@ -31,7 +33,6 @@ import {
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
-import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 
 const limiter = new Bottleneck({
   maxConcurrent: 10,
@@ -592,6 +593,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       successful: 0,
       failed: 0,
     }
+    const failedSlugs: string[] = []
+    const succeededSlugs: string[] = []
 
     for (let loopCount = 0; loopCount < loopLimit; ++loopCount) {
       const batch: CampaignWith<'pathToVictory'>[] = await this.model.findMany({
@@ -652,12 +655,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
                   state: r.details.state ?? '',
                 })
               if (!raceTargetDetails || !raceTargetDetails?.winNumber) {
+                failedSlugs.push(r.slug)
                 ++counts.failed
                 return
               }
               await this.updateJsonFields(r.id, {
                 pathToVictory: raceTargetDetails,
               })
+              succeededSlugs.push(r.slug)
               ++counts.successful
             } catch (error) {
               // Extract clean error information
@@ -682,6 +687,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     await this.slack.errorMessage({
       message: `Finished updating win numbers in the ${CURRENT_ENVIRONMENT} environment. Successful: ${counts.successful} Failed: ${counts.failed}`,
       error: null,
+    })
+    await this.slack.formattedMessage({
+      message: `Succeeded slugs (${counts.successful}) [showing up to 25]:\n${succeededSlugs.slice(0, 25).join(', ')}\n\nFailed slugs (${counts.failed}) [showing up to 25]:\n${failedSlugs.slice(0, 25).join(', ')}`,
+      error: null,
+      channel: SlackChannel.botDev,
     })
   }
 }
