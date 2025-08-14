@@ -293,7 +293,21 @@ export class CampaignsController {
 
   @Put('mine/race-target-details')
   @UseCampaign()
-  async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
+  async updateRaceTargetDetails(
+    @ReqCampaign() campaign: Campaign,
+    @ReqUser() user: User,
+    @Body() { slug }: CreateP2VSchema,
+  ) {
+    if (
+      slug &&
+      campaign?.slug !== slug &&
+      userHasRole(user, [UserRole.admin, UserRole.sales])
+    ) {
+      campaign = await this.campaigns.findFirstOrThrow({
+        where: { slug },
+      })
+    } else if (!campaign) throw new NotFoundException('Campaign not found')
+
     if (!campaign?.details?.positionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
