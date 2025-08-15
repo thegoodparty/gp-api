@@ -29,6 +29,7 @@ import { GoogleModule } from '../vendors/google/google.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { UsersModule } from 'src/users/users.module'
 import { WebsitesModule } from '../websites/websites.module'
+import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 
 @Global()
 @Module({
@@ -46,6 +47,7 @@ import { WebsitesModule } from '../websites/websites.module'
     AnalyticsModule,
     UsersModule,
     WebsitesModule,
+    QueueProducerModule,
   ],
   controllers: [
     CampaignsController,

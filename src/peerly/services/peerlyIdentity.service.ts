@@ -9,6 +9,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { AxiosResponse, isAxiosError } from 'axios'
@@ -18,32 +19,26 @@ import {
   Approve10DLCBrandResponse,
   CampaignVerificationStatus,
   Peerly10DLCBrandSubmitResponseBody,
+  PEERLY_COMMITTEE_TYPE,
+  PEERLY_CV_VERIFICATION_TYPE,
   PeerlyCreateCVTokenResponse,
   PeerlyIdentityCreateResponseBody,
+  PeerlyIdentityUseCaseResponseBody,
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import {
-  GooglePlacesService
-} from '../../vendors/google/services/google-places.service'
-import {
-  extractAddressComponents
-} from '../../vendors/google/util/GooglePlaces.util'
+import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
+import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
+import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 import {
-  CreateTcrCompliancePayload
-} from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
-
-const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
-const PEERLY_USECASE = 'POLITICAL'
-enum PEERLY_COMMITTEE_TYPE {
-  Candidate = 'CA',
-}
-enum PEERLY_CV_VERIFICATION_TYPE {
-  StateLocal = 'state_local',
-}
+  PEERLY_ENTITY_TYPE,
+  PEERLY_LOCALITIES,
+  PEERLY_LOCALITY_CATEGORIES,
+  PEERLY_USECASE,
+} from './peerly.const'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -93,6 +88,31 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       return identity
     } catch (error) {
       this.handleApiError(error)
+    }
+  }
+
+  async getIdentityUseCases(peerlyIdentityId: string) {
+    try {
+      const response: AxiosResponse<PeerlyIdentityUseCaseResponseBody> =
+        await lastValueFrom(
+          this.httpService.get(
+            `${this.baseUrl}/identities/${peerlyIdentityId}/get_usecases`,
+            await this.getBaseHttpHeaders(),
+          ),
+        )
+      const { data: useCases } = response
+      return useCases
+    } catch (e) {
+      if (isAxiosError(e) && e.status === 404) {
+        this.logger.warn(
+          'Peerly API returned 404 Not Found when fetching use cases. This is likely due to an invalid identity ID.',
+          format(e),
+        )
+        throw new NotFoundException(
+          'Use cases for given identity ID could not be found',
+        )
+      }
+      this.handleApiError(e)
     }
   }
 
@@ -335,22 +355,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.handleApiError(e)
     }
   }
-}
-
-enum PEERLY_LOCALITIES {
-  local = 'local',
-  state = 'state',
-}
-
-const PEERLY_LOCALITY_CATEGORIES = {
-  [PEERLY_LOCALITIES.local]: [
-    BallotReadyPositionLevel.CITY,
-    BallotReadyPositionLevel.COUNTY,
-    BallotReadyPositionLevel.LOCAL,
-    BallotReadyPositionLevel.REGIONAL,
-    BallotReadyPositionLevel.TOWNSHIP,
-  ],
-  [PEERLY_LOCALITIES.state]: [BallotReadyPositionLevel.STATE],
 }
 
 export const getPeerlyLocalFromBallotLevel = (

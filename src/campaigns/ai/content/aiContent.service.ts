@@ -6,13 +6,14 @@ import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import {
-  EnqueueService,
   MessageGroup,
-} from 'src/queue/producer/enqueue.service'
+  QueueProducerService,
+} from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../shared/services/slackService.types'
+import { QueueType } from '../../../queue/queue.types'
 
 @Injectable()
 export class AiContentService {
@@ -23,7 +24,7 @@ export class AiContentService {
     private readonly contentService: ContentService,
     private readonly aiService: AiService,
     private readonly slack: SlackService,
-    private readonly queue: EnqueueService,
+    private readonly queue: QueueProducerService,
   ) {}
 
   /** function to kickoff ai content generation and enqueue a message to run later */
@@ -142,7 +143,7 @@ export class AiContentService {
     }
 
     const queueMessage = {
-      type: 'generateAiContent',
+      type: QueueType.GENERATE_AI_CONTENT,
       data: {
         slug,
         key,

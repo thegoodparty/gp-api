@@ -156,3 +156,20 @@ export type PeerlyCreateCVTokenResponse = {
   message: string
   campaign_verify_token: string
 }
+export enum PEERLY_COMMITTEE_TYPE {
+  Candidate = 'CA',
+}
+
+export enum PEERLY_CV_VERIFICATION_TYPE {
+  StateLocal = 'state_local',
+}
+
+export type PeerlyIdentityUseCase = {
+  identity_id: string
+  account_id: string
+  usecase: string
+  tcr_campaign_id: string
+  submitted: number
+  activated: number
+}
+export type PeerlyIdentityUseCaseResponseBody = PeerlyIdentityUseCase[]
