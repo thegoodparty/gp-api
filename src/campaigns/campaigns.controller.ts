@@ -335,7 +335,7 @@ export class CampaignsController {
     @Body() body?: { pageSize?: number; loopLimit?: number },
   ) {
     // No need to await
-    await this.campaigns.updateMissingWinNumbers(
+    this.campaigns.updateMissingWinNumbers(
       body?.pageSize ?? 500,
       body?.loopLimit ?? 1000,
     )

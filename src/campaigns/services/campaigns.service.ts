@@ -26,7 +26,6 @@ import {
   CampaignLaunchStatus,
   CampaignPlanVersionData,
   CampaignStatus,
-  CampaignWith,
   OnboardingStep,
   PlanVersion,
 } from '../campaigns.types'
@@ -597,50 +596,52 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const succeededSlugs: string[] = []
 
     for (let loopCount = 0; loopCount < loopLimit; ++loopCount) {
-      const batch: CampaignWith<'pathToVictory'>[] = await this.model.findMany({
-        include: { pathToVictory: true },
-        where: {
-          pathToVictory: {
-            // Summary of this spaghetti query is: where they don't have a win number, but they...
-            // ... DO have an electionType and electionLocation
-            is: {
-              AND: [
-                {
-                  OR: [
-                    { data: { path: ['winNumber'], equals: Prisma.AnyNull } },
-                    {
-                      data: {
-                        path: ['winNumber'],
-                        not: { path: ['winNumber'] },
-                      },
-                    },
-                    { data: { path: ['winNumber'], not: '' } },
-                  ],
-                },
-                {
-                  data: {
-                    path: ['electionType'],
-                    not: { path: ['electionType'] },
-                  },
-                },
-                { data: { path: ['electionType'], not: Prisma.AnyNull } },
-                { data: { path: ['electionType'], not: '' } },
-                {
-                  data: {
-                    path: ['electionType'],
-                    not: { path: ['electionType'] },
-                  },
-                },
-                { data: { path: ['electionLocation'], not: Prisma.AnyNull } },
-                { data: { path: ['electionLocation'], not: '' } },
-              ],
-            },
-          },
-          ...(lastId ? { id: { gt: lastId } } : {}),
-        },
-        orderBy: { id: Prisma.SortOrder.asc },
-        take: pageSize,
-      })
+      type RowCandidate = {
+        id: number
+        slug: string
+        details: PrismaJson.CampaignDetails
+        p2vData: PrismaJson.PathToVictoryData
+      }
+
+      const afterIdClause = lastId
+        ? Prisma.sql`AND c.id > ${lastId}`
+        : Prisma.sql``
+
+      const rows = await this.client.$queryRaw<RowCandidate[]>(Prisma.sql`
+        SELECT c.id, c.slug, c.details, p2v.data AS "p2vData"
+        FROM public.campaign c
+        JOIN public.path_to_victory p2v ON p2v.campaign_id = c.id
+        WHERE
+          -- must have electionType and electionLocation present and not empty
+          (p2v.data ? 'electionType')
+          AND (p2v.data->>'electionType') IS NOT NULL AND (p2v.data->>'electionType') <> ''
+          AND (p2v.data ? 'electionLocation')
+          AND (p2v.data->>'electionLocation') IS NOT NULL AND (p2v.data->>'electionLocation') <> ''
+          AND (
+            -- missing/empty/zero winNumber
+            NOT (p2v.data ? 'winNumber')
+            OR (p2v.data->>'winNumber') IS NULL
+            OR (p2v.data->>'winNumber') = ''
+            OR ((p2v.data->>'winNumber') ~ '^[0-9]+$' AND (p2v.data->>'winNumber')::int = 0)
+            -- or p2vStatus not complete
+            OR (lower(coalesce(p2v.data->>'p2vStatus', '')) <> 'complete')
+          )
+          ${afterIdClause}
+        ORDER BY c.id ASC
+        LIMIT ${pageSize}
+      `)
+      type CandidateRecord = {
+        id: number
+        slug: string
+        details: PrismaJson.CampaignDetails
+        pathToVictory: { data: PrismaJson.PathToVictoryData }
+      }
+      const batch: CandidateRecord[] = rows.map((r) => ({
+        id: r.id,
+        slug: r.slug,
+        details: r.details,
+        pathToVictory: { data: r.p2vData },
+      }))
       if (batch.length === 0) break
 
       await Promise.allSettled(
