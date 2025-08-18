@@ -76,7 +76,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
             `${this.baseUrl}/identities`,
             {
               account_id: this.accountNumber,
-              identity_name: identityName,
+              identity_name: this.isTestEnvironment
+                ? `TEST-${identityName}`
+                : identityName,
               usecases: [PEERLY_USECASE],
             },
             await this.getBaseHttpHeaders(),
@@ -96,7 +98,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const response: AxiosResponse<PeerlyIdentityUseCaseResponseBody> =
         await lastValueFrom(
           this.httpService.get(
-            `${this.baseUrl}/identities/${peerlyIdentityId}/get_usecases`,
+            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/get_usecases`,
             await this.getBaseHttpHeaders(),
           ),
         )
@@ -155,12 +157,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
     }
     try {
+      const campaignCommitteeName = (
+        this.isTestEnvironment ? `TEST-${campaignCommittee}` : campaignCommittee
+      ).substring(0, 255) // Limit to 255 characters per Peerly API docs
       const submitBrandData = {
         entityType: PEERLY_ENTITY_TYPE,
         vertical: PEERLY_USECASE,
         is_political: true,
-        displayName: campaignCommittee.substring(0, 255), // Limit to 255 characters per Peerly API docs
-        companyName: campaignCommittee.substring(0, 255), // Limit to 255 characters per Peerly API docs
+        displayName: campaignCommitteeName,
+        companyName: campaignCommitteeName,
         ein,
         phone: parsePhoneNumberWithError(phone, 'US').number,
         street: street?.substring(0, 100), // Limit to 100 characters per Peerly API docs
@@ -183,22 +188,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { submission_key: submissionKey } = data
       this.logger.debug('Successfully submitted 10DLC brand', data)
       return submissionKey
-    } catch (error) {
-      this.handleApiError(error)
-    }
-  }
-
-  async getIdentityBrandInfo(peerlyIdentityId: string) {
-    try {
-      const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
-        await lastValueFrom(
-          this.httpService.get(
-            `${this.baseUrl}/identities/${peerlyIdentityId}/getAccountIdentityInfo`,
-            await this.getBaseHttpHeaders(),
-          ),
-        )
-      const { data } = response
-      const { submission_key: submissionKey } = data
     } catch (error) {
       this.handleApiError(error)
     }
@@ -271,7 +260,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const peerlyLocale = getPeerlyLocalFromBallotLevel(ballotLevel)
     try {
       const submitCVData = {
-        name: getUserFullName(user),
+        name: this.isTestEnvironment
+          ? `TEST-${getUserFullName(user)}`
+          : getUserFullName(user),
         general_campaign_email: email,
         verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
         filing_url: filingUrl,

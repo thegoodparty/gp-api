@@ -15,9 +15,7 @@ import {
   TcrComplianceStatus,
   User,
 } from '@prisma/client'
-import {
-  PathToVictoryService
-} from 'src/pathToVictory/services/pathToVictory.service'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
@@ -29,9 +27,7 @@ import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { isAfter, parseISO } from 'date-fns'
-import {
-  CampaignTcrComplianceService
-} from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { QueueProducerService } from '../producer/queueProducer.service'
 import { getTwelveHoursFromDate } from '../../shared/util/date.util'
 
