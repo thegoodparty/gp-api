@@ -15,6 +15,7 @@ import FormData from 'form-data'
 import {
   UploadPhoneListResponseDto,
   PhoneListStatusResponseDto,
+  PhoneListDetailsResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
@@ -71,6 +72,15 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     }
   }
 
+  private validateDetailsResponse(data: unknown): PhoneListDetailsResponseDto {
+    try {
+      return PhoneListDetailsResponseDto.create(data)
+    } catch (error) {
+      this.logger.error('Details response validation failed:', error)
+      throw new BadGatewayException('Invalid details response from Peerly API')
+    }
+  }
+
   async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {
     const { listName, csvStream, identityId, fileSize } = params
 
@@ -112,7 +122,9 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     }
   }
 
-  async uploadPhoneList(params: UploadPhoneListParams): Promise<PhoneListStatusResponseDto> {
+  async uploadPhoneList(
+    params: UploadPhoneListParams,
+  ): Promise<PhoneListStatusResponseDto> {
     const token = await this.uploadPhoneListToken(params)
     return this.checkPhoneListStatus(token)
   }
@@ -130,6 +142,24 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       )
 
       return this.validateStatusResponse(response.data)
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async getPhoneListDetails(
+    listId: number,
+  ): Promise<PhoneListDetailsResponseDto> {
+    try {
+      const config = await this.getBaseHttpHeaders()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${this.baseUrl}/api/phonelists/${listId}`,
+          config,
+        ),
+      )
+
+      return this.validateDetailsResponse(response.data)
     } catch (error) {
       this.handleApiError(error)
     }
