@@ -27,18 +27,12 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import {
-  GooglePlacesService
-} from '../../vendors/google/services/google-places.service'
-import {
-  extractAddressComponents
-} from '../../vendors/google/util/GooglePlaces.util'
+import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
+import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
-import {
-  CreateTcrCompliancePayload
-} from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 import {
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
