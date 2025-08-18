@@ -57,6 +57,7 @@ export enum MediaType {
 export enum PhoneListState {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
+  PENDING = 'PENDING',
 }
 
 // P2P SMS API types

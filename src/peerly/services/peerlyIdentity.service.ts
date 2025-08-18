@@ -8,7 +8,6 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
