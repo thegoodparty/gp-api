@@ -12,11 +12,13 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { SlackService } from 'src/shared/services/slack.service'
+import { SlackChannel } from 'src/shared/services/slackService.types'
 import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
+import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
@@ -24,14 +26,12 @@ import {
   CampaignLaunchStatus,
   CampaignPlanVersionData,
   CampaignStatus,
-  CampaignWith,
   OnboardingStep,
   PlanVersion,
 } from '../campaigns.types'
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
-import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 
 const limiter = new Bottleneck({
   maxConcurrent: 10,
@@ -592,52 +592,56 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       successful: 0,
       failed: 0,
     }
+    const failedSlugs: string[] = []
+    const succeededSlugs: string[] = []
 
     for (let loopCount = 0; loopCount < loopLimit; ++loopCount) {
-      const batch: CampaignWith<'pathToVictory'>[] = await this.model.findMany({
-        include: { pathToVictory: true },
-        where: {
-          pathToVictory: {
-            // Summary of this spaghetti query is: where they don't have a win number, but they...
-            // ... DO have an electionType and electionLocation
-            is: {
-              AND: [
-                {
-                  OR: [
-                    { data: { path: ['winNumber'], equals: Prisma.AnyNull } },
-                    {
-                      data: {
-                        path: ['winNumber'],
-                        not: { path: ['winNumber'] },
-                      },
-                    },
-                    { data: { path: ['winNumber'], not: '' } },
-                  ],
-                },
-                {
-                  data: {
-                    path: ['electionType'],
-                    not: { path: ['electionType'] },
-                  },
-                },
-                { data: { path: ['electionType'], not: Prisma.AnyNull } },
-                { data: { path: ['electionType'], not: '' } },
-                {
-                  data: {
-                    path: ['electionType'],
-                    not: { path: ['electionType'] },
-                  },
-                },
-                { data: { path: ['electionLocation'], not: Prisma.AnyNull } },
-                { data: { path: ['electionLocation'], not: '' } },
-              ],
-            },
-          },
-          ...(lastId ? { id: { gt: lastId } } : {}),
-        },
-        orderBy: { id: Prisma.SortOrder.asc },
-        take: pageSize,
-      })
+      type RowCandidate = {
+        id: number
+        slug: string
+        details: PrismaJson.CampaignDetails
+        p2vData: PrismaJson.PathToVictoryData
+      }
+
+      const afterIdClause = lastId
+        ? Prisma.sql`AND c.id > ${lastId}`
+        : Prisma.sql``
+
+      const rows = await this.client.$queryRaw<RowCandidate[]>(Prisma.sql`
+        SELECT c.id, c.slug, c.details, p2v.data AS "p2vData"
+        FROM public.campaign c
+        JOIN public.path_to_victory p2v ON p2v.campaign_id = c.id
+        WHERE
+          -- must have electionType and electionLocation present and not empty
+          (p2v.data ? 'electionType')
+          AND (p2v.data->>'electionType') IS NOT NULL AND (p2v.data->>'electionType') <> ''
+          AND (p2v.data ? 'electionLocation')
+          AND (p2v.data->>'electionLocation') IS NOT NULL AND (p2v.data->>'electionLocation') <> ''
+          AND (
+            -- missing/empty/zero winNumber
+            NOT (p2v.data ? 'winNumber')
+            OR (p2v.data->>'winNumber') IS NULL
+            OR (p2v.data->>'winNumber') = ''
+            OR ((p2v.data->>'winNumber') ~ '^[0-9]+$' AND (p2v.data->>'winNumber')::int = 0)
+            -- or p2vStatus not complete
+            OR (lower(coalesce(p2v.data->>'p2vStatus', '')) <> 'complete')
+          )
+          ${afterIdClause}
+        ORDER BY c.id ASC
+        LIMIT ${pageSize}
+      `)
+      type CandidateRecord = {
+        id: number
+        slug: string
+        details: PrismaJson.CampaignDetails
+        pathToVictory: { data: PrismaJson.PathToVictoryData }
+      }
+      const batch: CandidateRecord[] = rows.map((r) => ({
+        id: r.id,
+        slug: r.slug,
+        details: r.details,
+        pathToVictory: { data: r.p2vData },
+      }))
       if (batch.length === 0) break
 
       await Promise.allSettled(
@@ -652,12 +656,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
                   state: r.details.state ?? '',
                 })
               if (!raceTargetDetails || !raceTargetDetails?.winNumber) {
+                failedSlugs.push(r.slug)
                 ++counts.failed
                 return
               }
               await this.updateJsonFields(r.id, {
                 pathToVictory: raceTargetDetails,
               })
+              succeededSlugs.push(r.slug)
               ++counts.successful
             } catch (error) {
               // Extract clean error information
@@ -682,6 +688,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     await this.slack.errorMessage({
       message: `Finished updating win numbers in the ${CURRENT_ENVIRONMENT} environment. Successful: ${counts.successful} Failed: ${counts.failed}`,
       error: null,
+    })
+    await this.slack.formattedMessage({
+      message: `Succeeded slugs (${counts.successful}) [showing up to 25]:\n${succeededSlugs.slice(0, 25).join(', ')}\n\nFailed slugs (${counts.failed}) [showing up to 25]:\n${failedSlugs.slice(0, 25).join(', ')}`,
+      error: null,
+      channel: SlackChannel.botDev,
     })
   }
 }
