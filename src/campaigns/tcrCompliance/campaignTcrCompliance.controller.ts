@@ -29,7 +29,7 @@ import {
   QueueProducerService,
 } from '../../queue/producer/queueProducer.service'
 import { QueueType } from '../../queue/queue.types'
-import { getTwelveHoursFromDate } from '../../shared/util/date.util'
+import { addSeconds } from 'date-fns'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -160,7 +160,7 @@ export class CampaignTcrComplianceController {
         type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
         data: {
           peerlyIdentityId,
-          processTime: getTwelveHoursFromDate().toISOString(),
+          processTime: addSeconds(new Date(), 3).toISOString(), // getTwelveHoursFromDate().toISOString(),
         },
       },
       MessageGroup.tcrCompliance,

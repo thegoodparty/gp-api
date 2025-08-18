@@ -27,12 +27,18 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
-import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
+import {
+  GooglePlacesService
+} from '../../vendors/google/services/google-places.service'
+import {
+  extractAddressComponents
+} from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
-import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import {
+  CreateTcrCompliancePayload
+} from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 import {
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
@@ -103,11 +109,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           ),
         )
       const { data: useCases } = response
+      this.logger.debug(
+        `Successfully fetched use cases for identityId: ${peerlyIdentityId}`,
+        useCases,
+      )
       return useCases
     } catch (e) {
       if (isAxiosError(e) && e.status === 404) {
         this.logger.warn(
-          'Peerly API returned 404 Not Found when fetching use cases. This is likely due to an invalid identity ID.',
+          `Peerly API returned 404 Not Found when fetching use cases. This is likely due to an invalid identity ID: ${peerlyIdentityId}`,
           format(e),
         )
         throw new NotFoundException(
