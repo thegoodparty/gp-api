@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   Injectable,
-  Logger,
   BadRequestException,
 } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
@@ -30,8 +29,6 @@ interface UploadPhoneListParams {
 
 @Injectable()
 export class PeerlyPhoneListService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(PeerlyPhoneListService.name)
-
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
@@ -55,30 +52,15 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   }
 
   private validateUploadResponse(data: unknown): UploadPhoneListResponseDto {
-    try {
-      return UploadPhoneListResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Upload response validation failed:', error)
-      throw new BadGatewayException('Invalid upload response from Peerly API')
-    }
+    return this.validateData(data, UploadPhoneListResponseDto, 'upload')
   }
 
   private validateStatusResponse(data: unknown): PhoneListStatusResponseDto {
-    try {
-      return PhoneListStatusResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Status response validation failed:', error)
-      throw new BadGatewayException('Invalid status response from Peerly API')
-    }
+    return this.validateData(data, PhoneListStatusResponseDto, 'status')
   }
 
   private validateDetailsResponse(data: unknown): PhoneListDetailsResponseDto {
-    try {
-      return PhoneListDetailsResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Details response validation failed:', error)
-      throw new BadGatewayException('Invalid details response from Peerly API')
-    }
+    return this.validateData(data, PhoneListDetailsResponseDto, 'details')
   }
 
   async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {

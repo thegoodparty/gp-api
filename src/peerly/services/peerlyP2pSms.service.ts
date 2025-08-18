@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
@@ -28,8 +28,6 @@ interface CreateJobParams {
 
 @Injectable()
 export class PeerlyP2pSmsService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(PeerlyP2pSmsService.name)
-
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
@@ -53,14 +51,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   }
 
   private validateCreateJobResponse(data: unknown): CreateJobResponseDto {
-    try {
-      return CreateJobResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Create job response validation failed:', error)
-      throw new BadGatewayException(
-        'Invalid create job response from Peerly API',
-      )
-    }
+    return this.validateData(data, CreateJobResponseDto, 'create job')
   }
 
   async createJob(params: CreateJobParams): Promise<string> {

@@ -1,3 +1,5 @@
+import { BadGatewayException, Logger } from '@nestjs/common'
+
 const {
   PEERLY_MD5_EMAIL,
   PEERLY_MD5_PASSWORD,
@@ -24,4 +26,21 @@ export class PeerlyBaseConfig {
   readonly password = PEERLY_MD5_PASSWORD
   readonly accountNumber = PEERLY_ACCOUNT_NUMBER
   readonly httpTimeoutMs = parseInt(PEERLY_HTTP_TIMEOUT, 10)
+
+  protected readonly logger = new Logger(this.constructor.name)
+
+  protected validateData<T>(
+    data: unknown,
+    dto: { create: (data: unknown) => T },
+    context: string,
+  ): T {
+    try {
+      return dto.create(data)
+    } catch (error) {
+      this.logger.error(`${context} response validation failed:`, error)
+      throw new BadGatewayException(
+        `Invalid ${context} response from Peerly API`,
+      )
+    }
+  }
 }

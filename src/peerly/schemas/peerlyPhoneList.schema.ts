@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
+import { PhoneListState } from '../../peerly/peerly.types'
 
 const uploadPhoneListResponseSchema = z.object({
   Data: z.object({
@@ -14,7 +15,7 @@ const uploadPhoneListResponseSchema = z.object({
 const phoneListStatusResponseSchema = z.object({
   Data: z.object({
     list_status: z.string().optional(),
-    list_state: z.string().optional(),
+    list_state: z.nativeEnum(PhoneListState).optional(),
     list_id: z.number().optional(),
   }),
 })
@@ -30,7 +31,7 @@ const phoneListDetailsResponseSchema = z.object({
   account_id: z.string(),
   leads_acct_dnc: z.number(),
   list_name: z.string(),
-  list_state: z.string(),
+  list_state: z.nativeEnum(PhoneListState),
   list_id: z.number(),
   leads_cell_suppressed: z.number(),
   leads_supplied: z.number(),
