@@ -2,13 +2,14 @@ import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackService } from '../../shared/services/slack.service'
 import {
-  EnqueueService,
   MessageGroup,
-} from '../../queue/producer/enqueue.service'
+  QueueProducerService,
+} from '../../queue/producer/queueProducer.service'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
 import { PathToVictoryQueueMessage } from '../types/pathToVictory.types'
+import { QueueType } from '../../queue/queue.types'
 
 @Injectable()
 export class EnqueuePathToVictoryService {
@@ -17,7 +18,7 @@ export class EnqueuePathToVictoryService {
   constructor(
     private prisma: PrismaService,
     private slackService: SlackService,
-    private queueService: EnqueueService,
+    private queueService: QueueProducerService,
     private racesService: RacesService,
   ) {}
 
@@ -70,7 +71,7 @@ export class EnqueuePathToVictoryService {
         // queueMessage.data = { campaignId, ...raceData }
 
         queueMessage = {
-          type: 'pathToVictory',
+          type: QueueType.PATH_TO_VICTORY,
           data: {
             campaignId: campaignId.toString(),
             ...raceData,

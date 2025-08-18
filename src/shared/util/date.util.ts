@@ -1,13 +1,14 @@
 import {
   addDays,
+  addHours,
   DateArg,
+  endOfDay,
   format,
   parse,
-  startOfWeek,
-  subWeeks,
-  subDays,
   startOfDay,
-  endOfDay,
+  startOfWeek,
+  subDays,
+  subWeeks,
 } from 'date-fns'
 
 export enum DateFormats {
@@ -62,3 +63,5 @@ export const getDateRangeWithDefaults = (
     endDate: endDate ? endOfDay(endDate) : endOfDay(new Date()),
   }
 }
+export const getTwelveHoursFromDate = (date: Date = new Date()) =>
+  addHours(date, 12)

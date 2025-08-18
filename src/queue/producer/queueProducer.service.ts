@@ -7,6 +7,7 @@ import { queueConfig } from '../queue.config'
 export enum MessageGroup {
   p2v = 'p2v',
   content = 'content',
+  tcrCompliance = 'tcrCompliance',
   default = 'default',
 }
 
@@ -34,8 +35,8 @@ const producer = Producer.create({
 })
 
 @Injectable()
-export class EnqueueService {
-  private readonly logger = new Logger(EnqueueService.name)
+export class QueueProducerService {
+  private readonly logger = new Logger(QueueProducerService.name)
   constructor() {}
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async sendMessage(msg: any, group: MessageGroup = MessageGroup.default) {

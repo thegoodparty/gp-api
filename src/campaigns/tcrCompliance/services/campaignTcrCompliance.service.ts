@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -10,6 +11,8 @@ import { getTCRIdentityName } from '../util/trcCompliance.util'
 import { getUserFullName } from '../../../users/util/users.util'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
+import { PeerlyIdentityUseCase } from '../../../peerly/peerly.types'
+import { PEERLY_USECASE } from '../../../peerly/services/peerly.const'
 
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
@@ -74,9 +77,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         domain!,
       )
 
-    // TODO: Do whatever Peerly API dance is needed to start Campaign Verify
-    //  process once we have those endpoints from Peerly
-
     const newTcrCompliance = {
       ...tcrComplianceCreatePayload,
       postalAddress: campaign.formattedAddress!,
@@ -97,6 +97,22 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     return this.model.delete({
       where: { id },
     })
+  }
+
+  async checkTcrRegistrationStatus(peerlyIdentityId: string) {
+    let useCases: PeerlyIdentityUseCase[]
+    try {
+      useCases =
+        await this.peerlyIdentityService.getIdentityUseCases(peerlyIdentityId)
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return false
+      }
+      throw error
+    }
+
+    const useCase = useCases.find(({ usecase }) => usecase === PEERLY_USECASE)
+    return Boolean(useCase?.activated)
   }
 
   async retrieveCampaignVerifyToken(
