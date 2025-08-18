@@ -53,6 +53,13 @@ export enum MediaType {
   VIDEO = 'VIDEO',
 }
 
+// Phone list state enum
+export enum PhoneListState {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  PENDING = 'PENDING',
+}
+
 // P2P SMS API types
 export type PhoneListUploadResponse = {
   token: string

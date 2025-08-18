@@ -8,7 +8,6 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
@@ -42,7 +41,6 @@ import {
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(PeerlyIdentityService.name)
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,

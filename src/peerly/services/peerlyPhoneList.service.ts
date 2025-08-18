@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   Injectable,
-  Logger,
   BadRequestException,
 } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
@@ -15,6 +14,7 @@ import FormData from 'form-data'
 import {
   UploadPhoneListResponseDto,
   PhoneListStatusResponseDto,
+  PhoneListDetailsResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
@@ -29,8 +29,6 @@ interface UploadPhoneListParams {
 
 @Injectable()
 export class PeerlyPhoneListService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(PeerlyPhoneListService.name)
-
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
@@ -54,21 +52,15 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   }
 
   private validateUploadResponse(data: unknown): UploadPhoneListResponseDto {
-    try {
-      return UploadPhoneListResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Upload response validation failed:', error)
-      throw new BadGatewayException('Invalid upload response from Peerly API')
-    }
+    return this.validateData(data, UploadPhoneListResponseDto, 'upload')
   }
 
   private validateStatusResponse(data: unknown): PhoneListStatusResponseDto {
-    try {
-      return PhoneListStatusResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Status response validation failed:', error)
-      throw new BadGatewayException('Invalid status response from Peerly API')
-    }
+    return this.validateData(data, PhoneListStatusResponseDto, 'status')
+  }
+
+  private validateDetailsResponse(data: unknown): PhoneListDetailsResponseDto {
+    return this.validateData(data, PhoneListDetailsResponseDto, 'details')
   }
 
   async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {
@@ -112,7 +104,9 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     }
   }
 
-  async uploadPhoneList(params: UploadPhoneListParams): Promise<PhoneListStatusResponseDto> {
+  async uploadPhoneList(
+    params: UploadPhoneListParams,
+  ): Promise<PhoneListStatusResponseDto> {
     const token = await this.uploadPhoneListToken(params)
     return this.checkPhoneListStatus(token)
   }
@@ -130,6 +124,24 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       )
 
       return this.validateStatusResponse(response.data)
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async getPhoneListDetails(
+    listId: number,
+  ): Promise<PhoneListDetailsResponseDto> {
+    try {
+      const config = await this.getBaseHttpHeaders()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${this.baseUrl}/api/phonelists/${listId}`,
+          config,
+        ),
+      )
+
+      return this.validateDetailsResponse(response.data)
     } catch (error) {
       this.handleApiError(error)
     }

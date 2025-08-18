@@ -238,6 +238,70 @@ No body parameters required.
 
 ---
 
+## Get Phone List Details
+**GET** `https://app.peerly.com/api/phonelists/{list_id}`
+
+API endpoint to get details for a specific phone list.
+
+### Path Parameters
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `list_id` | int32  | Yes      | Phone list id to get details for. |
+
+### Query Parameters
+| Parameter         | Type    | Required | Description |
+|-------------------|---------|----------|-------------|
+| `include_sublists`| boolean | No       | Whether to include sublist information. Defaults to `false`. |
+
+### Example Request
+
+Headers:
+- `Authorization: JWT <token>`
+- `Accept: application/json`
+
+```javascript
+const options = {
+  method: 'GET',
+  headers: {accept: 'application/json', Authorization: 'JWT <token>'}
+};
+
+fetch('https://app.peerly.com/api/phonelists/123456?include_sublists=false', options)
+  .then(res => res.json())
+  .then(res => console.log(res))
+  .catch(err => console.error(err));
+```
+
+### Example Success Response (`200`)
+```json
+{
+  "leads_duplicate": 0,
+  "leads_master_dnc": 0,
+  "leads_cell_dnc": 0,
+  "leads_malformed": 0,
+  "leads_loaded": 4,
+  "use_nat_dnc": 0,
+  "suppress_cell_phones": 0,
+  "account_id": "11484047",
+  "leads_acct_dnc": 0,
+  "list_name": "my list",
+  "list_state": "ACTIVE",
+  "list_id": 123456,
+  "leads_cell_suppressed": 0,
+  "leads_supplied": 4,
+  "leads_invalid": 0,
+  "leads_nat_dnc": 0,
+  "upload_by": "System Admin",
+  "shared": 0,
+  "upload_date": "2016-10-14T10:14:03Z"
+}
+```
+
+### Responses
+- **200**: Success
+- **400**: Bad Request
+
+---
+
 ## Create Job
 **POST** `https://app.peerly.com/api/1to1/jobs`
 
