@@ -51,7 +51,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         session.session_id,
       )
 
-      await this.saveCampaignPlan(campaignPlanJson, campaign)
+      await this.saveCampaignPlan(campaignPlanJson, campaign, request)
 
       return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
     } catch (error) {
@@ -205,22 +205,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     campaign: CampaignWithPathToVictory,
     request: StartCampaignPlanRequest,
   ): Promise<CampaignTask[] | null> {
-    const currentHash = this.generateCampaignInfoHash({
-      campaign_plan_version: CAMPAIGN_PLAN_VERSION,
-      candidate_name: request.candidate_name,
-      election_date: request.election_date,
-      office_and_jurisdiction: request.office_and_jurisdiction,
-      race_type: request.race_type,
-      incumbent_status: request.incumbent_status,
-      seats_available: request.seats_available,
-      number_of_opponents: request.number_of_opponents,
-      win_number: request.win_number,
-      total_likely_voters: request.total_likely_voters,
-      available_cell_phones: request.available_cell_phones,
-      available_landlines: request.available_landlines,
-      primary_date: request.primary_date,
-      additional_race_context: request.additional_race_context,
-    })
+    const currentHash = this.generateCampaignInfoHashFromRequest(request)
 
     const existingPlan = await this.model.findUnique({
       where: { campaignId: campaign.id },
@@ -465,6 +450,28 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     ]
   }
 
+  private generateCampaignInfoHashFromRequest(
+    request: StartCampaignPlanRequest,
+  ): string {
+    const campaignInfo = {
+      campaign_plan_version: CAMPAIGN_PLAN_VERSION,
+      candidate_name: request.candidate_name,
+      election_date: request.election_date,
+      office_and_jurisdiction: request.office_and_jurisdiction,
+      race_type: request.race_type,
+      incumbent_status: request.incumbent_status,
+      seats_available: request.seats_available,
+      number_of_opponents: request.number_of_opponents,
+      win_number: request.win_number,
+      total_likely_voters: request.total_likely_voters,
+      available_cell_phones: request.available_cell_phones,
+      available_landlines: request.available_landlines,
+      primary_date: request.primary_date,
+      additional_race_context: request.additional_race_context,
+    }
+    return this.generateCampaignInfoHash(campaignInfo)
+  }
+
   private generateCampaignInfoHash(
     campaignInfo: Record<string, unknown>,
   ): string {
@@ -487,6 +494,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   private async saveCampaignPlan(
     campaignPlanJson: unknown,
     campaign: CampaignWithPathToVictory,
+    request: StartCampaignPlanRequest,
   ): Promise<void> {
     if (!campaignPlanJson || typeof campaignPlanJson !== 'object') {
       this.logger.warn('Invalid campaign plan JSON, skipping save')
@@ -494,17 +502,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     }
 
     const planData = campaignPlanJson as Record<string, unknown>
-
-    if (!planData.campaign_info || typeof planData.campaign_info !== 'object') {
-      this.logger.warn('No campaign_info found in plan JSON, skipping save')
-      return
-    }
-
-    const campaignInfo = planData.campaign_info as Record<string, unknown>
-    const campaignInfoHash = this.generateCampaignInfoHash({
-      campaign_plan_version: CAMPAIGN_PLAN_VERSION,
-      ...campaignInfo,
-    })
+    const campaignInfoHash = this.generateCampaignInfoHashFromRequest(request)
 
     const sections = (planData.sections as Record<string, unknown>) || {}
 
