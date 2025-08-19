@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
 import { lastValueFrom } from 'rxjs'
 import { format } from '@redtea/format-axios-error'
@@ -18,7 +18,6 @@ interface DecodedPeerlyToken {
 
 @Injectable()
 export class PeerlyAuthenticationService extends PeerlyBaseConfig {
-  private readonly logger = new Logger(PeerlyAuthenticationService.name)
   private token: string | null = null
   private tokenExpiry: number | null = null
   private readonly tokenRenewalThreshold = 5 * 60 // 5 minutes in seconds
