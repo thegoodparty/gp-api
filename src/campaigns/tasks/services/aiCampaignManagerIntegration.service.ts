@@ -1,10 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
+import { Campaign, PathToVictory } from '@prisma/client'
 import {
   AiCampaignManagerService,
   StartCampaignPlanRequest,
 } from './aiCampaignManager.service'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+
+type CampaignWithPathToVictory = Campaign & {
+  pathToVictory?: PathToVictory | null
+}
 
 @Injectable()
 export class AiCampaignManagerIntegrationService {
@@ -12,7 +16,9 @@ export class AiCampaignManagerIntegrationService {
 
   constructor(private readonly aiCampaignManager: AiCampaignManagerService) {}
 
-  async generateCampaignTasks(campaign: Campaign): Promise<CampaignTask[]> {
+  async generateCampaignTasks(
+    campaign: CampaignWithPathToVictory,
+  ): Promise<CampaignTask[]> {
     try {
       // Build request from campaign data
       const request = this.buildCampaignPlanRequest(campaign)
@@ -25,9 +31,7 @@ export class AiCampaignManagerIntegrationService {
       )
 
       // Wait for completion
-      const completedProgress = await this.aiCampaignManager.waitForCompletion(
-        session.session_id,
-      )
+      await this.aiCampaignManager.waitForCompletion(session.session_id)
       this.logger.log(
         `Campaign plan generation completed for session: ${session.session_id}`,
       )
@@ -46,32 +50,147 @@ export class AiCampaignManagerIntegrationService {
   }
 
   private buildCampaignPlanRequest(
-    campaign: Campaign,
+    campaign: CampaignWithPathToVictory,
   ): StartCampaignPlanRequest {
-    const { details, data } = campaign
+    const { details, data, pathToVictory } = campaign
+
+    const office = details.office || details.normalizedOffice || 'Local Office'
+    const jurisdiction = details.state || 'Unknown State'
+    const district = details.district ? ` - ${details.district}` : ''
+    const office_and_jurisdiction = `${office} in ${jurisdiction}${district}`
+
+    const pathData = pathToVictory?.data as Record<string, unknown> | undefined
+    const winNumber = this.extractNumberValue(pathData?.winNumber, 1000)
+    const totalRegisteredVoters = this.extractNumberValue(
+      pathData?.totalRegisteredVoters,
+      5000,
+    )
+    const projectedTurnout = this.extractNumberValue(
+      pathData?.projectedTurnout,
+      totalRegisteredVoters * 0.6,
+    )
+
+    const additionalContext = this.buildAdditionalRaceContext(campaign)
 
     return {
       candidate_name: data.name || `Campaign ${campaign.id}`,
-      office: details.office || details.normalizedOffice || 'Local Office',
-      state: details.state || 'Unknown',
-      party: details.party,
-      district: details.district,
       election_date:
         details.electionDate || new Date().toISOString().split('T')[0],
-      budget: this.extractBudgetFromData(data),
-      experience: details.pastExperience
-        ? typeof details.pastExperience === 'string'
-          ? details.pastExperience
-          : JSON.stringify(details.pastExperience)
-        : undefined,
-      key_issues: this.extractKeyIssues(details),
-      target_demographics: this.extractTargetDemographics(details),
-      campaign_goals: this.extractCampaignGoals(data),
+      office_and_jurisdiction,
+      race_type: this.determineRaceType(details),
+      incumbent_status: this.determineIncumbentStatus(details),
+      seats_available: 1,
+      number_of_opponents: this.extractNumberOfOpponents(details),
+      win_number: winNumber,
+      total_likely_voters: Math.floor(projectedTurnout),
+      available_cell_phones: Math.floor(projectedTurnout * 0.7),
+      available_landlines: Math.floor(projectedTurnout * 0.3),
+      primary_date: details.primaryElectionDate || null,
+      additional_race_context: additionalContext,
     }
   }
 
+  private extractNumberValue(value: unknown, defaultValue: number): number {
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value)
+      return isNaN(parsed) ? defaultValue : parsed
+    }
+    return defaultValue
+  }
+
+  private determineRaceType(details: unknown): string {
+    if (typeof details === 'object' && details && 'partisanType' in details) {
+      const partisanType = (details as { partisanType?: unknown }).partisanType
+      if (typeof partisanType === 'string') {
+        return partisanType.toLowerCase() === 'nonpartisan'
+          ? 'Nonpartisan'
+          : 'Partisan'
+      }
+    }
+    return 'Nonpartisan'
+  }
+
+  private determineIncumbentStatus(_details: unknown): string {
+    return 'N/A'
+  }
+
+  private extractNumberOfOpponents(details: unknown): number {
+    if (typeof details === 'object' && details && 'runningAgainst' in details) {
+      const runningAgainst = (details as { runningAgainst?: unknown })
+        .runningAgainst
+      if (Array.isArray(runningAgainst)) {
+        return runningAgainst.length
+      }
+    }
+    return 1
+  }
+
+  private buildAdditionalRaceContext(
+    campaign: CampaignWithPathToVictory,
+  ): string {
+    const { details, data } = campaign
+    const contextParts: string[] = []
+
+    if (details.party) {
+      const party =
+        details.party === 'Other' ? details.otherParty : details.party
+      contextParts.push(`Party: ${party}`)
+    }
+
+    if (details.pastExperience) {
+      const experience =
+        typeof details.pastExperience === 'string'
+          ? details.pastExperience
+          : JSON.stringify(details.pastExperience)
+      contextParts.push(`Experience: ${experience}`)
+    }
+
+    if (details.occupation) {
+      contextParts.push(`Occupation: ${details.occupation}`)
+    }
+
+    const keyIssues = this.extractKeyIssues(details)
+    if (keyIssues && keyIssues.length > 0) {
+      contextParts.push(`Key Issues: ${keyIssues.join(', ')}`)
+    }
+
+    const campaignGoals = this.extractCampaignGoals(data)
+    if (campaignGoals && campaignGoals.length > 0) {
+      contextParts.push(`Campaign Goals: ${campaignGoals.join(', ')}`)
+    }
+
+    const demographics = this.extractTargetDemographics(details)
+    if (demographics && demographics.length > 0) {
+      contextParts.push(`Demographics: ${demographics.join(', ')}`)
+    }
+
+    const budget = this.extractBudgetFromData(data)
+    if (budget) {
+      contextParts.push(`Budget: $${budget}`)
+    }
+
+    if (typeof details === 'object' && details && 'runningAgainst' in details) {
+      const runningAgainst = (details as { runningAgainst?: unknown })
+        .runningAgainst
+      if (Array.isArray(runningAgainst) && runningAgainst.length > 0) {
+        const opponents = runningAgainst
+          .map((opponent) => {
+            if (typeof opponent === 'object' && opponent) {
+              const opp = opponent as Record<string, unknown>
+              return `${opp.name || 'Unknown'} (${opp.party || 'Unknown Party'})`
+            }
+            return String(opponent)
+          })
+          .join(', ')
+        contextParts.push(`Opponents: ${opponents}`)
+      }
+    }
+
+    return contextParts.join('; ')
+  }
+
   private extractBudgetFromData(data: unknown): number | undefined {
-    // Try to extract budget information from campaign data
     if (typeof data === 'object' && data && 'budget' in data) {
       const budget = (data as { budget?: unknown }).budget
       if (typeof budget === 'number') return budget
@@ -100,7 +219,6 @@ export class AiCampaignManagerIntegrationService {
   }
 
   private extractTargetDemographics(details: unknown): string[] | undefined {
-    // Extract demographic information if available
     const demographics: string[] = []
 
     if (typeof details === 'object' && details) {
@@ -121,7 +239,6 @@ export class AiCampaignManagerIntegrationService {
   }
 
   private extractCampaignGoals(data: unknown): string[] | undefined {
-    // Extract campaign goals from data if available
     if (typeof data === 'object' && data && 'reportedVoterGoals' in data) {
       const goals = (data as { reportedVoterGoals?: unknown })
         .reportedVoterGoals
@@ -138,25 +255,22 @@ export class AiCampaignManagerIntegrationService {
     campaignPlanJson: unknown,
     campaignId: number,
   ): CampaignTask[] {
-    // TODO: Parse the actual JSON structure from the AI service
-    // For now, return a basic structure that can be extended
-    // when we know the exact JSON format returned by the AI service
-
     if (!campaignPlanJson || typeof campaignPlanJson !== 'object') {
       this.logger.warn('Invalid campaign plan JSON received')
       return []
     }
 
     const tasks: CampaignTask[] = []
+    const planData = campaignPlanJson as Record<string, unknown>
 
-    // Try to extract tasks from the JSON structure
-    // This is a placeholder implementation that should be updated
-    // based on the actual JSON structure from the AI service
     if (
-      'tasks' in campaignPlanJson &&
-      Array.isArray((campaignPlanJson as { tasks: unknown }).tasks)
+      'tasks' in planData &&
+      typeof planData.tasks === 'object' &&
+      planData.tasks &&
+      'all_tasks' in planData.tasks &&
+      Array.isArray((planData.tasks as { all_tasks: unknown }).all_tasks)
     ) {
-      const jsonTasks = (campaignPlanJson as { tasks: unknown[] }).tasks
+      const jsonTasks = (planData.tasks as { all_tasks: unknown[] }).all_tasks
 
       jsonTasks.forEach((task, index) => {
         if (typeof task === 'object' && task) {
@@ -166,7 +280,6 @@ export class AiCampaignManagerIntegrationService {
         }
       })
     } else {
-      // If no tasks structure found, create some default tasks
       this.logger.warn(
         'No tasks found in campaign plan JSON, creating default tasks',
       )
@@ -179,28 +292,59 @@ export class AiCampaignManagerIntegrationService {
   private convertJsonTaskToCampaignTask(
     jsonTask: object,
     campaignId: number,
-    weekNumber: number,
+    index: number,
   ): CampaignTask {
     const taskObj = jsonTask as Record<string, unknown>
+    const taskDate = String(taskObj.date || '')
+    const weekNumber = this.calculateWeekFromDate(taskDate, campaignId)
 
     return {
-      id: `ai-generated-${campaignId}-${Date.now()}-${weekNumber}`,
+      id: `ai-generated-${campaignId}-${index}-${Date.now()}`,
       title: String(taskObj.title || 'AI Generated Task'),
       description: String(
         taskObj.description || 'Task generated by AI Campaign Manager',
       ),
-      cta: String(taskObj.cta || 'Get started'),
-      flowType: this.mapToFlowType(taskObj.type || taskObj.flowType),
-      week: typeof taskObj.week === 'number' ? taskObj.week : weekNumber,
-      link: typeof taskObj.link === 'string' ? taskObj.link : undefined,
-      proRequired: Boolean(taskObj.proRequired),
-      deadline:
-        typeof taskObj.deadline === 'number' ? taskObj.deadline : undefined,
-      defaultAiTemplateId:
-        typeof taskObj.defaultAiTemplateId === 'string'
-          ? taskObj.defaultAiTemplateId
-          : undefined,
+      cta: this.generateCta(taskObj.type),
+      flowType: this.mapToFlowType(taskObj.type),
+      week: weekNumber,
+      link: undefined,
+      proRequired: false,
+      deadline: undefined,
+      defaultAiTemplateId: undefined,
     }
+  }
+
+  private calculateWeekFromDate(dateStr: string, campaignId: number): number {
+    if (!dateStr) return 9
+
+    try {
+      const taskDate = new Date(dateStr)
+      const electionDate = new Date('2026-11-03')
+      const diffTime = electionDate.getTime() - taskDate.getTime()
+      const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7))
+      return Math.min(Math.max(1, diffWeeks), 9)
+    } catch {
+      return 9
+    }
+  }
+
+  private generateCta(taskType: unknown): string {
+    const type = String(taskType || '').toLowerCase()
+
+    if (type.includes('text')) return 'Send text'
+    if (type.includes('robocall') || type.includes('call')) return 'Make calls'
+    if (
+      type.includes('market') ||
+      type.includes('fair') ||
+      type.includes('event')
+    )
+      return 'Attend event'
+    if (type.includes('forum') || type.includes('meeting'))
+      return 'Join meeting'
+    if (type.includes('volunteer')) return 'Volunteer'
+    if (type.includes('deadline')) return 'Check deadline'
+
+    return 'Get started'
   }
 
   private mapToFlowType(type: unknown): CampaignTaskType {

@@ -6,16 +6,18 @@ import { AxiosResponse } from 'axios'
 
 export interface StartCampaignPlanRequest {
   candidate_name: string
-  office: string
-  state: string
-  party?: string
-  district?: string
   election_date: string
-  budget?: number
-  experience?: string
-  key_issues?: string[]
-  target_demographics?: string[]
-  campaign_goals?: string[]
+  office_and_jurisdiction: string
+  race_type: string
+  incumbent_status: string
+  seats_available: number
+  number_of_opponents: number
+  win_number: number
+  total_likely_voters: number
+  available_cell_phones: number
+  available_landlines: number
+  primary_date?: string | null
+  additional_race_context?: string | null
 }
 
 export interface CampaignPlanSession {
@@ -45,18 +47,18 @@ export interface ProgressStreamData {
 
 @Injectable()
 export class AiCampaignManagerService {
-  private readonly apiBaseUrl: string
+  private readonly apiBaseUrl: string | undefined
   private readonly logger = new Logger(AiCampaignManagerService.name)
 
   constructor(private readonly httpService: HttpService) {
-    this.apiBaseUrl =
-      process.env.AI_CAMPAIGN_MANAGER_BASE || 'http://34.221.9.248:8000'
+    this.apiBaseUrl = process.env.AI_CAMPAIGN_MANAGER_BASE
   }
 
   async startCampaignPlanGeneration(
     request: StartCampaignPlanRequest,
   ): Promise<CampaignPlanSession> {
     try {
+      console.log('request', request)
       const response = await this.fetchFromApi<CampaignPlanSession>(
         '/start-campaign-plan-generation',
         {
@@ -157,18 +159,30 @@ export class AiCampaignManagerService {
       const { method = Methods.GET, data, headers = {} } = options
       const url = `${this.apiBaseUrl}${endpoint}`
 
+      let requestData = data
       const config = {
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           ...headers,
         },
+      }
+
+      if (method === Methods.POST && data && typeof data === 'object') {
+        const params = new URLSearchParams()
+        Object.keys(data).forEach((key) => {
+          if (data[key] !== null && data[key] !== undefined) {
+            params.append(key, String(data[key]))
+          }
+        })
+        requestData = params.toString()
+        this.logger.debug('URL-encoded request data:', requestData)
       }
 
       let response: AxiosResponse<T>
       switch (method) {
         case Methods.POST:
           response = await lastValueFrom(
-            this.httpService.post(url, data, config),
+            this.httpService.post(url, requestData, config),
           )
           break
         case Methods.PUT:

@@ -95,21 +95,17 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   async generateTasks(campaign: Campaign) {
-    // Generate tasks using AI integration
     const generatedTasks =
       await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
 
-    // Save tasks to database
     return this.saveTasks(campaign.id, generatedTasks)
   }
 
   async saveTasks(campaignId: number, tasks: CampaignTask[]) {
-    // Clear existing tasks for this campaign
     await this.model.deleteMany({
       where: { campaignId },
     })
 
-    // Create new tasks
     const tasksToCreate = tasks.map((task) => ({
       taskId: task.id,
       campaignId,
@@ -125,7 +121,7 @@ export class CampaignTasksService extends createPrismaBase(
       completed: false,
     }))
 
-    const createdTasks = await this.model.createMany({
+    await this.model.createMany({
       data: tasksToCreate,
     })
 
