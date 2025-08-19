@@ -58,7 +58,6 @@ export class AiCampaignManagerService {
     request: StartCampaignPlanRequest,
   ): Promise<CampaignPlanSession> {
     try {
-      console.log('request', request)
       const response = await this.fetchFromApi<CampaignPlanSession>(
         '/start-campaign-plan-generation',
         {
