@@ -28,7 +28,11 @@ describe('PeerlyIdentityService', () => {
         { provide: HttpService, useValue: { post: jest.fn() } },
         {
           provide: PeerlyAuthenticationService,
-          useValue: { getAuthorizationHeader: jest.fn().mockResolvedValue({ Authorization: 'Jwt token' }) },
+          useValue: {
+            getAuthorizationHeader: jest
+              .fn()
+              .mockResolvedValue({ Authorization: 'Jwt token' }),
+          },
         },
       ],
     }).compile()
@@ -54,5 +58,3 @@ describe('PeerlyIdentityService', () => {
     expect(link).toBe('https://peerly/link')
   })
 })
-
-

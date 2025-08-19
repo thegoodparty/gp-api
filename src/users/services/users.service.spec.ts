@@ -6,7 +6,9 @@ import { PrismaService } from '../../prisma/prisma.service'
 
 jest.mock('../../shared/util/strings.util', () => ({
   trimMany: (o: Record<string, string>) =>
-    Object.fromEntries(Object.entries(o).map(([k, v]) => [k, (v || '').trim()])),
+    Object.fromEntries(
+      Object.entries(o).map(([k, v]) => [k, (v || '').trim()]),
+    ),
 }))
 
 jest.mock('../util/passwords.util', () => ({
@@ -96,5 +98,3 @@ describe('UsersService', () => {
     ).rejects.toThrow('User with this email already exists')
   })
 })
-
-

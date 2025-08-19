@@ -15,5 +15,3 @@ describe('http.util', () => {
     expect(isAxiosResponse({})).toBeFalsy()
   })
 })
-
-

@@ -8,9 +8,12 @@ import {
 
 describe('strings.util', () => {
   it('trimMany trims values', () => {
-    expect(
-      trimMany({ a: ' a ', b: 'b', c: '  c', d: '' }),
-    ).toEqual({ a: 'a', b: 'b', c: 'c', d: '' })
+    expect(trimMany({ a: ' a ', b: 'b', c: '  c', d: '' })).toEqual({
+      a: 'a',
+      b: 'b',
+      c: 'c',
+      d: '',
+    })
   })
 
   it('toLowerAndTrim works', () => {
@@ -33,5 +36,3 @@ describe('strings.util', () => {
     expect(capitalizeFirstLetter('')).toBe('')
   })
 })
-
-

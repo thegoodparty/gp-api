@@ -45,7 +45,9 @@ describe('PeerlyAuthenticationService', () => {
     ;(lastValueFrom as unknown as jest.Mock).mockResolvedValueOnce({
       data: { token: 'jwt-token' },
     })
-    ;(jwt.decode as jest.Mock).mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 3600 })
+    ;(jwt.decode as jest.Mock).mockReturnValue({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
 
     const header = await service.getAuthorizationHeader()
     expect(header).toEqual({ Authorization: 'Jwt jwt-token' })
@@ -57,8 +59,8 @@ describe('PeerlyAuthenticationService', () => {
     })
     ;(jwt.decode as jest.Mock).mockReturnValue(null)
 
-    await expect(service.getToken()).rejects.toThrow('Peerly token renewal failed')
+    await expect(service.getToken()).rejects.toThrow(
+      'Peerly token renewal failed',
+    )
   })
 })
-
-

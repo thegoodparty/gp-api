@@ -9,5 +9,3 @@ describe('slug.util', () => {
     expect(buildSlug('Hello World', '123')).toBe('hello-world-123')
   })
 })
-
-

@@ -27,7 +27,11 @@ describe('PeerlyP2pSmsService', () => {
         { provide: HttpService, useValue: { post: jest.fn() } },
         {
           provide: PeerlyAuthenticationService,
-          useValue: { getAuthorizationHeader: jest.fn().mockResolvedValue({ Authorization: 'Jwt token' }) },
+          useValue: {
+            getAuthorizationHeader: jest
+              .fn()
+              .mockResolvedValue({ Authorization: 'Jwt token' }),
+          },
         },
       ],
     }).compile()
@@ -66,5 +70,3 @@ describe('PeerlyP2pSmsService', () => {
     expect(jobId).toBe('job-2')
   })
 })
-
-

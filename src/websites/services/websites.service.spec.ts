@@ -1,10 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { WebsitesService } from './websites.service'
 import { PrismaService } from '../../prisma/prisma.service'
+import { User } from '@prisma/client'
+import { CampaignWith } from 'src/campaigns/campaigns.types'
 
 jest.mock('src/users/util/users.util', () => ({
-  getUserFullName: (u: { firstName?: string; lastName?: string; name?: string }) =>
-    u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+  getUserFullName: (u: {
+    firstName?: string
+    lastName?: string
+    name?: string
+  }) => u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
 }))
 
 describe('WebsitesService', () => {
@@ -34,15 +39,35 @@ describe('WebsitesService', () => {
   it('createByCampaign builds content from campaign positions', async () => {
     ;(prisma.website.create as jest.Mock).mockResolvedValueOnce({ id: 10 })
     const result = await service.createByCampaign(
-      { email: 'u@e.com', firstName: 'A', lastName: 'B' } as any,
+      { email: 'u@e.com', firstName: 'A', lastName: 'B' } as User,
       {
         id: 2,
         slug: 'myslug',
         campaignPositions: [
-          { description: 'x', topIssue: { name: 'Issue X' } },
-          { description: undefined, topIssue: undefined },
+          { 
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            id: 1,
+            campaignId: 2,
+            description: 'x',
+            order: 1,
+            positionId: 1,
+            topIssueId: 1,
+            topIssue: { name: 'Issue X' } 
+          },
+          { 
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            id: 2,
+            campaignId: 2,
+            description: undefined,
+            order: 2,
+            positionId: 2,
+            topIssueId: null,
+            topIssue: undefined 
+          },
         ],
-      } as any,
+      } as unknown as CampaignWith<'campaignPositions'>,
     )
     expect(prisma.website.create).toHaveBeenCalled()
     expect(result).toEqual({ id: 10 })
@@ -56,5 +81,3 @@ describe('WebsitesService', () => {
     expect(site).toEqual({ id: 7 })
   })
 })
-
-

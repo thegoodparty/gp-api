@@ -28,7 +28,11 @@ describe('PeerlyPhoneListService', () => {
         { provide: HttpService, useValue: { post: jest.fn(), get: jest.fn() } },
         {
           provide: PeerlyAuthenticationService,
-          useValue: { getAuthorizationHeader: jest.fn().mockResolvedValue({ Authorization: 'Jwt token' }) },
+          useValue: {
+            getAuthorizationHeader: jest
+              .fn()
+              .mockResolvedValue({ Authorization: 'Jwt token' }),
+          },
         },
       ],
     }).compile()
@@ -58,5 +62,3 @@ describe('PeerlyPhoneListService', () => {
     expect(res).toEqual({ Data: { list_status: 'OK' } })
   })
 })
-
-

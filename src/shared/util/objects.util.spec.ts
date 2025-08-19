@@ -28,5 +28,3 @@ describe('objects.util', () => {
     expect(result).toEqual({ a: 1 })
   })
 })
-
-

@@ -10,5 +10,3 @@ describe('zipcodes.util', () => {
     expect(truncateZip('1234')).toBe('1234')
   })
 })
-
-

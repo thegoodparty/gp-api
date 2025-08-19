@@ -29,7 +29,11 @@ describe('PeerlyMediaService', () => {
         { provide: HttpService, useValue: { post: jest.fn() } },
         {
           provide: PeerlyAuthenticationService,
-          useValue: { getAuthorizationHeader: jest.fn().mockResolvedValue({ Authorization: 'Jwt token' }) },
+          useValue: {
+            getAuthorizationHeader: jest
+              .fn()
+              .mockResolvedValue({ Authorization: 'Jwt token' }),
+          },
         },
       ],
     }).compile()
@@ -63,5 +67,3 @@ describe('PeerlyMediaService', () => {
     expect(id).toBe('m-1')
   })
 })
-
-

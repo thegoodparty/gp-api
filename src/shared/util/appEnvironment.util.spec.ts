@@ -13,10 +13,11 @@ describe('appEnvironment.util', () => {
     expect([true, false]).toContain(IS_DEV)
     expect([true, false]).toContain(IS_PROD)
     // In test runs NODE_ENV is typically 'test'; CURRENT_ENVIRONMENT mirrors NODE_ENV, so accept any string
-    expect(typeof CURRENT_ENVIRONMENT === 'string' || CURRENT_ENVIRONMENT === undefined).toBe(true)
+    expect(
+      typeof CURRENT_ENVIRONMENT === 'string' ||
+        CURRENT_ENVIRONMENT === undefined,
+    ).toBe(true)
     void WEBAPP_ROOT
     void ASSET_DOMAIN
   })
 })
-
-

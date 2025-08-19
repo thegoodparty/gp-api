@@ -43,5 +43,3 @@ describe('date.util', () => {
     expect(endDate.getUTCHours()).toBe(23)
   })
 })
-
-

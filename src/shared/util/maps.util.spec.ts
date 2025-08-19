@@ -9,5 +9,3 @@ describe('maps.util', () => {
     expect(mapToObject(m)).toEqual({ a: '1', b: '2' })
   })
 })
-
-

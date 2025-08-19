@@ -1,4 +1,8 @@
-import { getRandomInt, getRandomPercentage, LARGEST_SAFE_INTEGER } from './numbers.util'
+import {
+  getRandomInt,
+  getRandomPercentage,
+  LARGEST_SAFE_INTEGER,
+} from './numbers.util'
 
 describe('numbers.util', () => {
   it('getRandomInt within range', () => {
@@ -22,5 +26,3 @@ describe('numbers.util', () => {
     expect(Number.isFinite(p)).toBe(true)
   })
 })
-
-
