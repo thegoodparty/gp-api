@@ -20,28 +20,23 @@ export class AiCampaignManagerIntegrationService {
     campaign: CampaignWithPathToVictory,
   ): Promise<CampaignTask[]> {
     try {
-      // Build request from campaign data
       const request = this.buildCampaignPlanRequest(campaign)
 
-      // Start campaign plan generation
       const session =
         await this.aiCampaignManager.startCampaignPlanGeneration(request)
       this.logger.log(
         `Started campaign plan generation with session ID: ${session.session_id}`,
       )
 
-      // Wait for completion
       await this.aiCampaignManager.waitForCompletion(session.session_id)
       this.logger.log(
         `Campaign plan generation completed for session: ${session.session_id}`,
       )
 
-      // Download the JSON result
       const campaignPlanJson = await this.aiCampaignManager.downloadJson(
         session.session_id,
       )
 
-      // Parse and convert to CampaignTask format
       return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
     } catch (error) {
       this.logger.error('Failed to generate campaign tasks', error)
