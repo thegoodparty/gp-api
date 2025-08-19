@@ -9,13 +9,10 @@ import {
 } from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
+import { Campaign, PathToVictory, TcrComplianceStatus } from '@prisma/client'
 import {
-  Campaign,
-  PathToVictory,
-  TcrComplianceStatus,
-  User,
-} from '@prisma/client'
-import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
+  PathToVictoryService
+} from 'src/pathToVictory/services/pathToVictory.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
@@ -27,9 +24,12 @@ import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { isAfter, parseISO } from 'date-fns'
-import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import {
+  CampaignTcrComplianceService
+} from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { QueueProducerService } from '../producer/queueProducer.service'
 import { getTwelveHoursFromDate } from '../../shared/util/date.util'
+import { EVENTS } from '../../segment/segment.types'
 
 @Injectable()
 export class QueueConsumerService {
@@ -98,20 +98,15 @@ export class QueueConsumerService {
           generateAiContentMessage,
         )
 
-        const campaign = await this.campaignsService.findUniqueOrThrow({
+        const { userId } = await this.campaignsService.findUniqueOrThrow({
           where: { slug: generateAiContentMessage.slug },
-          include: { user: true },
         })
 
-        this.analytics.trackEvent(
-          campaign.user as User,
-          'Content Builder: Generation Completed',
-          {
-            slug: generateAiContentMessage.slug,
-            key: generateAiContentMessage.key,
-            regenerate: generateAiContentMessage.regenerate,
-          },
-        )
+        this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+          slug: generateAiContentMessage.slug,
+          key: generateAiContentMessage.key,
+          regenerate: generateAiContentMessage.regenerate,
+        })
         break
       case QueueType.PATH_TO_VICTORY:
         this.logger.log('received pathToVictory message')
@@ -168,12 +163,28 @@ export class QueueConsumerService {
     this.logger.debug(
       `TCR Registration is active, updating TCR compliance w/ identity ID ${peerlyIdentityId} status to approved`,
     )
+
     await this.tcrComplianceService.model.update({
       where: { peerlyIdentityId },
       data: {
         status: TcrComplianceStatus.approved,
       },
     })
+
+    const { campaign } = await this.tcrComplianceService.findFirstOrThrow({
+      include: {
+        campaign: true,
+      },
+      where: { peerlyIdentityId },
+    })
+
+    const { userId } = campaign
+
+    this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+    this.analytics.identify(userId, {
+      '10DLC_compliant': true,
+    })
+
     return true
   }
 
