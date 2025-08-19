@@ -3,47 +3,25 @@ import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import { Methods } from 'http-constants-ts'
 import { AxiosResponse } from 'axios'
+import {
+  StartCampaignPlanRequest,
+  CampaignPlanSession,
+  ProgressStreamData,
+  CampaignPlanResponse,
+  ApiRequestOptions,
+} from '../aiCampaignManager.types'
 
-export interface StartCampaignPlanRequest {
-  candidate_name: string
-  election_date: string
-  office_and_jurisdiction: string
-  race_type: string
-  incumbent_status: string
-  seats_available: number
-  number_of_opponents: number
-  win_number: number
-  total_likely_voters: number
-  available_cell_phones: number
-  available_landlines: number
-  primary_date?: string | null
-  additional_race_context?: string | null
-}
-
-export interface CampaignPlanSession {
-  session_id: string
-}
-
-export interface ProgressStreamData {
-  progress: number
-  status: 'processing' | 'completed' | 'failed'
-  message: string
-  logs: string[]
-  timestamp: string
-  has_pdf: boolean
-  has_json: boolean
-  download_links: {
-    pdf?: string
-    json?: string
-  }
-  expires_at: string | null
-  expires_at_formatted: string | null
-  files_ready: {
-    pdf: boolean
-    json: boolean
-    total: number
-  }
-}
+export {
+  StartCampaignPlanRequest,
+  CampaignPlanSession,
+  ProgressStreamData,
+  CampaignPlanResponse,
+  CampaignPlanTask,
+  CampaignPlanSections,
+  CampaignPlanTasks,
+  CampaignPlanMetadata,
+  ApiRequestOptions,
+} from '../aiCampaignManager.types'
 
 @Injectable()
 export class AiCampaignManagerService {
@@ -73,11 +51,14 @@ export class AiCampaignManagerService {
     }
   }
 
-  async downloadJson(sessionId: string): Promise<unknown> {
+  async downloadJson(sessionId: string): Promise<CampaignPlanResponse> {
     try {
-      const response = await this.fetchFromApi(`/download-json/${sessionId}`, {
-        method: Methods.GET,
-      })
+      const response = await this.fetchFromApi<CampaignPlanResponse>(
+        `/download-json/${sessionId}`,
+        {
+          method: Methods.GET,
+        },
+      )
 
       return response.data
     } catch (error) {
@@ -147,18 +128,14 @@ export class AiCampaignManagerService {
 
   private async fetchFromApi<T>(
     endpoint: string,
-    options: {
-      method?: Methods
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data?: any
-      headers?: Record<string, string>
-    } = {},
+    options: ApiRequestOptions = {},
   ): Promise<AxiosResponse<T>> {
     try {
       const { method = Methods.GET, data, headers = {} } = options
       const url = `${this.apiBaseUrl}${endpoint}`
 
-      let requestData = data
+      let requestData: string | StartCampaignPlanRequest | null | undefined =
+        data
       const config = {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
