@@ -1,27 +1,41 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Campaign, PathToVictory } from '@prisma/client'
+import { createHash } from 'crypto'
 import {
   AiCampaignManagerService,
   StartCampaignPlanRequest,
 } from './aiCampaignManager.service'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+
+const CAMPAIGN_PLAN_VERSION = 1
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
 }
 
 @Injectable()
-export class AiCampaignManagerIntegrationService {
-  private readonly logger = new Logger(AiCampaignManagerIntegrationService.name)
+export class AiCampaignManagerIntegrationService extends createPrismaBase(
+  MODELS.CampaignPlan,
+) {
+  readonly logger = new Logger(AiCampaignManagerIntegrationService.name)
 
-  constructor(private readonly aiCampaignManager: AiCampaignManagerService) {}
+  constructor(private readonly aiCampaignManager: AiCampaignManagerService) {
+    super()
+  }
 
   async generateCampaignTasks(
     campaign: CampaignWithPathToVictory,
   ): Promise<CampaignTask[]> {
     try {
       const request = this.buildCampaignPlanRequest(campaign)
-
+      const existingTasks = await this.checkForExistingPlanVersion(
+        campaign,
+        request,
+      )
+      if (existingTasks) {
+        return existingTasks
+      }
       const session =
         await this.aiCampaignManager.startCampaignPlanGeneration(request)
       this.logger.log(
@@ -36,6 +50,8 @@ export class AiCampaignManagerIntegrationService {
       const campaignPlanJson = await this.aiCampaignManager.downloadJson(
         session.session_id,
       )
+
+      await this.saveCampaignPlan(campaignPlanJson, campaign)
 
       return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
     } catch (error) {
@@ -183,6 +199,41 @@ export class AiCampaignManagerIntegrationService {
     }
 
     return contextParts.join('; ')
+  }
+
+  private async checkForExistingPlanVersion(
+    campaign: CampaignWithPathToVictory,
+    request: StartCampaignPlanRequest,
+  ): Promise<CampaignTask[] | null> {
+    const currentHash = this.generateCampaignInfoHash({
+      campaign_plan_version: CAMPAIGN_PLAN_VERSION,
+      candidate_name: request.candidate_name,
+      election_date: request.election_date,
+      office_and_jurisdiction: request.office_and_jurisdiction,
+      race_type: request.race_type,
+      incumbent_status: request.incumbent_status,
+      seats_available: request.seats_available,
+      number_of_opponents: request.number_of_opponents,
+      win_number: request.win_number,
+      total_likely_voters: request.total_likely_voters,
+      available_cell_phones: request.available_cell_phones,
+      available_landlines: request.available_landlines,
+      primary_date: request.primary_date,
+      additional_race_context: request.additional_race_context,
+    })
+
+    const existingPlan = await this.model.findUnique({
+      where: { campaignId: campaign.id },
+    })
+
+    if (existingPlan && existingPlan.campaignInfoHash === currentHash) {
+      this.logger.log(
+        `Campaign plan unchanged for campaign ${campaign.id}, returning existing tasks`,
+      )
+      return this.parseCampaignPlanToTasks(existingPlan.rawJson, campaign)
+    }
+
+    return null
   }
 
   private extractBudgetFromData(data: unknown): number | undefined {
@@ -412,5 +463,86 @@ export class AiCampaignManagerIntegrationService {
         proRequired: false,
       },
     ]
+  }
+
+  private generateCampaignInfoHash(
+    campaignInfo: Record<string, unknown>,
+  ): string {
+    const { generated_date: _generated_date, ...campaignInfoWithoutDate } =
+      campaignInfo
+    const sortedInfo = Object.keys(campaignInfoWithoutDate)
+      .sort()
+      .reduce(
+        (result, key) => {
+          result[key] = campaignInfoWithoutDate[key]
+          return result
+        },
+        {} as Record<string, unknown>,
+      )
+
+    const hashString = JSON.stringify(sortedInfo)
+    return createHash('sha256').update(hashString).digest('hex')
+  }
+
+  private async saveCampaignPlan(
+    campaignPlanJson: unknown,
+    campaign: CampaignWithPathToVictory,
+  ): Promise<void> {
+    if (!campaignPlanJson || typeof campaignPlanJson !== 'object') {
+      this.logger.warn('Invalid campaign plan JSON, skipping save')
+      return
+    }
+
+    const planData = campaignPlanJson as Record<string, unknown>
+
+    if (!planData.campaign_info || typeof planData.campaign_info !== 'object') {
+      this.logger.warn('No campaign_info found in plan JSON, skipping save')
+      return
+    }
+
+    const campaignInfo = planData.campaign_info as Record<string, unknown>
+    const campaignInfoHash = this.generateCampaignInfoHash({
+      campaign_plan_version: CAMPAIGN_PLAN_VERSION,
+      ...campaignInfo,
+    })
+
+    const sections = (planData.sections as Record<string, unknown>) || {}
+
+    const campaignPlanData = {
+      campaignId: campaign.id,
+      campaignInfoHash,
+      overview: (sections.overview as string) || null,
+      strategicLandscapeElectoralGoals:
+        (sections.strategic_landscape_electoral_goals as string) || null,
+      campaignTimeline: (sections.campaign_timeline as string) || null,
+      recommendedTotalBudget:
+        (sections.recommended_total_budget as string) || null,
+      knowYourCommunity: (sections.know_your_community as string) || null,
+      voterContactPlan: (sections.voter_contact_plan as string) || null,
+      rawJson: planData,
+    }
+
+    try {
+      const existingPlan = await this.model.findUnique({
+        where: { campaignId: campaign.id },
+      })
+
+      if (existingPlan) {
+        await this.model.delete({
+          where: { campaignId: campaign.id },
+        })
+      }
+
+      await this.model.create({
+        data: campaignPlanData,
+      })
+
+      this.logger.log(
+        `Campaign plan saved for campaign ${campaign.id} with hash ${campaignInfoHash}`,
+      )
+    } catch (error) {
+      this.logger.error('Failed to save campaign plan', error)
+      throw error
+    }
   }
 }

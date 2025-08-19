@@ -43,6 +43,7 @@ model Campaign {
   outreach              Outreach[]
   communityIssue        CommunityIssue[]
   campaignTasks         CampaignTask[]
+  campaignPlan          CampaignPlan?
 
   @@index([slug])
   @@map("campaign")
