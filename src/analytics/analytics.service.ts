@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SegmentService } from 'src/segment/segment.service'
 import Stripe from 'stripe'
-import { EVENTS, SegmentTrackEventProperties, SegmentIdentityTraits } from 'src/segment/segment.types'
+import {
+  EVENTS,
+  SegmentTrackEventProperties,
+  SegmentIdentityTraits,
+} from 'src/segment/segment.types'
 
 @Injectable()
 export class AnalyticsService {
