@@ -40,13 +40,7 @@ export class P2pPhoneListUploadService {
       campaign.id,
     )
 
-    if (!tcrCompliance) {
-      throw new NotFoundException(
-        'TCR compliance record not found for this campaign',
-      )
-    }
-
-    if (!tcrCompliance.peerlyIdentityId) {
+    if (!tcrCompliance || !tcrCompliance.peerlyIdentityId) {
       throw new BadRequestException(
         'TCR compliance record does not have a Peerly identity ID',
       )
@@ -84,7 +78,7 @@ export class P2pPhoneListUploadService {
         identityId: tcrCompliance.peerlyIdentityId,
       })
 
-      this.logger.log(
+      this.logger.debug(
         `P2P phone list uploaded successfully for campaign ${campaign.id}, token: ${token}`,
       )
 
