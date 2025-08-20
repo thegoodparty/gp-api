@@ -62,7 +62,6 @@ export type Audience = {
   gender_female?: boolean | null
 }
 
-
 // P2P SMS interfaces
 interface CreateP2pCampaignParams {
   campaign: CampaignWith<'pathToVictory'>
@@ -300,16 +299,17 @@ export class VoterOutreachService {
         return {
           title: template.title,
           text: template.text,
-          ...(mediaId && template.mediaStream && {
-            advanced: {
-              media: {
-                media_id: mediaId,
-                media_type: template.mediaStream.mimeType.startsWith('video/')
-                  ? MediaType.VIDEO
-                  : MediaType.IMAGE,
+          ...(mediaId &&
+            template.mediaStream && {
+              advanced: {
+                media: {
+                  media_id: mediaId,
+                  media_type: template.mediaStream.mimeType.startsWith('video/')
+                    ? MediaType.VIDEO
+                    : MediaType.IMAGE,
+                },
               },
-            },
-          }),
+            }),
         }
       })
 

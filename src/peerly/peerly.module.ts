@@ -6,10 +6,12 @@ import { PeerlyIdentityService } from './services/peerlyIdentity.service'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PeerlyMediaService } from './services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from './services/peerlyP2pSms.service'
+import { P2pController } from './p2p.controller'
 import { GoogleModule } from '../vendors/google/google.module'
 
 @Module({
   imports: [HttpModule, JwtModule, GoogleModule],
+  controllers: [P2pController],
   providers: [
     PeerlyAuthenticationService,
     PeerlyIdentityService,

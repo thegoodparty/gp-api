@@ -14,7 +14,9 @@ import {
   Post,
   UsePipes,
 } from '@nestjs/common'
-import { CampaignTcrComplianceService } from './services/campaignTcrCompliance.service'
+import {
+  CampaignTcrComplianceService
+} from './services/campaignTcrCompliance.service'
 import { CreateTcrComplianceDto } from './schemas/createTcrComplianceDto.schema'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
@@ -22,8 +24,16 @@ import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
 import { UsersService } from '../../users/services/users.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
-import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
+import {
+  submitCampaignVerifyPinDto
+} from './schemas/submitCampaignVerifyPinDto.schema'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
+import {
+  MessageGroup,
+  QueueProducerService,
+} from '../../queue/producer/queueProducer.service'
+import { QueueType } from '../../queue/queue.types'
+import { getTwelveHoursFromDate } from '../../shared/util/date.util'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -32,6 +42,7 @@ export class CampaignTcrComplianceController {
     private readonly userService: UsersService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly campaignsService: CampaignsService,
+    private queueService: QueueProducerService,
   ) {}
 
   @Get('mine')
@@ -141,14 +152,44 @@ export class CampaignTcrComplianceController {
         campaignVerifyToken,
       )
 
-    await this.tcrComplianceService.model.update({
+    const { peerlyIdentityId } = await this.tcrComplianceService.model.update({
       where: { id: tcrCompliance.id },
       data: {
         status: TcrComplianceStatus.pending,
       },
     })
 
+    await this.queueService.sendMessage(
+      {
+        type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
+        data: {
+          peerlyIdentityId,
+          processTime: getTwelveHoursFromDate().toISOString(),
+        },
+      },
+      MessageGroup.tcrCompliance,
+    )
+
     return campaignVerifyBrand
+  }
+
+  @Get(':id/status')
+  @UseCampaign()
+  async getTcrComplianceStatus(
+    @Param('id') tcrComplianceId: string,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const { peerlyIdentityId } = await this.retrieveTcrCompliance(
+      tcrComplianceId,
+      campaign,
+    )
+    return {
+      status: !peerlyIdentityId
+        ? false
+        : await this.tcrComplianceService.checkTcrRegistrationStatus(
+            peerlyIdentityId!,
+          ),
+    }
   }
 
   @Delete(':id')
