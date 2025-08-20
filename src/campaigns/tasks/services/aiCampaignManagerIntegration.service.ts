@@ -217,7 +217,10 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       this.logger.log(
         `Campaign plan unchanged for campaign ${campaign.id}, returning existing tasks`,
       )
-      return this.parseCampaignPlanToTasks(existingPlan.rawJson, campaign)
+      return this.parseCampaignPlanToTasks(
+        existingPlan.rawJson as CampaignPlanResponse,
+        campaign,
+      )
     }
 
     return null
@@ -475,31 +478,24 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   private async saveCampaignPlan(
-    campaignPlanJson: unknown,
+    campaignPlanJson: CampaignPlanResponse,
     campaign: CampaignWithPathToVictory,
     request: StartCampaignPlanRequest,
   ): Promise<void> {
-    if (!campaignPlanJson || typeof campaignPlanJson !== 'object') {
-      this.logger.warn('Invalid campaign plan JSON, skipping save')
-      return
-    }
-
-    const planData = campaignPlanJson as Record<string, unknown>
+    const planData = campaignPlanJson
     const campaignInfoHash = this.generateCampaignInfoHashFromRequest(request)
-
-    const sections = (planData.sections as Record<string, unknown>) || {}
 
     const campaignPlanData = {
       campaignId: campaign.id,
       campaignInfoHash,
-      overview: (sections.overview as string) || null,
+      overview: planData.sections.overview || null,
       strategicLandscapeElectoralGoals:
-        (sections.strategic_landscape_electoral_goals as string) || null,
-      campaignTimeline: (sections.campaign_timeline as string) || null,
+        planData.sections.strategic_landscape_electoral_goals || null,
+      campaignTimeline: planData.sections.campaign_timeline || null,
       recommendedTotalBudget:
-        (sections.recommended_total_budget as string) || null,
-      knowYourCommunity: (sections.know_your_community as string) || null,
-      voterContactPlan: (sections.voter_contact_plan as string) || null,
+        planData.sections.recommended_total_budget || null,
+      knowYourCommunity: planData.sections.know_your_community || null,
+      voterContactPlan: planData.sections.voter_contact_plan || null,
       rawJson: planData,
     }
 
