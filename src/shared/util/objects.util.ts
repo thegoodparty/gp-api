@@ -29,6 +29,7 @@ export const pick = (obj: { [key: string]: any }, keys: string[]): object => {
 // Similar to the above 'pick' helper, but with pickKeys() the compiler won't allow non-existent keys
 // Additionally, type checking is retained after the call since the resulting object is structurally typed
 export function pickKeys<
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   O extends Record<string, unknown>,
   K extends readonly (keyof O)[],
 >(obj: O, keys: K): Pick<O, K[number]> {

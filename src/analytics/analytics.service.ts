@@ -18,11 +18,13 @@ export class AnalyticsService {
   track(
     userId: number,
     eventName: string,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     properties?: Record<string, unknown>,
   ) {
     this.segment.trackEvent(userId, eventName, properties)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   identify(userId: number, traits: Record<string, unknown>) {
     this.segment.identify(userId, traits)
   }

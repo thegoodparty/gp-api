@@ -22,6 +22,7 @@ export abstract class AwsService {
    * @param error - The AWS error to handle
    * @param message - Optional message to add to the error log
    */
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleAwsError(error: unknown, message?: string): never {
     this.logger.debug(`AWS error: ${message}`, error)
 

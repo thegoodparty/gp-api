@@ -330,9 +330,7 @@ export class CampaignsController {
 
   @Put('admin/:slug/race-target-details')
   @Roles(UserRole.admin)
-  async updateRaceTargetDetailsBySlug(
-    @Param('slug') slug: string,
-  ) {
+  async updateRaceTargetDetailsBySlug(@Param('slug') slug: string) {
     const campaign = await this.campaigns.findFirstOrThrow({
       where: { slug },
     })

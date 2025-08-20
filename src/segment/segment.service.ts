@@ -23,6 +23,7 @@ export class SegmentService {
   trackEvent(
     userId: number,
     event: string,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     properties: Record<string, unknown> = {},
   ) {
     try {
@@ -37,6 +38,7 @@ export class SegmentService {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   identify(userId: number, traits: Record<string, unknown>) {
     const segmentProps = pickKeys(traits, SEGMENT_KEYS)
     const stringId = String(userId)

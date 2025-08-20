@@ -35,6 +35,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     super()
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
       'Failed to communicate with Peerly API',
@@ -50,6 +51,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private validateCreateJobResponse(data: unknown): CreateJobResponseDto {
     return this.validateData(data, CreateJobResponseDto, 'create job')
   }
