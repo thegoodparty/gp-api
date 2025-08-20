@@ -74,9 +74,12 @@ export class UpdateCampaignSchema extends createZodDto(
   z
     .object({
       slug: z.string().optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data: z.record(z.string(), z.unknown()).optional(),
       details: CampaignDetailsSchema.optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       aiContent: z.record(z.string(), z.unknown()).optional(),
       formattedAddress: z.string().optional(),
       placeId: z.string().optional(),

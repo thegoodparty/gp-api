@@ -61,9 +61,11 @@ export class ElectionsService {
       if (status >= 200 && status < 300) return data
       this.logger.warn(`Election API GET ${path}} responded ${status}`)
       return null
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (error: unknown) {
       const baseMessage = `Election API GET ${path} failed`
       if (isAxiosError(error)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const data = error.response?.data as Record<string, unknown> | undefined
         const apiMessage =
           typeof data?.message === 'string' ? data.message : undefined
@@ -82,6 +84,7 @@ export class ElectionsService {
   private buildSlackErrorMessage(
     title: string,
     context: Record<string, string | number | boolean | null | undefined>,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     error: unknown,
   ): string {
     const contextLines = Object.entries(context)

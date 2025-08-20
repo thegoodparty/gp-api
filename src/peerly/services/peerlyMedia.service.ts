@@ -41,6 +41,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
     super()
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
       'Failed to communicate with Peerly API',
@@ -49,6 +50,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private validateCreateResponse(data: unknown): CreateMediaResponseDto {
     return this.validateData(data, CreateMediaResponseDto, 'create media')
   }
