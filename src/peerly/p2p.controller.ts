@@ -1,9 +1,11 @@
 import {
   BadGatewayException,
+  Body,
   Controller,
   Get,
   Logger,
   Param,
+  Post,
   UsePipes,
 } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
@@ -16,6 +18,9 @@ import {
   CheckPhoneListStatusSuccessResponseDto,
   CheckPhoneListStatusFailureResponseDto,
 } from './schemas/p2pPhoneListStatus.schema'
+import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
+import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
+import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
 
 @Controller('p2p')
 @UsePipes(ZodValidationPipe)
@@ -24,6 +29,7 @@ export class P2pController {
 
   constructor(
     private readonly peerlyPhoneListService: PeerlyPhoneListService,
+    private readonly p2pPhoneListUploadService: P2pPhoneListUploadService,
   ) {}
 
   @Get('phone-list/:token/status')
@@ -66,6 +72,37 @@ export class P2pController {
       throw new BadGatewayException(
         'Failed to check phone list status due to request failure.',
       )
+    }
+  }
+
+  @Post('phone-list')
+  @UseCampaign()
+  async uploadPhoneList(
+    @ReqCampaign() campaign: Campaign,
+    @Body() request: P2pPhoneListRequestSchema,
+  ): Promise<P2pPhoneListResponseSchema> {
+    try {
+      const { token, listName } =
+        await this.p2pPhoneListUploadService.uploadPhoneList(campaign, request)
+
+      return {
+        success: true,
+        token,
+        listName,
+        message: 'Phone list uploaded successfully',
+      }
+    } catch (error) {
+      this.logger.error('Failed to upload phone list', error)
+
+      return {
+        success: false,
+        token: '',
+        listName: request.listName,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to upload phone list',
+      }
     }
   }
 }
