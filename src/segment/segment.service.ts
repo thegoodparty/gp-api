@@ -3,6 +3,10 @@ import { Injectable, Logger } from '@nestjs/common'
 import Analytics from '@segment/analytics-node'
 import { pickKeys } from 'src/shared/util/objects.util'
 import { SEGMENT_KEYS } from './segment.schema'
+import {
+  SegmentIdentityTraits,
+  SegmentTrackEventProperties,
+} from './segment.types'
 
 @Injectable()
 export class SegmentService {
@@ -23,8 +27,7 @@ export class SegmentService {
   trackEvent(
     userId: number,
     event: string,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    properties: Record<string, unknown> = {},
+    properties: SegmentTrackEventProperties = {},
   ) {
     try {
       const stringId = String(userId)
@@ -38,8 +41,7 @@ export class SegmentService {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  identify(userId: number, traits: Record<string, unknown>) {
+  identify(userId: number, traits: SegmentIdentityTraits) {
     const segmentProps = pickKeys(traits, SEGMENT_KEYS)
     const stringId = String(userId)
     this.analytics.identify({ userId: stringId, traits: segmentProps })

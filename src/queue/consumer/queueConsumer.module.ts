@@ -6,6 +6,7 @@ import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
 import { PathToVictoryModule } from '../../pathToVictory/pathToVictory.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 import { QueueProducerModule } from '../producer/queueProducer.module'
+import { AnalyticsModule } from '../../analytics/analytics.module'
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { QueueProducerModule } from '../producer/queueProducer.module'
     PathToVictoryModule,
     ElectionsModule,
     QueueProducerModule,
+    AnalyticsModule,
   ],
   providers: [QueueConsumerService],
 })
