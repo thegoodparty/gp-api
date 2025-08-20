@@ -10,7 +10,10 @@ import { VoterDatabaseService } from '../../voters/services/voterDatabase.servic
 import { PeerlyPhoneListService } from './peerlyPhoneList.service'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
-import { VoterFileType, CustomFilter } from '../../voters/voterFile/voterFile.types'
+import {
+  VoterFileType,
+  CustomFilter,
+} from '../../voters/voterFile/voterFile.types'
 import { typeToQuery } from '../../voters/voterFile/util/voterFile.util'
 import { Readable } from 'stream'
 import { to as copyTo } from 'pg-copy-streams'
@@ -72,10 +75,7 @@ export class P2pPhoneListUploadService {
         .map(([key, _value]) => key as CustomFilter)
 
       // Generate CSV stream with voter data including phone numbers
-      const csvStream = await this.generatePhoneListCsvStream(
-        campaign,
-        filters,
-      )
+      const csvStream = await this.generatePhoneListCsvStream(campaign, filters)
 
       // Upload to Peerly
       const token = await this.peerlyPhoneListService.uploadPhoneListToken({
@@ -126,7 +126,7 @@ export class P2pPhoneListUploadService {
 
     // Create a raw CSV stream without StreamableFile wrapper
     const client = await this.voterDatabaseService['pool'].connect()
-    
+
     const csvStream = client
       .query(copyTo(`COPY(${query}) TO STDOUT WITH CSV HEADER`))
       .on('error', (err: Error) => {

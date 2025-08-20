@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { JwtModule } from '@nestjs/jwt'
 import { PeerlyAuthenticationService } from './services/peerlyAuthentication.service'
@@ -10,10 +10,14 @@ import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service
 import { P2pController } from './p2p.controller'
 import { GoogleModule } from '../vendors/google/google.module'
 import { VotersModule } from '../voters/voters.module'
-import { CampaignsModule } from '../campaigns/campaigns.module'
 
 @Module({
-  imports: [HttpModule, JwtModule, GoogleModule, VotersModule, CampaignsModule],
+  imports: [
+    HttpModule,
+    JwtModule,
+    GoogleModule,
+    forwardRef(() => VotersModule),
+  ],
   controllers: [P2pController],
   providers: [
     PeerlyAuthenticationService,
