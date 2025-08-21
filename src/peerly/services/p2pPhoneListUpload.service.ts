@@ -115,6 +115,13 @@ export class P2pPhoneListUploadService {
       VOTER_CSV_COLUMN_MAPPINGS,
     )
 
-    return streamableFile.getStream() as Readable
+    const stream = streamableFile.getStream()
+    if (!(stream instanceof Readable)) {
+      throw new Error(
+        'Expected Readable stream from csvStream but received different type',
+      )
+    }
+
+    return stream
   }
 }
