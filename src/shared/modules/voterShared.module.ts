@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { HttpModule } from '@nestjs/axios'
 import { VoterDatabaseService } from '../../voters/services/voterDatabase.service'
 import { SlackService } from '../services/slack.service'
 
@@ -9,6 +10,7 @@ import { SlackService } from '../services/slack.service'
  * without creating circular dependencies.
  */
 @Module({
+  imports: [HttpModule],
   providers: [VoterDatabaseService, SlackService],
   exports: [VoterDatabaseService],
 })

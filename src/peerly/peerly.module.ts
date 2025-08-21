@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { JwtModule } from '@nestjs/jwt'
 import { PeerlyAuthenticationService } from './services/peerlyAuthentication.service'
@@ -18,7 +18,7 @@ import { CampaignsModule } from '../campaigns/campaigns.module'
     JwtModule,
     GoogleModule,
     VoterSharedModule,
-    CampaignsModule,
+    forwardRef(() => CampaignsModule),
   ],
   controllers: [P2pController],
   providers: [
