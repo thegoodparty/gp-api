@@ -22,11 +22,6 @@ import { PeerlyModule } from '../peerly/peerly.module'
     VotersService,
     VoterFileFilterService,
   ],
-  exports: [
-    VoterFileService,
-    VotersService,
-    VoterFileFilterService,
-    VoterDatabaseService,
-  ],
+  exports: [VoterFileService, VotersService],
 })
 export class VotersModule {}

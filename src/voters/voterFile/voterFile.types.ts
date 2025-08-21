@@ -12,25 +12,15 @@ export enum VoterFileType {
 }
 
 // TODO: these should be cleaned up to only be what is currently used
-// Import from shared location to avoid circular dependencies
-import {
-  CUSTOM_CHANNELS,
-  CUSTOM_FILTERS,
-  CUSTOM_PURPOSES,
-  CustomChannel,
-  CustomFilter,
-  CustomPurpose,
-} from '../../shared/types/voter.types'
-
-// Re-export for backward compatibility
-export {
-  CUSTOM_CHANNELS,
-  CUSTOM_FILTERS,
-  CUSTOM_PURPOSES,
-  CustomChannel,
-  CustomFilter,
-  CustomPurpose,
-}
+export const CUSTOM_CHANNELS = [
+  'Phone Banking',
+  'Telemarketing',
+  'Door Knocking',
+  'Direct Mail',
+  'Texting',
+  'SMS Texting',
+  'Facebook',
+] as const
 
 export const CHANNEL_TO_TYPE_MAP: {
   [key in CustomChannel]: VoterFileType
@@ -56,6 +46,31 @@ export const TASK_TO_TYPE_MAP: {
   [CampaignTaskType.events]: VoterFileType.full,
   [CampaignTaskType.education]: VoterFileType.full,
 }
+
+export const CUSTOM_FILTERS = [
+  'audience_superVoters',
+  'audience_likelyVoters',
+  'audience_unreliableVoters',
+  'audience_unlikelyVoters',
+  'audience_firstTimeVoters',
+  'party_independent',
+  'party_democrat',
+  'party_republican',
+  'age_18_25',
+  'age_25_35',
+  'age_35_50',
+  'age_50_plus',
+  'gender_male',
+  'gender_female',
+  'gender_unknown',
+  'audience_request',
+] as const
+
+export const CUSTOM_PURPOSES = ['GOTV', 'Persuasion', 'Voter ID'] as const
+
+export type CustomChannel = (typeof CUSTOM_CHANNELS)[number]
+export type CustomFilter = (typeof CUSTOM_FILTERS)[number]
+type CustomPurpose = (typeof CUSTOM_PURPOSES)[number]
 
 // TODO: store this in DB table? (currently in campaign.data)
 export type CustomVoterFile = {
