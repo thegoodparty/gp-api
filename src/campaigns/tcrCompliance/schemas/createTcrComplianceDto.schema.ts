@@ -6,6 +6,7 @@ import {
   WriteEmailSchema,
 } from '../../../shared/schemas'
 import { createZodDto } from 'nestjs-zod'
+import { MatchingContactFieldType } from '@prisma/client'
 
 export class CreateTcrComplianceDto extends createZodDto(
   z.object({
@@ -17,5 +18,8 @@ export class CreateTcrComplianceDto extends createZodDto(
     filingUrl: z.string().url(),
     email: WriteEmailSchema,
     phone: PhoneSchema,
+    matchingContactFields: z
+      .array(z.nativeEnum(MatchingContactFieldType))
+      .min(1),
   }),
 ) {}
