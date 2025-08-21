@@ -8,8 +8,6 @@ import {
 import { createZodDto } from 'nestjs-zod'
 import { MatchingContactFieldType } from '@prisma/client'
 
-const FILING_URL_PATTERN = new RegExp(/https?:\/\/(.+.)?fec.gov(.+)?/i)
-
 export class CreateTcrComplianceDto extends createZodDto(
   z.object({
     ein: EinSchema,
@@ -17,7 +15,7 @@ export class CreateTcrComplianceDto extends createZodDto(
     formattedAddress: z.string(),
     committeeName: z.string(),
     websiteDomain: DomainSchema,
-    filingUrl: z.string().url().regex(FILING_URL_PATTERN),
+    filingUrl: z.string().url(),
     email: WriteEmailSchema,
     phone: PhoneSchema,
     matchingContactFields: z
