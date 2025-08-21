@@ -37,6 +37,9 @@ export class VoterFileFilterService extends createPrismaBase(
   }
 
   // TODO: Fix the keys for the audience fields in the frontend so we don't have to do this mapping: https://goodparty.atlassian.net/browse/WEB-4277
+  // NOTE: This function duplicates field mapping logic with transformRequestToFilters in P2P service.
+  // Consider using the shared utility function mapAudienceFields from src/peerly/utils/audienceMapping.util.ts
+  // in a future refactor to consolidate this logic and reduce code duplication.
   async voterFileFilterToAudience(idOrFilter: VoterFileFilter | number) {
     const {
       audienceSuperVoters: audience_superVoters,
