@@ -73,7 +73,9 @@ export const articleCategoriesTransformer: Transformer<
   articleCategories.sort(compareArticleCategories)
 
   articleCategories.forEach((category) => {
-    category.articles.sort((a, b) => (a.order ?? DEFAULT_ORDER) - (b.order ?? DEFAULT_ORDER))
+    category.articles.sort(
+      (a, b) => (a.order ?? DEFAULT_ORDER) - (b.order ?? DEFAULT_ORDER),
+    )
   })
 
   return articleCategories

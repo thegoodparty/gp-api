@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   Injectable,
-  Logger,
   BadRequestException,
 } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
@@ -15,7 +14,6 @@ import FormData from 'form-data'
 import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
 import { MediaStatus } from '../peerly.types'
 import { MimeTypes } from 'http-constants-ts'
-
 
 const MAX_FILE_SIZE = 512000 // 500KB
 
@@ -36,8 +34,6 @@ interface CreateMediaParams {
 
 @Injectable()
 export class PeerlyMediaService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(PeerlyMediaService.name)
-
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
@@ -54,18 +50,12 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
   }
 
   private validateCreateResponse(data: unknown): CreateMediaResponseDto {
-    try {
-      return CreateMediaResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Create media response validation failed:', error)
-      throw new BadGatewayException(
-        'Invalid create media response from Peerly API',
-      )
-    }
+    return this.validateData(data, CreateMediaResponseDto, 'create media')
   }
 
   async createMedia(params: CreateMediaParams): Promise<string> {
-    const { identityId, fileStream, fileName, mimeType, fileSize, title } = params
+    const { identityId, fileStream, fileName, mimeType, fileSize, title } =
+      params
 
     if (!ALLOWED_MEDIA_TYPES.includes(mimeType)) {
       throw new BadRequestException(
@@ -105,13 +95,13 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       )
       const { data } = response
       const validatedData = this.validateCreateResponse(data)
-      
+
       if (validatedData.status === MediaStatus.ERROR) {
         const errorMessage = validatedData.error || 'Media creation failed'
         this.logger.error('Media creation failed:', errorMessage)
         throw new BadGatewayException(`Media creation failed: ${errorMessage}`)
       }
-      
+
       this.logger.debug('Successfully created media', validatedData)
       return validatedData.media_id
     } catch (error) {
