@@ -1,11 +1,11 @@
 import { Logger } from '@nestjs/common'
+import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
   CustomFilter,
   CustomVoterFile,
   VoterFileType,
 } from '../voterFile.types'
-import { CampaignWith } from 'src/campaigns/campaigns.types'
-import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 
 const logger = new Logger('Voter File Utils')
 
@@ -19,6 +19,12 @@ export function typeToQuery(
   limit?: number,
 ) {
   const state = campaign.details.state
+  const electionDate: string | undefined = campaign.details?.electionDate
+  const electionYear = electionDate
+    ? Number(String(electionDate).slice(0, 4))
+    : undefined
+  const isEvenElectionYear =
+    typeof electionYear === 'number' ? electionYear % 2 === 0 : true
   let whereClause = ''
   let nestedWhereClause = ''
   let l2ColumnName = campaign.pathToVictory?.data.electionType
@@ -87,15 +93,28 @@ export function typeToQuery(
     "Mailing_Families_FamilyID",
     "Mailing_Families_HHCount",
     "Mailing_HHParties_Description",
-    "MilitaryStatus_Description",
-    "General_2022",
-    "General_2020",
-    "General_2018",
-    "General_2016",
-    "Primary_2022",
-    "Primary_2020",
-    "Primary_2018",
-    "Primary_2016"`
+    "MilitaryStatus_Description"`
+
+    const LATEST_EVEN_YEAR = 2024
+    const LATEST_ODD_YEAR = 2023
+
+    const buildYearColumns = (latest: number) => {
+      const years: number[] = []
+      for (let y = latest; years.length < 5; y -= 2) years.push(y)
+      return years
+    }
+
+    const generalYears = buildYearColumns(
+      isEvenElectionYear ? LATEST_EVEN_YEAR : LATEST_ODD_YEAR,
+    )
+    const primaryYears = generalYears
+
+    const generalCols = generalYears.map((y) => `"General_${y}"`).join(', ')
+    const primaryCols = primaryYears.map((y) => `"Primary_${y}"`).join(', ')
+
+    columns += `,
+    ${generalCols},
+    ${primaryCols}`
   } else {
     columns = `"LALVOTERID", 
     "Voters_FirstName", 
