@@ -16,7 +16,6 @@ import {
   VOTER_CSV_COLUMN_MAPPINGS,
 } from '../utils/audienceMapping.util'
 import { Readable } from 'stream'
-import { to as copyTo } from 'pg-copy-streams'
 
 @Injectable()
 export class P2pPhoneListUploadService {
@@ -110,19 +109,12 @@ export class P2pPhoneListUploadService {
 
     this.logger.debug('Generated P2P phone list query:', query)
 
-    const client = await this.voterDatabaseService['pool'].connect()
+    const streamableFile = await this.voterDatabaseService.csvStream(
+      query,
+      'phone-list',
+      VOTER_CSV_COLUMN_MAPPINGS,
+    )
 
-    const csvStream = client
-      .query(copyTo(`COPY(${query}) TO STDOUT WITH CSV HEADER`))
-      .on('error', (err: Error) => {
-        this.logger.error('Error in CSV stream:', err)
-        client.release()
-        throw err
-      })
-      .on('end', () => {
-        client.release()
-      })
-
-    return csvStream
+    return streamableFile.getStream() as Readable
   }
 }
