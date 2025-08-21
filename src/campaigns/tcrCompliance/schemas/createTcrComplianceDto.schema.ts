@@ -20,6 +20,8 @@ export class CreateTcrComplianceDto extends createZodDto(
     filingUrl: z.string().url().regex(FILING_URL_PATTERN),
     email: WriteEmailSchema,
     phone: PhoneSchema,
-    matchingContactFields: z.array(z.nativeEnum(MatchingContactFieldType)),
+    matchingContactFields: z
+      .array(z.nativeEnum(MatchingContactFieldType))
+      .min(1),
   }),
 ) {}
