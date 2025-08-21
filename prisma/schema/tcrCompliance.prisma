@@ -27,7 +27,7 @@ model TcrCompliance {
   updatedAt             DateTime                   @updatedAt @map("updated_at")
   campaign              Campaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId            Int                        @unique @map("campaign_id")
-  matchingContactFields MatchingContactFieldType[] @map("matching_contact_fields")
+  matchingContactFields MatchingContactFieldType[] @default([]) @map("matching_contact_fields")
 
   peerlyIdentityId              String? @unique @map("peerly_identity_id")
   peerlyRegistrationLink        String? @map("peerly_registration_link")
