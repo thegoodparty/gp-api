@@ -65,9 +65,7 @@ export class P2pController {
       }
 
       this.logger.error('Failed to check phone list status', error)
-      throw new BadGatewayException(
-        'Failed to check phone list status.',
-      )
+      throw new BadGatewayException('Failed to check phone list status.')
     }
   }
 
@@ -78,8 +76,10 @@ export class P2pController {
     @Body() request: P2pPhoneListRequestSchema,
   ): Promise<P2pPhoneListResponseSchema> {
     try {
-      const { token } =
-        await this.p2pPhoneListUploadService.uploadPhoneList(campaign, request)
+      const { token } = await this.p2pPhoneListUploadService.uploadPhoneList(
+        campaign,
+        request,
+      )
 
       return { token }
     } catch (error) {
