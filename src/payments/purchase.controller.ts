@@ -1,10 +1,10 @@
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
-import { StripeService } from '../stripe/services/stripe.service'
+import { StripeService } from '../vendors/stripe/services/stripe.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Prisma, User } from '@prisma/client'
 import { UsersService } from '../users/services/users.service'
 import { PurchaseService } from './services/purchase.service'
-import { CreatePurchaseIntentDto, CompletePurchaseDto } from './purchase.types'
+import { CompletePurchaseDto, CreatePurchaseIntentDto } from './purchase.types'
 
 @Controller('payments/purchase')
 export class PurchaseController {

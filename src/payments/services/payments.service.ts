@@ -1,10 +1,10 @@
 import {
-  Injectable,
   BadGatewayException,
   BadRequestException,
+  Injectable,
 } from '@nestjs/common'
 import { User } from '@prisma/client'
-import { StripeService } from 'src/stripe/services/stripe.service'
+import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { PaymentIntentPayload, PaymentType } from '../payments.types'
 import { UsersService } from '../../users/services/users.service'
 

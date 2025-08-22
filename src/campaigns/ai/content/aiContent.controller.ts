@@ -31,7 +31,7 @@ import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { EVENTS } from '../../../segment/segment.types'
+import { EVENTS } from '../../../vendors/segment/segment.types'
 
 @Controller('campaigns/ai')
 @UseCampaign()

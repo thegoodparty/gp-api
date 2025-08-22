@@ -25,7 +25,7 @@ import { isAfter, parseISO } from 'date-fns'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { QueueProducerService } from '../producer/queueProducer.service'
 import { getTwelveHoursFromDate } from '../../shared/util/date.util'
-import { EVENTS } from '../../segment/segment.types'
+import { EVENTS } from '../../vendors/segment/segment.types'
 
 @Injectable()
 export class QueueConsumerService {
