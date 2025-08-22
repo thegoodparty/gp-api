@@ -20,7 +20,7 @@ import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { AuthenticationService } from 'src/authentication/authentication.service'
-import { EVENTS } from 'src/segment/segment.types'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @Injectable()

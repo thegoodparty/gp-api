@@ -20,7 +20,7 @@ import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { parseIsoDateString } from '../../shared/util/date.util'
-import { StripeService } from '../../stripe/services/stripe.service'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
   CampaignLaunchStatus,

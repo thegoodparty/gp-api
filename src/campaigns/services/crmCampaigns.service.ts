@@ -21,7 +21,7 @@ import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory
 import { pick } from '../../shared/util/objects.util'
 import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { EcanvasserIntegrationService } from '../../ecanvasserIntegration/services/ecanvasserIntegration.service'
+import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
 import {
   CRMCompanyProperties,
   CRMCompanyPropertiesSchema,
