@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -115,9 +116,17 @@ export class P2pController {
   async createJob(
     @ReqCampaign() campaign: Campaign,
     @Body() request: CreateP2pJobRequestDto,
-    @ReqFile() image: FileUpload,
+    @ReqFile() image?: FileUpload,
   ): Promise<CreateP2pJobResponseDto> {
     try {
+      if (!image) {
+        throw new BadRequestException('Image file is required for P2P job creation')
+      }
+
+      if (!image.filename || !image.mimetype || !image.data) {
+        throw new BadRequestException('Invalid image file: missing required properties')
+      }
+
       let imageStream: Readable
       if (image.data instanceof Buffer) {
         imageStream = Readable.from(image.data)
