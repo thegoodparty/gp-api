@@ -131,7 +131,10 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     }
   }
 
-  async requestCanvassers(jobId: string, initials: string = 'GE'): Promise<void> {
+  async requestCanvassers(
+    jobId: string,
+    initials: string = 'GE',
+  ): Promise<void> {
     const body = {
       requested_initials: initials,
     }
