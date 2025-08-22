@@ -7,6 +7,7 @@ import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { MediaType } from '../peerly.types'
+import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 
 interface Template {
   title: string
@@ -133,7 +134,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
   async requestCanvassers(
     jobId: string,
-    initials: string = 'GE',
+    initials: string = P2P_JOB_DEFAULTS.CANVASSER_INITIALS,
   ): Promise<void> {
     const body = {
       requested_initials: initials,

@@ -30,6 +30,7 @@ import { ReqFile } from '../files/decorators/ReqFiles.decorator'
 import { FileUpload } from '../files/files.types'
 import { MimeTypes } from 'http-constants-ts'
 import { Readable } from 'stream'
+import { P2P_ERROR_MESSAGES } from './constants/p2pJob.constants'
 
 @Controller('p2p')
 @UsePipes(ZodValidationPipe)
@@ -120,11 +121,13 @@ export class P2pController {
   ): Promise<CreateP2pJobResponseDto> {
     try {
       if (!image) {
-        throw new BadRequestException('Image file is required for P2P job creation')
+        throw new BadRequestException(P2P_ERROR_MESSAGES.IMAGE_REQUIRED)
       }
 
       if (!image.filename || !image.mimetype || !image.data) {
-        throw new BadRequestException('Invalid image file: missing required properties')
+        throw new BadRequestException(
+          P2P_ERROR_MESSAGES.INVALID_IMAGE_PROPERTIES,
+        )
       }
 
       let imageStream: Readable
@@ -151,8 +154,8 @@ export class P2pController {
 
       return { success: true, message: 'P2P job created successfully' }
     } catch (error) {
-      this.logger.error('Failed to create P2P job', error)
-      return { success: false, message: 'Failed to create P2P job' }
+      this.logger.error(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED, error)
+      throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
     }
   }
 }

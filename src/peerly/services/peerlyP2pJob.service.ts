@@ -5,6 +5,10 @@ import { OutreachService } from '../../outreach/services/outreach.service'
 import { OutreachType, OutreachStatus } from '@prisma/client'
 import { MediaType } from '../peerly.types'
 import { Readable } from 'stream'
+import {
+  P2P_JOB_DEFAULTS,
+  P2P_ERROR_MESSAGES,
+} from '../constants/p2pJob.constants'
 
 interface CreateP2pJobParams {
   campaignId: number
@@ -39,8 +43,8 @@ export class PeerlyP2pJobService {
       imageInfo,
       scriptText,
       identityId,
-      name = 'P2P SMS Campaign',
-      didState = 'auto',
+      name = P2P_JOB_DEFAULTS.CAMPAIGN_NAME,
+      didState = P2P_JOB_DEFAULTS.DID_STATE,
     } = params
 
     let mediaId: string | undefined
@@ -65,7 +69,7 @@ export class PeerlyP2pJobService {
         name,
         templates: [
           {
-            title: 'Default Template',
+            title: P2P_JOB_DEFAULTS.TEMPLATE_TITLE,
             text: scriptText,
             advanced: {
               media: {
@@ -106,12 +110,12 @@ export class PeerlyP2pJobService {
         `P2P job creation completed successfully for campaign ${campaignId}`,
       )
     } catch (error) {
-      this.logger.error('Failed to create P2P job', error)
+      this.logger.error(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED, error)
 
       // If we have a job ID, we could attempt cleanup here
       // For now, we'll let the error propagate and rely on manual cleanup if needed
 
-      throw new BadGatewayException('Failed to create P2P job')
+      throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
     }
   }
 }
