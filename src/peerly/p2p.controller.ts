@@ -1,9 +1,11 @@
 import {
   BadGatewayException,
+  Body,
   Controller,
   Get,
   Logger,
   Param,
+  Post,
   UsePipes,
 } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
@@ -12,10 +14,10 @@ import { ReqCampaign } from '../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../campaigns/decorators/UseCampaign.decorator'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PhoneListState } from './peerly.types'
-import {
-  CheckPhoneListStatusSuccessResponseDto,
-  CheckPhoneListStatusFailureResponseDto,
-} from './schemas/p2pPhoneListStatus.schema'
+import { CheckPhoneListStatusResponseDto } from './schemas/p2pPhoneListStatus.schema'
+import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
+import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
+import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
 
 @Controller('p2p')
 @UsePipes(ZodValidationPipe)
@@ -24,6 +26,7 @@ export class P2pController {
 
   constructor(
     private readonly peerlyPhoneListService: PeerlyPhoneListService,
+    private readonly p2pPhoneListUploadService: P2pPhoneListUploadService,
   ) {}
 
   @Get('phone-list/:token/status')
@@ -31,19 +34,15 @@ export class P2pController {
   async checkPhoneListStatus(
     @ReqCampaign() campaign: Campaign,
     @Param('token') token: string,
-  ): Promise<
-    | CheckPhoneListStatusSuccessResponseDto
-    | CheckPhoneListStatusFailureResponseDto
-  > {
+  ): Promise<CheckPhoneListStatusResponseDto> {
     try {
       const statusResponse =
         await this.peerlyPhoneListService.checkPhoneListStatus(token)
 
       if (statusResponse.Data.list_state !== PhoneListState.ACTIVE) {
-        return {
-          success: false,
-          message: `Phone list is not ready. Current status: ${statusResponse.Data.list_state || 'unknown'}`,
-        }
+        throw new BadGatewayException(
+          `Phone list is not ready. Current status: ${statusResponse.Data.list_state || 'unknown'}`,
+        )
       }
 
       const listId = statusResponse.Data.list_id
@@ -57,15 +56,35 @@ export class P2pController {
         await this.peerlyPhoneListService.getPhoneListDetails(listId)
 
       return {
-        success: true,
         phoneListId: listId,
         leadsLoaded: detailsResponse.leads_loaded,
       }
     } catch (error) {
+      if (error instanceof BadGatewayException) {
+        throw error
+      }
+
       this.logger.error('Failed to check phone list status', error)
-      throw new BadGatewayException(
-        'Failed to check phone list status due to request failure.',
+      throw new BadGatewayException('Failed to check phone list status.')
+    }
+  }
+
+  @Post('phone-list')
+  @UseCampaign()
+  async uploadPhoneList(
+    @ReqCampaign() campaign: Campaign,
+    @Body() request: P2pPhoneListRequestSchema,
+  ): Promise<P2pPhoneListResponseSchema> {
+    try {
+      const { token } = await this.p2pPhoneListUploadService.uploadPhoneList(
+        campaign,
+        request,
       )
+
+      return { token }
+    } catch (error) {
+      this.logger.error('Failed to upload phone list', error)
+      throw new BadGatewayException('Failed to upload phone list.')
     }
   }
 }

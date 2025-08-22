@@ -32,7 +32,9 @@ export class PeerlyBaseConfig {
   protected readonly logger = new Logger(this.constructor.name)
 
   protected validateData<T>(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     data: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     dto: { create: (data: unknown) => T },
     context: string,
   ): T {

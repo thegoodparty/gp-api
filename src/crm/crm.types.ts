@@ -263,5 +263,6 @@ export type MockHubspotClient = {
   setAccessToken: (token: string) => void
   setApiKey: (apiKey: string) => void
   setDeveloperApiKey: (developerApiKey: string) => void
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   apiRequest: (opts?: Record<string, unknown>) => Promise<Response>
 }

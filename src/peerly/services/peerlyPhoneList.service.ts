@@ -36,6 +36,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     super()
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
       'Failed to communicate with Peerly API',
@@ -51,14 +52,17 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private validateUploadResponse(data: unknown): UploadPhoneListResponseDto {
     return this.validateData(data, UploadPhoneListResponseDto, 'upload')
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private validateStatusResponse(data: unknown): PhoneListStatusResponseDto {
     return this.validateData(data, PhoneListStatusResponseDto, 'status')
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private validateDetailsResponse(data: unknown): PhoneListDetailsResponseDto {
     return this.validateData(data, PhoneListDetailsResponseDto, 'details')
   }

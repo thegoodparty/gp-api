@@ -3,6 +3,7 @@ import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 
 export const campaignPositionFactory = generateFactory<CampaignPosition>(
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   (args?: unknown) => {
     const overrides = (args as Partial<CampaignPosition>) || {}
     return {
