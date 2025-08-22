@@ -100,7 +100,7 @@ export function typeToQuery(
 
     const buildYearColumns = (latest: number) => {
       const years: number[] = []
-      for (let y = latest; years.length < 5; y -= 2) years.push(y)
+      for (let y = latest; years.length < 4; y -= 2) years.push(y)
       return years
     }
 
@@ -109,12 +109,23 @@ export function typeToQuery(
     )
     const primaryYears = generalYears
 
-    const generalCols = generalYears.map((y) => `"General_${y}"`).join(', ')
-    const primaryCols = primaryYears.map((y) => `"Primary_${y}"`).join(', ')
+    const generalCols = generalYears
+      .map((y) =>
+        isEvenElectionYear ? `"General_${y}"` : `"AnyElection_${y}"`,
+      )
+      .join(', ')
+    const primaryCols = isEvenElectionYear
+      ? primaryYears.map((y) => `"Primary_${y}"`).join(', ')
+      : ''
 
-    columns += `,
+    const columnsSuffix = isEvenElectionYear
+      ? `,
     ${generalCols},
     ${primaryCols}`
+      : `,
+    ${generalCols}`
+
+    columns += columnsSuffix
   } else {
     columns = `"LALVOTERID", 
     "Voters_FirstName", 
