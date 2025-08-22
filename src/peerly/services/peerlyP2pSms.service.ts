@@ -130,4 +130,24 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       this.handleApiError(error)
     }
   }
+
+  async requestCanvassers(jobId: string, initials: string = 'GE'): Promise<void> {
+    const body = {
+      requested_initials: initials,
+    }
+
+    try {
+      const config = await this.getBaseHttpHeaders()
+      await lastValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/api/v2/p2p/${jobId}/request_canvassers`,
+          body,
+          config,
+        ),
+      )
+      this.logger.log(`Requested canvassers for job ID: ${jobId}`)
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
 }
