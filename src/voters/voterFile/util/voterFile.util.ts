@@ -9,6 +9,25 @@ import {
 
 const logger = new Logger('Voter File Utils')
 
+const VOTER_FILE_LATEST_EVEN_YEAR = Number(
+  process.env.VOTER_FILE_LATEST_EVEN_YEAR,
+)
+const VOTER_FILE_LATEST_ODD_YEAR = Number(
+  process.env.VOTER_FILE_LATEST_ODD_YEAR,
+)
+
+const VOTER_FILE_YEARS_LENGTH = Number(process.env.VOTER_FILE_YEARS_LENGTH)
+
+if (
+  !VOTER_FILE_LATEST_EVEN_YEAR ||
+  !VOTER_FILE_LATEST_ODD_YEAR ||
+  !VOTER_FILE_YEARS_LENGTH
+) {
+  throw new Error(
+    'Please update your .env with VOTER_FILE_LATEST_EVEN_YEAR, VOTER_FILE_LATEST_ODD_YEAR and VOTER_FILE_YEARS_LENGTH',
+  )
+}
+
 export function typeToQuery(
   type: VoterFileType,
   campaign: CampaignWith<'pathToVictory'>,
@@ -95,17 +114,17 @@ export function typeToQuery(
     "Mailing_HHParties_Description",
     "MilitaryStatus_Description"`
 
-    const LATEST_EVEN_YEAR = 2024
-    const LATEST_ODD_YEAR = 2023
-
     const buildYearColumns = (latest: number) => {
       const years: number[] = []
-      for (let y = latest; years.length < 4; y -= 2) years.push(y)
+      for (let y = latest; years.length < VOTER_FILE_YEARS_LENGTH; y -= 2)
+        years.push(y)
       return years
     }
 
     const generalYears = buildYearColumns(
-      isEvenElectionYear ? LATEST_EVEN_YEAR : LATEST_ODD_YEAR,
+      isEvenElectionYear
+        ? VOTER_FILE_LATEST_EVEN_YEAR
+        : VOTER_FILE_LATEST_ODD_YEAR,
     )
     const primaryYears = generalYears
 
