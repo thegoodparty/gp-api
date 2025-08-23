@@ -1,12 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
-import { parse, differenceInWeeks } from 'date-fns'
-import { DateFormats } from '../../../shared/util/date.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { CampaignTask } from '../campaignTasks.types'
-
-const MAX_WEEK_NUMBER = 9
+import { defaultTasks } from '../fixures/defaultTasks'
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -19,42 +16,29 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   async listCampaignTasks(
-    { id: campaignId, details }: Campaign,
-    currentDate?: Date,
-    endDate?: Date,
+    { id: campaignId }: Campaign,
+    _currentDate?: Date,
+    _endDate?: Date,
   ) {
     const where: Prisma.CampaignTaskWhereInput = { campaignId }
-
-    if (currentDate) {
-      const { electionDate: electionDateStr } = details
-      const electionDate =
-        endDate || parse(electionDateStr!, DateFormats.isoDate, currentDate)
-
-      const weekNumber = Math.min(
-        Math.max(1, differenceInWeeks(electionDate, currentDate)),
-        MAX_WEEK_NUMBER,
-      )
-
-      where.week = weekNumber
-    }
 
     return this.model.findMany({ where })
   }
 
-  async getCampaignTaskById(campaignId: number, taskId: string) {
+  async getCampaignTaskById(campaignId: number, taskId: number) {
     return this.model.findFirst({
       where: {
         campaignId,
-        taskId,
+        id: taskId,
       },
     })
   }
 
-  async completeTask({ id: campaignId }: Campaign, taskId: string) {
+  async completeTask({ id: campaignId }: Campaign, taskId: number) {
     const task = await this.model.findFirst({
       where: {
         campaignId,
-        taskId,
+        id: taskId,
       },
     })
 
@@ -72,11 +56,11 @@ export class CampaignTasksService extends createPrismaBase(
     })
   }
 
-  async unCompleteTask({ id: campaignId }: Campaign, taskId: string) {
+  async unCompleteTask({ id: campaignId }: Campaign, taskId: number) {
     const task = await this.model.findFirst({
       where: {
         campaignId,
-        taskId,
+        id: taskId,
       },
     })
 
@@ -106,18 +90,13 @@ export class CampaignTasksService extends createPrismaBase(
       where: { campaignId },
     })
 
-    const tasksToCreate = tasks.map((task) => ({
-      taskId: task.id,
+    const tasksToCreate = [...defaultTasks, ...tasks].map((task) => ({
       campaignId,
       title: task.title,
       description: task.description,
       cta: task.cta,
       flowType: task.flowType,
-      week: task.week,
       link: task.link,
-      proRequired: task.proRequired || false,
-      deadline: task.deadline,
-      defaultAiTemplateId: task.defaultAiTemplateId,
       completed: false,
     }))
 
@@ -125,10 +104,9 @@ export class CampaignTasksService extends createPrismaBase(
       data: tasksToCreate,
     })
 
-    // Return the created tasks
     return this.model.findMany({
       where: { campaignId },
-      orderBy: { week: 'desc' },
+      orderBy: { id: 'asc' },
     })
   }
 

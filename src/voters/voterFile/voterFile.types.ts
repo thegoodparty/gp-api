@@ -39,12 +39,15 @@ export const TASK_TO_TYPE_MAP: {
 } = {
   [CampaignTaskType.doorKnocking]: VoterFileType.doorKnocking,
   [CampaignTaskType.phoneBanking]: VoterFileType.telemarketing,
-  [CampaignTaskType.socialMedia]: VoterFileType.full, // TODO: check if voter file type is correct, should it be digitalAds?
+  [CampaignTaskType.socialMedia]: VoterFileType.full,
   [CampaignTaskType.robocall]: VoterFileType.robocall,
   [CampaignTaskType.text]: VoterFileType.sms,
-  // These maybe won't be used?, putting here for completeness
-  [CampaignTaskType.events]: VoterFileType.full,
-  [CampaignTaskType.education]: VoterFileType.full,
+  [CampaignTaskType.externalLink]: VoterFileType.full,
+  [CampaignTaskType.general]: VoterFileType.full,
+  [CampaignTaskType.website]: VoterFileType.full,
+  [CampaignTaskType.compliance]: VoterFileType.full,
+  [CampaignTaskType.upgradeToPro]: VoterFileType.full,
+  [CampaignTaskType.profile]: VoterFileType.full,
 }
 
 export const CUSTOM_FILTERS = [

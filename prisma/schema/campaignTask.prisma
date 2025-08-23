@@ -4,30 +4,28 @@ enum CampaignTaskType {
     doorKnocking
     phoneBanking
     socialMedia
-    events
-    education
+    externalLink
+    general
+    website
+    compliance
+    upgradeToPro
+    profile
 }
 
 model CampaignTask {
-    id                  Int              @id @default(autoincrement())
-    createdAt           DateTime         @default(now()) @map("created_at")
-    updatedAt           DateTime         @updatedAt @map("updated_at")
-    taskId              String           @unique @map("task_id")
-    title               String
-    description         String
-    cta                 String
-    flowType            CampaignTaskType @map("flow_type")
-    week                Int
-    link                String?
-    proRequired         Boolean?         @default(false) @map("pro_required")
-    deadline            Int?
-    defaultAiTemplateId String?          @map("default_ai_template_id")
-    completed           Boolean          @default(false)
-    campaign            Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-    campaignId          Int              @map("campaign_id")
+    id          Int              @id @default(autoincrement())
+    createdAt   DateTime         @default(now()) @map("created_at")
+    updatedAt   DateTime         @updatedAt @map("updated_at")
+    title       String
+    description String
+    cta         String
+    flowType    CampaignTaskType @map("flow_type")
+    link        String?
+    completed   Boolean          @default(false)
+    campaign    Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+    campaignId  Int              @map("campaign_id")
 
     @@index([campaignId])
-    @@index([campaignId, week])
     @@index([campaignId, completed])
     @@map("campaign_task")
 }

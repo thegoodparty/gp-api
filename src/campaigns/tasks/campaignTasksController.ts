@@ -27,20 +27,20 @@ export class CampaignTasksController {
     return this.tasksService.listCampaignTasks(campaign, date, endDate)
   }
 
-  @Put('complete/:taskId')
+  @Put('complete/:id')
   async completeTask(
     @ReqCampaign() campaign: Campaign,
-    @Param('taskId') taskId: string,
+    @Param('id') id: string,
   ) {
-    return this.tasksService.completeTask(campaign, taskId)
+    return this.tasksService.completeTask(campaign, parseInt(id))
   }
 
-  @Delete('complete/:taskId')
+  @Delete('complete/:id')
   async unCompleteTask(
     @ReqCampaign() campaign: Campaign,
-    @Param('taskId') taskId: string,
+    @Param('id') id: string,
   ) {
-    return this.tasksService.unCompleteTask(campaign, taskId)
+    return this.tasksService.unCompleteTask(campaign, parseInt(id))
   }
 
   @Post('generate')
