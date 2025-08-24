@@ -1,3 +1,5 @@
+import { CampaignTaskType } from '@prisma/client'
+
 export interface StartCampaignPlanRequest {
   candidate_name: string
   election_date: string
@@ -44,8 +46,12 @@ export interface CampaignPlanTask {
   parsed_date: string | null
   title: string
   description: string
-  type: string
-  category: string
+  category: CampaignTaskType
+  cta: string
+  link: string | null
+  pro_required: boolean
+  deadline: number | null
+  defaultAiTemplateId: string | null
 }
 
 export interface CampaignPlanSections {

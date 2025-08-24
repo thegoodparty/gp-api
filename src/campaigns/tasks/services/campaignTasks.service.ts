@@ -5,6 +5,7 @@ import { DateFormats } from '../../../shared/util/date.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { CampaignTask } from '../campaignTasks.types'
+import { defaultTasks } from '../fixures/defaultTasks'
 
 const MAX_WEEK_NUMBER = 9
 
@@ -45,7 +46,7 @@ export class CampaignTasksService extends createPrismaBase(
     return this.model.findFirst({
       where: {
         campaignId,
-        taskId,
+        taskId: `${campaignId}-${taskId}`,
       },
     })
   }
@@ -54,7 +55,7 @@ export class CampaignTasksService extends createPrismaBase(
     const task = await this.model.findFirst({
       where: {
         campaignId,
-        taskId,
+        taskId: `${campaignId}-${taskId}`,
       },
     })
 
@@ -76,7 +77,7 @@ export class CampaignTasksService extends createPrismaBase(
     const task = await this.model.findFirst({
       where: {
         campaignId,
-        taskId,
+        taskId: `${campaignId}-${taskId}`,
       },
     })
 
@@ -95,46 +96,121 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   async generateTasks(campaign: Campaign) {
-    const generatedTasks =
-      await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
+    try {
+      console.log(`Starting task generation for campaign ${campaign.id}`)
 
-    return this.saveTasks(campaign.id, generatedTasks)
+      const generatedTasks =
+        await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
+
+      console.log(
+        `AI generated ${generatedTasks.length} tasks for campaign ${campaign.id}:`,
+        generatedTasks.map((t) => ({ id: t.id, title: t.title, week: t.week })),
+      )
+
+      const savedTasks = await this.saveTasks(campaign.id, generatedTasks)
+
+      console.log(
+        `Successfully saved ${savedTasks.length} total tasks for campaign ${campaign.id}`,
+      )
+
+      return savedTasks
+    } catch (error) {
+      console.error(
+        `Failed to generate tasks for campaign ${campaign.id}:`,
+        error,
+      )
+
+      console.log(
+        `Attempting to save only default tasks for campaign ${campaign.id}`,
+      )
+      try {
+        return await this.saveTasks(campaign.id, [])
+      } catch (fallbackError) {
+        console.error(
+          `Even default task saving failed for campaign ${campaign.id}:`,
+          fallbackError,
+        )
+        throw fallbackError
+      }
+    }
   }
 
   async saveTasks(campaignId: number, tasks: CampaignTask[]) {
-    await this.model.deleteMany({
-      where: { campaignId },
-    })
+    console.log(
+      `Saving tasks for campaign ${campaignId}. AI tasks: ${tasks.length}, Default tasks: ${defaultTasks.length}`,
+    )
 
-    const tasksToCreate = tasks.map((task) => ({
-      taskId: task.id,
-      campaignId,
-      title: task.title,
-      description: task.description,
-      cta: task.cta,
-      flowType: task.flowType,
-      week: task.week,
-      link: task.link,
-      proRequired: task.proRequired || false,
-      deadline: task.deadline,
-      defaultAiTemplateId: task.defaultAiTemplateId,
-      completed: false,
-    }))
+    try {
+      const deletedCount = await this.model.deleteMany({
+        where: { campaignId },
+      })
+      console.log(
+        `Deleted ${deletedCount.count} existing tasks for campaign ${campaignId}`,
+      )
 
-    await this.model.createMany({
-      data: tasksToCreate,
-    })
+      const tasksToCreate = [...defaultTasks, ...tasks].map((task) => ({
+        taskId: `${campaignId}-${task.id}`,
+        campaignId,
+        title: task.title,
+        description: task.description,
+        cta: task.cta,
+        flowType: task.flowType,
+        week: task.week,
+        link: task.link,
+        proRequired: task.proRequired || false,
+        deadline: task.deadline,
+        defaultAiTemplateId: task.defaultAiTemplateId,
+        completed: false,
+      }))
 
-    // Return the created tasks
-    return this.model.findMany({
-      where: { campaignId },
-      orderBy: { week: 'desc' },
-    })
+      console.log(
+        `Attempting to create ${tasksToCreate.length} tasks for campaign ${campaignId}`,
+      )
+      console.log(
+        'Task IDs being created:',
+        tasksToCreate.map((t) => t.taskId),
+      )
+
+      const createResult = await this.model.createMany({
+        data: tasksToCreate,
+      })
+
+      console.log(
+        `Successfully created ${createResult.count} tasks for campaign ${campaignId}`,
+      )
+
+      // Return the created tasks
+      const finalTasks = await this.model.findMany({
+        where: { campaignId },
+        orderBy: { week: 'desc' },
+      })
+
+      console.log(
+        `Found ${finalTasks.length} tasks in database for campaign ${campaignId}`,
+      )
+
+      return finalTasks
+    } catch (error) {
+      console.error(`Error in saveTasks for campaign ${campaignId}:`, error)
+      throw error
+    }
   }
 
   async clearTasks(campaignId: number): Promise<void> {
     await this.model.deleteMany({
       where: { campaignId },
     })
+  }
+
+  async testSaveDefaultTasks(campaignId: number) {
+    console.log(`Testing default task saving for campaign ${campaignId}`)
+    try {
+      const result = await this.saveTasks(campaignId, [])
+      console.log(`Test successful! Saved ${result.length} default tasks`)
+      return result
+    } catch (error) {
+      console.error(`Test failed for campaign ${campaignId}:`, error)
+      throw error
+    }
   }
 }

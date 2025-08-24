@@ -47,4 +47,9 @@ export class CampaignTasksController {
   async generateTasks(@ReqCampaign() campaign: Campaign) {
     return this.tasksService.generateTasks(campaign)
   }
+
+  @Post('test-default')
+  async testDefaultTasks(@ReqCampaign() campaign: Campaign) {
+    return this.tasksService.testSaveDefaultTasks(campaign.id)
+  }
 }

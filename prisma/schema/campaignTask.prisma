@@ -9,7 +9,7 @@ enum CampaignTaskType {
 }
 
 model CampaignTask {
-    id                  Int              @id @default(autoincrement())
+    id                  String           @id @default(cuid())
     createdAt           DateTime         @default(now()) @map("created_at")
     updatedAt           DateTime         @updatedAt @map("updated_at")
     taskId              String           @unique @map("task_id")
@@ -27,7 +27,6 @@ model CampaignTask {
     campaignId          Int              @map("campaign_id")
 
     @@index([campaignId])
-    @@index([campaignId, week])
     @@index([campaignId, completed])
     @@map("campaign_task")
 }
