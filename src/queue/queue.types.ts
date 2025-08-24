@@ -6,6 +6,7 @@ export enum QueueType {
 
 export type QueueMessage = {
   type: QueueType
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   data: unknown // any until we define the actual data structure for each message type
 }
 

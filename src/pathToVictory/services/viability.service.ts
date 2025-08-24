@@ -253,6 +253,7 @@ export class ViabilityService {
       }
 
       return viabilityScore
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error'

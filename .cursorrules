@@ -8,10 +8,10 @@ alwaysApply: true
 
 ## Rule 0: Type Safety
 
-NEVER use the `any` type in new code. Always use proper TypeScript types:
+NEVER use the `any` or `unknown` types in new code. Always use proper TypeScript types:
 
 - ✅ Good: `user: User`, `data: { id: string; name: string }`, `error: Error`
-- ❌ Bad: `user: any`, `data: any`, `error: any`
+- ❌ Bad: `user: any`, `data: any`, `error: any`, `value: unknown`
 
 For complex external API responses, create proper interfaces:
 ```typescript
@@ -37,7 +37,14 @@ function processData<T>(data: T): T { return data }
 function handleValue(value: string | number | boolean): void {}
 ```
 
-Pre-existing `any` types have been marked with `// eslint-disable-next-line @typescript-eslint/no-explicit-any` for gradual migration.
+For external API responses that need validation, use proper type guards or validation libraries:
+```typescript
+function isApiResponse(data: unknown): data is ApiResponse {
+  return typeof data === 'object' && data !== null && 'data' in data
+}
+```
+
+Pre-existing `any` and `unknown` types have been marked with `// eslint-disable-next-line @typescript-eslint/no-explicit-any` and `// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment` respectively for gradual migration.
 
 ## Rule 1: Exception Handling
 
