@@ -75,10 +75,10 @@ export class DomainsController {
     let message: DomainOperationStatus
     switch (domain.status) {
       case DomainStatus.pending:
-        message = DomainOperationStatus.SUBMITTED
+        message = DomainOperationStatus.IN_PROGRESS
         break
       case DomainStatus.submitted:
-        message = DomainOperationStatus.IN_PROGRESS
+        message = DomainOperationStatus.SUBMITTED
         break
       case DomainStatus.registered:
         message = DomainOperationStatus.SUCCESSFUL
