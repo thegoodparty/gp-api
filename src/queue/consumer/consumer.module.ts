@@ -3,6 +3,7 @@ import { SqsModule } from '@ssut/nestjs-sqs'
 import { ConsumerService } from './consumer.service'
 import { queueConfig } from '../queue.config'
 import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
+import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { PathToVictoryModule } from '../../pathToVictory/pathToVictory.module'
 import { ElectionsModule } from 'src/elections/elections.module'
 
@@ -17,6 +18,7 @@ import { ElectionsModule } from 'src/elections/elections.module'
       ],
     }),
     CampaignsAiModule,
+    CampaignsModule,
     PathToVictoryModule,
     ElectionsModule,
   ],

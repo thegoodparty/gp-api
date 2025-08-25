@@ -8,3 +8,7 @@ export type GenerateAiContentMessage = {
   key: string
   regenerate: boolean
 }
+
+export type GenerateTasksMessage = {
+  campaignId: number
+}

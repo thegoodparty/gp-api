@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
-import { GenerateAiContentMessage, QueueMessage } from '../queue.types'
+import {
+  GenerateAiContentMessage,
+  GenerateTasksMessage,
+  QueueMessage,
+} from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Campaign, PathToVictory, User } from '@prisma/client'
@@ -16,6 +20,7 @@ import {
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { CampaignTasksService } from 'src/campaigns/tasks/services/campaignTasks.service'
 
 @Injectable()
 export class ConsumerService {
@@ -28,6 +33,7 @@ export class ConsumerService {
     private readonly viabilityService: ViabilityService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
+    private readonly campaignTasksService: CampaignTasksService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -91,6 +97,11 @@ export class ConsumerService {
         this.logger.log('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         await this.handlePathToVictoryMessage(pathToVictoryMessage)
+        break
+      case 'generateTasks':
+        this.logger.log('received generateTasks message')
+        const generateTasksMessage = queueMessage.data as GenerateTasksMessage
+        await this.handleGenerateTasksMessage(generateTasksMessage)
         break
     }
   }
@@ -241,6 +252,29 @@ export class ConsumerService {
           },
         },
       })
+    }
+  }
+
+  private async handleGenerateTasksMessage(message: GenerateTasksMessage) {
+    try {
+      this.logger.log(`Generating tasks for campaign ${message.campaignId}`)
+
+      const campaign = await this.campaignsService.findUniqueOrThrow({
+        where: { id: message.campaignId },
+        include: { pathToVictory: true },
+      })
+
+      await this.campaignTasksService.generateTasks(campaign)
+
+      this.logger.log(
+        `Successfully generated tasks for campaign ${message.campaignId}`,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate tasks for campaign ${message.campaignId}`,
+        error,
+      )
+      throw error
     }
   }
 }

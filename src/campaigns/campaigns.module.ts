@@ -31,6 +31,7 @@ import { PeerlyModule } from '../peerly/peerly.module'
 import { GoogleModule } from '../vendors/google/google.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { UsersModule } from 'src/users/users.module'
+import { QueueProducerModule } from '../queue/producer/producer.module'
 
 @Global()
 @Module({
@@ -48,6 +49,7 @@ import { UsersModule } from 'src/users/users.module'
     GoogleModule,
     AnalyticsModule,
     UsersModule,
+    QueueProducerModule,
   ],
   controllers: [
     CampaignsController,
@@ -77,6 +79,7 @@ import { UsersModule } from 'src/users/users.module'
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTcrComplianceService,
+    CampaignTasksService,
   ],
 })
 export class CampaignsModule {}
