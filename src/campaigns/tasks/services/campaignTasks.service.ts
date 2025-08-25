@@ -82,10 +82,10 @@ export class CampaignTasksService extends createPrismaBase(
         await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
 
       return this.saveTasks(campaign.id, generatedTasks)
-    } catch (_error: unknown) {
+    } catch (_error) {
       try {
         return await this.saveTasks(campaign.id, [])
-      } catch (fallbackError: unknown) {
+      } catch (fallbackError) {
         throw fallbackError
       }
     }

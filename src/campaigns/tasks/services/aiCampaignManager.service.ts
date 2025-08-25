@@ -62,7 +62,7 @@ export class AiCampaignManagerService {
         this.httpService.get<CampaignPlanResponse>(url),
       )
       return response.data
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error('Failed to download campaign plan JSON', error)
       throw new BadGatewayException('Failed to download campaign plan JSON')
     }
