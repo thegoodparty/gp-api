@@ -94,7 +94,7 @@ export class CampaignTasksService extends createPrismaBase(
 
   async generateDefaultTasks(campaign: Campaign) {
     const tasks = await this.model.findMany({
-      where: { campaignId: campaign.id },
+      where: { campaignId: campaign.id, isDefaultTask: true },
     })
     if (tasks.length > 0) {
       return
@@ -120,6 +120,7 @@ export class CampaignTasksService extends createPrismaBase(
       deadline: task.deadline,
       defaultAiTemplateId: task.defaultAiTemplateId,
       completed: false,
+      isDefaultTask: task.isDefaultTask || false,
     }))
 
     await this.model.createMany({
