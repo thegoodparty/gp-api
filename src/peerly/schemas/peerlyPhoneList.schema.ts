@@ -14,7 +14,7 @@ const uploadPhoneListResponseSchema = z.object({
 const phoneListStatusResponseSchema = z.object({
   Data: z.object({
     list_status: z.string().optional(),
-    list_state: z.string().optional(), 
+    list_state: z.string().optional(),
     list_id: z.number().optional(),
   }),
 })

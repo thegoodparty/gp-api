@@ -3,7 +3,7 @@ import { Campaign, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { CampaignTask } from '../campaignTasks.types'
-import { defaultTasks } from '../fixures/defaultTasks'
+import { defaultTasks } from '../fixtures/defaultTasks'
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -82,10 +82,10 @@ export class CampaignTasksService extends createPrismaBase(
         await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
 
       return this.saveTasks(campaign.id, generatedTasks)
-    } catch (_error) {
+    } catch (_error: unknown) {
       try {
         return await this.saveTasks(campaign.id, [])
-      } catch (fallbackError) {
+      } catch (fallbackError: unknown) {
         throw fallbackError
       }
     }

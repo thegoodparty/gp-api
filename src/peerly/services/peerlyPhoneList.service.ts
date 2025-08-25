@@ -112,7 +112,9 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     }
   }
 
-  async uploadPhoneList(params: UploadPhoneListParams): Promise<PhoneListStatusResponseDto> {
+  async uploadPhoneList(
+    params: UploadPhoneListParams,
+  ): Promise<PhoneListStatusResponseDto> {
     const token = await this.uploadPhoneListToken(params)
     return this.checkPhoneListStatus(token)
   }

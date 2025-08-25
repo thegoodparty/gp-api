@@ -62,7 +62,7 @@ export class AiCampaignManagerService {
         this.httpService.get<CampaignPlanResponse>(url),
       )
       return response.data
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('Failed to download campaign plan JSON', error)
       throw new BadGatewayException('Failed to download campaign plan JSON')
     }
@@ -93,7 +93,7 @@ export class AiCampaignManagerService {
       }
 
       return progressData
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('Failed to get progress stream', error)
       throw new BadGatewayException('Failed to get progress stream')
     }

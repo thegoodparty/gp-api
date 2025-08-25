@@ -14,6 +14,8 @@ const CAMPAIGN_PLAN_VERSION = process.env.CAMPAIGN_PLAN_VERSION || 1
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
+  details: PrismaJson.CampaignDetails
+  data: PrismaJson.CampaignData
 }
 
 @Injectable()
@@ -105,7 +107,10 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     }
   }
 
-  private extractNumberValue(value: unknown, defaultValue: number): number {
+  private extractNumberValue(
+    value: string | number | undefined,
+    defaultValue: number,
+  ): number {
     if (typeof value === 'number') return value
     if (typeof value === 'string') {
       const parsed = parseFloat(value)
@@ -114,29 +119,26 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     return defaultValue
   }
 
-  private determineRaceType(details: unknown): string {
-    if (typeof details === 'object' && details && 'partisanType' in details) {
-      const partisanType = (details as { partisanType?: unknown }).partisanType
-      if (typeof partisanType === 'string') {
-        return partisanType.toLowerCase() === 'nonpartisan'
-          ? 'Nonpartisan'
-          : 'Partisan'
-      }
+  private determineRaceType(details: PrismaJson.CampaignDetails): string {
+    if (details.partisanType && typeof details.partisanType === 'string') {
+      return details.partisanType.toLowerCase() === 'nonpartisan'
+        ? 'Nonpartisan'
+        : 'Partisan'
     }
     return 'Nonpartisan'
   }
 
-  private determineIncumbentStatus(_details: unknown): string {
+  private determineIncumbentStatus(
+    _details: PrismaJson.CampaignDetails,
+  ): string {
     return 'N/A'
   }
 
-  private extractNumberOfOpponents(details: unknown): number {
-    if (typeof details === 'object' && details && 'runningAgainst' in details) {
-      const runningAgainst = (details as { runningAgainst?: unknown })
-        .runningAgainst
-      if (Array.isArray(runningAgainst)) {
-        return runningAgainst.length
-      }
+  private extractNumberOfOpponents(
+    details: PrismaJson.CampaignDetails,
+  ): number {
+    if (details.runningAgainst && Array.isArray(details.runningAgainst)) {
+      return details.runningAgainst.length
     }
     return 1
   }
@@ -185,21 +187,17 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       contextParts.push(`Budget: $${budget}`)
     }
 
-    if (typeof details === 'object' && details && 'runningAgainst' in details) {
-      const runningAgainst = (details as { runningAgainst?: unknown })
-        .runningAgainst
-      if (Array.isArray(runningAgainst) && runningAgainst.length > 0) {
-        const opponents = runningAgainst
-          .map((opponent) => {
-            if (typeof opponent === 'object' && opponent) {
-              const opp = opponent as Record<string, unknown>
-              return `${opp.name || 'Unknown'} (${opp.party || 'Unknown Party'})`
-            }
-            return String(opponent)
-          })
-          .join(', ')
-        contextParts.push(`Opponents: ${opponents}`)
-      }
+    if (
+      details.runningAgainst &&
+      Array.isArray(details.runningAgainst) &&
+      details.runningAgainst.length > 0
+    ) {
+      const opponents = details.runningAgainst
+        .map((opponent) => {
+          return `${opponent.name || 'Unknown'} (${opponent.party || 'Unknown Party'})`
+        })
+        .join(', ')
+      contextParts.push(`Opponents: ${opponents}`)
     }
 
     return contextParts.join('; ')
@@ -228,9 +226,15 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     return null
   }
 
-  private extractBudgetFromData(data: unknown): number | undefined {
-    if (typeof data === 'object' && data && 'budget' in data) {
-      const budget = (data as { budget?: unknown }).budget
+  private extractBudgetFromData(
+    data: PrismaJson.CampaignData,
+  ): number | undefined {
+    if (
+      data.reportedVoterGoals &&
+      typeof data.reportedVoterGoals === 'object'
+    ) {
+      const goals = data.reportedVoterGoals as Record<string, unknown>
+      const budget = goals.budget
       if (typeof budget === 'number') return budget
       if (typeof budget === 'string') {
         const parsed = parseFloat(budget)
@@ -240,51 +244,45 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     return undefined
   }
 
-  private extractKeyIssues(details: unknown): string[] | undefined {
-    if (typeof details === 'object' && details && 'customIssues' in details) {
-      const customIssues = (details as { customIssues?: unknown }).customIssues
-      if (Array.isArray(customIssues)) {
-        return customIssues
-          .map((issue) =>
-            typeof issue === 'object' && issue && 'title' in issue
-              ? String((issue as { title: unknown }).title)
-              : undefined,
-          )
-          .filter((title): title is string => Boolean(title))
-      }
+  private extractKeyIssues(
+    details: PrismaJson.CampaignDetails,
+  ): string[] | undefined {
+    if (details.customIssues && Array.isArray(details.customIssues)) {
+      return details.customIssues
+        .map((issue) => issue.title)
+        .filter((title): title is string => Boolean(title))
     }
     return undefined
   }
 
-  private extractTargetDemographics(details: unknown): string[] | undefined {
+  private extractTargetDemographics(
+    details: PrismaJson.CampaignDetails,
+  ): string[] | undefined {
     const demographics: string[] = []
 
-    if (typeof details === 'object' && details) {
-      const detailsObj = details as Record<string, unknown>
-
-      if (detailsObj.city && typeof detailsObj.city === 'string') {
-        demographics.push(`City: ${detailsObj.city}`)
-      }
-      if (detailsObj.county && typeof detailsObj.county === 'string') {
-        demographics.push(`County: ${detailsObj.county}`)
-      }
-      if (detailsObj.level && typeof detailsObj.level === 'string') {
-        demographics.push(`Level: ${detailsObj.level}`)
-      }
+    if (details.city && typeof details.city === 'string') {
+      demographics.push(`City: ${details.city}`)
+    }
+    if (details.county && typeof details.county === 'string') {
+      demographics.push(`County: ${details.county}`)
+    }
+    if (details.level && typeof details.level === 'string') {
+      demographics.push(`Level: ${details.level}`)
     }
 
     return demographics.length > 0 ? demographics : undefined
   }
 
-  private extractCampaignGoals(data: unknown): string[] | undefined {
-    if (typeof data === 'object' && data && 'reportedVoterGoals' in data) {
-      const goals = (data as { reportedVoterGoals?: unknown })
-        .reportedVoterGoals
-      if (typeof goals === 'object' && goals) {
-        return Object.entries(goals)
-          .map(([key, value]) => `${key}: ${value}`)
-          .filter(Boolean)
-      }
+  private extractCampaignGoals(
+    data: PrismaJson.CampaignData,
+  ): string[] | undefined {
+    if (
+      data.reportedVoterGoals &&
+      typeof data.reportedVoterGoals === 'object'
+    ) {
+      return Object.entries(data.reportedVoterGoals)
+        .map(([key, value]) => `${key}: ${value}`)
+        .filter(Boolean)
     }
     return undefined
   }
@@ -359,7 +357,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
 
     try {
       const taskDate = new Date(dateStr)
-      const { electionDate: electionDateStr } = campaign.details
+      const electionDateStr = campaign.details.electionDate
 
       if (!electionDateStr) return 1
 
@@ -420,7 +418,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   }
 
   private generateCampaignInfoHash(
-    campaignInfo: Record<string, unknown>,
+    campaignInfo: Record<string, string | number | boolean | null | undefined>,
   ): string {
     const { generated_date: _generated_date, ...campaignInfoWithoutDate } =
       campaignInfo
@@ -431,7 +429,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
           result[key] = campaignInfoWithoutDate[key]
           return result
         },
-        {} as Record<string, unknown>,
+        {} as Record<string, string | number | boolean | null | undefined>,
       )
 
     const hashString = JSON.stringify(sortedInfo)

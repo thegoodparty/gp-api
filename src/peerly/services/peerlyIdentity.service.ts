@@ -16,7 +16,6 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
 } from '../peerly.types'
 
-
 const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 const PEERLY_USECASE = 'POLITICAL'
 
