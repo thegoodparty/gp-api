@@ -85,7 +85,7 @@ export class QueueConsumerService {
       return false
     }
 
-    const queueMessage: QueueMessage = JSON.parse(message.Body)
+    const queueMessage: QueueMessage = JSON.parse(message.Body) as QueueMessage
     this.logger.log('processing queue message type ', queueMessage.type)
 
     switch (queueMessage.type) {
@@ -218,17 +218,19 @@ export class QueueConsumerService {
         {
           campaign: campaign as Campaign & { pathToVictory: PathToVictory },
           pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
-          officeName: p2vResponse.officeName || '',
-          electionDate: p2vResponse.electionDate || '',
-          electionTerm: p2vResponse.electionTerm || 0,
-          electionLevel: p2vResponse.electionLevel || '',
-          electionState: p2vResponse.electionState || '',
-          electionCounty: p2vResponse.electionCounty || '',
-          electionMunicipality: p2vResponse.electionMunicipality || '',
-          subAreaName: p2vResponse.subAreaName,
-          subAreaValue: p2vResponse.subAreaValue,
-          partisanType: p2vResponse.partisanType || '',
-          priorElectionDates: p2vResponse.priorElectionDates || [],
+          officeName: (p2vResponse.officeName as string) || '',
+          electionDate: (p2vResponse.electionDate as string) || '',
+          electionTerm: (p2vResponse.electionTerm as number) || 0,
+          electionLevel: (p2vResponse.electionLevel as string) || '',
+          electionState: (p2vResponse.electionState as string) || '',
+          electionCounty: (p2vResponse.electionCounty as string) || '',
+          electionMunicipality:
+            (p2vResponse.electionMunicipality as string) || '',
+          subAreaName: p2vResponse.subAreaName as string,
+          subAreaValue: p2vResponse.subAreaValue as string,
+          partisanType: (p2vResponse.partisanType as string) || '',
+          priorElectionDates:
+            (p2vResponse.priorElectionDates as string[]) || [],
         },
       )
     } catch (e) {

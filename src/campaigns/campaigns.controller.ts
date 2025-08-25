@@ -22,10 +22,14 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import {
-  EnqueueService,
+  QueueProducerService,
   MessageGroup,
-} from 'src/queue/producer/enqueue.service'
-import { GenerateTasksMessage, QueueMessage } from 'src/queue/queue.types'
+} from 'src/queue/producer/queueProducer.service'
+import {
+  GenerateTasksMessage,
+  QueueMessage,
+  QueueType,
+} from 'src/queue/queue.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
@@ -58,7 +62,7 @@ export class CampaignsController {
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
     private readonly analytics: AnalyticsService,
-    private readonly enqueueService: EnqueueService,
+    private readonly queueProducerService: QueueProducerService,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -335,13 +339,13 @@ export class CampaignsController {
     })
 
     const taskGenerationMessage: QueueMessage = {
-      type: 'generateTasks',
+      type: QueueType.GENERATE_TASKS,
       data: {
         campaignId: campaign.id,
       } as GenerateTasksMessage,
     }
 
-    await this.enqueueService.sendMessage(
+    await this.queueProducerService.sendMessage(
       taskGenerationMessage,
       MessageGroup.default,
     )
