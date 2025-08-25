@@ -1,14 +1,11 @@
 import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
-import { Methods } from 'http-constants-ts'
-import { AxiosResponse } from 'axios'
 import {
   StartCampaignPlanRequest,
   CampaignPlanSession,
   ProgressStreamData,
   CampaignPlanResponse,
-  ApiRequestOptions,
 } from '../aiCampaignManager.types'
 
 export {
@@ -20,7 +17,6 @@ export {
   CampaignPlanSections,
   CampaignPlanTasks,
   CampaignPlanMetadata,
-  ApiRequestOptions,
 } from '../aiCampaignManager.types'
 
 @Injectable()
@@ -35,15 +31,22 @@ export class AiCampaignManagerService {
   async startCampaignPlanGeneration(
     request: StartCampaignPlanRequest,
   ): Promise<CampaignPlanSession> {
-    try {
-      const response = await this.fetchFromApi<CampaignPlanSession>(
-        '/start-campaign-plan-generation',
-        {
-          method: Methods.POST,
-          data: request,
-        },
-      )
+    const url = `${this.apiBaseUrl}/start-campaign-plan-generation`
 
+    const params = new URLSearchParams()
+    Object.keys(request).forEach((key) => {
+      if (request[key] !== null && request[key] !== undefined) {
+        params.append(key, String(request[key]))
+      }
+    })
+    const requestData = params.toString()
+
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post<CampaignPlanSession>(url, requestData, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }),
+      )
       return response.data
     } catch (error) {
       this.logger.error('Failed to start campaign plan generation', error)
@@ -52,14 +55,12 @@ export class AiCampaignManagerService {
   }
 
   async downloadJson(sessionId: string): Promise<CampaignPlanResponse> {
-    try {
-      const response = await this.fetchFromApi<CampaignPlanResponse>(
-        `/download-json/${sessionId}`,
-        {
-          method: Methods.GET,
-        },
-      )
+    const url = `${this.apiBaseUrl}/download-json/${sessionId}`
 
+    try {
+      const response = await lastValueFrom(
+        this.httpService.get<CampaignPlanResponse>(url),
+      )
       return response.data
     } catch (error) {
       this.logger.error('Failed to download campaign plan JSON', error)
@@ -68,13 +69,10 @@ export class AiCampaignManagerService {
   }
 
   async getProgressStream(sessionId: string): Promise<ProgressStreamData[]> {
+    const url = `${this.apiBaseUrl}/progress-stream/${sessionId}`
+
     try {
-      const response = await this.fetchFromApi<string>(
-        `/progress-stream/${sessionId}`,
-        {
-          method: Methods.GET,
-        },
-      )
+      const response = await lastValueFrom(this.httpService.get<string>(url))
 
       const lines = response.data
         .split('\n')
@@ -124,65 +122,6 @@ export class AiCampaignManagerService {
     }
 
     throw new BadGatewayException('Campaign plan generation timed out')
-  }
-
-  private async fetchFromApi<T>(
-    endpoint: string,
-    options: ApiRequestOptions = {},
-  ): Promise<AxiosResponse<T>> {
-    try {
-      const { method = Methods.GET, data, headers = {} } = options
-      const url = `${this.apiBaseUrl}${endpoint}`
-
-      let requestData: string | StartCampaignPlanRequest | null | undefined =
-        data
-      const config = {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          ...headers,
-        },
-      }
-
-      if (method === Methods.POST && data && typeof data === 'object') {
-        const params = new URLSearchParams()
-        Object.keys(data).forEach((key) => {
-          if (data[key] !== null && data[key] !== undefined) {
-            params.append(key, String(data[key]))
-          }
-        })
-        requestData = params.toString()
-        this.logger.debug('URL-encoded request data:', requestData)
-      }
-
-      let response: AxiosResponse<T>
-      switch (method) {
-        case Methods.POST:
-          response = await lastValueFrom(
-            this.httpService.post(url, requestData, config),
-          )
-          break
-        case Methods.PUT:
-          response = await lastValueFrom(
-            this.httpService.put(url, data, config),
-          )
-          break
-        case Methods.DELETE:
-          response = await lastValueFrom(this.httpService.delete(url, config))
-          break
-        default:
-          response = await lastValueFrom(this.httpService.get(url, config))
-      }
-
-      return response
-    } catch (error) {
-      this.logger.error(
-        `Failed to ${options.method || Methods.GET} ${endpoint}`,
-        error,
-      )
-      throw new BadGatewayException(
-        'Failed to communicate with AI Campaign Manager API',
-      )
-    }
   }
 
   private async sleep(ms: number): Promise<void> {

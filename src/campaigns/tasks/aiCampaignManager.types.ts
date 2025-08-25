@@ -98,9 +98,3 @@ export interface CampaignPlanResponse {
   tasks: CampaignPlanTasks
   metadata: CampaignPlanMetadata
 }
-
-export interface ApiRequestOptions {
-  method?: string
-  data?: StartCampaignPlanRequest | null
-  headers?: Record<string, string>
-}

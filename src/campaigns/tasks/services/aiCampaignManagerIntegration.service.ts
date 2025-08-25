@@ -72,7 +72,9 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     const district = details.district ? ` - ${details.district}` : ''
     const office_and_jurisdiction = `${office} in ${jurisdiction}${district}`
 
-    const pathData = pathToVictory?.data as Record<string, unknown> | undefined
+    const pathData = pathToVictory?.data as
+      | PrismaJson.PathToVictoryData
+      | undefined
     const winNumber = this.extractNumberValue(pathData?.winNumber, 1000)
     const totalRegisteredVoters = this.extractNumberValue(
       pathData?.totalRegisteredVoters,
