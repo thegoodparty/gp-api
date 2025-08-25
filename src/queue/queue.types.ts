@@ -23,5 +23,5 @@ export type TcrComplianceStatusCheckMessage = {
 }
 
 export type GenerateTasksMessage = {
-  campaignId: string
+  campaignId: number
 }
