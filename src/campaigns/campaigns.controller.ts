@@ -312,7 +312,8 @@ export class CampaignsController {
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
-    return this.campaigns.updateJsonFields(campaign.id, {
+
+    const res = this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
@@ -326,6 +327,8 @@ export class CampaignsController {
         districtManuallySet: false,
       },
     })
+    // TODO: Need to enqueue task generation here.
+    return res
   }
 
   // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194

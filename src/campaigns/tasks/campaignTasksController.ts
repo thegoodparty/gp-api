@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseDatePipe,
-  Post,
-  Put,
-  Query,
-} from '@nestjs/common'
+import { Controller, Delete, Get, Param, Post, Put } from '@nestjs/common'
 import { CampaignTasksService } from './services/campaignTasks.service'
 import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
@@ -19,37 +10,28 @@ export class CampaignTasksController {
   constructor(private readonly tasksService: CampaignTasksService) {}
 
   @Get()
-  listCampaignTasks(
-    @ReqCampaign() campaign: Campaign,
-    @Query('date', new ParseDatePipe({ optional: true })) date?: Date,
-    @Query('endDate', new ParseDatePipe({ optional: true })) endDate?: Date,
-  ) {
-    return this.tasksService.listCampaignTasks(campaign, date, endDate)
+  listCampaignTasks(@ReqCampaign() campaign: Campaign) {
+    return this.tasksService.listCampaignTasks(campaign)
   }
 
-  @Put('complete/:taskId')
+  @Put('complete/:id')
   async completeTask(
     @ReqCampaign() campaign: Campaign,
-    @Param('taskId') taskId: string,
+    @Param('id') id: string,
   ) {
-    return this.tasksService.completeTask(campaign, taskId)
+    return this.tasksService.completeTask(campaign, id)
   }
 
-  @Delete('complete/:taskId')
+  @Delete('complete/:id')
   async unCompleteTask(
     @ReqCampaign() campaign: Campaign,
-    @Param('taskId') taskId: string,
+    @Param('id') id: string,
   ) {
-    return this.tasksService.unCompleteTask(campaign, taskId)
+    return this.tasksService.unCompleteTask(campaign, id)
   }
 
   @Post('generate')
   async generateTasks(@ReqCampaign() campaign: Campaign) {
     return this.tasksService.generateTasks(campaign)
-  }
-
-  @Post('test-default')
-  async testDefaultTasks(@ReqCampaign() campaign: Campaign) {
-    return this.tasksService.testSaveDefaultTasks(campaign.id)
   }
 }

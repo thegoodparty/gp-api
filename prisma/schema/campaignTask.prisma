@@ -6,18 +6,19 @@ enum CampaignTaskType {
     socialMedia
     events
     education
+    compliance
 }
 
 model CampaignTask {
     id                  String           @id @default(cuid())
     createdAt           DateTime         @default(now()) @map("created_at")
     updatedAt           DateTime         @updatedAt @map("updated_at")
-    taskId              String           @unique @map("task_id")
     title               String
     description         String
     cta                 String
     flowType            CampaignTaskType @map("flow_type")
     week                Int
+    date                DateTime?
     link                String?
     proRequired         Boolean?         @default(false) @map("pro_required")
     deadline            Int?

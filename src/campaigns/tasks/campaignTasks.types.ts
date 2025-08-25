@@ -6,6 +6,7 @@ export enum CampaignTaskType {
   socialMedia = 'socialMedia',
   events = 'events',
   education = 'education',
+  compliance = 'compliance',
 }
 
 export type CampaignTask = {
@@ -20,6 +21,8 @@ export type CampaignTask = {
   flowType: CampaignTaskType
   /** Week number for the task to be shown in to user */
   week: number
+  /** Date when the task should be executed */
+  date?: string
   /** URL to link to if not a "flow" type of task */
   link?: string
   /** Whether the task requires a pro account */
