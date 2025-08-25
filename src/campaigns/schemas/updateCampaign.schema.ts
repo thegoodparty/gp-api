@@ -1,12 +1,15 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { ElectionLevel } from 'src/campaigns/campaigns.types'
+import {
+  BallotReadyPositionLevel,
+  ElectionLevel,
+} from 'src/campaigns/campaigns.types'
 
 // AI'ed from the CampaignDetails type
 const CampaignDetailsSchema = z
   .object({
     state: z.string(),
-    ballotLevel: z.string(),
+    ballotLevel: z.nativeEnum(BallotReadyPositionLevel),
     electionDate: z.string(),
     primaryElectionDate: z.string(),
     zip: z.string(),
@@ -71,9 +74,12 @@ export class UpdateCampaignSchema extends createZodDto(
   z
     .object({
       slug: z.string().optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data: z.record(z.string(), z.unknown()).optional(),
       details: CampaignDetailsSchema.optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       aiContent: z.record(z.string(), z.unknown()).optional(),
       formattedAddress: z.string().optional(),
       placeId: z.string().optional(),

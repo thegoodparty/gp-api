@@ -2,13 +2,15 @@ import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import {
-  GenerateAiContentMessage,
   GenerateTasksMessage,
+  GenerateAiContentMessageData,
   QueueMessage,
+  QueueType,
+  TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import { Campaign, PathToVictory, User } from '@prisma/client'
+import { Campaign, PathToVictory, TcrComplianceStatus } from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { SlackChannel } from 'src/shared/services/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
@@ -21,10 +23,15 @@ import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { CampaignTasksService } from 'src/campaigns/tasks/services/campaignTasks.service'
+import { isAfter, parseISO } from 'date-fns'
+import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { QueueProducerService } from '../producer/queueProducer.service'
+import { getTwelveHoursFromDate } from '../../shared/util/date.util'
+import { EVENTS } from '../../segment/segment.types'
 
 @Injectable()
-export class ConsumerService {
-  private readonly logger = new Logger(ConsumerService.name)
+export class QueueConsumerService {
+  private readonly logger = new Logger(QueueConsumerService.name)
 
   constructor(
     private readonly aiContentService: AiContentService,
@@ -34,76 +41,155 @@ export class ConsumerService {
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
     private readonly campaignTasksService: CampaignTasksService,
+    private readonly tcrComplianceService: CampaignTcrComplianceService,
+    private readonly queueProducerService: QueueProducerService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
     const shouldRequeue = await this.handleMessageAndMaybeRequeue(message)
-    // Return a rejected promise if requeue is needed without throwing an error
-    if (shouldRequeue) {
-      return Promise.reject('Requeuing message without stopping the process')
-    }
-    return true // Return true to delete the message from the queue
+
+    return shouldRequeue
+      ? // Return a rejected promise if requeue is needed without throwing an error
+        Promise.reject('Requeuing message without stopping the process')
+      : true // Return true to delete the message from the queue
   }
 
   // Function to process message and decide if requeue is necessary
   async handleMessageAndMaybeRequeue(message: Message): Promise<boolean> {
     try {
-      await this.processMessage(message)
-      return false // No requeue needed
+      this.logger.debug('Processing queue message: ', message)
+      return await this.processMessage(message)
     } catch (error) {
       this.logger.error('Message processing failed, will requeue:', error)
       return true // Indicate that we should requeue
     }
   }
 
+  // TODO: Each message type should be assigned it's own SQS queue allowing each
+  //  module/service to listen to and handle it's own messages.  Or, in the very
+  //  least, at _least_ delineate and abstract the message handling based on the
+  //  MessageGroup for each message. However, that would be less desirable due
+  //  to the requirement to still have a single queue consumer/poller.
+  //
+  //  This also limits us to using features that are only available for FIFO
+  //  queues, complicating implementations. i.e. Long-polling semiphores are
+  //  complicated since FIFO queues do not support the delaySeconds option field.
+  //
+  //  Furthermore, the message types here are not type-safe and could be
+  //  misinterpreted by other modules/services.
+  //
+  //  https://goodparty.atlassian.net/browse/WEB-4518
   async processMessage(message: Message) {
-    // console.log(`consumer received message: ${message.Body}`);
-    if (!message) {
-      return
+    if (!message || !message.Body) {
+      return false
     }
-    const body = message.Body
-    if (!body) {
-      return
-    }
-    const queueMessage: QueueMessage = JSON.parse(body)
+
+    const queueMessage: QueueMessage = JSON.parse(message.Body)
     this.logger.log('processing queue message type ', queueMessage.type)
 
     switch (queueMessage.type) {
-      case 'generateAiContent':
+      case QueueType.GENERATE_AI_CONTENT:
         this.logger.log('received generateAiContent message')
         const generateAiContentMessage =
-          queueMessage.data as GenerateAiContentMessage
+          queueMessage.data as GenerateAiContentMessageData
         await this.aiContentService.handleGenerateAiContent(
           generateAiContentMessage,
         )
 
-        const campaign = await this.campaignsService.findUniqueOrThrow({
+        const { userId } = await this.campaignsService.findUniqueOrThrow({
           where: { slug: generateAiContentMessage.slug },
-          include: { user: true },
         })
 
-        this.analytics.trackEvent(
-          campaign.user as User,
-          'Content Builder: Generation Completed',
-          {
-            slug: generateAiContentMessage.slug,
-            key: generateAiContentMessage.key,
-            regenerate: generateAiContentMessage.regenerate,
-          },
-        )
+        this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+          slug: generateAiContentMessage.slug,
+          key: generateAiContentMessage.key,
+          regenerate: generateAiContentMessage.regenerate,
+        })
         break
-      case 'pathToVictory':
+      case QueueType.PATH_TO_VICTORY:
         this.logger.log('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         await this.handlePathToVictoryMessage(pathToVictoryMessage)
         break
-      case 'generateTasks':
+      case QueueType.GENERATE_TASKS:
         this.logger.log('received generateTasks message')
         const generateTasksMessage = queueMessage.data as GenerateTasksMessage
         await this.handleGenerateTasksMessage(generateTasksMessage)
         break
+      case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
+        this.logger.log('received tcrComplianceStatusCheck message')
+        return await this.handleTcrComplianceCheckMessage(
+          queueMessage.data as TcrComplianceStatusCheckMessage,
+        )
     }
+    // Return true to delete the message from the queue
+    return true
+  }
+
+  // TODO: ALL of the below functions should be moved to their respective
+  //  services. This is a queue consumer class. There should be no business
+  //  logic in the queue consumer class. This GREATLY complicates development.
+  private async handleTcrComplianceCheckMessage({
+    processTime,
+    peerlyIdentityId,
+  }: TcrComplianceStatusCheckMessage) {
+    const processDateTime = parseISO(processTime)
+    const now = new Date()
+
+    if (isAfter(processDateTime, now)) {
+      this.logger.debug('Process time not yet reached. Re-queuing')
+      return false
+    }
+    this.logger.debug('Process time met. Proceeding with processing')
+
+    const status =
+      await this.tcrComplianceService.checkTcrRegistrationStatus(
+        peerlyIdentityId,
+      )
+
+    if (!status) {
+      this.logger.debug(
+        'TCR Registration still not active, re-queuing with delay',
+      )
+      await this.queueProducerService.sendMessage({
+        type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
+        data: {
+          processTime: getTwelveHoursFromDate(processDateTime).toISOString(),
+          peerlyIdentityId,
+        },
+      })
+      // Delete the previous message from the queue since we can't just requeue w/ a `delaySeconds` option on a FIFO queue.
+      return true
+    }
+
+    // Update the TCR compliance status to approved once the registration is active
+    this.logger.debug(
+      `TCR Registration is active, updating TCR compliance w/ identity ID ${peerlyIdentityId} status to approved`,
+    )
+
+    await this.tcrComplianceService.model.update({
+      where: { peerlyIdentityId },
+      data: {
+        status: TcrComplianceStatus.approved,
+      },
+    })
+
+    const { campaign } = await this.tcrComplianceService.findFirstOrThrow({
+      include: {
+        campaign: true,
+      },
+      where: { peerlyIdentityId },
+    })
+
+    const { userId } = campaign
+
+    this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+    this.analytics.identify(userId, {
+      '10DLC_compliant': true,
+    })
+
+    return true
   }
 
   private async handlePathToVictoryMessage(message: PathToVictoryInput) {

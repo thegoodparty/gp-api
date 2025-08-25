@@ -1,16 +1,16 @@
-import { Controller, Get, BadGatewayException, Logger } from '@nestjs/common'
-import { EnqueueService } from './enqueue.service'
-import { QueueMessage } from '../queue.types'
+import { BadGatewayException, Controller, Get, Logger } from '@nestjs/common'
+import { QueueProducerService } from './queueProducer.service'
+import { QueueMessage, QueueType } from '../queue.types'
 
 @Controller('queue')
-export class QueueController {
-  private readonly logger = new Logger(QueueController.name)
-  constructor(private readonly queueService: EnqueueService) {}
+export class QueueProducerController {
+  private readonly logger = new Logger(QueueProducerController.name)
+  constructor(private readonly queueService: QueueProducerService) {}
 
   @Get()
   async testQueue() {
     const body: QueueMessage = {
-      type: 'generateAiContent',
+      type: QueueType.GENERATE_AI_CONTENT,
       data: {
         slug: 'test-slug',
         key: 'test-key',

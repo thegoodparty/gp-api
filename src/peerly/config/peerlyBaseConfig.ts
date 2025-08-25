@@ -1,9 +1,12 @@
+import { BadGatewayException, Logger } from '@nestjs/common'
+
 const {
   PEERLY_MD5_EMAIL,
   PEERLY_MD5_PASSWORD,
   PEERLY_API_BASE_URL,
   PEERLY_ACCOUNT_NUMBER,
   PEERLY_HTTP_TIMEOUT = '15000', // 15 seconds default
+  PEERLY_TEST_ENVIRONMENT,
 } = process.env
 
 if (!PEERLY_API_BASE_URL) {
@@ -24,4 +27,24 @@ export class PeerlyBaseConfig {
   readonly password = PEERLY_MD5_PASSWORD
   readonly accountNumber = PEERLY_ACCOUNT_NUMBER
   readonly httpTimeoutMs = parseInt(PEERLY_HTTP_TIMEOUT, 10)
+  readonly isTestEnvironment = Boolean(PEERLY_TEST_ENVIRONMENT === 'true')
+
+  protected readonly logger = new Logger(this.constructor.name)
+
+  protected validateData<T>(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    data: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    dto: { create: (data: unknown) => T },
+    context: string,
+  ): T {
+    try {
+      return dto.create(data)
+    } catch (error) {
+      this.logger.error(`${context} response validation failed:`, error)
+      throw new BadGatewayException(
+        `Invalid ${context} response from Peerly API`,
+      )
+    }
+  }
 }

@@ -21,7 +21,7 @@ export function parseRaces(
     const { node } = edge || {}
     const { isPrimary } = node || {}
     const { electionDay, name: electionName } = node?.election || {}
-    const { name, hasPrimary, partisanType } = node?.position || {}
+    const { name, hasPrimary } = node?.position || {}
 
     const electionYear = new Date(electionDay).getFullYear()
 

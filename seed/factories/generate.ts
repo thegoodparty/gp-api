@@ -13,6 +13,7 @@ import { deepmerge as deepMerge } from 'deepmerge-ts'
  *
  * const fakeUser = userFactory({ firstName: 'Jerry'})
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 export function generateFactory<T>(generateFn: (args?: unknown) => Partial<T>) {
   return (args: Partial<T> = {}) => deepMerge(generateFn(), args) as T
 }

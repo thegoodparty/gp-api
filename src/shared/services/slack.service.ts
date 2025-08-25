@@ -55,6 +55,7 @@ export class SlackService {
         ),
       )
       return data
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (e: unknown) {
       this.logger.error(`Failed to send slack message!`, e)
     }

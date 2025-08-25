@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   Injectable,
-  Logger,
   BadRequestException,
 } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
@@ -35,8 +34,6 @@ interface CreateMediaParams {
 
 @Injectable()
 export class PeerlyMediaService extends PeerlyBaseConfig {
-  private readonly logger: Logger = new Logger(PeerlyMediaService.name)
-
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
@@ -44,6 +41,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
     super()
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
       'Failed to communicate with Peerly API',
@@ -52,15 +50,9 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private validateCreateResponse(data: unknown): CreateMediaResponseDto {
-    try {
-      return CreateMediaResponseDto.create(data)
-    } catch (error) {
-      this.logger.error('Create media response validation failed:', error)
-      throw new BadGatewayException(
-        'Invalid create media response from Peerly API',
-      )
-    }
+    return this.validateData(data, CreateMediaResponseDto, 'create media')
   }
 
   async createMedia(params: CreateMediaParams): Promise<string> {

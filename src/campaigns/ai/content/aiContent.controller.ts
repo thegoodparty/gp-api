@@ -31,6 +31,7 @@ import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from '../../../segment/segment.types'
 
 @Controller('campaigns/ai')
 @UseCampaign()
@@ -57,7 +58,7 @@ export class AiContentController {
       const result = await this.aiContent.createContent(campaign, body)
 
       // Don't need to await here, don't want to wait for this call
-      this.analytics.trackEvent(user, 'Content Builder: Generation Started', {
+      this.analytics.track(user.id, EVENTS.AiContent.GenerationStarted, {
         slug: campaign.slug,
         key: body.key,
         regenerate: body.regenerate,

@@ -24,6 +24,7 @@ export interface CompletePurchaseDto {
 
 export type PostPurchaseHandler<
   TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   TResult = unknown,
 > = (
   paymentIntentId: string,
@@ -32,6 +33,7 @@ export type PostPurchaseHandler<
 
 export interface PurchaseHandler<
   TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   TResult = unknown,
 > {
   validatePurchase(metadata: PurchaseMetadata<TMetadata>): Promise<void>

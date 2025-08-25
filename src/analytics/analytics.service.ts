@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { User } from '@prisma/client'
 import { SegmentService } from 'src/segment/segment.service'
 import Stripe from 'stripe'
-import { EVENTS } from 'src/segment/segment.types'
+import {
+  EVENTS,
+  SegmentTrackEventProperties,
+  SegmentIdentityTraits,
+} from 'src/segment/segment.types'
 
 @Injectable()
 export class AnalyticsService {
@@ -10,20 +13,15 @@ export class AnalyticsService {
 
   constructor(private readonly segment: SegmentService) {}
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async trackEvent(user: User, eventName: string, properties: any) {
-    return this.segment.trackEvent(user.id, eventName, properties)
-  }
-
   track(
     userId: number,
     eventName: string,
-    properties?: Record<string, unknown>,
+    properties?: SegmentTrackEventProperties,
   ) {
     this.segment.trackEvent(userId, eventName, properties)
   }
 
-  identify(userId: number, traits: Record<string, unknown>) {
+  identify(userId: number, traits: SegmentIdentityTraits) {
     this.segment.identify(userId, traits)
   }
 

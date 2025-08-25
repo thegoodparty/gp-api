@@ -349,6 +349,47 @@ export class CampaignsController {
     return res
   }
 
+  @Put('admin/:slug/race-target-details')
+  @Roles(UserRole.admin)
+  async updateRaceTargetDetailsBySlug(@Param('slug') slug: string) {
+    const campaign = await this.campaigns.findFirstOrThrow({
+      where: { slug },
+    })
+
+    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+      throw new BadRequestException(
+        `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
+      )
+    }
+    const raceTargetDetails =
+      await this.elections.getBallotReadyMatchedRaceTargetDetails(
+        campaign.details.positionId,
+        campaign.details.electionDate,
+      )
+    if (!raceTargetDetails) {
+      throw new NotFoundException(
+        'Failed to fetch the raceTargetDetails for the requested campaign',
+      )
+    }
+    const { district, winNumber, voterContactGoal, projectedTurnout } =
+      raceTargetDetails
+    const { L2DistrictType, L2DistrictName } = district
+    return this.campaigns.updateJsonFields(campaign.id, {
+      pathToVictory: {
+        districtId: district.id,
+        electionType: L2DistrictType,
+        electionLocation: L2DistrictName,
+        winNumber,
+        voterContactGoal,
+        projectedTurnout,
+        source: P2VSource.ElectionApi,
+        p2vStatus: P2VStatus.complete,
+        p2vCompleteDate: new Date().toISOString().slice(0, 10),
+        districtManuallySet: false,
+      },
+    })
+  }
+
   // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
   @Post('missing-win-numbers/update')
   @Roles(UserRole.admin)
@@ -356,7 +397,7 @@ export class CampaignsController {
     @Body() body?: { pageSize?: number; loopLimit?: number },
   ) {
     // No need to await
-    await this.campaigns.updateMissingWinNumbers(
+    this.campaigns.updateMissingWinNumbers(
       body?.pageSize ?? 500,
       body?.loopLimit ?? 1000,
     )

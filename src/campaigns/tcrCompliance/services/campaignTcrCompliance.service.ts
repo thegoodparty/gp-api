@@ -1,17 +1,27 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CreateTcrComplianceDto } from '../schemas/createTcrComplianceDto.schema'
 import { PeerlyIdentityService } from '../../../peerly/services/peerlyIdentity.service'
 import { Campaign, TcrCompliance, User } from '@prisma/client'
 import { getTCRIdentityName } from '../util/trcCompliance.util'
 import { getUserFullName } from '../../../users/util/users.util'
-import { postalAddressToString } from '../../../shared/util/postalAddresses.util'
+import { WebsitesService } from '../../../websites/services/websites.service'
+import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
+import { PeerlyIdentityUseCase } from '../../../peerly/peerly.types'
+import { PEERLY_USECASE } from '../../../peerly/services/peerly.const'
 
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
   MODELS.TcrCompliance,
 ) {
-  constructor(private readonly peerlyIdentityService: PeerlyIdentityService) {
+  constructor(
+    private readonly peerlyIdentityService: PeerlyIdentityService,
+    private readonly websitesService: WebsitesService,
+  ) {
     super()
   }
 
@@ -24,12 +34,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
   async create(
     user: User,
     campaign: Campaign,
-    tcrCompliance: CreateTcrComplianceDto,
+    tcrComplianceCreatePayload: CreateTcrCompliancePayload,
   ) {
-    const tcrIdentityName = getTCRIdentityName(
-      getUserFullName(user!),
-      tcrCompliance.ein,
-    )
+    const { ein, filingUrl, email } = tcrComplianceCreatePayload
+    const tcrIdentityName = getTCRIdentityName(getUserFullName(user!), ein)
     const tcrComplianceIdentity =
       await this.peerlyIdentityService.createIdentity(tcrIdentityName)
 
@@ -41,16 +49,37 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     const peerly10DLCBrandSubmissionKey =
       await this.peerlyIdentityService.submit10DlcBrand(
         tcrComplianceIdentity.identity_id,
-        tcrCompliance,
+        tcrComplianceCreatePayload,
         campaign,
       )
 
-    // TODO: Do whatever Peerly API dance is needed to start Campaign Verify
-    //  process once we have those endpoints from Peerly
+    const { domain } = await this.websitesService.findFirstOrThrow({
+      where: {
+        campaignId: campaign.id,
+      },
+      include: {
+        domain: true,
+      },
+    })
+
+    // TODO: determine if we need to do anything with this data once we can
+    //  actually get a valid response from Peerly
+    const campaignVerifySubmissionData =
+      await this.peerlyIdentityService.submitCampaignVerifyRequest(
+        {
+          ein,
+          filingUrl,
+          peerlyIdentityId: tcrComplianceIdentity.identity_id,
+          email,
+        },
+        user,
+        campaign,
+        domain!,
+      )
 
     const newTcrCompliance = {
-      ...tcrCompliance,
-      postalAddress: postalAddressToString(tcrCompliance.postalAddress),
+      ...tcrComplianceCreatePayload,
+      postalAddress: campaign.formattedAddress!,
       campaignId: campaign.id,
       peerlyIdentityId: tcrComplianceIdentity.identity_id,
       peerlyIdentityProfileLink,
@@ -70,8 +99,24 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
   }
 
+  async checkTcrRegistrationStatus(peerlyIdentityId: string) {
+    let useCases: PeerlyIdentityUseCase[]
+    try {
+      useCases =
+        await this.peerlyIdentityService.getIdentityUseCases(peerlyIdentityId)
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return false
+      }
+      throw error
+    }
+
+    const useCase = useCases.find(({ usecase }) => usecase === PEERLY_USECASE)
+    return Boolean(useCase?.activated)
+  }
+
   async retrieveCampaignVerifyToken(
-    pin: number,
+    pin: string,
     { peerlyIdentityId }: TcrCompliance,
   ) {
     if (!peerlyIdentityId) {
@@ -79,12 +124,17 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         'TCR compliance does not have a Peerly identity ID',
       )
     }
-    // TODO: talk to Peerly service to retrieve the campaign verify token
-    // This is a placeholder implementation. Replace with actual logic to retrieve the token.
-    return (async (pin) =>
-      Promise.resolve(
-        `dummy-campaign-verify-token-${pin}-${peerlyIdentityId}`,
-      ))(pin)
+    const pinIsValid = await this.peerlyIdentityService.verifyCampaignVerifyPin(
+      peerlyIdentityId,
+      pin,
+    )
+    if (!pinIsValid) {
+      throw new UnprocessableEntityException('Invalid PIN')
+    }
+
+    return await this.peerlyIdentityService.createCampaignVerifyToken(
+      peerlyIdentityId,
+    )
   }
 
   async submitCampaignVerifyToken(

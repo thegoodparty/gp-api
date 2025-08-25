@@ -31,7 +31,8 @@ import { PeerlyModule } from '../peerly/peerly.module'
 import { GoogleModule } from '../vendors/google/google.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { UsersModule } from 'src/users/users.module'
-import { QueueProducerModule } from '../queue/producer/producer.module'
+import { WebsitesModule } from '../websites/websites.module'
+import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 
 @Global()
 @Module({
@@ -49,6 +50,7 @@ import { QueueProducerModule } from '../queue/producer/producer.module'
     GoogleModule,
     AnalyticsModule,
     UsersModule,
+    WebsitesModule,
     QueueProducerModule,
   ],
   controllers: [

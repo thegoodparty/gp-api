@@ -288,8 +288,6 @@ export class PathToVictoryService extends createPrismaBase(
     `
 
     if (
-      pathToVictoryResponse?.counts?.total &&
-      pathToVictoryResponse.counts.total > 0 &&
       pathToVictoryResponse.counts.projectedTurnout &&
       pathToVictoryResponse.counts.projectedTurnout > 0
     ) {
@@ -402,8 +400,6 @@ export class PathToVictoryService extends createPrismaBase(
 
       let p2vStatus: P2VStatus = P2VStatus.waiting
       if (
-        pathToVictoryResponse?.counts?.total &&
-        pathToVictoryResponse.counts.total > 0 &&
         pathToVictoryResponse?.counts?.projectedTurnout &&
         pathToVictoryResponse.counts.projectedTurnout > 0
       ) {
@@ -416,17 +412,6 @@ export class PathToVictoryService extends createPrismaBase(
         data: {
           data: {
             ...p2vData,
-            totalRegisteredVoters: pathToVictoryResponse.counts.total,
-            republicans: pathToVictoryResponse.counts.republican,
-            democrats: pathToVictoryResponse.counts.democrat,
-            indies: pathToVictoryResponse.counts.independent,
-            women: pathToVictoryResponse.counts.women,
-            men: pathToVictoryResponse.counts.men,
-            white: pathToVictoryResponse.counts.white,
-            asian: pathToVictoryResponse.counts.asian,
-            africanAmerican: pathToVictoryResponse.counts.africanAmerican,
-            hispanic: pathToVictoryResponse.counts.hispanic,
-            averageTurnout: pathToVictoryResponse.counts.averageTurnout,
             projectedTurnout: pathToVictoryResponse.counts.projectedTurnout,
             winNumber: pathToVictoryResponse.counts.winNumber,
             voterContactGoal: pathToVictoryResponse.counts.voterContactGoal,
