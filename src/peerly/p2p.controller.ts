@@ -1,11 +1,13 @@
 import {
   BadGatewayException,
+  BadRequestException,
   Body,
   Controller,
   Get,
   Logger,
   Param,
   Post,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
@@ -14,10 +16,27 @@ import { ReqCampaign } from '../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../campaigns/decorators/UseCampaign.decorator'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PhoneListState } from './peerly.types'
-import { CheckPhoneListStatusResponseDto } from './schemas/p2pPhoneListStatus.schema'
+import {
+  CheckPhoneListStatusResponseDto
+} from './schemas/p2pPhoneListStatus.schema'
 import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
-import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
-import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
+import {
+  P2pPhoneListResponseSchema
+} from './schemas/p2pPhoneListResponse.schema'
+import {
+  P2pPhoneListUploadService
+} from './services/p2pPhoneListUpload.service'
+import { PeerlyP2pJobService } from './services/peerlyP2pJob.service'
+import {
+  CreateP2pJobRequestDto,
+  CreateP2pJobResponseDto,
+} from './schemas/createP2pJob.schema'
+import { FilesInterceptor } from '../files/interceptors/files.interceptor'
+import { ReqFile } from '../files/decorators/ReqFiles.decorator'
+import { FileUpload } from '../files/files.types'
+import { MimeTypes } from 'http-constants-ts'
+import { Readable } from 'stream'
+import { P2P_ERROR_MESSAGES } from './constants/p2pJob.constants'
 
 @Controller('p2p')
 @UsePipes(ZodValidationPipe)
@@ -27,12 +46,12 @@ export class P2pController {
   constructor(
     private readonly peerlyPhoneListService: PeerlyPhoneListService,
     private readonly p2pPhoneListUploadService: P2pPhoneListUploadService,
+    private readonly peerlyP2pJobService: PeerlyP2pJobService,
   ) {}
 
   @Get('phone-list/:token/status')
   @UseCampaign()
   async checkPhoneListStatus(
-    @ReqCampaign() campaign: Campaign,
     @Param('token') token: string,
   ): Promise<CheckPhoneListStatusResponseDto> {
     try {
@@ -85,6 +104,63 @@ export class P2pController {
     } catch (error) {
       this.logger.error('Failed to upload phone list', error)
       throw new BadGatewayException('Failed to upload phone list.')
+    }
+  }
+
+  @Post('create-job')
+  @UseCampaign()
+  @UseInterceptors(
+    FilesInterceptor('image', {
+      mode: 'buffer',
+      mimeTypes: [
+        MimeTypes.IMAGE_JPEG,
+        MimeTypes.IMAGE_GIF,
+        MimeTypes.IMAGE_PNG,
+      ],
+    }),
+  )
+  async createJob(
+    @ReqCampaign() campaign: Campaign,
+    @Body() request: CreateP2pJobRequestDto,
+    @ReqFile() image?: FileUpload,
+  ): Promise<CreateP2pJobResponseDto> {
+    try {
+      if (!image) {
+        throw new BadRequestException(P2P_ERROR_MESSAGES.IMAGE_REQUIRED)
+      }
+
+      if (!image.filename || !image.mimetype || !image.data) {
+        throw new BadRequestException(
+          P2P_ERROR_MESSAGES.INVALID_IMAGE_PROPERTIES,
+        )
+      }
+
+      let imageStream: Readable
+      if (image.data instanceof Buffer) {
+        imageStream = Readable.from(image.data)
+      } else {
+        imageStream = image.data as Readable
+      }
+
+      await this.peerlyP2pJobService.createP2pJob({
+        campaignId: campaign.id,
+        listId: request.listId,
+        imageInfo: {
+          fileStream: imageStream,
+          fileName: image.filename,
+          mimeType: image.mimetype,
+          title: request.title,
+        },
+        scriptText: request.scriptText,
+        identityId: request.identityId,
+        name: request.name,
+        didState: request.didState,
+      })
+
+      return { success: true, message: 'P2P job created successfully' }
+    } catch (error) {
+      this.logger.error(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED, error)
+      throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
     }
   }
 }
