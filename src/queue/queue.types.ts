@@ -2,6 +2,7 @@ export enum QueueType {
   GENERATE_AI_CONTENT = 'generateAiContent',
   PATH_TO_VICTORY = 'pathToVictory',
   TCR_COMPLIANCE_STATUS_CHECK = 'tcrComplianceStatusCheck',
+  GENERATE_TASKS = 'generateTasks',
 }
 
 export type QueueMessage = {
@@ -19,4 +20,8 @@ export type GenerateAiContentMessageData = {
 export type TcrComplianceStatusCheckMessage = {
   peerlyIdentityId: string
   processTime: string // ISO 8601 date time string format
+}
+
+export type GenerateTasksMessage = {
+  campaignId: number
 }

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import {
+  GenerateTasksMessage,
   GenerateAiContentMessageData,
   QueueMessage,
   QueueType,
@@ -21,6 +22,7 @@ import {
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { CampaignTasksService } from 'src/campaigns/tasks/services/campaignTasks.service'
 import { isAfter, parseISO } from 'date-fns'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { QueueProducerService } from '../producer/queueProducer.service'
@@ -38,6 +40,7 @@ export class QueueConsumerService {
     private readonly viabilityService: ViabilityService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
+    private readonly campaignTasksService: CampaignTasksService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly queueProducerService: QueueProducerService,
   ) {}
@@ -82,7 +85,7 @@ export class QueueConsumerService {
       return false
     }
 
-    const queueMessage: QueueMessage = JSON.parse(message.Body)
+    const queueMessage: QueueMessage = JSON.parse(message.Body) as QueueMessage
     this.logger.log('processing queue message type ', queueMessage.type)
 
     switch (queueMessage.type) {
@@ -108,6 +111,11 @@ export class QueueConsumerService {
         this.logger.log('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         await this.handlePathToVictoryMessage(pathToVictoryMessage)
+        break
+      case QueueType.GENERATE_TASKS:
+        this.logger.log('received generateTasks message')
+        const generateTasksMessage = queueMessage.data as GenerateTasksMessage
+        await this.handleGenerateTasksMessage(generateTasksMessage)
         break
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
         this.logger.log('received tcrComplianceStatusCheck message')
@@ -210,17 +218,19 @@ export class QueueConsumerService {
         {
           campaign: campaign as Campaign & { pathToVictory: PathToVictory },
           pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
-          officeName: p2vResponse.officeName || '',
-          electionDate: p2vResponse.electionDate || '',
-          electionTerm: p2vResponse.electionTerm || 0,
-          electionLevel: p2vResponse.electionLevel || '',
-          electionState: p2vResponse.electionState || '',
-          electionCounty: p2vResponse.electionCounty || '',
-          electionMunicipality: p2vResponse.electionMunicipality || '',
-          subAreaName: p2vResponse.subAreaName,
-          subAreaValue: p2vResponse.subAreaValue,
-          partisanType: p2vResponse.partisanType || '',
-          priorElectionDates: p2vResponse.priorElectionDates || [],
+          officeName: (p2vResponse.officeName as string) || '',
+          electionDate: (p2vResponse.electionDate as string) || '',
+          electionTerm: (p2vResponse.electionTerm as number) || 0,
+          electionLevel: (p2vResponse.electionLevel as string) || '',
+          electionState: (p2vResponse.electionState as string) || '',
+          electionCounty: (p2vResponse.electionCounty as string) || '',
+          electionMunicipality:
+            (p2vResponse.electionMunicipality as string) || '',
+          subAreaName: p2vResponse.subAreaName as string,
+          subAreaValue: p2vResponse.subAreaValue as string,
+          partisanType: (p2vResponse.partisanType as string) || '',
+          priorElectionDates:
+            (p2vResponse.priorElectionDates as string[]) || [],
         },
       )
     } catch (e) {
@@ -330,6 +340,29 @@ export class QueueConsumerService {
           },
         },
       })
+    }
+  }
+
+  private async handleGenerateTasksMessage(message: GenerateTasksMessage) {
+    try {
+      this.logger.log(`Generating tasks for campaign ${message.campaignId}`)
+
+      const campaign = await this.campaignsService.findUniqueOrThrow({
+        where: { id: message.campaignId },
+        include: { pathToVictory: true },
+      })
+
+      await this.campaignTasksService.generateTasks(campaign)
+
+      this.logger.log(
+        `Successfully generated tasks for campaign ${message.campaignId}`,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate tasks for campaign ${message.campaignId}`,
+        error,
+      )
+      throw error
     }
   }
 }

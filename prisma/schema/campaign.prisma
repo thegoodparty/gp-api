@@ -35,13 +35,14 @@ model Campaign {
   campaignPlanVersion   CampaignPlanVersion?
   aiChats               AiChat[]
   ecanvasser            Ecanvasser?
-  completedTaskIds      String[]                @default([]) @map("completed_task_ids")
   ScheduledMessage      ScheduledMessage[]
   tcrCompliance         TcrCompliance?
   voterFileFilters      VoterFileFilter[]
   website               Website?
   outreach              Outreach[]
   communityIssue        CommunityIssue[]
+  campaignTasks         CampaignTask[]
+  campaignPlan          CampaignPlan?
 
   @@index([slug])
   @@map("campaign")
