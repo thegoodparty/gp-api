@@ -78,6 +78,7 @@ export class CampaignTasksService extends createPrismaBase(
 
   async generateTasks(campaign: Campaign) {
     try {
+      await this.generateDefaultTasks(campaign)
       const generatedTasks =
         await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
 
@@ -91,12 +92,22 @@ export class CampaignTasksService extends createPrismaBase(
     }
   }
 
+  async generateDefaultTasks(campaign: Campaign) {
+    const tasks = await this.model.findMany({
+      where: { campaignId: campaign.id },
+    })
+    if (tasks.length > 0) {
+      return
+    }
+    return this.saveTasks(campaign.id, defaultTasks)
+  }
+
   async saveTasks(campaignId: number, tasks: CampaignTask[]) {
     await this.model.deleteMany({
-      where: { campaignId },
+      where: { campaignId, isDefaultTask: false },
     })
 
-    const tasksToCreate = [...defaultTasks, ...tasks].map((task) => ({
+    const tasksToCreate = tasks.map((task) => ({
       campaignId,
       title: task.title,
       description: task.description,

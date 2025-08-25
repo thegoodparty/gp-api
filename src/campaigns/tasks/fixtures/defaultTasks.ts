@@ -9,6 +9,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 205, // so it's always the first task
     flowType: CampaignTaskType.education,
     link: '/dashboard/campaign-details',
+    isDefaultTask: true,
   },
   {
     id: 'default-f47ac10b-58cc-4372-a567-0e02b2c3d479',
@@ -19,6 +20,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 204,
     flowType: CampaignTaskType.education,
     link: '/dashboard/website',
+    isDefaultTask: true,
   },
   {
     id: 'default-f47ac10b-58cc-4372-a567-1asd54d7',
@@ -28,6 +30,7 @@ export const defaultTasks: CampaignTask[] = [
     cta: 'Begin outreach',
     week: 203,
     flowType: CampaignTaskType.education,
+    isDefaultTask: true,
   },
   {
     id: 'default-oiusn2-58cc-4372-a567-1asd54d7',
@@ -37,5 +40,6 @@ export const defaultTasks: CampaignTask[] = [
     week: 202,
     flowType: CampaignTaskType.education,
     link: 'https://goodpartyorg.circle.so/join?invitation_token=ee5c167c12e1335125a5c8dce7c493e95032deb7-a58159ab-64c4-422a-9396-b6925c225952',
+    isDefaultTask: true,
   },
 ]

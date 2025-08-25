@@ -21,6 +21,7 @@ model CampaignTask {
     date                DateTime?
     link                String?
     proRequired         Boolean?         @default(false) @map("pro_required")
+    isDefaultTask       Boolean?         @default(false) @map("is_default_task")
     deadline            Int?
     defaultAiTemplateId String?          @map("default_ai_template_id")
     completed           Boolean          @default(false)
