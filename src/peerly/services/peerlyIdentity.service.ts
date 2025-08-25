@@ -26,12 +26,18 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
-import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
+import {
+  GooglePlacesService
+} from '../../vendors/google/services/google-places.service'
+import {
+  extractAddressComponents
+} from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
-import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import {
+  CreateTcrCompliancePayload
+} from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 import {
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
@@ -268,7 +274,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           : getUserFullName(user),
         general_campaign_email: email,
         verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-        filing_url: filingUrl,
+        filing_url: filingUrl.startsWith('http')
+          ? filingUrl
+          : `https://${filingUrl}`,
         committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
         committee_ein: ein,
         election_date: formatDate(new Date(electionDate!), DateFormats.isoDate),

@@ -1,9 +1,12 @@
 import { createZodDto } from 'nestjs-zod'
-import { DomainSchema } from 'src/shared/schemas'
 import { z } from 'zod'
+import { isFQDN } from 'validator'
 
 export class SearchDomainSchema extends createZodDto(
   z.object({
-    domain: DomainSchema,
+    domain: z.string().refine((v) => isFQDN(v), {
+      message:
+        'Invalid domain format. Must be a Fully Qualified Domain Name (e.g., example.com or foo.example.com)',
+    }),
   }),
 ) {}
