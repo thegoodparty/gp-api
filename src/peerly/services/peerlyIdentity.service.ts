@@ -26,18 +26,25 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
-import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
+import {
+  GooglePlacesService
+} from '../../vendors/google/services/google-places.service'
+import {
+  extractAddressComponents
+} from '../../vendors/google/util/GooglePlaces.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
-import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import {
+  CreateTcrCompliancePayload
+} from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 import {
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
   PEERLY_LOCALITY_CATEGORIES,
   PEERLY_USECASE,
 } from './peerly.const'
+import { getUrlProtocol } from '../../shared/util/strings.util'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -268,7 +275,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           : getUserFullName(user),
         general_campaign_email: email,
         verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-        filing_url: filingUrl.startsWith('http')
+        filing_url: getUrlProtocol(filingUrl)
           ? filingUrl
           : `https://${filingUrl}`,
         committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
