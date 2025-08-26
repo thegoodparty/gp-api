@@ -1,5 +1,5 @@
-import { randomBytes } from 'crypto'
-import { getRandomInt } from './numbers.util'
+import { randomBytes } from "crypto";
+import { getRandomInt } from "./numbers.util";
 
 export const trimMany = (strings: {
   [key: string]: string
@@ -41,4 +41,8 @@ export function capitalizeFirstLetter(str: string): string {
   if (!str || str.length < 2) return str
 
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+}
+export const getUrlProtocol = (url: string) => {
+  const result = url.match(/^https?:\/\//i) // Check if URL is already prefixed with http(s), case-insensitive
+  return result?.[0]?.toLowerCase()
 }
