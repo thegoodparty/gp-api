@@ -99,6 +99,17 @@ export class OutreachController {
     imageUrl: string,
   ) {
     try {
+      if (!image.filename) {
+        throw new BadRequestException(
+          'Image filename is required for P2P outreach',
+        )
+      }
+      if (!image.mimetype) {
+        throw new BadRequestException(
+          'Image MIME type is required for P2P outreach',
+        )
+      }
+
       let imageStream: Readable
       if (image.data instanceof Buffer) {
         imageStream = Readable.from(image.data)
@@ -111,8 +122,8 @@ export class OutreachController {
         listId: createOutreachDto.phoneListId!,
         imageInfo: {
           fileStream: imageStream,
-          fileName: image.filename!,
-          mimeType: image.mimetype!,
+          fileName: image.filename,
+          mimeType: image.mimetype,
           title: createOutreachDto.title,
         },
         scriptText: createOutreachDto.script!,
