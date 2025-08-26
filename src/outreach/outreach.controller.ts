@@ -12,15 +12,17 @@ import {
 import { OutreachService } from './services/outreach.service'
 import { CreateOutreachSchema } from './schemas/createOutreachSchema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
+import { Campaign, OutreachType } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqFile } from '../files/decorators/ReqFiles.decorator'
 import { FileUpload } from '../files/files.types'
 import { FilesService } from 'src/files/files.service'
-import { CampaignTaskType } from '../campaigns/tasks/campaignTasks.types'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { PeerlyP2pJobService } from '../peerly/services/peerlyP2pJob.service'
+import { OutreachStatus } from '@prisma/client'
+import { Readable } from 'stream'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -30,6 +32,7 @@ export class OutreachController {
   constructor(
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
+    private readonly peerlyP2pJobService: PeerlyP2pJobService,
   ) {}
 
   @Post()
@@ -55,9 +58,15 @@ export class OutreachController {
 
     const { outreachType, date } = createOutreachDto
 
-    if (outreachType === CampaignTaskType.text && !image) {
+    if (outreachType === OutreachType.text && !image) {
       throw new BadRequestException(
         'image is required for text outreach campaigns',
+      )
+    }
+
+    if (outreachType === OutreachType.p2p && !image) {
+      throw new BadRequestException(
+        'image is required for P2P outreach campaigns',
       )
     }
 
@@ -68,7 +77,56 @@ export class OutreachController {
         `scheduled-campaign/${campaign.slug}/${outreachType}/${date}`,
       ))
 
+    if (outreachType === OutreachType.p2p) {
+      return this.createP2pOutreach(campaign, createOutreachDto, image!, imageUrl!)
+    }
+
     return this.outreachService.create(createOutreachDto, imageUrl)
+  }
+
+  private async createP2pOutreach(
+    campaign: Campaign,
+    createOutreachDto: CreateOutreachSchema,
+    image: FileUpload,
+    imageUrl: string,
+  ) {
+    try {
+      let imageStream: Readable
+      if (image.data instanceof Buffer) {
+        imageStream = Readable.from(image.data)
+      } else {
+        imageStream = image.data as Readable
+      }
+
+      const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
+        campaignId: campaign.id,
+        listId: createOutreachDto.phoneListId!,
+        imageInfo: {
+          fileStream: imageStream,
+          fileName: image.filename!,
+          mimeType: image.mimetype!,
+          title: createOutreachDto.title,
+        },
+        scriptText: createOutreachDto.script!,
+        identityId: createOutreachDto.identityId!,
+        name: createOutreachDto.name,
+        didState: createOutreachDto.didState,
+      })
+
+      return this.outreachService.create(
+        {
+          ...createOutreachDto,
+          projectId: jobId, 
+          status: OutreachStatus.in_progress,
+        },
+        imageUrl,
+      )
+    } catch (error) {
+      this.logger.error('Failed to create P2P outreach', error)
+      throw new BadRequestException(
+        'Failed to create P2P outreach. Please check your parameters and try again.',
+      )
+    }
   }
 
   @Get()

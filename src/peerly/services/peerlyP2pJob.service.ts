@@ -36,7 +36,12 @@ export class PeerlyP2pJobService {
     private readonly outreachService: OutreachService,
   ) {}
 
-  async createP2pJob(params: CreateP2pJobParams): Promise<void> {
+  /**
+   * Creates a P2P job in Peerly and returns the job ID
+   * @param params - P2P job parameters
+   * @returns Promise<string> - The created job ID
+   */
+  async createPeerlyP2pJob(params: CreateP2pJobParams): Promise<string> {
     const {
       campaignId,
       listId,
@@ -94,21 +99,11 @@ export class PeerlyP2pJobService {
       await this.peerlyP2pSmsService.requestCanvassers(jobId)
       this.logger.log('Canvassers requested successfully')
 
-      // Step 5: Create OUTREACH record in database
-      this.logger.log('Creating OUTREACH record in database')
-      await this.outreachService.create({
-        campaignId,
-        outreachType: OutreachType.text,
-        projectId: jobId,
-        name,
-        status: OutreachStatus.in_progress,
-        script: scriptText,
-      })
-      this.logger.log('OUTREACH record created successfully')
-
       this.logger.log(
         `P2P job creation completed successfully for campaign ${campaignId}`,
       )
+
+      return jobId
     } catch (error) {
       this.logger.error(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED, error)
 
@@ -116,6 +111,39 @@ export class PeerlyP2pJobService {
       // For now, we'll let the error propagate and rely on manual cleanup if needed
 
       throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
+    }
+  }
+
+  /**
+   * @deprecated Use createPeerlyP2pJob() and handle OUTREACH record creation separately
+   * Legacy method that creates both Peerly job and OUTREACH record
+   */
+  async createP2pJob(params: CreateP2pJobParams): Promise<void> {
+    const {
+      campaignId,
+      listId,
+      scriptText,
+      name = P2P_JOB_DEFAULTS.CAMPAIGN_NAME,
+    } = params
+
+    try {
+      // Create the Peerly job
+      const jobId = await this.createPeerlyP2pJob(params)
+
+      // Create OUTREACH record in database
+      this.logger.log('Creating OUTREACH record in database')
+      await this.outreachService.create({
+        campaignId,
+        outreachType: OutreachType.p2p, // Updated to use p2p instead of text
+        projectId: jobId,
+        name,
+        status: OutreachStatus.in_progress,
+        script: scriptText,
+      })
+      this.logger.log('OUTREACH record created successfully')
+    } catch (error) {
+      this.logger.error('Failed to create P2P job with outreach record', error)
+      throw error
     }
   }
 }

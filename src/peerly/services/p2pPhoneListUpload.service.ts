@@ -94,12 +94,12 @@ export class P2pPhoneListUploadService {
   ): Promise<Readable> {
     const customFilters = {
       filters,
-      channel: CHANNELS.PHONE_BANKING,
+      channel: CHANNELS.TEXTING,
       purpose: PURPOSES.GOTV,
     }
 
     const query = typeToQuery(
-      VoterFileType.telemarketing,
+      VoterFileType.sms,
       { ...campaign, pathToVictory: null },
       customFilters,
       false, // not count only

@@ -39,6 +39,7 @@ import { OutreachModule } from '../outreach/outreach.module'
     PeerlyPhoneListService,
     PeerlyMediaService,
     PeerlyP2pSmsService,
+    PeerlyP2pJobService, // Export for use in OutreachModule
   ],
 })
 export class PeerlyModule {}
