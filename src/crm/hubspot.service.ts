@@ -19,13 +19,17 @@ export class HubspotService {
     this._client = new Client({ accessToken: HUBSPOT_TOKEN })
 
     // HubSpot rate limit: 190 requests per 10 seconds (rolling window)
-    // Bottleneck handles this as 19 requests per second with a reservoir of 190
+    // Configuration can be customized via environment variables
     this._rateLimiter = new Bottleneck({
-      reservoir: 190,
-      reservoirRefreshAmount: 190,
-      reservoirRefreshInterval: 10 * 1000, // 10 seconds in milliseconds
-      maxConcurrent: 1,
-      minTime: 1000 / 19, // 1 second / 19 requests = ~52.6ms between requests
+      maxConcurrent: parseInt(process.env.HUBSPOT_MAX_CONCURRENT ?? '5'),
+      minTime: parseInt(process.env.HUBSPOT_MIN_TIME ?? '100'),
+      reservoir: parseInt(process.env.HUBSPOT_RESERVOIR ?? '190'),
+      reservoirRefreshAmount: parseInt(
+        process.env.HUBSPOT_RESERVOIR_REFRESH_AMOUNT ?? '190',
+      ),
+      reservoirRefreshInterval: parseInt(
+        process.env.HUBSPOT_RESERVOIR_REFRESH_INTERVAL ?? '10000',
+      ), // 10 seconds
     })
   }
 
@@ -41,6 +45,40 @@ export class HubspotService {
 
   async throttleRequest<T>(apiCall: () => Promise<T>): Promise<T> {
     return this._rateLimiter.schedule(() => apiCall())
+  }
+
+  async throttleRequestWithPriority<T>(
+    apiCall: () => Promise<T>,
+    priority: number = 5,
+  ): Promise<T> {
+    return this._rateLimiter.schedule({ priority }, () => apiCall())
+  }
+
+  async throttleRequestWithRetry<T>(
+    apiCall: () => Promise<T>,
+    retries: number = 3,
+  ): Promise<T> {
+    let lastError: Error
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await this._rateLimiter.schedule(() => apiCall())
+      } catch (error) {
+        lastError = error as Error
+        if (i === retries - 1) throw lastError
+        // Wait before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)))
+      }
+    }
+    throw lastError!
+  }
+
+  getRateLimiterStats() {
+    return {
+      running: this._rateLimiter.running(),
+      queued: this._rateLimiter.queued(),
+      done: this._rateLimiter.done(),
+      count: this._rateLimiter.counts(),
+    }
   }
 
   get rateLimiter(): Bottleneck {
