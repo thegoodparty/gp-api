@@ -16,16 +16,10 @@ import { ReqCampaign } from '../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../campaigns/decorators/UseCampaign.decorator'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PhoneListState } from './peerly.types'
-import {
-  CheckPhoneListStatusResponseDto
-} from './schemas/p2pPhoneListStatus.schema'
+import { CheckPhoneListStatusResponseDto } from './schemas/p2pPhoneListStatus.schema'
 import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
-import {
-  P2pPhoneListResponseSchema
-} from './schemas/p2pPhoneListResponse.schema'
-import {
-  P2pPhoneListUploadService
-} from './services/p2pPhoneListUpload.service'
+import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
+import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
 import { PeerlyP2pJobService } from './services/peerlyP2pJob.service'
 import {
   CreateP2pJobRequestDto,

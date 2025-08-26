@@ -31,7 +31,7 @@ export class P2pPhoneListUploadService {
     campaign: Campaign,
     request: P2pPhoneListRequestSchema,
   ): Promise<{ token: string; listName: string }> {
-    const { listName, ...filterData } = request
+    const { name: listName, ...filterData } = request
 
     const tcrCompliance = await this.tcrComplianceService.fetchByCampaignId(
       campaign.id,
@@ -83,7 +83,7 @@ export class P2pPhoneListUploadService {
   }
 
   private transformRequestToFilters(
-    filterData: Omit<P2pPhoneListRequestSchema, 'listName'>,
+    filterData: Omit<P2pPhoneListRequestSchema, 'name'>,
   ): CustomFilter[] {
     return mapAudienceFieldsToCustomFilters(filterData)
   }

@@ -45,7 +45,7 @@ export class VoterFileService {
         : (Object.values(CampaignTaskType) as string[]).includes(type as string)
           ? TASK_TO_TYPE_MAP[type as CampaignTaskType]
           : type === OutreachType.p2p
-            ? VoterFileType.sms 
+            ? VoterFileType.sms
             : (type as VoterFileType)
 
     if (countOnly) {

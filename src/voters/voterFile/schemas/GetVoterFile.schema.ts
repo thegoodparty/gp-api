@@ -29,9 +29,9 @@ export class GetVoterFileSchema extends createZodDto(
         return LOWER_CASE_TYPE_MAP[val as string] ?? val
       },
       z.union([
-        z.nativeEnum(VoterFileType), 
+        z.nativeEnum(VoterFileType),
         z.nativeEnum(CampaignTaskType),
-        z.nativeEnum(OutreachType)
+        z.nativeEnum(OutreachType),
       ]),
     ),
     customFilters: parseJsonString(

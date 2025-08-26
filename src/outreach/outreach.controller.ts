@@ -78,7 +78,12 @@ export class OutreachController {
       ))
 
     if (outreachType === OutreachType.p2p) {
-      return this.createP2pOutreach(campaign, createOutreachDto, image!, imageUrl!)
+      return this.createP2pOutreach(
+        campaign,
+        createOutreachDto,
+        image!,
+        imageUrl!,
+      )
     }
 
     return this.outreachService.create(createOutreachDto, imageUrl)
@@ -116,7 +121,7 @@ export class OutreachController {
       return this.outreachService.create(
         {
           ...createOutreachDto,
-          projectId: jobId, 
+          projectId: jobId,
           status: OutreachStatus.in_progress,
         },
         imageUrl,
