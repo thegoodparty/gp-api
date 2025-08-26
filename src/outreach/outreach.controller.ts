@@ -78,11 +78,17 @@ export class OutreachController {
       ))
 
     if (outreachType === OutreachType.p2p) {
+      if (!image) {
+        throw new BadRequestException('Image is required for P2P outreach')
+      }
+      if (!imageUrl) {
+        throw new BadRequestException('Failed to upload image for P2P outreach')
+      }
       return this.createP2pOutreach(
         campaign,
         createOutreachDto,
-        image!,
-        imageUrl!,
+        image,
+        imageUrl,
       )
     }
 

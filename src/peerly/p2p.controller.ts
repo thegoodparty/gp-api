@@ -136,7 +136,7 @@ export class P2pController {
         imageStream = image.data as Readable
       }
 
-      await this.peerlyP2pJobService.createP2pJob({
+      await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         listId: request.listId,
         imageInfo: {
