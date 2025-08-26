@@ -6,7 +6,6 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import Bottleneck from 'bottleneck'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -30,10 +29,6 @@ import {
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
-
-const limiter = new Bottleneck({
-  maxConcurrent: 10,
-})
 
 enum CandidateVerification {
   yes = 'YES',
@@ -523,6 +518,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     if (updateExistingVersion === true) {
       for (let i = 0; i < versions[key].length; i++) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const version = versions[key][i]
         if (
           JSON.stringify(version.inputValues) === JSON.stringify(inputValues)
@@ -546,6 +542,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (updateExistingVersion === false) {
       this.logger.log('adding new version')
       // add new version to the top of the list.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const length = versions[key].unshift(newVersion)
       if (length > 10) {
         versions[key].length = 10
