@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign, OutreachType, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { SlackService } from 'src/shared/services/slack.service'
@@ -44,7 +44,9 @@ export class VoterFileService {
         ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
         : (Object.values(CampaignTaskType) as string[]).includes(type as string)
           ? TASK_TO_TYPE_MAP[type as CampaignTaskType]
-          : (type as VoterFileType)
+          : type === OutreachType.p2p
+            ? VoterFileType.sms
+            : (type as VoterFileType)
 
     if (countOnly) {
       return this.getVoterCount(resolvedType, campaign, customFilters)
