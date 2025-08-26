@@ -58,6 +58,10 @@ export class HubspotService {
     apiCall: () => Promise<T>,
     retries: number = 3,
   ): Promise<T> {
+    if (retries <= 0) {
+      return this._rateLimiter.schedule(() => apiCall())
+    }
+
     let lastError: Error
     for (let i = 0; i < retries; i++) {
       try {
