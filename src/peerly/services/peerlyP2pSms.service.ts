@@ -7,6 +7,7 @@ import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { MediaType } from '../peerly.types'
+import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 
 interface Template {
   title: string
@@ -126,6 +127,29 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
           config,
         ),
       )
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async requestCanvassers(
+    jobId: string,
+    initials: string = P2P_JOB_DEFAULTS.CANVASSER_INITIALS,
+  ): Promise<void> {
+    const body = {
+      requested_initials: initials,
+    }
+
+    try {
+      const config = await this.getBaseHttpHeaders()
+      await lastValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/api/v2/p2p/${jobId}/request_canvassers`,
+          body,
+          config,
+        ),
+      )
+      this.logger.log(`Requested canvassers for job ID: ${jobId}`)
     } catch (error) {
       this.handleApiError(error)
     }

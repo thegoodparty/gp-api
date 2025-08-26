@@ -32,7 +32,6 @@ export class P2pController {
   @Get('phone-list/:token/status')
   @UseCampaign()
   async checkPhoneListStatus(
-    @ReqCampaign() campaign: Campaign,
     @Param('token') token: string,
   ): Promise<CheckPhoneListStatusResponseDto> {
     try {
@@ -87,4 +86,5 @@ export class P2pController {
       throw new BadGatewayException('Failed to upload phone list.')
     }
   }
+
 }

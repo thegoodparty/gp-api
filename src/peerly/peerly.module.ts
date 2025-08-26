@@ -7,10 +7,12 @@ import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PeerlyMediaService } from './services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from './services/peerlyP2pSms.service'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
+import { PeerlyP2pJobService } from './services/peerlyP2pJob.service'
 import { P2pController } from './p2p.controller'
 import { GoogleModule } from '../vendors/google/google.module'
 import { VoterSharedModule } from '../shared/modules/voterShared.module'
 import { CampaignsModule } from '../campaigns/campaigns.module'
+import { OutreachModule } from '../outreach/outreach.module'
 
 @Module({
   imports: [
@@ -19,6 +21,7 @@ import { CampaignsModule } from '../campaigns/campaigns.module'
     GoogleModule,
     VoterSharedModule,
     forwardRef(() => CampaignsModule),
+    forwardRef(() => OutreachModule),
   ],
   controllers: [P2pController],
   providers: [
@@ -28,6 +31,7 @@ import { CampaignsModule } from '../campaigns/campaigns.module'
     PeerlyMediaService,
     PeerlyP2pSmsService,
     P2pPhoneListUploadService,
+    PeerlyP2pJobService,
   ],
   exports: [
     PeerlyAuthenticationService,
@@ -35,6 +39,7 @@ import { CampaignsModule } from '../campaigns/campaigns.module'
     PeerlyPhoneListService,
     PeerlyMediaService,
     PeerlyP2pSmsService,
+    PeerlyP2pJobService, // Export for use in OutreachModule
   ],
 })
 export class PeerlyModule {}
