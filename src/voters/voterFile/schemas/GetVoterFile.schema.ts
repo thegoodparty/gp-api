@@ -9,6 +9,7 @@ import {
 import { ALLOWED_COLUMNS } from '../../constants/allowedColumns.const'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { parseJsonString } from 'src/shared/util/zod.util'
+import { OutreachType } from '@prisma/client'
 
 const LOWER_CASE_TYPE_MAP = {
   doorknocking: VoterFileType.doorKnocking,
@@ -27,7 +28,11 @@ export class GetVoterFileSchema extends createZodDto(
         // check if val is a lowercase version
         return LOWER_CASE_TYPE_MAP[val as string] ?? val
       },
-      z.union([z.nativeEnum(VoterFileType), z.nativeEnum(CampaignTaskType)]),
+      z.union([
+        z.nativeEnum(VoterFileType), 
+        z.nativeEnum(CampaignTaskType),
+        z.nativeEnum(OutreachType)
+      ]),
     ),
     customFilters: parseJsonString(
       z
