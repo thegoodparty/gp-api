@@ -54,9 +54,11 @@ export class CrmCampaignsService {
 
   async getCrmCompanyById(hubspotId: string) {
     try {
-      return await this.hubspot.client.crm.companies.basicApi.getById(
-        hubspotId,
-        HUBSPOT_COMPANY_PROPERTIES,
+      return await this.hubspot.throttleRequest(() =>
+        this.hubspot.client.crm.companies.basicApi.getById(
+          hubspotId,
+          HUBSPOT_COMPANY_PROPERTIES,
+        ),
       )
     } catch (error) {
       const message = 'hubspot error - get-company-by-id'
@@ -70,8 +72,8 @@ export class CrmCampaignsService {
 
   private async getCompanyOwner(companyOwnerId: number) {
     try {
-      return await this.hubspot.client.crm.owners.ownersApi.getById(
-        companyOwnerId,
+      return await this.hubspot.throttleRequest(() =>
+        this.hubspot.client.crm.owners.ownersApi.getById(companyOwnerId),
       )
     } catch (error) {
       const message = 'hubspot error - get-company-owner'
@@ -109,9 +111,11 @@ export class CrmCampaignsService {
   private async createCompany(companyObj: CRMCompanyProperties) {
     let crmCompany: SimplePublicObject | null = null
     try {
-      crmCompany = await this.hubspot.client.crm.companies.basicApi.create({
-        properties: companyObj,
-      })
+      crmCompany = await this.hubspot.throttleRequest(() =>
+        this.hubspot.client.crm.companies.basicApi.create({
+          properties: companyObj,
+        }),
+      )
     } catch (error) {
       this.logger.error('error creating company', error)
       this.slack.errorMessage({
@@ -139,9 +143,10 @@ export class CrmCampaignsService {
     let crmCompany: SimplePublicObject
 
     try {
-      crmCompany = await this.hubspot.client.crm.companies.basicApi.update(
-        hubspotId,
-        { properties: crmCompanyProperties },
+      crmCompany = await this.hubspot.throttleRequest(() =>
+        this.hubspot.client.crm.companies.basicApi.update(hubspotId, {
+          properties: crmCompanyProperties,
+        }),
       )
     } catch (e) {
       const { candidate_name: name } = crmCompanyProperties
@@ -394,10 +399,8 @@ export class CrmCampaignsService {
     }
 
     try {
-      await this.hubspot.client.crm.associations.v4.batchApi.create(
-        '0-2',
-        '0-1',
-        {
+      await this.hubspot.throttleRequest(() =>
+        this.hubspot.client.crm.associations.v4.batchApi.create('0-2', '0-1', {
           inputs: [
             {
               _from: { id: crmCompanyId },
@@ -411,7 +414,7 @@ export class CrmCampaignsService {
               ],
             },
           ],
-        },
+        }),
       )
     } catch (error) {
       this.logger.error({
@@ -725,15 +728,19 @@ export class CrmCampaignsService {
 
     return includeAll
       ? crmCompanyProperties
-      : fields.reduce((acc, field) => {
-          if (
-            crmCompanyProperties[field] ||
-            crmCompanyProperties[field] === null
-          ) {
-            acc[field] = crmCompanyProperties[field]
-          }
-          return acc
-        }, {})
+      : fields.reduce(
+          (acc: Record<string, string | number | undefined>, field) => {
+            if (
+              crmCompanyProperties[field] ||
+              crmCompanyProperties[field] === null
+            ) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              acc[field] = crmCompanyProperties[field]
+            }
+            return acc
+          },
+          {},
+        )
   }
 
   private async updateHubSpotCompaniesBatch(
@@ -744,9 +751,11 @@ export class CrmCampaignsService {
     }
 
     try {
-      const updates = await this.hubspot.client.crm.companies.batchApi.update({
-        inputs: companyUpdateObjects,
-      })
+      const updates = await this.hubspot.throttleRequest(() =>
+        this.hubspot.client.crm.companies.batchApi.update({
+          inputs: companyUpdateObjects,
+        }),
+      )
       const updatedCount = updates?.results?.length || 0
       this.logger.log(`Batch completed: ${updatedCount} companies updated`)
       return updatedCount
