@@ -65,6 +65,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       account_id: this.accountNumber,
       name,
       templates,
+      did_state: didState,
       can_use_mms: hasMms,
       ...(identityId && { identity_id: identityId }),
     }
