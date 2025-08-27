@@ -1,21 +1,21 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
+import { Campaign, OutreachType, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
+import { SlackService } from 'src/shared/services/slack.service'
+import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
+import { SlackChannel } from '../../shared/services/slackService.types'
+import { VoterDatabaseService } from '../services/voterDatabase.service'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
+import { HelpMessageSchema } from './schemas/HelpMessage.schema'
+import { buildSlackBlocks } from './util/slack.util'
+import { typeToQuery } from './util/voterFile.util'
 import {
   CHANNEL_TO_TYPE_MAP,
   TASK_TO_TYPE_MAP,
   VoterFileType,
 } from './voterFile.types'
-import { typeToQuery } from './util/voterFile.util'
-import { VoterDatabaseService } from '../services/voterDatabase.service'
-import { Campaign, User } from '@prisma/client'
-import { SlackService } from 'src/shared/services/slack.service'
-import { IS_PROD } from 'src/shared/util/appEnvironment.util'
-import { buildSlackBlocks } from './util/slack.util'
-import { HelpMessageSchema } from './schemas/HelpMessage.schema'
-import { SlackChannel } from '../../shared/services/slackService.types'
-import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 
 @Injectable()
 export class VoterFileService {
@@ -40,11 +40,13 @@ export class VoterFileService {
   ) {
     // Resolve type once at the beginning
     const resolvedType: VoterFileType =
-      type === 'custom' && customFilters?.channel
+      type === VoterFileType.custom && customFilters?.channel
         ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
-        : Object.values(CampaignTaskType).includes(type as CampaignTaskType)
-          ? TASK_TO_TYPE_MAP[type]
-          : type
+        : (Object.values(CampaignTaskType) as string[]).includes(type as string)
+          ? TASK_TO_TYPE_MAP[type as CampaignTaskType]
+          : type === OutreachType.p2p
+            ? VoterFileType.sms
+            : (type as VoterFileType)
 
     if (countOnly) {
       return this.getVoterCount(resolvedType, campaign, customFilters)

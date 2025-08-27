@@ -576,3 +576,49 @@ initial_file_upload=@/path/to/1080-31sec-test.mp4
 ### Responses
 - **201**: Success (check `status` field for `"ERROR"` if creation fails)
 - **400**: Bad Request
+
+---
+
+## Request Canvassers
+**POST** `https://app.peerly.com/api/v2/p2p/{id}/request_canvassers`
+
+API endpoint to request initial canvassers for a P2P SMS job.
+
+### Overview
+This endpoint allows for a request for initial canvassers on a job. The request will be immediately reviewed by our team, and once approved, the job will be updated to show that canvassers are scheduled.
+
+### Path Parameters
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | string | Yes      | ID of the P2P SMS job to request canvassers for. |
+
+### Body Parameters
+| Parameter            | Type   | Required | Description |
+|---------------------|--------|----------|-------------|
+| `requested_initials` | string | Yes      | User's first and last initials for the canvasser request. |
+
+### Example Request
+
+Headers:
+- `Authorization: JWT <token>`
+- `Accept: application/json`
+- `Content-Type: application/json`
+
+```json
+{
+  "requested_initials": "JD"
+}
+```
+
+### Example Success Response (`200`)
+```json
+{
+  "message": "Canvasser request submitted successfully",
+  "job_id": "12345",
+  "status": "pending_review"
+}
+```
+
+### Responses
+- **200**: Success
+- **400**: Bad Request

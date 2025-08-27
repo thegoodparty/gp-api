@@ -11,8 +11,8 @@ import {
   OnboardingStep,
   VoterGoals,
 } from 'src/campaigns/campaigns.types'
-import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
 import { HubSpot } from 'src/crm/crm.types'
+import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
 
 export {}
 
@@ -67,6 +67,7 @@ declare global {
       electionId?: string | null
       tier?: string
       einNumber?: string | null
+      wonGeneral?: boolean
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
     //  No reason to have both.

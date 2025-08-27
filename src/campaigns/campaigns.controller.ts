@@ -393,17 +393,4 @@ export class CampaignsController {
       },
     })
   }
-
-  // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
-  @Post('missing-win-numbers/update')
-  @Roles(UserRole.admin)
-  async updateMissingWinNumbers(
-    @Body() body?: { pageSize?: number; loopLimit?: number },
-  ) {
-    // No need to await
-    this.campaigns.updateMissingWinNumbers(
-      body?.pageSize ?? 500,
-      body?.loopLimit ?? 1000,
-    )
-  }
 }

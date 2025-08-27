@@ -1,13 +1,32 @@
 import { Logger } from '@nestjs/common'
+import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
   CustomFilter,
   CustomVoterFile,
   VoterFileType,
 } from '../voterFile.types'
-import { CampaignWith } from 'src/campaigns/campaigns.types'
-import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 
 const logger = new Logger('Voter File Utils')
+
+const VOTER_FILE_LATEST_EVEN_YEAR = Number(
+  process.env.VOTER_FILE_LATEST_EVEN_YEAR,
+)
+const VOTER_FILE_LATEST_ODD_YEAR = Number(
+  process.env.VOTER_FILE_LATEST_ODD_YEAR,
+)
+
+const VOTER_FILE_YEARS_LENGTH = Number(process.env.VOTER_FILE_YEARS_LENGTH)
+
+if (
+  !VOTER_FILE_LATEST_EVEN_YEAR ||
+  !VOTER_FILE_LATEST_ODD_YEAR ||
+  !VOTER_FILE_YEARS_LENGTH
+) {
+  throw new Error(
+    'Please update your .env with VOTER_FILE_LATEST_EVEN_YEAR, VOTER_FILE_LATEST_ODD_YEAR and VOTER_FILE_YEARS_LENGTH',
+  )
+}
 
 export function typeToQuery(
   type: VoterFileType,
@@ -19,6 +38,12 @@ export function typeToQuery(
   limit?: number,
 ) {
   const state = campaign.details.state
+  const electionDate: string | undefined = campaign.details?.electionDate
+  const electionYear = electionDate
+    ? Number(String(electionDate).slice(0, 4))
+    : undefined
+  const isEvenElectionYear =
+    typeof electionYear === 'number' ? electionYear % 2 === 0 : true
   let whereClause = ''
   let nestedWhereClause = ''
   let l2ColumnName = campaign.pathToVictory?.data.electionType
@@ -87,15 +112,39 @@ export function typeToQuery(
     "Mailing_Families_FamilyID",
     "Mailing_Families_HHCount",
     "Mailing_HHParties_Description",
-    "MilitaryStatus_Description",
-    "General_2022",
-    "General_2020",
-    "General_2018",
-    "General_2016",
-    "Primary_2022",
-    "Primary_2020",
-    "Primary_2018",
-    "Primary_2016"`
+    "MilitaryStatus_Description"`
+
+    const buildYearColumns = (latest: number) => {
+      const years: number[] = []
+      for (let y = latest; years.length < VOTER_FILE_YEARS_LENGTH; y -= 2)
+        years.push(y)
+      return years
+    }
+
+    const generalYears = buildYearColumns(
+      isEvenElectionYear
+        ? VOTER_FILE_LATEST_EVEN_YEAR
+        : VOTER_FILE_LATEST_ODD_YEAR,
+    )
+    const primaryYears = generalYears
+
+    const generalCols = generalYears
+      .map((y) =>
+        isEvenElectionYear ? `"General_${y}"` : `"AnyElection_${y}"`,
+      )
+      .join(', ')
+    const primaryCols = isEvenElectionYear
+      ? primaryYears.map((y) => `"Primary_${y}"`).join(', ')
+      : ''
+
+    const columnsSuffix = isEvenElectionYear
+      ? `,
+    ${generalCols},
+    ${primaryCols}`
+      : `,
+    ${generalCols}`
+
+    columns += columnsSuffix
   } else {
     columns = `"LALVOTERID", 
     "Voters_FirstName", 

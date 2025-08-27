@@ -69,13 +69,14 @@ export class CampaignTcrComplianceController {
     }
     const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
       tcrComplianceDto
-    const { ein } = tcrComplianceCreatePayload
+    const { ein, committeeName } = tcrComplianceCreatePayload
     const user = await this.userService.findByCampaign(campaign)
     const updatedCampaign = await this.campaignsService.updateJsonFields(
       campaign.id,
       {
         details: {
           einNumber: ein,
+          campaignCommittee: committeeName,
         },
         placeId,
         formattedAddress,
