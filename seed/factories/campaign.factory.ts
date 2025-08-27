@@ -60,7 +60,6 @@ export const campaignFactory = generateFactory<Campaign>(() => {
       },
     },
     vendorTsData: {},
-    completedTaskIds: [],
     canDownloadFederal: faker.datatype.boolean(0.3),
   }
 

@@ -21,6 +21,15 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import {
+  QueueProducerService,
+  MessageGroup,
+} from 'src/queue/producer/queueProducer.service'
+import {
+  GenerateTasksMessage,
+  QueueMessage,
+  QueueType,
+} from 'src/queue/queue.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
@@ -53,6 +62,7 @@ export class CampaignsController {
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
     private readonly analytics: AnalyticsService,
+    private readonly queueProducerService: QueueProducerService,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -312,7 +322,8 @@ export class CampaignsController {
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
-    return this.campaigns.updateJsonFields(campaign.id, {
+
+    const res = this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
@@ -326,6 +337,20 @@ export class CampaignsController {
         districtManuallySet: false,
       },
     })
+
+    const taskGenerationMessage: QueueMessage = {
+      type: QueueType.GENERATE_TASKS,
+      data: {
+        campaignId: campaign.id,
+      } as GenerateTasksMessage,
+    }
+
+    await this.queueProducerService.sendMessage(
+      taskGenerationMessage,
+      MessageGroup.default,
+    )
+
+    return res
   }
 
   @Put('admin/:slug/race-target-details')
