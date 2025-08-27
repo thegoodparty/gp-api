@@ -73,7 +73,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     try {
       const config = await this.getBaseHttpHeaders()
       const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/api/1to1/jobs`, body, config),
+        this.httpService.post(`${this.baseUrl}/1to1/jobs`, body, config),
       )
 
       const validated = this.validateCreateJobResponse(response.data)
@@ -122,7 +122,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       const config = await this.getBaseHttpHeaders()
       await lastValueFrom(
         this.httpService.post(
-          `${this.baseUrl}/api/1to1/jobs/${jobId}/assignlist`,
+          `${this.baseUrl}/1to1/jobs/${jobId}/assignlist`,
           body,
           config,
         ),
@@ -144,7 +144,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       const config = await this.getBaseHttpHeaders()
       await lastValueFrom(
         this.httpService.post(
-          `${this.baseUrl}/api/v2/p2p/${jobId}/request_canvassers`,
+          `${this.baseUrl}/v2/p2p/${jobId}/request_canvassers`,
           body,
           config,
         ),

@@ -110,9 +110,9 @@ export class OutreachController {
         )
       }
 
-      let imageStream: Readable
+      let imageStream: Readable | Buffer
       if (image.data instanceof Buffer) {
-        imageStream = Readable.from(image.data)
+        imageStream = image.data
       } else {
         imageStream = image.data as Readable
       }
