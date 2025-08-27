@@ -1,7 +1,7 @@
 import {
   BadGatewayException,
-  Injectable,
   BadRequestException,
+  Injectable,
 } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
@@ -12,9 +12,9 @@ import { format } from '@redtea/format-axios-error'
 import { Readable } from 'stream'
 import FormData from 'form-data'
 import {
-  UploadPhoneListResponseDto,
-  PhoneListStatusResponseDto,
   PhoneListDetailsResponseDto,
+  PhoneListStatusResponseDto,
+  UploadPhoneListResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
@@ -93,7 +93,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
         ...form.getHeaders(),
       }
       const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/api/phonelists`, form, {
+        this.httpService.post(`${this.baseUrl}/phonelists`, form, {
           headers,
           timeout: this.httpTimeoutMs,
           maxBodyLength: MAX_FILE_SIZE,
@@ -122,7 +122,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       const config = await this.getBaseHttpHeaders()
       const response = await lastValueFrom(
         this.httpService.get(
-          `${this.baseUrl}/api/phonelists/${token}/checkstatus`,
+          `${this.baseUrl}/phonelists/${token}/checkstatus`,
           config,
         ),
       )
@@ -139,10 +139,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     try {
       const config = await this.getBaseHttpHeaders()
       const response = await lastValueFrom(
-        this.httpService.get(
-          `${this.baseUrl}/api/phonelists/${listId}`,
-          config,
-        ),
+        this.httpService.get(`${this.baseUrl}/phonelists/${listId}`, config),
       )
 
       return this.validateDetailsResponse(response.data)
