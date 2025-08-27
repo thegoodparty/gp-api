@@ -1,5 +1,3 @@
-import { CampaignTaskType } from '@prisma/client'
-
 export interface StartCampaignPlanRequest {
   candidate_name: string
   election_date: string
@@ -42,59 +40,41 @@ export interface ProgressStreamData {
 }
 
 export interface CampaignPlanTask {
-  date: string
-  parsed_date: string | null
   title: string
   description: string
-  category: CampaignTaskType
   cta: string
-  link: string | null
-  pro_required: boolean
-  deadline: number | null
-  defaultAiTemplateId: string | null
+  flowType: string
+  week?: number
+  proRequired: boolean
+  defaultAiTemplateId?: string
+  date: string
+  deadline?: number
 }
 
-export interface CampaignPlanSections {
-  overview: string
-  strategic_landscape_electoral_goals: string
-  campaign_timeline: string
-  recommended_total_budget: string
-  know_your_community: string
-  voter_contact_plan: string
-}
-
-export interface CampaignPlanTasks {
-  timeline: CampaignPlanTask[]
-  voter_contact: CampaignPlanTask[]
-  all_tasks: CampaignPlanTask[]
-  total_count: number
-}
-
-export interface CampaignPlanMetadata {
-  format_version: string
-  extraction_date: string
-  sections_count: number
-  total_tasks: number
+export interface CampaignPlanTaskMetadata {
+  generation_timestamp: string
+  statistics: {
+    total_tasks: number
+    ai_generated_tasks: number
+    static_tasks: number
+    by_flow_type: Record<string, number>
+    by_source: Record<string, number>
+    by_week: Record<string, number>
+    with_templates: number
+    pro_required: number
+    date_range: {
+      earliest: string
+      latest: string
+    }
+  }
 }
 
 export interface CampaignPlanResponse {
-  campaign_info: {
-    candidate_name: string
-    office_and_jurisdiction: string
-    election_date: string
-    primary_date: string | null
-    race_type: string
-    incumbent_status: string
-    seats_available: number
-    number_of_opponents: number
-    win_number: number
-    total_likely_voters: number
-    available_cell_phones: number
-    available_landlines: number
-    additional_race_context: string
-    generated_date: string
-  }
-  sections: CampaignPlanSections
-  tasks: CampaignPlanTasks
-  metadata: CampaignPlanMetadata
+  campaign_plan: string
+  candidate_name: string
+  election_date: string
+  office_and_jurisdiction: string
+  generation_timestamp: string
+  ai_tasks: CampaignPlanTask[]
+  task_metadata: CampaignPlanTaskMetadata
 }

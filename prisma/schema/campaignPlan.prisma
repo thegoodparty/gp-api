@@ -4,13 +4,7 @@ model CampaignPlan {
     updatedAt DateTime @updatedAt @map("updated_at")
 
     campaignInfoHash String @map("campaign_info_hash")
-
-    overview                         String?
-    strategicLandscapeElectoralGoals String? @map("strategic_landscape_electoral_goals")
-    campaignTimeline                 String? @map("campaign_timeline")
-    recommendedTotalBudget           String? @map("recommended_total_budget")
-    knowYourCommunity                String? @map("know_your_community")
-    voterContactPlan                 String? @map("voter_contact_plan")
+    plan             String
 
     rawJson Json? @map("raw_json")
 

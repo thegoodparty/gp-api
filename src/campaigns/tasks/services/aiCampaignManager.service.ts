@@ -14,9 +14,7 @@ export {
   ProgressStreamData,
   CampaignPlanResponse,
   CampaignPlanTask,
-  CampaignPlanSections,
-  CampaignPlanTasks,
-  CampaignPlanMetadata,
+  CampaignPlanTaskMetadata,
 } from '../aiCampaignManager.types'
 
 @Injectable()
