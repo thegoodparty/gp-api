@@ -7,6 +7,7 @@ import {
 } from '../../../shared/schemas'
 import { createZodDto } from 'nestjs-zod'
 import { MatchingContactFieldType } from '@prisma/client'
+import { urlIncludesPath } from '../../../shared/util/strings.util'
 
 export class CreateTcrComplianceDto extends createZodDto(
   z.object({
@@ -15,7 +16,10 @@ export class CreateTcrComplianceDto extends createZodDto(
     formattedAddress: z.string(),
     committeeName: z.string(),
     websiteDomain: UrlOrDomainSchema,
-    filingUrl: UrlOrDomainSchema,
+    filingUrl: UrlOrDomainSchema.refine(urlIncludesPath, {
+      message:
+        'Filing URL must include path (e.g. https://example.com/filing, not just https://example.com)',
+    }),
     email: WriteEmailSchema,
     phone: PhoneSchema,
     matchingContactFields: z

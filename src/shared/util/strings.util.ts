@@ -1,5 +1,5 @@
-import { randomBytes } from "crypto";
-import { getRandomInt } from "./numbers.util";
+import { randomBytes } from 'crypto'
+import { getRandomInt } from './numbers.util'
 
 export const trimMany = (strings: {
   [key: string]: string
@@ -46,3 +46,10 @@ export const getUrlProtocol = (url: string) => {
   const result = url.match(/^https?:\/\//i) // Check if URL is already prefixed with http(s), case-insensitive
   return result?.[0]?.toLowerCase()
 }
+
+export const ensureUrlHasProtocol = (url: string) =>
+  getUrlProtocol(url) ? url : `https://${url}`
+
+export const urlIncludesPath = (urlStr: string): boolean =>
+  // optional protocol, but must have path (e.g. http://example.com/path not just http://example.com)
+  /^(https?:\/\/)?[^\/\s]+\/[^\/\s]+.*$/i.test(urlStr)
