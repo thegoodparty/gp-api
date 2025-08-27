@@ -8,9 +8,10 @@ import { FilesModule } from '../files/files.module'
 import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PaymentsModule } from '../payments/payments.module'
+import { PeerlyModule } from '../peerly/peerly.module'
 
 @Module({
-  imports: [HttpModule, EmailModule, FilesModule, PaymentsModule],
+  imports: [HttpModule, EmailModule, FilesModule, PaymentsModule, PeerlyModule],
   controllers: [OutreachController],
   providers: [OutreachService, OutreachPurchaseHandlerService],
   exports: [OutreachService, OutreachPurchaseHandlerService],

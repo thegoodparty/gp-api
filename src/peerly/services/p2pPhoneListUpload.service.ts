@@ -13,7 +13,7 @@ import {
 import { typeToQuery } from '../../voters/voterFile/util/voterFile.util'
 import {
   mapAudienceFieldsToCustomFilters,
-  VOTER_CSV_COLUMN_MAPPINGS,
+  P2P_CSV_COLUMN_MAPPINGS,
 } from '../utils/audienceMapping.util'
 import { Readable } from 'stream'
 
@@ -31,7 +31,7 @@ export class P2pPhoneListUploadService {
     campaign: Campaign,
     request: P2pPhoneListRequestSchema,
   ): Promise<{ token: string; listName: string }> {
-    const { listName, ...filterData } = request
+    const { name: listName, ...filterData } = request
 
     const tcrCompliance = await this.tcrComplianceService.fetchByCampaignId(
       campaign.id,
@@ -83,7 +83,7 @@ export class P2pPhoneListUploadService {
   }
 
   private transformRequestToFilters(
-    filterData: Omit<P2pPhoneListRequestSchema, 'listName'>,
+    filterData: Omit<P2pPhoneListRequestSchema, 'name'>,
   ): CustomFilter[] {
     return mapAudienceFieldsToCustomFilters(filterData)
   }
@@ -94,17 +94,17 @@ export class P2pPhoneListUploadService {
   ): Promise<Readable> {
     const customFilters = {
       filters,
-      channel: CHANNELS.PHONE_BANKING,
+      channel: CHANNELS.TEXTING,
       purpose: PURPOSES.GOTV,
     }
 
     const query = typeToQuery(
-      VoterFileType.telemarketing,
+      VoterFileType.sms,
       { ...campaign, pathToVictory: null },
       customFilters,
       false, // not count only
       false, // not fix columns
-      VOTER_CSV_COLUMN_MAPPINGS,
+      P2P_CSV_COLUMN_MAPPINGS,
     )
 
     this.logger.debug('Generated P2P phone list query:', query)
@@ -112,7 +112,7 @@ export class P2pPhoneListUploadService {
     const streamableFile = await this.voterDatabaseService.csvStream(
       query,
       'phone-list',
-      VOTER_CSV_COLUMN_MAPPINGS,
+      P2P_CSV_COLUMN_MAPPINGS,
     )
 
     const stream = streamableFile.getStream()
