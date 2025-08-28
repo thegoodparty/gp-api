@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { StripeService } from '../../stripe/services/stripe.service'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'

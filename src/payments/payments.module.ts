@@ -6,7 +6,7 @@ import { PurchaseService } from './services/purchase.service'
 import { EmailModule } from '../email/email.module'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { UsersModule } from '../users/users.module'
-import { StripeModule } from 'src/stripe/stripe.module'
+import { StripeModule } from 'src/vendors/stripe/stripe.module'
 import { PaymentsService } from './services/payments.service'
 
 @Module({

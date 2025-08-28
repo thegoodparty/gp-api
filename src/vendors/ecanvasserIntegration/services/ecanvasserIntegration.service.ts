@@ -8,7 +8,7 @@ import {
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CreateEcanvasserSchema } from '../schemas/createEcanvasser.schema'
 import { UpdateEcanvasserSchema } from '../schemas/updateEcanvasser.schema'
-import { CampaignsService } from '../../campaigns/services/campaigns.service'
+import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
 import slugify from 'slugify'
 import { EcanvasserSummary } from '../ecanvasserIntegration.types'

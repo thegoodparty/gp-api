@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
-import { SegmentModule } from 'src/segment/segment.module'
+import { SegmentModule } from 'src/vendors/segment/segment.module'
 import { AiModule } from '../ai/ai.module'
 import { ElectionsModule } from '../elections/elections.module'
 import { EmailModule } from '../email/email.module'

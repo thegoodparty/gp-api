@@ -4,16 +4,16 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common'
-import { AwsRoute53Service } from 'src/aws/services/awsRoute53.service'
+import { AwsRoute53Service } from 'src/vendors/aws/services/awsRoute53.service'
 import { DomainStatus, User } from '@prisma/client'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
-import { VercelService } from 'src/vercel/services/vercel.service'
+import { VercelService } from 'src/vendors/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
 import { PaymentStatus, PaymentType } from 'src/payments/payments.types'
-import { StripeService } from 'src/stripe/services/stripe.service'
+import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
-import { GP_DOMAIN_CONTACT } from 'src/vercel/vercel.const'
+import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { DomainPurchaseMetadata } from '../domains.types' // Enum for domain operation statuses
 
