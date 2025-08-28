@@ -6,17 +6,27 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
-import { MediaType } from '../peerly.types'
 import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 
 interface Template {
+  is_default: boolean
   title: string
   text: string
   advanced?: {
-    media: {
-      media_id: string
-      media_type: MediaType
-    }
+    show_stop: boolean
+    organization?: string
+    bodies?: Array<{
+      text: string
+    }>
+    call_to_actions?: Array<{
+      text: string
+      url?: string
+    }>
+  }
+  media?: {
+    media_type: string
+    media_id: string
+    title: string
   }
 }
 
@@ -42,6 +52,12 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       'Failed to communicate with Peerly API',
       isAxiosResponse(error) ? format(error) : error,
     )
+    // Also log the full error response if available
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (isAxiosResponse(error) && (error as any).response?.data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.logger.error('Peerly API error response:', JSON.stringify((error as any).response.data, null, 2))
+    }
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }
 
@@ -59,7 +75,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
   async createJob(params: CreateJobParams): Promise<string> {
     const { name, templates, didState, identityId } = params
-    const hasMms = templates.some((t) => !!t.advanced?.media)
+    const hasMms = templates.some((t) => !!t.media)
 
     const body = {
       account_id: this.accountNumber,
@@ -67,6 +83,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       templates,
       did_state: didState,
       can_use_mms: hasMms,
+      schedule_id: P2P_JOB_DEFAULTS.SCHEDULE_ID,
       ...(identityId && { identity_id: identityId }),
     }
 

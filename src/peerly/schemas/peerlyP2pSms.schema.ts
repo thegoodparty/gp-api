@@ -2,7 +2,7 @@ import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 
 const createJobResponseSchema = z.object({
-  agents: z.array(z.any()).optional(),
+  agents: z.union([z.array(z.any()), z.record(z.any())]).optional(),
   name: z.string(),
   status: z.string(),
   templates: z.array(

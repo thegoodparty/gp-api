@@ -272,10 +272,26 @@ export class VoterOutreachService {
         countOnly: false,
       })
 
-      // Extract the stream from StreamableFile
-      let csvStream: Readable
+      // Extract the stream from StreamableFile and convert to buffer
+      let csvBuffer: Buffer
       if (csvResult instanceof StreamableFile) {
-        csvStream = csvResult.getStream() as Readable
+        const csvStream = csvResult.getStream() as Readable
+        const chunks: Buffer[] = []
+        
+        csvBuffer = await new Promise((resolve, reject) => {
+          csvStream.on('data', (chunk) => {
+            chunks.push(Buffer.from(chunk))
+          })
+          
+          csvStream.on('end', () => {
+            const csvData = Buffer.concat(chunks)
+            resolve(csvData)
+          })
+          
+          csvStream.on('error', (error) => {
+            reject(error)
+          })
+        })
       } else {
         throw new Error('Expected StreamableFile from voter file service')
       }
@@ -283,7 +299,7 @@ export class VoterOutreachService {
       this.logger.log('Uploading phone list...')
       const listStatus = await this.phoneListService.uploadPhoneList({
         listName: `${jobName} - ${new Date().toISOString()}`,
-        csvStream,
+        csvBuffer,
         identityId,
       })
 
@@ -297,17 +313,20 @@ export class VoterOutreachService {
       const templates = messageTemplates.map((template, index) => {
         const mediaId = templateMediaMap.get(index)
         return {
+          is_default: index === 0,
           title: template.title,
           text: template.text,
+          advanced: {
+            show_stop: false,
+          },
           ...(mediaId &&
             template.mediaStream && {
-              advanced: {
-                media: {
-                  media_id: mediaId,
-                  media_type: template.mediaStream.mimeType.startsWith('video/')
-                    ? MediaType.VIDEO
-                    : MediaType.IMAGE,
-                },
+              media: {
+                media_type: template.mediaStream.mimeType.startsWith('video/')
+                  ? 'VIDEO'
+                  : 'IMAGE',
+                media_id: mediaId,
+                title: template.title || 'Default Media Title',
               },
             }),
         }

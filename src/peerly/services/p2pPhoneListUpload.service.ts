@@ -45,12 +45,12 @@ export class P2pPhoneListUploadService {
 
     const filters = this.transformRequestToFilters(filterData)
 
-    let csvStream: Readable
+    let csvBuffer: Buffer
     try {
-      csvStream = await this.generatePhoneListCsvStream(campaign, filters)
+      csvBuffer = await this.generatePhoneListCsvStream(campaign, filters)
     } catch (error) {
       this.logger.error(
-        `Failed to generate CSV stream for campaign ${campaign.id}:`,
+        `Failed to generate CSV buffer for campaign ${campaign.id}:`,
         error,
       )
       throw new BadRequestException(
@@ -62,7 +62,7 @@ export class P2pPhoneListUploadService {
     try {
       token = await this.peerlyPhoneListService.uploadPhoneListToken({
         listName,
-        csvStream,
+        csvBuffer,
         identityId: tcrCompliance.peerlyIdentityId,
       })
     } catch (error) {
@@ -91,7 +91,7 @@ export class P2pPhoneListUploadService {
   private async generatePhoneListCsvStream(
     campaign: Campaign,
     filters: CustomFilter[],
-  ): Promise<Readable> {
+  ): Promise<Buffer> {
     const customFilters = {
       filters,
       channel: CHANNELS.TEXTING,
@@ -109,19 +109,37 @@ export class P2pPhoneListUploadService {
 
     this.logger.debug('Generated P2P phone list query:', query)
 
-    const streamableFile = await this.voterDatabaseService.csvStream(
+    const stream = await this.voterDatabaseService.csvReadableStream(
       query,
-      'phone-list',
       P2P_CSV_COLUMN_MAPPINGS,
     )
 
-    const stream = streamableFile.getStream()
     if (!(stream instanceof Readable)) {
       throw new Error(
-        'Expected Readable stream from csvStream but received different type',
+        'Expected Readable stream from csvReadableStream but received different type',
       )
     }
 
-    return stream
+    // Collect the stream data into a buffer to ensure FormData can consume it properly
+    const chunks: Buffer[] = []
+    
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk) => {
+        chunks.push(Buffer.from(chunk))
+      })
+      
+      stream.on('end', () => {
+        const csvData = Buffer.concat(chunks)
+        this.logger.debug(`Collected ${csvData.length} bytes of CSV data`)
+        
+        // Return the buffer directly instead of creating a stream
+        resolve(csvData)
+      })
+      
+      stream.on('error', (error) => {
+        this.logger.error('Error collecting CSV stream data:', error)
+        reject(error)
+      })
+    })
   }
 }

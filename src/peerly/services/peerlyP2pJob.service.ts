@@ -2,7 +2,6 @@ import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
 import { OutreachService } from '../../outreach/services/outreach.service'
-import { MediaType } from '../peerly.types'
 import { Readable } from 'stream'
 import {
   P2P_JOB_DEFAULTS,
@@ -66,13 +65,22 @@ export class PeerlyP2pJobService {
         name,
         templates: [
           {
+            is_default: true,
             title: P2P_JOB_DEFAULTS.TEMPLATE_TITLE,
             text: scriptText,
             advanced: {
-              media: {
-                media_id: mediaId,
-                media_type: MediaType.IMAGE,
-              },
+              show_stop: false,
+              organization: identityId,
+              bodies: [
+                {
+                  text: scriptText,
+                }
+              ],
+            },
+            media: {
+              media_type: 'IMAGE',
+              media_id: mediaId,
+              title: imageInfo.title || P2P_JOB_DEFAULTS.TEMPLATE_TITLE,
             },
           },
         ],

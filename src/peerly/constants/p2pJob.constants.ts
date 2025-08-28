@@ -3,6 +3,7 @@ export const P2P_JOB_DEFAULTS = {
   DID_STATE: 'USA',
   TEMPLATE_TITLE: 'Default Template',
   CANVASSER_INITIALS: 'GE',
+  SCHEDULE_ID: 1058113, // Updated schedule_id from testing summary
 } as const
 
 export const P2P_ERROR_MESSAGES = {

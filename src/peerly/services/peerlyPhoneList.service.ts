@@ -9,7 +9,6 @@ import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
-import { Readable } from 'stream'
 import FormData from 'form-data'
 import {
   PhoneListDetailsResponseDto,
@@ -22,7 +21,7 @@ const MAX_FILE_SIZE = 104857600 // 100MB
 
 interface UploadPhoneListParams {
   listName: string
-  csvStream: Readable
+  csvBuffer: Buffer
   identityId?: string
   fileSize?: number
 }
@@ -68,13 +67,24 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   }
 
   async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {
-    const { listName, csvStream, identityId, fileSize } = params
+    const { listName, csvBuffer, identityId, fileSize } = params
 
-    // Validate file size if provided
-    if (fileSize && fileSize > MAX_FILE_SIZE) {
+    // Validate file size using buffer length
+    const actualFileSize = fileSize || csvBuffer.length
+    if (actualFileSize > MAX_FILE_SIZE) {
       throw new BadRequestException(
         `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`,
       )
+    }
+
+    // Create list mapping for Peerly API based on our CSV column structure
+    const listMap = {
+      first_name: 1,
+      last_name: 2,
+      lead_phone: 3,
+      state: 4,
+      city: 5,
+      zip: 6,
     }
 
     const form = new FormData()
@@ -82,7 +92,8 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     if (identityId) form.append('identity_id', identityId)
     form.append('list_name', listName)
     form.append('suppress_cell_phones', P2P_SUPPRESS_CELL_PHONES)
-    form.append('file', csvStream, {
+    form.append('list_map', JSON.stringify(listMap))
+    form.append('file', csvBuffer, {
       filename: 'voters.csv',
       contentType: 'text/csv',
     })
