@@ -87,7 +87,7 @@ export class QueueConsumerService {
           this.logger.error('Failed to send Slack notification:', slackError)
         }
 
-        return true // Don't requeue, delete the message
+        return false // Don't requeue, delete the message
       }
     }
   }
