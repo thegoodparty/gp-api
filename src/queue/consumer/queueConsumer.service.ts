@@ -351,6 +351,8 @@ export class QueueConsumerService {
       )
     }
 
+    return true
+
     // This is disabled until we have a process to load the data from the sheet
     // and a place to store the data since BallotCandidate was deprecated.
     // const isProd = WEBAPP_ROOT === 'https://goodparty.org'
