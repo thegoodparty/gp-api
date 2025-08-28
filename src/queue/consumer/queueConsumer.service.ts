@@ -27,6 +27,8 @@ import { QueueProducerService } from '../producer/queueProducer.service'
 import { getTwelveHoursFromDate } from '../../shared/util/date.util'
 import { EVENTS } from '../../segment/segment.types'
 
+const ONE_MINUTE = 60000
+
 @Injectable()
 export class QueueConsumerService {
   private readonly logger = new Logger(QueueConsumerService.name)
@@ -97,7 +99,7 @@ export class QueueConsumerService {
           const aiContentTimeoutPromise = new Promise<never>((_, reject) => {
             setTimeout(
               () => reject(new Error('AI content generation timeout')),
-              600000, // 10 minutes
+              ONE_MINUTE * 10,
             )
           })
 
@@ -113,7 +115,7 @@ export class QueueConsumerService {
             (_, reject) => {
               setTimeout(
                 () => reject(new Error('Campaign lookup timeout')),
-                60000, // 1 minute
+                ONE_MINUTE,
               )
             },
           )
@@ -177,7 +179,7 @@ export class QueueConsumerService {
       const tcrTimeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(
           () => reject(new Error('TCR compliance check timeout')),
-          300000, // 5 minutes
+          ONE_MINUTE * 5,
         )
       })
 
