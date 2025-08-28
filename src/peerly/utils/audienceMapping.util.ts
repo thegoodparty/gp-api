@@ -142,7 +142,7 @@ export function mapAudienceFieldsToCustomFilters(
  */
 export const P2P_CSV_DB_COLUMN = {
   first_name: 'Voters_FirstName',
-  last_name: 'Voters_LastName', 
+  last_name: 'Voters_LastName',
   phone: 'VoterTelephones_CellPhoneFormatted',
   state: 'Residence_Addresses_State',
   city: 'Residence_Addresses_City',

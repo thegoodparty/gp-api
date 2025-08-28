@@ -86,5 +86,4 @@ export class P2pController {
       throw new BadGatewayException('Failed to upload phone list.')
     }
   }
-
 }

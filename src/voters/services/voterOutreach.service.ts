@@ -26,7 +26,6 @@ import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types
 import { PeerlyPhoneListService } from '../../peerly/services/peerlyPhoneList.service'
 import { PeerlyMediaService } from '../../peerly/services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from '../../peerly/services/peerlyP2pSms.service'
-import { MediaType } from '../../peerly/peerly.types'
 import { VoterFileService } from '../voterFile/voterFile.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
 import { VoterFileType } from '../voterFile/voterFile.types'
@@ -277,17 +276,17 @@ export class VoterOutreachService {
       if (csvResult instanceof StreamableFile) {
         const csvStream = csvResult.getStream() as Readable
         const chunks: Buffer[] = []
-        
+
         csvBuffer = await new Promise((resolve, reject) => {
           csvStream.on('data', (chunk) => {
             chunks.push(Buffer.from(chunk))
           })
-          
+
           csvStream.on('end', () => {
             const csvData = Buffer.concat(chunks)
             resolve(csvData)
           })
-          
+
           csvStream.on('error', (error) => {
             reject(error)
           })

@@ -122,20 +122,20 @@ export class P2pPhoneListUploadService {
 
     // Collect the stream data into a buffer to ensure FormData can consume it properly
     const chunks: Buffer[] = []
-    
+
     return new Promise((resolve, reject) => {
       stream.on('data', (chunk) => {
         chunks.push(Buffer.from(chunk))
       })
-      
+
       stream.on('end', () => {
         const csvData = Buffer.concat(chunks)
         this.logger.debug(`Collected ${csvData.length} bytes of CSV data`)
-        
+
         // Return the buffer directly instead of creating a stream
         resolve(csvData)
       })
-      
+
       stream.on('error', (error) => {
         this.logger.error('Error collecting CSV stream data:', error)
         reject(error)

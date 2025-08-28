@@ -74,7 +74,7 @@ export class PeerlyP2pJobService {
               bodies: [
                 {
                   text: scriptText,
-                }
+                },
               ],
             },
             media: {
