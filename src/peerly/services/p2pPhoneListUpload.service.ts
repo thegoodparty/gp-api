@@ -104,12 +104,9 @@ export class P2pPhoneListUploadService {
       purpose: PURPOSES.GOTV,
     }
 
-    console.log(`customFilters =>`, customFilters)
-
     const query = typeToQuery(
       VoterFileType.sms,
       campaign,
-      // { ...campaign, pathToVictory: null },
       customFilters,
       false, // not count only
       false, // not fix columns

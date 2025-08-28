@@ -37,15 +37,7 @@ export function typeToQuery(
   selectedColumns?: GetVoterFileSchema['selectedColumns'],
   limit?: number,
 ) {
-  console.log('typeToQuery', {
-    type,
-    campaign,
-    customFilters,
-    justCount,
-    fixColumns,
-    selectedColumns,
-    limit,
-  })
+
   const state = campaign.details.state
   const electionDate: string | undefined = campaign.details?.electionDate
   const electionYear = electionDate
@@ -173,15 +165,6 @@ export function typeToQuery(
       "Residence_Addresses_Zip"`
     }
 
-    // if (type === 'sms') {
-    //   columns += `, "VoterTelephones_CellPhoneFormatted"`
-    //   if (whereClause) {
-    //     whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-    //   } else {
-    //     whereClause += `"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-    //   }
-    // }
-
     if (type === 'digitalAds') {
       columns += `, "VoterTelephones_CellPhoneFormatted",
       "Residence_Addresses_AddressLine", 
@@ -234,7 +217,6 @@ export function typeToQuery(
     }
   }
 
-  console.log(`customFilters =>`, customFilters)
   if (customFilters?.filters && customFilters.filters.length > 0) {
     const customFiltersQuery = customFiltersToQuery(customFilters.filters)
     if (whereClause !== '') {

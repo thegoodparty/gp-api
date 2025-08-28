@@ -15,6 +15,7 @@ import {
   PhoneListStatusResponseDto,
   UploadPhoneListResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
+import { P2P_PHONE_LIST_MAP } from '../constants/p2pJob.constants'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB
@@ -69,7 +70,6 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {
     const { listName, csvBuffer, identityId, fileSize } = params
 
-    // Validate file size using buffer length
     const actualFileSize = fileSize || csvBuffer.length
     if (actualFileSize > MAX_FILE_SIZE) {
       throw new BadRequestException(
@@ -77,22 +77,12 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       )
     }
 
-    // Create list mapping for Peerly API based on our CSV column structure
-    const listMap = {
-      first_name: 1,
-      last_name: 2,
-      lead_phone: 3,
-      state: 4,
-      city: 5,
-      zip: 6,
-    }
-
     const form = new FormData()
     form.append('account', this.accountNumber)
     if (identityId) form.append('identity_id', identityId)
     form.append('list_name', listName)
     form.append('suppress_cell_phones', P2P_SUPPRESS_CELL_PHONES)
-    form.append('list_map', JSON.stringify(listMap))
+    form.append('list_map', JSON.stringify(P2P_PHONE_LIST_MAP))
     form.append('file', csvBuffer, {
       filename: 'voters.csv',
       contentType: 'text/csv',

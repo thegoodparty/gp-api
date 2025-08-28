@@ -71,7 +71,6 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       isAxiosResponse(error) ? format(error) : error,
     )
 
-    // Log detailed error response if available
     if (isAxiosResponse(error)) {
       const axiosError = error as PeerlyAxiosError
       if (axiosError.response?.data) {
@@ -80,12 +79,11 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
           JSON.stringify(axiosError.response.data, null, 2),
         )
 
-        // Extract meaningful error message from API response
         const apiError = axiosError.response.data
         const errorMessage =
-          apiError.error || 
-          apiError.message || 
-          apiError.Error || // Peerly API uses 'Error' with capital E
+          apiError.error ||
+          apiError.message ||
+          apiError.Error ||
           'Unknown API error'
         throw new BadGatewayException(`Peerly API error: ${errorMessage}`)
       }
