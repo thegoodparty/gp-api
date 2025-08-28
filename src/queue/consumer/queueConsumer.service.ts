@@ -57,7 +57,8 @@ export class QueueConsumerService {
   async handleMessageAndMaybeRequeue(message: Message): Promise<boolean> {
     try {
       this.logger.debug('Processing queue message: ', message)
-      return await this.processMessage(message)
+      const success = await this.processMessage(message)
+      return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
       const shouldRequeue = this.shouldRequeueError(error as Error)
 
@@ -150,15 +151,22 @@ export class QueueConsumerService {
             generateAiContentMessage,
           )
 
-          const { userId } = await this.campaignsService.findUniqueOrThrow({
-            where: { slug: generateAiContentMessage.slug },
-          })
+          try {
+            const { userId } = await this.campaignsService.findUniqueOrThrow({
+              where: { slug: generateAiContentMessage.slug },
+            })
 
-          this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
-            slug: generateAiContentMessage.slug,
-            key: generateAiContentMessage.key,
-            regenerate: generateAiContentMessage.regenerate,
-          })
+            this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+              slug: generateAiContentMessage.slug,
+              key: generateAiContentMessage.key,
+              regenerate: generateAiContentMessage.regenerate,
+            })
+          } catch (analyticsError) {
+            this.logger.error(
+              'Failed to track analytics for AI content:',
+              analyticsError,
+            )
+          }
         } catch (error) {
           this.logger.error(
             `Error processing AI content generation for slug: ${generateAiContentMessage.slug}`,
@@ -238,11 +246,17 @@ export class QueueConsumerService {
     })
 
     const { userId } = campaign
-
-    this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
-    this.analytics.identify(userId, {
-      '10DLC_compliant': true,
-    })
+    try {
+      this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+      this.analytics.identify(userId, {
+        '10DLC_compliant': true,
+      })
+    } catch (analyticsError) {
+      this.logger.error(
+        'Failed to track analytics for TCR compliance:',
+        analyticsError,
+      )
+    }
 
     return true
   }
