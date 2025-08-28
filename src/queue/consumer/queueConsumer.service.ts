@@ -87,7 +87,7 @@ export class QueueConsumerService {
           this.logger.error('Failed to send Slack notification:', slackError)
         }
 
-        return false // Don't requeue, delete the message
+        return true // Don't requeue, delete the message
       }
     }
   }
@@ -133,7 +133,7 @@ export class QueueConsumerService {
   //  https://goodparty.atlassian.net/browse/WEB-4518
   async processMessage(message: Message) {
     if (!message || !message.Body) {
-      return false
+      return true // Delete invalid messages from queue
     }
 
     const parsedBody = JSON.parse(message.Body) as QueueMessage
@@ -202,7 +202,7 @@ export class QueueConsumerService {
 
     if (isAfter(processDateTime, now)) {
       this.logger.debug('Process time not yet reached. Re-queuing')
-      return false
+      return false // Requeue message - process time not reached yet
     }
     this.logger.debug('Process time met. Proceeding with processing')
 
