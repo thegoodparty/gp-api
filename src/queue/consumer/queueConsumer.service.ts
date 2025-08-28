@@ -252,7 +252,7 @@ export class QueueConsumerService {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(
           () => reject(new Error('Path to victory processing timeout')),
-          600000, // 10 minutes
+          ONE_MINUTE * 10,
         )
       })
 
@@ -278,7 +278,7 @@ export class QueueConsumerService {
       const analysisTimeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(
           () => reject(new Error('Path to victory analysis timeout')),
-          300000, // 5 minutes
+          ONE_MINUTE * 5,
         )
       })
 
@@ -335,8 +335,8 @@ export class QueueConsumerService {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(
           () => reject(new Error('Viability score calculation timeout')),
-          300000,
-        ) // 5 minutes
+          ONE_MINUTE * 5,
+        )
       })
 
       viability = await Promise.race([
