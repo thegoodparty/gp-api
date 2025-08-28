@@ -82,41 +82,78 @@ export class QueueConsumerService {
       return false
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const queueMessage: QueueMessage = JSON.parse(message.Body)
     this.logger.log('processing queue message type ', queueMessage.type)
 
-    switch (queueMessage.type) {
-      case QueueType.GENERATE_AI_CONTENT:
-        this.logger.log('received generateAiContent message')
-        const generateAiContentMessage =
-          queueMessage.data as GenerateAiContentMessageData
-        await this.aiContentService.handleGenerateAiContent(
-          generateAiContentMessage,
-        )
+    try {
+      switch (queueMessage.type) {
+        case QueueType.GENERATE_AI_CONTENT:
+          this.logger.log('received generateAiContent message')
+          const generateAiContentMessage =
+            queueMessage.data as GenerateAiContentMessageData
 
-        const { userId } = await this.campaignsService.findUniqueOrThrow({
-          where: { slug: generateAiContentMessage.slug },
-        })
+          // Add timeout to prevent hanging
+          const aiContentTimeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(
+              () => reject(new Error('AI content generation timeout')),
+              600000, // 10 minutes
+            )
+          })
 
-        this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
-          slug: generateAiContentMessage.slug,
-          key: generateAiContentMessage.key,
-          regenerate: generateAiContentMessage.regenerate,
-        })
-        break
-      case QueueType.PATH_TO_VICTORY:
-        this.logger.log('received pathToVictory message')
-        const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
-        await this.handlePathToVictoryMessage(pathToVictoryMessage)
-        break
-      case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
-        this.logger.log('received tcrComplianceStatusCheck message')
-        return await this.handleTcrComplianceCheckMessage(
-          queueMessage.data as TcrComplianceStatusCheckMessage,
-        )
+          await Promise.race([
+            this.aiContentService.handleGenerateAiContent(
+              generateAiContentMessage,
+            ),
+            aiContentTimeoutPromise,
+          ])
+
+          // Add timeout to prevent hanging
+          const campaignLookupTimeoutPromise = new Promise<never>(
+            (_, reject) => {
+              setTimeout(
+                () => reject(new Error('Campaign lookup timeout')),
+                60000, // 1 minute
+              )
+            },
+          )
+
+          const { userId } = await Promise.race([
+            this.campaignsService.findUniqueOrThrow({
+              where: { slug: generateAiContentMessage.slug },
+            }),
+            campaignLookupTimeoutPromise,
+          ])
+
+          this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+            slug: generateAiContentMessage.slug,
+            key: generateAiContentMessage.key,
+            regenerate: generateAiContentMessage.regenerate,
+          })
+          break
+        case QueueType.PATH_TO_VICTORY:
+          this.logger.log('received pathToVictory message')
+          const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
+          await this.handlePathToVictoryMessage(pathToVictoryMessage)
+          break
+        case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
+          this.logger.log('received tcrComplianceStatusCheck message')
+          return await this.handleTcrComplianceCheckMessage(
+            queueMessage.data as TcrComplianceStatusCheckMessage,
+          )
+      }
+      // Return true to delete the message from the queue
+      return true
+    } catch (error) {
+      this.logger.error('Error processing message', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        messageType: queueMessage.type,
+        messageBody: message.Body,
+      })
+      // Return false to requeue the message
+      return false
     }
-    // Return true to delete the message from the queue
-    return true
   }
 
   // TODO: ALL of the below functions should be moved to their respective
@@ -126,62 +163,81 @@ export class QueueConsumerService {
     processTime,
     peerlyIdentityId,
   }: TcrComplianceStatusCheckMessage) {
-    const processDateTime = parseISO(processTime)
-    const now = new Date()
+    try {
+      const processDateTime = parseISO(processTime)
+      const now = new Date()
 
-    if (isAfter(processDateTime, now)) {
-      this.logger.debug('Process time not yet reached. Re-queuing')
-      return false
-    }
-    this.logger.debug('Process time met. Proceeding with processing')
+      if (isAfter(processDateTime, now)) {
+        this.logger.debug('Process time not yet reached. Re-queuing')
+        return false
+      }
+      this.logger.debug('Process time met. Proceeding with processing')
 
-    const status =
-      await this.tcrComplianceService.checkTcrRegistrationStatus(
-        peerlyIdentityId,
-      )
+      // Add timeout to prevent hanging
+      const tcrTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error('TCR compliance check timeout')),
+          300000, // 5 minutes
+        )
+      })
 
-    if (!status) {
+      const status = await Promise.race([
+        this.tcrComplianceService.checkTcrRegistrationStatus(peerlyIdentityId),
+        tcrTimeoutPromise,
+      ])
+
+      if (!status) {
+        this.logger.debug(
+          'TCR Registration still not active, re-queuing with delay',
+        )
+        await this.queueProducerService.sendMessage({
+          type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
+          data: {
+            processTime: getTwelveHoursFromDate(processDateTime).toISOString(),
+            peerlyIdentityId,
+          },
+        })
+        // Delete the previous message from the queue since we can't just requeue w/ a `delaySeconds` option on a FIFO queue.
+        return true
+      }
+
+      // Update the TCR compliance status to approved once the registration is active
       this.logger.debug(
-        'TCR Registration still not active, re-queuing with delay',
+        `TCR Registration is active, updating TCR compliance w/ identity ID ${peerlyIdentityId} status to approved`,
       )
-      await this.queueProducerService.sendMessage({
-        type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
+
+      await this.tcrComplianceService.model.update({
+        where: { peerlyIdentityId },
         data: {
-          processTime: getTwelveHoursFromDate(processDateTime).toISOString(),
-          peerlyIdentityId,
+          status: TcrComplianceStatus.approved,
         },
       })
-      // Delete the previous message from the queue since we can't just requeue w/ a `delaySeconds` option on a FIFO queue.
+
+      const { campaign } = await this.tcrComplianceService.findFirstOrThrow({
+        include: {
+          campaign: true,
+        },
+        where: { peerlyIdentityId },
+      })
+
+      const { userId } = campaign
+
+      this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+      this.analytics.identify(userId, {
+        '10DLC_compliant': true,
+      })
+
       return true
+    } catch (error) {
+      this.logger.error('Error in TCR compliance check message handler', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        peerlyIdentityId,
+        processTime,
+      })
+      // Return false to requeue the message
+      return false
     }
-
-    // Update the TCR compliance status to approved once the registration is active
-    this.logger.debug(
-      `TCR Registration is active, updating TCR compliance w/ identity ID ${peerlyIdentityId} status to approved`,
-    )
-
-    await this.tcrComplianceService.model.update({
-      where: { peerlyIdentityId },
-      data: {
-        status: TcrComplianceStatus.approved,
-      },
-    })
-
-    const { campaign } = await this.tcrComplianceService.findFirstOrThrow({
-      include: {
-        campaign: true,
-      },
-      where: { peerlyIdentityId },
-    })
-
-    const { userId } = campaign
-
-    this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
-    this.analytics.identify(userId, {
-      '10DLC_compliant': true,
-    })
-
-    return true
   }
 
   private async handlePathToVictoryMessage(message: PathToVictoryInput) {
@@ -190,10 +246,20 @@ export class QueueConsumerService {
       null
 
     try {
-      const p2vResponse: P2VResponse =
-        await this.pathToVictoryService.handlePathToVictory({
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Path to victory processing timeout')),
+          600000, // 10 minutes
+        )
+      })
+
+      const p2vResponse: P2VResponse = await Promise.race([
+        this.pathToVictoryService.handlePathToVictory({
           ...message,
-        })
+        }),
+        timeoutPromise,
+      ])
       this.logger.debug('p2vResponse', p2vResponse)
 
       campaign = await this.campaignsService.findUnique({
@@ -206,28 +272,52 @@ export class QueueConsumerService {
         throw new Error('campaign not found')
       }
 
-      p2vSuccess = await this.pathToVictoryService.analyzePathToVictoryResponse(
-        {
+      // Add timeout to prevent hanging
+      const analysisTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Path to victory analysis timeout')),
+          300000, // 5 minutes
+        )
+      })
+
+      p2vSuccess = await Promise.race([
+        this.pathToVictoryService.analyzePathToVictoryResponse({
           campaign: campaign as Campaign & { pathToVictory: PathToVictory },
           pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           officeName: p2vResponse.officeName || '',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           electionDate: p2vResponse.electionDate || '',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           electionTerm: p2vResponse.electionTerm || 0,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           electionLevel: p2vResponse.electionLevel || '',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           electionState: p2vResponse.electionState || '',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           electionCounty: p2vResponse.electionCounty || '',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           electionMunicipality: p2vResponse.electionMunicipality || '',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           subAreaName: p2vResponse.subAreaName,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           subAreaValue: p2vResponse.subAreaValue,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           partisanType: p2vResponse.partisanType || '',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           priorElectionDates: p2vResponse.priorElectionDates || [],
-        },
-      )
+        }),
+        analysisTimeoutPromise,
+      ])
     } catch (e) {
-      this.logger.error('error in consumer/handlePathToVictoryMessage', e)
+      this.logger.error('error in consumer/handlePathToVictoryMessage', {
+        error: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : undefined,
+        campaignId: message.campaignId,
+      })
       await this.slackService.errorMessage({
         message: 'error in consumer/handlePathToVictoryMessage',
-        error: e,
+        error: e instanceof Error ? e.message : String(e),
       })
     }
 
@@ -239,11 +329,26 @@ export class QueueConsumerService {
     // Calculate viability score after a valid path to victory response
     let viability: ViabilityScore | null = null
     try {
-      viability = await this.viabilityService.calculateViabilityScore(
-        Number(message.campaignId),
-      )
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Viability score calculation timeout')),
+          300000,
+        ) // 5 minutes
+      })
+
+      viability = await Promise.race([
+        this.viabilityService.calculateViabilityScore(
+          Number(message.campaignId),
+        ),
+        timeoutPromise,
+      ])
     } catch (e) {
-      this.logger.error('error calculating viability score', e)
+      this.logger.error('error calculating viability score', {
+        error: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : undefined,
+        campaignId: message.campaignId,
+      })
     }
 
     if (viability) {
@@ -290,46 +395,56 @@ export class QueueConsumerService {
   }
 
   private async handlePathToVictoryFailure(campaign: Campaign) {
-    const p2v = await this.pathToVictoryService.findUniqueOrThrow({
-      where: { campaignId: campaign.id },
-    })
-
-    let p2vAttempts = 0
-    if (p2v.data.p2vAttempts) {
-      p2vAttempts = p2v.data.p2vAttempts
-    }
-    p2vAttempts += 1
-
-    if (p2vAttempts >= 3) {
-      await this.slackService.message(
-        {
-          body: `Path To Victory has failed 3 times for ${campaign.slug}. Marking as failed`,
-        },
-        SlackChannel.botPathToVictoryIssues,
-      )
-
-      // mark the p2vStatus as Failed
-      await this.pathToVictoryService.update({
-        where: { id: p2v.id },
-        data: {
-          data: {
-            ...p2v.data,
-            p2vAttempts,
-            p2vStatus: P2VStatus.failed,
-          },
-        },
+    try {
+      const p2v = await this.pathToVictoryService.findUniqueOrThrow({
+        where: { campaignId: campaign.id },
       })
-    } else {
-      // otherwise, increment the p2vAttempts
-      await this.pathToVictoryService.update({
-        where: { id: p2v.id },
-        data: {
-          data: {
-            ...p2v.data,
-            p2vAttempts,
+
+      let p2vAttempts = 0
+      if (p2v.data.p2vAttempts) {
+        p2vAttempts = p2v.data.p2vAttempts
+      }
+      p2vAttempts += 1
+
+      if (p2vAttempts >= 3) {
+        await this.slackService.message(
+          {
+            body: `Path To Victory has failed 3 times for ${campaign.slug}. Marking as failed`,
           },
-        },
+          SlackChannel.botPathToVictoryIssues,
+        )
+
+        // mark the p2vStatus as Failed
+        await this.pathToVictoryService.update({
+          where: { id: p2v.id },
+          data: {
+            data: {
+              ...p2v.data,
+              p2vAttempts,
+              p2vStatus: P2VStatus.failed,
+            },
+          },
+        })
+      } else {
+        // otherwise, increment the p2vAttempts
+        await this.pathToVictoryService.update({
+          where: { id: p2v.id },
+          data: {
+            data: {
+              ...p2v.data,
+              p2vAttempts,
+            },
+          },
+        })
+      }
+    } catch (error) {
+      this.logger.error('Error in handlePathToVictoryFailure', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        campaignId: campaign.id,
+        campaignSlug: campaign.slug,
       })
+      // Don't throw here as this is called from within a catch block
     }
   }
 }
