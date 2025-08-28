@@ -1,13 +1,18 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
-import { VoterDatabaseService } from '../../voters/services/voterDatabase.service'
+import {
+  VoterDatabaseService
+} from '../../voters/services/voterDatabase.service'
 import { PeerlyPhoneListService } from './peerlyPhoneList.service'
-import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
+import {
+  CampaignTcrComplianceService
+} from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import {
+  P2pPhoneListRequestSchema
+} from '../schemas/p2pPhoneListRequest.schema'
 import { VoterFileType } from '../../voters/voterFile/voterFile.types'
 import {
-  CustomFilter,
   CHANNELS,
+  CustomFilter,
   PURPOSES,
 } from '../../shared/types/voter.types'
 import { typeToQuery } from '../../voters/voterFile/util/voterFile.util'
@@ -16,6 +21,7 @@ import {
   P2P_CSV_COLUMN_MAPPINGS,
 } from '../utils/audienceMapping.util'
 import { Readable } from 'stream'
+import { CampaignWith } from '../../campaigns/campaigns.types'
 
 @Injectable()
 export class P2pPhoneListUploadService {
@@ -28,7 +34,7 @@ export class P2pPhoneListUploadService {
   ) {}
 
   async uploadPhoneList(
-    campaign: Campaign,
+    campaign: CampaignWith<'pathToVictory'>,
     request: P2pPhoneListRequestSchema,
   ): Promise<{ token: string; listName: string }> {
     const { name: listName, ...filterData } = request
@@ -89,7 +95,7 @@ export class P2pPhoneListUploadService {
   }
 
   private async generatePhoneListCsvStream(
-    campaign: Campaign,
+    campaign: CampaignWith<'pathToVictory'>,
     filters: CustomFilter[],
   ): Promise<Buffer> {
     const customFilters = {
@@ -98,9 +104,12 @@ export class P2pPhoneListUploadService {
       purpose: PURPOSES.GOTV,
     }
 
+    console.log(`customFilters =>`, customFilters)
+
     const query = typeToQuery(
       VoterFileType.sms,
-      { ...campaign, pathToVictory: null },
+      campaign,
+      // { ...campaign, pathToVictory: null },
       customFilters,
       false, // not count only
       false, // not fix columns
