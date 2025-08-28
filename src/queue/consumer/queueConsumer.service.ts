@@ -71,10 +71,14 @@ export class QueueConsumerService {
         )
 
         // Send error notification to Slack for non-retryable errors
-        await this.slackService.errorMessage({
-          message: 'Queue message discarded due to non-retryable error',
-          error: error as Error,
-        })
+        try {
+          await this.slackService.errorMessage({
+            message: 'Queue message discarded due to non-retryable error',
+            error: error as Error,
+          })
+        } catch (slackError) {
+          this.logger.error('Failed to send Slack notification:', slackError)
+        }
 
         return false // Don't requeue, delete the message
       }
