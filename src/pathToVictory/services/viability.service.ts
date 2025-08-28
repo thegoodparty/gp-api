@@ -4,9 +4,7 @@ import { SlackService } from '../../shared/services/slack.service'
 import { Campaign } from '@prisma/client'
 import { ViabilityScore } from '../types/pathToVictory.types'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
-import {
-  RaceWithOfficeHoldersNode
-} from 'src/elections/types/ballotReady.types'
+import { RaceWithOfficeHoldersNode } from 'src/elections/types/ballotReady.types'
 import { SHORT_TO_LONG_STATE } from '../../shared/constants/states'
 
 @Injectable()
@@ -122,16 +120,18 @@ export class ViabilityService {
         openSeat === undefined
       ) {
         this.logger.error(
-          `Cannot run Viability score. Missing required parameters => ${{
-            state,
-            officeLevel,
-            officeType,
-            isPartisan,
-            seats,
-            isIncumbent,
-            opponents,
-            openSeat,
-          }.toString()}`,
+          `Cannot run Viability score. Missing required parameters => ${JSON.stringify(
+            {
+              state,
+              officeLevel,
+              officeType,
+              isPartisan,
+              seats,
+              isIncumbent,
+              opponents,
+              openSeat,
+            },
+          )}`,
         )
       } else {
         const viability = this.calculateNewViabilityScore(
