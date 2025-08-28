@@ -106,7 +106,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/phonelists`, form, {
           headers,
-          timeout: this.httpTimeoutMs,
+          timeout: this.uploadTimeoutMs,
           maxBodyLength: MAX_FILE_SIZE,
           maxContentLength: MAX_FILE_SIZE,
         }),

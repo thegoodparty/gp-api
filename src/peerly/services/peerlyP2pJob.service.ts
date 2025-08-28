@@ -1,7 +1,6 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
-import { OutreachService } from '../../outreach/services/outreach.service'
 import { Readable } from 'stream'
 import {
   P2P_JOB_DEFAULTS,
@@ -31,7 +30,6 @@ export class PeerlyP2pJobService {
   constructor(
     private readonly peerlyMediaService: PeerlyMediaService,
     private readonly peerlyP2pSmsService: PeerlyP2pSmsService,
-    private readonly outreachService: OutreachService,
   ) {}
 
   async createPeerlyP2pJob(params: CreateP2pJobParams): Promise<string> {
@@ -93,9 +91,9 @@ export class PeerlyP2pJobService {
       await this.peerlyP2pSmsService.assignListToJob(jobId, listId)
       this.logger.log('List assigned successfully')
 
-      this.logger.log(`Requesting canvassers for job ${jobId}`)
-      await this.peerlyP2pSmsService.requestCanvassers(jobId)
-      this.logger.log('Canvassers requested successfully')
+      // this.logger.log(`Requesting canvassers for job ${jobId}`)
+      // await this.peerlyP2pSmsService.requestCanvassers(jobId)
+      // this.logger.log('Canvassers requested successfully')
 
       this.logger.log(
         `P2P job creation completed successfully for campaign ${campaignId}`,
