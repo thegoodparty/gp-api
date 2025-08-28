@@ -25,7 +25,7 @@ const ALLOWED_MEDIA_TYPES = [
 
 interface CreateMediaParams {
   identityId: string
-  fileStream: Readable
+  fileStream: Readable | Buffer
   fileName: string
   mimeType: string
   fileSize?: number
@@ -80,6 +80,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
     form.append('initial_file_upload', fileStream, {
       filename: fileName,
       contentType: mimeType,
+      knownLength: fileStream instanceof Buffer ? fileStream.length : undefined,
     })
 
     try {
@@ -88,7 +89,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
         ...form.getHeaders(),
       }
       const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/api/v2/media`, form, {
+        this.httpService.post(`${this.baseUrl}/v2/media`, form, {
           headers,
           timeout: this.httpTimeoutMs,
           maxBodyLength: MAX_FILE_SIZE,

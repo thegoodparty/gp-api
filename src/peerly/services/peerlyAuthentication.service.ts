@@ -96,6 +96,6 @@ export class PeerlyAuthenticationService extends PeerlyBaseConfig {
   }
 
   async getAuthorizationHeader() {
-    return { Authorization: `Jwt ${await this.getToken()}` }
+    return { Authorization: `JWT ${await this.getToken()}` }
   }
 }

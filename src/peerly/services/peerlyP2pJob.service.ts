@@ -2,7 +2,6 @@ import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
 import { OutreachService } from '../../outreach/services/outreach.service'
-import { OutreachType, OutreachStatus } from '@prisma/client'
 import { MediaType } from '../peerly.types'
 import { Readable } from 'stream'
 import {
@@ -14,7 +13,7 @@ interface CreateP2pJobParams {
   campaignId: number
   listId: number
   imageInfo: {
-    fileStream: Readable
+    fileStream: Readable | Buffer
     fileName: string
     mimeType: string
     fileSize?: number
