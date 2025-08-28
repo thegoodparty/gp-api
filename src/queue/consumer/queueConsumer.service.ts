@@ -63,6 +63,7 @@ export class QueueConsumerService {
 
       if (shouldRequeue) {
         this.logger.error('Message processing failed, will requeue:', error)
+        this.logger.error('Messages to be requeued:', message)
         return true // Indicate that we should requeue
       } else {
         this.logger.error(
