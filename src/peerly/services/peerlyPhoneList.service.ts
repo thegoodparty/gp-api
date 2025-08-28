@@ -18,6 +18,7 @@ import {
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB
+const PEERLY_UPLOAD_TIMEOUT_MS = 30000 // 30s
 
 interface UploadPhoneListParams {
   listName: string
@@ -28,6 +29,7 @@ interface UploadPhoneListParams {
 
 @Injectable()
 export class PeerlyPhoneListService extends PeerlyBaseConfig {
+  httpTimeoutMs = PEERLY_UPLOAD_TIMEOUT_MS
   constructor(
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
