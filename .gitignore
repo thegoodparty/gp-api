@@ -29,6 +29,7 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/test-scripts
 
 # IDEs and editors
 /.vscode

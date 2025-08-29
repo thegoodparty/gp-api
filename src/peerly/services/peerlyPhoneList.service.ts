@@ -9,20 +9,20 @@ import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
-import { Readable } from 'stream'
 import FormData from 'form-data'
 import {
   PhoneListDetailsResponseDto,
   PhoneListStatusResponseDto,
   UploadPhoneListResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
+import { P2P_PHONE_LIST_MAP } from '../constants/p2pJob.constants'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB
 
 interface UploadPhoneListParams {
   listName: string
-  csvStream: Readable
+  csvBuffer: Buffer
   identityId?: string
   fileSize?: number
 }
@@ -68,10 +68,10 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   }
 
   async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {
-    const { listName, csvStream, identityId, fileSize } = params
+    const { listName, csvBuffer, identityId, fileSize } = params
 
-    // Validate file size if provided
-    if (fileSize && fileSize > MAX_FILE_SIZE) {
+    const actualFileSize = fileSize || csvBuffer.length
+    if (actualFileSize > MAX_FILE_SIZE) {
       throw new BadRequestException(
         `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`,
       )
@@ -82,7 +82,8 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     if (identityId) form.append('identity_id', identityId)
     form.append('list_name', listName)
     form.append('suppress_cell_phones', P2P_SUPPRESS_CELL_PHONES)
-    form.append('file', csvStream, {
+    form.append('list_map', JSON.stringify(P2P_PHONE_LIST_MAP))
+    form.append('file', csvBuffer, {
       filename: 'voters.csv',
       contentType: 'text/csv',
     })
@@ -95,7 +96,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/phonelists`, form, {
           headers,
-          timeout: this.httpTimeoutMs,
+          timeout: this.uploadTimeoutMs,
           maxBodyLength: MAX_FILE_SIZE,
           maxContentLength: MAX_FILE_SIZE,
         }),

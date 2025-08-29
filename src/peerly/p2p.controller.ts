@@ -8,7 +8,6 @@ import {
   Post,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from '../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../campaigns/decorators/UseCampaign.decorator'
@@ -18,6 +17,7 @@ import { CheckPhoneListStatusResponseDto } from './schemas/p2pPhoneListStatus.sc
 import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
 import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
+import { CampaignWith } from '../campaigns/campaigns.types'
 
 @Controller('p2p')
 @UsePipes(ZodValidationPipe)
@@ -71,7 +71,7 @@ export class P2pController {
   @Post('phone-list')
   @UseCampaign()
   async uploadPhoneList(
-    @ReqCampaign() campaign: Campaign,
+    @ReqCampaign() campaign: CampaignWith<'pathToVictory'>,
     @Body() request: P2pPhoneListRequestSchema,
   ): Promise<P2pPhoneListResponseSchema> {
     try {
@@ -86,5 +86,4 @@ export class P2pController {
       throw new BadGatewayException('Failed to upload phone list.')
     }
   }
-
 }
