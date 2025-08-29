@@ -113,7 +113,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       templates,
       did_state: didState,
       can_use_mms: hasMms,
-      schedule_id: P2P_JOB_DEFAULTS.SCHEDULE_ID,
+      schedule_id: this.scheduleId,
       ...(identityId && { identity_id: identityId }),
     }
 
