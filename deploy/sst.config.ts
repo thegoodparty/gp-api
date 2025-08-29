@@ -387,6 +387,8 @@ export default $config({
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
         deletionProtection: true,
+        performanceInsightsEnabled: true,
+        performanceInsightsRetentionPeriod: 7,  
         finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
         serverlessv2ScalingConfiguration: {
           maxCapacity: 128,
@@ -450,6 +452,8 @@ export default $config({
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
         deletionProtection: true,
+        performanceInsightsEnabled: true,
+        performanceInsightsRetentionPeriod: 7,
         finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
         serverlessv2ScalingConfiguration: {
           maxCapacity: 128,
