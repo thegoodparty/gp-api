@@ -349,6 +349,14 @@ export default $config({
       },
     })
 
+    // Create IAM Role for RDS Enhanced Monitoring
+    const rdsMonitoringRole = new aws.iam.Role('rdsMonitoringRole', {
+      assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: 'monitoring.rds.amazonaws.com',
+      }),
+      managedPolicyArns: ['arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole'],
+    })
+
     // Warning: Do not change the clusterIdentifier.
     // The clusterIdentifier is used as a unique identifier for your RDS cluster.
     // Changing it will cause Pulumi/SST to try to create a new RDS cluster and delete the old one
@@ -388,7 +396,7 @@ export default $config({
         storageEncrypted: true,
         deletionProtection: true,
         performanceInsightsEnabled: true,
-        performanceInsightsRetentionPeriod: 7,  
+        performanceInsightsRetentionPeriod: 7,
         finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
         serverlessv2ScalingConfiguration: {
           maxCapacity: 128,
@@ -402,6 +410,8 @@ export default $config({
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterCluster.engineVersion,
+        monitoringInterval: 60,
+        monitoringRoleArn: rdsMonitoringRole.arn,
       })
 
       // Second voter cluster for database swap operation
@@ -416,6 +426,8 @@ export default $config({
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterClusterLatest.engineVersion,
+        monitoringInterval: 60,
+        monitoringRoleArn: rdsMonitoringRole.arn,
       })
 
     } else if ($app.stage === 'qa') {
@@ -466,6 +478,8 @@ export default $config({
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterCluster.engineVersion,
+        monitoringInterval: 60,
+        monitoringRoleArn: rdsMonitoringRole.arn,
       })
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
