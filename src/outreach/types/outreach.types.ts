@@ -14,3 +14,10 @@ export interface OutreachPurchaseMetadata extends BasePurchaseMetadata {
   message?: string
   date?: string
 }
+
+export interface TextOutreachPostPurchaseResult {
+  campaignId: number
+  contactCount: number
+  outreachType: string
+  newTextCount: number
+}

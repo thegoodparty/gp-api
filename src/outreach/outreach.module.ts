@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { OutreachController } from './outreach.controller'
 import { OutreachService } from './services/outreach.service'
 import { OutreachPurchaseHandlerService } from './services/outreachPurchase.service'
@@ -9,9 +9,10 @@ import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PaymentsModule } from '../payments/payments.module'
 import { PeerlyModule } from '../peerly/peerly.module'
+import { CampaignsModule } from '../campaigns/campaigns.module'
 
 @Module({
-  imports: [HttpModule, EmailModule, FilesModule, PaymentsModule, PeerlyModule],
+  imports: [HttpModule, EmailModule, FilesModule, PaymentsModule, PeerlyModule, forwardRef(() => CampaignsModule)],
   controllers: [OutreachController],
   providers: [OutreachService, OutreachPurchaseHandlerService],
   exports: [OutreachService, OutreachPurchaseHandlerService],
@@ -24,6 +25,11 @@ export class OutreachModule {
     this.purchaseService.registerPurchaseHandler(
       PurchaseType.TEXT,
       this.outreachPurchaseHandler,
+    )
+
+    this.purchaseService.registerPostPurchaseHandler(
+      PurchaseType.TEXT,
+      this.outreachPurchaseHandler.handleTextOutreachPostPurchase.bind(this.outreachPurchaseHandler),
     )
   }
 }
