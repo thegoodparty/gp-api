@@ -45,41 +45,48 @@ export class OutreachPurchaseHandlerService
       throw new BadRequestException('contactCount is required in metadata')
     }
 
-    // Get the campaign
-    const campaign = await this.campaignsService.findUnique({
-      where: { id: campaignId },
-    })
-    if (!campaign) {
-      throw new BadRequestException('Campaign not found')
-    }
+    const result = await this.campaignsService.client.$transaction(
+      async (tx) => {
+        const campaign = await tx.campaign.findUnique({
+          where: { id: campaignId },
+        })
+        
+        if (!campaign) {
+          throw new BadRequestException('Campaign not found')
+        }
 
-    // Get current reported voter goals
-    const currentData = campaign.data as any
-    const currentReportedVoterGoals = currentData?.reportedVoterGoals || {}
-    const currentTextCount = currentReportedVoterGoals.text || 0
+        const currentData = (campaign.data as any) || {}
+        const currentReportedVoterGoals = currentData.reportedVoterGoals || {}
+        const currentTextCount = currentReportedVoterGoals.text || 0
 
-    // Update the campaign with the new text contact count
-    const updatedData = {
-      ...currentData,
-      reportedVoterGoals: {
-        ...currentReportedVoterGoals,
-        text: currentTextCount + contactCount,
+        const updatedData = {
+          ...currentData,
+          reportedVoterGoals: {
+            ...currentReportedVoterGoals,
+            text: currentTextCount + contactCount,
+          },
+        }
+
+        await tx.campaign.update({
+          where: { id: campaignId },
+          data: {
+            data: updatedData,
+          },
+        })
+
+        return {
+          campaignId,
+          contactCount,
+          outreachType,
+          newTextCount: currentTextCount + contactCount,
+        }
       },
-    }
-
-    // Save the updated campaign
-    await this.campaignsService.update({
-      where: { id: campaignId },
-      data: {
-        data: updatedData,
+      {
+        maxWait: 5000,
+        timeout: 10000,
       },
-    })
+    )
 
-    return {
-      campaignId,
-      contactCount,
-      outreachType,
-      newTextCount: currentTextCount + contactCount,
-    }
+    return result
   }
 }
