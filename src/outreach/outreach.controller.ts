@@ -40,7 +40,7 @@ export class OutreachController {
   @UseCampaign()
   @UseInterceptors(
     FilesInterceptor('file', {
-      mode: 'stream',
+      mode: 'buffer',
       mimeTypes: [
         MimeTypes.IMAGE_JPEG,
         MimeTypes.IMAGE_GIF,
@@ -111,7 +111,6 @@ export class OutreachController {
         )
       }
 
-      console.dir(image, { depth: 4, colors: true })
       let imageStream: Readable | Buffer
       if (image.data instanceof Buffer) {
         imageStream = image.data
