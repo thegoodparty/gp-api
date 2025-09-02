@@ -3,8 +3,8 @@ import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
 import { Readable } from 'stream'
 import {
-  P2P_JOB_DEFAULTS,
   P2P_ERROR_MESSAGES,
+  P2P_JOB_DEFAULTS,
 } from '../constants/p2pJob.constants'
 
 interface CreateP2pJobParams {
@@ -91,6 +91,8 @@ export class PeerlyP2pJobService {
       await this.peerlyP2pSmsService.assignListToJob(jobId, listId)
       this.logger.log('List assigned successfully')
 
+      // TODO: Re-enable once Peerly supports account configuration
+      // See WEB-4583 https://goodparty.atlassian.net/browse/WEB-4583
       // this.logger.log(`Requesting canvassers for job ${jobId}`)
       // await this.peerlyP2pSmsService.requestCanvassers(jobId)
       // this.logger.log('Canvassers requested successfully')
