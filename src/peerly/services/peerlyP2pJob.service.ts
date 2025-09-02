@@ -91,7 +91,6 @@ export class PeerlyP2pJobService {
       await this.peerlyP2pSmsService.assignListToJob(jobId, listId)
       this.logger.log('List assigned successfully')
 
-
       // TODO: Re-enable once Peerly supports account configuration
       // See WEB-4583 https://goodparty.atlassian.net/browse/WEB-4583
       // this.logger.log(`Requesting canvassers for job ${jobId}`)
