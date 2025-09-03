@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { OutreachPurchaseMetadata } from '../types/outreach.types'
+import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
 
 @Injectable()
 export class OutreachPurchaseHandlerService
   implements PurchaseHandler<OutreachPurchaseMetadata>
 {
+  constructor(private readonly campaignsService: CampaignsService) {}
+
   async validatePurchase({
     contactCount,
     pricePerContact,
@@ -22,7 +26,41 @@ export class OutreachPurchaseHandlerService
   async calculateAmount({
     contactCount,
     pricePerContact,
+    campaignId,
   }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<number> {
+    if (!campaignId) {
+      return contactCount * pricePerContact
+    }
+
+    const hasOffer =
+      await this.campaignsService.checkFreeTextsEligibility(campaignId)
+
+    if (hasOffer) {
+      const discountedContactCount = Math.max(0, contactCount - FREE_TEXTS_OFFER.COUNT)
+      return discountedContactCount * pricePerContact
+    }
+
     return contactCount * pricePerContact
+  }
+
+  async calculateDiscount(
+    contactCount: number,
+    pricePerContact: number,
+    campaignId?: number,
+  ): Promise<number> {
+    if (!campaignId) {
+      return 0
+    }
+
+    const hasOffer =
+      await this.campaignsService.checkFreeTextsEligibility(campaignId)
+
+    if (hasOffer) {
+      // Calculate discount amount for up to 5,000 texts
+      const freeTexts = Math.min(contactCount, FREE_TEXTS_OFFER.COUNT)
+      return freeTexts * pricePerContact
+    }
+
+    return 0
   }
 }
