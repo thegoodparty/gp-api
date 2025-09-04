@@ -2,7 +2,6 @@ export const P2P_JOB_DEFAULTS = {
   CAMPAIGN_NAME: 'P2P SMS Campaign',
   DID_STATE: 'USA',
   TEMPLATE_TITLE: 'Default Template',
-  CANVASSER_INITIALS: 'GE',
 } as const
 
 export const P2P_ERROR_MESSAGES = {
