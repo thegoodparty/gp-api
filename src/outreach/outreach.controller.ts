@@ -23,7 +23,6 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { PeerlyP2pJobService } from '../peerly/services/peerlyP2pJob.service'
 import { Readable } from 'stream'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { CampaignsService } from '../campaigns/services/campaigns.service'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -35,7 +34,6 @@ export class OutreachController {
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
-    private readonly campaignsService: CampaignsService,
   ) {}
 
   @Post()
@@ -90,8 +88,6 @@ export class OutreachController {
         image,
         imageUrl,
       )
-
-      await this.redeemFreeTextsIfApplicable(campaign.id, outreachType)
 
       return outreach
     }
@@ -172,28 +168,5 @@ export class OutreachController {
   @UseCampaign()
   findAll(@ReqCampaign() campaign: Campaign) {
     return this.outreachService.findByCampaignId(campaign.id)
-  }
-
-  private async redeemFreeTextsIfApplicable(
-    campaignId: number,
-    outreachType: OutreachType,
-  ): Promise<void> {
-    if (outreachType !== OutreachType.p2p) {
-      return
-    }
-
-    try {
-      const hasOffer =
-        await this.campaignsService.checkFreeTextsEligibility(campaignId)
-      if (hasOffer) {
-        await this.campaignsService.redeemFreeTexts(campaignId)
-        this.logger.log(`Free texts offer redeemed for campaign ${campaignId}`)
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to redeem free texts offer for campaign ${campaignId}:`,
-        error,
-      )
-    }
   }
 }
