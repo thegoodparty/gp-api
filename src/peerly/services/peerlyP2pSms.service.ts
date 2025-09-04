@@ -1,12 +1,14 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import {
+  PeerlyAuthenticatedUser,
+  PeerlyAuthenticationService,
+} from './peerlyAuthentication.service'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
-import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { AxiosResponse } from 'axios'
 
 interface Template {
@@ -180,12 +182,16 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     }
   }
 
-  async requestCanvassers(
-    jobId: string,
-    initials: string = P2P_JOB_DEFAULTS.CANVASSER_INITIALS,
-  ): Promise<void> {
+  async requestCanvassers(jobId: string): Promise<void> {
+    const authenticatedUser = await this.peerlyAuth.getAuthenticatedUser()
+    if (!authenticatedUser) {
+      throw new BadGatewayException(
+        'Cannot request canvassers: No authenticated user',
+      )
+    }
+
     const body = {
-      requested_initials: initials,
+      requested_initials: getAuthenticatedUserInitials(authenticatedUser),
     }
 
     try {
@@ -202,4 +208,10 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       this.handleApiError(error)
     }
   }
+}
+
+const getAuthenticatedUserInitials = (user: PeerlyAuthenticatedUser) => {
+  const firstInitial = user.first_name ? user.first_name.charAt(0) : ''
+  const lastInitial = user.last_name ? user.last_name.charAt(0) : ''
+  return (firstInitial + lastInitial).toUpperCase()
 }
