@@ -53,7 +53,7 @@ export class AnalyticsService {
       const paymentMethod =
         pm.type === 'card' ? (pm.card?.wallet?.type ?? 'credit card') : pm.type
 
-      await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
+      this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
         price,
         paymentMethod,
         renewalDate: new Date(

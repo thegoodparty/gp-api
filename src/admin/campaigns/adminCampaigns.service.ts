@@ -60,7 +60,7 @@ export class AdminCampaignsService {
     const resetToken = this.auth.generatePasswordResetToken()
     const updatedUser = await this.users.setResetToken(user.id, resetToken)
     this.email.sendSetPasswordEmail(updatedUser)
-    await this.analytics.track(user.id, EVENTS.Onboarding.UserCreated)
+    this.analytics.track(user.id, EVENTS.Onboarding.UserCreated)
 
     // find slug
     const slug = await this.campaigns.findSlug(user)
@@ -116,7 +116,7 @@ export class AdminCampaignsService {
       data: attributes,
     })
     if (isPro === true) {
-      await this.analytics.track(
+      this.analytics.track(
         updatedCampaign?.userId,
         EVENTS.Account.ProSubscriptionConfirmed,
         {

@@ -156,15 +156,11 @@ export class QueueConsumerService {
               where: { slug: generateAiContentMessage.slug },
             })
 
-            await this.analytics.track(
-              userId,
-              EVENTS.AiContent.ContentGenerated,
-              {
-                slug: generateAiContentMessage.slug,
-                key: generateAiContentMessage.key,
-                regenerate: generateAiContentMessage.regenerate,
-              },
-            )
+            this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+              slug: generateAiContentMessage.slug,
+              key: generateAiContentMessage.key,
+              regenerate: generateAiContentMessage.regenerate,
+            })
           } catch (analyticsError) {
             this.logger.error(
               'Failed to track analytics for AI content:',
@@ -251,7 +247,7 @@ export class QueueConsumerService {
 
     const { userId } = campaign
     try {
-      await this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+      this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
       this.analytics.identify(userId, {
         '10DLC_compliant': true,
       })
