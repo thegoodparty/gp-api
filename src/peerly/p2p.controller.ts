@@ -39,9 +39,11 @@ export class P2pController {
         await this.peerlyPhoneListService.checkPhoneListStatus(token)
 
       if (statusResponse.Data.list_state !== PhoneListState.ACTIVE) {
-        throw new BadGatewayException(
-          `Phone list is not ready. Current status: ${statusResponse.Data.list_state || 'unknown'}`,
-        )
+        const status = statusResponse.Data.list_state || 'unknown'
+        const message = status === PhoneListState.PROCESSING 
+          ? 'Phone list is still processing. Please try again in a few moments.'
+          : `Phone list is not ready. Current status: ${status}`
+        throw new BadGatewayException(message)
       }
 
       const listId = statusResponse.Data.list_id
