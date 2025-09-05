@@ -116,7 +116,7 @@ export class AuthenticationController {
       // don't want to expose that user with email doesn't exist
       return
     }
-    this.analytics.track(user.id, EVENTS.Account.PasswordResetRequested)
+    await this.analytics.track(user.id, EVENTS.Account.PasswordResetRequested)
     // generate and set reset token on user
     const token = this.authenticationService.generatePasswordResetToken()
     user = await this.usersService.setResetToken(user.id, token)

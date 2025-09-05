@@ -1,4 +1,3 @@
-// src/shared/segment/segment.service.ts
 import { Injectable, Logger } from '@nestjs/common'
 import Analytics from '@segment/analytics-node'
 import { pickKeys } from 'src/shared/util/objects.util'
@@ -20,7 +19,6 @@ export class SegmentService {
         'SEGMENT_WRITE_KEY is not defined. Please add it to your .env',
       )
     }
-
     this.analytics = new Analytics({ writeKey: SEGMENT_WRITE_KEY })
   }
 
