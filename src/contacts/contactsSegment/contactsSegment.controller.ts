@@ -38,14 +38,14 @@ export class ContactsSegmentController {
     @Param('id', ParseIntPipe) id: number,
     @ReqCampaign() campaign: Campaign,
   ) {
-    return this.contactsSegmentService
-      .findByIdAndCampaignId(id, campaign.id)
-      .then((segment) => {
-        if (!segment) {
-          throw new NotFoundException('Contacts segment not found')
-        }
-        return segment
-      })
+    const segment = await this.contactsSegmentService.findByIdAndCampaignId(
+      id,
+      campaign.id,
+    )
+    if (!segment) {
+      throw new NotFoundException('Contacts segment not found')
+    }
+    return segment
   }
 
   @Post()
@@ -62,13 +62,13 @@ export class ContactsSegmentController {
     @Body() body: UpdateContactsSegmentDto,
     @ReqCampaign() campaign: Campaign,
   ) {
-    await this.contactsSegmentService
-      .findByIdAndCampaignId(id, campaign.id)
-      .then((segment) => {
-        if (!segment) {
-          throw new NotFoundException('Contacts segment not found')
-        }
-      })
+    const segment = await this.contactsSegmentService.findByIdAndCampaignId(
+      id,
+      campaign.id,
+    )
+    if (!segment) {
+      throw new NotFoundException('Contacts segment not found')
+    }
     return this.contactsSegmentService.update(id, body, campaign.id)
   }
 
@@ -78,13 +78,13 @@ export class ContactsSegmentController {
     @Param('id', ParseIntPipe) id: number,
     @ReqCampaign() campaign: Campaign,
   ) {
-    await this.contactsSegmentService
-      .findByIdAndCampaignId(id, campaign.id)
-      .then((segment) => {
-        if (!segment) {
-          throw new NotFoundException('Contacts segment not found')
-        }
-      })
+    const segment = await this.contactsSegmentService.findByIdAndCampaignId(
+      id,
+      campaign.id,
+    )
+    if (!segment) {
+      throw new NotFoundException('Contacts segment not found')
+    }
     await this.contactsSegmentService.delete(id, campaign.id)
   }
 }
