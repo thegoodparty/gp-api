@@ -78,7 +78,7 @@ model ContactsSegment {
   ethnicityHispanic          Boolean  @default(false) @map("ethnicity_hispanic")
   ethnicityUnknown           Boolean  @default(false) @map("ethnicity_unknown")
 
-  campaignId Int      @unique @map("campaign_id")
+  campaignId Int      @map("campaign_id")
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@unique([name, campaignId])
