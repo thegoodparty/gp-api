@@ -23,8 +23,13 @@ export class AnalyticsService {
     eventName: string,
     properties?: SegmentTrackEventProperties,
   ) {
-    const user = await this.usersService.findFirst({ where: { id: userId } })
-    const email = user?.email
+    let email: string | undefined
+    try {
+      const user = await this.usersService.findFirst({ where: { id: userId } })
+      email = user?.email
+    } catch (e) {
+      this.logger.error('Error fetching user for analytics', e)
+    }
     this.segment.trackEvent(userId, eventName, {
       ...(email ? { email } : {}),
       ...properties,
