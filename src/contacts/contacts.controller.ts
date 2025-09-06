@@ -1,9 +1,11 @@
 import { Controller, Get, Query, UsePipes } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ContactsService } from './contacts.service'
 import { ListContactsDTO } from './schemas/listContacts.schema'
 
 @Controller('contacts')
+@UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
