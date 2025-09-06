@@ -161,7 +161,9 @@ export class OutreachController {
 
       // Redeem free texts offer if eligible
       try {
-        const hasOffer = await this.campaignsService.checkFreeTextsEligibility(campaign.id)
+        const hasOffer = await this.campaignsService.checkFreeTextsEligibility(
+          campaign.id,
+        )
         if (hasOffer) {
           await this.campaignsService.redeemFreeTexts(campaign.id)
           this.logger.log(

@@ -40,9 +40,10 @@ export class P2pController {
 
       if (statusResponse.Data.list_state !== PhoneListState.ACTIVE) {
         const status = statusResponse.Data.list_state || 'unknown'
-        const message = status === PhoneListState.PROCESSING 
-          ? 'Phone list is still processing. Please try again in a few moments.'
-          : `Phone list is not ready. Current status: ${status}`
+        const message =
+          status === PhoneListState.PROCESSING
+            ? 'Phone list is still processing. Please try again in a few moments.'
+            : `Phone list is not ready. Current status: ${status}`
         throw new BadGatewayException(message)
       }
 
