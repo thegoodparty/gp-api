@@ -25,6 +25,7 @@ export interface AudienceFieldsInput {
   age50Plus?: boolean
   genderMale?: boolean
   genderFemale?: boolean
+  genderUnknown?: boolean
 }
 
 export interface AudienceFieldsOutput {
@@ -42,6 +43,7 @@ export interface AudienceFieldsOutput {
   age_50_plus?: boolean
   gender_male?: boolean
   gender_female?: boolean
+  gender_unknown?: boolean
 }
 
 /**
@@ -56,9 +58,10 @@ export interface AudienceFieldsOutput {
  * const result = mapAudienceFields({
  *   audienceSuperVoters: true,
  *   partyIndependent: true,
+ *   genderUnknown: true,
  *   age18_25: false
  * })
- * // Returns: { audience_superVoters: true, party_independent: true }
+ * // Returns: { audience_superVoters: true, party_independent: true, gender_unknown: true }
  * ```
  */
 export function mapAudienceFields(
@@ -89,6 +92,7 @@ export function mapAudienceFields(
     ...(input.age50Plus === true ? { age_50_plus: true } : {}),
     ...(input.genderMale === true ? { gender_male: true } : {}),
     ...(input.genderFemale === true ? { gender_female: true } : {}),
+    ...(input.genderUnknown === true ? { gender_unknown: true } : {}),
   }
 }
 

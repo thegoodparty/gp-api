@@ -17,6 +17,7 @@ model VoterFileFilter {
   age50Plus                Boolean?   @default(false) @map("age_50_plus")
   genderMale               Boolean?   @default(false) @map("gender_male")
   genderFemale             Boolean?   @default(false) @map("gender_female")
+  genderUnknown            Boolean?   @default(false) @map("gender_unknown")
   voterCount               Int?       @map("voter_count")
   campaign                 Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId               Int        @map("campaign_id")
