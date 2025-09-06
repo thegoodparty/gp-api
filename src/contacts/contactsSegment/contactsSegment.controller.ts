@@ -18,7 +18,7 @@ import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CreateContactsSegmentDto } from './schemas/CreateContactsSegment.schema'
 import { UpdateContactsSegmentDto } from './schemas/UpdateContactsSegment.schema'
-import { ContactsSegmentService } from './services/contactsSegment.service'
+import { ContactsSegmentService } from './contactsSegment.service'
 
 @Controller('contacts-segment')
 @UseCampaign()

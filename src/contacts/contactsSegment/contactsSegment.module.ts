@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { ContactsSegmentController } from './contactsSegment.controller'
-import { ContactsSegmentService } from './services/contactsSegment.service'
+import { ContactsSegmentService } from './contactsSegment.service'
 
 @Module({
   imports: [CampaignsModule],

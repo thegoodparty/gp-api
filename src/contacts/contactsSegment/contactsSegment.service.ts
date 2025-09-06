@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { ContactsSegment } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CreateContactsSegmentDto } from '../schemas/CreateContactsSegment.schema'
-import { UpdateContactsSegmentDto } from '../schemas/UpdateContactsSegment.schema'
+import { CreateContactsSegmentDto } from './schemas/CreateContactsSegment.schema'
+import { UpdateContactsSegmentDto } from './schemas/UpdateContactsSegment.schema'
 
 @Injectable()
 export class ContactsSegmentService extends createPrismaBase(
