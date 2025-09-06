@@ -23,6 +23,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { PeerlyP2pJobService } from '../peerly/services/peerlyP2pJob.service'
 import { Readable } from 'stream'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { CampaignsService } from '../campaigns/services/campaigns.service'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -34,6 +35,7 @@ export class OutreachController {
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
+    private readonly campaignsService: CampaignsService,
   ) {}
 
   @Post()
@@ -148,7 +150,7 @@ export class OutreachController {
         didState: createOutreachDto.didState,
       })
 
-      return this.outreachService.create(
+      const outreach = await this.outreachService.create(
         {
           ...createOutreachDto,
           projectId: jobId,
@@ -156,6 +158,25 @@ export class OutreachController {
         },
         imageUrl,
       )
+
+      // Redeem free texts offer if eligible
+      try {
+        const hasOffer = await this.campaignsService.checkFreeTextsEligibility(campaign.id)
+        if (hasOffer) {
+          await this.campaignsService.redeemFreeTexts(campaign.id)
+          this.logger.log(
+            `Free texts offer redeemed for campaign ${campaign.id} during P2P outreach creation`,
+          )
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to redeem free texts offer for campaign ${campaign.id}:`,
+          error,
+        )
+        // Don't fail the outreach creation if redemption fails
+      }
+
+      return outreach
     } catch (error) {
       this.logger.error('Failed to create P2P outreach', error)
       throw new BadRequestException(
