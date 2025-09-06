@@ -59,14 +59,6 @@ export class OutreachController {
 
     const { outreachType, date } = createOutreachDto
 
-    this.logger.debug('Creating outreach', {
-      outreachType,
-      hasImage: !!image,
-      imageSize: image?.size,
-      imageMimeType: image?.mimetype,
-      imageFilename: image?.filename,
-    })
-
     if (outreachType === OutreachType.text && !image) {
       throw new BadRequestException(
         'image is required for text outreach campaigns',
