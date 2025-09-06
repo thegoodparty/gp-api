@@ -41,6 +41,7 @@ model Campaign {
   tcrCompliance         TcrCompliance?
   voterFileFilters      VoterFileFilter[]
   website               Website?
+  contactSegments       ContactsSegment[]
   outreach              Outreach[]
   communityIssue        CommunityIssue[]
 

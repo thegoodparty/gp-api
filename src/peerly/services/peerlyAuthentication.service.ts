@@ -6,6 +6,7 @@ import { format } from '@redtea/format-axios-error'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { JwtService } from '@nestjs/jwt'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
+import { AxiosResponse } from 'axios'
 
 const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
 
@@ -16,8 +17,25 @@ interface DecodedPeerlyToken {
   exp: number
 }
 
+export interface PeerlyAuthenticatedUser {
+  user_id: number
+  last_name: string
+  email: string
+  user_type: string
+  identities: any[]
+  first_name: string
+  local_timezone: string
+}
+
+interface PeerlyAuthenticationResponseBody {
+  user: PeerlyAuthenticatedUser
+  root_accounts: string[]
+  token: string
+}
+
 @Injectable()
 export class PeerlyAuthenticationService extends PeerlyBaseConfig {
+  private authenticatedUser: PeerlyAuthenticatedUser | null = null
   private token: string | null = null
   private tokenExpiry: number | null = null
   private readonly tokenRenewalThreshold = 5 * 60 // 5 minutes in seconds
@@ -40,23 +58,30 @@ export class PeerlyAuthenticationService extends PeerlyBaseConfig {
 
   private async renewToken(): Promise<void> {
     try {
-      const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/token-auth`, {
-          email: this.email,
-          password: this.password,
-        }),
-      )
-      const { data } = response
-      if (data?.token) {
-        const decodedToken: DecodedPeerlyToken = this.jwtService.decode(
-          data.token,
+      const response: AxiosResponse<PeerlyAuthenticationResponseBody> =
+        await lastValueFrom(
+          this.httpService.post(`${this.baseUrl}/token-auth`, {
+            email: this.email,
+            password: this.password,
+          }),
         )
+      const { data } = response
+      if (!data) {
+        this.logger.error('No data received from Peerly token-auth endpoint')
+        throw new Error('Peerly token renewal failed: No data received')
+      }
+
+      const { token, user } = data
+      this.authenticatedUser = user
+
+      if (token) {
+        const decodedToken: DecodedPeerlyToken = this.jwtService.decode(token)
         if (
           decodedToken &&
           typeof decodedToken === 'object' &&
           'exp' in decodedToken
         ) {
-          this.token = data.token
+          this.token = token
           this.tokenExpiry = decodedToken.exp as number
           this.logger.debug(
             `Successfully renewed Peerly token${
@@ -90,6 +115,11 @@ export class PeerlyAuthenticationService extends PeerlyBaseConfig {
     return this.token
   }
 
+  getAuthenticatedUser(): PeerlyAuthenticatedUser | null {
+    return this.authenticatedUser
+  }
+
+  // Initial authentication on service startup
   @Timeout(0)
   async authenticate() {
     await this.renewToken()

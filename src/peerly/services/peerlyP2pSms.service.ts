@@ -6,8 +6,8 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
-import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { AxiosResponse } from 'axios'
+import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials'
 
 interface Template {
   is_default: boolean
@@ -180,12 +180,16 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     }
   }
 
-  async requestCanvassers(
-    jobId: string,
-    initials: string = P2P_JOB_DEFAULTS.CANVASSER_INITIALS,
-  ): Promise<void> {
+  async requestCanvassers(jobId: string): Promise<void> {
+    const authenticatedUser = await this.peerlyAuth.getAuthenticatedUser()
+    if (!authenticatedUser) {
+      throw new BadGatewayException(
+        'Cannot request canvassers: No authenticated user',
+      )
+    }
+
     const body = {
-      requested_initials: initials,
+      requested_initials: getAuthenticatedUserInitials(authenticatedUser),
     }
 
     try {
