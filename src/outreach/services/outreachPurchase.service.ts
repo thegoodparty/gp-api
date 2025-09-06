@@ -31,21 +31,49 @@ export class OutreachPurchaseHandlerService
     campaignId,
     outreachType,
   }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<number> {
+    this.logger.debug('Calculating amount for outreach purchase', {
+      contactCount,
+      pricePerContact,
+      campaignId,
+      outreachType,
+    })
+
     if (!campaignId || outreachType !== 'p2p') {
+      this.logger.debug('No discount applied - missing campaignId or not p2p type', {
+        campaignId,
+        outreachType,
+      })
       return contactCount * pricePerContact
     }
 
     const hasOffer =
       await this.campaignsService.checkFreeTextsEligibility(campaignId)
 
+    this.logger.debug('Free texts offer eligibility check', {
+      campaignId,
+      hasOffer,
+    })
+
     if (hasOffer) {
       const discountedContactCount = Math.max(
         0,
         contactCount - FREE_TEXTS_OFFER.COUNT,
       )
-      return discountedContactCount * pricePerContact
+      const finalAmount = discountedContactCount * pricePerContact
+      this.logger.debug('Applied free texts discount', {
+        originalContactCount: contactCount,
+        freeTextsCount: FREE_TEXTS_OFFER.COUNT,
+        discountedContactCount,
+        pricePerContact,
+        finalAmount,
+      })
+      return finalAmount
     }
 
+    this.logger.debug('No free texts offer - full price', {
+      campaignId,
+      finalAmount: contactCount * pricePerContact,
+    })
     return contactCount * pricePerContact
   }
 

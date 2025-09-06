@@ -39,9 +39,10 @@ export class PurchaseService {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
     }
 
-    this.logger.debug('Creating purchase intent', dto)
+    this.logger.debug('Creating purchase intent', { type: dto.type, metadata: dto.metadata })
     await handler.validatePurchase(dto.metadata)
     const amount = await handler.calculateAmount(dto.metadata)
+    this.logger.debug('Calculated amount for purchase intent', { amount, metadata: dto.metadata })
 
     const paymentMetadata = {
       type: this.getPaymentType(dto.type),
