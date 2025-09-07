@@ -74,11 +74,15 @@ export class ContactsService {
       )
     }
 
+    if (!campaign.details) {
+      throw new BadRequestException('Campaign details are missing')
+    }
+
     const state = campaign.details.state
 
     const districtType = electionType.replace(/_/g, ' ')
 
-    if (state?.length !== 2) {
+    if (!state || state.length !== 2) {
       throw new BadRequestException('Invalid state code in campaign data')
     }
 
