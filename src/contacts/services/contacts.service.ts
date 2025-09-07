@@ -7,7 +7,7 @@ import {
 import { HttpService } from '@nestjs/axios'
 import { Campaign, PathToVictory } from '@prisma/client'
 import { lastValueFrom } from 'rxjs'
-import { ListContactsDTO } from './schemas/listContacts.schema'
+import { ListContactsDTO } from '../schemas/listContacts.schema'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null

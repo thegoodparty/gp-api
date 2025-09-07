@@ -3,7 +3,7 @@ import { Campaign, PathToVictory } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { ContactsService } from './contacts.service'
+import { ContactsService } from './services/contacts.service'
 import { ListContactsDTO } from './schemas/listContacts.schema'
 
 type CampaignWithPathToVictory = Campaign & {
