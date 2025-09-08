@@ -1,14 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import {
-  VoterDatabaseService
-} from '../../voters/services/voterDatabase.service'
+import { VoterDatabaseService } from '../../voters/services/voterDatabase.service'
 import { PeerlyPhoneListService } from './peerlyPhoneList.service'
-import {
-  CampaignTcrComplianceService
-} from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import {
-  P2pPhoneListRequestSchema
-} from '../schemas/p2pPhoneListRequest.schema'
+import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
 import { VoterFileType } from '../../voters/voterFile/voterFile.types'
 import {
   CHANNELS,

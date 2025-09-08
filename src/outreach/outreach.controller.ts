@@ -82,12 +82,14 @@ export class OutreachController {
       if (!imageUrl) {
         throw new BadRequestException('Failed to upload image for P2P outreach')
       }
-      return this.createP2pOutreach(
+      const outreach = await this.createP2pOutreach(
         campaign,
         createOutreachDto,
         image,
         imageUrl,
       )
+
+      return outreach
     }
 
     return this.outreachService.create(createOutreachDto, imageUrl)
@@ -146,7 +148,7 @@ export class OutreachController {
         didState: createOutreachDto.didState,
       })
 
-      return this.outreachService.create(
+      const outreach = await this.outreachService.create(
         {
           ...createOutreachDto,
           projectId: jobId,
@@ -154,6 +156,9 @@ export class OutreachController {
         },
         imageUrl,
       )
+
+
+      return outreach
     } catch (error) {
       this.logger.error('Failed to create P2P outreach', error)
       throw new BadRequestException(

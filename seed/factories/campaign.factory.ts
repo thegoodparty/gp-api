@@ -62,6 +62,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     vendorTsData: {},
     completedTaskIds: [],
     canDownloadFederal: faker.datatype.boolean(0.3),
+    hasFreeTextsOffer: faker.datatype.boolean(0.2),
   }
 
   // NOTE: putting this in the object literal above gives a TS error on the generationStatus key

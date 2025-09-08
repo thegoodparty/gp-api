@@ -37,7 +37,6 @@ export function typeToQuery(
   selectedColumns?: GetVoterFileSchema['selectedColumns'],
   limit?: number,
 ) {
-
   const state = campaign.details.state
   const electionDate: string | undefined = campaign.details?.electionDate
   const electionYear = electionDate
