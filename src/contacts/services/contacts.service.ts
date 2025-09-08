@@ -19,18 +19,18 @@ const { PEOPLE_API_URL } = process.env
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
 
-  constructor(private readonly httpService: HttpService) {}
-
-  async findContacts(
-    dto: ListContactsDTO,
-    campaign: CampaignWithPathToVictory,
-  ) {
+  constructor(private readonly httpService: HttpService) {
     if (!PEOPLE_API_URL) {
       throw new BadGatewayException(
         'PEOPLE_API_URL environment variable not configured',
       )
     }
+  }
 
+  async findContacts(
+    dto: ListContactsDTO,
+    campaign: CampaignWithPathToVictory,
+  ) {
     const { resultsPerPage, page } = dto
 
     const locationData = this.extractLocationFromCampaign(campaign)
