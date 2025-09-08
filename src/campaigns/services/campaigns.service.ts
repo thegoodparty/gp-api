@@ -357,28 +357,39 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   }
 
   async redeemFreeTexts(campaignId: number): Promise<void> {
-    const campaign = await this.model.findUnique({
-      where: { id: campaignId },
-      select: { hasFreeTextsOffer: true, userId: true },
-    })
+    const result = await this.client.$transaction(
+      async (tx) => {
+        const updatedCampaign = await tx.campaign.updateMany({
+          where: {
+            id: campaignId,
+            hasFreeTextsOffer: true,
+          },
+          data: { hasFreeTextsOffer: false },
+        })
 
-    if (!campaign?.hasFreeTextsOffer) {
-      throw new Error('No free texts offer available for this campaign')
-    }
+        if (updatedCampaign.count === 0) {
+          throw new BadRequestException(
+            'No free texts offer available for this campaign',
+          )
+        }
 
-    await this.model.update({
-      where: { id: campaignId },
-      data: { hasFreeTextsOffer: false },
-    })
+        const campaign = await tx.campaign.findUnique({
+          where: { id: campaignId },
+          select: { userId: true },
+        })
 
-    this.analytics.track(
-      campaign.userId,
-      EVENTS.Outreach.FreeTextsOfferRedeemed,
+        return campaign?.userId
+      },
       {
-        campaignId,
-        redeemedAt: new Date().toISOString(),
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       },
     )
+    if (result) {
+      this.analytics.track(result, EVENTS.Outreach.FreeTextsOfferRedeemed, {
+        campaignId,
+        redeemedAt: new Date().toISOString(),
+      })
+    }
   }
 
   async getStatus(campaign?: Campaign) {
