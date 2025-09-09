@@ -354,10 +354,10 @@ export class RacesService {
         )
 
         // If we couldn't get city/county with mtfcc/geo then use the AI.
-        //  locationResp = await this.extractLocationAi(
-        //    officeName + ' - ' + electionState,
-        //    level,
-        //  )
+        locationResp = await this.extractLocationAi(
+          officeName + ' - ' + electionState,
+          level,
+        )
         this.logger.debug(slug, 'locationResp', locationResp)
       }
 
