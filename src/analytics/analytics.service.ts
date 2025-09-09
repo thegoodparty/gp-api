@@ -1,24 +1,39 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import { SegmentService } from 'src/segment/segment.service'
 import Stripe from 'stripe'
 import {
   EVENTS,
-  SegmentTrackEventProperties,
   SegmentIdentityTraits,
+  SegmentTrackEventProperties,
 } from 'src/segment/segment.types'
+import { UsersService } from '../users/services/users.service'
 
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name)
 
-  constructor(private readonly segment: SegmentService) {}
+  constructor(
+    private readonly segment: SegmentService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
+  ) {}
 
-  track(
+  async track(
     userId: number,
     eventName: string,
     properties?: SegmentTrackEventProperties,
   ) {
-    this.segment.trackEvent(userId, eventName, properties)
+    let email: string | undefined
+    try {
+      const user = await this.usersService.findFirst({ where: { id: userId } })
+      email = user?.email
+    } catch (e) {
+      this.logger.error('Error fetching user for analytics', e)
+    }
+    this.segment.trackEvent(userId, eventName, {
+      ...(email ? { email } : {}),
+      ...properties,
+    })
   }
 
   identify(userId: number, traits: SegmentIdentityTraits) {
@@ -38,7 +53,7 @@ export class AnalyticsService {
       const paymentMethod =
         pm.type === 'card' ? (pm.card?.wallet?.type ?? 'credit card') : pm.type
 
-      this.segment.trackEvent(userId, EVENTS.Account.ProSubscriptionConfirmed, {
+      this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
         price,
         paymentMethod,
         renewalDate: new Date(

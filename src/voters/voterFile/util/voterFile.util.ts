@@ -164,15 +164,6 @@ export function typeToQuery(
       "Residence_Addresses_Zip"`
     }
 
-    if (type === 'sms') {
-      columns += `, "VoterTelephones_CellPhoneFormatted"`
-      if (whereClause) {
-        whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-      } else {
-        whereClause += `"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-      }
-    }
-
     if (type === 'digitalAds') {
       columns += `, "VoterTelephones_CellPhoneFormatted",
       "Residence_Addresses_AddressLine", 
@@ -213,6 +204,15 @@ export function typeToQuery(
       "Languages_Description"`
 
       whereClause += ` AND "VoterTelephones_LandlineFormatted" IS NOT NULL`
+    }
+  }
+
+  if (type === 'sms') {
+    columns += `, "VoterTelephones_CellPhoneFormatted"`
+    if (whereClause) {
+      whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
+    } else {
+      whereClause += `"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
     }
   }
 

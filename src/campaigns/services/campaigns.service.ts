@@ -8,6 +8,7 @@ import {
 import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/segment/segment.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { SlackService } from 'src/shared/services/slack.service'
@@ -319,9 +320,19 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     isPro: boolean = true,
     trackCampaign: boolean = true,
   ) {
+    const existingCampaign = await this.model.findUnique({
+      where: { id: campaignId },
+      select: { isPro: true, hasFreeTextsOffer: true },
+    })
+
+    const isBecomingProFirstTime = !existingCampaign?.isPro && isPro
+
     const campaign = await this.model.update({
       where: { id: campaignId },
-      data: { isPro },
+      data: {
+        isPro,
+        ...(isBecomingProFirstTime && { hasFreeTextsOffer: true }),
+      },
     })
     // Must be in serial so as to not overwrite campaign details w/ concurrent queries
     await this.patchCampaignDetails(campaignId, {
@@ -334,6 +345,50 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
       }
       await this.crm.trackCampaign(campaignId)
+    }
+  }
+
+  async checkFreeTextsEligibility(campaignId: number): Promise<boolean> {
+    const campaign = await this.model.findUnique({
+      where: { id: campaignId },
+      select: { hasFreeTextsOffer: true },
+    })
+    return campaign?.hasFreeTextsOffer ?? false
+  }
+
+  async redeemFreeTexts(campaignId: number): Promise<void> {
+    const result = await this.client.$transaction(
+      async (tx) => {
+        const updatedCampaign = await tx.campaign.updateMany({
+          where: {
+            id: campaignId,
+            hasFreeTextsOffer: true,
+          },
+          data: { hasFreeTextsOffer: false },
+        })
+
+        if (updatedCampaign.count === 0) {
+          throw new BadRequestException(
+            'No free texts offer available for this campaign',
+          )
+        }
+
+        const campaign = await tx.campaign.findUnique({
+          where: { id: campaignId },
+          select: { userId: true },
+        })
+
+        return campaign?.userId
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    )
+    if (result) {
+      this.analytics.track(result, EVENTS.Outreach.FreeTextsOfferRedeemed, {
+        campaignId,
+        redeemedAt: new Date().toISOString(),
+      })
     }
   }
 

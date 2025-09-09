@@ -39,7 +39,6 @@ export class PurchaseService {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
     }
 
-    this.logger.debug('Creating purchase intent', dto)
     await handler.validatePurchase(dto.metadata)
     const amount = await handler.calculateAmount(dto.metadata)
 

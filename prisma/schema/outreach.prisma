@@ -33,7 +33,7 @@ model Outreach {
   date              DateTime?
   imageUrl          String?          @map("image_url")
   voterFileFilter   VoterFileFilter? @relation(fields: [voterFileFilterId], references: [id])
-  voterFileFilterId Int?             @unique @map("voter_file_filter_id")
+  voterFileFilterId Int?             @map("voter_file_filter_id")
   phoneListId       Int?             @map("phone_list_id")
   // P2P-specific fields
   identityId        String?          @map("identity_id")
