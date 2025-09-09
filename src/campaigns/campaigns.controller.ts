@@ -101,7 +101,7 @@ export class CampaignsController {
     }
 
     if (p2vStatus === P2VStatus.waiting) {
-      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
     }
 
     return p2v

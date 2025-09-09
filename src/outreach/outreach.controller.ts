@@ -12,7 +12,7 @@ import {
 import { OutreachService } from './services/outreach.service'
 import { CreateOutreachSchema } from './schemas/createOutreachSchema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign, OutreachType } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqFile } from '../files/decorators/ReqFiles.decorator'
 import { FileUpload } from '../files/files.types'
@@ -21,8 +21,8 @@ import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PeerlyP2pJobService } from '../peerly/services/peerlyP2pJob.service'
-import { OutreachStatus } from '@prisma/client'
 import { Readable } from 'stream'
+import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -30,6 +30,7 @@ export class OutreachController {
   private readonly logger = new Logger(OutreachController.name)
 
   constructor(
+    private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
@@ -81,12 +82,14 @@ export class OutreachController {
       if (!imageUrl) {
         throw new BadRequestException('Failed to upload image for P2P outreach')
       }
-      return this.createP2pOutreach(
+      const outreach = await this.createP2pOutreach(
         campaign,
         createOutreachDto,
         image,
         imageUrl,
       )
+
+      return outreach
     }
 
     return this.outreachService.create(createOutreachDto, imageUrl)
@@ -117,6 +120,19 @@ export class OutreachController {
         imageStream = image.data as Readable
       }
 
+      const { peerlyIdentityId } =
+        await this.tcrComplianceService.findFirstOrThrow({
+          where: {
+            campaignId: campaign.id,
+          },
+        })
+
+      if (!peerlyIdentityId) {
+        throw new BadRequestException(
+          'TCR Compliance Peerly identity ID is required for P2P outreach',
+        )
+      }
+
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         listId: createOutreachDto.phoneListId!,
@@ -127,12 +143,12 @@ export class OutreachController {
           title: createOutreachDto.title,
         },
         scriptText: createOutreachDto.script!,
-        identityId: createOutreachDto.identityId!,
+        identityId: peerlyIdentityId!,
         name: createOutreachDto.name,
         didState: createOutreachDto.didState,
       })
 
-      return this.outreachService.create(
+      const outreach = await this.outreachService.create(
         {
           ...createOutreachDto,
           projectId: jobId,
@@ -140,6 +156,9 @@ export class OutreachController {
         },
         imageUrl,
       )
+
+
+      return outreach
     } catch (error) {
       this.logger.error('Failed to create P2P outreach', error)
       throw new BadRequestException(

@@ -36,10 +36,12 @@ model Campaign {
   aiChats               AiChat[]
   ecanvasser            Ecanvasser?
   completedTaskIds      String[]                @default([]) @map("completed_task_ids")
+  hasFreeTextsOffer     Boolean                 @default(false) @map("has_free_texts_offer")
   ScheduledMessage      ScheduledMessage[]
   tcrCompliance         TcrCompliance?
   voterFileFilters      VoterFileFilter[]
   website               Website?
+  contactSegments       ContactsSegment[]
   outreach              Outreach[]
   communityIssue        CommunityIssue[]
 

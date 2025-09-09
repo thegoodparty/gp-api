@@ -1,8 +1,8 @@
 import {
-  Injectable,
   CanActivate,
-  Logger,
   ExecutionContext,
+  Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
@@ -11,6 +11,7 @@ import {
   REQUIRE_CAMPAIGN_META_KEY,
   RequireCamapaignMetadata,
 } from '../decorators/UseCampaign.decorator'
+import { CampaignWith } from '../campaigns.types'
 
 @Injectable()
 /**
@@ -42,7 +43,7 @@ export class UseCampaignGuard implements CanActivate {
 
     if (campaign) {
       // store on request to access with @UserCampaign decorator
-      request.campaign = campaign
+      request.campaign = campaign as CampaignWith<'pathToVictory'>
       return true
     } else if (continueIfNotFound === true) {
       // if continueIfNotFound, allow request handler to continue

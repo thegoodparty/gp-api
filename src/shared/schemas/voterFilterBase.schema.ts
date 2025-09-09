@@ -19,4 +19,5 @@ export const voterFilterBaseSchema = z.object({
   age50Plus: z.boolean().optional(),
   genderMale: z.boolean().optional(),
   genderFemale: z.boolean().optional(),
+  genderUnknown: z.boolean().optional(),
 })
