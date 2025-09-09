@@ -3,7 +3,10 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { GeoData } from '../types/elections.types'
+import { PositionLevel } from 'src/generated/graphql.types'
+import { AiService } from '../../ai/ai.service'
+import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
+import { GEO_TYPES, MTFCC_TYPES } from '../constants/geo.consts'
 import {
   CITY_PROMPT,
   COUNTY_PROMPT,
@@ -11,15 +14,12 @@ import {
   TOWNSHIP_PROMPT,
   VILLAGE_PROMPT,
 } from '../constants/prompts.consts'
-import { GEO_TYPES, MTFCC_TYPES } from '../constants/geo.consts'
-import { CensusEntitiesService } from './censusEntities.service'
-import { BallotReadyService } from './ballotReady.service'
-import { PositionLevel } from 'src/generated/graphql.types'
-import { AiService } from '../../ai/ai.service'
-import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
-import { parseRaces } from '../util/parseRaces.util'
-import { RaceNode } from '../types/ballotReady.types'
 import { RacesByZipSchema } from '../schemas/RacesByZip.schema'
+import { RaceNode } from '../types/ballotReady.types'
+import { GeoData } from '../types/elections.types'
+import { parseRaces } from '../util/parseRaces.util'
+import { BallotReadyService } from './ballotReady.service'
+import { CensusEntitiesService } from './censusEntities.service'
 
 @Injectable()
 export class RacesService {
