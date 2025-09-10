@@ -18,27 +18,22 @@ type CampaignWithPathToVictory = Campaign & {
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
+if (!PEOPLE_API_URL) {
+  throw new Error('Please set PEOPLE_API_URL in your .env')
+}
+if (!PEOPLE_API_S2S_SECRET) {
+  throw new Error('Please set PEOPLE_API_S2S_SECRET in your .env')
+}
+
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
   private cachedToken: string | null = null
-  private tokenExpiration: number = 0
 
   constructor(
     private readonly httpService: HttpService,
     private readonly contactsSegmentService: ContactsSegmentService,
-  ) {
-    if (!PEOPLE_API_URL) {
-      throw new BadGatewayException(
-        'PEOPLE_API_URL environment variable not configured',
-      )
-    }
-    if (!PEOPLE_API_S2S_SECRET) {
-      throw new BadGatewayException(
-        'PEOPLE_API_S2S_SECRET environment variable not configured',
-      )
-    }
-  }
+  ) {}
 
   async findContacts(
     dto: ListContactsDTO,
@@ -80,28 +75,39 @@ export class ContactsService {
   }
 
   private getValidS2SToken(): string {
-    const now = Math.floor(Date.now() / 1000)
-    const bufferTime = 60
-
-    if (this.cachedToken && this.tokenExpiration > now + bufferTime) {
+    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
       return this.cachedToken
     }
 
     return this.generateAndCacheS2SToken()
   }
 
+  private isTokenValid(token: string): boolean {
+    try {
+      const decoded = jwt.decode(token) as { exp?: number }
+      if (!decoded || !decoded.exp) {
+        return false
+      }
+
+      const now = Math.floor(Date.now() / 1000)
+      const bufferTime = 60
+
+      return decoded.exp > now + bufferTime
+    } catch {
+      return false
+    }
+  }
+
   private generateAndCacheS2SToken(): string {
     const now = Math.floor(Date.now() / 1000)
-    const expirationTime = now + 300
 
     const payload = {
       iss: 'gp-api',
       iat: now,
-      exp: expirationTime,
+      exp: now + 300,
     }
 
     this.cachedToken = jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
-    this.tokenExpiration = expirationTime
 
     return this.cachedToken
   }
