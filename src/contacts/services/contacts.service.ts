@@ -8,12 +8,13 @@ import { HttpService } from '@nestjs/axios'
 import { Campaign, PathToVictory } from '@prisma/client'
 import { lastValueFrom } from 'rxjs'
 import { ListContactsDTO } from '../schemas/listContacts.schema'
+import jwt from 'jsonwebtoken'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
 }
 
-const { PEOPLE_API_URL } = process.env
+const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
 @Injectable()
 export class ContactsService {
@@ -23,6 +24,11 @@ export class ContactsService {
     if (!PEOPLE_API_URL) {
       throw new BadGatewayException(
         'PEOPLE_API_URL environment variable not configured',
+      )
+    }
+    if (!PEOPLE_API_S2S_SECRET) {
+      throw new BadGatewayException(
+        'PEOPLE_API_S2S_SECRET environment variable not configured',
       )
     }
   }
@@ -44,9 +50,15 @@ export class ContactsService {
     })
 
     try {
+      const token = this.generateS2SToken()
       const response = await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}/v1/people/list?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         ),
       )
       return response.data
@@ -54,6 +66,15 @@ export class ContactsService {
       this.logger.error('Failed to fetch contacts from people API', error)
       throw new BadGatewayException('Failed to fetch contacts from people API')
     }
+  }
+
+  private generateS2SToken(): string {
+    const payload = {
+      iss: 'gp-api',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 300,
+    }
+    return jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
   }
 
   private extractLocationFromCampaign(campaign: CampaignWithPathToVictory): {
