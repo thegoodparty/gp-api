@@ -9,6 +9,7 @@ import { Campaign, PathToVictory } from '@prisma/client'
 import { lastValueFrom } from 'rxjs'
 import { ListContactsDTO } from '../schemas/listContacts.schema'
 import jwt from 'jsonwebtoken'
+import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -39,7 +40,13 @@ export class ContactsService {
     dto: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    const { resultsPerPage, page } = dto
+    const { resultsPerPage, page, segment } = dto
+    console.log('segment', segment, typeof segment)
+    const segmentToFiltersMap =
+      defaultSegmentToFiltersMap[
+        segment as keyof typeof defaultSegmentToFiltersMap
+      ]
+    console.log('segmentToFiltersMap', segmentToFiltersMap)
 
     const locationData = this.extractLocationFromCampaign(campaign)
 
