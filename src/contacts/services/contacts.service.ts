@@ -19,6 +19,8 @@ const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
+  private cachedToken: string | null = null
+  private tokenExpiration: number = 0
 
   constructor(private readonly httpService: HttpService) {
     if (!PEOPLE_API_URL) {
@@ -50,7 +52,7 @@ export class ContactsService {
     })
 
     try {
-      const token = this.generateS2SToken()
+      const token = this.getValidS2SToken()
       const response = await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}/v1/people/list?${params.toString()}`,
@@ -68,13 +70,31 @@ export class ContactsService {
     }
   }
 
-  private generateS2SToken(): string {
+  private getValidS2SToken(): string {
+    const now = Math.floor(Date.now() / 1000)
+    const bufferTime = 60
+
+    if (this.cachedToken && this.tokenExpiration > now + bufferTime) {
+      return this.cachedToken
+    }
+
+    return this.generateAndCacheS2SToken()
+  }
+
+  private generateAndCacheS2SToken(): string {
+    const now = Math.floor(Date.now() / 1000)
+    const expirationTime = now + 300
+
     const payload = {
       iss: 'gp-api',
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 300,
+      iat: now,
+      exp: expirationTime,
     }
-    return jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
+
+    this.cachedToken = jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
+    this.tokenExpiration = expirationTime
+
+    return this.cachedToken
   }
 
   private extractLocationFromCampaign(campaign: CampaignWithPathToVictory): {
