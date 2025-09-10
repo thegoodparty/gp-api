@@ -5,11 +5,12 @@ import {
   Logger,
 } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
-import { Campaign, PathToVictory } from '@prisma/client'
+import { Campaign, PathToVictory, ContactsSegment } from '@prisma/client'
 import { lastValueFrom } from 'rxjs'
 import { ListContactsDTO } from '../schemas/listContacts.schema'
 import jwt from 'jsonwebtoken'
 import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
+import { ContactsSegmentService } from '../contactsSegment/services/contactsSegment.service'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -23,7 +24,10 @@ export class ContactsService {
   private cachedToken: string | null = null
   private tokenExpiration: number = 0
 
-  constructor(private readonly httpService: HttpService) {
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly contactsSegmentService: ContactsSegmentService,
+  ) {
     if (!PEOPLE_API_URL) {
       throw new BadGatewayException(
         'PEOPLE_API_URL environment variable not configured',
@@ -41,12 +45,7 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
   ) {
     const { resultsPerPage, page, segment } = dto
-    console.log('segment', segment, typeof segment)
-    const segmentToFiltersMap =
-      defaultSegmentToFiltersMap[
-        segment as keyof typeof defaultSegmentToFiltersMap
-      ]
-    console.log('segmentToFiltersMap', segmentToFiltersMap)
+    const filters = await this.segmentToFilters(segment, campaign)
 
     const locationData = this.extractLocationFromCampaign(campaign)
 
@@ -56,6 +55,9 @@ export class ContactsService {
       districtName: locationData.districtName,
       resultsPerPage: resultsPerPage.toString(),
       page: page.toString(),
+      ...Object.fromEntries(
+        Object.entries(filters).map(([key, value]) => [key, String(value)]),
+      ),
     })
 
     try {
@@ -139,5 +141,85 @@ export class ContactsService {
       districtType,
       districtName: electionLocation,
     }
+  }
+
+  private async segmentToFilters(
+    segment: string | undefined,
+    campaign: CampaignWithPathToVictory,
+  ) {
+    const resolvedSegment = segment || 'all'
+    const segmentToFiltersMap =
+      defaultSegmentToFiltersMap[
+        resolvedSegment as keyof typeof defaultSegmentToFiltersMap
+      ]
+
+    return segmentToFiltersMap
+      ? segmentToFiltersMap.filters
+      : await this.getCustomSegmentFilters(resolvedSegment, campaign)
+  }
+
+  private async getCustomSegmentFilters(
+    segment: string,
+    campaign: CampaignWithPathToVictory,
+  ) {
+    const customSegment =
+      await this.contactsSegmentService.findByIdAndCampaignId(
+        parseInt(segment),
+        campaign.id,
+      )
+
+    return customSegment
+      ? this.convertContactsSegmentToFilters(customSegment)
+      : {}
+  }
+
+  private convertContactsSegmentToFilters(
+    segment: ContactsSegment,
+  ): Record<string, boolean> {
+    const filters: Record<string, boolean> = {}
+
+    if (segment.genderMale) filters['VoterRegistrations_Gender_Male'] = true
+    if (segment.genderFemale) filters['VoterRegistrations_Gender_Female'] = true
+    if (segment.genderUnknown)
+      filters['VoterRegistrations_Gender_Unknown'] = true
+
+    if (segment.age18_25) filters['VoterRegistrations_Age_18_25'] = true
+    if (segment.age25_35) filters['VoterRegistrations_Age_25_35'] = true
+    if (segment.age35_50) filters['VoterRegistrations_Age_35_50'] = true
+    if (segment.age50Plus) filters['VoterRegistrations_Age_50Plus'] = true
+
+    if (segment.politicalPartyDemocrat)
+      filters['VoterRegistrations_PoliticalParty_Democrat'] = true
+    if (segment.politicalPartyNonPartisan)
+      filters['VoterRegistrations_PoliticalParty_NonPartisan'] = true
+    if (segment.politicalPartyRepublican)
+      filters['VoterRegistrations_PoliticalParty_Republican'] = true
+
+    if (segment.hasCellPhone)
+      filters['VoterTelephones_CellPhoneFormatted'] = true
+    if (segment.hasLandline) filters['VoterTelephones_LandlineFormatted'] = true
+    if (segment.hasEmail) filters['VoterEmails_Email'] = true
+    if (segment.hasAddress) filters['VoterRegistrations_Address'] = true
+
+    if (segment.registeredVoterYes)
+      filters['VoterRegistrations_RegisteredVoter_Yes'] = true
+    if (segment.registeredVoterNo)
+      filters['VoterRegistrations_RegisteredVoter_No'] = true
+
+    if (segment.activeVoterYes)
+      filters['VoterRegistrations_ActiveVoter_Yes'] = true
+    if (segment.activeVoterNo)
+      filters['VoterRegistrations_ActiveVoter_No'] = true
+
+    if (segment.voterLikelyFirstTime)
+      filters['VoterRegistrations_VoterLikely_FirstTime'] = true
+    if (segment.voterLikelyLikely)
+      filters['VoterRegistrations_VoterLikely_Likely'] = true
+    if (segment.voterLikelySuper)
+      filters['VoterRegistrations_VoterLikely_Super'] = true
+    if (segment.voterLikelyUnknown)
+      filters['VoterRegistrations_VoterLikely_Unknown'] = true
+
+    return filters
   }
 }
