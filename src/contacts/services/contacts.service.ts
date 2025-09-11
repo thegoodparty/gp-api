@@ -11,6 +11,10 @@ import { ListContactsDTO } from '../schemas/listContacts.schema'
 import jwt from 'jsonwebtoken'
 import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
 import { ContactsSegmentService } from '../contactsSegment/services/contactsSegment.service'
+import {
+  CONTACTS_SEGMENT_FIELD_NAMES,
+  VOTER_FILTER_KEYS,
+} from '../contactsSegment/constants/contactsSegment.constants'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -184,47 +188,62 @@ export class ContactsService {
   ): Record<string, boolean> {
     const filters: Record<string, boolean> = {}
 
-    if (segment.genderMale) filters['VoterRegistrations_Gender_Male'] = true
-    if (segment.genderFemale) filters['VoterRegistrations_Gender_Female'] = true
-    if (segment.genderUnknown)
-      filters['VoterRegistrations_Gender_Unknown'] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_MALE])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_GENDER_MALE] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_FEMALE])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_GENDER_FEMALE] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_UNKNOWN])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_GENDER_UNKNOWN] = true
 
-    if (segment.age18_25) filters['VoterRegistrations_Age_18_25'] = true
-    if (segment.age25_35) filters['VoterRegistrations_Age_25_35'] = true
-    if (segment.age35_50) filters['VoterRegistrations_Age_35_50'] = true
-    if (segment.age50Plus) filters['VoterRegistrations_Age_50Plus'] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_18_25])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_18_25] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_25_35])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_25_35] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_35_50])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_35_50] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_50_PLUS])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_50_PLUS] = true
 
-    if (segment.politicalPartyDemocrat)
-      filters['VoterRegistrations_PoliticalParty_Democrat'] = true
-    if (segment.politicalPartyNonPartisan)
-      filters['VoterRegistrations_PoliticalParty_NonPartisan'] = true
-    if (segment.politicalPartyRepublican)
-      filters['VoterRegistrations_PoliticalParty_Republican'] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_DEMOCRAT])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_POLITICAL_PARTY_DEMOCRAT] =
+        true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_NON_PARTISAN])
+      filters[
+        VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_POLITICAL_PARTY_NON_PARTISAN
+      ] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_REPUBLICAN])
+      filters[
+        VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_POLITICAL_PARTY_REPUBLICAN
+      ] = true
 
-    if (segment.hasCellPhone)
-      filters['VoterTelephones_CellPhoneFormatted'] = true
-    if (segment.hasLandline) filters['VoterTelephones_LandlineFormatted'] = true
-    if (segment.hasEmail) filters['VoterEmails_Email'] = true
-    if (segment.hasAddress) filters['VoterRegistrations_Address'] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_CELL_PHONE])
+      filters[VOTER_FILTER_KEYS.VOTER_TELEPHONES_CELL_PHONE_FORMATTED] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_LANDLINE])
+      filters[VOTER_FILTER_KEYS.VOTER_TELEPHONES_LANDLINE_FORMATTED] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_EMAIL])
+      filters[VOTER_FILTER_KEYS.VOTER_EMAILS_EMAIL] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_ADDRESS])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_ADDRESS] = true
 
-    if (segment.registeredVoterYes)
-      filters['VoterRegistrations_RegisteredVoter_Yes'] = true
-    if (segment.registeredVoterNo)
-      filters['VoterRegistrations_RegisteredVoter_No'] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.REGISTERED_VOTER_YES])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_REGISTERED_VOTER_YES] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.REGISTERED_VOTER_NO])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_REGISTERED_VOTER_NO] = true
 
-    if (segment.activeVoterYes)
-      filters['VoterRegistrations_ActiveVoter_Yes'] = true
-    if (segment.activeVoterNo)
-      filters['VoterRegistrations_ActiveVoter_No'] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.ACTIVE_VOTER_YES])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_ACTIVE_VOTER_YES] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.ACTIVE_VOTER_NO])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_ACTIVE_VOTER_NO] = true
 
-    if (segment.voterLikelyFirstTime)
-      filters['VoterRegistrations_VoterLikely_FirstTime'] = true
-    if (segment.voterLikelyLikely)
-      filters['VoterRegistrations_VoterLikely_Likely'] = true
-    if (segment.voterLikelySuper)
-      filters['VoterRegistrations_VoterLikely_Super'] = true
-    if (segment.voterLikelyUnknown)
-      filters['VoterRegistrations_VoterLikely_Unknown'] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_FIRST_TIME])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_FIRST_TIME] =
+        true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_LIKELY])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_LIKELY] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_SUPER])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_SUPER] = true
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_UNKNOWN])
+      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_UNKNOWN] = true
 
     return filters
   }
