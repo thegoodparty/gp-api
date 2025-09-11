@@ -38,6 +38,7 @@ import {
   PEERLY_LOCALITY_CATEGORIES,
   PEERLY_USECASE,
 } from './peerly.const'
+import { ensureUrlHasProtocol } from '../../shared/util/strings.util'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -268,7 +269,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           : getUserFullName(user),
         general_campaign_email: email,
         verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-        filing_url: filingUrl,
+        filing_url: ensureUrlHasProtocol(filingUrl),
         committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
         committee_ein: ein,
         election_date: formatDate(new Date(electionDate!), DateFormats.isoDate),

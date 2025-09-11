@@ -25,6 +25,7 @@ export interface AudienceFieldsInput {
   age50Plus?: boolean
   genderMale?: boolean
   genderFemale?: boolean
+  genderUnknown?: boolean
 }
 
 export interface AudienceFieldsOutput {
@@ -42,6 +43,7 @@ export interface AudienceFieldsOutput {
   age_50_plus?: boolean
   gender_male?: boolean
   gender_female?: boolean
+  gender_unknown?: boolean
 }
 
 /**
@@ -56,9 +58,10 @@ export interface AudienceFieldsOutput {
  * const result = mapAudienceFields({
  *   audienceSuperVoters: true,
  *   partyIndependent: true,
+ *   genderUnknown: true,
  *   age18_25: false
  * })
- * // Returns: { audience_superVoters: true, party_independent: true }
+ * // Returns: { audience_superVoters: true, party_independent: true, gender_unknown: true }
  * ```
  */
 export function mapAudienceFields(
@@ -89,6 +92,7 @@ export function mapAudienceFields(
     ...(input.age50Plus === true ? { age_50_plus: true } : {}),
     ...(input.genderMale === true ? { gender_male: true } : {}),
     ...(input.genderFemale === true ? { gender_female: true } : {}),
+    ...(input.genderUnknown === true ? { gender_unknown: true } : {}),
   }
 }
 
@@ -137,23 +141,23 @@ export function mapAudienceFieldsToCustomFilters(
 }
 
 /**
- * Database column names used in voter data queries.
- * These represent the actual column names in the voter database.
+ * Actual database column names used in voter data queries.
+ * These must match columns from ALLOWED_COLUMNS in the voter module.
  */
-export const CSV_DB_COLUMN = {
-  first_name: 'first_name',
-  last_name: 'last_name',
-  phone: 'phone',
-  state: 'state',
-  city: 'city',
-  zip: 'zip',
+export const P2P_CSV_DB_COLUMN = {
+  first_name: 'Voters_FirstName',
+  last_name: 'Voters_LastName',
+  phone: 'VoterTelephones_CellPhoneFormatted',
+  state: 'Residence_Addresses_State',
+  city: 'Residence_Addresses_City',
+  zip: 'Residence_Addresses_Zip',
 } as const
 
 /**
- * CSV export column labels for voter data files.
- * These are the headers that appear in exported CSV files.
+ * CSV export column labels for P2P phone list files.
+ * These are the headers that appear in exported CSV files for Peerly.
  */
-export const CSV_COLUMN_LABEL = {
+export const P2P_CSV_COLUMN_LABEL = {
   first_name: 'first_name',
   last_name: 'last_name',
   lead_phone: 'lead_phone',
@@ -163,14 +167,14 @@ export const CSV_COLUMN_LABEL = {
 } as const
 
 /**
- * Common column mappings for voter data CSV exports.
- * Maps database columns to CSV export labels.
+ * P2P phone list column mappings for voter data CSV exports.
+ * Maps actual database columns to CSV export labels for Peerly platform.
  */
-export const VOTER_CSV_COLUMN_MAPPINGS: { db: string; label: string }[] = [
-  { db: CSV_DB_COLUMN.first_name, label: CSV_COLUMN_LABEL.first_name },
-  { db: CSV_DB_COLUMN.last_name, label: CSV_COLUMN_LABEL.last_name },
-  { db: CSV_DB_COLUMN.phone, label: CSV_COLUMN_LABEL.lead_phone },
-  { db: CSV_DB_COLUMN.state, label: CSV_COLUMN_LABEL.state },
-  { db: CSV_DB_COLUMN.city, label: CSV_COLUMN_LABEL.city },
-  { db: CSV_DB_COLUMN.zip, label: CSV_COLUMN_LABEL.zip },
+export const P2P_CSV_COLUMN_MAPPINGS: { db: string; label: string }[] = [
+  { db: P2P_CSV_DB_COLUMN.first_name, label: P2P_CSV_COLUMN_LABEL.first_name },
+  { db: P2P_CSV_DB_COLUMN.last_name, label: P2P_CSV_COLUMN_LABEL.last_name },
+  { db: P2P_CSV_DB_COLUMN.phone, label: P2P_CSV_COLUMN_LABEL.lead_phone },
+  { db: P2P_CSV_DB_COLUMN.state, label: P2P_CSV_COLUMN_LABEL.state },
+  { db: P2P_CSV_DB_COLUMN.city, label: P2P_CSV_COLUMN_LABEL.city },
+  { db: P2P_CSV_DB_COLUMN.zip, label: P2P_CSV_COLUMN_LABEL.zip },
 ]

@@ -1,21 +1,21 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
 import { VoterDatabaseService } from '../../voters/services/voterDatabase.service'
 import { PeerlyPhoneListService } from './peerlyPhoneList.service'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
 import { VoterFileType } from '../../voters/voterFile/voterFile.types'
 import {
-  CustomFilter,
   CHANNELS,
+  CustomFilter,
   PURPOSES,
 } from '../../shared/types/voter.types'
 import { typeToQuery } from '../../voters/voterFile/util/voterFile.util'
 import {
   mapAudienceFieldsToCustomFilters,
-  VOTER_CSV_COLUMN_MAPPINGS,
+  P2P_CSV_COLUMN_MAPPINGS,
 } from '../utils/audienceMapping.util'
 import { Readable } from 'stream'
+import { CampaignWith } from '../../campaigns/campaigns.types'
 
 @Injectable()
 export class P2pPhoneListUploadService {
@@ -28,10 +28,10 @@ export class P2pPhoneListUploadService {
   ) {}
 
   async uploadPhoneList(
-    campaign: Campaign,
+    campaign: CampaignWith<'pathToVictory'>,
     request: P2pPhoneListRequestSchema,
   ): Promise<{ token: string; listName: string }> {
-    const { listName, ...filterData } = request
+    const { name: listName, ...filterData } = request
 
     const tcrCompliance = await this.tcrComplianceService.fetchByCampaignId(
       campaign.id,
@@ -45,12 +45,12 @@ export class P2pPhoneListUploadService {
 
     const filters = this.transformRequestToFilters(filterData)
 
-    let csvStream: Readable
+    let csvBuffer: Buffer
     try {
-      csvStream = await this.generatePhoneListCsvStream(campaign, filters)
+      csvBuffer = await this.generatePhoneListCsvStream(campaign, filters)
     } catch (error) {
       this.logger.error(
-        `Failed to generate CSV stream for campaign ${campaign.id}:`,
+        `Failed to generate CSV buffer for campaign ${campaign.id}:`,
         error,
       )
       throw new BadRequestException(
@@ -62,7 +62,7 @@ export class P2pPhoneListUploadService {
     try {
       token = await this.peerlyPhoneListService.uploadPhoneListToken({
         listName,
-        csvStream,
+        csvBuffer,
         identityId: tcrCompliance.peerlyIdentityId,
       })
     } catch (error) {
@@ -83,45 +83,63 @@ export class P2pPhoneListUploadService {
   }
 
   private transformRequestToFilters(
-    filterData: Omit<P2pPhoneListRequestSchema, 'listName'>,
+    filterData: Omit<P2pPhoneListRequestSchema, 'name'>,
   ): CustomFilter[] {
     return mapAudienceFieldsToCustomFilters(filterData)
   }
 
   private async generatePhoneListCsvStream(
-    campaign: Campaign,
+    campaign: CampaignWith<'pathToVictory'>,
     filters: CustomFilter[],
-  ): Promise<Readable> {
+  ): Promise<Buffer> {
     const customFilters = {
       filters,
-      channel: CHANNELS.PHONE_BANKING,
+      channel: CHANNELS.TEXTING,
       purpose: PURPOSES.GOTV,
     }
 
     const query = typeToQuery(
-      VoterFileType.telemarketing,
-      { ...campaign, pathToVictory: null },
+      VoterFileType.sms,
+      campaign,
       customFilters,
       false, // not count only
       false, // not fix columns
-      VOTER_CSV_COLUMN_MAPPINGS,
+      P2P_CSV_COLUMN_MAPPINGS,
     )
 
     this.logger.debug('Generated P2P phone list query:', query)
 
-    const streamableFile = await this.voterDatabaseService.csvStream(
+    const stream = await this.voterDatabaseService.csvReadableStream(
       query,
-      'phone-list',
-      VOTER_CSV_COLUMN_MAPPINGS,
+      P2P_CSV_COLUMN_MAPPINGS,
     )
 
-    const stream = streamableFile.getStream()
     if (!(stream instanceof Readable)) {
       throw new Error(
-        'Expected Readable stream from csvStream but received different type',
+        'Expected Readable stream from csvReadableStream but received different type',
       )
     }
 
-    return stream
+    // Collect the stream data into a buffer to ensure FormData can consume it properly
+    const chunks: Buffer[] = []
+
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk) => {
+        chunks.push(Buffer.from(chunk))
+      })
+
+      stream.on('end', () => {
+        const csvData = Buffer.concat(chunks)
+        this.logger.debug(`Collected ${csvData.length} bytes of CSV data`)
+
+        // Return the buffer directly instead of creating a stream
+        resolve(csvData)
+      })
+
+      stream.on('error', (error) => {
+        this.logger.error('Error collecting CSV stream data:', error)
+        reject(error)
+      })
+    })
   }
 }

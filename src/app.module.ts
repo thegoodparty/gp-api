@@ -31,6 +31,8 @@ import { AnalyticsModule } from './analytics/analytics.module'
 import { WebsitesModule } from './websites/websites.module'
 import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
 import { PeerlyModule } from './peerly/peerly.module'
+import { ContactsModule } from './contacts/contacts.module'
+import { ContactsSegmentModule } from './contacts/contactsSegment/contactsSegment.module'
 
 @Module({
   imports: [
@@ -62,6 +64,8 @@ import { PeerlyModule } from './peerly/peerly.module'
     WebsitesModule,
     CommunityIssuesModule,
     PeerlyModule,
+    ContactsModule,
+    ContactsSegmentModule,
   ],
   providers: [
     SessionsService,

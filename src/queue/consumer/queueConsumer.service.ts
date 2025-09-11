@@ -7,6 +7,7 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/shared/services/slack.service'
 import { Campaign, PathToVictory, TcrComplianceStatus } from '@prisma/client'
@@ -56,11 +57,64 @@ export class QueueConsumerService {
   async handleMessageAndMaybeRequeue(message: Message): Promise<boolean> {
     try {
       this.logger.debug('Processing queue message: ', message)
-      return await this.processMessage(message)
+      const success = await this.processMessage(message)
+      return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
-      this.logger.error('Message processing failed, will requeue:', error)
-      return true // Indicate that we should requeue
+      const shouldRequeue = this.shouldRequeueError(error as Error)
+
+      if (shouldRequeue) {
+        this.logger.error('Message processing failed, will requeue:', error)
+        this.logger.error('Messages to be requeued:', message)
+        return true // Indicate that we should requeue
+      } else {
+        this.logger.error(
+          'Message processing failed with non-retryable error, discarding message:',
+          error,
+        )
+
+        this.logger.error('Message discarded:', message)
+
+        // Send error notification to Slack for non-retryable errors
+        try {
+          await this.slackService.errorMessage({
+            message: 'Queue message discarded due to non-retryable error',
+            error: {
+              error,
+              message,
+            },
+          })
+        } catch (slackError) {
+          this.logger.error('Failed to send Slack notification:', slackError)
+        }
+
+        return false // Don't requeue, delete the message
+      }
     }
+  }
+
+  private shouldRequeueError(error: Error): boolean {
+    // Don't retry Prisma errors for missing records - these are permanent failures
+    if (error instanceof PrismaClientKnownRequestError) {
+      // P2025: Record not found
+      if (error.code === 'P2025') {
+        return false
+      }
+      // P2002: Unique constraint violation
+      if (error.code === 'P2002') {
+        return false
+      }
+    }
+
+    // Don't retry validation errors or other client errors
+    if (
+      error.message.includes('validation') ||
+      error.message.includes('Invalid')
+    ) {
+      return false
+    }
+
+    // Retry network errors, timeouts, and other temporary failures
+    return true
   }
 
   // TODO: Each message type should be assigned it's own SQS queue allowing each
@@ -79,10 +133,11 @@ export class QueueConsumerService {
   //  https://goodparty.atlassian.net/browse/WEB-4518
   async processMessage(message: Message) {
     if (!message || !message.Body) {
-      return false
+      return true // Delete invalid messages from queue
     }
 
-    const queueMessage: QueueMessage = JSON.parse(message.Body)
+    const parsedBody = JSON.parse(message.Body) as QueueMessage
+    const queueMessage: QueueMessage = parsedBody
     this.logger.log('processing queue message type ', queueMessage.type)
 
     switch (queueMessage.type) {
@@ -90,19 +145,35 @@ export class QueueConsumerService {
         this.logger.log('received generateAiContent message')
         const generateAiContentMessage =
           queueMessage.data as GenerateAiContentMessageData
-        await this.aiContentService.handleGenerateAiContent(
-          generateAiContentMessage,
-        )
 
-        const { userId } = await this.campaignsService.findUniqueOrThrow({
-          where: { slug: generateAiContentMessage.slug },
-        })
+        try {
+          await this.aiContentService.handleGenerateAiContent(
+            generateAiContentMessage,
+          )
 
-        this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
-          slug: generateAiContentMessage.slug,
-          key: generateAiContentMessage.key,
-          regenerate: generateAiContentMessage.regenerate,
-        })
+          try {
+            const { userId } = await this.campaignsService.findUniqueOrThrow({
+              where: { slug: generateAiContentMessage.slug },
+            })
+
+            this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+              slug: generateAiContentMessage.slug,
+              key: generateAiContentMessage.key,
+              regenerate: generateAiContentMessage.regenerate,
+            })
+          } catch (analyticsError) {
+            this.logger.error(
+              'Failed to track analytics for AI content:',
+              analyticsError,
+            )
+          }
+        } catch (error) {
+          this.logger.error(
+            `Error processing AI content generation for slug: ${generateAiContentMessage.slug}`,
+            error,
+          )
+          throw error
+        }
         break
       case QueueType.PATH_TO_VICTORY:
         this.logger.log('received pathToVictory message')
@@ -131,7 +202,7 @@ export class QueueConsumerService {
 
     if (isAfter(processDateTime, now)) {
       this.logger.debug('Process time not yet reached. Re-queuing')
-      return false
+      return false // Requeue message - process time not reached yet
     }
     this.logger.debug('Process time met. Proceeding with processing')
 
@@ -175,11 +246,17 @@ export class QueueConsumerService {
     })
 
     const { userId } = campaign
-
-    this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
-    this.analytics.identify(userId, {
-      '10DLC_compliant': true,
-    })
+    try {
+      this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+      this.analytics.identify(userId, {
+        '10DLC_compliant': true,
+      })
+    } catch (analyticsError) {
+      this.logger.error(
+        'Failed to track analytics for TCR compliance:',
+        analyticsError,
+      )
+    }
 
     return true
   }
@@ -210,17 +287,19 @@ export class QueueConsumerService {
         {
           campaign: campaign as Campaign & { pathToVictory: PathToVictory },
           pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
-          officeName: p2vResponse.officeName || '',
-          electionDate: p2vResponse.electionDate || '',
-          electionTerm: p2vResponse.electionTerm || 0,
-          electionLevel: p2vResponse.electionLevel || '',
-          electionState: p2vResponse.electionState || '',
-          electionCounty: p2vResponse.electionCounty || '',
-          electionMunicipality: p2vResponse.electionMunicipality || '',
-          subAreaName: p2vResponse.subAreaName,
-          subAreaValue: p2vResponse.subAreaValue,
-          partisanType: p2vResponse.partisanType || '',
-          priorElectionDates: p2vResponse.priorElectionDates || [],
+          officeName: (p2vResponse.officeName as string) || '',
+          electionDate: (p2vResponse.electionDate as string) || '',
+          electionTerm: (p2vResponse.electionTerm as number) || 0,
+          electionLevel: (p2vResponse.electionLevel as string) || '',
+          electionState: (p2vResponse.electionState as string) || '',
+          electionCounty: (p2vResponse.electionCounty as string) || '',
+          electionMunicipality:
+            (p2vResponse.electionMunicipality as string) || '',
+          subAreaName: p2vResponse.subAreaName as string | undefined,
+          subAreaValue: p2vResponse.subAreaValue as string | undefined,
+          partisanType: (p2vResponse.partisanType as string) || '',
+          priorElectionDates:
+            (p2vResponse.priorElectionDates as string[]) || [],
         },
       )
     } catch (e) {
@@ -271,6 +350,8 @@ export class QueueConsumerService {
         SlackChannel.botPathToVictory,
       )
     }
+
+    return true
 
     // This is disabled until we have a process to load the data from the sheet
     // and a place to store the data since BallotCandidate was deprecated.

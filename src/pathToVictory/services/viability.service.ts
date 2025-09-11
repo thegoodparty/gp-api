@@ -6,7 +6,6 @@ import { ViabilityScore } from '../types/pathToVictory.types'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { RaceWithOfficeHoldersNode } from 'src/elections/types/ballotReady.types'
 import { SHORT_TO_LONG_STATE } from '../../shared/constants/states'
-import { SlackChannel } from 'src/shared/services/slackService.types'
 
 @Injectable()
 export class ViabilityService {
@@ -120,32 +119,51 @@ export class ViabilityService {
         opponents === undefined ||
         openSeat === undefined
       ) {
-        throw new Error(
-          'Cannot run Viability score. Missing required parameters',
+        this.logger.error(
+          `Cannot run Viability score. Missing required parameters => ${JSON.stringify(
+            {
+              state,
+              officeLevel,
+              officeType,
+              isPartisan,
+              seats,
+              isIncumbent,
+              opponents,
+              openSeat,
+            },
+          )}`,
         )
+      } else {
+        const viability = this.calculateNewViabilityScore(
+          state,
+          officeLevel,
+          officeType,
+          isPartisan,
+          seats,
+          isIncumbent,
+          opponents,
+          openSeat,
+        )
+
+        this.logger.debug('viability', viability)
+
+        return viability
       }
-
-      const viability = this.calculateNewViabilityScore(
-        state,
-        officeLevel,
-        officeType,
-        isPartisan,
-        seats,
-        isIncumbent,
-        opponents,
-        openSeat,
-      )
-
-      this.logger.debug('viability', viability)
-
-      return viability
+      return {
+        level: '',
+        isPartisan: false,
+        isIncumbent: false,
+        isUncontested: false,
+        candidates: 0,
+        seats: 0,
+        candidatesPerSeat: 0,
+        score: 0,
+        probOfWin: 0,
+      }
     } catch (e) {
-      this.logger.error('Error calculating viability score', e)
-      await this.slackService.message(
-        {
-          body: `Not enough information to calculate viability score for campaign: ${campaign?.slug}`,
-        },
-        SlackChannel.botPathToVictoryIssues,
+      this.logger.error(
+        `Error calculating viability score for campaign slug => ${campaign?.slug}`,
+        e,
       )
       throw e
     }

@@ -6,16 +6,28 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { isAxiosResponse } from '../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
-import { MediaType } from '../peerly.types'
+import { AxiosResponse } from 'axios'
+import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials'
 
 interface Template {
+  is_default: boolean
   title: string
   text: string
   advanced?: {
-    media: {
-      media_id: string
-      media_type: MediaType
-    }
+    show_stop: boolean
+    organization?: string
+    bodies?: Array<{
+      text: string
+    }>
+    call_to_actions?: Array<{
+      text: string
+      url?: string
+    }>
+  }
+  media?: {
+    media_type: string
+    media_id: string
+    title: string
   }
 }
 
@@ -24,6 +36,24 @@ interface CreateJobParams {
   templates: Template[]
   didState: string
   identityId?: string
+}
+
+interface PeerlyApiErrorResponse {
+  error?: string
+  message?: string
+  Error?: string // Peerly API uses 'Error' with capital E
+  details?: unknown
+  [key: string]: unknown
+}
+
+interface PeerlyApiResponse {
+  id?: string
+  [key: string]: unknown
+}
+
+type PeerlyAxiosError = {
+  response?: AxiosResponse<PeerlyApiErrorResponse>
+  [key: string]: unknown
 }
 
 @Injectable()
@@ -35,12 +65,30 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     super()
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
       'Failed to communicate with Peerly API',
       isAxiosResponse(error) ? format(error) : error,
     )
+
+    if (isAxiosResponse(error)) {
+      const axiosError = error as PeerlyAxiosError
+      if (axiosError.response?.data) {
+        this.logger.error(
+          'Peerly API error response:',
+          JSON.stringify(axiosError.response.data, null, 2),
+        )
+
+        const apiError = axiosError.response.data
+        const errorMessage =
+          apiError.error ||
+          apiError.message ||
+          apiError.Error ||
+          'Unknown API error'
+        throw new BadGatewayException(`Peerly API error: ${errorMessage}`)
+      }
+    }
+
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }
 
@@ -51,14 +99,13 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private validateCreateJobResponse(data: unknown): CreateJobResponseDto {
     return this.validateData(data, CreateJobResponseDto, 'create job')
   }
 
   async createJob(params: CreateJobParams): Promise<string> {
     const { name, templates, didState, identityId } = params
-    const hasMms = templates.some((t) => !!t.advanced?.media)
+    const hasMms = templates.some((t) => !!t.media)
 
     const body = {
       account_id: this.accountNumber,
@@ -66,13 +113,14 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       templates,
       did_state: didState,
       can_use_mms: hasMms,
+      schedule_id: this.scheduleId,
       ...(identityId && { identity_id: identityId }),
     }
 
     try {
       const config = await this.getBaseHttpHeaders()
       const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/api/1to1/jobs`, body, config),
+        this.httpService.post(`${this.baseUrl}/1to1/jobs`, body, config),
       )
 
       const validated = this.validateCreateJobResponse(response.data)
@@ -86,8 +134,9 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       let jobId: string | undefined
 
       // First check response body for job ID (most likely location)
-      if ((response.data as any)?.id) {
-        jobId = (response.data as any).id
+      const responseData = response.data as PeerlyApiResponse
+      if (responseData?.id) {
+        jobId = responseData.id
       }
 
       // Fallback to Location header if not in body
@@ -121,11 +170,38 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       const config = await this.getBaseHttpHeaders()
       await lastValueFrom(
         this.httpService.post(
-          `${this.baseUrl}/api/1to1/jobs/${jobId}/assignlist`,
+          `${this.baseUrl}/1to1/jobs/${jobId}/assignlist`,
           body,
           config,
         ),
       )
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async requestCanvassers(jobId: string): Promise<void> {
+    const authenticatedUser = await this.peerlyAuth.getAuthenticatedUser()
+    if (!authenticatedUser) {
+      throw new BadGatewayException(
+        'Cannot request canvassers: No authenticated user',
+      )
+    }
+
+    const body = {
+      requested_initials: getAuthenticatedUserInitials(authenticatedUser),
+    }
+
+    try {
+      const config = await this.getBaseHttpHeaders()
+      await lastValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/v2/p2p/${jobId}/request_canvassers`,
+          body,
+          config,
+        ),
+      )
+      this.logger.log(`Requested canvassers for job ID: ${jobId}`)
     } catch (error) {
       this.handleApiError(error)
     }

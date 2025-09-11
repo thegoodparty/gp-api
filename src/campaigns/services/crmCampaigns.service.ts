@@ -141,7 +141,9 @@ export class CrmCampaignsService {
     try {
       crmCompany = await this.hubspot.client.crm.companies.basicApi.update(
         hubspotId,
-        { properties: crmCompanyProperties },
+        {
+          properties: crmCompanyProperties,
+        },
       )
     } catch (e) {
       const { candidate_name: name } = crmCompanyProperties
@@ -725,15 +727,19 @@ export class CrmCampaignsService {
 
     return includeAll
       ? crmCompanyProperties
-      : fields.reduce((acc, field) => {
-          if (
-            crmCompanyProperties[field] ||
-            crmCompanyProperties[field] === null
-          ) {
-            acc[field] = crmCompanyProperties[field]
-          }
-          return acc
-        }, {})
+      : fields.reduce(
+          (acc: Record<string, string | number | undefined>, field) => {
+            if (
+              crmCompanyProperties[field] ||
+              crmCompanyProperties[field] === null
+            ) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              acc[field] = crmCompanyProperties[field]
+            }
+            return acc
+          },
+          {},
+        )
   }
 
   private async updateHubSpotCompaniesBatch(

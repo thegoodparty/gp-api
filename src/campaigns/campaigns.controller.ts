@@ -101,7 +101,7 @@ export class CampaignsController {
     }
 
     if (p2vStatus === P2VStatus.waiting) {
-      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
     }
 
     return p2v
@@ -367,18 +367,5 @@ export class CampaignsController {
         districtManuallySet: false,
       },
     })
-  }
-
-  // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
-  @Post('missing-win-numbers/update')
-  @Roles(UserRole.admin)
-  async updateMissingWinNumbers(
-    @Body() body?: { pageSize?: number; loopLimit?: number },
-  ) {
-    // No need to await
-    this.campaigns.updateMissingWinNumbers(
-      body?.pageSize ?? 500,
-      body?.loopLimit ?? 1000,
-    )
   }
 }

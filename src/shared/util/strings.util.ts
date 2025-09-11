@@ -42,3 +42,14 @@ export function capitalizeFirstLetter(str: string): string {
 
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
+export const getUrlProtocol = (url: string) => {
+  const result = url.match(/^https?:\/\//i) // Check if URL is already prefixed with http(s), case-insensitive
+  return result?.[0]?.toLowerCase()
+}
+
+export const ensureUrlHasProtocol = (url: string) =>
+  getUrlProtocol(url) ? url : `https://${url}`
+
+export const urlIncludesPath = (urlStr: string): boolean =>
+  // optional protocol, but must have path (e.g. http://example.com/path not just http://example.com)
+  /^(https?:\/\/)?[^\/\s]+\/[^\/\s]+.*$/i.test(urlStr)

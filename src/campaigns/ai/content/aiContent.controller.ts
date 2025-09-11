@@ -57,7 +57,6 @@ export class AiContentController {
     try {
       const result = await this.aiContent.createContent(campaign, body)
 
-      // Don't need to await here, don't want to wait for this call
       this.analytics.track(user.id, EVENTS.AiContent.GenerationStarted, {
         slug: campaign.slug,
         key: body.key,

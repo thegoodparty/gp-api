@@ -58,6 +58,7 @@ export enum PhoneListState {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
   PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
 }
 
 // P2P SMS API types

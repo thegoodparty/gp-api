@@ -20,6 +20,26 @@ export class CreateOutreachSchema extends createZodDto(
       date: z.string().datetime({ offset: true }).optional(),
       imageUrl: z.string().url().optional(),
       voterFileFilterId: z.coerce.number().int().positive().optional(),
+      phoneListId: z.coerce.number().int().positive().optional(),
+      // P2P-specific fields
+      didState: z.string().optional(),
+      title: z.string().optional(),
     })
-    .strict(),
+    .strict()
+    .superRefine((data, ctx) => {
+      if (data.outreachType === OutreachType.p2p && !data.phoneListId) {
+        ctx.addIssue({
+          path: ['phoneListId'],
+          code: z.ZodIssueCode.custom,
+          message: 'Phone list ID is required for P2P outreach',
+        })
+      }
+      if (data.outreachType === OutreachType.p2p && !data.script) {
+        ctx.addIssue({
+          path: ['script'],
+          code: z.ZodIssueCode.custom,
+          message: 'Script is required for P2P outreach',
+        })
+      }
+    }),
 ) {}

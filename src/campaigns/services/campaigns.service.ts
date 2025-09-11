@@ -6,14 +6,12 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import Bottleneck from 'bottleneck'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { SlackService } from 'src/shared/services/slack.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
-import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
@@ -32,10 +30,6 @@ import {
 import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
-
-const limiter = new Bottleneck({
-  maxConcurrent: 10,
-})
 
 enum CandidateVerification {
   yes = 'YES',
@@ -326,9 +320,19 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     isPro: boolean = true,
     trackCampaign: boolean = true,
   ) {
+    const existingCampaign = await this.model.findUnique({
+      where: { id: campaignId },
+      select: { isPro: true, hasFreeTextsOffer: true },
+    })
+
+    const isBecomingProFirstTime = !existingCampaign?.isPro && isPro
+
     const campaign = await this.model.update({
       where: { id: campaignId },
-      data: { isPro },
+      data: {
+        isPro,
+        ...(isBecomingProFirstTime && { hasFreeTextsOffer: true }),
+      },
     })
     // Must be in serial so as to not overwrite campaign details w/ concurrent queries
     await this.patchCampaignDetails(campaignId, {
@@ -341,6 +345,50 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
       }
       await this.crm.trackCampaign(campaignId)
+    }
+  }
+
+  async checkFreeTextsEligibility(campaignId: number): Promise<boolean> {
+    const campaign = await this.model.findUnique({
+      where: { id: campaignId },
+      select: { hasFreeTextsOffer: true },
+    })
+    return campaign?.hasFreeTextsOffer ?? false
+  }
+
+  async redeemFreeTexts(campaignId: number): Promise<void> {
+    const result = await this.client.$transaction(
+      async (tx) => {
+        const updatedCampaign = await tx.campaign.updateMany({
+          where: {
+            id: campaignId,
+            hasFreeTextsOffer: true,
+          },
+          data: { hasFreeTextsOffer: false },
+        })
+
+        if (updatedCampaign.count === 0) {
+          throw new BadRequestException(
+            'No free texts offer available for this campaign',
+          )
+        }
+
+        const campaign = await tx.campaign.findUnique({
+          where: { id: campaignId },
+          select: { userId: true },
+        })
+
+        return campaign?.userId
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    )
+    if (result) {
+      this.analytics.track(result, EVENTS.Outreach.FreeTextsOfferRedeemed, {
+        campaignId,
+        redeemedAt: new Date().toISOString(),
+      })
     }
   }
 
@@ -525,6 +573,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     if (updateExistingVersion === true) {
       for (let i = 0; i < versions[key].length; i++) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const version = versions[key][i]
         if (
           JSON.stringify(version.inputValues) === JSON.stringify(inputValues)
@@ -548,6 +597,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (updateExistingVersion === false) {
       this.logger.log('adding new version')
       // add new version to the top of the list.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const length = versions[key].unshift(newVersion)
       if (length > 10) {
         versions[key].length = 10
@@ -582,117 +632,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         formattedAddress: string
         placeId: string
       },
-    })
-  }
-
-  // TODO: Rip this out when no longer needed https://goodparty.atlassian.net/browse/DT-194
-  async updateMissingWinNumbers(pageSize = 500, loopLimit = 1000) {
-    let lastId: number | null = null
-    const counts = {
-      successful: 0,
-      failed: 0,
-    }
-    const failedSlugs: string[] = []
-    const succeededSlugs: string[] = []
-
-    for (let loopCount = 0; loopCount < loopLimit; ++loopCount) {
-      type RowCandidate = {
-        id: number
-        slug: string
-        details: PrismaJson.CampaignDetails
-        p2vData: PrismaJson.PathToVictoryData
-      }
-
-      const afterIdClause = lastId
-        ? Prisma.sql`AND c.id > ${lastId}`
-        : Prisma.sql``
-
-      const rows = await this.client.$queryRaw<RowCandidate[]>(Prisma.sql`
-        SELECT c.id, c.slug, c.details, p2v.data AS "p2vData"
-        FROM public.campaign c
-        JOIN public.path_to_victory p2v ON p2v.campaign_id = c.id
-        WHERE
-          -- must have electionType and electionLocation present and not empty
-          (p2v.data ? 'electionType')
-          AND (p2v.data->>'electionType') IS NOT NULL AND (p2v.data->>'electionType') <> ''
-          AND (p2v.data ? 'electionLocation')
-          AND (p2v.data->>'electionLocation') IS NOT NULL AND (p2v.data->>'electionLocation') <> ''
-          AND (
-            -- missing/empty/zero winNumber
-            NOT (p2v.data ? 'winNumber')
-            OR (p2v.data->>'winNumber') IS NULL
-            OR (p2v.data->>'winNumber') = ''
-            OR ((p2v.data->>'winNumber') ~ '^[0-9]+$' AND (p2v.data->>'winNumber')::int = 0)
-            -- or p2vStatus not complete
-            OR (lower(coalesce(p2v.data->>'p2vStatus', '')) <> 'complete')
-          )
-          ${afterIdClause}
-        ORDER BY c.id ASC
-        LIMIT ${pageSize}
-      `)
-      type CandidateRecord = {
-        id: number
-        slug: string
-        details: PrismaJson.CampaignDetails
-        pathToVictory: { data: PrismaJson.PathToVictoryData }
-      }
-      const batch: CandidateRecord[] = rows.map((r) => ({
-        id: r.id,
-        slug: r.slug,
-        details: r.details,
-        pathToVictory: { data: r.p2vData },
-      }))
-      if (batch.length === 0) break
-
-      await Promise.allSettled(
-        batch.map((r) =>
-          limiter.schedule(async () => {
-            try {
-              const raceTargetDetails =
-                await this.elections.buildRaceTargetDetails({
-                  L2DistrictType: r.pathToVictory?.data.electionType ?? '',
-                  L2DistrictName: r.pathToVictory?.data.electionLocation ?? '',
-                  electionDate: r.details.electionDate ?? '',
-                  state: r.details.state ?? '',
-                })
-              if (!raceTargetDetails || !raceTargetDetails?.winNumber) {
-                failedSlugs.push(r.slug)
-                ++counts.failed
-                return
-              }
-              await this.updateJsonFields(r.id, {
-                pathToVictory: raceTargetDetails,
-              })
-              succeededSlugs.push(r.slug)
-              ++counts.successful
-            } catch (error) {
-              // Extract clean error information
-              let errorMessage: string
-              if (error instanceof Error) {
-                errorMessage = error.message
-              } else {
-                errorMessage = String(error)
-              }
-
-              this.logger.error(
-                `Failed to update missing win number for campaignId: ${r.id}`,
-                { error: errorMessage, campaignId: r.id },
-              )
-              ++counts.failed
-            }
-          }),
-        ),
-      )
-      lastId = batch[batch.length - 1].id
-    }
-    await this.slack.errorMessage({
-      message: `Finished updating win numbers in the ${CURRENT_ENVIRONMENT} environment. Successful: ${counts.successful} Failed: ${counts.failed}`,
-      error: null,
-    })
-    await this.slack.formattedMessage({
-      message: `Succeeded slugs (${counts.successful}) [showing up to 25]:\n${succeededSlugs.slice(0, 25).join(', ')}\n\nFailed slugs (${counts.failed}) [showing up to 25]:\n${failedSlugs.slice(0, 25).join(', ')}`,
-      error: null,
-      channel: SlackChannel.botDev,
     })
   }
 }

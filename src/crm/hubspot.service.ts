@@ -24,8 +24,7 @@ export class HubspotService {
   get client(): Client {
     return this.isTokenAvailable()
       ? this._client
-      : // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        (this.createMockClient() as unknown as Client)
+      : (this.createMockClient() as unknown as Client)
   }
 
   private createMockClient(): MockHubspotClient {
