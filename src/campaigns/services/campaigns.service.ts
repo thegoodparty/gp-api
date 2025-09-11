@@ -8,7 +8,7 @@ import {
 import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { EVENTS } from 'src/segment/segment.types'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { SlackService } from 'src/shared/services/slack.service'
@@ -18,7 +18,7 @@ import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { parseIsoDateString } from '../../shared/util/date.util'
-import { StripeService } from '../../stripe/services/stripe.service'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
   CampaignLaunchStatus,

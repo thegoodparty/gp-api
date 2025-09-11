@@ -8,7 +8,7 @@
  * Frontend should be updated to use consistent field names to eliminate this mapping.
  */
 
-import { CustomFilter } from '../../shared/types/voter.types'
+import { CustomFilter } from '../../../shared/types/voter.types'
 
 export interface AudienceFieldsInput {
   audienceSuperVoters?: boolean

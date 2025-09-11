@@ -5,14 +5,14 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { PeerlyIdentityService } from '../../../peerly/services/peerlyIdentity.service'
+import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
 import { Campaign, TcrCompliance, User } from '@prisma/client'
 import { getTCRIdentityName } from '../util/trcCompliance.util'
 import { getUserFullName } from '../../../users/util/users.util'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
-import { PeerlyIdentityUseCase } from '../../../peerly/peerly.types'
-import { PEERLY_USECASE } from '../../../peerly/services/peerly.const'
+import { PeerlyIdentityUseCase } from '../../../vendors/peerly/peerly.types'
+import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
 
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(

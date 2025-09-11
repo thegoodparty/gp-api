@@ -9,15 +9,15 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ReqCampaign } from '../campaigns/decorators/ReqCampaign.decorator'
-import { UseCampaign } from '../campaigns/decorators/UseCampaign.decorator'
+import { ReqCampaign } from '../../campaigns/decorators/ReqCampaign.decorator'
+import { UseCampaign } from '../../campaigns/decorators/UseCampaign.decorator'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PhoneListState } from './peerly.types'
 import { CheckPhoneListStatusResponseDto } from './schemas/p2pPhoneListStatus.schema'
 import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
 import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
-import { CampaignWith } from '../campaigns/campaigns.types'
+import { CampaignWith } from '../../campaigns/campaigns.types'
 
 @Controller('p2p')
 @UsePipes(ZodValidationPipe)
