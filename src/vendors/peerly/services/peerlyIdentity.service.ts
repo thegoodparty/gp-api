@@ -2,7 +2,7 @@ import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../shared/util/http.util'
+import { isAxiosResponse } from '../../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import {
   BadGatewayException,
@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common'
 import { AxiosResponse, isAxiosError } from 'axios'
 import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
-import { getUserFullName } from '../../users/util/users.util'
+import { getUserFullName } from '../../../users/util/users.util'
 import {
   Approve10DLCBrandResponse,
   CampaignVerificationStatus,
@@ -26,19 +26,19 @@ import {
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../vendors/google/services/google-places.service'
-import { extractAddressComponents } from '../../vendors/google/util/GooglePlaces.util'
-import { DateFormats, formatDate } from '../../shared/util/date.util'
+import { GooglePlacesService } from '../../google/services/google-places.service'
+import { extractAddressComponents } from '../../google/util/GooglePlaces.util'
+import { DateFormats, formatDate } from '../../../shared/util/date.util'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
-import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
-import { CreateTcrCompliancePayload } from '../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
+import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 import {
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
   PEERLY_LOCALITY_CATEGORIES,
   PEERLY_USECASE,
 } from './peerly.const'
-import { ensureUrlHasProtocol } from '../../shared/util/strings.util'
+import { ensureUrlHasProtocol } from '../../../shared/util/strings.util'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {

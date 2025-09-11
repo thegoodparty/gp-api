@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { PhoneListState } from '../../peerly/peerly.types'
+import { PhoneListState } from '../peerly.types'
 
 const uploadPhoneListResponseSchema = z.object({
   Data: z.object({

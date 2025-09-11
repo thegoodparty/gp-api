@@ -8,7 +8,7 @@ import { FilesModule } from '../files/files.module'
 import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PaymentsModule } from '../payments/payments.module'
-import { PeerlyModule } from '../peerly/peerly.module'
+import { PeerlyModule } from '../vendors/peerly/peerly.module'
 
 @Module({
   imports: [HttpModule, EmailModule, FilesModule, PaymentsModule, PeerlyModule],

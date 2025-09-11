@@ -9,10 +9,10 @@ import { PeerlyP2pSmsService } from './services/peerlyP2pSms.service'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
 import { PeerlyP2pJobService } from './services/peerlyP2pJob.service'
 import { P2pController } from './p2p.controller'
-import { GoogleModule } from '../vendors/google/google.module'
-import { VoterSharedModule } from '../shared/modules/voterShared.module'
-import { CampaignsModule } from '../campaigns/campaigns.module'
-import { OutreachModule } from '../outreach/outreach.module'
+import { GoogleModule } from '../google/google.module'
+import { VoterSharedModule } from '../../shared/modules/voterShared.module'
+import { CampaignsModule } from '../../campaigns/campaigns.module'
+import { OutreachModule } from '../../outreach/outreach.module'
 
 @Module({
   imports: [

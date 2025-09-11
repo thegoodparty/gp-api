@@ -24,7 +24,7 @@ import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messa
 import { StripeModule } from '../vendors/stripe/stripe.module'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
-import { PeerlyModule } from '../peerly/peerly.module'
+import { PeerlyModule } from '../vendors/peerly/peerly.module'
 import { GoogleModule } from '../vendors/google/google.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { UsersModule } from 'src/users/users.module'

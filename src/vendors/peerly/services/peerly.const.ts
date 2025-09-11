@@ -1,4 +1,4 @@
-import { BallotReadyPositionLevel } from '../../campaigns/campaigns.types'
+import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
 
 export const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 export const PEERLY_USECASE = 'POLITICAL'
