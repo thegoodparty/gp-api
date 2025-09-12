@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Vercel } from '@vercel/sdk'
 
+enum RecordType {
+  Mx = 'MX',
+  Txt = 'TXT',
+}
+
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
 
 if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
@@ -8,6 +13,8 @@ if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
     'VERCEL_TOKEN, VERCEL_PROJECT_ID, and VERCEL_TEAM_ID must be set in environment variables',
   )
 }
+
+export type DNSRecord = { uid: string; updated?: number }
 
 @Injectable()
 export class VercelService {
@@ -146,6 +153,58 @@ export class VercelService {
     } catch (error) {
       this.logger.error('Error listing domains:', error)
       throw new Error(`Failed to list domains: ${error}`)
+    }
+  }
+
+  async createMXRecords(domain: string): Promise<DNSRecord[]> {
+    try {
+      const mx1 = await this.client.dns.createRecord({
+        domain,
+        teamId: VERCEL_TEAM_ID,
+        requestBody: {
+          type: RecordType.Mx,
+          name: '',
+          value: 'mx1.forwardemail.net',
+          mxPriority: 10,
+          ttl: 60,
+        },
+      })
+
+      const mx2 = await this.client.dns.createRecord({
+        domain,
+        teamId: VERCEL_TEAM_ID,
+        requestBody: {
+          type: RecordType.Mx,
+          name: '',
+          value: 'mx2.forwardemail.net',
+          mxPriority: 20,
+          ttl: 60,
+        },
+      })
+
+      return [mx1, mx2].filter((r): r is DNSRecord => Boolean((r as DNSRecord).uid))
+    } catch (error) {
+      this.logger.error(`Error creating MX records for ${domain}:`, error)
+      throw new Error(`Failed to create MX records: ${error}`)
+    }
+  }
+
+  async createSPFRecord(domain: string): Promise<DNSRecord> {
+    try {
+      const res = await this.client.dns.createRecord({
+        domain,
+        teamId: VERCEL_TEAM_ID,
+        requestBody: {
+          type: RecordType.Txt,
+          name: '',
+          value: 'v=spf1 a include:spf.forwardemail.net -all',
+          ttl: 60,
+        },
+      })
+      return res as DNSRecord
+    } catch (error) {
+      this.logger.error(`Error creating SPF record for ${domain}:`, error)
+      throw new Error(`Failed to create SPF record: ${error}`)
     }
   }
 }
