@@ -10,8 +10,9 @@ import {
   ForwardEmailDomainResponse,
 } from '../forwardEmail.types'
 
-const { FORWARDEMAIL_API_TOKEN, FORWARDEMAIL_BASE_URL, PEERLY_HTTP_TIMEOUT } =
-  process.env
+const FORWARDEMAIL_TIMEOUT_MS = 10000
+
+const { FORWARDEMAIL_API_TOKEN, FORWARDEMAIL_BASE_URL } = process.env
 
 if (!FORWARDEMAIL_BASE_URL) {
   throw new Error('Missing FORWARDEMAIL_BASE_URL config')
@@ -25,7 +26,7 @@ if (!FORWARDEMAIL_API_TOKEN) {
 export class ForwardEmailService {
   private readonly logger = new Logger(ForwardEmailService.name)
   private readonly baseUrl = FORWARDEMAIL_BASE_URL!
-  private readonly httpTimeoutMs = parseInt(PEERLY_HTTP_TIMEOUT || '15000', 10)
+  private readonly httpTimeoutMs = FORWARDEMAIL_TIMEOUT_MS
 
   constructor(private readonly httpService: HttpService) {}
 
