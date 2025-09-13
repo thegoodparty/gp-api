@@ -13,7 +13,7 @@ import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
 import { ContactsSegmentService } from '../contactsSegment/services/contactsSegment.service'
 import {
   CONTACTS_SEGMENT_FIELD_NAMES,
-  VOTER_FILTER_KEYS,
+  CONTACTS_FILTER_VALUES,
 } from '../contactsSegment/constants/contactsSegment.constants'
 
 type CampaignWithPathToVictory = Campaign & {
@@ -54,9 +54,10 @@ export class ContactsService {
       districtName: locationData.districtName,
       resultsPerPage: resultsPerPage.toString(),
       page: page.toString(),
-      ...Object.fromEntries(
-        Object.entries(filters).map(([key, value]) => [key, String(value)]),
-      ),
+    })
+
+    filters.forEach((filter) => {
+      params.append('filters', filter)
     })
 
     try {
@@ -156,7 +157,7 @@ export class ContactsService {
   private async segmentToFilters(
     segment: string | undefined,
     campaign: CampaignWithPathToVictory,
-  ) {
+  ): Promise<string[]> {
     const resolvedSegment = segment || 'all'
     const segmentToFiltersMap =
       defaultSegmentToFiltersMap[
@@ -171,7 +172,7 @@ export class ContactsService {
   private async getCustomSegmentFilters(
     segment: string,
     campaign: CampaignWithPathToVictory,
-  ) {
+  ): Promise<string[]> {
     const customSegment =
       await this.contactsSegmentService.findByIdAndCampaignId(
         parseInt(segment),
@@ -180,70 +181,46 @@ export class ContactsService {
 
     return customSegment
       ? this.convertContactsSegmentToFilters(customSegment)
-      : {}
+      : []
   }
 
-  private convertContactsSegmentToFilters(
-    segment: ContactsSegment,
-  ): Record<string, boolean> {
-    const filters: Record<string, boolean> = {}
+  private convertContactsSegmentToFilters(segment: ContactsSegment): string[] {
+    const filters: string[] = []
 
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_MALE])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_GENDER_MALE] = true
+      filters.push(CONTACTS_FILTER_VALUES.GENDER_MALE)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_FEMALE])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_GENDER_FEMALE] = true
+      filters.push(CONTACTS_FILTER_VALUES.GENDER_FEMALE)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_UNKNOWN])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_GENDER_UNKNOWN] = true
+      filters.push(CONTACTS_FILTER_VALUES.GENDER_UNKNOWN)
 
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_18_25])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_18_25] = true
+      filters.push(CONTACTS_FILTER_VALUES.AGE_18_25)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_25_35])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_25_35] = true
+      filters.push(CONTACTS_FILTER_VALUES.AGE_25_35)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_35_50])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_35_50] = true
+      filters.push(CONTACTS_FILTER_VALUES.AGE_35_50)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_50_PLUS])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_AGE_50_PLUS] = true
+      filters.push(CONTACTS_FILTER_VALUES.AGE_50_PLUS)
 
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_DEMOCRAT])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_POLITICAL_PARTY_DEMOCRAT] =
-        true
+      filters.push(CONTACTS_FILTER_VALUES.PARTY_DEMOCRAT)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_NON_PARTISAN])
-      filters[
-        VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_POLITICAL_PARTY_NON_PARTISAN
-      ] = true
+      filters.push(CONTACTS_FILTER_VALUES.PARTY_INDEPENDENT)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_REPUBLICAN])
-      filters[
-        VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_POLITICAL_PARTY_REPUBLICAN
-      ] = true
-
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_CELL_PHONE])
-      filters[VOTER_FILTER_KEYS.VOTER_TELEPHONES_CELL_PHONE_FORMATTED] = true
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_LANDLINE])
-      filters[VOTER_FILTER_KEYS.VOTER_TELEPHONES_LANDLINE_FORMATTED] = true
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_EMAIL])
-      filters[VOTER_FILTER_KEYS.VOTER_EMAILS_EMAIL] = true
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_ADDRESS])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_ADDRESS] = true
-
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.REGISTERED_VOTER_YES])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_REGISTERED_VOTER_YES] = true
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.REGISTERED_VOTER_NO])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_REGISTERED_VOTER_NO] = true
-
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.ACTIVE_VOTER_YES])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_ACTIVE_VOTER_YES] = true
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.ACTIVE_VOTER_NO])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_ACTIVE_VOTER_NO] = true
+      filters.push(CONTACTS_FILTER_VALUES.PARTY_REPUBLICAN)
 
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_FIRST_TIME])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_FIRST_TIME] =
-        true
+      filters.push(CONTACTS_FILTER_VALUES.AUDIENCE_FIRST_TIME_VOTERS)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_LIKELY])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_LIKELY] = true
+      filters.push(CONTACTS_FILTER_VALUES.AUDIENCE_LIKELY_VOTERS)
     if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_SUPER])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_SUPER] = true
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_UNKNOWN])
-      filters[VOTER_FILTER_KEYS.VOTER_REGISTRATIONS_VOTER_LIKELY_UNKNOWN] = true
+      filters.push(CONTACTS_FILTER_VALUES.AUDIENCE_SUPER_VOTERS)
+
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_CELL_PHONE])
+      filters.push(CONTACTS_FILTER_VALUES.VOTER_TELEPHONES_CELL_PHONE_FORMATTED)
+    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_LANDLINE])
+      filters.push(CONTACTS_FILTER_VALUES.VOTER_TELEPHONES_LANDLINE_FORMATTED)
 
     return filters
   }

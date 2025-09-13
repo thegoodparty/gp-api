@@ -1,27 +1,21 @@
 const defaultSegmentToFiltersMap = {
   all: {
-    filters: {},
+    filters: [],
   },
   texting: {
-    filters: {
-      VoterTelephones_CellPhoneFormatted: true,
-    },
+    filters: ['cellPhoneFormatted'],
   },
   doorKnocking: {
-    filters: {},
+    filters: [],
   },
   directMail: {
-    filters: {},
+    filters: [],
   },
   phoneBanking: {
-    filters: {
-      VoterTelephones_LandlineFormatted: true,
-    },
+    filters: ['landlineFormatted'],
   },
   digitalAds: {
-    filters: {
-      VoterTelephones_CellPhoneFormatted: true,
-    },
+    filters: ['cellPhoneFormatted'],
   },
 }
 
