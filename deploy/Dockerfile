@@ -77,5 +77,8 @@ COPY --from=builder /app/seed ./seed
 # Set the NODE_ENV to production
 ENV NODE_ENV=production
 
+# Copy New Relic configuration
+COPY --from=builder /app/newrelic.js ./
+
 # Start the application
-CMD ["node", "dist/src/main"]
+CMD ["node", "-r", "./newrelic.js", "dist/src/main"]

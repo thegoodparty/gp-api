@@ -1,7 +1,6 @@
 'use strict'
 
-import dotenv from 'dotenv'
-dotenv.config()
+require('dotenv').config()
 
 // Only enable New Relic if both app name and license key are provided
 if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {

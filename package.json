@@ -8,10 +8,10 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",
-    "start": "nest -r newrelic.js start",
+    "start": "nest -r ./newrelic.js start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node -r ./newrelic.js dist/main",
+    "start:prod": "node -r ./newrelic.js dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint-format": "npm run lint && npm run format",
     "migrate:dev": "npx prisma migrate dev",
