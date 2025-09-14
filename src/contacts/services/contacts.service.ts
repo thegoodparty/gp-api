@@ -7,7 +7,10 @@ import {
 import { HttpService } from '@nestjs/axios'
 import { Campaign, PathToVictory, ContactsSegment } from '@prisma/client'
 import { lastValueFrom } from 'rxjs'
-import { ListContactsDTO } from '../schemas/listContacts.schema'
+import {
+  ListContactsDTO,
+  DownloadContactsDTO,
+} from '../schemas/listContacts.schema'
 import jwt from 'jsonwebtoken'
 import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
 import { ContactsSegmentService } from '../contactsSegment/services/contactsSegment.service'
@@ -15,6 +18,7 @@ import {
   CONTACTS_SEGMENT_FIELD_NAMES,
   CONTACTS_FILTER_VALUES,
 } from '../contactsSegment/constants/contactsSegment.constants'
+import { FastifyReply } from 'fastify'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -76,6 +80,53 @@ export class ContactsService {
     } catch (error) {
       this.logger.error('Failed to fetch contacts from people API', error)
       throw new BadGatewayException('Failed to fetch contacts from people API')
+    }
+  }
+
+  async downloadContacts(
+    dto: DownloadContactsDTO,
+    campaign: CampaignWithPathToVictory,
+    res: FastifyReply,
+  ) {
+    const segment = dto.segment as string | undefined
+    const filters = await this.segmentToFilters(segment, campaign)
+
+    const locationData = this.extractLocationFromCampaign(campaign)
+
+    const params = new URLSearchParams({
+      state: locationData.state,
+      districtType: locationData.districtType,
+      districtName: locationData.districtName,
+    })
+
+    filters.forEach((filter) => {
+      params.append('filters', filter)
+    })
+
+    try {
+      const token = this.getValidS2SToken()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}/v1/people/download?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            responseType: 'stream',
+          },
+        ),
+      )
+
+      return new Promise<void>((resolve, reject) => {
+        response.data.pipe(res.raw)
+        response.data.on('end', resolve)
+        response.data.on('error', reject)
+      })
+    } catch (error) {
+      this.logger.error('Failed to download contacts from people API', error)
+      throw new BadGatewayException(
+        'Failed to download contacts from people API',
+      )
     }
   }
 
