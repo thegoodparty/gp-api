@@ -1,5 +1,5 @@
 'use strict'
-
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config()
 
 // Only enable New Relic if both app name and license key are provided
