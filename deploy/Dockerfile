@@ -11,7 +11,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Install dependencies  
-COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json newrelic.js ./
 
 # Copy application source files, prisma files, and seed data
 COPY src/ ./src
