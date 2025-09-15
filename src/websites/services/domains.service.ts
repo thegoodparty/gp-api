@@ -15,7 +15,8 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
-import { DomainPurchaseMetadata } from '../domains.types' // Enum for domain operation statuses
+import { DomainPurchaseMetadata } from '../domains.types'
+import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service' // Enum for domain operation statuses
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -54,6 +55,7 @@ export class DomainsService
     private readonly vercel: VercelService,
     private readonly payments: PaymentsService,
     private readonly stripe: StripeService,
+    private readonly forwardEmailService: ForwardEmailService,
   ) {
     super()
   }
@@ -338,8 +340,8 @@ export class DomainsService
 
     let vercelResult, projectResult
 
-    try {
-      if (this.shouldEnableDomainPurchase()) {
+    if (this.shouldEnableDomainPurchase()) {
+      try {
         vercelResult = await this.vercel.purchaseDomain(
           domain.name,
           {
@@ -357,23 +359,55 @@ export class DomainsService
         )
 
         projectResult = await this.vercel.addDomainToProject(domain.name)
-      } else {
-        this.logger.debug(
-          `Skipping domain purchase for ${domain.name} - ${this.getDomainPurchaseStatus()}`,
+      } catch (error) {
+        this.logger.error('Error registering domain with Vercel:', error)
+
+        await this.model.update({
+          where: { id: domain.id },
+          data: { status: DomainStatus.inactive },
+        })
+
+        throw new BadGatewayException(
+          `Failed to register domain with Vercel: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
         )
       }
-    } catch (error) {
-      this.logger.error('Error registering domain with Vercel:', error)
 
-      await this.model.update({
-        where: { id: domain.id },
-        data: { status: DomainStatus.inactive },
-      })
+      try {
+        await this.vercel.createMXRecords(domain.name)
+      } catch (e) {
+        this.logger.error('Error creating DNS MX records for domain:', e)
+        // Not throwing error here as domain registration was successful
+      }
+      this.logger.debug(`MX records created for domain ${domain.name}`)
 
-      throw new BadGatewayException(
-        `Failed to register domain with Vercel: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
+      try {
+        await this.vercel.createSPFRecord(domain.name)
+      } catch (e) {
+        this.logger.error('Error creating SPF record for domain:', e)
+        // Not throwing error here as domain registration was successful
+      }
+      this.logger.debug(`SPF record created for domain ${domain.name}`)
+
+      try {
+        await this.forwardEmailService.addDomain(domain)
+        await this.forwardEmailService.createCatchAllAlias(
+          domain,
+          contact.email,
+        )
+      } catch (e) {
+        this.logger.error(
+          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} :`,
+          e,
+        )
+      }
+      this.logger.debug(
+        `Email forwarding set up for domain *@${domain.name} -> ${contact.email}`,
+      )
+    } else {
+      this.logger.debug(
+        `Domain purchase disabled for ${domain.name} - ${this.getDomainPurchaseStatus()}`,
       )
     }
 
