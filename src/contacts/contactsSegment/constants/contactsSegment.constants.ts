@@ -270,3 +270,30 @@ export const VOTER_FILTER_KEYS = {
   VOTER_REGISTRATIONS_VOTER_LIKELY_UNKNOWN:
     'VoterRegistrations_VoterLikely_Unknown',
 } as const
+
+export const CONTACTS_FILTER_VALUES = {
+  // Gender filters
+  GENDER_MALE: 'genderMale',
+  GENDER_FEMALE: 'genderFemale',
+  GENDER_UNKNOWN: 'genderUnknown',
+
+  // Age filters
+  AGE_18_25: 'age18_25',
+  AGE_25_35: 'age25_35',
+  AGE_35_50: 'age35_50',
+  AGE_50_PLUS: 'age50Plus',
+
+  // Political party filters
+  PARTY_DEMOCRAT: 'partyDemocrat',
+  PARTY_INDEPENDENT: 'partyIndependent',
+  PARTY_REPUBLICAN: 'partyRepublican',
+
+  // Audience filters
+  AUDIENCE_FIRST_TIME_VOTERS: 'audienceFirstTimeVoters',
+  AUDIENCE_LIKELY_VOTERS: 'audienceLikelyVoters',
+  AUDIENCE_SUPER_VOTERS: 'audienceSuperVoters',
+
+  // Contact filters
+  VOTER_TELEPHONES_CELL_PHONE_FORMATTED: 'cellPhoneFormatted',
+  VOTER_TELEPHONES_LANDLINE_FORMATTED: 'landlineFormatted',
+} as const

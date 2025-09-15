@@ -7,4 +7,9 @@ const listContactsSchema = z.object({
   segment: z.string().optional(),
 })
 
+const downloadContactsSchema = z.object({
+  segment: z.string().optional(),
+})
+
 export class ListContactsDTO extends createZodDto(listContactsSchema) {}
+export class DownloadContactsDTO extends createZodDto(downloadContactsSchema) {}
