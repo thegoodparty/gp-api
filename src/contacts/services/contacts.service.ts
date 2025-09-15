@@ -200,8 +200,8 @@ export class ContactsService {
 
     return {
       state,
-      districtType: this.elections.cleanDistrictName(electionType),
-      districtName: electionLocation,
+      districtType: electionType,
+      districtName: this.elections.cleanDistrictName(electionLocation),
     }
   }
 
