@@ -149,6 +149,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     identityId: string,
     tcrCompliancePayload: CreateTcrCompliancePayload,
     { details: campaignDetails, placeId }: Campaign,
+    domain: Domain,
   ) {
     const { phone, websiteDomain, email, ein } = tcrCompliancePayload
     const { street, city, state, postalCode } = extractAddressComponents(
@@ -177,7 +178,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         state: state?.short_name,
         postalCode: postalCode?.long_name,
         website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
-        email: email.substring(0, 100), // Limit to 100 characters per Peerly API docs
+        email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
       }
       this.logger.debug('Submitting 10DLC brand with data:', submitBrandData)
       const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =

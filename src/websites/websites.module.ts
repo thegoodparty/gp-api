@@ -15,12 +15,14 @@ import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { StripeModule } from 'src/vendors/stripe/stripe.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
+import { ForwardEmailModule } from '../vendors/forwardEmail/forwardEmail.module'
 
 @Module({
   imports: [
     HttpModule,
     AwsModule,
     VercelModule,
+    ForwardEmailModule,
     FilesModule,
     PaymentsModule,
     UsersModule,

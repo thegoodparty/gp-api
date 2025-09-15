@@ -13,6 +13,7 @@ import { WebsitesService } from '../../../websites/services/websites.service'
 import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
 import { PeerlyIdentityUseCase } from '../../../vendors/peerly/peerly.types'
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
+import { DomainsService } from '../../../websites/services/domains.service'
 
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
@@ -21,6 +22,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
   constructor(
     private readonly peerlyIdentityService: PeerlyIdentityService,
     private readonly websitesService: WebsitesService,
+    private readonly domainService: DomainsService,
   ) {
     super()
   }
@@ -37,6 +39,21 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     tcrComplianceCreatePayload: CreateTcrCompliancePayload,
   ) {
     const { ein, filingUrl, email } = tcrComplianceCreatePayload
+
+    const { domain } = await this.websitesService.findFirstOrThrow({
+      where: {
+        campaignId: campaign.id,
+      },
+      include: {
+        domain: true,
+      },
+    })
+    if (!domain) {
+      throw new BadRequestException(
+        'Campaign must have a domain to create TCR compliance',
+      )
+    }
+
     const tcrIdentityName = getTCRIdentityName(getUserFullName(user!), ein)
     const tcrComplianceIdentity =
       await this.peerlyIdentityService.createIdentity(tcrIdentityName)
@@ -51,16 +68,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         tcrComplianceIdentity.identity_id,
         tcrComplianceCreatePayload,
         campaign,
+        domain,
       )
-
-    const { domain } = await this.websitesService.findFirstOrThrow({
-      where: {
-        campaignId: campaign.id,
-      },
-      include: {
-        domain: true,
-      },
-    })
 
     // TODO: determine if we need to do anything with this data once we can
     //  actually get a valid response from Peerly
