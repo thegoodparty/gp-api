@@ -11,6 +11,11 @@ import {
 } from '../forwardEmail.types'
 
 const FORWARDEMAIL_TIMEOUT_MS = 10000
+enum FORWARDEMAIL_PLAN {
+  Free = 'free',
+  EnhancedProtection = 'enhanced_protection',
+  Team = 'team',
+}
 
 const { FORWARDEMAIL_API_TOKEN, FORWARDEMAIL_BASE_URL } = process.env
 
@@ -56,7 +61,7 @@ export class ForwardEmailService {
         await lastValueFrom(
           this.httpService.post<ForwardEmailDomainResponse>(
             `${this.baseUrl}/domains`,
-            { domain: domain.name },
+            { domain: domain.name, plan: FORWARDEMAIL_PLAN.EnhancedProtection },
             this.getBaseHttpHeaders(),
           ),
         )
@@ -69,14 +74,14 @@ export class ForwardEmailService {
   }
 
   async createCatchAllAlias(
-    domain: Domain,
     forwardToEmail: string,
+    forwardingDomainResponse: ForwardEmailDomainResponse,
   ): Promise<ForwardEmailAliasResponse> {
     try {
       const response: AxiosResponse<ForwardEmailAliasResponse> =
         await lastValueFrom(
           this.httpService.post<ForwardEmailAliasResponse>(
-            `${this.baseUrl}/domains/${encodeURIComponent(domain.name)}/aliases`,
+            `${this.baseUrl}/domains/${encodeURIComponent(forwardingDomainResponse.id)}/aliases`,
             { name: '*', recipients: forwardToEmail },
             this.getBaseHttpHeaders(),
           ),
