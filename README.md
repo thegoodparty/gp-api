@@ -42,7 +42,7 @@ $ npm install
 
 
 ### (Optional) Use Docker for postgres
-[Install Docker] https://docs.docker.com/get-started/get-docker/
+[Install Docker](https://docs.docker.com/get-started/get-docker/)
 ``` bash
 $ docker compose up -d
 
