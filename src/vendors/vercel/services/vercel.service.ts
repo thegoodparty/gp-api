@@ -192,7 +192,7 @@ export class VercelService {
     }
   }
 
-  async createSPFRecord(
+  async createTXTVerificationRecord(
     domain: string,
     forwardingDomainResponse: ForwardEmailDomainResponse,
   ): Promise<DNSRecord> {

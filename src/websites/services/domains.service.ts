@@ -338,7 +338,10 @@ export class DomainsService
     this.logger.debug(`MX records created for domain ${domain.name}`)
 
     try {
-      await this.vercel.createSPFRecord(domain.name, forwardEmailDomain!)
+      await this.vercel.createTXTVerificationRecord(
+        domain.name,
+        forwardEmailDomain!,
+      )
     } catch (e) {
       this.logger.error('Error creating SPF record for domain:', e)
       throw new Error('Error creating SPF record for domain:', { cause: e })
