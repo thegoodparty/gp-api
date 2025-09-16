@@ -20,4 +20,6 @@ export const voterFilterBaseSchema = z.object({
   genderMale: z.boolean().optional(),
   genderFemale: z.boolean().optional(),
   genderUnknown: z.boolean().optional(),
+  hasCellPhone: z.boolean().optional(),
+  hasLandline: z.boolean().optional(),
 })

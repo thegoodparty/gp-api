@@ -4,7 +4,7 @@ import { voterFilterBaseSchema } from '../../shared/schemas/voterFilterBase.sche
 
 export class CreateVoterFileFilterSchema extends createZodDto(
   voterFilterBaseSchema.extend({
-    name: z.string().min(1),
+    name: z.string().min(1).optional(),
     voterCount: z.coerce.number().optional().default(0),
   }),
 ) {}
