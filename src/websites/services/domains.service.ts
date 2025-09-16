@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { AwsRoute53Service } from 'src/vendors/aws/services/awsRoute53.service'
-import { DomainStatus, User } from '@prisma/client'
+import { Domain, DomainStatus, User } from '@prisma/client'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { VercelService } from 'src/vendors/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
@@ -16,7 +16,8 @@ import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { DomainPurchaseMetadata } from '../domains.types'
-import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service' // Enum for domain operation statuses
+import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
+import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types' // Enum for domain operation statuses
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -313,6 +314,55 @@ export class DomainsService
     }
   }
 
+  private async setupDomainEmailForwarding(
+    domain: Domain,
+    forwardingEmailAddress: string,
+  ) {
+    let forwardEmailDomain: ForwardEmailDomainResponse | null = null
+    try {
+      forwardEmailDomain = await this.forwardEmailService.addDomain(domain)
+    } catch (e) {
+      this.logger.error('Error adding domain to forward email service:', e)
+      throw new Error('Error adding domain to forward email service:', {
+        cause: e,
+      })
+    }
+    this.logger.debug(`Domain added to ForwardEmail service: ${domain.name}`)
+
+    try {
+      await this.vercel.createMXRecords(domain.name)
+    } catch (e) {
+      this.logger.error('Error creating DNS MX records for domain:', e)
+      throw new Error('Error creating DNS MX records for domain:', { cause: e })
+    }
+    this.logger.debug(`MX records created for domain ${domain.name}`)
+
+    try {
+      await this.vercel.createSPFRecord(domain.name, forwardEmailDomain!)
+    } catch (e) {
+      this.logger.error('Error creating SPF record for domain:', e)
+      throw new Error('Error creating SPF record for domain:', { cause: e })
+    }
+    this.logger.debug(`SPF record created for domain ${domain.name}`)
+
+    try {
+      await this.forwardEmailService.createCatchAllAlias(
+        forwardingEmailAddress,
+        forwardEmailDomain!,
+      )
+    } catch (e) {
+      this.logger.error(
+        `catch-all alias not created for domain *@${domain.name} -> ${forwardingEmailAddress} :`,
+        e,
+      )
+      throw new Error(
+        `catch-all alias not created for domain *@${domain.name} -> ${forwardingEmailAddress} :`,
+        { cause: e },
+      )
+    }
+    return forwardEmailDomain
+  }
+
   // called after payment is accepted, send registration request to Vercel
   async completeDomainRegistration(
     websiteId: number,
@@ -338,7 +388,9 @@ export class DomainsService
       throw new BadRequestException('Domain price not available')
     }
 
-    let vercelResult, projectResult
+    let vercelResult,
+      projectResult,
+      forwardEmailDomain: ForwardEmailDomainResponse | null = null
 
     if (this.shouldEnableDomainPurchase()) {
       try {
@@ -375,36 +427,19 @@ export class DomainsService
       }
 
       try {
-        await this.vercel.createMXRecords(domain.name)
-      } catch (e) {
-        this.logger.error('Error creating DNS MX records for domain:', e)
-        // Not throwing error here as domain registration was successful
-      }
-      this.logger.debug(`MX records created for domain ${domain.name}`)
-
-      try {
-        await this.vercel.createSPFRecord(domain.name)
-      } catch (e) {
-        this.logger.error('Error creating SPF record for domain:', e)
-        // Not throwing error here as domain registration was successful
-      }
-      this.logger.debug(`SPF record created for domain ${domain.name}`)
-
-      try {
-        await this.forwardEmailService.addDomain(domain)
-        await this.forwardEmailService.createCatchAllAlias(
+        forwardEmailDomain = await this.setupDomainEmailForwarding(
           domain,
           contact.email,
+        )
+        this.logger.debug(
+          `Email forwarding set up for domain *@${domain.name} -> ${contact.email}`,
         )
       } catch (e) {
         this.logger.error(
           `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} :`,
-          e,
         )
+        // Not throwing an error here to allow for continued execution
       }
-      this.logger.debug(
-        `Email forwarding set up for domain *@${domain.name} -> ${contact.email}`,
-      )
     } else {
       this.logger.debug(
         `Domain purchase disabled for ${domain.name} - ${this.getDomainPurchaseStatus()}`,
@@ -416,6 +451,9 @@ export class DomainsService
       data: {
         operationId: `vercel-${domain.name}-${Date.now()}`,
         status: DomainStatus.submitted,
+        ...(forwardEmailDomain
+          ? { emailForwardingDomainId: forwardEmailDomain.id }
+          : {}),
       },
     })
 

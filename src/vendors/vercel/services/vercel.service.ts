@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Vercel } from '@vercel/sdk'
+import { ForwardEmailDomainResponse } from '../../forwardEmail/forwardEmail.types'
 
 enum RecordType {
   Mx = 'MX',
@@ -177,19 +178,24 @@ export class VercelService {
           type: RecordType.Mx,
           name: '',
           value: 'mx2.forwardemail.net',
-          mxPriority: 20,
+          mxPriority: 10,
           ttl: 60,
         },
       })
 
-      return [mx1, mx2].filter((r): r is DNSRecord => Boolean((r as DNSRecord).uid))
+      return [mx1, mx2].filter((r): r is DNSRecord =>
+        Boolean((r as DNSRecord).uid),
+      )
     } catch (error) {
       this.logger.error(`Error creating MX records for ${domain}:`, error)
       throw new Error(`Failed to create MX records: ${error}`)
     }
   }
 
-  async createSPFRecord(domain: string): Promise<DNSRecord> {
+  async createSPFRecord(
+    domain: string,
+    forwardingDomainResponse: ForwardEmailDomainResponse,
+  ): Promise<DNSRecord> {
     try {
       const res = await this.client.dns.createRecord({
         domain,
@@ -197,7 +203,7 @@ export class VercelService {
         requestBody: {
           type: RecordType.Txt,
           name: '',
-          value: 'v=spf1 a include:spf.forwardemail.net -all',
+          value: `forward-email-site-verification=${forwardingDomainResponse.verification_record}`,
           ttl: 60,
         },
       })
