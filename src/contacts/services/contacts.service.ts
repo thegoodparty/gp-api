@@ -1,24 +1,25 @@
+import { HttpService } from '@nestjs/axios'
 import {
-  Injectable,
   BadGatewayException,
   BadRequestException,
+  Injectable,
   Logger,
 } from '@nestjs/common'
-import { HttpService } from '@nestjs/axios'
-import { Campaign, PathToVictory, ContactsSegment } from '@prisma/client'
-import { lastValueFrom } from 'rxjs'
-import {
-  ListContactsDTO,
-  DownloadContactsDTO,
-} from '../schemas/listContacts.schema'
+import { Campaign, ContactsSegment, PathToVictory } from '@prisma/client'
+import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
-import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
+import { lastValueFrom } from 'rxjs'
+import { ElectionsService } from 'src/elections/services/elections.service'
+import {
+  CONTACTS_FILTER_VALUES,
+  CONTACTS_SEGMENT_FIELD_NAMES,
+} from '../contactsSegment/constants/contactsSegment.constants'
 import { ContactsSegmentService } from '../contactsSegment/services/contactsSegment.service'
 import {
-  CONTACTS_SEGMENT_FIELD_NAMES,
-  CONTACTS_FILTER_VALUES,
-} from '../contactsSegment/constants/contactsSegment.constants'
-import { FastifyReply } from 'fastify'
+  DownloadContactsDTO,
+  ListContactsDTO,
+} from '../schemas/listContacts.schema'
+import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -41,6 +42,7 @@ export class ContactsService {
   constructor(
     private readonly httpService: HttpService,
     private readonly contactsSegmentService: ContactsSegmentService,
+    private readonly elections: ElectionsService,
   ) {}
 
   async findContacts(
@@ -192,16 +194,14 @@ export class ContactsService {
 
     const state = campaign.details.state
 
-    const districtType = electionType.replace(/_/g, ' ')
-
     if (!state || state.length !== 2) {
       throw new BadRequestException('Invalid state code in campaign data')
     }
 
     return {
       state,
-      districtType,
-      districtName: electionLocation,
+      districtType: electionType,
+      districtName: this.elections.cleanDistrictName(electionLocation),
     }
   }
 
