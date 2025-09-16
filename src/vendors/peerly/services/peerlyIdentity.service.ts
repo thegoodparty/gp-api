@@ -207,7 +207,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const response: AxiosResponse<Approve10DLCBrandResponse> =
         await lastValueFrom(
           this.httpService.post(
-            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit`,
+            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/approve`,
             {
               campaign_verify_token: campaignVerifyToken,
               entity_type: PEERLY_ENTITY_TYPE,
