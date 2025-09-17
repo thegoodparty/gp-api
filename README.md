@@ -40,6 +40,19 @@
 $ npm install
 ```
 
+
+### (Optional) Use Docker for postgres
+[Install Docker](https://docs.docker.com/get-started/get-docker/)
+``` bash
+$ docker compose up -d
+
+# to stop docker
+$ docker compose stop
+
+# docker can also be managed in the docker dashboard of the desktop app
+```
+
+### Install Postgres locally (Not docker)
 - Create a Postgres database for the project to connect to. There are many ways to do this, below is an example using Homebrew on macOS:
 
   ```sh
@@ -81,6 +94,7 @@ $ npm run migrate:reset
 ### Database Stop & Cleanup
 
   Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
+
 
 ## Compile and run the project
 

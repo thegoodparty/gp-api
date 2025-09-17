@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { ContentfulService } from '../../contentful/contentful.service'
+import { ContentfulService } from '../../vendors/contentful/contentful.service'
 import { Content, ContentType } from '@prisma/client'
 import { Entry } from 'contentful'
 import {

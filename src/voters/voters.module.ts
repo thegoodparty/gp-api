@@ -10,7 +10,7 @@ import { VotersController } from './voters.controller'
 import { EmailModule } from 'src/email/email.module'
 import { OutreachModule } from 'src/outreach/outreach.module'
 import { VoterFileFilterService } from './services/voterFileFilter.service'
-import { PeerlyModule } from '../peerly/peerly.module'
+import { PeerlyModule } from '../vendors/peerly/peerly.module'
 
 @Module({
   imports: [FilesModule, HttpModule, EmailModule, OutreachModule, PeerlyModule],

@@ -1,12 +1,16 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Param,
+  ParseIntPipe,
   Post,
+  Put,
   Query,
   UseGuards,
   UsePipes,
@@ -18,7 +22,7 @@ import { CanDownloadVoterFileGuard } from './guards/CanDownloadVoterFile.guard'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
-import { Campaign, User, UserRole } from '@prisma/client'
+import { Campaign, User, UserRole, VoterFileFilter } from '@prisma/client'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
@@ -28,6 +32,7 @@ import { userHasRole } from 'src/users/util/users.util'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { VoterFileFilterService } from '../services/voterFileFilter.service'
 import { CreateVoterFileFilterSchema } from '../schemas/CreateVoterFileFilterSchema'
+import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
 import { OutreachService } from '../../outreach/services/outreach.service'
 
 export const VOTER_FILE_ROUTE = 'voters/voter-file'
@@ -126,5 +131,54 @@ export class VoterFileController {
     @Body() voterFileFilter: CreateVoterFileFilterSchema,
   ) {
     return this.voterFileFilterService.create(campaign.id, voterFileFilter)
+  }
+
+  @Get('filters')
+  @UseCampaign()
+  listVoterFileFilters(@ReqCampaign() campaign: Campaign) {
+    return this.voterFileFilterService.findByCampaignId(campaign.id)
+  }
+
+  @Get('filter/:id')
+  @UseCampaign()
+  async getVoterFileFilter(
+    @Param('id', ParseIntPipe) id: number,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const filter: VoterFileFilter | null =
+      await this.voterFileFilterService.findByIdAndCampaignId(id, campaign.id)
+    if (!filter) {
+      throw new NotFoundException('Voter file filter not found')
+    }
+    return filter
+  }
+
+  @Put('filter/:id')
+  @UseCampaign()
+  async updateVoterFileFilter(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateVoterFileFilterSchema,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const filter: VoterFileFilter | null =
+      await this.voterFileFilterService.findByIdAndCampaignId(id, campaign.id)
+    if (!filter) {
+      throw new NotFoundException('Voter file filter not found')
+    }
+    return this.voterFileFilterService.updateByIdAndCampaignId(
+      id,
+      campaign.id,
+      body,
+    )
+  }
+
+  @Delete('filter/:id')
+  @UseCampaign()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteVoterFileFilter(
+    @Param('id', ParseIntPipe) id: number,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    await this.voterFileFilterService.deleteByIdAndCampaignId(id, campaign.id)
   }
 }

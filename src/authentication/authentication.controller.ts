@@ -32,7 +32,7 @@ import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strate
 import { CrmUsersService } from '../users/services/crmUsers.service'
 import { setTokenCookie } from './util/setTokenCookie.util'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
-import { EVENTS } from 'src/segment/segment.types'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @PublicAccess()
