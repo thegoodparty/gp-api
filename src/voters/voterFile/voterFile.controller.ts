@@ -179,11 +179,6 @@ export class VoterFileController {
     @Param('id', ParseIntPipe) id: number,
     @ReqCampaign() campaign: Campaign,
   ) {
-    const filter: VoterFileFilter | null =
-      await this.voterFileFilterService.findByIdAndCampaignId(id, campaign.id)
-    if (!filter) {
-      throw new NotFoundException('Voter file filter not found')
-    }
     await this.voterFileFilterService.deleteByIdAndCampaignId(id, campaign.id)
   }
 }
