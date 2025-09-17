@@ -1,6 +1,6 @@
 ---
 description: Cursor rules for GP-API TypeScript/NestJS project. Enforce type safety, Prisma patterns, exception handling, and coding standards.
-globs: ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx"]
+globs: ['**/*.ts', '**/*.js', '**/*.tsx', '**/*.jsx']
 alwaysApply: true
 ---
 
@@ -14,6 +14,7 @@ NEVER use the `any` or `unknown` types in new code. Always use proper TypeScript
 - ❌ Bad: `user: any`, `data: any`, `error: any`, `value: unknown`
 
 For complex external API responses, create proper interfaces:
+
 ```typescript
 interface ApiResponse {
   data: { id: string; name: string }
@@ -22,6 +23,7 @@ interface ApiResponse {
 ```
 
 For catch blocks, use `Error` type or create specific error types:
+
 ```typescript
 try {
   // code
@@ -31,13 +33,17 @@ try {
 ```
 
 For function parameters where the type is truly unknown, use generics or unions:
+
 ```typescript
-function processData<T>(data: T): T { return data }
+function processData<T>(data: T): T {
+  return data
+}
 // or
 function handleValue(value: string | number | boolean): void {}
 ```
 
 For external API responses that need validation, use proper type guards or validation libraries:
+
 ```typescript
 function isApiResponse(data: unknown): data is ApiResponse {
   return typeof data === 'object' && data !== null && 'data' in data
@@ -438,13 +444,11 @@ When attempting to delete files:
 REQUIRED STEPS:
 
 1. ALWAYS verify file existence first:
-
    - Use `list_dir` to check directory contents
    - Use `file_search` to confirm exact path if needed
    - Use `grep_search` to verify file contents if relevant
 
 2. DELETION HIERARCHY:
-
    - First attempt: Use `delete_file` tool with relative path
    - If failed: Use `delete_file` tool with absolute path
    - If still failed: Use terminal `rm` command as last resort
@@ -567,6 +571,51 @@ VERIFICATION STEPS:
 3. For any import that's no longer valid, either update it or remove it
 4. Pay special attention to utilities that might be widely used across the codebase
 5. If adding a new import, double-check that the file and export exist
+
+## Rule 24: Ensure HTTP methods decorated with @HttpCode(HttpStatus.NO_CONTENT) don't return response data
+
+globs: ["**/*.controller.ts", "**/*.ts"]
+alwaysApply: true
+
+## HTTP 204 No Content Response Rule
+
+#### Rule: No Response Data for HTTP 204
+
+Methods decorated with `@HttpCode(HttpStatus.NO_CONTENT)` MUST NOT return any data.
+
+REQUIRED BEHAVIOR:
+
+- Use `await` instead of `return` for service calls in methods with `@HttpCode(HttpStatus.NO_CONTENT)`
+- HTTP 204 responses indicate successful processing with no content body
+- The method should execute the operation but not return any response data
+
+EXAMPLES:
+
+**CORRECT:**
+
+```typescript
+@Delete('resource/:id')
+@HttpCode(HttpStatus.NO_CONTENT)
+async deleteResource(@Param('id') id: string) {
+  await this.service.delete(id)
+}
+```
+
+**INCORRECT:**
+
+```typescript
+@Delete('resource/:id')
+@HttpCode(HttpStatus.NO_CONTENT)
+async deleteResource(@Param('id') id: string) {
+  return this.service.delete(id) // ❌ Returns data with 204 status
+}
+```
+
+VERIFICATION:
+
+- Check all controller methods with `@HttpCode(HttpStatus.NO_CONTENT)`
+- Ensure they use `await` for service calls instead of `return`
+- Maintain HTTP specification compliance where 204 means "no content"
 
 ## General NestJS Patterns
 
