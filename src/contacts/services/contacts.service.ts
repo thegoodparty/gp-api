@@ -5,16 +5,12 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common'
-import { Campaign, ContactsSegment, PathToVictory } from '@prisma/client'
+import { Campaign, VoterFileFilter, PathToVictory } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import {
-  CONTACTS_FILTER_VALUES,
-  CONTACTS_SEGMENT_FIELD_NAMES,
-} from '../contactsSegment/constants/contactsSegment.constants'
-import { ContactsSegmentService } from '../contactsSegment/services/contactsSegment.service'
+import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
@@ -41,7 +37,7 @@ export class ContactsService {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly contactsSegmentService: ContactsSegmentService,
+    private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
   ) {}
 
@@ -225,53 +221,41 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
   ): Promise<string[]> {
     const customSegment =
-      await this.contactsSegmentService.findByIdAndCampaignId(
+      await this.voterFileFilterService.findByIdAndCampaignId(
         parseInt(segment),
         campaign.id,
       )
 
     return customSegment
-      ? this.convertContactsSegmentToFilters(customSegment)
+      ? this.convertVoterFileFilterToFilters(customSegment)
       : []
   }
 
-  private convertContactsSegmentToFilters(segment: ContactsSegment): string[] {
+  private convertVoterFileFilterToFilters(segment: VoterFileFilter): string[] {
     const filters: string[] = []
 
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_MALE])
-      filters.push(CONTACTS_FILTER_VALUES.GENDER_MALE)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_FEMALE])
-      filters.push(CONTACTS_FILTER_VALUES.GENDER_FEMALE)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.GENDER_UNKNOWN])
-      filters.push(CONTACTS_FILTER_VALUES.GENDER_UNKNOWN)
+    if (segment.genderMale) filters.push('genderMale')
+    if (segment.genderFemale) filters.push('genderFemale')
+    if (segment.genderUnknown) filters.push('genderUnknown')
 
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_18_25])
-      filters.push(CONTACTS_FILTER_VALUES.AGE_18_25)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_25_35])
-      filters.push(CONTACTS_FILTER_VALUES.AGE_25_35)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_35_50])
-      filters.push(CONTACTS_FILTER_VALUES.AGE_35_50)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.AGE_50_PLUS])
-      filters.push(CONTACTS_FILTER_VALUES.AGE_50_PLUS)
+    if (segment.age18_25) filters.push('age18_25')
+    if (segment.age25_35) filters.push('age25_35')
+    if (segment.age35_50) filters.push('age35_50')
+    if (segment.age50Plus) filters.push('age50Plus')
 
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_DEMOCRAT])
-      filters.push(CONTACTS_FILTER_VALUES.PARTY_DEMOCRAT)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_NON_PARTISAN])
-      filters.push(CONTACTS_FILTER_VALUES.PARTY_INDEPENDENT)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.POLITICAL_PARTY_REPUBLICAN])
-      filters.push(CONTACTS_FILTER_VALUES.PARTY_REPUBLICAN)
+    if (segment.partyDemocrat) filters.push('partyDemocrat')
+    if (segment.partyIndependent) filters.push('partyIndependent')
+    if (segment.partyRepublican) filters.push('partyRepublican')
 
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_FIRST_TIME])
-      filters.push(CONTACTS_FILTER_VALUES.AUDIENCE_FIRST_TIME_VOTERS)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_LIKELY])
-      filters.push(CONTACTS_FILTER_VALUES.AUDIENCE_LIKELY_VOTERS)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.VOTER_LIKELY_SUPER])
-      filters.push(CONTACTS_FILTER_VALUES.AUDIENCE_SUPER_VOTERS)
+    if (segment.audienceFirstTimeVoters) filters.push('audienceFirstTimeVoters')
+    if (segment.audienceLikelyVoters) filters.push('audienceLikelyVoters')
+    if (segment.audienceSuperVoters) filters.push('audienceSuperVoters')
+    if (segment.audienceUnreliableVoters)
+      filters.push('audienceUnreliableVoters')
+    if (segment.audienceUnlikelyVoters) filters.push('audienceUnlikelyVoters')
 
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_CELL_PHONE])
-      filters.push(CONTACTS_FILTER_VALUES.VOTER_TELEPHONES_CELL_PHONE_FORMATTED)
-    if (segment[CONTACTS_SEGMENT_FIELD_NAMES.HAS_LANDLINE])
-      filters.push(CONTACTS_FILTER_VALUES.VOTER_TELEPHONES_LANDLINE_FORMATTED)
+    if (segment.hasCellPhone) filters.push('cellPhoneFormatted')
+    if (segment.hasLandline) filters.push('landlineFormatted')
 
     return filters
   }

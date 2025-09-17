@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, VoterFileFilter } from '@prisma/client'
+import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
 
 @Injectable()
 export class VoterFileFilterService extends createPrismaBase(
@@ -33,6 +34,42 @@ export class VoterFileFilterService extends createPrismaBase(
   async delete(id: number) {
     return this.model.delete({
       where: { id },
+    })
+  }
+
+  findByCampaignId(campaignId: number): Promise<VoterFileFilter[]> {
+    return this.model.findMany({
+      where: { campaignId },
+      orderBy: { name: 'asc' },
+    })
+  }
+
+  findByIdAndCampaignId(
+    id: number,
+    campaignId: number,
+  ): Promise<VoterFileFilter | null> {
+    return this.findFirst({
+      where: { id, campaignId },
+    })
+  }
+
+  updateByIdAndCampaignId(
+    id: number,
+    campaignId: number,
+    data: UpdateVoterFileFilterSchema,
+  ): Promise<VoterFileFilter> {
+    return this.model.update({
+      where: { id, campaignId },
+      data,
+    })
+  }
+
+  deleteByIdAndCampaignId(
+    id: number,
+    campaignId: number,
+  ): Promise<VoterFileFilter> {
+    return this.model.delete({
+      where: { id, campaignId },
     })
   }
 
