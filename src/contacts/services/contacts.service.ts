@@ -250,6 +250,9 @@ export class ContactsService {
     if (segment.audienceFirstTimeVoters) filters.push('audienceFirstTimeVoters')
     if (segment.audienceLikelyVoters) filters.push('audienceLikelyVoters')
     if (segment.audienceSuperVoters) filters.push('audienceSuperVoters')
+    if (segment.audienceUnreliableVoters)
+      filters.push('audienceUnreliableVoters')
+    if (segment.audienceUnlikelyVoters) filters.push('audienceUnlikelyVoters')
 
     if (segment.hasCellPhone) filters.push('cellPhoneFormatted')
     if (segment.hasLandline) filters.push('landlineFormatted')
