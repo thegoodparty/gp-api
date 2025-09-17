@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import {
+  DomainEmailForwardingMessage,
   GenerateAiContentMessageData,
   QueueMessage,
   QueueType,
@@ -27,6 +28,8 @@ import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/serv
 import { QueueProducerService } from '../producer/queueProducer.service'
 import { getTwelveHoursFromDate } from '../../shared/util/date.util'
 import { EVENTS } from '../../vendors/segment/segment.types'
+import { DomainsService } from '../../websites/services/domains.service'
+import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
 
 @Injectable()
 export class QueueConsumerService {
@@ -40,6 +43,7 @@ export class QueueConsumerService {
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
+    private readonly domainsService: DomainsService,
     private readonly queueProducerService: QueueProducerService,
   ) {}
 
@@ -185,6 +189,11 @@ export class QueueConsumerService {
         return await this.handleTcrComplianceCheckMessage(
           queueMessage.data as TcrComplianceStatusCheckMessage,
         )
+      case QueueType.DOMAIN_EMAIL_FORWARDING:
+        this.logger.log('received domainEmailForwarding message')
+        return await this.handleDomainEmailForwardingMessage(
+          queueMessage.data as DomainEmailForwardingMessage,
+        )
     }
     // Return true to delete the message from the queue
     return true
@@ -261,7 +270,47 @@ export class QueueConsumerService {
     return true
   }
 
-  private async handlePathToVictoryMessage(message: PathToVictoryInput) {
+  private async handleDomainEmailForwardingMessage({
+    domainId,
+    forwardingEmailAddress,
+  }: DomainEmailForwardingMessage): Promise<boolean> {
+    if (!this.domainsService.shouldEnableDomainPurchase()) {
+      const message = `Domain purchasing is disabled - skipping backfill for domainId: ${domainId}`
+      this.logger.debug(message)
+      throw new Error(message, { cause: { domainId, forwardingEmailAddress } })
+    }
+    const domain = await this.domainsService.model.findUniqueOrThrow({
+      where: { id: domainId },
+    })
+
+    let forwardEmailDomain: ForwardEmailDomainResponse
+    try {
+      forwardEmailDomain = await this.domainsService.setupDomainEmailForwarding(
+        domain,
+        forwardingEmailAddress,
+      )
+      this.logger.debug(
+        `Email forwarding set up for domain *@${domain.name} -> ${forwardingEmailAddress}`,
+      )
+    } catch (e) {
+      const message = `Error setting up email forwarding for domain *@${domain.name} -> ${forwardingEmailAddress}`
+      this.logger.error(message)
+      throw new Error(message, { cause: { domainId, forwardingEmailAddress } })
+    }
+
+    await this.domainsService.model.update({
+      where: {
+        id: domainId,
+      },
+      data: { emailForwardingDomainId: forwardEmailDomain.id },
+    })
+
+    return true
+  }
+
+  private async handlePathToVictoryMessage(
+    message: PathToVictoryInput,
+  ): Promise<boolean> {
     let p2vSuccess = false
     let campaign: (Campaign & { pathToVictory: PathToVictory | null }) | null =
       null
@@ -352,22 +401,6 @@ export class QueueConsumerService {
     }
 
     return true
-
-    // This is disabled until we have a process to load the data from the sheet
-    // and a place to store the data since BallotCandidate was deprecated.
-    // const isProd = WEBAPP_ROOT === 'https://goodparty.org'
-    // // Send the candidate to google sheets for techspeed on production
-    // if (isProd) {
-    //   try {
-    //     await this.crmService.techspeedAppendSheets(message.campaignId)
-    //   } catch (e) {
-    //     this.logger.error('error in techspeedAppendSheets', e)
-    //     await this.slackService.errorMessage({
-    //       message: 'error in techspeedAppendSheets',
-    //       error: e,
-    //     })
-    //   }
-    // }
   }
 
   private async handlePathToVictoryFailure(campaign: Campaign) {
