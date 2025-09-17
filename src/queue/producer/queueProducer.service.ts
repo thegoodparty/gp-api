@@ -3,13 +3,7 @@ import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
 import { queueConfig } from '../queue.config'
-
-export enum MessageGroup {
-  p2v = 'p2v',
-  content = 'content',
-  tcrCompliance = 'tcrCompliance',
-  default = 'default',
-}
+import { MessageGroup } from '../queue.types'
 
 const config: SQSClientConfig = {
   region: process.env.AWS_REGION || '',

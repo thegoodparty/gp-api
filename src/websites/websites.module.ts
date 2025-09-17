@@ -16,6 +16,7 @@ import { PurchaseType } from 'src/payments/purchase.types'
 import { StripeModule } from 'src/vendors/stripe/stripe.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { ForwardEmailModule } from '../vendors/forwardEmail/forwardEmail.module'
+import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ForwardEmailModule } from '../vendors/forwardEmail/forwardEmail.module'
     UsersModule,
     StripeModule,
     forwardRef(() => CampaignsModule),
+    QueueProducerModule,
   ],
   controllers: [DomainsController, WebsitesController],
   providers: [
