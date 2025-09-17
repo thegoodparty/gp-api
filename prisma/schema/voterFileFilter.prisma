@@ -18,6 +18,8 @@ model VoterFileFilter {
   genderMale               Boolean?   @default(false) @map("gender_male")
   genderFemale             Boolean?   @default(false) @map("gender_female")
   genderUnknown            Boolean?   @default(false) @map("gender_unknown")
+  hasCellPhone             Boolean?   @default(false) @map("has_cell_phone")
+  hasLandline              Boolean?   @default(false) @map("has_landline")
   voterCount               Int?       @map("voter_count")
   campaign                 Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId               Int        @map("campaign_id")

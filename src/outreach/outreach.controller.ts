@@ -20,7 +20,7 @@ import { FilesService } from 'src/files/files.service'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { PeerlyP2pJobService } from '../peerly/services/peerlyP2pJob.service'
+import { PeerlyP2pJobService } from '../vendors/peerly/services/peerlyP2pJob.service'
 import { Readable } from 'stream'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 
@@ -156,7 +156,6 @@ export class OutreachController {
         },
         imageUrl,
       )
-
 
       return outreach
     } catch (error) {

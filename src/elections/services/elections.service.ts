@@ -237,7 +237,7 @@ export class ElectionsService {
     })
   }
 
-  private cleanDistrictName(L2DistrictName: string) {
+  cleanDistrictName(L2DistrictName: string) {
     const segments = L2DistrictName.split('##')
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
