@@ -184,6 +184,6 @@ export class VoterFileController {
     if (!filter) {
       throw new NotFoundException('Voter file filter not found')
     }
-    return this.voterFileFilterService.deleteByIdAndCampaignId(id, campaign.id)
+    await this.voterFileFilterService.deleteByIdAndCampaignId(id, campaign.id)
   }
 }
