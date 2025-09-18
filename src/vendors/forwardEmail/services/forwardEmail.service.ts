@@ -27,6 +27,10 @@ if (!FORWARDEMAIL_API_TOKEN) {
   throw new Error('Missing FORWARDEMAIL_API_TOKEN config')
 }
 
+const forwardEmailApiTokenBase64Encoded: string = Buffer.from(
+  `${FORWARDEMAIL_API_TOKEN}:`, // MUST have `:` for basic auth
+).toString('base64')
+
 @Injectable()
 export class ForwardEmailService {
   private readonly logger = new Logger(ForwardEmailService.name)
@@ -50,7 +54,7 @@ export class ForwardEmailService {
     timeout: number
   } {
     return {
-      headers: { Authorization: `Basic ${FORWARDEMAIL_API_TOKEN}` },
+      headers: { Authorization: `Basic ${forwardEmailApiTokenBase64Encoded}` },
       timeout: this.httpTimeoutMs,
     }
   }

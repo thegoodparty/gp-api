@@ -5,15 +5,12 @@ import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { SlackService } from 'src/shared/services/slack.service'
-import {
-  MessageGroup,
-  QueueProducerService,
-} from 'src/queue/producer/queueProducer.service'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../shared/services/slackService.types'
-import { QueueType } from '../../../queue/queue.types'
+import { MessageGroup, QueueType } from '../../../queue/queue.types'
 
 @Injectable()
 export class AiContentService {
