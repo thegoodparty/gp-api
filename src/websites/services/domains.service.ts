@@ -17,7 +17,10 @@ import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { DomainPurchaseMetadata } from '../domains.types'
 import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
-import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types' // Enum for domain operation statuses
+import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
+import { QueueProducerService } from '../../queue/producer/queueProducer.service'
+import { Timeout } from '@nestjs/schedule'
+import { MessageGroup, QueueType } from '../../queue/queue.types'
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -57,11 +60,60 @@ export class DomainsService
     private readonly payments: PaymentsService,
     private readonly stripe: StripeService,
     private readonly forwardEmailService: ForwardEmailService,
+    private queueService: QueueProducerService,
   ) {
     super()
   }
 
-  private shouldEnableDomainPurchase(): boolean {
+  // This will attempt to setup domain email forwarding for domains that have not yet done so.
+  @Timeout(0)
+  private async backfillDomainEmailRedirects() {
+    if (!this.shouldEnableDomainPurchase()) {
+      this.logger.debug(': Domain purchase disabled - skipping backfill')
+      return
+    }
+    const domains = await this.model.findMany({
+      where: {
+        emailForwardingDomainId: null,
+      },
+      include: {
+        website: {
+          include: {
+            campaign: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    for (const { id: domainId, website } of domains) {
+      const { campaign } = website
+      const { user } = campaign
+      const { email: forwardingEmailAddress } = user!
+      const messageData = {
+        domainId,
+        forwardingEmailAddress,
+      }
+      this.logger.debug(
+        `Found domain with no email forwarding, enqueuing task: ${JSON.stringify(messageData)}`,
+      )
+      await this.queueService.sendMessage(
+        {
+          type: QueueType.DOMAIN_EMAIL_FORWARDING,
+          data: {
+            domainId,
+            forwardingEmailAddress,
+          },
+        },
+        MessageGroup.domainEmailRedirect,
+      )
+    }
+  }
+
+  shouldEnableDomainPurchase(): boolean {
     return !this.stripe.isTestMode
   }
 
@@ -314,7 +366,7 @@ export class DomainsService
     }
   }
 
-  private async setupDomainEmailForwarding(
+  async setupDomainEmailForwarding(
     domain: Domain,
     forwardingEmailAddress: string,
   ) {

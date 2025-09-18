@@ -24,11 +24,8 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
 import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
-import {
-  MessageGroup,
-  QueueProducerService,
-} from '../../queue/producer/queueProducer.service'
-import { QueueType } from '../../queue/queue.types'
+import { QueueProducerService } from '../../queue/producer/queueProducer.service'
+import { MessageGroup, QueueType } from '../../queue/queue.types'
 import { getTwelveHoursFromDate } from '../../shared/util/date.util'
 
 @Controller('campaigns/tcr-compliance')
