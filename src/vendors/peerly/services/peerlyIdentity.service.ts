@@ -131,7 +131,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
             {
               entityType: PEERLY_ENTITY_TYPE,
               is_political: true,
-              usecases: [PEERLY_USECASE],
             },
             await this.getBaseHttpHeaders(),
           ),
