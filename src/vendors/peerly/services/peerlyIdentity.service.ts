@@ -104,7 +104,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         config,
       })}`,
     )
-    return lastValueFrom(this.httpService[method.name](url, data, config))
+    return lastValueFrom(
+      data
+        ? this.httpService[method.name](url, data, config)
+        : this.httpService[method.name](url, config),
+    )
   }
 
   async createIdentity(identityName: string) {
