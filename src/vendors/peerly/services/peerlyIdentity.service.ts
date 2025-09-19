@@ -1,8 +1,7 @@
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
+import { lastValueFrom, Observable } from 'rxjs'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import {
   BadGatewayException,
@@ -11,7 +10,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { AxiosResponse, isAxiosError } from 'axios'
+import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
 import { getUserFullName } from '../../../users/util/users.util'
 import {
@@ -35,10 +34,29 @@ import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/cam
 import {
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
-  PEERLY_LOCALITY_CATEGORIES,
   PEERLY_USECASE,
 } from './peerly.const'
 import { ensureUrlHasProtocol } from '../../../shared/util/strings.util'
+import { getPeerlyLocaleFromBallotLevel } from '../utils/getPeerlyLocaleFromBallotLevel.util'
+
+type HttpServiceMethod = {
+  <T = any, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>,
+  ): Observable<AxiosResponse<T, D>>
+  <T = any, D = any>(
+    url: string,
+    config?: AxiosRequestConfig<D>,
+  ): Observable<AxiosResponse<T, D>>
+}
+
+interface PeerlyHttpRequestConfig {
+  url: string
+  method: HttpServiceMethod
+  data?: unknown
+  config?: AxiosRequestConfig
+}
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -52,11 +70,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
+    const formattedError = isAxiosError(error) && JSON.stringify(format(error))
     this.logger.error(
-      'Failed to communicate with Peerly API',
-      isAxiosResponse(error) ? format(error) : error,
+      `Peerly API ERROR: ${formattedError}`,
+      !formattedError ? error : '',
     )
-    throw new BadGatewayException('Failed to communicate with Peerly API')
+    throw new BadGatewayException('Peerly API ERROR')
   }
 
   // TODO: move this out to a base service or utility once we have more than one
@@ -68,22 +87,42 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
   }
 
+  // TODO: Figure out how to get this abstracted out to log requests via axios interceptors
+  //  once this package updates their dependency:
+  //  https://github.com/narando/nest-axios-interceptor/pull/655
+  private async makeHttpRequest({
+    url,
+    method,
+    data,
+    config,
+  }: PeerlyHttpRequestConfig): Promise<AxiosResponse> {
+    this.logger.debug(
+      `Initializing HTTP request: ${JSON.stringify({
+        url,
+        method: method.name,
+        data,
+        config,
+      })}`,
+    )
+    return lastValueFrom(this.httpService[method.name](url, data, config))
+  }
+
   async createIdentity(identityName: string) {
+    this.logger.debug(`Creating identity with name: '${identityName}'`)
     try {
       const response: AxiosResponse<PeerlyIdentityCreateResponseBody> =
-        await lastValueFrom(
-          this.httpService.post(
-            `${this.baseUrl}/identities`,
-            {
-              account_id: this.accountNumber,
-              identity_name: this.isTestEnvironment
-                ? `TEST-${identityName}`
-                : identityName,
-              usecases: [PEERLY_USECASE],
-            },
-            await this.getBaseHttpHeaders(),
-          ),
-        )
+        await this.makeHttpRequest({
+          url: `${this.baseUrl}/identities`,
+          method: this.httpService.post,
+          data: {
+            account_id: this.accountNumber,
+            identity_name: this.isTestEnvironment
+              ? `TEST-${identityName}`
+              : identityName,
+            usecases: [PEERLY_USECASE],
+          },
+          config: await this.getBaseHttpHeaders(),
+        })
       const { data } = response
       const { Data: identity } = data
       this.logger.debug('Successfully created identity', identity)
@@ -96,12 +135,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async getIdentityUseCases(peerlyIdentityId: string) {
     try {
       const response: AxiosResponse<PeerlyIdentityUseCaseResponseBody> =
-        await lastValueFrom(
-          this.httpService.get(
-            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/get_usecases`,
-            await this.getBaseHttpHeaders(),
-          ),
-        )
+        await this.makeHttpRequest({
+          url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/get_usecases`,
+          method: this.httpService.get,
+          config: (await this.getBaseHttpHeaders()) as AxiosRequestConfig,
+        })
       const { data: useCases } = response
       this.logger.debug(
         `Successfully fetched use cases for identityId: ${peerlyIdentityId}`,
@@ -125,16 +163,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async submitIdentityProfile(identityId: string) {
     try {
       const response: AxiosResponse<PeerlySubmitIdentityProfileResponseBody> =
-        await lastValueFrom(
-          this.httpService.post(
-            `${this.baseUrl}/identities/${identityId}/submitProfile`,
-            {
-              entityType: PEERLY_ENTITY_TYPE,
-              is_political: true,
-            },
-            await this.getBaseHttpHeaders(),
-          ),
-        )
+        await this.makeHttpRequest({
+          url: `${this.baseUrl}/identities/${identityId}/submitProfile`,
+          method: this.httpService.post,
+          data: {
+            entityType: PEERLY_ENTITY_TYPE,
+            is_political: true,
+          },
+          config: await this.getBaseHttpHeaders(),
+        })
       const { data } = response
       const { link } = data
       this.logger.debug('Successfully submitted identity profile', data)
@@ -181,13 +218,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       }
       this.logger.debug('Submitting 10DLC brand with data:', submitBrandData)
       const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
-        await lastValueFrom(
-          this.httpService.post(
-            `${this.baseUrl}/v2/tdlc/${identityId}/submit`,
-            submitBrandData,
-            await this.getBaseHttpHeaders(),
-          ),
-        )
+        await this.makeHttpRequest({
+          url: `${this.baseUrl}/v2/tdlc/${identityId}/submit`,
+          method: this.httpService.post,
+          data: submitBrandData,
+          config: await this.getBaseHttpHeaders(),
+        })
       const { data } = response
       const { submission_key: submissionKey } = data
       this.logger.debug('Successfully submitted 10DLC brand', data)
@@ -261,7 +297,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         'Campaign must have electionDate to submit CV request',
       )
     }
-    const peerlyLocale = getPeerlyLocalFromBallotLevel(ballotLevel)
+    const peerlyLocale = getPeerlyLocaleFromBallotLevel(ballotLevel)
     try {
       const submitCVData = {
         name: this.isTestEnvironment
@@ -351,10 +387,3 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
   }
 }
-
-export const getPeerlyLocalFromBallotLevel = (
-  ballotLevel: BallotReadyPositionLevel,
-) =>
-  Object.keys(PEERLY_LOCALITY_CATEGORIES).find((key) =>
-    PEERLY_LOCALITY_CATEGORIES[key].includes(ballotLevel),
-  )

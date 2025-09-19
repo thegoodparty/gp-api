@@ -7,7 +7,7 @@ import { isAxiosResponse } from '../../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { AxiosResponse } from 'axios'
-import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials'
+import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials.util'
 
 interface Template {
   is_default: boolean
