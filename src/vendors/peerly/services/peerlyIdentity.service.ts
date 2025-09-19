@@ -70,7 +70,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
-    const formattedError = isAxiosError(error) && JSON.stringify(format(error))
+    const formattedError =
+      (isAxiosError(error) && JSON.stringify(format(error))) || ''
     this.logger.error(
       `Peerly API ERROR: ${formattedError}`,
       !formattedError ? error : '',
