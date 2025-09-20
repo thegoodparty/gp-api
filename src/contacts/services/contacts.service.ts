@@ -64,6 +64,8 @@ export class ContactsService {
       campaign,
     )
     this.appendDemographicFilter(params, demographicFilter)
+    const listFilters = await this.segmentToFilters(segment, campaign)
+    listFilters.forEach((f) => params.append('filters[]', f))
     params.set('full', 'true')
 
     try {
@@ -106,6 +108,8 @@ export class ContactsService {
       campaign,
     )
     this.appendDemographicFilter(params, demographicFilter)
+    const listFilters = await this.segmentToFilters(segment, campaign)
+    listFilters.forEach((f) => params.append('filters[]', f))
     params.set('full', 'true')
 
     try {
@@ -195,7 +199,7 @@ export class ContactsService {
       throw new BadRequestException('Campaign details are missing')
     }
 
-    const state = campaign.details.state
+    const { state } = campaign.details as { state?: string }
 
     if (!state || state.length !== 2) {
       throw new BadRequestException('Invalid state code in campaign data')
