@@ -5,7 +5,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common'
-import { Campaign, VoterFileFilter, PathToVictory } from '@prisma/client'
+import { VoterFileFilter } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
@@ -16,10 +16,11 @@ import {
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
 import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
-
-type CampaignWithPathToVictory = Campaign & {
-  pathToVictory?: PathToVictory | null
-}
+import {
+  DemographicFilter,
+  ExtendedVoterFileFilter,
+  CampaignWithPathToVictory,
+} from '../contacts.types'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -46,7 +47,6 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
   ) {
     const { resultsPerPage, page, segment } = dto
-    const filters = await this.segmentToFilters(segment, campaign)
 
     const locationData = this.extractLocationFromCampaign(campaign)
 
@@ -58,9 +58,13 @@ export class ContactsService {
       page: page.toString(),
     })
 
-    filters.forEach((filter) => {
-      params.append('filters', filter)
-    })
+    // Build demographic filter from full segment when custom segment id is used
+    const demographicFilter = await this.buildDemographicFilterFromSegmentId(
+      segment,
+      campaign,
+    )
+    this.appendDemographicFilter(params, demographicFilter)
+    params.set('full', 'true')
 
     try {
       const token = this.getValidS2SToken()
@@ -75,7 +79,7 @@ export class ContactsService {
         ),
       )
       return response.data
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('Failed to fetch contacts from people API', error)
       throw new BadGatewayException('Failed to fetch contacts from people API')
     }
@@ -87,7 +91,6 @@ export class ContactsService {
     res: FastifyReply,
   ) {
     const segment = dto.segment as string | undefined
-    const filters = await this.segmentToFilters(segment, campaign)
 
     const locationData = this.extractLocationFromCampaign(campaign)
 
@@ -97,9 +100,13 @@ export class ContactsService {
       districtName: locationData.districtName,
     })
 
-    filters.forEach((filter) => {
-      params.append('filters', filter)
-    })
+    // Build demographic filter from full segment when custom segment id is used
+    const demographicFilter = await this.buildDemographicFilterFromSegmentId(
+      segment,
+      campaign,
+    )
+    this.appendDemographicFilter(params, demographicFilter)
+    params.set('full', 'true')
 
     try {
       const token = this.getValidS2SToken()
@@ -120,7 +127,7 @@ export class ContactsService {
         response.data.on('end', resolve)
         response.data.on('error', reject)
       })
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('Failed to download contacts from people API', error)
       throw new BadGatewayException(
         'Failed to download contacts from people API',
@@ -258,5 +265,186 @@ export class ContactsService {
     if (segment.hasLandline) filters.push('landlineFormatted')
 
     return filters
+  }
+
+  private async buildDemographicFilterFromSegmentId(
+    segment: string | undefined,
+    campaign: CampaignWithPathToVictory,
+  ): Promise<DemographicFilter> {
+    // If segment is a known default, no demographic filter additions are applied
+    if (!segment || this.isDefaultSegment(segment)) return {}
+
+    const id = parseInt(segment)
+    if (!Number.isFinite(id)) return {}
+
+    const fullSegment = await this.voterFileFilterService.findByIdAndCampaignId(
+      id,
+      campaign.id,
+    )
+    if (!fullSegment) return {}
+
+    return this.translateSegmentToDemographicFilter(fullSegment)
+  }
+
+  private isDefaultSegment(segment: string): boolean {
+    return Boolean(
+      defaultSegmentToFiltersMap[
+        segment as keyof typeof defaultSegmentToFiltersMap
+      ],
+    )
+  }
+
+  private translateSegmentToDemographicFilter(
+    s: VoterFileFilter,
+  ): DemographicFilter {
+    const seg = s as ExtendedVoterFileFilter
+    const filter: DemographicFilter = {}
+
+    // Registered voter
+    const rv: Array<boolean> = []
+    if (seg.registeredVoterTrue) rv.push(true)
+    if (seg.registeredVoterFalse) rv.push(false)
+    if (rv.length) filter.registeredVoter = { in: rv }
+
+    // Voter status
+    if (seg.voterStatus && seg.voterStatus.length)
+      filter.voterStatus = { in: seg.voterStatus }
+
+    // Marital status booleans → vendor domain strings; Unknown means null
+    const marital: string[] = []
+    let maritalIncludeNull = false
+    if (seg.likelyMarried) marital.push('Inferred Married')
+    if (seg.likelySingle) marital.push('Inferred Single')
+    if (seg.married) marital.push('Married')
+    if (seg.single) marital.push('Single')
+    if (seg.maritalUnknown) maritalIncludeNull = true
+    if (marital.length || maritalIncludeNull) {
+      filter.maritalStatus = {
+        ...(marital.length ? { in: marital } : {}),
+        ...(maritalIncludeNull ? { is: 'null' } : {}),
+      }
+    }
+
+    // Presence of children; Unknown means null
+    const children: string[] = []
+    let childrenIncludeNull = false
+    if (seg.hasChildrenYes) children.push('Yes')
+    if (seg.hasChildrenNo) children.push('No')
+    if (seg.hasChildrenUnknown) childrenIncludeNull = true
+    if (children.length || childrenIncludeNull) {
+      filter.presenceOfChildren = {
+        ...(children.length ? { in: children } : {}),
+        ...(childrenIncludeNull ? { is: 'null' } : {}),
+      }
+    }
+
+    // Veteran status; Unknown means null
+    const veteran: string[] = []
+    let veteranIncludeNull = false
+    if (seg.veteranYes) veteran.push('Yes')
+    if (seg.veteranUnknown) veteranIncludeNull = true
+    if (veteran.length || veteranIncludeNull) {
+      filter.veteranStatus = {
+        ...(veteran.length ? { in: veteran } : {}),
+        ...(veteranIncludeNull ? { is: 'null' } : {}),
+      }
+    }
+
+    // Homeowner probability model; Unknown means null
+    const homeowner: string[] = []
+    let homeownerIncludeNull = false
+    if (seg.homeownerYes) homeowner.push('Yes Homeowner')
+    if (seg.homeownerLikely) homeowner.push('Probable Homeowner')
+    if (seg.homeownerNo) homeowner.push('Renter')
+    if (seg.homeownerUnknown) homeownerIncludeNull = true
+    if (homeowner.length || homeownerIncludeNull) {
+      filter.homeownerProbabilityModel = {
+        ...(homeowner.length ? { in: homeowner } : {}),
+        ...(homeownerIncludeNull ? { is: 'null' } : {}),
+      }
+    }
+
+    // Business owner in household; Unknown means null
+    const biz: string[] = []
+    let bizIncludeNull = false
+    if (seg.businessOwnerYes) biz.push('Yes')
+    if (seg.businessOwnerUnknown) bizIncludeNull = true
+    if (biz.length || bizIncludeNull) {
+      filter.businessOwner = {
+        ...(biz.length ? { in: biz } : {}),
+        ...(bizIncludeNull ? { is: 'null' } : {}),
+      }
+    }
+
+    // Education levels; Unknown means null
+    const edu: string[] = []
+    let eduIncludeNull = false
+    if (seg.educationNone) edu.push('Did not complete high school likely')
+    if (seg.educationHighSchoolDiploma) {
+      edu.push('Completed high school likely')
+    }
+    if (seg.educationTechnicalSchool) {
+      edu.push('Attended vocational/technical school likely')
+    }
+    if (seg.educationSomeCollege) {
+      edu.push('Attended but did not complete college likely')
+    }
+    if (seg.educationCollegeDegree) {
+      edu.push('Completed college likely')
+    }
+    if (seg.educationGraduateDegree) {
+      edu.push('Completed grad school likely')
+    }
+    if (seg.educationUnknown) eduIncludeNull = true
+    if (edu.length || eduIncludeNull) {
+      filter.educationOfPerson = {
+        ...(edu.length ? { in: edu } : {}),
+        ...(eduIncludeNull ? { is: 'null' } : {}),
+      }
+    }
+
+    // Language codes
+    if (seg.languageCodes && seg.languageCodes.length)
+      filter.languageCode = { in: seg.languageCodes }
+
+    // Estimated income ranges (vendor domain strings)
+    if (seg.incomeRanges && seg.incomeRanges.length)
+      filter.estimatedIncomeAmount = { in: seg.incomeRanges }
+
+    // Ethnic groups broad categories; Unknown means null
+    const eth: string[] = []
+    let ethIncludeNull = false
+    if (seg.ethnicityAsian) eth.push('East & South Asian')
+    if (seg.ethnicityEuropean) eth.push('European')
+    if (seg.ethnicityHispanic) eth.push('Hispanic & Portuguese')
+    if (seg.ethnicityAfricanAmerican) eth.push('Likely African American')
+    if (seg.ethnicityOther) eth.push('Other')
+    if (seg.ethnicityUnknown) ethIncludeNull = true
+    if (eth.length || ethIncludeNull) {
+      filter.ethnicGroupsEthnicGroup1Desc = {
+        ...(eth.length ? { in: eth } : {}),
+        ...(ethIncludeNull ? { is: 'null' } : {}),
+      }
+    }
+    return filter
+  }
+
+  private appendDemographicFilter(
+    params: URLSearchParams,
+    demographicFilter: DemographicFilter,
+  ): void {
+    Object.entries(demographicFilter).forEach(([apiField, ops]) => {
+      if (!ops || typeof ops !== 'object') return
+      if (ops.eq !== undefined)
+        params.append(`filter[${apiField}][eq]`, String(ops.eq))
+      if (ops.is === 'null' || ops.is === 'not_null')
+        params.append(`filter[${apiField}][is]`, String(ops.is))
+      if (ops.in !== undefined) {
+        const values = Array.isArray(ops.in) ? ops.in : [ops.in]
+        values.forEach((v) =>
+          params.append(`filter[${apiField}][in][]`, String(v)),
+        )
+      }
+    })
   }
 }
