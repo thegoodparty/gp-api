@@ -50,4 +50,7 @@ export const voterFilterBaseSchema = z.object({
   ethnicityAfricanAmerican: z.boolean().optional(),
   ethnicityOther: z.boolean().optional(),
   ethnicityUnknown: z.boolean().optional(),
+  languageCodes: z.array(z.string()).optional(),
+  voterStatus: z.array(z.string()).optional(),
+  incomeRanges: z.array(z.string()).optional(),
 })
