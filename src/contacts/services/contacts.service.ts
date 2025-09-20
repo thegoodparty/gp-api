@@ -12,15 +12,15 @@ import { lastValueFrom } from 'rxjs'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {
+  CampaignWithPathToVictory,
+  DemographicFilter,
+  ExtendedVoterFileFilter,
+} from '../contacts.types'
+import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
 import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
-import {
-  DemographicFilter,
-  ExtendedVoterFileFilter,
-  CampaignWithPathToVictory,
-} from '../contacts.types'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -78,7 +78,7 @@ export class ContactsService {
           },
         ),
       )
-      return response.data
+      return this.transformListResponse(response.data)
     } catch (error: unknown) {
       this.logger.error('Failed to fetch contacts from people API', error)
       throw new BadGatewayException('Failed to fetch contacts from people API')
@@ -446,5 +446,238 @@ export class ContactsService {
         )
       }
     })
+  }
+
+  private transformListResponse(data: {
+    pagination: {
+      totalResults: number
+      currentPage: number
+      pageSize: number
+      totalPages: number
+      hasNextPage: boolean
+      hasPreviousPage: boolean
+    }
+    people: Array<{
+      LALVOTERID?: string
+      State?: string | null
+      FirstName?: string | null
+      MiddleName?: string | null
+      LastName?: string | null
+      NameSuffix?: string | null
+      Residence_Addresses_AddressLine?: string | null
+      Residence_Addresses_ExtraAddressLine?: string | null
+      Residence_Addresses_City?: string | null
+      Residence_Addresses_State?: string | null
+      Residence_Addresses_Zip?: string | null
+      Residence_Addresses_ZipPlus4?: string | null
+      VoterTelephones_LandlineFormatted?: string | null
+      VoterTelephones_CellPhoneFormatted?: string | null
+      Age?: string | null
+      Gender?: string | null
+      Parties_Description?: string | null
+      County?: string | null
+      City?: string | null
+      Precinct?: string | null
+      Business_Owner?: string | null
+      Education_Of_Person?: string | null
+      Estimated_Income_Amount?: string | null
+      Homeowner_Probability_Model?: string | null
+      Language_Code?: string | null
+      Marital_Status?: string | null
+      Presence_Of_Children?: string | null
+      Registered_Voter?: boolean | null
+      Veteran_Status?: string | null
+      Voter_Status?: string | null
+      EthnicGroups_EthnicGroup1Desc?: string | null
+      Age_Int?: number | null
+    }>
+  }) {
+    return {
+      pagination: data.pagination,
+      people: data.people.map((p) => this.transformPerson(p)),
+    }
+  }
+
+  private transformPerson(p: {
+    FirstName?: string | null
+    LastName?: string | null
+    Gender?: string | null
+    Age?: string | null
+    Age_Int?: number | null
+    Parties_Description?: string | null
+    Registered_Voter?: boolean | null
+    Voter_Status?: string | null
+    Residence_Addresses_AddressLine?: string | null
+    Residence_Addresses_City?: string | null
+    Residence_Addresses_State?: string | null
+    Residence_Addresses_Zip?: string | null
+    Residence_Addresses_ZipPlus4?: string | null
+    VoterTelephones_CellPhoneFormatted?: string | null
+    VoterTelephones_LandlineFormatted?: string | null
+    Marital_Status?: string | null
+    Presence_Of_Children?: string | null
+    Veteran_Status?: string | null
+    Homeowner_Probability_Model?: string | null
+    Business_Owner?: string | null
+    Education_Of_Person?: string | null
+    EthnicGroups_EthnicGroup1Desc?: string | null
+    Language_Code?: string | null
+    Estimated_Income_Amount?: string | null
+  }) {
+    const firstName = p.FirstName || ''
+    const lastName = p.LastName || ''
+    const gender =
+      p.Gender === 'M' ? 'Male' : p.Gender === 'F' ? 'Female' : 'Unknown'
+    const age =
+      typeof p.Age_Int === 'number' && Number.isFinite(p.Age_Int)
+        ? p.Age_Int
+        : p.Age && Number.isFinite(parseInt(p.Age, 10))
+          ? parseInt(p.Age, 10)
+          : 'Unknown'
+    const politicalParty = p.Parties_Description || 'Unknown'
+    const registeredVoter =
+      p.Registered_Voter === true
+        ? 'Yes'
+        : p.Registered_Voter === false
+          ? 'No'
+          : 'Unknown'
+    const activeVoter = 'Unknown'
+    const voterStatus = p.Voter_Status || 'Unknown'
+    const zipPlus4 = p.Residence_Addresses_ZipPlus4
+      ? `-${p.Residence_Addresses_ZipPlus4}`
+      : ''
+    const addressParts = [
+      p.Residence_Addresses_AddressLine,
+      [p.Residence_Addresses_City, p.Residence_Addresses_State]
+        .filter((v) => Boolean(v))
+        .join(', '),
+      [p.Residence_Addresses_Zip, zipPlus4].filter((v) => Boolean(v)).join(''),
+    ].filter((v) => Boolean(v))
+    const address = addressParts.length ? addressParts.join(', ') : 'Unknown'
+    const cellPhone = p.VoterTelephones_CellPhoneFormatted || 'Unknown'
+    const landline = p.VoterTelephones_LandlineFormatted || 'Unknown'
+    const maritalStatus = this.mapMaritalStatus(p.Marital_Status)
+    const hasChildrenUnder18 = this.mapPresenceOfChildren(
+      p.Presence_Of_Children,
+    )
+    const veteranStatus = p.Veteran_Status === 'Yes' ? 'Yes' : 'Unknown'
+    const homeowner = this.mapHomeowner(p.Homeowner_Probability_Model)
+    const businessOwner =
+      p.Business_Owner && p.Business_Owner.toLowerCase().includes('owner')
+        ? 'Yes'
+        : 'Unknown'
+    const levelOfEducation = this.mapEducation(p.Education_Of_Person)
+    const ethnicityGroup = this.mapEthnicity(p.EthnicGroups_EthnicGroup1Desc)
+    const language = p.Language_Code ? p.Language_Code : 'Unknown'
+    const estimatedIncomeRange = p.Estimated_Income_Amount || 'Unknown'
+
+    return {
+      firstName,
+      lastName,
+      gender,
+      age,
+      politicalParty,
+      registeredVoter,
+      activeVoter,
+      voterStatus,
+      address,
+      cellPhone,
+      landline,
+      maritalStatus,
+      hasChildrenUnder18,
+      veteranStatus,
+      homeowner,
+      businessOwner,
+      levelOfEducation,
+      ethnicityGroup,
+      language,
+      estimatedIncomeRange,
+    }
+  }
+
+  private mapMaritalStatus(
+    value: string | null | undefined,
+  ): 'Likely Married' | 'Likely Single' | 'Married' | 'Single' | 'Unknown' {
+    if (!value) return 'Unknown'
+    const v = value.toLowerCase()
+    if (v.includes('inferred married')) return 'Likely Married'
+    if (v.includes('inferred single')) return 'Likely Single'
+    if (v === 'married') return 'Married'
+    if (v === 'single') return 'Single'
+    return 'Unknown'
+  }
+
+  private mapPresenceOfChildren(
+    value: string | null | undefined,
+  ): 'Yes' | 'No' | 'Unknown' {
+    if (!value) return 'Unknown'
+    const v = value.toLowerCase()
+    if (v === 'y' || v === 'yes') return 'Yes'
+    if (v === 'n' || v === 'no') return 'No'
+    return 'Unknown'
+  }
+
+  private mapHomeowner(
+    value: string | null | undefined,
+  ): 'Yes' | 'Likely' | 'No' | 'Unknown' {
+    if (!value) return 'Unknown'
+    const v = value.toLowerCase()
+    if (v.includes('home owner') || v.includes('yes homeowner')) return 'Yes'
+    if (v.includes('probable homeowner')) return 'Likely'
+    if (v.includes('renter')) return 'No'
+    return 'Unknown'
+  }
+
+  private mapEducation(
+    value: string | null | undefined,
+  ):
+    | 'None'
+    | 'High School Diploma'
+    | 'Technical School'
+    | 'Some College'
+    | 'College Degree'
+    | 'Graduate Degree'
+    | 'Unknown' {
+    if (!value) return 'Unknown'
+    const v = value.toLowerCase()
+    if (v.includes('did not complete high school')) return 'None'
+    if (v.includes('completed high school')) return 'High School Diploma'
+    if (v.includes('vocational') || v.includes('technical school'))
+      return 'Technical School'
+    if (v.includes('did not complete college')) return 'Some College'
+    if (v.includes('completed college')) return 'College Degree'
+    if (v.includes('completed grad school') || v.includes('graduate'))
+      return 'Graduate Degree'
+    return 'Unknown'
+  }
+
+  private mapEthnicity(
+    value: string | null | undefined,
+  ):
+    | 'Asian'
+    | 'European'
+    | 'Hispanic'
+    | 'African American'
+    | 'Other'
+    | 'Unknown' {
+    if (!value) return 'Unknown'
+    const v = value.toLowerCase()
+    if (
+      v.includes('east & south asian') ||
+      v.includes('east and south asian') ||
+      v.includes('asian')
+    )
+      return 'Asian'
+    if (v.includes('european')) return 'European'
+    if (
+      v.includes('hispanic & portuguese') ||
+      v.includes('hispanic and portuguese') ||
+      v.includes('hispanic')
+    )
+      return 'Hispanic'
+    if (v.includes('likely african american') || v.includes('african american'))
+      return 'African American'
+    if (v.includes('other')) return 'Other'
+    return 'Unknown'
   }
 }
