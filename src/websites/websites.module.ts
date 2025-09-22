@@ -15,17 +15,21 @@ import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { StripeModule } from 'src/vendors/stripe/stripe.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
+import { ForwardEmailModule } from '../vendors/forwardEmail/forwardEmail.module'
+import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 
 @Module({
   imports: [
     HttpModule,
     AwsModule,
     VercelModule,
+    ForwardEmailModule,
     FilesModule,
     PaymentsModule,
     UsersModule,
     StripeModule,
     forwardRef(() => CampaignsModule),
+    QueueProducerModule,
   ],
   controllers: [DomainsController, WebsitesController],
   providers: [

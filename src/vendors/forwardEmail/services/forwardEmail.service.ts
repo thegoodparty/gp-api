@@ -11,6 +11,11 @@ import {
 } from '../forwardEmail.types'
 
 const FORWARDEMAIL_TIMEOUT_MS = 10000
+enum FORWARDEMAIL_PLAN {
+  Free = 'free',
+  EnhancedProtection = 'enhanced_protection',
+  Team = 'team',
+}
 
 const { FORWARDEMAIL_API_TOKEN, FORWARDEMAIL_BASE_URL } = process.env
 
@@ -21,6 +26,10 @@ if (!FORWARDEMAIL_BASE_URL) {
 if (!FORWARDEMAIL_API_TOKEN) {
   throw new Error('Missing FORWARDEMAIL_API_TOKEN config')
 }
+
+const forwardEmailApiTokenBase64Encoded: string = Buffer.from(
+  `${FORWARDEMAIL_API_TOKEN}:`, // MUST have `:` for basic auth
+).toString('base64')
 
 @Injectable()
 export class ForwardEmailService {
@@ -45,7 +54,7 @@ export class ForwardEmailService {
     timeout: number
   } {
     return {
-      headers: { Authorization: `Basic ${FORWARDEMAIL_API_TOKEN}` },
+      headers: { Authorization: `Basic ${forwardEmailApiTokenBase64Encoded}` },
       timeout: this.httpTimeoutMs,
     }
   }
@@ -56,7 +65,7 @@ export class ForwardEmailService {
         await lastValueFrom(
           this.httpService.post<ForwardEmailDomainResponse>(
             `${this.baseUrl}/domains`,
-            { domain: domain.name },
+            { domain: domain.name, plan: FORWARDEMAIL_PLAN.EnhancedProtection },
             this.getBaseHttpHeaders(),
           ),
         )
@@ -69,14 +78,14 @@ export class ForwardEmailService {
   }
 
   async createCatchAllAlias(
-    domain: Domain,
     forwardToEmail: string,
+    forwardingDomainResponse: ForwardEmailDomainResponse,
   ): Promise<ForwardEmailAliasResponse> {
     try {
       const response: AxiosResponse<ForwardEmailAliasResponse> =
         await lastValueFrom(
           this.httpService.post<ForwardEmailAliasResponse>(
-            `${this.baseUrl}/domains/${encodeURIComponent(domain.name)}/aliases`,
+            `${this.baseUrl}/domains/${encodeURIComponent(forwardingDomainResponse.id)}/aliases`,
             { name: '*', recipients: forwardToEmail },
             this.getBaseHttpHeaders(),
           ),

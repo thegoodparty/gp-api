@@ -29,7 +29,7 @@ export interface ForwardEmailDomainResponse {
   plan?: string
   max_recipients_per_alias?: number
   smtp_port?: string
-  name?: string
+  name: string
   has_mx_record?: boolean
   has_txt_record?: boolean
   has_dkim_record?: boolean
@@ -37,8 +37,8 @@ export interface ForwardEmailDomainResponse {
   has_dmarc_record?: boolean
   has_recipient_verification?: boolean
   has_custom_verification?: boolean
-  verification_record?: string
-  id?: string
+  verification_record: string
+  id: string
   object?: 'domain'
   created_at?: string
   updated_at?: string

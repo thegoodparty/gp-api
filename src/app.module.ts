@@ -32,7 +32,6 @@ import { WebsitesModule } from './websites/websites.module'
 import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
 import { PeerlyModule } from './vendors/peerly/peerly.module'
 import { ContactsModule } from './contacts/contacts.module'
-import { ContactsSegmentModule } from './contacts/contactsSegment/contactsSegment.module'
 
 @Module({
   imports: [
@@ -65,7 +64,6 @@ import { ContactsSegmentModule } from './contacts/contactsSegment/contactsSegmen
     CommunityIssuesModule,
     PeerlyModule,
     ContactsModule,
-    ContactsSegmentModule,
   ],
   providers: [
     SessionsService,

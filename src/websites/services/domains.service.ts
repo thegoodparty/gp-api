@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { AwsRoute53Service } from 'src/vendors/aws/services/awsRoute53.service'
-import { DomainStatus, User } from '@prisma/client'
+import { Domain, DomainStatus, User } from '@prisma/client'
 import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import { VercelService } from 'src/vendors/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
@@ -15,7 +15,14 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
-import { DomainPurchaseMetadata } from '../domains.types' // Enum for domain operation statuses
+import { DomainPurchaseMetadata } from '../domains.types'
+import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
+import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
+import { QueueProducerService } from '../../queue/producer/queueProducer.service'
+import { Timeout } from '@nestjs/schedule'
+import { MessageGroup, QueueType } from '../../queue/queue.types'
+
+const { ENABLE_DOMAIN_SETUP } = process.env
 
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
@@ -54,18 +61,62 @@ export class DomainsService
     private readonly vercel: VercelService,
     private readonly payments: PaymentsService,
     private readonly stripe: StripeService,
+    private readonly forwardEmailService: ForwardEmailService,
+    private queueService: QueueProducerService,
   ) {
     super()
   }
 
-  private shouldEnableDomainPurchase(): boolean {
-    return !this.stripe.isTestMode
+  // This will attempt to setup domain email forwarding for domains that have not yet done so.
+  @Timeout(0)
+  private async backfillDomainEmailRedirects() {
+    if (!this.shouldEnableDomainPurchase()) {
+      this.logger.debug(': Domain purchase disabled - skipping backfill')
+      return
+    }
+    const domains = await this.model.findMany({
+      where: {
+        emailForwardingDomainId: null,
+      },
+      include: {
+        website: {
+          include: {
+            campaign: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    for (const { id: domainId, website } of domains) {
+      const { campaign } = website
+      const { user } = campaign
+      const { email: forwardingEmailAddress } = user!
+      const messageData = {
+        domainId,
+        forwardingEmailAddress,
+      }
+      this.logger.debug(
+        `Found domain with no email forwarding, enqueuing task: ${JSON.stringify(messageData)}`,
+      )
+      await this.queueService.sendMessage(
+        {
+          type: QueueType.DOMAIN_EMAIL_FORWARDING,
+          data: {
+            domainId,
+            forwardingEmailAddress,
+          },
+        },
+        MessageGroup.domainEmailRedirect,
+      )
+    }
   }
 
-  private getDomainPurchaseStatus(): string {
-    return this.stripe.isTestMode
-      ? 'disabled because Stripe is in test mode'
-      : 'enabled'
+  shouldEnableDomainPurchase(): boolean {
+    return ENABLE_DOMAIN_SETUP === 'true'
   }
 
   async validatePurchase(
@@ -311,6 +362,58 @@ export class DomainsService
     }
   }
 
+  async setupDomainEmailForwarding(
+    domain: Domain,
+    forwardingEmailAddress: string,
+  ) {
+    let forwardEmailDomain: ForwardEmailDomainResponse | null = null
+    try {
+      forwardEmailDomain = await this.forwardEmailService.addDomain(domain)
+    } catch (e) {
+      this.logger.error('Error adding domain to forward email service:', e)
+      throw new Error('Error adding domain to forward email service:', {
+        cause: e,
+      })
+    }
+    this.logger.debug(`Domain added to ForwardEmail service: ${domain.name}`)
+
+    try {
+      await this.vercel.createMXRecords(domain.name)
+    } catch (e) {
+      this.logger.error('Error creating DNS MX records for domain:', e)
+      throw new Error('Error creating DNS MX records for domain:', { cause: e })
+    }
+    this.logger.debug(`MX records created for domain ${domain.name}`)
+
+    try {
+      await this.vercel.createTXTVerificationRecord(
+        domain.name,
+        forwardEmailDomain!,
+      )
+    } catch (e) {
+      this.logger.error('Error creating SPF record for domain:', e)
+      throw new Error('Error creating SPF record for domain:', { cause: e })
+    }
+    this.logger.debug(`SPF record created for domain ${domain.name}`)
+
+    try {
+      await this.forwardEmailService.createCatchAllAlias(
+        forwardingEmailAddress,
+        forwardEmailDomain!,
+      )
+    } catch (e) {
+      this.logger.error(
+        `catch-all alias not created for domain *@${domain.name} -> ${forwardingEmailAddress} :`,
+        e,
+      )
+      throw new Error(
+        `catch-all alias not created for domain *@${domain.name} -> ${forwardingEmailAddress} :`,
+        { cause: e },
+      )
+    }
+    return forwardEmailDomain
+  }
+
   // called after payment is accepted, send registration request to Vercel
   async completeDomainRegistration(
     websiteId: number,
@@ -336,10 +439,12 @@ export class DomainsService
       throw new BadRequestException('Domain price not available')
     }
 
-    let vercelResult, projectResult
+    let vercelResult,
+      projectResult,
+      forwardEmailDomain: ForwardEmailDomainResponse | null = null
 
-    try {
-      if (this.shouldEnableDomainPurchase()) {
+    if (this.shouldEnableDomainPurchase()) {
+      try {
         vercelResult = await this.vercel.purchaseDomain(
           domain.name,
           {
@@ -357,24 +462,37 @@ export class DomainsService
         )
 
         projectResult = await this.vercel.addDomainToProject(domain.name)
-      } else {
-        this.logger.debug(
-          `Skipping domain purchase for ${domain.name} - ${this.getDomainPurchaseStatus()}`,
+      } catch (error) {
+        this.logger.error('Error registering domain with Vercel:', error)
+
+        await this.model.update({
+          where: { id: domain.id },
+          data: { status: DomainStatus.inactive },
+        })
+
+        throw new BadGatewayException(
+          `Failed to register domain with Vercel: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
         )
       }
-    } catch (error) {
-      this.logger.error('Error registering domain with Vercel:', error)
 
-      await this.model.update({
-        where: { id: domain.id },
-        data: { status: DomainStatus.inactive },
-      })
-
-      throw new BadGatewayException(
-        `Failed to register domain with Vercel: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      )
+      try {
+        forwardEmailDomain = await this.setupDomainEmailForwarding(
+          domain,
+          contact.email,
+        )
+        this.logger.debug(
+          `Email forwarding set up for domain *@${domain.name} -> ${contact.email}`,
+        )
+      } catch (e) {
+        this.logger.error(
+          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} :`,
+        )
+        // Not throwing an error here to allow for continued execution
+      }
+    } else {
+      this.logger.debug(`Domain purchase disabled for ${domain.name}`)
     }
 
     await this.model.update({
@@ -382,6 +500,9 @@ export class DomainsService
       data: {
         operationId: `vercel-${domain.name}-${Date.now()}`,
         status: DomainStatus.submitted,
+        ...(forwardEmailDomain
+          ? { emailForwardingDomainId: forwardEmailDomain.id }
+          : {}),
       },
     })
 
