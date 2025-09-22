@@ -253,7 +253,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
               entity_type: PEERLY_ENTITY_TYPE,
               usecase: PEERLY_USECASE,
               sample1: `Hello {first_name}, this is ${getUserFullName(user)}, a volunteer from ${committeeName}. We need your support in the upcoming election. Every vote will count, please reply and let me know if you will need any help. Reply STOP to opt-out`,
-              sample2: `Hello {first_name}, this is ${getUserFullName(user)}, a volunteer from ${committeeName}. We're looking for volunteers for some canvassing this coming weekend and I was wondering if you may be interested?. Reply STOP to opt-out`,
+              sample2: `Hello {first_name}, this is ${getUserFullName(user)}, a volunteer from ${committeeName}. We're looking for volunteers for some canvassing this coming weekend and I was wondering if you may be interested? Reply STOP to opt-out`,
             },
             await this.getBaseHttpHeaders(),
           ),
