@@ -22,6 +22,8 @@ import { QueueProducerService } from '../../queue/producer/queueProducer.service
 import { Timeout } from '@nestjs/schedule'
 import { MessageGroup, QueueType } from '../../queue/queue.types'
 
+const { ENABLE_DOMAIN_SETUP } = process.env
+
 // Enum for domain operation statuses
 export enum DomainOperationStatus {
   SUBMITTED = 'SUBMITTED',
@@ -114,13 +116,7 @@ export class DomainsService
   }
 
   shouldEnableDomainPurchase(): boolean {
-    return !this.stripe.isTestMode
-  }
-
-  private getDomainPurchaseStatus(): string {
-    return this.stripe.isTestMode
-      ? 'disabled because Stripe is in test mode'
-      : 'enabled'
+    return ENABLE_DOMAIN_SETUP === 'true'
   }
 
   async validatePurchase(
@@ -496,9 +492,7 @@ export class DomainsService
         // Not throwing an error here to allow for continued execution
       }
     } else {
-      this.logger.debug(
-        `Domain purchase disabled for ${domain.name} - ${this.getDomainPurchaseStatus()}`,
-      )
+      this.logger.debug(`Domain purchase disabled for ${domain.name}`)
     }
 
     await this.model.update({
