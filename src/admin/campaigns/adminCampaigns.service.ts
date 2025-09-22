@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
@@ -25,6 +25,8 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 
 @Injectable()
 export class AdminCampaignsService {
+  private readonly logger = new Logger(AdminCampaignsService.name)
+
   constructor(
     private readonly email: EmailService,
     private readonly users: UsersService,
@@ -116,14 +118,21 @@ export class AdminCampaignsService {
       data: attributes,
     })
     if (isPro === true) {
-      this.analytics.track(
-        updatedCampaign?.userId,
-        EVENTS.Account.ProSubscriptionConfirmed,
-        {
-          price: 0,
-          paymentMethod: 'admin',
-        },
-      )
+      this.logger.log(`[ADMIN] Starting analytics tracking for admin pro subscription - User: ${updatedCampaign?.userId}, Campaign: ${id}`)
+      try {
+        await this.analytics.track(
+          updatedCampaign?.userId,
+          EVENTS.Account.ProSubscriptionConfirmed,
+          {
+            price: 0,
+            paymentMethod: 'admin',
+          },
+        )
+        this.logger.log(`[ADMIN] Successfully tracked admin pro subscription analytics - User: ${updatedCampaign?.userId}`)
+      } catch (error) {
+        this.logger.error(`[ADMIN] Failed to track admin pro subscription analytics - User: ${updatedCampaign?.userId}, Campaign: ${id}`, error)
+        // Don't throw - we don't want to fail the admin operation for analytics issues
+      }
     }
     await this.crm.trackCampaign(updatedCampaign.id)
 

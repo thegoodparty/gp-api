@@ -22,21 +22,30 @@ export class SegmentService {
     this.analytics = new Analytics({ writeKey: SEGMENT_WRITE_KEY })
   }
 
-  trackEvent(
+  async trackEvent(
     userId: number,
     event: string,
     properties: SegmentTrackEventProperties = {},
-  ) {
-    try {
-      const stringId = String(userId)
-      this.analytics.track({
-        event,
-        userId: stringId,
-        properties,
-      })
-    } catch (err) {
-      this.logger.error(`Failed to track event: ${event}`, err)
-    }
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const stringId = String(userId)
+        this.analytics.track({
+          event,
+          userId: stringId,
+          properties,
+          callback: (err) => {
+            if (err) {
+              this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
+              reject(err)
+            } 
+          }
+        })
+      } catch (err) {
+        this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
+        reject(err)
+      }
+    })
   }
 
   identify(userId: number, traits: SegmentIdentityTraits) {
