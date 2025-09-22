@@ -100,7 +100,7 @@ describe('PeerlyIdentityService', () => {
     it('should successfully approve 10DLC brand with correct parameters', async () => {
       // Arrange
       const campaignVerifyToken = 'test-verify-token'
-      const expectedUrl = `${service['baseUrl']}/v2/tdlc/${mockTcrCompliance.peerlyIdentityId}/submit`
+      const expectedUrl = `${service['baseUrl']}/v2/tdlc/${mockTcrCompliance.peerlyIdentityId}/approve`
       
       const expectedPayload = {
         campaign_verify_token: campaignVerifyToken,
