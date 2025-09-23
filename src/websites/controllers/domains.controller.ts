@@ -10,12 +10,7 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import {
-  DomainsService,
-  DomainStatusResponse,
-  DomainOperationStatus,
-  DomainOperationType,
-} from '../services/domains.service'
+import { DomainsService } from '../services/domains.service'
 import { PaymentStatus } from 'src/payments/payments.types'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SearchDomainSchema } from '../schemas/SearchDomain.schema'
@@ -24,6 +19,11 @@ import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign, DomainStatus, UserRole } from '@prisma/client'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { WebsitesService } from '../services/websites.service'
+import {
+  DomainOperationStatus,
+  DomainOperationType,
+  DomainStatusResponse,
+} from '../domains.types'
 
 @Controller('domains')
 @UsePipes(ZodValidationPipe)
