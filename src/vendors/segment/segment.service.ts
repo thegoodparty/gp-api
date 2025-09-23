@@ -38,7 +38,10 @@ export class SegmentService {
             if (err) {
               this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
               reject(err)
-            } 
+            } else {
+              this.logger.debug(`[SEGMENT] Successfully sent event to Segment - Event: ${event}, User: ${userId}`)
+              resolve()
+            }
           }
         })
       } catch (err) {
