@@ -283,7 +283,7 @@ export class QueueConsumerService {
       where: { id: domainId },
     })
 
-    let forwardEmailDomain: ForwardEmailDomainResponse
+    let forwardEmailDomain: ForwardEmailDomainResponse | null = null
     try {
       forwardEmailDomain = await this.domainsService.setupDomainEmailForwarding(
         domain,
@@ -298,12 +298,13 @@ export class QueueConsumerService {
       throw new Error(message, { cause: { domainId, forwardingEmailAddress } })
     }
 
-    await this.domainsService.model.update({
-      where: {
-        id: domainId,
-      },
-      data: { emailForwardingDomainId: forwardEmailDomain.id },
-    })
+    forwardEmailDomain &&
+      (await this.domainsService.model.update({
+        where: {
+          id: domainId,
+        },
+        data: { emailForwardingDomainId: forwardEmailDomain.id },
+      }))
 
     return true
   }
