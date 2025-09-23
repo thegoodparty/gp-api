@@ -6,14 +6,28 @@ import {
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
-import { Campaign, TcrCompliance, User } from '@prisma/client'
+import {
+  Campaign,
+  TcrCompliance,
+  TcrComplianceStatus,
+  User,
+} from '@prisma/client'
 import { getTCRIdentityName } from '../util/trcCompliance.util'
 import { getUserFullName } from '../../../users/util/users.util'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
 import { PeerlyIdentityUseCase } from '../../../vendors/peerly/peerly.types'
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
-import { DomainsService } from '../../../websites/services/domains.service'
+import { Interval, Timeout } from '@nestjs/schedule'
+import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
+import {
+  QueueType,
+  TcrComplianceStatusCheckMessage,
+} from '../../../queue/queue.types'
+
+const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
+  ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
+  : 12 * 60 * 60 // Defaults to 12 hrs
 
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
@@ -22,9 +36,33 @@ export class CampaignTcrComplianceService extends createPrismaBase(
   constructor(
     private readonly peerlyIdentityService: PeerlyIdentityService,
     private readonly websitesService: WebsitesService,
-    private readonly domainService: DomainsService,
+    private queueService: QueueProducerService,
   ) {
     super()
+  }
+
+  @Timeout(0) // This will run immediately when the module is loaded
+  @Interval(TCR_COMPLIANCE_CHECK_INTERVAL * 1000) // This will run based on the environment variable
+  private async bootstrapTcrComplianceCheck() {
+    const pendingTcrCompliances = await this.model.findMany({
+      where: {
+        status: TcrComplianceStatus.pending,
+      },
+    })
+    this.logger.debug(
+      `Queuing up pendingTcrCompliances =>`,
+      pendingTcrCompliances,
+    )
+    if (pendingTcrCompliances.length) {
+      await Promise.allSettled(
+        pendingTcrCompliances.map((tcrCompliance) =>
+          this.queueService.sendMessage({
+            type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
+            data: { tcrCompliance } as TcrComplianceStatusCheckMessage,
+          }),
+        ),
+      )
+    }
   }
 
   async fetchByCampaignId(campaignId: number) {
