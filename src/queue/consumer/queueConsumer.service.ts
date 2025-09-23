@@ -204,7 +204,7 @@ export class QueueConsumerService {
     const { peerlyIdentityId } = tcrCompliance
     if (!peerlyIdentityId) {
       this.logger.error(
-        `No peerlyIdentityId found on TcrCompliance provided, skipping: ${tcrCompliance}`,
+        `No peerlyIdentityId found on TcrCompliance provided, skipping: ${JSON.stringify(tcrCompliance)}`,
       )
       return true // remove message from the queue
     }
@@ -247,7 +247,7 @@ export class QueueConsumerService {
       })
     } catch (analyticsError) {
       this.logger.error(
-        `Failed to track analytics for TCR compliance: ${tcrCompliance}`,
+        `Failed to track analytics for TCR compliance: ${JSON.stringify(tcrCompliance)}`,
         analyticsError,
       )
     }
