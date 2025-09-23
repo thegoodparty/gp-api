@@ -1,5 +1,10 @@
 import { HttpService } from '@nestjs/axios'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common'
 import { AxiosResponse, isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { format } from '@redtea/format-axios-error'
@@ -85,7 +90,7 @@ export class ForwardEmailService {
           } catch (e) {
             if (
               isAxiosError(e) &&
-              e.response?.status === 429 &&
+              e.response?.status === HttpStatus.CONFLICT &&
               attempt < maxRetries
             ) {
               await this.sleep(backoff)
