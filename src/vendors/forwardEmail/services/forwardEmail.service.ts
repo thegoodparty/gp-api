@@ -1,6 +1,6 @@
 import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
-import { AxiosResponse } from 'axios'
+import { AxiosResponse, isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { format } from '@redtea/format-axios-error'
 import { isAxiosResponse } from '../../../shared/util/http.util'
@@ -59,6 +59,90 @@ export class ForwardEmailService {
     }
   }
 
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  private async paginateWithBackoff<T>(
+    requester: (page: number, limit: number) => Promise<AxiosResponse<T[]>>,
+  ): Promise<T[]> {
+    const all: T[] = []
+    const limit = 1000
+    let page = 1
+    let backoff = 250
+    const maxBackoff = 8000
+    const maxRetries = 5
+    try {
+      let hasMore = true
+      while (hasMore) {
+        let response: AxiosResponse<T[]> | null = null
+        let attempt = 0
+        let pending = true
+        while (pending) {
+          try {
+            response = await requester(page, limit)
+            pending = false
+          } catch (e) {
+            if (
+              isAxiosError(e) &&
+              e.response?.status === 429 &&
+              attempt < maxRetries
+            ) {
+              await this.sleep(backoff)
+              backoff = Math.min(backoff * 2, maxBackoff)
+              attempt += 1
+            } else {
+              this.handleApiError(e as Error)
+            }
+          }
+        }
+        const data = response!.data
+        all.push(...data)
+        const pageCount = Number(response!.headers['x-page-count'])
+        const pageCurrent = Number(response!.headers['x-page-current'])
+        const hasHeaderPagination =
+          Number.isFinite(pageCount) &&
+          Number.isFinite(pageCurrent) &&
+          pageCurrent < pageCount
+        hasMore = hasHeaderPagination || data.length === limit
+        if (hasMore) {
+          page += 1
+          await this.sleep(backoff)
+          backoff = Math.min(backoff * 2, maxBackoff)
+        }
+      }
+      return all
+    } catch (error) {
+      this.handleApiError(error as Error)
+    }
+  }
+
+  private async listDomains(): Promise<ForwardEmailDomainResponse[]> {
+    const domains = await this.paginateWithBackoff<ForwardEmailDomainResponse>(
+      (p, l) =>
+        lastValueFrom(
+          this.httpService.get<ForwardEmailDomainResponse[]>(
+            `${this.baseUrl}/domains`,
+            {
+              ...this.getBaseHttpHeaders(),
+              params: { page: p, limit: l, paginate: true, pagination: true },
+            },
+          ),
+        ),
+    )
+    this.logger.debug(
+      `Successfully retrieved (${domains?.length}) Forward Email domains`,
+    )
+    return domains
+  }
+
+  async getDomain(
+    domainName: string,
+  ): Promise<ForwardEmailDomainResponse | null> {
+    const domains = await this.listDomains()
+    return domains.find((d) => d.name === domainName) || null
+  }
+
   async addDomain(domain: Domain): Promise<ForwardEmailDomainResponse> {
     try {
       const response: AxiosResponse<ForwardEmailDomainResponse> =
@@ -77,6 +161,34 @@ export class ForwardEmailService {
     }
   }
 
+  async getCatchAllDomainAliases(
+    domainName: string,
+  ): Promise<ForwardEmailAliasResponse[]> {
+    const aliases = await this.paginateWithBackoff<ForwardEmailAliasResponse>(
+      (p, l) =>
+        lastValueFrom(
+          this.httpService.get<ForwardEmailAliasResponse[]>(
+            `${this.baseUrl}/domains/${encodeURIComponent(domainName)}/aliases`,
+            {
+              ...this.getBaseHttpHeaders(),
+              params: {
+                page: p,
+                limit: l,
+                paginate: true,
+                pagination: true,
+                name: '*',
+              },
+            },
+          ),
+        ),
+    )
+    this.logger.debug(
+      'Successfully retrieved Forward Email catch-all aliases',
+      aliases,
+    )
+    return aliases
+  }
+
   async createCatchAllAlias(
     forwardToEmail: string,
     forwardingDomainResponse: ForwardEmailDomainResponse,
@@ -92,8 +204,32 @@ export class ForwardEmailService {
         )
       const { data } = response
       this.logger.debug(
-        'Successfully created Forward Email catch-all alias',
-        data,
+        `Successfully created Forward Email catch-all alias: ${JSON.stringify(data)}`,
+      )
+      return data
+    } catch (error) {
+      this.handleApiError(error as Error)
+    }
+  }
+
+  async updateDomainAlias(
+    aliasId: string,
+    forwardToEmail: string,
+    forwardingDomainResponse: ForwardEmailDomainResponse,
+  ): Promise<ForwardEmailAliasResponse> {
+    try {
+      const response: AxiosResponse<ForwardEmailAliasResponse> =
+        await lastValueFrom(
+          this.httpService.put<ForwardEmailAliasResponse>(
+            `${this.baseUrl}/domains/${encodeURIComponent(forwardingDomainResponse.id)}/aliases/${encodeURIComponent(aliasId)}`,
+            { recipients: forwardToEmail },
+            this.getBaseHttpHeaders(),
+          ),
+        )
+
+      const { data } = response
+      this.logger.debug(
+        `Successfully updated Forward Email catch-all alias: ${JSON.stringify(data)}`,
       )
       return data
     } catch (error) {
