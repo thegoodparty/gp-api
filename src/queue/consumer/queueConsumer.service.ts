@@ -23,10 +23,8 @@ import {
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { isAfter, parseISO } from 'date-fns'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { QueueProducerService } from '../producer/queueProducer.service'
-import { getTwelveHoursFromDate } from '../../shared/util/date.util'
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
@@ -68,15 +66,13 @@ export class QueueConsumerService {
 
       if (shouldRequeue) {
         this.logger.error('Message processing failed, will requeue:', error)
-        this.logger.error('Messages to be requeued:', message)
+        this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
         return true // Indicate that we should requeue
       } else {
         this.logger.error(
-          'Message processing failed with non-retryable error, discarding message:',
+          `Message processing failed with non-retryable error, discarding message: ${JSON.stringify(message)}`,
           error,
         )
-
-        this.logger.error('Message discarded:', message)
 
         // Send error notification to Slack for non-retryable errors
         try {
@@ -142,7 +138,7 @@ export class QueueConsumerService {
 
     const parsedBody = JSON.parse(message.Body) as QueueMessage
     const queueMessage: QueueMessage = parsedBody
-    this.logger.log('processing queue message type ', queueMessage.type)
+    this.logger.log(`processing queue message type ${queueMessage.type}`)
 
     switch (queueMessage.type) {
       case QueueType.GENERATE_AI_CONTENT:
@@ -203,17 +199,15 @@ export class QueueConsumerService {
   //  services. This is a queue consumer class. There should be no business
   //  logic in the queue consumer class. This GREATLY complicates development.
   private async handleTcrComplianceCheckMessage({
-    processTime,
-    peerlyIdentityId,
+    tcrCompliance,
   }: TcrComplianceStatusCheckMessage) {
-    const processDateTime = parseISO(processTime)
-    const now = new Date()
-
-    if (isAfter(processDateTime, now)) {
-      this.logger.debug('Process time not yet reached. Re-queuing')
-      return false // Requeue message - process time not reached yet
+    const { peerlyIdentityId } = tcrCompliance
+    if (!peerlyIdentityId) {
+      this.logger.error(
+        `No peerlyIdentityId found on TcrCompliance provided, skipping: ${tcrCompliance}`,
+      )
+      return true // remove message from the queue
     }
-    this.logger.debug('Process time met. Proceeding with processing')
 
     const status =
       await this.tcrComplianceService.checkTcrRegistrationStatus(
@@ -222,20 +216,11 @@ export class QueueConsumerService {
 
     if (!status) {
       this.logger.debug(
-        'TCR Registration still not active, re-queuing with delay',
+        `TCR Registration is not active at this time: ${JSON.stringify(tcrCompliance)}`,
       )
-      await this.queueProducerService.sendMessage({
-        type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
-        data: {
-          processTime: getTwelveHoursFromDate(processDateTime).toISOString(),
-          peerlyIdentityId,
-        },
-      })
-      // Delete the previous message from the queue since we can't just requeue w/ a `delaySeconds` option on a FIFO queue.
-      return true
+      return true // delete from the queue
     }
 
-    // Update the TCR compliance status to approved once the registration is active
     this.logger.debug(
       `TCR Registration is active, updating TCR compliance w/ identity ID ${peerlyIdentityId} status to approved`,
     )
@@ -262,7 +247,7 @@ export class QueueConsumerService {
       })
     } catch (analyticsError) {
       this.logger.error(
-        'Failed to track analytics for TCR compliance:',
+        `Failed to track analytics for TCR compliance: ${tcrCompliance}`,
         analyticsError,
       )
     }
