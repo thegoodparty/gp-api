@@ -36,14 +36,6 @@ import { GetProjectDomainResponseBody } from '@vercel/sdk/models/getprojectdomai
 import { isAxiosError } from 'axios'
 import { VerifyProjectDomainResponseBody } from '@vercel/sdk/models/verifyprojectdomainop'
 
-// class VercelNotFoundError {}
-// class GetProjectDomainResponseBody {
-//   public name: string = ''
-//   apexName: string = ''
-//   projectId: string = ''
-//   verified: boolean = false
-// }
-
 const { ENABLE_DOMAIN_SETUP } = process.env
 
 @Injectable()
