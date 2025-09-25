@@ -1,3 +1,5 @@
+import { TcrCompliance } from '@prisma/client'
+
 export enum QueueType {
   GENERATE_AI_CONTENT = 'generateAiContent',
   PATH_TO_VICTORY = 'pathToVictory',
@@ -18,8 +20,7 @@ export type GenerateAiContentMessageData = {
 }
 
 export type TcrComplianceStatusCheckMessage = {
-  peerlyIdentityId: string
-  processTime: string // ISO 8601 date time string format
+  tcrCompliance: TcrCompliance
 }
 
 export type DomainEmailForwardingMessage = {

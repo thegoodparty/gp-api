@@ -1,11 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { HttpStatus, Injectable, Logger } from '@nestjs/common'
 import { Vercel } from '@vercel/sdk'
+import type {
+  GetRecordsResponseBody,
+  Records as VercelDNSRecord,
+} from '@vercel/sdk/models/getrecordsop'
 import { ForwardEmailDomainResponse } from '../../forwardEmail/forwardEmail.types'
-
-enum RecordType {
-  Mx = 'MX',
-  Txt = 'TXT',
-}
+import { VercelNotFoundError } from '@vercel/sdk/models/vercelnotfounderror'
+import { VercelError } from '@vercel/sdk/models/vercelerror'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
 
@@ -15,12 +16,43 @@ if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
   )
 }
 
+export const FORWARDEMAIL_MX1_VALUE = 'mx1.forwardemail.net'
+export const FORWARDEMAIL_MX2_VALUE = 'mx2.forwardemail.net'
+export const FORWARDEMAIL_TXT_VALUE_PREFIX = 'forward-email-site-verification='
+
+export enum VercelDnsRecordType {
+  Mx = 'MX',
+  Txt = 'TXT',
+}
+
 export type DNSRecord = { uid: string; updated?: number }
 
 @Injectable()
 export class VercelService {
   private readonly logger = new Logger(VercelService.name)
   private readonly client = new Vercel({ bearerToken: VERCEL_TOKEN })
+
+  isVercelNotFoundError(e: unknown): e is VercelNotFoundError {
+    return (
+      e instanceof VercelNotFoundError ||
+      // We have to do this additional check because not all @vercel/sdk methods
+      //  throw an instance of VercelNotFoundError
+      (e instanceof VercelError && e.statusCode === HttpStatus.NOT_FOUND)
+    )
+  }
+
+  async getProjectDomain(domainName: string) {
+    try {
+      return await this.client.projects.getProjectDomain({
+        idOrName: VERCEL_PROJECT_ID!,
+        domain: domainName,
+        teamId: VERCEL_TEAM_ID,
+      })
+    } catch (error) {
+      this.logger.error(`Error getting domain ${domainName}:`, error)
+      throw error
+    }
+  }
 
   async addDomainToProject(domainName: string) {
     try {
@@ -33,7 +65,7 @@ export class VercelService {
       })
     } catch (error) {
       this.logger.error(`Error adding domain ${domainName} to project:`, error)
-      throw new Error(`Failed to add domain to Vercel project: ${error}`)
+      throw error
     }
   }
 
@@ -49,7 +81,7 @@ export class VercelService {
         `Error removing domain ${domainName} from project:`,
         error,
       )
-      throw new Error(`Failed to remove domain from Vercel project: ${error}`)
+      throw error
     }
   }
 
@@ -62,7 +94,7 @@ export class VercelService {
       })
     } catch (error) {
       this.logger.error(`Error verifying domain ${domainName}:`, error)
-      throw new Error(`Failed to verify domain: ${error}`)
+      throw error
     }
   }
 
@@ -77,7 +109,7 @@ export class VercelService {
       return result
     } catch (error) {
       this.logger.error(`Error checking price for domain ${domainName}:`, error)
-      throw new Error(`Failed to check domain price: ${error}`)
+      throw error
     }
   }
 
@@ -127,7 +159,7 @@ export class VercelService {
       return result
     } catch (error) {
       this.logger.error(`Error purchasing domain ${domainName}:`, error)
-      throw new Error(`Failed to register domain with Vercel: ${error}`)
+      throw error
     }
   }
 
@@ -142,7 +174,7 @@ export class VercelService {
         `Error getting domain details for ${domainName}:`,
         error,
       )
-      throw new Error(`Failed to get domain details: ${error}`)
+      throw error
     }
   }
 
@@ -153,7 +185,48 @@ export class VercelService {
       })
     } catch (error) {
       this.logger.error('Error listing domains:', error)
-      throw new Error(`Failed to list domains: ${error}`)
+      throw error
+    }
+  }
+
+  async listDnsRecords(domainName: string): Promise<VercelDNSRecord[]> {
+    try {
+      const all: VercelDNSRecord[] = []
+      const limit = '100'
+      let since: string | null = null
+      let hasMore = true
+      let backoff = 250
+      const maxBackoff = 4000
+      while (hasMore) {
+        const res = await this.client.dns.getRecords({
+          domain: domainName,
+          teamId: VERCEL_TEAM_ID,
+          limit,
+          ...(since ? { since } : {}),
+        })
+        if (typeof res === 'string') {
+          this.logger.error(
+            `Error listing DNS records for ${domainName}: ${res}`,
+          )
+          return []
+        }
+        const page = res as GetRecordsResponseBody
+        const records = (page as { records: VercelDNSRecord[] }).records ?? []
+        all.push(...records)
+        const nextTs =
+          (page as { pagination?: { next?: number | null } }).pagination
+            ?.next ?? null
+        hasMore = Boolean(nextTs)
+        since = nextTs ? String(nextTs) : null
+        if (hasMore) {
+          await new Promise((r) => setTimeout(r, backoff))
+          backoff = Math.min(backoff * 2, maxBackoff)
+        }
+      }
+      return all
+    } catch (error) {
+      this.logger.error(`Error listing DNS records for ${domainName}:`, error)
+      throw error
     }
   }
 
@@ -163,9 +236,9 @@ export class VercelService {
         domain,
         teamId: VERCEL_TEAM_ID,
         requestBody: {
-          type: RecordType.Mx,
+          type: VercelDnsRecordType.Mx,
           name: '',
-          value: 'mx1.forwardemail.net',
+          value: FORWARDEMAIL_MX1_VALUE,
           mxPriority: 10,
           ttl: 60,
         },
@@ -175,9 +248,9 @@ export class VercelService {
         domain,
         teamId: VERCEL_TEAM_ID,
         requestBody: {
-          type: RecordType.Mx,
+          type: VercelDnsRecordType.Mx,
           name: '',
-          value: 'mx2.forwardemail.net',
+          value: FORWARDEMAIL_MX2_VALUE,
           mxPriority: 10,
           ttl: 60,
         },
@@ -188,7 +261,7 @@ export class VercelService {
       )
     } catch (error) {
       this.logger.error(`Error creating MX records for ${domain}:`, error)
-      throw new Error(`Failed to create MX records: ${error}`)
+      throw error
     }
   }
 
@@ -201,16 +274,16 @@ export class VercelService {
         domain,
         teamId: VERCEL_TEAM_ID,
         requestBody: {
-          type: RecordType.Txt,
+          type: VercelDnsRecordType.Txt,
           name: '',
-          value: `forward-email-site-verification=${forwardingDomainResponse.verification_record}`,
+          value: `${FORWARDEMAIL_TXT_VALUE_PREFIX}${forwardingDomainResponse.verification_record}`,
           ttl: 60,
         },
       })
       return res as DNSRecord
     } catch (error) {
       this.logger.error(`Error creating SPF record for ${domain}:`, error)
-      throw new Error(`Failed to create SPF record: ${error}`)
+      throw error
     }
   }
 }

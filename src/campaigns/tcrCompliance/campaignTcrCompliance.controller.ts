@@ -24,9 +24,6 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
 import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
-import { QueueProducerService } from '../../queue/producer/queueProducer.service'
-import { MessageGroup, QueueType } from '../../queue/queue.types'
-import { getTwelveHoursFromDate } from '../../shared/util/date.util'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -35,7 +32,6 @@ export class CampaignTcrComplianceController {
     private readonly userService: UsersService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly campaignsService: CampaignsService,
-    private queueService: QueueProducerService,
   ) {}
 
   @Get('mine')
@@ -146,23 +142,12 @@ export class CampaignTcrComplianceController {
         campaignVerifyToken,
       )
 
-    const { peerlyIdentityId } = await this.tcrComplianceService.model.update({
+    await this.tcrComplianceService.model.update({
       where: { id: tcrCompliance.id },
       data: {
         status: TcrComplianceStatus.pending,
       },
     })
-
-    await this.queueService.sendMessage(
-      {
-        type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
-        data: {
-          peerlyIdentityId,
-          processTime: getTwelveHoursFromDate().toISOString(),
-        },
-      },
-      MessageGroup.tcrCompliance,
-    )
 
     return campaignVerifyBrand
   }
