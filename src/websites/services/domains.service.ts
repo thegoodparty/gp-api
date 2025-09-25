@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  HttpStatus,
   Injectable,
 } from '@nestjs/common'
 import { AwsRoute53Service } from 'src/vendors/aws/services/awsRoute53.service'
@@ -15,7 +16,7 @@ import {
   VercelService,
 } from 'src/vendors/vercel/services/vercel.service'
 import { PaymentsService } from 'src/payments/services/payments.service'
-import { PaymentStatus, PaymentType } from 'src/payments/payments.types'
+import { PaymentStatus } from 'src/payments/payments.types'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
@@ -27,10 +28,13 @@ import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEm
 import { QueueProducerService } from '../../queue/producer/queueProducer.service'
 import { Timeout } from '@nestjs/schedule'
 import { MessageGroup, QueueType } from '../../queue/queue.types'
-import { AddProjectDomainResponseBody } from '@vercel/sdk/src/models/addprojectdomainop'
-import { BuyDomainResponse } from '@vercel/sdk/src/models/buydomainop'
-import { GetDomainResponseBody } from '@vercel/sdk/src/models/getdomainop'
-import { Records } from '@vercel/sdk/src/models/getrecordsop'
+import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
+import { BuyDomainResponse } from '@vercel/sdk/models/buydomainop'
+import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
+import { Records } from '@vercel/sdk/models/getrecordsop'
+import { GetProjectDomainResponseBody } from '@vercel/sdk/models/getprojectdomainop'
+import { isAxiosError } from 'axios'
+import { VerifyProjectDomainResponseBody } from '@vercel/sdk/models/verifyprojectdomainop'
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -301,71 +305,41 @@ export class DomainsService
     }
   }
 
-  async startDomainRegistration(
-    user: User,
-    websiteId: number,
-    domainName: string,
-  ) {
-    const searchResult = this.validateDomainSearchResult(
-      await this.searchForDomain(domainName),
-    )
-
-    if (searchResult.availability !== DomainAvailability.AVAILABLE) {
-      throw new ConflictException('Domain not available')
-    }
-
-    const domain = await this.model.create({
-      data: {
-        websiteId,
-        name: domainName,
-        price: searchResult.price,
-      },
-    })
-
-    if (!domain.price) {
-      throw new BadGatewayException('Domain price not available')
-    }
-
-    const paymentIntent = await this.payments.createPayment(user, {
-      type: PaymentType.DOMAIN_REGISTRATION,
-      amount: domain.price.toNumber() * 100,
-      domainName,
-      domainId: domain.id,
-    })
-
-    await this.model.update({
-      where: { id: domain.id },
-      data: { paymentId: paymentIntent.id, status: DomainStatus.pending },
-    })
-
-    return {
-      domain,
-      paymentSecret: paymentIntent.client_secret,
-    }
-  }
-
   async setupDomainEmailForwarding(
     domain: Domain,
     forwardingEmailAddress: string,
   ) {
     let forwardEmailDomain: ForwardEmailDomainResponse | null = null
+    let existingForwardEmailDomain: ForwardEmailDomainResponse | null = null
     try {
-      const existingForwardEmailDomain =
-        await this.forwardEmailService.getDomain(domain.name)
+      existingForwardEmailDomain = await this.forwardEmailService.getDomain(
+        domain.name,
+      )
       if (existingForwardEmailDomain) {
         this.logger.debug(
           `Domain ${domain.name} already exists in ForwardEmail service, skipping domain creation`,
         )
       }
-      forwardEmailDomain =
-        existingForwardEmailDomain ||
-        (await this.forwardEmailService.addDomain(domain))
+      forwardEmailDomain = existingForwardEmailDomain
     } catch (e) {
-      this.logger.error('Error adding domain to forward email service:', e)
-      throw new Error('Error adding domain to forward email service:', {
-        cause: e,
-      })
+      if (isAxiosError(e) && e.status !== HttpStatus.NOT_FOUND) {
+        this.logger.error('Error adding domain to forward email service:', e)
+        throw new Error('Error adding domain to forward email service:', {
+          cause: e,
+        })
+      }
     }
+    if (!forwardEmailDomain) {
+      try {
+        forwardEmailDomain = await this.forwardEmailService.addDomain(domain)
+      } catch (e) {
+        this.logger.error('Error adding domain to forward email service:', e)
+        throw new Error('Error adding domain to forward email service:', {
+          cause: e,
+        })
+      }
+    }
+
     this.logger.debug(`Domain added to ForwardEmail service: ${domain.name}`)
 
     let dnsRecords: Records[] = []
@@ -463,6 +437,9 @@ export class DomainsService
   }
 
   // called after payment is accepted, send registration request to Vercel
+  // TODO: This should be attempted BEFORE payment is taken. If this fails for some reason,
+  //  we've already taken the customer's $$ and not would need a mechanism to refund
+  //  them.  This is backwards
   async completeDomainRegistration(
     websiteId: number,
     contact: RegisterDomainSchema,
@@ -488,17 +465,28 @@ export class DomainsService
     }
 
     let vercelResult: GetDomainResponseBody | BuyDomainResponse | null = null,
+      existingDomain: GetDomainResponseBody | null = null,
       projectResult: AddProjectDomainResponseBody | null = null,
       forwardEmailDomain: ForwardEmailDomainResponse | null = null
 
     if (this.shouldEnableDomainPurchase()) {
       try {
-        const existingDomain = await this.vercel.getDomainDetails(domain.name)
+        existingDomain = await this.vercel.getDomainDetails(domain.name)
         if (existingDomain) {
           this.logger.debug(
             `Domain ${domain.name} already exists in Vercel, skipping registration`,
           )
         }
+      } catch (e) {
+        if (!this.vercel.isVercelNotFoundError(e)) {
+          this.logger.error(`Error getting domain details from Vercel: ${e}`)
+          throw new Error('Error getting domain details from Vercel:', {
+            cause: e,
+          })
+        }
+      }
+
+      try {
         vercelResult =
           existingDomain ||
           (await this.vercel.purchaseDomain(
@@ -516,14 +504,23 @@ export class DomainsService
             },
             domain.price.toNumber(),
           ))
-
-        const existingProjectDomain = await this.vercel.getProjectDomain(
-          domain.name,
-        )
-        if (existingProjectDomain) {
-          this.logger.debug(
-            `Project Domain ${domain.name} already exists in Vercel project, skipping attachment to project`,
+        let existingProjectDomain: GetProjectDomainResponseBody | null = null
+        try {
+          existingProjectDomain = await this.vercel.getProjectDomain(
+            domain.name,
           )
+          if (existingProjectDomain) {
+            this.logger.debug(
+              `Project Domain ${domain.name} already exists in Vercel project, skipping attachment to project`,
+            )
+          }
+        } catch (e) {
+          if (!this.vercel.isVercelNotFoundError(e)) {
+            this.logger.error(`Error getting project domain from Vercel: ${e}`)
+            throw new Error('Error getting project domain from Vercel: ', {
+              cause: e,
+            })
+          }
         }
         projectResult =
           existingProjectDomain ||
@@ -588,7 +585,7 @@ export class DomainsService
       where: { websiteId },
     })
 
-    let verifyResult
+    let verifyResult: VerifyProjectDomainResponseBody
 
     try {
       verifyResult = await this.vercel.verifyProjectDomain(domain.name)
