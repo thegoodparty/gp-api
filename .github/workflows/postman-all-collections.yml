@@ -1,4 +1,4 @@
-name: API - Postman (All Collections in Workspace)
+name: API - Postman (Workspace, No Seed)
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   postman-tests:
-    name: Run Postman Collections (Workspace)
+    name: Run Postman Collections (Workspace, Skip Seed)
     runs-on: ubuntu-latest
 
     services:
@@ -25,13 +25,12 @@ jobs:
           --health-retries=10
 
     env:
-      # App env
       NODE_ENV: test
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/gpdb
       BASE_URL: ${{ vars.BASE_URL || 'http://localhost:3000' }}
-      # Postman
       POSTMAN_WORKSPACE_ID: ${{ vars.POSTMAN_WORKSPACE_ID }}
       POSTMAN_ENV_UID: ${{ vars.POSTMAN_ENVIRONMENT_ID }}
+      PRISMA_SKIP_SEED: 'true'
 
     steps:
       - name: Checkout
@@ -46,8 +45,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Migrate and seed database
-        run: npm run migrate:reset
+      - name: Migrate database (skip seed)
+        run: npx prisma migrate reset --force --skip-seed
 
       - name: Install wait-on
         run: npm i -g wait-on
@@ -76,7 +75,6 @@ jobs:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
         run: |
           set -euo pipefail
-
           mkdir -p postman-reports
 
           echo "Fetching collections for workspace: ${POSTMAN_WORKSPACE_ID}"
@@ -84,43 +82,32 @@ jobs:
             --header "X-Api-Key: ${POSTMAN_API_KEY}" \
             "https://api.getpostman.com/collections?workspace=${POSTMAN_WORKSPACE_ID}")
 
-          # Pull both UID and name for nicer report filenames
           mapfile -t COL_UIDS < <(echo "$collections_json" | jq -r '.collections[].uid')
           mapfile -t COL_NAMES < <(echo "$collections_json" | jq -r '.collections[].name')
 
           if [ ${#COL_UIDS[@]} -eq 0 ]; then
-            echo "No collections found in the workspace. Exiting with failure."
+            echo "No collections found in the workspace."
             exit 1
           fi
 
           overall_status=0
-
           for idx in "${!COL_UIDS[@]}"; do
             uid="${COL_UIDS[$idx]}"
-            # Sanitize collection name for file paths
             name="$(echo "${COL_NAMES[$idx]}" | tr -cd '[:alnum:]._-' | cut -c1-60)"
             name="${name:-collection}"
 
-            echo "----------------------------------------------"
-            echo "Running Postman collection:"
-            echo "  Name: ${COL_NAMES[$idx]}"
-            echo "  UID : ${uid}"
-            echo "----------------------------------------------"
-
-            # Build dynamic args: optional environment, common baseUrl override
-            args=( "collection" "run" "$uid"
+            echo "Running collection: ${COL_NAMES[$idx]} ($uid)"
+            args=( collection run "$uid"
                    --env-var "baseUrl=$BASE_URL"
                    --reporters "junit,html"
                    --reporter-junit-export "postman-reports/${name}.${uid}.junit.xml"
                    --reporter-html-export "postman-reports/${name}.${uid}.report.html" )
-
             if [ -n "${POSTMAN_ENV_UID:-}" ]; then
               args+=( -e "$POSTMAN_ENV_UID" )
             fi
 
-            # Execute collection; capture status so we can finish the loop and upload all reports
             if ! postman "${args[@]}"; then
-              echo "Collection failed: ${COL_NAMES[$idx]} (${uid})"
+              echo "Collection failed: ${COL_NAMES[$idx]}"
               overall_status=1
             fi
           done
