@@ -1,0 +1,140 @@
+name: API - Postman (All Collections in Workspace)
+
+on:
+  pull_request:
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  postman-tests:
+    name: Run Postman Collections (Workspace)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        ports: [ "5432:5432" ]
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gpdb
+        options: >-
+          --health-cmd="pg_isready -U postgres -d gpdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # App env
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/gpdb
+      BASE_URL: ${{ vars.BASE_URL || 'http://localhost:3000' }}
+      # Postman
+      POSTMAN_WORKSPACE_ID: ${{ vars.POSTMAN_WORKSPACE_ID }}
+      POSTMAN_ENV_UID: ${{ vars.POSTMAN_ENVIRONMENT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 22.12.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Migrate and seed database
+        run: npm run migrate:reset
+
+      - name: Install wait-on
+        run: npm i -g wait-on
+
+      - name: Start API (background)
+        run: |
+          npm run start:dev &
+          echo $! > server.pid
+
+      - name: Wait for API readiness
+        run: wait-on "$BASE_URL/api"
+
+      - name: Install Postman CLI and jq
+        run: |
+          npm i -g @postman/cli
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      - name: Authenticate Postman CLI
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        run: postman login --with-api-key "$POSTMAN_API_KEY"
+
+      - name: Discover and run all collections in workspace
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p postman-reports
+
+          echo "Fetching collections for workspace: ${POSTMAN_WORKSPACE_ID}"
+          collections_json=$(curl -sS \
+            --header "X-Api-Key: ${POSTMAN_API_KEY}" \
+            "https://api.getpostman.com/collections?workspace=${POSTMAN_WORKSPACE_ID}")
+
+          # Pull both UID and name for nicer report filenames
+          mapfile -t COL_UIDS < <(echo "$collections_json" | jq -r '.collections[].uid')
+          mapfile -t COL_NAMES < <(echo "$collections_json" | jq -r '.collections[].name')
+
+          if [ ${#COL_UIDS[@]} -eq 0 ]; then
+            echo "No collections found in the workspace. Exiting with failure."
+            exit 1
+          fi
+
+          overall_status=0
+
+          for idx in "${!COL_UIDS[@]}"; do
+            uid="${COL_UIDS[$idx]}"
+            # Sanitize collection name for file paths
+            name="$(echo "${COL_NAMES[$idx]}" | tr -cd '[:alnum:]._-' | cut -c1-60)"
+            name="${name:-collection}"
+
+            echo "----------------------------------------------"
+            echo "Running Postman collection:"
+            echo "  Name: ${COL_NAMES[$idx]}"
+            echo "  UID : ${uid}"
+            echo "----------------------------------------------"
+
+            # Build dynamic args: optional environment, common baseUrl override
+            args=( "collection" "run" "$uid"
+                   --env-var "baseUrl=$BASE_URL"
+                   --reporters "junit,html"
+                   --reporter-junit-export "postman-reports/${name}.${uid}.junit.xml"
+                   --reporter-html-export "postman-reports/${name}.${uid}.report.html" )
+
+            if [ -n "${POSTMAN_ENV_UID:-}" ]; then
+              args+=( -e "$POSTMAN_ENV_UID" )
+            fi
+
+            # Execute collection; capture status so we can finish the loop and upload all reports
+            if ! postman "${args[@]}"; then
+              echo "Collection failed: ${COL_NAMES[$idx]} (${uid})"
+              overall_status=1
+            fi
+          done
+
+          exit $overall_status
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f server.pid ]; then kill "$(cat server.pid)" || true; fi
+
+      - name: Upload Postman reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postman-reports
+          path: postman-reports/
