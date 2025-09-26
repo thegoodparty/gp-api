@@ -19,8 +19,10 @@ import {
 import {
   DownloadContactsDTO,
   ListContactsDTO,
+  StatsDTO,
 } from '../schemas/listContacts.schema'
 import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
+import { transformStatsResponse } from './stats.transformer'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -81,7 +83,7 @@ export class ContactsService {
         ),
       )
       return this.transformListResponse(response.data)
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error('Failed to fetch contacts from people API', error)
       throw new BadGatewayException('Failed to fetch contacts from people API')
     }
@@ -131,11 +133,43 @@ export class ContactsService {
         response.data.on('end', resolve)
         response.data.on('error', reject)
       })
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error('Failed to download contacts from people API', error)
       throw new BadGatewayException(
         'Failed to download contacts from people API',
       )
+    }
+  }
+
+  async getDistrictStats(dto: StatsDTO, campaign: CampaignWithPathToVictory) {
+    const locationData = this.extractLocationFromCampaign(campaign)
+
+    const params = new URLSearchParams({
+      state: locationData.state,
+      districtType: locationData.districtType,
+      districtName: locationData.districtName,
+    })
+    if (dto?.electionYear) {
+      params.set('electionYear', String(dto.electionYear))
+    }
+
+    try {
+      const token = this.getValidS2SToken()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}/v1/people/stats?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      )
+      const transformed = transformStatsResponse(response.data)
+      return transformed
+    } catch (error) {
+      this.logger.error('Failed to fetch stats from people API', error)
+      throw new BadGatewayException('Failed to fetch stats from people API')
     }
   }
 
