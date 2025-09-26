@@ -118,7 +118,6 @@ export class AdminCampaignsService {
       data: attributes,
     })
     if (isPro === true) {
-      this.logger.log(`[ADMIN] Starting analytics tracking for admin pro subscription - User: ${updatedCampaign?.userId}, Campaign: ${id}`)
       try {
         await this.analytics.track(
           updatedCampaign?.userId,
@@ -128,7 +127,6 @@ export class AdminCampaignsService {
             paymentMethod: 'admin',
           },
         )
-        this.logger.log(`[ADMIN] Successfully tracked admin pro subscription analytics - User: ${updatedCampaign?.userId}`)
       } catch (error) {
         this.logger.error(`[ADMIN] Failed to track admin pro subscription analytics - User: ${updatedCampaign?.userId}, Campaign: ${id}`, error)
         // Don't throw - we don't want to fail the admin operation for analytics issues
