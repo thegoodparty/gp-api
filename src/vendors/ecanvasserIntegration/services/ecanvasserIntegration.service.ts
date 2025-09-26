@@ -70,10 +70,13 @@ export class EcanvasserIntegrationService extends createPrismaBase(
     })
   }
 
-  async mine(campaignId: number): Promise<Omit<Ecanvasser, 'apiKey'>> {
-    const ecanvasser = await this.model.findFirstOrThrow({
+  async mine(campaignId: number): Promise<Omit<Ecanvasser, 'apiKey'> | null> {
+    const ecanvasser = await this.model.findFirst({
       where: { campaignId },
     })
+    if (!ecanvasser) {
+      return null
+    }
     const { apiKey, ...rest } = ecanvasser
     return rest
   }
