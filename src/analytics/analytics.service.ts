@@ -23,7 +23,7 @@ export class AnalyticsService {
     eventName: string,
     properties?: SegmentTrackEventProperties,
   ) {
-    this.logger.log(`[ANALYTICS] Starting event tracking - Event: ${eventName}, User: ${userId}`)
+    this.logger.debug(`[ANALYTICS] Starting event tracking - Event: ${eventName}, User: ${userId}`)
     
     let email: string | undefined
     try {
@@ -42,7 +42,7 @@ export class AnalyticsService {
     
     try {
       await this.segment.trackEvent(userId, eventName, eventData)
-      this.logger.log(`[ANALYTICS] Successfully tracked event: ${eventName} for user: ${userId}`)
+      this.logger.debug(`[ANALYTICS] Successfully tracked event: ${eventName} for user: ${userId}`)
     } catch (e) {
       this.logger.error(`[ANALYTICS] Failed to track event: ${eventName} for user: ${userId}`, e)
       throw e // Re-throw to propagate the error
@@ -54,7 +54,7 @@ export class AnalyticsService {
   }
 
   async trackProPayment(userId: number, session: Stripe.Checkout.Session) {
-    this.logger.log(`[ANALYTICS] Starting pro payment tracking - User: ${userId}, Session: ${session.id}`)
+    this.logger.debug(`[ANALYTICS] Starting pro payment tracking - User: ${userId}, Session: ${session.id}`)
     
     try {
       // Validate session has required data
@@ -73,13 +73,13 @@ export class AnalyticsService {
       if (typeof session.subscription === 'string') {
         this.logger.warn(`[ANALYTICS] Subscription is string ID in session ${session.id}, cannot extract detailed data for user ${userId}`)
         // We can still track the event with limited data
-        this.logger.log(`[ANALYTICS] Tracking pro payment with limited data - User: ${userId}`)
+        this.logger.debug(`[ANALYTICS] Tracking pro payment with limited data - User: ${userId}`)
         await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
           price: 0,
           paymentMethod: 'unknown',
           renewalDate: new Date().toISOString(),
         })
-        this.logger.log(`[ANALYTICS] Successfully tracked pro payment with limited data - User: ${userId}`)
+        this.logger.debug(`[ANALYTICS] Successfully tracked pro payment with limited data - User: ${userId}`)
         return
       } else {
         subscription = session.subscription
@@ -126,10 +126,10 @@ export class AnalyticsService {
       }
 
       const eventProperties = { price, paymentMethod, renewalDate }
-      this.logger.log(`[ANALYTICS] Tracking pro payment with properties: ${JSON.stringify(eventProperties)} for user ${userId}`)
+      this.logger.debug(`[ANALYTICS] Tracking pro payment with properties: ${JSON.stringify(eventProperties)} for user ${userId}`)
 
       await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, eventProperties)
-      this.logger.log(`[ANALYTICS] Successfully tracked pro payment for user ${userId}`)
+      this.logger.debug(`[ANALYTICS] Successfully tracked pro payment for user ${userId}`)
     } catch (e) {
       this.logger.error(`[ANALYTICS] Error tracking pro payment for user ${userId}, session ${session.id}`, e)
       throw e // Re-throw to propagate the error
