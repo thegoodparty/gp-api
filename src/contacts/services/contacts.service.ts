@@ -255,12 +255,10 @@ export class ContactsService {
     if (segment.age25_35) filters.push('age25_35')
     if (segment.age35_50) filters.push('age35_50')
     if (segment.age50Plus) filters.push('age50Plus')
-    if (segment.ageUnknown) filters.push('ageUnknown')
 
     if (segment.partyDemocrat) filters.push('partyDemocrat')
     if (segment.partyIndependent) filters.push('partyIndependent')
     if (segment.partyRepublican) filters.push('partyRepublican')
-    if (segment.partyUnknown) filters.push('partyUnknown')
 
     if (segment.audienceFirstTimeVoters) filters.push('audienceFirstTimeVoters')
     if (segment.audienceLikelyVoters) filters.push('audienceLikelyVoters')
@@ -450,34 +448,6 @@ export class ContactsService {
       filter.ethnicGroupsEthnicGroup1Desc = {
         ...(eth.length ? { in: eth } : {}),
         ...(ethIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Handle new Unknown age filter - null ages
-    if (seg.ageUnknown) {
-      // If other age filters are set, we need to OR with null
-      const hasOtherAgeFilters =
-        seg.age18_25 || seg.age25_35 || seg.age35_50 || seg.age50Plus
-      if (hasOtherAgeFilters) {
-        // This will be handled by the existing age filter logic in people-api
-        // The ageUnknown filter will be passed as a regular filter
-      } else {
-        // Only unknown age selected - filter for null ages
-        filter.ageInt = { is: 'null' }
-      }
-    }
-
-    // Handle new Unknown party filter - null parties
-    if (seg.partyUnknown) {
-      // If other party filters are set, we need to OR with null
-      const hasOtherPartyFilters =
-        seg.partyDemocrat || seg.partyIndependent || seg.partyRepublican
-      if (hasOtherPartyFilters) {
-        // This will be handled by the existing party filter logic in people-api
-        // The partyUnknown filter will be passed as a regular filter
-      } else {
-        // Only unknown party selected - filter for null/empty parties
-        filter.partiesDescription = { is: 'null' }
       }
     }
 
