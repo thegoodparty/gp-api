@@ -169,7 +169,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           campaignUpdateData.canDownloadFederal = canDownloadFederal
         }
         if (details) {
-          await this.handleSubscriptionCancelAtUpdate(campaign.details, details)
           const mergedDetails = deepMerge(
             campaign.details as object,
             details,
