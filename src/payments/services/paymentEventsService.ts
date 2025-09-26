@@ -119,13 +119,6 @@ export class PaymentEventsService {
       )
     }
     const { id: campaignId } = campaign
-    const electionDate = parseCampaignElectionDate(campaign)
-
-    if (!electionDate || electionDate < new Date()) {
-      throw new BadGatewayException(
-        'No electionDate or electionDate is in the past',
-      )
-    }
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
     await this.campaignsService.patchCampaignDetails(campaignId, {
@@ -134,7 +127,6 @@ export class PaymentEventsService {
     await this.campaignsService.setIsPro(campaignId)
 
     await Promise.allSettled([
-      this.stripeService.setSubscriptionCancelAt(subscriptionId, electionDate),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
