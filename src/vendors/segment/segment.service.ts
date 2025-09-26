@@ -22,11 +22,11 @@ export class SegmentService {
     this.analytics = new Analytics({ writeKey: SEGMENT_WRITE_KEY })
   }
 
-  trackEvent(
+  async trackEvent(
     userId: number,
     event: string,
     properties: SegmentTrackEventProperties = {},
-  ) {
+  ): Promise<void> {
     try {
       const stringId = String(userId)
       this.analytics.track({
@@ -34,8 +34,10 @@ export class SegmentService {
         userId: stringId,
         properties,
       })
+      this.logger.debug(`[SEGMENT] Event queued for tracking - Event: ${event}, User: ${userId}`)
     } catch (err) {
-      this.logger.error(`Failed to track event: ${event}`, err)
+      this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
+      throw err
     }
   }
 
