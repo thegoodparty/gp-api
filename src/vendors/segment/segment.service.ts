@@ -27,28 +27,18 @@ export class SegmentService {
     event: string,
     properties: SegmentTrackEventProperties = {},
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        const stringId = String(userId)
-        this.analytics.track({
-          event,
-          userId: stringId,
-          properties,
-          callback: (err) => {
-            if (err) {
-              this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
-              reject(err)
-            } else {
-              this.logger.debug(`[SEGMENT] Successfully sent event to Segment - Event: ${event}, User: ${userId}`)
-              resolve()
-            }
-          }
-        })
-      } catch (err) {
-        this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
-        reject(err)
-      }
-    })
+    try {
+      const stringId = String(userId)
+      this.analytics.track({
+        event,
+        userId: stringId,
+        properties,
+      })
+      this.logger.debug(`[SEGMENT] Event queued for tracking - Event: ${event}, User: ${userId}`)
+    } catch (err) {
+      this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
+      throw err
+    }
   }
 
   identify(userId: number, traits: SegmentIdentityTraits) {
