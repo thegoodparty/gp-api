@@ -243,7 +243,13 @@ export class PaymentEventsService {
     })
     await this.campaignsService.setIsPro(campaignId)
 
-    this.analytics.trackProPayment(user.id, session)
+    // Track analytics with proper error handling
+    try {
+      await this.analytics.trackProPayment(user.id, session)
+    } catch (error) {
+      this.logger.error(`[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`, error)
+      // Don't throw - we don't want to fail the webhook for analytics issues
+    }
 
     return await Promise.allSettled([
       this.usersService.patchUserMetaData(user.id, {
