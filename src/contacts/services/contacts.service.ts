@@ -242,7 +242,9 @@ export class ContactsService {
       : []
   }
 
-  private convertVoterFileFilterToFilters(segment: VoterFileFilter): string[] {
+  private convertVoterFileFilterToFilters(
+    segment: ExtendedVoterFileFilter,
+  ): string[] {
     const filters: string[] = []
 
     if (segment.genderMale) filters.push('genderMale')
@@ -264,6 +266,7 @@ export class ContactsService {
     if (segment.audienceUnreliableVoters)
       filters.push('audienceUnreliableVoters')
     if (segment.audienceUnlikelyVoters) filters.push('audienceUnlikelyVoters')
+    if (segment.audienceUnknown) filters.push('audienceUnknown')
 
     if (segment.hasCellPhone) filters.push('cellPhoneFormatted')
     if (segment.hasLandline) filters.push('landlineFormatted')
@@ -306,9 +309,16 @@ export class ContactsService {
 
     // Registered voter
     const rv: Array<boolean> = []
+    let rvIncludeNull = false
     if (seg.registeredVoterTrue) rv.push(true)
     if (seg.registeredVoterFalse) rv.push(false)
-    if (rv.length) filter.registeredVoter = { in: rv }
+    if (seg.registeredVoterUnknown) rvIncludeNull = true
+    if (rv.length || rvIncludeNull) {
+      filter.registeredVoter = {
+        ...(rv.length ? { in: rv } : {}),
+        ...(rvIncludeNull ? { is: 'null' } : {}),
+      }
+    }
 
     // Voter status
     if (seg.voterStatus && seg.voterStatus.length)
@@ -412,8 +422,18 @@ export class ContactsService {
       filter.languageCode = { in: seg.languageCodes }
 
     // Estimated income ranges (vendor domain strings)
-    if (seg.incomeRanges && seg.incomeRanges.length)
-      filter.estimatedIncomeAmount = { in: seg.incomeRanges }
+    const income: string[] = []
+    let incomeIncludeNull = false
+    if (seg.incomeRanges && seg.incomeRanges.length) {
+      income.push(...seg.incomeRanges)
+    }
+    if (seg.incomeUnknown) incomeIncludeNull = true
+    if (income.length || incomeIncludeNull) {
+      filter.estimatedIncomeAmount = {
+        ...(income.length ? { in: income } : {}),
+        ...(incomeIncludeNull ? { is: 'null' } : {}),
+      }
+    }
 
     // Ethnic groups broad categories; Unknown means null
     const eth: string[] = []
@@ -430,6 +450,7 @@ export class ContactsService {
         ...(ethIncludeNull ? { is: 'null' } : {}),
       }
     }
+
     return filter
   }
 
