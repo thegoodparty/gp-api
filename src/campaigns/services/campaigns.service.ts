@@ -169,7 +169,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           campaignUpdateData.canDownloadFederal = canDownloadFederal
         }
         if (details) {
-          await this.handleSubscriptionCancelAtUpdate(campaign.details, details)
           const mergedDetails = deepMerge(
             campaign.details as object,
             details,
@@ -249,24 +248,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return updatedCampaign ? updatedCampaign : null
   }
 
-  private async handleSubscriptionCancelAtUpdate(
-    currentDetails: PrismaJson.CampaignDetails,
-    updateDetails: Partial<PrismaJson.CampaignDetails>,
-  ) {
-    const { subscriptionId } = currentDetails
-    const { electionDate: electionDateUpdateStr } = updateDetails
-
-    // If we're changing the electionDate and there's an existing subscriptionId,
-    //  then we need to also update the cancelAt date on the subscription
-    if (electionDateUpdateStr && subscriptionId) {
-      const electionDate = parseIsoDateString(electionDateUpdateStr)
-      await this.stripeService.setSubscriptionCancelAt(
-        subscriptionId,
-        electionDate,
-      )
-    }
-  }
-
   async patchCampaignDetails(
     campaignId: number,
     details: Partial<PrismaJson.CampaignDetails>,
@@ -280,8 +261,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       )
     }
     const { details: currentDetails } = currentCampaign
-
-    await this.handleSubscriptionCancelAtUpdate(currentDetails, details)
 
     const updatedDetails = {
       ...currentDetails,
