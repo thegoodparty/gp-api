@@ -74,7 +74,7 @@ export class AnalyticsService {
         this.logger.warn(`[ANALYTICS] Subscription is string ID in session ${session.id}, cannot extract detailed data for user ${userId}. Tracking with limited data.`)
         await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
           price: 0,
-          paymentMethod: 'unknown',
+          paymentMethod: null,
           renewalDate: new Date().toISOString(),
         })
         this.logger.debug(`[ANALYTICS] Successfully tracked pro payment with limited data - User: ${userId}`)
@@ -102,13 +102,11 @@ export class AnalyticsService {
       this.logger.debug(`[ANALYTICS] Extracted price: $${price} for user ${userId}`)
 
       // Extract payment method safely
-      let paymentMethod = 'unknown'
+      let paymentMethodType: Stripe.PaymentMethod.Type | null = null
       if (paymentIntent?.payment_method) {
         const pm = paymentIntent.payment_method as Stripe.PaymentMethod
-        paymentMethod = pm.type === 'card' 
-          ? (pm.card?.wallet?.type ?? 'credit card') 
-          : pm.type
-        this.logger.debug(`[ANALYTICS] Extracted payment method: ${paymentMethod} for user ${userId}`)
+        paymentMethodType = pm.type
+        this.logger.debug(`[ANALYTICS] Extracted payment method type: ${paymentMethodType} for user ${userId}`)
       } else {
         this.logger.warn(`[ANALYTICS] No payment method found for user ${userId}`)
       }
@@ -123,7 +121,7 @@ export class AnalyticsService {
         renewalDate = new Date().toISOString()
       }
 
-      const eventProperties = { price, paymentMethod, renewalDate }
+      const eventProperties = { price, paymentMethod: paymentMethodType, renewalDate }
       this.logger.debug(`[ANALYTICS] Tracking pro payment with properties: ${JSON.stringify(eventProperties)} for user ${userId}`)
 
       await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, eventProperties)
