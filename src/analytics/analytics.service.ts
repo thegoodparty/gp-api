@@ -103,10 +103,17 @@ export class AnalyticsService {
 
       // Extract payment method safely
       let paymentMethodType: Stripe.PaymentMethod.Type | null = null
+      let walletType: Stripe.PaymentMethod.Card.Wallet.Type | null = null
       if (paymentIntent?.payment_method) {
         const pm = paymentIntent.payment_method as Stripe.PaymentMethod
         paymentMethodType = pm.type
-        this.logger.debug(`[ANALYTICS] Extracted payment method type: ${paymentMethodType} for user ${userId}`)
+        
+        // Extract wallet type for card payments
+        if (pm.type === 'card' && pm.card?.wallet?.type) {
+          walletType = pm.card.wallet.type
+        }
+        
+        this.logger.debug(`[ANALYTICS] Extracted payment method type: ${paymentMethodType}, wallet type: ${walletType} for user ${userId}`)
       } else {
         this.logger.warn(`[ANALYTICS] No payment method found for user ${userId}`)
       }
@@ -121,7 +128,12 @@ export class AnalyticsService {
         renewalDate = new Date().toISOString()
       }
 
-      const eventProperties = { price, paymentMethod: paymentMethodType, renewalDate }
+      const eventProperties = { 
+        price, 
+        paymentMethod: paymentMethodType, 
+        walletType,
+        renewalDate 
+      }
       this.logger.debug(`[ANALYTICS] Tracking pro payment with properties: ${JSON.stringify(eventProperties)} for user ${userId}`)
 
       await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, eventProperties)
