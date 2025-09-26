@@ -231,7 +231,6 @@ export class PaymentEventsService {
         customerId: customerId as string,
         checkoutSessionId: null,
       }),
-
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
