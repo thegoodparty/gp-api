@@ -74,7 +74,9 @@ export class AnalyticsService {
         this.logger.warn(`[ANALYTICS] Subscription is string ID in session ${session.id}, cannot extract detailed data for user ${userId}. Tracking with limited data.`)
         await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
           price: 0,
-          paymentMethod: null,
+          paymentMethod: null, // Backward compatible field
+          paymentMethodType: null, // New structured field
+          walletType: null, // New structured field
           renewalDate: new Date().toISOString(),
         })
         this.logger.debug(`[ANALYTICS] Successfully tracked pro payment with limited data - User: ${userId}`)
@@ -128,10 +130,23 @@ export class AnalyticsService {
         renewalDate = new Date().toISOString()
       }
 
+      // Maintain backward compatibility: combine payment method and wallet type
+      let paymentMethod: string | null = null
+      if (paymentMethodType) {
+        if (paymentMethodType === 'card' && walletType) {
+          // For card payments with wallet, use wallet type (e.g., 'apple_pay')
+          paymentMethod = walletType
+        } else {
+          // For other payment methods, use the payment method type
+          paymentMethod = paymentMethodType
+        }
+      }
+
       const eventProperties = { 
         price, 
-        paymentMethod: paymentMethodType, 
-        walletType,
+        paymentMethod, // Backward compatible combined field
+        paymentMethodType, // New structured field
+        walletType, // New structured field
         renewalDate 
       }
       this.logger.debug(`[ANALYTICS] Tracking pro payment with properties: ${JSON.stringify(eventProperties)} for user ${userId}`)
