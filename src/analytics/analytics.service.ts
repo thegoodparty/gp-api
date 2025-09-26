@@ -71,9 +71,7 @@ export class AnalyticsService {
       // Handle subscription data - could be string ID or full object
       let subscription: Stripe.Subscription
       if (typeof session.subscription === 'string') {
-        this.logger.warn(`[ANALYTICS] Subscription is string ID in session ${session.id}, cannot extract detailed data for user ${userId}`)
-        // We can still track the event with limited data
-        this.logger.debug(`[ANALYTICS] Tracking pro payment with limited data - User: ${userId}`)
+        this.logger.warn(`[ANALYTICS] Subscription is string ID in session ${session.id}, cannot extract detailed data for user ${userId}. Tracking with limited data.`)
         await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
           price: 0,
           paymentMethod: 'unknown',
