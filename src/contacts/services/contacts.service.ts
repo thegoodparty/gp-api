@@ -242,7 +242,9 @@ export class ContactsService {
       : []
   }
 
-  private convertVoterFileFilterToFilters(segment: VoterFileFilter): string[] {
+  private convertVoterFileFilterToFilters(
+    segment: ExtendedVoterFileFilter,
+  ): string[] {
     const filters: string[] = []
 
     if (segment.genderMale) filters.push('genderMale')
@@ -253,10 +255,12 @@ export class ContactsService {
     if (segment.age25_35) filters.push('age25_35')
     if (segment.age35_50) filters.push('age35_50')
     if (segment.age50Plus) filters.push('age50Plus')
+    if (segment.ageUnknown) filters.push('ageUnknown')
 
     if (segment.partyDemocrat) filters.push('partyDemocrat')
     if (segment.partyIndependent) filters.push('partyIndependent')
     if (segment.partyRepublican) filters.push('partyRepublican')
+    if (segment.partyUnknown) filters.push('partyUnknown')
 
     if (segment.audienceFirstTimeVoters) filters.push('audienceFirstTimeVoters')
     if (segment.audienceLikelyVoters) filters.push('audienceLikelyVoters')
@@ -264,6 +268,7 @@ export class ContactsService {
     if (segment.audienceUnreliableVoters)
       filters.push('audienceUnreliableVoters')
     if (segment.audienceUnlikelyVoters) filters.push('audienceUnlikelyVoters')
+    if (segment.audienceUnknown) filters.push('audienceUnknown')
 
     if (segment.hasCellPhone) filters.push('cellPhoneFormatted')
     if (segment.hasLandline) filters.push('landlineFormatted')
@@ -306,9 +311,16 @@ export class ContactsService {
 
     // Registered voter
     const rv: Array<boolean> = []
+    let rvIncludeNull = false
     if (seg.registeredVoterTrue) rv.push(true)
     if (seg.registeredVoterFalse) rv.push(false)
-    if (rv.length) filter.registeredVoter = { in: rv }
+    if (seg.registeredVoterUnknown) rvIncludeNull = true
+    if (rv.length || rvIncludeNull) {
+      filter.registeredVoter = {
+        ...(rv.length ? { in: rv } : {}),
+        ...(rvIncludeNull ? { is: 'null' } : {}),
+      }
+    }
 
     // Voter status
     if (seg.voterStatus && seg.voterStatus.length)
@@ -412,8 +424,18 @@ export class ContactsService {
       filter.languageCode = { in: seg.languageCodes }
 
     // Estimated income ranges (vendor domain strings)
-    if (seg.incomeRanges && seg.incomeRanges.length)
-      filter.estimatedIncomeAmount = { in: seg.incomeRanges }
+    const income: string[] = []
+    let incomeIncludeNull = false
+    if (seg.incomeRanges && seg.incomeRanges.length) {
+      income.push(...seg.incomeRanges)
+    }
+    if (seg.incomeUnknown) incomeIncludeNull = true
+    if (income.length || incomeIncludeNull) {
+      filter.estimatedIncomeAmount = {
+        ...(income.length ? { in: income } : {}),
+        ...(incomeIncludeNull ? { is: 'null' } : {}),
+      }
+    }
 
     // Ethnic groups broad categories; Unknown means null
     const eth: string[] = []
@@ -430,6 +452,35 @@ export class ContactsService {
         ...(ethIncludeNull ? { is: 'null' } : {}),
       }
     }
+
+    // Handle new Unknown age filter - null ages
+    if (seg.ageUnknown) {
+      // If other age filters are set, we need to OR with null
+      const hasOtherAgeFilters =
+        seg.age18_25 || seg.age25_35 || seg.age35_50 || seg.age50Plus
+      if (hasOtherAgeFilters) {
+        // This will be handled by the existing age filter logic in people-api
+        // The ageUnknown filter will be passed as a regular filter
+      } else {
+        // Only unknown age selected - filter for null ages
+        filter.ageInt = { is: 'null' }
+      }
+    }
+
+    // Handle new Unknown party filter - null parties
+    if (seg.partyUnknown) {
+      // If other party filters are set, we need to OR with null
+      const hasOtherPartyFilters =
+        seg.partyDemocrat || seg.partyIndependent || seg.partyRepublican
+      if (hasOtherPartyFilters) {
+        // This will be handled by the existing party filter logic in people-api
+        // The partyUnknown filter will be passed as a regular filter
+      } else {
+        // Only unknown party selected - filter for null/empty parties
+        filter.partiesDescription = { is: 'null' }
+      }
+    }
+
     return filter
   }
 
