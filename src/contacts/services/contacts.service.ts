@@ -72,7 +72,7 @@ export class ContactsService {
       const token = this.getValidS2SToken()
       const response = await lastValueFrom(
         this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/list?${params.toString()}`,
+          `${PEOPLE_API_URL}/v1/people?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -85,6 +85,18 @@ export class ContactsService {
       this.logger.error('Failed to fetch contacts from people API', error)
       throw new BadGatewayException('Failed to fetch contacts from people API')
     }
+  }
+
+  async findPerson(id: string) {
+    return (
+      await lastValueFrom(
+        this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
+          headers: {
+            Authorization: `Bearer ${this.getValidS2SToken()}`,
+          },
+        }),
+      )
+    ).data
   }
 
   async downloadContacts(
