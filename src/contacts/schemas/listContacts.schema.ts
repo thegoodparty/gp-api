@@ -11,10 +11,5 @@ const downloadContactsSchema = z.object({
   segment: z.string().optional(),
 })
 
-const statsSchema = z.object({
-  electionYear: z.coerce.number().optional(),
-})
-
 export class ListContactsDTO extends createZodDto(listContactsSchema) {}
 export class DownloadContactsDTO extends createZodDto(downloadContactsSchema) {}
-export class StatsDTO extends createZodDto(statsSchema) {}

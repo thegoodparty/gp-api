@@ -374,6 +374,29 @@ export function transformStatsResponse(data: PeopleStats): NormalizedStats {
     }
   }
 
+  if (categories.maritalStatus && categories.familyMarital)
+    delete categories.familyMarital
+  if (categories.presenceOfChildren && categories.familyChildren)
+    delete categories.familyChildren
+  if (categories.homeowner && categories.homeownerProbabilityModel)
+    delete categories.homeownerProbabilityModel
+  if (categories.language && categories.languageCode)
+    delete categories.languageCode
+  if (categories.education && categories.educationOfPerson)
+    delete categories.educationOfPerson
+  if (categories.estimatedIncomeRange && categories.estimatedIncomeAmount)
+    delete categories.estimatedIncomeAmount
+
+  if (categories.age && categories.ageInt) {
+    delete categories.ageInt
+  } else if (!categories.age && categories.ageInt) {
+    categories.age = categories.ageInt
+    delete categories.ageInt
+  }
+
+  if (categories.estimatedIncomeRange && categories.income)
+    delete categories.income
+
   return {
     meta: data.meta,
     categories,

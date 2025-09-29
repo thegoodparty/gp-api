@@ -19,10 +19,9 @@ import {
 import {
   DownloadContactsDTO,
   ListContactsDTO,
-  StatsDTO,
 } from '../schemas/listContacts.schema'
-import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
-import { transformStatsResponse } from './stats.transformer'
+import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
+import { transformStatsResponse } from '../stats.transformer'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -141,7 +140,7 @@ export class ContactsService {
     }
   }
 
-  async getDistrictStats(dto: StatsDTO, campaign: CampaignWithPathToVictory) {
+  async getDistrictStats(campaign: CampaignWithPathToVictory) {
     const locationData = this.extractLocationFromCampaign(campaign)
 
     const params = new URLSearchParams({
@@ -149,9 +148,12 @@ export class ContactsService {
       districtType: locationData.districtType,
       districtName: locationData.districtName,
     })
-    if (dto?.electionYear) {
-      params.set('electionYear', String(dto.electionYear))
-    }
+    const details = campaign.details as { electionDate?: string } | undefined
+    const electionYear = details?.electionDate
+      ? Number(String(details.electionDate).slice(0, 4))
+      : undefined
+    if (typeof electionYear === 'number' && Number.isFinite(electionYear))
+      params.set('electionYear', String(electionYear))
 
     try {
       const token = this.getValidS2SToken()

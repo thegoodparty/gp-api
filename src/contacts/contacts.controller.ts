@@ -7,7 +7,6 @@ import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
-  StatsDTO,
 } from './schemas/listContacts.schema'
 import { ContactsService } from './services/contacts.service'
 
@@ -41,10 +40,7 @@ export class ContactsController {
   }
 
   @Get('stats')
-  getContactsStats(
-    @Query() dto: StatsDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
-  ) {
-    return this.contactsService.getDistrictStats(dto, campaign)
+  getContactsStats(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+    return this.contactsService.getDistrictStats(campaign)
   }
 }
