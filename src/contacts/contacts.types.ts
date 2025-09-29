@@ -48,4 +48,9 @@ export type ExtendedVoterFileFilter = VoterFileFilter & {
   ethnicityAfricanAmerican?: boolean | null
   ethnicityOther?: boolean | null
   ethnicityUnknown?: boolean | null
+  ageUnknown?: boolean | null
+  partyUnknown?: boolean | null
+  audienceUnknown?: boolean | null
+  registeredVoterUnknown?: boolean | null
+  incomeUnknown?: boolean | null
 }
