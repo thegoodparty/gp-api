@@ -1,14 +1,14 @@
-import { Controller, Get, Query, UsePipes, Res, Param } from '@nestjs/common'
+import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
 import { Campaign, PathToVictory } from '@prisma/client'
+import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { ContactsService } from './services/contacts.service'
 import {
-  ListContactsDTO,
   DownloadContactsDTO,
+  ListContactsDTO,
 } from './schemas/listContacts.schema'
-import { FastifyReply } from 'fastify'
+import { ContactsService } from './services/contacts.service'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -37,6 +37,11 @@ export class ContactsController {
     res.header('Content-Type', 'text/csv')
     res.header('Content-Disposition', 'attachment; filename="contacts.csv"')
     await this.contactsService.downloadContacts(dto, campaign, res)
+  }
+
+  @Get('stats')
+  getContactsStats(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+    return this.contactsService.getDistrictStats(campaign)
   }
 
   @Get(':id')
