@@ -4,7 +4,9 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common'
+import { isAxiosError } from 'axios'
 import { VoterFileFilter } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
@@ -20,6 +22,12 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
+import {
+  PersonInput,
+  PersonOutput,
+  PersonListItem,
+  PeopleListResponse,
+} from '../schemas/person.schema'
 import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
@@ -82,12 +90,15 @@ export class ContactsService {
       )
       return this.transformListResponse(response.data)
     } catch (error) {
-      this.logger.error('Failed to fetch contacts from people API', error)
+      this.logger.error(
+        'Failed to fetch contacts from people API',
+        JSON.stringify(error),
+      )
       throw new BadGatewayException('Failed to fetch contacts from people API')
     }
   }
 
-  async findPerson(id: string) {
+  async findPerson(id: string): Promise<PersonOutput> {
     try {
       const response = await lastValueFrom(
         this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
@@ -98,7 +109,15 @@ export class ContactsService {
       )
       return this.transformPerson(response.data)
     } catch (error) {
-      this.logger.error('Failed to fetch person from people API', error)
+      this.logger.error(
+        'Failed to fetch person from people API',
+        JSON.stringify(error),
+      )
+
+      if (isAxiosError(error) && error.response?.status === 404) {
+        throw new NotFoundException('Person not found')
+      }
+
       throw new BadGatewayException('Failed to fetch person from people API')
     }
   }
@@ -489,86 +508,14 @@ export class ContactsService {
     })
   }
 
-  private transformListResponse(data: {
-    pagination: {
-      totalResults: number
-      currentPage: number
-      pageSize: number
-      totalPages: number
-      hasNextPage: boolean
-      hasPreviousPage: boolean
-    }
-    people: Array<{
-      id?: string
-      LALVOTERID?: string
-      State?: string | null
-      FirstName?: string | null
-      MiddleName?: string | null
-      LastName?: string | null
-      NameSuffix?: string | null
-      Residence_Addresses_AddressLine?: string | null
-      Residence_Addresses_ExtraAddressLine?: string | null
-      Residence_Addresses_City?: string | null
-      Residence_Addresses_State?: string | null
-      Residence_Addresses_Zip?: string | null
-      Residence_Addresses_ZipPlus4?: string | null
-      VoterTelephones_LandlineFormatted?: string | null
-      VoterTelephones_CellPhoneFormatted?: string | null
-      Age?: string | null
-      Gender?: string | null
-      Parties_Description?: string | null
-      County?: string | null
-      City?: string | null
-      Precinct?: string | null
-      Business_Owner?: string | null
-      Education_Of_Person?: string | null
-      Estimated_Income_Amount?: string | null
-      Homeowner_Probability_Model?: string | null
-      Language_Code?: string | null
-      Marital_Status?: string | null
-      Presence_Of_Children?: string | null
-      Registered_Voter?: boolean | null
-      Veteran_Status?: string | null
-      Voter_Status?: string | null
-      EthnicGroups_EthnicGroup1Desc?: string | null
-      Age_Int?: number | null
-    }>
-  }) {
+  private transformListResponse(data: PeopleListResponse) {
     return {
       pagination: data.pagination,
-      people: data.people.map((p) => this.transformPerson(p)),
+      people: data.people.map((p: PersonListItem) => this.transformPerson(p)),
     }
   }
 
-  private transformPerson(p: {
-    id?: string
-    FirstName?: string | null
-    LastName?: string | null
-    Gender?: string | null
-    Age?: string | null
-    Age_Int?: number | null
-    Parties_Description?: string | null
-    Registered_Voter?: boolean | null
-    Voter_Status?: string | null
-    Residence_Addresses_AddressLine?: string | null
-    Residence_Addresses_City?: string | null
-    Residence_Addresses_State?: string | null
-    Residence_Addresses_Zip?: string | null
-    Residence_Addresses_ZipPlus4?: string | null
-    VoterTelephones_CellPhoneFormatted?: string | null
-    VoterTelephones_LandlineFormatted?: string | null
-    Marital_Status?: string | null
-    Presence_Of_Children?: string | null
-    Veteran_Status?: string | null
-    Homeowner_Probability_Model?: string | null
-    Business_Owner?: string | null
-    Education_Of_Person?: string | null
-    EthnicGroups_EthnicGroup1Desc?: string | null
-    Language_Code?: string | null
-    Estimated_Income_Amount?: string | null
-    Residence_Addresses_Latitude?: string | null
-    Residence_Addresses_Longitude?: string | null
-  }) {
+  private transformPerson(p: PersonInput): PersonOutput {
     const firstName = p.FirstName || ''
     const lastName = p.LastName || ''
     const gender =
