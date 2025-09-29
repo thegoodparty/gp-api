@@ -81,21 +81,26 @@ export class ContactsService {
         ),
       )
       return this.transformListResponse(response.data)
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error('Failed to fetch contacts from people API', error)
       throw new BadGatewayException('Failed to fetch contacts from people API')
     }
   }
 
   async findPerson(id: string) {
-    const response = await lastValueFrom(
-      this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
-        headers: {
-          Authorization: `Bearer ${this.getValidS2SToken()}`,
-        },
-      }),
-    )
-    return this.transformPerson(response.data)
+    try {
+      const response = await lastValueFrom(
+        this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
+          headers: {
+            Authorization: `Bearer ${this.getValidS2SToken()}`,
+          },
+        }),
+      )
+      return this.transformPerson(response.data)
+    } catch (error) {
+      this.logger.error('Failed to fetch person from people API', error)
+      throw new BadGatewayException('Failed to fetch person from people API')
+    }
   }
 
   async downloadContacts(
@@ -142,7 +147,7 @@ export class ContactsService {
         response.data.on('end', resolve)
         response.data.on('error', reject)
       })
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error('Failed to download contacts from people API', error)
       throw new BadGatewayException(
         'Failed to download contacts from people API',
