@@ -14,14 +14,16 @@ import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
 import { getUserFullName } from '../../../users/util/users.util'
 import {
-  Approve10DLCBrandResponse,
+  Approve10DLCBrandResponseBody,
   CampaignVerificationStatus,
   Peerly10DLCBrandSubmitResponseBody,
   PEERLY_COMMITTEE_TYPE,
   PEERLY_CV_VERIFICATION_TYPE,
   PeerlyCreateCVTokenResponse,
+  PeerlyIdentity,
   PeerlyIdentityCreateResponseBody,
   PeerlyIdentityUseCaseResponseBody,
+  PeerlySubmitCVResponseBody,
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
@@ -68,7 +70,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     super()
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     const formattedError =
       (isAxiosError(error) && JSON.stringify(format(error))) || ''
@@ -112,7 +113,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     )
   }
 
-  async createIdentity(identityName: string) {
+  async createIdentity(identityName: string): Promise<PeerlyIdentity> {
     this.logger.debug(`Creating identity with name: '${identityName}'`)
     try {
       const response: AxiosResponse<PeerlyIdentityCreateResponseBody> =
@@ -192,7 +193,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     { details: campaignDetails, placeId }: Campaign,
     domain: Domain,
   ) {
-    const { phone, websiteDomain, email, ein } = tcrCompliancePayload
+    const { phone, websiteDomain, ein } = tcrCompliancePayload
     const { street, city, state, postalCode } = extractAddressComponents(
       await this.placesService.getAddressByPlaceId(placeId!),
     )
@@ -244,7 +245,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     campaignVerifyToken: string = '',
   ) {
     try {
-      const response: AxiosResponse<Approve10DLCBrandResponse> =
+      const response: AxiosResponse<Approve10DLCBrandResponseBody> =
         await lastValueFrom(
           this.httpService.post(
             `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/approve`,
@@ -280,7 +281,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     user: User,
     campaign: Campaign,
     domain: Domain,
-  ) {
+  ): Promise<PeerlySubmitCVResponseBody> {
     const { details: campaignDetails, placeId } = campaign
     const { electionDate, ballotLevel } = campaignDetails
     const {
@@ -332,13 +333,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           : {}),
       }
       this.logger.debug('Submitting CV request with data:', submitCVData)
-      const response = await lastValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit_cv`,
-          submitCVData,
-          await this.getBaseHttpHeaders(),
-        ),
-      )
+      const response: AxiosResponse<PeerlySubmitCVResponseBody> =
+        await lastValueFrom(
+          this.httpService.post(
+            `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit_cv`,
+            submitCVData,
+            await this.getBaseHttpHeaders(),
+          ),
+        )
       const { data } = response
       this.logger.debug('Successfully submitted CV request', data)
       return data

@@ -11,9 +11,10 @@ import { EmailModule } from 'src/email/email.module'
 import { OutreachModule } from 'src/outreach/outreach.module'
 import { VoterFileFilterService } from './services/voterFileFilter.service'
 import { PeerlyModule } from '../vendors/peerly/peerly.module'
+import { SlackModule } from 'src/vendors/slack/slack.module'
 
 @Module({
-  imports: [FilesModule, HttpModule, EmailModule, OutreachModule, PeerlyModule],
+  imports: [FilesModule, HttpModule, EmailModule, OutreachModule, PeerlyModule, SlackModule],
   controllers: [VotersController, VoterFileController],
   providers: [
     VoterFileService,

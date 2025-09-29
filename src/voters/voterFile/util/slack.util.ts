@@ -1,4 +1,4 @@
-import { SlackMessageType } from 'src/shared/services/slackService.types'
+import { SlackMessageType } from 'src/vendors/slack/slackService.types'
 
 type Inputs = {
   name: string

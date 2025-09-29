@@ -1,19 +1,24 @@
+export type PeerlyIdentity = {
+  identity_id: string
+  identity_name: string
+  start_date: string
+  account_id: string
+  tcr_identity_status: string | null
+}
 export type PeerlyIdentityCreateResponseBody = {
-  Data: {
-    identity_id: string
-    identity_name: string
-    start_date: string
-    account_id: string
-    tcr_identity_status: string | null
-  }
+  Data: PeerlyIdentity
 }
 export type PeerlySubmitIdentityProfileResponseBody = {
   link: string
 }
+export interface PeerlySubmitCVResponseBody {
+  message: string
+  verification_id: string
+}
 export type Peerly10DLCBrandSubmitResponseBody = {
   submission_key: string
 }
-export type Approve10DLCBrandResponse = {
+export type Approve10DLCBrandResponseBody = {
   street: string
   usecases: string[]
   phone: string

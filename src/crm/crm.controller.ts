@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
-import { SlackService } from '../shared/services/slack.service'
+import { SlackService } from '../vendors/slack/services/slack.service'
 import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'

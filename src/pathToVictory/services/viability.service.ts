@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign } from '@prisma/client'
 import { ViabilityScore } from '../types/pathToVictory.types'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'

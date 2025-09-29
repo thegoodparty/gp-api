@@ -10,10 +10,10 @@ import {
 } from '../queue.types'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { Campaign, PathToVictory, TcrComplianceStatus } from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import {

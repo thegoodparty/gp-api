@@ -6,14 +6,14 @@ import {
 } from '@nestjs/common'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom } from 'rxjs'
-import { SLACK_CHANNEL_IDS } from './slackService.config'
+import { SLACK_CHANNEL_IDS } from '../slackService.config'
 import {
   FormattedSlackMessageArgs,
   SlackChannel,
   SlackMessage,
   SlackMessageType,
   VanitySlackMethodArgs,
-} from './slackService.types'
+} from '../slackService.types'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
