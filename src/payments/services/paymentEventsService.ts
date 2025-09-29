@@ -278,6 +278,9 @@ export class PaymentEventsService {
     }
 
     await this.campaignsService.persistCampaignProCancellation(campaign)
+    await this.campaignsService.patchCampaignDetails(campaign.id, {
+      subscriptionCanceledAt: Date.now(),
+    })
     await this.sendProCancellationSlackMessage(user, campaign)
   }
 
