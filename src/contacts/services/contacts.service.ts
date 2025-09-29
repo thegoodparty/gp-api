@@ -88,15 +88,14 @@ export class ContactsService {
   }
 
   async findPerson(id: string) {
-    return (
-      await lastValueFrom(
-        this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
-          headers: {
-            Authorization: `Bearer ${this.getValidS2SToken()}`,
-          },
-        }),
-      )
-    ).data
+    const response = await lastValueFrom(
+      this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
+        headers: {
+          Authorization: `Bearer ${this.getValidS2SToken()}`,
+        },
+      }),
+    )
+    return this.transformPerson(response.data)
   }
 
   async downloadContacts(
@@ -495,6 +494,7 @@ export class ContactsService {
       hasPreviousPage: boolean
     }
     people: Array<{
+      id?: string
       LALVOTERID?: string
       State?: string | null
       FirstName?: string | null
@@ -536,6 +536,7 @@ export class ContactsService {
   }
 
   private transformPerson(p: {
+    id?: string
     FirstName?: string | null
     LastName?: string | null
     Gender?: string | null
@@ -560,6 +561,8 @@ export class ContactsService {
     EthnicGroups_EthnicGroup1Desc?: string | null
     Language_Code?: string | null
     Estimated_Income_Amount?: string | null
+    Residence_Addresses_Latitude?: string | null
+    Residence_Addresses_Longitude?: string | null
   }) {
     const firstName = p.FirstName || ''
     const lastName = p.LastName || ''
@@ -607,8 +610,10 @@ export class ContactsService {
     const ethnicityGroup = this.mapEthnicity(p.EthnicGroups_EthnicGroup1Desc)
     const language = p.Language_Code ? p.Language_Code : 'Unknown'
     const estimatedIncomeRange = p.Estimated_Income_Amount || 'Unknown'
-
+    const lat = p.Residence_Addresses_Latitude || null
+    const lng = p.Residence_Addresses_Longitude || null
     return {
+      id: p.id,
       firstName,
       lastName,
       gender,
@@ -629,6 +634,8 @@ export class ContactsService {
       ethnicityGroup,
       language,
       estimatedIncomeRange,
+      lat,
+      lng,
     }
   }
 
