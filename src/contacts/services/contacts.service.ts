@@ -205,7 +205,11 @@ export class ContactsService {
       const transformed = transformStatsResponse(response.data)
       return transformed
     } catch (error) {
-      this.logger.error('Failed to fetch stats from people API', error)
+      const errStr =
+        error instanceof Error
+          ? error.stack || error.message
+          : JSON.stringify(error)
+      this.logger.error('Failed to fetch stats from people API', errStr)
       throw new BadGatewayException('Failed to fetch stats from people API')
     }
   }
