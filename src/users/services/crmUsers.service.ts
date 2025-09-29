@@ -267,7 +267,7 @@ export class CrmUsersService {
         this.logger.error('Unexpected Error:', error)
       }
       this.logger.error('hubspot error', message, error)
-      this.slack.errorMessage({ message: 'Error submitting form', error })
+      await this.slack.errorMessage({ message: 'Error submitting form', error })
       throw new BadGatewayException(message)
     }
   }

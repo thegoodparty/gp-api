@@ -1,3 +1,7 @@
+import { AxiosRequestConfig, AxiosResponse } from 'axios'
+import { HttpException } from '@nestjs/common'
+import { Campaign } from '@prisma/client'
+import { Observable } from 'rxjs'
 export type PeerlyIdentity = {
   identity_id: string
   identity_name: string
@@ -185,4 +189,41 @@ export type PeerlyIdentityUseCase = {
   submitted: number
   activated: number
 }
+
 export type PeerlyIdentityUseCaseResponseBody = PeerlyIdentityUseCase[]
+
+type HttpServiceMethod = {
+  <T = any, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>,
+  ): Observable<AxiosResponse<T, D>>
+  <T = any, D = any>(
+    url: string,
+    config?: AxiosRequestConfig<D>,
+  ): Observable<AxiosResponse<T, D>>
+}
+
+export interface PeerlyHttpRequestConfig {
+  url: string
+  method: HttpServiceMethod
+  data?: unknown
+  config?: AxiosRequestConfig
+}
+
+type HttpExceptionConstructor<T = {}> = new (message: string) => T
+
+export interface HandleApiErrorParams {
+  error: unknown
+  requestConfig: PeerlyHttpRequestConfig
+  httpExceptionMethod?: HttpExceptionConstructor<HttpException>
+  peerlyIdentityId?: string
+  campaign: Campaign
+}
+
+export interface BuildPeerlyErrorSlackMessageBlocksParams {
+  requestConfig: PeerlyHttpRequestConfig
+  formattedError: string
+  peerlyIdentityId?: string
+  campaign: Campaign
+}

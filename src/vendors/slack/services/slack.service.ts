@@ -55,17 +55,19 @@ export class SlackService {
         ),
       )
       return data
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (e: unknown) {
       this.logger.error(`Failed to send slack message!`, e)
     }
   }
 
-  async errorMessage({ message, error }: VanitySlackMethodArgs) {
+  async errorMessage(
+    { message, error }: VanitySlackMethodArgs,
+    channel?: SlackChannel,
+  ) {
     return await this.formattedMessage({
       message,
       error,
-      channel: SlackChannel.botDev,
+      channel: channel || SlackChannel.botDev,
     })
   }
 

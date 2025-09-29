@@ -95,7 +95,7 @@ export class ScheduledMessagingService extends createPrismaBase(
         } catch (e) {
           this.logger.error('Error sending message', e)
           const errorMessage = e instanceof Error ? e.toString() : String(e)
-          this.slack.errorMessage({
+          await this.slack.errorMessage({
             message: 'Error sending scheduled message',
             error: e,
           })
