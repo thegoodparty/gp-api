@@ -6,14 +6,14 @@ import {
 } from '@nestjs/common'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom } from 'rxjs'
-import { SLACK_CHANNEL_IDS } from './slackService.config'
+import { SLACK_CHANNEL_IDS } from '../slackService.config'
 import {
   FormattedSlackMessageArgs,
   SlackChannel,
   SlackMessage,
   SlackMessageType,
   VanitySlackMethodArgs,
-} from './slackService.types'
+} from '../slackService.types'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
@@ -55,17 +55,19 @@ export class SlackService {
         ),
       )
       return data
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (e: unknown) {
       this.logger.error(`Failed to send slack message!`, e)
     }
   }
 
-  async errorMessage({ message, error }: VanitySlackMethodArgs) {
+  async errorMessage(
+    { message, error }: VanitySlackMethodArgs,
+    channel?: SlackChannel,
+  ) {
     return await this.formattedMessage({
       message,
       error,
-      channel: SlackChannel.botDev,
+      channel: channel || SlackChannel.botDev,
     })
   }
 

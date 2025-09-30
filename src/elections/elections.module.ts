@@ -12,6 +12,7 @@ import { ElectionsService } from './services/elections.service'
 import { ElectionTypeService } from './services/electionType.service'
 import { MunicipalitiesService } from './services/municipalities.service'
 import { RacesService } from './services/races.service'
+import { SlackModule } from 'src/vendors/slack/slack.module'
 
 @Module({
   controllers: [ElectionsController],
@@ -31,6 +32,7 @@ import { RacesService } from './services/races.service'
     VotersModule,
     forwardRef(() => CampaignsModule),
     HttpModule,
+    SlackModule,
   ],
 })
 export class ElectionsModule {}

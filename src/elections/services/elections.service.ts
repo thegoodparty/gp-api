@@ -8,8 +8,8 @@ import {
 import { isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
-import { SlackService } from 'src/shared/services/slack.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {

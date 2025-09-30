@@ -10,13 +10,13 @@ import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/services/users.service'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateName } from '../../email/email.types'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -220,7 +220,10 @@ export class PaymentEventsService {
     try {
       await this.analytics.trackProPayment(user.id, session)
     } catch (error) {
-      this.logger.error(`[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`, error)
+      this.logger.error(
+        `[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`,
+        error,
+      )
       // Don't throw - we don't want to fail the webhook for analytics issues
     }
 

@@ -8,7 +8,7 @@ import {
 } from '@hubspot/api-client/lib/codegen/crm/companies'
 import { HubspotService } from '../../crm/hubspot.service'
 import { CampaignsService } from './campaigns.service'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { getUserFullName } from '../../users/util/users.util'
 import { formatDateForCRM } from '../../crm/util/cms.util'
@@ -19,7 +19,7 @@ import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
 import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
 import { pick } from '../../shared/util/objects.util'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
 import {
@@ -61,7 +61,7 @@ export class CrmCampaignsService {
     } catch (error) {
       const message = 'hubspot error - get-company-by-id'
       this.logger.error(message, error)
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message,
         error,
       })
@@ -76,7 +76,7 @@ export class CrmCampaignsService {
     } catch (error) {
       const message = 'hubspot error - get-company-owner'
       this.logger.error(message, error)
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message,
         error,
       })
@@ -114,14 +114,14 @@ export class CrmCampaignsService {
       })
     } catch (error) {
       this.logger.error('error creating company', error)
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message: `Error creating company for ${companyObj.candidate_name} in hubspot`,
         error,
       })
     }
 
     if (!crmCompany) {
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message: `Error creating company for ${companyObj.candidate_name} in hubspot. No response from hubspot.`,
       })
       return
@@ -149,7 +149,7 @@ export class CrmCampaignsService {
       const { candidate_name: name } = crmCompanyProperties
       this.logger.error('error updating crm', e)
       if (e instanceof ApiException && e.code === 404) {
-        this.slack.errorMessage({
+        await this.slack.errorMessage({
           message: `Could not find hubspot company for ${name} with hubspotId ${hubspotId}`,
           error: e,
         })
@@ -163,7 +163,7 @@ export class CrmCampaignsService {
             },
           }))
       } else {
-        this.slack.errorMessage({
+        await this.slack.errorMessage({
           message: `Error updating company for ${name} with existing hubspotId: ${hubspotId} in hubspot`,
           error: e,
         })
@@ -371,7 +371,7 @@ export class CrmCampaignsService {
         errors: validated.error.errors,
         fields: fieldsToSync,
       })
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message: msg,
         error: validated.error,
       })
@@ -460,7 +460,7 @@ export class CrmCampaignsService {
     if (!user) {
       const message = `No user found for campaign ${campaignId}`
       this.logger.error(message)
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message,
       })
       return
@@ -472,7 +472,7 @@ export class CrmCampaignsService {
     if (!crmContactId) {
       const message = `No hubspot id found for user ${userId}`
       this.logger.debug(message)
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message,
       })
       try {
@@ -828,7 +828,7 @@ export class CrmCampaignsService {
             }
           } catch (error) {
             this.logger.error('error at crm/sync', error)
-            this.slack.errorMessage({
+            await this.slack.errorMessage({
               message: `error at crm/sync - campaignSlug: ${campaign?.slug}`,
               error,
             })
@@ -849,7 +849,7 @@ export class CrmCampaignsService {
       }
     }
 
-    this.slack.message(
+    await this.slack.message(
       { body: `completed crm/sync - updated: ${updated}` },
       SlackChannel.botDev,
     )

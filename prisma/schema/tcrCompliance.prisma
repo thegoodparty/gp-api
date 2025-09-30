@@ -33,6 +33,7 @@ model TcrCompliance {
   peerlyRegistrationLink        String? @map("peerly_registration_link")
   peerlyIdentityProfileLink     String? @map("peerly_identity_profile_link")
   peerly10DLCBrandSubmissionKey String? @unique @map("peerly_10dlc_brand_submission_key")
+  peerlyCvVerificationId        String? @unique @map("peerly_cv_verification_id")
 
   @@map("tcr_compliance")
 }

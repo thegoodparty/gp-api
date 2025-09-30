@@ -21,8 +21,6 @@ if (process.env.NODE_ENV !== 'production') {
   }
 }
 
-console.log('process.env.AWS_ACCESS_KEY_ID', process.env.AWS_ACCESS_KEY_ID)
-
 // create simple producer. the producer in nest-sqs does not work.
 // so we use the underlying sqs-producer package
 const producer = Producer.create({

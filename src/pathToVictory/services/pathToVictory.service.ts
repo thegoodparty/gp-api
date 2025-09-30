@@ -3,7 +3,7 @@ import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { VotersService } from 'src/voters/services/voters.service'
 import { VoterCounts } from 'src/voters/voters.types'
@@ -13,7 +13,7 @@ import { EmailService } from '../../email/email.service'
 import { EmailTemplateName } from '../../email/email.types'
 import { PrismaService } from '../../prisma/prisma.service'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import {
   P2VSource,
   PathToVictoryInput,

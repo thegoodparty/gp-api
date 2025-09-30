@@ -13,6 +13,7 @@ import { OfficeMatchService } from './services/officeMatch.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
 import { ViabilityService } from './services/viability.service'
 import { ViabilityController } from './viability.controller'
+import { SlackModule } from 'src/vendors/slack/slack.module'
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ViabilityController } from './viability.controller'
     EmailModule,
     QueueProducerModule,
     SegmentModule,
+    SlackModule,
   ],
   controllers: [PathToVictoryController, ViabilityController],
   providers: [
