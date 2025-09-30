@@ -55,7 +55,7 @@ export class AdminCampaignsController {
     })
     // Logging the deletion to Slack to track why campaigns are deleted:
     //  https://goodparty.atlassian.net/browse/WEB-4324
-    this.slack.message(
+    await this.slack.message(
       {
         body: `Admin ${user.email} deleted campaign with ID ${id} related to userId: ${campaign.userId}`,
       },
