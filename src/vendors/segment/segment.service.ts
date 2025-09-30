@@ -34,9 +34,14 @@ export class SegmentService {
         userId: stringId,
         properties,
       })
-      this.logger.debug(`[SEGMENT] Event queued for tracking - Event: ${event}, User: ${userId}`)
+      this.logger.debug(
+        `[SEGMENT] Event queued for tracking - Event: ${event}, User: ${userId}`,
+      )
     } catch (err) {
-      this.logger.error(`[SEGMENT] Failed to track event: ${event} for user: ${userId}`, err)
+      this.logger.error(
+        `[SEGMENT] Failed to track event: ${event} for user: ${userId}`,
+        err,
+      )
       throw err
     }
   }

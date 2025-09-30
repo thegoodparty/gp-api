@@ -30,6 +30,7 @@ import { AnalyticsModule } from '../analytics/analytics.module'
 import { UsersModule } from 'src/users/users.module'
 import { WebsitesModule } from '../websites/websites.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
+import { SlackModule } from 'src/vendors/slack/slack.module'
 
 @Global()
 @Module({
@@ -48,6 +49,7 @@ import { QueueProducerModule } from '../queue/producer/queueProducer.module'
     UsersModule,
     WebsitesModule,
     QueueProducerModule,
+    SlackModule,
   ],
   controllers: [
     CampaignsController,

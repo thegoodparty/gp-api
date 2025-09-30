@@ -5,10 +5,10 @@ import { ContentService } from 'src/content/services/content.service'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
-import { SlackChannel } from '../../../shared/services/slackService.types'
+import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string

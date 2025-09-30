@@ -10,9 +10,7 @@ import {
   RawBodyRequest,
   Req,
 } from '@nestjs/common'
-import {
-  PublicAccess
-} from '../authentication/decorators/PublicAccess.decorator'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import { Stripe } from 'stripe'
 import { PaymentEventsService } from './services/paymentEventsService'
 import { StripeService } from '../vendors/stripe/services/stripe.service'

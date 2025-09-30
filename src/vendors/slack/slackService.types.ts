@@ -7,6 +7,7 @@ export const enum SlackChannel {
   botPolitics = 'bot-politics',
   botFeedback = 'bot-feedback',
   botDeletions = 'bot-deletions',
+  bot10DlcCompliance = 'bot-10dlc-compliance',
 }
 
 export enum SlackMessageType {

@@ -13,6 +13,8 @@ import { GoogleModule } from '../google/google.module'
 import { VoterSharedModule } from '../../shared/modules/voterShared.module'
 import { CampaignsModule } from '../../campaigns/campaigns.module'
 import { OutreachModule } from '../../outreach/outreach.module'
+import { SlackModule } from '../slack/slack.module'
+import { UsersModule } from '../../users/users.module'
 
 @Module({
   imports: [
@@ -20,8 +22,10 @@ import { OutreachModule } from '../../outreach/outreach.module'
     JwtModule,
     GoogleModule,
     VoterSharedModule,
+    SlackModule,
     forwardRef(() => CampaignsModule),
     forwardRef(() => OutreachModule),
+    UsersModule,
   ],
   controllers: [P2pController],
   providers: [
