@@ -6,8 +6,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { isAxiosError } from 'axios'
 import { VoterFileFilter } from '@prisma/client'
+import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
@@ -23,12 +23,13 @@ import {
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
 import {
-  PersonInput,
-  PersonOutput,
-  PersonListItem,
   PeopleListResponse,
+  PersonInput,
+  PersonListItem,
+  PersonOutput,
 } from '../schemas/person.schema'
-import defaultSegmentToFiltersMap from './segmentsToFiltersMap.const'
+import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
+import { transformStatsResponse } from '../stats.transformer'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -171,6 +172,45 @@ export class ContactsService {
       throw new BadGatewayException(
         'Failed to download contacts from people API',
       )
+    }
+  }
+
+  async getDistrictStats(campaign: CampaignWithPathToVictory) {
+    const locationData = this.extractLocationFromCampaign(campaign)
+
+    const params = new URLSearchParams({
+      state: locationData.state,
+      districtType: locationData.districtType,
+      districtName: locationData.districtName,
+    })
+    const details = campaign.details as { electionDate?: string } | undefined
+    const electionYear = details?.electionDate
+      ? Number(String(details.electionDate).slice(0, 4))
+      : undefined
+    if (typeof electionYear === 'number' && Number.isFinite(electionYear))
+      params.set('electionYear', String(electionYear))
+
+    try {
+      const token = this.getValidS2SToken()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}/v1/people/stats?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      )
+      const transformed = transformStatsResponse(response.data)
+      return transformed
+    } catch (error) {
+      const errStr =
+        error instanceof Error
+          ? error.stack || error.message
+          : JSON.stringify(error)
+      this.logger.error('Failed to fetch stats from people API', errStr)
+      throw new BadGatewayException('Failed to fetch stats from people API')
     }
   }
 

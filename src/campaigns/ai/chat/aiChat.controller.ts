@@ -20,7 +20,7 @@ import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiChatService } from './aiChat.service'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { PromptReplaceCampaign } from 'src/ai/ai.service'
 
 @Controller('campaigns/ai/chat')

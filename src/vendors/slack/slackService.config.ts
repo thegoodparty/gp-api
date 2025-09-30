@@ -29,4 +29,8 @@ export const SLACK_CHANNEL_IDS = {
     channelId: process.env.SLACK_BOT_FEEDBACK_CHANNEL_ID,
     channelToken: process.env.SLACK_BOT_FEEDBACK_CHANNEL_TOKEN,
   },
+  [SlackChannel.bot10DlcCompliance]: {
+    channelId: process.env.SLACK_BOT_10DLC_COMPLIANCE_CHANNEL_ID,
+    channelToken: process.env.SLACK_BOT_10DLC_COMPLIANCE_CHANNEL_TOKEN,
+  },
 }

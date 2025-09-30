@@ -17,15 +17,15 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { UsersService } from 'src/users/services/users.service'
 import {
-  DateRangeFilter,
   AdminUserListSchema,
+  DateRangeFilter,
 } from './schemas/AdminUserList.schema'
 import { subDays, subMonths } from 'date-fns'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
 import { AdminImpersonateSchema } from './schemas/AdminImpersonate.schema'
 import { AuthenticationService } from 'src/authentication/authentication.service'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { ReadUserOutputSchema } from 'src/users/schemas/ReadUserOutput.schema'
 import { UserRole } from '@prisma/client'
 

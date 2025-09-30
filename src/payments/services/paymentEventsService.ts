@@ -10,13 +10,13 @@ import { WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/services/users.service'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateName } from '../../email/email.types'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -119,13 +119,6 @@ export class PaymentEventsService {
       )
     }
     const { id: campaignId } = campaign
-    const electionDate = parseCampaignElectionDate(campaign)
-
-    if (!electionDate || electionDate < new Date()) {
-      throw new BadGatewayException(
-        'No electionDate or electionDate is in the past',
-      )
-    }
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
     await this.campaignsService.patchCampaignDetails(campaignId, {
@@ -134,7 +127,6 @@ export class PaymentEventsService {
     await this.campaignsService.setIsPro(campaignId)
 
     await Promise.allSettled([
-      this.stripeService.setSubscriptionCancelAt(subscriptionId, electionDate),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
@@ -163,29 +155,10 @@ export class PaymentEventsService {
       throw new BadGatewayException('No campaign found with given subscription')
     }
 
-    // The only way for us to determine if a user is resuming a subscription that
-    //  they previously requested to cancel, but haven't reached the end of
-    //  their pay period, is to do this check, and then reset the cancel_at date
-    //  to the election date for their campaign.
-    const isResumeEvent = !cancelAt && previousCancelAt
-    if (isResumeEvent) {
-      const electionDate = parseCampaignElectionDate(campaign)
-      if (!electionDate || electionDate < new Date()) {
-        throw new BadGatewayException(
-          'No electionDate or electionDate is in the past',
-        )
-      }
-
-      await this.stripeService.setSubscriptionCancelAt(
-        subscriptionId,
-        electionDate,
-      )
-    } else {
-      await this.campaignsService.patchCampaignDetails(campaign.id, {
-        subscriptionCanceledAt: canceledAt,
-        subscriptionCancelAt: cancelAt,
-      })
-    }
+    await this.campaignsService.patchCampaignDetails(campaign.id, {
+      subscriptionCanceledAt: canceledAt,
+      subscriptionCancelAt: cancelAt,
+    })
 
     const user = (await this.usersService.findByCampaign(campaign)) as User
     const isCancellationRequest =
@@ -247,7 +220,10 @@ export class PaymentEventsService {
     try {
       await this.analytics.trackProPayment(user.id, session)
     } catch (error) {
-      this.logger.error(`[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`, error)
+      this.logger.error(
+        `[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`,
+        error,
+      )
       // Don't throw - we don't want to fail the webhook for analytics issues
     }
 
@@ -256,10 +232,6 @@ export class PaymentEventsService {
         customerId: customerId as string,
         checkoutSessionId: null,
       }),
-      this.stripeService.setSubscriptionCancelAt(
-        subscriptionId as string,
-        electionDate,
-      ),
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
@@ -315,6 +287,9 @@ export class PaymentEventsService {
     }
 
     await this.campaignsService.persistCampaignProCancellation(campaign)
+    await this.campaignsService.patchCampaignDetails(campaign.id, {
+      subscriptionCanceledAt: Date.now(),
+    })
     await this.sendProCancellationSlackMessage(user, campaign)
   }
 

@@ -3,7 +3,7 @@ import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
 import { ScheduledMessage } from '@prisma/client'
 import { EmailService } from '../email/email.service'
 import { ScheduledMessageTypes } from '../email/email.types'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { Interval, Timeout } from '@nestjs/schedule'
 
 const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
@@ -95,7 +95,7 @@ export class ScheduledMessagingService extends createPrismaBase(
         } catch (e) {
           this.logger.error('Error sending message', e)
           const errorMessage = e instanceof Error ? e.toString() : String(e)
-          this.slack.errorMessage({
+          await this.slack.errorMessage({
             message: 'Error sending scheduled message',
             error: e,
           })

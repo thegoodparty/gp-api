@@ -1,19 +1,28 @@
+import { AxiosRequestConfig, AxiosResponse } from 'axios'
+import { HttpException } from '@nestjs/common'
+import { Campaign } from '@prisma/client'
+import { Observable } from 'rxjs'
+export type PeerlyIdentity = {
+  identity_id: string
+  identity_name: string
+  start_date: string
+  account_id: string
+  tcr_identity_status: string | null
+}
 export type PeerlyIdentityCreateResponseBody = {
-  Data: {
-    identity_id: string
-    identity_name: string
-    start_date: string
-    account_id: string
-    tcr_identity_status: string | null
-  }
+  Data: PeerlyIdentity
 }
 export type PeerlySubmitIdentityProfileResponseBody = {
   link: string
 }
+export interface PeerlySubmitCVResponseBody {
+  message: string
+  verification_id: string
+}
 export type Peerly10DLCBrandSubmitResponseBody = {
   submission_key: string
 }
-export type Approve10DLCBrandResponse = {
+export type Approve10DLCBrandResponseBody = {
   street: string
   usecases: string[]
   phone: string
@@ -180,4 +189,41 @@ export type PeerlyIdentityUseCase = {
   submitted: number
   activated: number
 }
+
 export type PeerlyIdentityUseCaseResponseBody = PeerlyIdentityUseCase[]
+
+type HttpServiceMethod = {
+  <T = any, D = any>(
+    url: string,
+    data?: D,
+    config?: AxiosRequestConfig<D>,
+  ): Observable<AxiosResponse<T, D>>
+  <T = any, D = any>(
+    url: string,
+    config?: AxiosRequestConfig<D>,
+  ): Observable<AxiosResponse<T, D>>
+}
+
+export interface PeerlyHttpRequestConfig {
+  url: string
+  method: HttpServiceMethod
+  data?: unknown
+  config?: AxiosRequestConfig
+}
+
+type HttpExceptionConstructor<T = {}> = new (message: string) => T
+
+export interface HandleApiErrorParams {
+  error: unknown
+  requestConfig: PeerlyHttpRequestConfig
+  httpExceptionMethod?: HttpExceptionConstructor<HttpException>
+  peerlyIdentityId?: string
+  campaign: Campaign
+}
+
+export interface BuildPeerlyErrorSlackMessageBlocksParams {
+  requestConfig: PeerlyHttpRequestConfig
+  formattedError: string
+  peerlyIdentityId?: string
+  campaign: Campaign
+}

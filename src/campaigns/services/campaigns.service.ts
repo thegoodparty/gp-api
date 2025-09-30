@@ -11,7 +11,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
@@ -169,7 +169,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           campaignUpdateData.canDownloadFederal = canDownloadFederal
         }
         if (details) {
-          await this.handleSubscriptionCancelAtUpdate(campaign.details, details)
           const mergedDetails = deepMerge(
             campaign.details as object,
             details,
@@ -249,24 +248,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return updatedCampaign ? updatedCampaign : null
   }
 
-  private async handleSubscriptionCancelAtUpdate(
-    currentDetails: PrismaJson.CampaignDetails,
-    updateDetails: Partial<PrismaJson.CampaignDetails>,
-  ) {
-    const { subscriptionId } = currentDetails
-    const { electionDate: electionDateUpdateStr } = updateDetails
-
-    // If we're changing the electionDate and there's an existing subscriptionId,
-    //  then we need to also update the cancelAt date on the subscription
-    if (electionDateUpdateStr && subscriptionId) {
-      const electionDate = parseIsoDateString(electionDateUpdateStr)
-      await this.stripeService.setSubscriptionCancelAt(
-        subscriptionId,
-        electionDate,
-      )
-    }
-  }
-
   async patchCampaignDetails(
     campaignId: number,
     details: Partial<PrismaJson.CampaignDetails>,
@@ -280,8 +261,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       )
     }
     const { details: currentDetails } = currentCampaign
-
-    await this.handleSubscriptionCancelAtUpdate(currentDetails, details)
 
     const updatedDetails = {
       ...currentDetails,

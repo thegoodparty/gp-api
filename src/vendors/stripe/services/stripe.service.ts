@@ -2,7 +2,7 @@ import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import Stripe from 'stripe'
 import { User } from '@prisma/client'
 import { PaymentIntentPayload, PaymentType } from 'src/payments/payments.types'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
   process.env

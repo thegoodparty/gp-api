@@ -13,7 +13,7 @@ import { HubspotService } from '../../crm/hubspot.service'
 import { CRMContactProperties } from '../../crm/crm.types'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { AxiosError, isAxiosError } from 'axios'
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts'
@@ -267,7 +267,7 @@ export class CrmUsersService {
         this.logger.error('Unexpected Error:', error)
       }
       this.logger.error('hubspot error', message, error)
-      this.slack.errorMessage({ message: 'Error submitting form', error })
+      await this.slack.errorMessage({ message: 'Error submitting form', error })
       throw new BadGatewayException(message)
     }
   }
