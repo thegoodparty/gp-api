@@ -4,6 +4,8 @@ import { z } from 'zod'
 const searchContactsSchema = z
   .object({
     name: z.string().trim().min(2).max(100).optional(),
+    firstName: z.string().trim().min(1).max(100).optional(),
+    lastName: z.string().trim().min(1).max(100).optional(),
     phone: z.string().trim().min(2).max(30).optional(),
     page: z.coerce.number().optional().default(1),
     resultsPerPage: z.coerce
@@ -14,5 +16,8 @@ const searchContactsSchema = z
       .optional()
       .default(25),
   })
-  .refine((v) => Boolean(v.name || v.phone), 'Provide name or phone to search')
+  .refine(
+    (v) => Boolean(v.name || v.phone || v.firstName || v.lastName),
+    'Provide name, firstName/lastName, or phone to search',
+  )
 export class SearchContactsDTO extends createZodDto(searchContactsSchema) {}

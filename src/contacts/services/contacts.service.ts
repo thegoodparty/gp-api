@@ -22,13 +22,13 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
-import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import {
   PeopleListResponse,
   PersonInput,
   PersonListItem,
   PersonOutput,
 } from '../schemas/person.schema'
+import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
 
@@ -104,7 +104,7 @@ export class ContactsService {
     dto: SearchContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    const { resultsPerPage, page, name, phone } = dto
+    const { resultsPerPage, page, name, phone, firstName, lastName } = dto
 
     const locationData = this.extractLocationFromCampaign(campaign)
 
@@ -116,6 +116,8 @@ export class ContactsService {
       page: page.toString(),
     })
     if (name) params.set('name', name)
+    if (firstName) params.set('firstName', firstName)
+    if (lastName) params.set('lastName', lastName)
     if (phone) params.set('phone', phone)
     params.set('full', 'true')
 
