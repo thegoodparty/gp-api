@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
-import { SlackService } from '../../shared/services/slack.service'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { AiService } from '../../ai/ai.service'
 import { ElectionType } from '@prisma/client'
 import {

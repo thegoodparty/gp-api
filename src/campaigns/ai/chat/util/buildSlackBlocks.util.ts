@@ -1,7 +1,7 @@
 import {
   SlackMessageBlock,
   SlackMessageType,
-} from '../../../../shared/services/slackService.types'
+} from '../../../../vendors/slack/slackService.types'
 
 export function buildSlackBlocks(
   type,

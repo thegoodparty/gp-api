@@ -2,11 +2,11 @@ import { ChatOpenAI } from '@langchain/openai'
 import { OpenAI } from 'openai'
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
 import { Injectable, Logger } from '@nestjs/common'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { Prisma, User } from '@prisma/client'
 import { getUserFullName } from 'src/users/util/users.util'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
-import { SlackChannel } from '../shared/services/slackService.types'
+import { SlackChannel } from '../vendors/slack/slackService.types'
 import {
   ChatCompletion,
   ChatCompletionNamedToolChoice,

@@ -13,7 +13,7 @@ import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
 import slugify from 'slugify'
 import { EcanvasserSummary } from '../ecanvasserIntegration.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { EcanvasserService } from './ecanvasser.service'
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000

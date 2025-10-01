@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { Campaign, OutreachType, User } from '@prisma/client'
 import {
   AudienceSlackBlock,
@@ -16,7 +16,7 @@ import { VOTER_FILE_ROUTE } from '../voterFile/voterFile.controller'
 import {
   SlackChannel,
   SlackMessageType,
-} from 'src/shared/services/slackService.types'
+} from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { getUserFullName } from 'src/users/util/users.util'
 import { EmailService } from 'src/email/email.service'

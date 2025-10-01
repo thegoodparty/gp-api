@@ -19,8 +19,8 @@ import { Roles } from '../../authentication/decorators/Roles.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { User, UserRole } from '@prisma/client'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
-import { SlackService } from '../../shared/services/slack.service'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 
 @Controller('admin/campaigns')
 @Roles(UserRole.admin)
@@ -55,7 +55,7 @@ export class AdminCampaignsController {
     })
     // Logging the deletion to Slack to track why campaigns are deleted:
     //  https://goodparty.atlassian.net/browse/WEB-4324
-    this.slack.message(
+    await this.slack.message(
       {
         body: `Admin ${user.email} deleted campaign with ID ${id} related to userId: ${campaign.userId}`,
       },
