@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -130,6 +131,9 @@ export class VoterFileController {
     @ReqCampaign() campaign: Campaign,
     @Body() voterFileFilter: CreateVoterFileFilterSchema,
   ) {
+    if (!campaign.isPro) {
+      throw new BadRequestException('Campaign is not pro')
+    }
     return this.voterFileFilterService.create(campaign.id, voterFileFilter)
   }
 
@@ -160,6 +164,9 @@ export class VoterFileController {
     @Body() body: UpdateVoterFileFilterSchema,
     @ReqCampaign() campaign: Campaign,
   ) {
+    if (!campaign.isPro) {
+      throw new BadRequestException('Campaign is not pro')
+    }
     const filter: VoterFileFilter | null =
       await this.voterFileFilterService.findByIdAndCampaignId(id, campaign.id)
     if (!filter) {
