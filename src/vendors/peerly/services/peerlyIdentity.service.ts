@@ -26,6 +26,7 @@ import {
   PeerlyIdentity,
   PeerlyIdentityCreateResponseBody,
   PeerlyIdentityUseCaseResponseBody,
+  PeerlyRetrieveCampaignVerifyStatusResponseBody,
   PeerlySubmitCVResponseBody,
   PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
@@ -92,7 +93,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     if (httpExceptionMethod) {
       throw new httpExceptionMethod(genericPeerlyErrorMessage)
     }
-    throw new BadGatewayException(genericPeerlyErrorMessage)
+    // TODO: vendor services should just throw the exception that caused the problem
+    //  instead of determining the Http response w/ `BadGatewayException`.
+    //  That should happen in the consumer services of vendor services:
+    //  https://goodparty.clickup.com/t/86ac8y227
+
+    throw new BadGatewayException(genericPeerlyErrorMessage, {
+      cause: error,
+    })
   }
 
   // TODO: move this out to a base service or utility once we have more than one
@@ -392,6 +400,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           }
         : {}),
     }
+
     const requestConfig: PeerlyHttpRequestConfig = {
       url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit_cv`,
       method: this.httpService.post,
@@ -413,6 +422,37 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         requestConfig,
         campaign,
         peerlyIdentityId: peerlyIdentityId!,
+      })
+    }
+  }
+
+  async retrieveCampaignVerifyStatus(
+    peerlyIdentityId: string,
+    campaign: Campaign,
+  ) {
+    const requestConfig: PeerlyHttpRequestConfig = {
+      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/retrieve_cv`,
+      method: this.httpService.get,
+      config: await this.getAxiosRequestConfig(),
+    }
+    try {
+      this.logger.debug(
+        `Retrieving campaign verify status for identityId: ${peerlyIdentityId}`,
+      )
+      const response: AxiosResponse<PeerlyRetrieveCampaignVerifyStatusResponseBody> =
+        await this.makeHttpRequest(requestConfig)
+      const { data } = response
+      const { verification_status } = data
+      this.logger.debug(
+        `Successfully retrieved campaign verify status: ${JSON.stringify(data)}`,
+      )
+      return verification_status
+    } catch (e) {
+      await this.handleApiError({
+        error: e,
+        requestConfig,
+        campaign,
+        peerlyIdentityId,
       })
     }
   }

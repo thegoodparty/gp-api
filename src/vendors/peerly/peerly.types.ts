@@ -1,5 +1,5 @@
 import { AxiosRequestConfig, AxiosResponse } from 'axios'
-import { HttpException } from '@nestjs/common'
+import { HttpException, HttpExceptionOptions } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { Observable } from 'rxjs'
 export type PeerlyIdentity = {
@@ -170,8 +170,21 @@ export type PeerlyGetIdentityBrandInfoResponse = {
   tcr_vertical: string
 }
 export type PeerlyCreateCVTokenResponse = {
-  message: string
   campaign_verify_token: string
+}
+
+export enum PeerlyCvVerificationStatus {
+  REQUESTED = 'REQUESTED',
+  IN_REVIEW = 'IN_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
+// TODO: make this an enum once we have the answer to this question:
+//  https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759423143435669
+export type PeerlyRetrieveCampaignVerifyStatusResponseBody = {
+  verification_status: PeerlyCvVerificationStatus
 }
 export enum PEERLY_COMMITTEE_TYPE {
   Candidate = 'CA',
@@ -211,7 +224,10 @@ export interface PeerlyHttpRequestConfig {
   config?: AxiosRequestConfig
 }
 
-type HttpExceptionConstructor<T = {}> = new (message: string) => T
+type HttpExceptionConstructor<T = {}> = new (
+  message: string,
+  options?: HttpExceptionOptions,
+) => T
 
 export interface HandleApiErrorParams {
   error: unknown

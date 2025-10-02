@@ -4,7 +4,7 @@ import { ScheduledMessage } from '@prisma/client'
 import { EmailService } from '../email/email.service'
 import { ScheduledMessageTypes } from '../email/email.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { Interval, Timeout } from '@nestjs/schedule'
+import { Interval } from '@nestjs/schedule'
 
 const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
   .SCHEDULED_MESSAGING_INTERVAL_SECS
@@ -22,7 +22,6 @@ export class ScheduledMessagingService extends createPrismaBase(
     super()
   }
 
-  @Timeout(0) // This will run immediately when the module is loaded
   @Interval(SCHEDULED_MESSAGING_INTERVAL_SECS * 1000) // This will run based on the environment variable
   private async processScheduledMessages() {
     this.logger.debug(

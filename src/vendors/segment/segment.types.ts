@@ -9,6 +9,7 @@ export const EVENTS = {
   Outreach: {
     ComplianceCompleted: 'Voter Outreach - 10DLC Compliance Completed',
     FreeTextsOfferRedeemed: 'Voter Outreach - Free Texts Offer Redeemed',
+    CampaignVerifyTokenStatusUpdate: 'Campaign Verify Token Status Update',
   },
   AiContent: {
     GenerationStarted: 'Content Builder: Generation Started',
