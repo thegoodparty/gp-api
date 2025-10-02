@@ -220,7 +220,7 @@ export class QueueConsumerService {
           `HTTP exception occurred while fetching CV token status: ${status} - ${e.message}`,
           { peerlyIdentityId, status, response: e.getResponse() },
         )
-        if (status && status >= 404) {
+        if (status && status === 404) {
           this.logger.debug(
             `Received 404 NOT FOUND. CV token has not been requested yet for identity ID ${peerlyIdentityId}`,
           )
