@@ -28,6 +28,7 @@ import {
   PersonListItem,
   PersonOutput,
 } from '../schemas/person.schema'
+import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
 
@@ -96,6 +97,49 @@ export class ContactsService {
         JSON.stringify(error),
       )
       throw new BadGatewayException('Failed to fetch contacts from people API')
+    }
+  }
+
+  async searchContacts(
+    dto: SearchContactsDTO,
+    campaign: CampaignWithPathToVictory,
+  ) {
+    const { resultsPerPage, page, name, phone, firstName, lastName } = dto
+
+    const locationData = this.extractLocationFromCampaign(campaign)
+
+    const params = new URLSearchParams({
+      state: locationData.state,
+      districtType: locationData.districtType,
+      districtName: locationData.districtName,
+      resultsPerPage: resultsPerPage.toString(),
+      page: page.toString(),
+    })
+    if (name) params.set('name', name)
+    if (firstName) params.set('firstName', firstName)
+    if (lastName) params.set('lastName', lastName)
+    if (phone) params.set('phone', phone)
+    params.set('full', 'true')
+
+    try {
+      const token = this.getValidS2SToken()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}/v1/people/search?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      )
+      return this.transformListResponse(response.data)
+    } catch (error) {
+      this.logger.error(
+        'Failed to search contacts from people API',
+        JSON.stringify(error),
+      )
+      throw new BadGatewayException('Failed to search contacts from people API')
     }
   }
 
