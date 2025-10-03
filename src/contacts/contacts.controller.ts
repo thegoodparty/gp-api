@@ -8,6 +8,7 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from './schemas/listContacts.schema'
+import { SampleContactsDTO } from './schemas/sampleContacts.schema'
 import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
 
@@ -51,6 +52,14 @@ export class ContactsController {
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
     return this.contactsService.searchContacts(dto, campaign)
+  }
+
+  @Get('sample')
+  sampleContacts(
+    @Query() dto: SampleContactsDTO,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+  ) {
+    return this.contactsService.sampleContacts(dto, campaign)
   }
 
   @Get(':id')

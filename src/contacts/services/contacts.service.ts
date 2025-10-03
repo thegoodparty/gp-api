@@ -29,6 +29,7 @@ import {
   PersonOutput,
 } from '../schemas/person.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
+import { SampleContactsDTO } from '../schemas/sampleContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
 
@@ -143,6 +144,55 @@ export class ContactsService {
     } catch (error) {
       this.logger.error('Failed to search contacts from people API', error)
       throw new BadGatewayException('Failed to search contacts from people API')
+    }
+  }
+
+  async sampleContacts(
+    dto: SampleContactsDTO,
+    campaign: CampaignWithPathToVictory,
+  ) {
+    const { size } = dto
+
+    const locationData = this.extractLocationFromCampaign(campaign)
+
+    const params = new URLSearchParams({
+      state: locationData.state,
+      districtType: locationData.districtType,
+      districtName: locationData.districtName,
+      size: String(size ?? 500),
+      full: 'true',
+    })
+
+    try {
+      const token = this.getValidS2SToken()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}/v1/people/sample?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      )
+      const data = response.data as unknown
+      let peopleArray: PersonListItem[] = []
+      if (Array.isArray(data)) {
+        peopleArray = data as PersonListItem[]
+      } else if (
+        typeof data === 'object' &&
+        data !== null &&
+        Array.isArray((data as { people?: unknown }).people)
+      ) {
+        peopleArray = (data as { people: PersonListItem[] }).people
+      }
+      return {
+        ...(typeof data === 'object' && data !== null ? (data as object) : {}),
+        count: peopleArray.length,
+      }
+    } catch (error) {
+      this.logger.error('Failed to sample contacts from people API', error)
+      throw new BadGatewayException('Failed to sample contacts from people API')
     }
   }
 
