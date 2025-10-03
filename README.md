@@ -40,9 +40,10 @@
 $ npm install
 ```
 
-
 ### (Optional) Use Docker for postgres
+
 [Install Docker](https://docs.docker.com/get-started/get-docker/)
+
 ``` bash
 $ docker compose up -d
 
@@ -81,7 +82,10 @@ $ docker compose stop
   ALTER USER postgres CREATEDB;
   ```
 
+### Database Setup
+
 - Copy `.env.example` to `.env` and fill in the necessary environment variables.
+
 - Run the following command to create the database tables:
 
 ```bash
@@ -90,6 +94,7 @@ $ npm run migrate:reset
 
 - This also generates the Prisma Client and Typescript types.
 - This should also run seeds to populate your local DB with dummy data.
+
 
 ### Database Stop & Cleanup
 
