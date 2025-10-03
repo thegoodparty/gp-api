@@ -1,11 +1,6 @@
 import { Campaign, PathToVictory } from '@prisma/client'
 import { VoterFileFilter } from '@prisma/client'
 
-export type TevynApiDto = {
-  message: string
-  csvFileUrl?: string
-  imageUrl?: string
-}
 
 export type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null

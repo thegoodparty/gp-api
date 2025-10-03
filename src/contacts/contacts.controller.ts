@@ -20,7 +20,8 @@ import {
 } from './schemas/listContacts.schema'
 import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
-import type { TevynApiDto } from './contacts.types'
+import { z } from 'zod'
+import { TevynApiSchema } from './schemas/tevynApi.schema'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -70,10 +71,11 @@ export class ContactsController {
   }
 
   @Post('tevyn-api')
+  @UsePipes(new ZodValidationPipe(TevynApiSchema))
   sendTevynSlack(
     @ReqUser() user: User,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
-    @Body() { message, csvFileUrl, imageUrl }: TevynApiDto,
+    @Body() { message, csvFileUrl, imageUrl }: z.infer<typeof TevynApiSchema>,
   ) {
     const userInfo = {
       name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -86,8 +88,8 @@ export class ContactsController {
       message,
       userInfo,
       campaignSlug,
-      csvFileUrl,
-      imageUrl,
+      csvFileUrl || undefined,
+      imageUrl || undefined,
     )
   }
 }
