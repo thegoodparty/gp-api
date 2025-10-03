@@ -18,6 +18,7 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from './schemas/listContacts.schema'
+import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
 import type { TevynApiDto } from './contacts.types'
 
@@ -53,6 +54,14 @@ export class ContactsController {
   @Get('stats')
   getContactsStats(@ReqCampaign() campaign: CampaignWithPathToVictory) {
     return this.contactsService.getDistrictStats(campaign)
+  }
+
+  @Get('search')
+  searchContacts(
+    @Query() dto: SearchContactsDTO,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+  ) {
+    return this.contactsService.searchContacts(dto, campaign)
   }
 
   @Get(':id')
