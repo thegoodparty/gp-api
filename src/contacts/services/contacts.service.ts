@@ -185,11 +185,16 @@ export class ContactsService {
         Array.isArray((data as { people?: unknown }).people)
       ) {
         peopleArray = (data as { people: PersonListItem[] }).people
+      } else if (typeof data === 'object' && data !== null) {
+        const values = Object.values(data as Record<string, unknown>)
+        if (
+          values.length &&
+          values.every((v) => typeof v === 'object' && v !== null)
+        ) {
+          peopleArray = values as PersonListItem[]
+        }
       }
-      return {
-        ...(typeof data === 'object' && data !== null ? (data as object) : {}),
-        count: peopleArray.length,
-      }
+      return peopleArray.map((p) => this.transformPerson(p))
     } catch (error) {
       this.logger.error('Failed to sample contacts from people API', error)
       throw new BadGatewayException('Failed to sample contacts from people API')
