@@ -106,6 +106,12 @@ export class ContactsService {
   ) {
     const { resultsPerPage, page, name, phone, firstName, lastName } = dto
 
+    if (!campaign.isPro) {
+      throw new BadRequestException(
+        'Search contacts is only available for pro campaigns',
+      )
+    }
+
     const locationData = this.extractLocationFromCampaign(campaign)
 
     const params = new URLSearchParams({
@@ -135,10 +141,7 @@ export class ContactsService {
       )
       return this.transformListResponse(response.data)
     } catch (error) {
-      this.logger.error(
-        'Failed to search contacts from people API',
-        JSON.stringify(error),
-      )
+      this.logger.error('Failed to search contacts from people API', error)
       throw new BadGatewayException('Failed to search contacts from people API')
     }
   }
