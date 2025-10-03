@@ -172,6 +172,9 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
     res: FastifyReply,
   ) {
+    if (!campaign.isPro) {
+      throw new BadRequestException('Campaign is not pro')
+    }
     const segment = dto.segment as string | undefined
 
     const locationData = this.extractLocationFromCampaign(campaign)
