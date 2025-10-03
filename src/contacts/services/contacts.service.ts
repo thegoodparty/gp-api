@@ -30,6 +30,9 @@ import {
 } from '../schemas/person.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -49,6 +52,7 @@ export class ContactsService {
     private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
+    private readonly slack: SlackService,
   ) {}
 
   async findContacts(
@@ -715,5 +719,23 @@ export class ContactsService {
       return 'African American'
     if (v.includes('other')) return 'Other'
     return 'Unknown'
+  }
+
+  async sendTevynApiMessage(
+    message: string,
+    userInfo: { name?: string; email: string; phone?: string },
+    campaignSlug: string,
+    csvFileUrl?: string,
+    imageUrl?: string,
+  ) {
+    const blocks = buildTevynApiSlackBlocks({
+      message,
+      csvFileUrl,
+      imageUrl,
+      userInfo,
+      campaignSlug,
+    })
+
+    await this.slack.message({ blocks }, SlackChannel.botTevynApi)
   }
 }

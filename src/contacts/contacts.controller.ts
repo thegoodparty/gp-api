@@ -1,14 +1,25 @@
-import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
-import { Campaign, PathToVictory } from '@prisma/client'
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Res,
+  UsePipes,
+} from '@nestjs/common'
+import { Campaign, PathToVictory, User } from '@prisma/client'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from './schemas/listContacts.schema'
 import { ContactsService } from './services/contacts.service'
+import type { TevynApiDto } from './contacts.types'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -47,5 +58,27 @@ export class ContactsController {
   @Get(':id')
   getContact(@Param('id') id: string) {
     return this.contactsService.findPerson(id)
+  }
+
+  @Post('tevyn-api')
+  sendTevynSlack(
+    @ReqUser() user: User,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @Body() { message, csvFileUrl, imageUrl }: TevynApiDto,
+  ) {
+    const userInfo = {
+      name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      email: user.email,
+      phone: user.phone || undefined,
+    }
+    const campaignSlug = campaign.slug
+
+    return this.contactsService.sendTevynApiMessage(
+      message,
+      userInfo,
+      campaignSlug,
+      csvFileUrl,
+      imageUrl,
+    )
   }
 }
