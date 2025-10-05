@@ -8,7 +8,9 @@ if (process.env.NODE_ENV !== 'production') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('dotenv').config()
   } catch (error) {
-    console.log('Note: dotenv not loaded (this is expected in production)')
+    console.warn(
+      'Warning: Failed to load .env file in development environment. Ensure dotenv is installed or environment variables are set directly.',
+    )
   }
 }
 
