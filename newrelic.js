@@ -1,7 +1,5 @@
 'use strict'
 
-// Only load dotenv in non-production environments (local development)
-// In production (Docker/ECS), environment variables are passed directly to the container
 if (process.env.NODE_ENV !== 'production') {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   try {
@@ -14,7 +12,6 @@ if (process.env.NODE_ENV !== 'production') {
   }
 }
 
-// Debug: Log what we have (without exposing the actual license key)
 console.log('New Relic Configuration Check:', {
   NODE_ENV: process.env.NODE_ENV,
   HAS_APP_NAME: !!process.env.NEW_RELIC_APP_NAME,
@@ -22,7 +19,6 @@ console.log('New Relic Configuration Check:', {
   APP_NAME: process.env.NEW_RELIC_APP_NAME || 'NOT SET',
 })
 
-// Only enable New Relic if both app name and license key are provided
 if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
   console.error(
     '❌ New Relic DISABLED: Missing required environment variables',
@@ -41,13 +37,12 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
     app_name: [process.env.NEW_RELIC_APP_NAME],
     license_key: process.env.NEW_RELIC_LICENSE_KEY,
     logging: {
-      level: 'info',
-      filepath: 'stdout', // Log to stdout for CloudWatch
+      level: 'trace',
+      filepath: 'stdout',
     },
     distributed_tracing: {
       enabled: true,
     },
-    // Enable application_logging to see logs in New Relic
     application_logging: {
       enabled: true,
       forwarding: {
@@ -80,4 +75,27 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
   console.log(
     'New Relic agent initialized. Note: It may take 1-2 minutes for data to appear in New Relic after the first transaction.',
   )
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const newrelic = require('newrelic')
+
+  setTimeout(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const config = newrelic.agent.config
+      console.log('New Relic Agent Status:', {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        enabled: config.agent_enabled,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        host: config.host || 'collector.newrelic.com',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        port: config.port || 443,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        appName: config.app_name,
+      })
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    } catch (error) {
+      console.error('Error checking New Relic agent status:', error.message)
+    }
+  }, 5000)
 }
