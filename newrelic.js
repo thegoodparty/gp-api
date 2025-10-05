@@ -42,6 +42,23 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
     license_key: process.env.NEW_RELIC_LICENSE_KEY,
     logging: {
       level: 'info',
+      filepath: 'stdout', // Log to stdout for CloudWatch
+    },
+    distributed_tracing: {
+      enabled: true,
+    },
+    // Enable application_logging to see logs in New Relic
+    application_logging: {
+      enabled: true,
+      forwarding: {
+        enabled: true,
+      },
+      metrics: {
+        enabled: true,
+      },
+      local_decorating: {
+        enabled: true,
+      },
     },
     allow_all_headers: true,
     attributes: {
@@ -59,4 +76,8 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
       ],
     },
   }
+
+  console.log(
+    'New Relic agent initialized. Note: It may take 1-2 minutes for data to appear in New Relic after the first transaction.',
+  )
 }
