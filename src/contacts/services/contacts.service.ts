@@ -28,7 +28,7 @@ import {
   PersonListItem,
   PersonOutput,
 } from '../schemas/person.schema'
-import { SampleContactsDTO } from '../schemas/sampleContacts.schema'
+import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
@@ -148,18 +148,16 @@ export class ContactsService {
   }
 
   async sampleContacts(
-    dto: SampleContactsDTO,
+    dto: SampleContacts,
     campaign: CampaignWithPathToVictory,
   ) {
-    const { size } = dto
-
     const locationData = this.extractLocationFromCampaign(campaign)
 
     const params = new URLSearchParams({
       state: locationData.state,
       districtType: locationData.districtType,
       districtName: locationData.districtName,
-      size: String(size ?? 500),
+      size: String(dto.size ?? 500),
       full: 'true',
     })
 
