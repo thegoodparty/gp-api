@@ -287,7 +287,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   }
 
   async approve10DLCBrand(
-    user: User,
     { committeeName, peerlyIdentityId, campaignId }: TcrCompliance,
     campaignVerifyToken: string = '',
   ) {
