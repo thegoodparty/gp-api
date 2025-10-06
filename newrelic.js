@@ -1,21 +1,44 @@
 'use strict'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require('dotenv').config()
 
-// Only enable New Relic if both app name and license key are provided
+if (process.env.NODE_ENV !== 'production') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('dotenv').config()
+  } catch (error) {
+    console.warn(
+      'Warning: Failed to load .env file in development environment. Ensure dotenv is installed or environment variables are set directly.',
+    )
+  }
+}
+
 if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
-  console.log(
+  console.warn(
     'New Relic disabled: Missing NEW_RELIC_APP_NAME or NEW_RELIC_LICENSE_KEY',
   )
   module.exports = {}
 } else {
-  console.log(`New Relic enabled for: ${process.env.NEW_RELIC_APP_NAME}`)
-
   exports.config = {
     app_name: [process.env.NEW_RELIC_APP_NAME],
     license_key: process.env.NEW_RELIC_LICENSE_KEY,
     logging: {
-      level: 'info',
+      level: 'warn',
+      filepath: 'stdout',
+    },
+    distributed_tracing: {
+      enabled: true,
+    },
+    application_logging: {
+      enabled: true,
+      forwarding: {
+        enabled: true,
+      },
+      metrics: {
+        enabled: true,
+      },
+      local_decorating: {
+        enabled: true,
+      },
     },
     allow_all_headers: true,
     attributes: {
