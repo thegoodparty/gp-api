@@ -16,9 +16,14 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
   console.warn(
     'New Relic disabled: Missing NEW_RELIC_APP_NAME or NEW_RELIC_LICENSE_KEY',
   )
-  module.exports = {}
-} else {
+  // Export config with agent_enabled: false to disable the agent
   exports.config = {
+    agent_enabled: false,
+  }
+} else {
+  // Export full configuration when env vars are present
+  exports.config = {
+    agent_enabled: true,
     app_name: [process.env.NEW_RELIC_APP_NAME],
     license_key: process.env.NEW_RELIC_LICENSE_KEY,
     logging: {
