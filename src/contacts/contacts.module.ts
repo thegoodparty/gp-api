@@ -5,9 +5,16 @@ import { ElectionsModule } from 'src/elections/elections.module'
 import { VotersModule } from 'src/voters/voters.module'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './services/contacts.service'
+import { SlackModule } from 'src/vendors/slack/slack.module'
 
 @Module({
-  imports: [HttpModule, CampaignsModule, VotersModule, ElectionsModule],
+  imports: [
+    HttpModule,
+    CampaignsModule,
+    VotersModule,
+    ElectionsModule,
+    SlackModule,
+  ],
   controllers: [ContactsController],
   providers: [ContactsService],
   exports: [ContactsService],
