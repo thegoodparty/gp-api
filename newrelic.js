@@ -40,6 +40,12 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
         enabled: true,
       },
     },
+    error_collector: {
+      enabled: true,
+      // Ignore 401 (Unauthorized) errors since they're expected for unauthenticated requests
+      // This prevents bots/guests hitting protected endpoints from inflating error rates
+      ignore_status_codes: [401],
+    },
     allow_all_headers: true,
     attributes: {
       exclude: [
