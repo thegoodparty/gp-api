@@ -81,4 +81,6 @@ ENV NODE_ENV=production
 COPY --from=builder /app/newrelic.js ./
 
 # Start the application
-CMD ["node", "-r", "./newrelic.js", "dist/src/main"]
+# Note: -r newrelic (not -r ./newrelic.js) loads the newrelic module,
+# which then automatically loads config from newrelic.js
+CMD ["node", "-r", "newrelic", "dist/src/main"]

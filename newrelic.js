@@ -56,8 +56,4 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
       ],
     },
   }
-
-  // Initialize the New Relic agent
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('newrelic')
 }
