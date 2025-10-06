@@ -17,9 +17,12 @@ import { getUserFullName } from '../../../users/util/users.util'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
 import {
+  PeerlyIdentityProfileResponseBody,
   PeerlyIdentity,
+  PeerlyIdentityProfile,
   PeerlyIdentityUseCase,
   PeerlySubmitCVResponseBody,
+  PeerlyGetCvRequestResponseBody,
 } from '../../../vendors/peerly/peerly.types'
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
 import { Interval, Timeout } from '@nestjs/schedule'
@@ -75,6 +78,12 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
   }
 
+  // TODO: Refactor this flow to persist the Peerly Identity ID and other
+  //  relevant data in the TCR Compliance record as we go, and then use that to
+  //  determine flow progress instead of calling Peerly for everything.
+  //  Once we do so, the UI and other consumers that are determining logic flows
+  //  based on existence of TcrCompliance records will need to be updated to
+  //  reflect this change.
   async create(
     user: User,
     campaign: Campaign,
@@ -95,45 +104,103 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         'Campaign must have a domain to create TCR compliance',
       )
     }
-    let tcrComplianceIdentity: PeerlyIdentity | null = null,
+    let identities: PeerlyIdentity[] = [],
+      tcrComplianceIdentity: PeerlyIdentity | null = null,
       peerlyIdentityProfileLink: string | null = null,
       peerly10DLCBrandSubmissionKey: string | null = null,
       campaignVerifySubmissionData: PeerlySubmitCVResponseBody | null = null
 
     const tcrIdentityName = getTCRIdentityName(getUserFullName(user!), ein)
+    this.logger.debug('tcrIdentityName', tcrIdentityName)
+
+    identities = await this.peerlyIdentityService.getIdentities(campaign)
+    const existingIdentity = identities.find(
+      (identity) => identity.identity_name === tcrIdentityName,
+    )
 
     tcrComplianceIdentity =
+      existingIdentity ||
       (await this.peerlyIdentityService.createIdentity(
         tcrIdentityName,
         campaign,
-      )) || null
+      )) ||
+      null
 
-    peerlyIdentityProfileLink =
+    let exitingIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
+      null
+    try {
+      exitingIdentityProfileResponse =
+        await this.peerlyIdentityService.getIdentityProfile(
+          tcrComplianceIdentity!.identity_id,
+          campaign,
+        )
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        exitingIdentityProfileResponse = null
+      } else {
+        throw error
+      }
+    }
+
+    const peerlyIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
+      exitingIdentityProfileResponse ||
       (await this.peerlyIdentityService.submitIdentityProfile(
         tcrComplianceIdentity!.identity_id,
         campaign,
-      )) || null
+      )) ||
+      null
 
-    peerly10DLCBrandSubmissionKey =
-      (await this.peerlyIdentityService.submit10DlcBrand(
-        tcrComplianceIdentity!.identity_id,
-        tcrComplianceCreatePayload,
-        campaign,
-        domain,
-      )) || null
+    peerlyIdentityProfileLink = peerlyIdentityProfileResponse?.link || null
+
+    const identityProfile: PeerlyIdentityProfile | null =
+      peerlyIdentityProfileResponse?.profile
+        ? peerlyIdentityProfileResponse?.profile
+        : null
+
+    // Apparently,  duck-typing whether `vertical` has been set or not, is the
+    //  _only_ way to determine whether or not the given Identity has a 10DLC
+    //  "brand" submitted for it or not. See Peerly Slack discussion here:
+    //  https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759788426640679
+    if (!identityProfile?.vertical) {
+      peerly10DLCBrandSubmissionKey =
+        (await this.peerlyIdentityService.submit10DlcBrand(
+          tcrComplianceIdentity!.identity_id,
+          tcrComplianceCreatePayload,
+          campaign,
+          domain,
+        )) || null
+    }
+
+    let existingCampaignVerifyRequest: PeerlyGetCvRequestResponseBody | null =
+      null
+    try {
+      existingCampaignVerifyRequest =
+        await this.peerlyIdentityService.getCampaignVerifyRequest(
+          tcrComplianceIdentity!.identity_id,
+          campaign,
+        )
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        existingCampaignVerifyRequest = null
+      } else {
+        throw error
+      }
+    }
 
     campaignVerifySubmissionData =
-      (await this.peerlyIdentityService.submitCampaignVerifyRequest(
-        {
-          ein,
-          filingUrl,
-          peerlyIdentityId: tcrComplianceIdentity!.identity_id,
-          email,
-        },
-        user,
-        campaign,
-        domain!,
-      )) || null
+      existingCampaignVerifyRequest?.verification_status
+        ? await this.peerlyIdentityService.submitCampaignVerifyRequest(
+            {
+              ein,
+              filingUrl,
+              peerlyIdentityId: tcrComplianceIdentity!.identity_id,
+              email,
+            },
+            user,
+            campaign,
+            domain!,
+          )
+        : null
 
     const newTcrCompliance = {
       ...tcrComplianceCreatePayload,
