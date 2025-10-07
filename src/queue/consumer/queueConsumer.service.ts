@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import {
@@ -27,6 +27,9 @@ import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/serv
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
+import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
+import { isNestJsHttpException } from '../../shared/util/http.util'
+import { isAxiosError } from 'axios'
 
 @Injectable()
 export class QueueConsumerService {
@@ -193,6 +196,50 @@ export class QueueConsumerService {
     return true
   }
 
+  private async getCvTokenStatus(
+    peerlyIdentityId: string,
+  ): Promise<PeerlyCvVerificationStatus | null> {
+    let cvTokenStatus: PeerlyCvVerificationStatus | null = null
+    try {
+      cvTokenStatus =
+        (await this.tcrComplianceService.getCvTokenStatus(peerlyIdentityId)) ||
+        null
+    } catch (e) {
+      // TODO: We have to do all this error handling because of how Peerly is
+      //  throwing `BadGatewayException` instead of just throwing the
+      //  `AxiosError` that caused the problem in the first place. We should revisit
+      //  this when we have more time: https://goodparty.clickup.com/t/86ac8y227
+      if (
+        isNestJsHttpException(e) &&
+        e instanceof BadGatewayException &&
+        isAxiosError(e.cause)
+      ) {
+        const requestError = e.cause
+        const status = requestError.response?.status
+        this.logger.warn(
+          `HTTP exception occurred while fetching CV token status: ${status} - ${e.message}`,
+          { peerlyIdentityId, status, response: e.getResponse() },
+        )
+        if (status && status === 404) {
+          this.logger.debug(
+            `Received 404 NOT FOUND. CV token has not been requested yet for identity ID ${peerlyIdentityId}`,
+          )
+        } else {
+          // Something else went wrong
+          this.logger.error(
+            `HTTP exception occurred while fetching CV token status: ${status} - ${e.message}`,
+            { peerlyIdentityId, status, response: e.getResponse() },
+          )
+          throw e.cause
+        }
+      } else {
+        // Something else went wrong. Just throw the error.
+        throw e
+      }
+    }
+    return cvTokenStatus
+  }
+
   // TODO: ALL of the below functions should be moved to their respective
   //  services. This is a queue consumer class. There should be no business
   //  logic in the queue consumer class. This GREATLY complicates development.
@@ -207,12 +254,31 @@ export class QueueConsumerService {
       return true // remove message from the queue
     }
 
-    const status =
+    const { campaign } = await this.tcrComplianceService.findFirstOrThrow({
+      include: {
+        campaign: true,
+      },
+      where: { peerlyIdentityId },
+    })
+    const { userId } = campaign
+
+    const cvTokenStatus = await this.getCvTokenStatus(peerlyIdentityId)
+
+    cvTokenStatus &&
+      (await this.analytics.track(
+        userId,
+        EVENTS.Outreach.CampaignVerifyTokenStatusUpdate,
+        {
+          cvTokenStatus,
+        },
+      ))
+
+    const registrationStatus =
       await this.tcrComplianceService.checkTcrRegistrationStatus(
         peerlyIdentityId,
       )
 
-    if (!status) {
+    if (!registrationStatus) {
       this.logger.debug(
         `TCR Registration is not active at this time: ${JSON.stringify(tcrCompliance)}`,
       )
@@ -230,14 +296,6 @@ export class QueueConsumerService {
       },
     })
 
-    const { campaign } = await this.tcrComplianceService.findFirstOrThrow({
-      include: {
-        campaign: true,
-      },
-      where: { peerlyIdentityId },
-    })
-
-    const { userId } = campaign
     try {
       this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
       this.analytics.identify(userId, {

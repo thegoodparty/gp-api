@@ -23,7 +23,7 @@ import {
   PeerlyGetCvRequestResponseBody,
 } from '../../../vendors/peerly/peerly.types'
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
-import { Interval, Timeout } from '@nestjs/schedule'
+import { Interval } from '@nestjs/schedule'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
   QueueType,
@@ -46,7 +46,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     super()
   }
 
-  @Timeout(0) // This will run immediately when the module is loaded
   @Interval(TCR_COMPLIANCE_CHECK_INTERVAL * 1000) // This will run based on the environment variable
   private async bootstrapTcrComplianceCheck() {
     const pendingTcrCompliances = await this.model.findMany({
@@ -54,11 +53,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         status: TcrComplianceStatus.pending,
       },
     })
-    this.logger.debug(
-      `Queuing up pendingTcrCompliances =>`,
-      pendingTcrCompliances,
-    )
     if (pendingTcrCompliances.length) {
+      this.logger.debug(
+        `Queuing up pendingTcrCompliances =>`,
+        pendingTcrCompliances,
+      )
       await Promise.allSettled(
         pendingTcrCompliances.map((tcrCompliance) =>
           this.queueService.sendMessage({
@@ -66,6 +65,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
             data: { tcrCompliance } as TcrComplianceStatusCheckMessage,
           }),
         ),
+      )
+    } else {
+      this.logger.debug(
+        'No pending TCR Compliances need checking at this time.',
       )
     }
   }
@@ -261,6 +264,19 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     const useCase = useCases.find(({ usecase }) => usecase === PEERLY_USECASE)
     return Boolean(useCase?.activated)
+  }
+
+  async getCvTokenStatus(peerlyIdentityId: string) {
+    const { campaign } = await this.model.findFirstOrThrow({
+      where: { peerlyIdentityId },
+      include: {
+        campaign: true,
+      },
+    })
+    return await this.peerlyIdentityService.retrieveCampaignVerifyStatus(
+      peerlyIdentityId,
+      campaign,
+    )
   }
 
   async retrieveCampaignVerifyToken(
