@@ -276,7 +276,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       `Fetching identity profile for identityId: ${peerlyIdentityId}`,
     )
     const requestConfig = {
-      url: `${this.baseUrl}/api/identities/${peerlyIdentityId}/getProfile`,
+      url: `${this.baseUrl}/identities/${peerlyIdentityId}/getProfile`,
       method: this.httpService.get,
       config: (await this.getAxiosRequestConfig()) as AxiosRequestConfig,
     }
