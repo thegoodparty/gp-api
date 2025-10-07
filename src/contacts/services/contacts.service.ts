@@ -28,6 +28,7 @@ import {
   PersonListItem,
   PersonOutput,
 } from '../schemas/person.schema'
+import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
@@ -157,6 +158,40 @@ export class ContactsService {
     } catch (error) {
       this.logger.error('Failed to search contacts from people API', error)
       throw new BadGatewayException('Failed to search contacts from people API')
+    }
+  }
+
+  async sampleContacts(
+    dto: SampleContacts,
+    campaign: CampaignWithPathToVictory,
+  ) {
+    const locationData = this.extractLocationFromCampaign(campaign)
+
+    const params = new URLSearchParams({
+      state: locationData.state,
+      districtType: locationData.districtType,
+      districtName: locationData.districtName,
+      size: String(dto.size ?? 500),
+      full: 'true',
+    })
+
+    try {
+      const token = this.getValidS2SToken()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}/v1/people/sample?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      )
+      const people = this.normalizePeopleResponse(response.data)
+      return people.map((p) => this.transformPerson(p))
+    } catch (error) {
+      this.logger.error('Failed to sample contacts from people API', error)
+      throw new BadGatewayException('Failed to sample contacts from people API')
     }
   }
 
@@ -696,6 +731,22 @@ export class ContactsService {
       pagination: data.pagination,
       people: data.people.map((p: PersonListItem) => this.transformPerson(p)),
     }
+  }
+
+  private normalizePeopleResponse(
+    data:
+      | PeopleListResponse
+      | PersonListItem[]
+      | { people: PersonListItem[] }
+      | Record<string, PersonListItem>,
+  ): PersonListItem[] {
+    if (Array.isArray(data)) return data
+    if (typeof data === 'object' && data !== null) {
+      if ('people' in data) return (data as { people: PersonListItem[] }).people
+      const values = Object.values(data as Record<string, PersonListItem>)
+      return values
+    }
+    return []
   }
 
   private transformPerson(p: PersonInput): PersonOutput {
