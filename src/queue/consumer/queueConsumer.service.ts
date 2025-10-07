@@ -24,7 +24,6 @@ import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { QueueProducerService } from '../producer/queueProducer.service'
 import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
@@ -42,7 +41,6 @@ export class QueueConsumerService {
     private readonly campaignsService: CampaignsService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly domainsService: DomainsService,
-    private readonly queueProducerService: QueueProducerService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)

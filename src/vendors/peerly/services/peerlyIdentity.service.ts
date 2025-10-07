@@ -18,16 +18,19 @@ import {
   BuildPeerlyErrorSlackMessageBlocksParams,
   CampaignVerificationStatus,
   HandleApiErrorParams,
+  Peerly10DlcBrandData,
   Peerly10DLCBrandSubmitResponseBody,
   PEERLY_COMMITTEE_TYPE,
   PEERLY_CV_VERIFICATION_TYPE,
   PeerlyCreateCVTokenResponse,
+  PeerlyGetCvRequestResponseBody,
+  PeerlyGetIdentitiesResponseBody,
+  PeerlyIdentityProfileResponseBody,
   PeerlyHttpRequestConfig,
   PeerlyIdentity,
   PeerlyIdentityCreateResponseBody,
   PeerlyIdentityUseCaseResponseBody,
   PeerlySubmitCVResponseBody,
-  PeerlySubmitIdentityProfileResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
 import { GooglePlacesService } from '../../google/services/google-places.service'
@@ -59,6 +62,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     private readonly campaignsService: CampaignsService,
   ) {
     super()
+  }
+
+  getTCRIdentityName(userFullName: string, campaignEIN: string) {
+    return this.isTestEnvironment
+      ? `TEST-${userFullName} - ${campaignEIN}`
+      : `${userFullName} - ${campaignEIN}`
   }
 
   private async handleApiError({
@@ -138,9 +147,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       method: this.httpService.post,
       data: {
         account_id: this.accountNumber,
-        identity_name: this.isTestEnvironment
-          ? `TEST-${identityName}`
-          : identityName,
+        identity_name: identityName,
         usecases: [PEERLY_USECASE],
       },
       config: await this.getAxiosRequestConfig(),
@@ -161,6 +168,38 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         campaign,
       })
     }
+  }
+
+  async getIdentities(campaign?: Campaign): Promise<PeerlyIdentity[]> {
+    this.logger.debug('Fetching list of identities from Peerly')
+    const requestConfig = {
+      url: `${this.baseUrl}/identities/listByAccount`,
+      method: this.httpService.get,
+      config: {
+        ...(await this.getAxiosRequestConfig()),
+        params: {
+          account_id: this.accountNumber,
+        },
+      } as AxiosRequestConfig,
+    }
+    let result: PeerlyIdentity[] = []
+    try {
+      const response: AxiosResponse<PeerlyGetIdentitiesResponseBody> =
+        await this.makeHttpRequest(requestConfig)
+      const { data } = response
+      const { identities } = data
+      this.logger.debug(
+        `Successfully fetched ${identities.length} identities: ${JSON.stringify(identities.map((identity) => identity.identity_name))}`,
+      )
+      result = identities
+    } catch (error) {
+      await this.handleApiError({
+        error,
+        requestConfig,
+        campaign: campaign!,
+      })
+    }
+    return result
   }
 
   async getIdentityUseCases(peerlyIdentityId: string, campaign: Campaign) {
@@ -196,7 +235,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
   }
 
-  async submitIdentityProfile(peerlyIdentityId: string, campaign: Campaign) {
+  async submitIdentityProfile(
+    peerlyIdentityId: string,
+    campaign: Campaign,
+  ): Promise<PeerlyIdentityProfileResponseBody | null> {
     const requestConfig = {
       url: `${this.baseUrl}/identities/${peerlyIdentityId}/submitProfile`,
       method: this.httpService.post,
@@ -206,15 +248,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       },
       config: await this.getAxiosRequestConfig(),
     }
+    let result: PeerlyIdentityProfileResponseBody | null = null
     try {
-      const response: AxiosResponse<PeerlySubmitIdentityProfileResponseBody> =
+      const response: AxiosResponse<PeerlyIdentityProfileResponseBody> =
         await this.makeHttpRequest(requestConfig)
       const { data } = response
-      const { link } = data
       this.logger.debug(
         `Successfully submitted identity profile: ${JSON.stringify(data)}`,
       )
-      return link
+      result = data
     } catch (error) {
       await this.handleApiError({
         error,
@@ -223,6 +265,48 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         peerlyIdentityId,
       })
     }
+    return result
+  }
+
+  async getIdentityProfile(
+    peerlyIdentityId: string,
+    campaign: Campaign,
+  ): Promise<PeerlyIdentityProfileResponseBody | null> {
+    this.logger.debug(
+      `Fetching identity profile for identityId: ${peerlyIdentityId}`,
+    )
+    const requestConfig = {
+      url: `${this.baseUrl}/identities/${peerlyIdentityId}/getProfile`,
+      method: this.httpService.get,
+      config: (await this.getAxiosRequestConfig()) as AxiosRequestConfig,
+    }
+    let result: PeerlyIdentityProfileResponseBody | null = null
+    try {
+      const response: AxiosResponse<PeerlyIdentityProfileResponseBody> =
+        await this.makeHttpRequest(requestConfig)
+      const { data } = response
+      this.logger.debug(
+        `Successfully fetched identity profile for identityId: ${peerlyIdentityId}: ${JSON.stringify(data)}`,
+      )
+      result = data || null
+    } catch (e) {
+      if (isAxiosError(e) && e.status === 404) {
+        this.logger.warn(
+          `Peerly API returned 404 Not Found when fetching identity profile. This is likely due to an invalid identity ID: ${peerlyIdentityId}`,
+          format(e),
+        )
+        throw new NotFoundException(
+          'Identity profile for given identity ID could not be found',
+        )
+      }
+      await this.handleApiError({
+        error: e,
+        requestConfig,
+        campaign,
+        peerlyIdentityId,
+      })
+    }
+    return result
   }
 
   async submit10DlcBrand(
@@ -245,7 +329,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const campaignCommitteeName = (
       this.isTestEnvironment ? `TEST-${campaignCommittee}` : campaignCommittee
     ).substring(0, 255) // Limit to 255 characters per Peerly API docs
-    const submitBrandData = {
+
+    const submitBrandData: Peerly10DlcBrandData = {
       entityType: PEERLY_ENTITY_TYPE,
       vertical: PEERLY_USECASE,
       is_political: true,
@@ -260,7 +345,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
     }
-    this.logger.debug(`Submitting 10DLC brand with data: ${submitBrandData}`)
+
+    this.logger.debug(
+      `Submitting 10DLC brand with data: ${JSON.stringify(submitBrandData)}`,
+    )
     const requestConfig = {
       url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit`,
       method: this.httpService.post,
@@ -331,6 +419,47 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
   }
 
+  async getCampaignVerifyRequest(
+    peerlyIdentityId: string,
+    campaign: Campaign,
+  ): Promise<PeerlyGetCvRequestResponseBody | null> {
+    this.logger.debug(
+      `Fetching Campaign Verify status for identityId: ${peerlyIdentityId}`,
+    )
+    const requestConfig = {
+      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/retrieve_cv`,
+      method: this.httpService.get,
+      config: (await this.getAxiosRequestConfig()) as AxiosRequestConfig,
+    }
+    let result: PeerlyGetCvRequestResponseBody | null = null
+    try {
+      const response: AxiosResponse<PeerlyGetCvRequestResponseBody> =
+        await this.makeHttpRequest(requestConfig)
+      const { data } = response
+      this.logger.debug(
+        `Successfully fetched Campaign Verify status for identityId: ${peerlyIdentityId}: ${JSON.stringify(data)}`,
+      )
+      result = data
+    } catch (e) {
+      if (isAxiosError(e) && e.status === 404) {
+        this.logger.warn(
+          `Peerly API returned 404 Not Found when fetching Campaign Verify status. This is likely due to an invalid identity ID or no CV submission: ${peerlyIdentityId}`,
+          format(e),
+        )
+        throw new NotFoundException(
+          'Campaign Verify status for given identity ID could not be found',
+        )
+      }
+      await this.handleApiError({
+        error: e,
+        requestConfig,
+        campaign,
+        peerlyIdentityId,
+      })
+    }
+    return result
+  }
+
   async submitCampaignVerifyRequest(
     {
       email,
@@ -341,7 +470,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     user: User,
     campaign: Campaign,
     domain: Domain,
-  ): Promise<PeerlySubmitCVResponseBody | undefined> {
+  ): Promise<PeerlySubmitCVResponseBody | null> {
     const { details: campaignDetails, placeId } = campaign
     const { electionDate, ballotLevel } = campaignDetails
     const {
@@ -397,6 +526,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       data: submitCVData,
       config: await this.getAxiosRequestConfig(),
     }
+    let result: PeerlySubmitCVResponseBody | null = null
     try {
       this.logger.debug(
         `Submitting CV request with data: ${JSON.stringify(submitCVData)}`,
@@ -405,7 +535,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         await this.makeHttpRequest(requestConfig)
       const { data } = response
       this.logger.debug(`Successfully submitted CV request: ${data}`)
-      return data
+      result = data
     } catch (error) {
       await this.handleApiError({
         error,
@@ -414,6 +544,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         peerlyIdentityId: peerlyIdentityId!,
       })
     }
+    return result
   }
 
   async verifyCampaignVerifyPin(

@@ -8,16 +8,81 @@ export type PeerlyIdentity = {
   start_date: string
   account_id: string
   tcr_identity_status: string | null
+  vetting_expire_date?: string
+  usecases?: string[]
 }
 export type PeerlyIdentityCreateResponseBody = {
   Data: PeerlyIdentity
 }
-export type PeerlySubmitIdentityProfileResponseBody = {
+
+export interface PeerlyCampaignConfig {
+  autoRenewal: number
+  description: string
+  embeddedLink: number
+  embeddedPhone: number
+  sample1: string
+  subscriberOptin: number
+  subscriberOptout: number
+  usecase: string
+  vertical: string
+}
+
+export interface PeerlyIdentityProfile {
+  account_id: string
+  base_account_id: string
+  campaignVerifyToken: string | null
+  campaigns: Record<string, PeerlyCampaignConfig>
+  city: string
+  companyName: string
+  country: string | null
+  displayName: string
+  ein: string
+  email: string
+  entityType: string
+  is_political: boolean
+  legal_entity_type: string
+  phone: string
+  postalCode: string
+  state: string
+  status: string
+  street: string
+  usecase: string
+  vertical?: string
+  usecases: string[]
+  website: string
+  will_send_over_2k: boolean
+}
+
+export interface PeerlyIdentityProfileResponseBody {
   link: string
+  profile?: PeerlyIdentityProfile
+}
+
+export type PeerlyGetIdentitiesResponseBody = {
+  identities: PeerlyIdentity[]
+}
+
+export interface PeerlyGetCvRequestResponseBody {
+  verification_status: string
 }
 export interface PeerlySubmitCVResponseBody {
   message: string
   verification_id: string
+}
+export interface Peerly10DlcBrandData {
+  entityType: string
+  vertical: string
+  is_political: boolean
+  displayName: string
+  companyName: string
+  ein: string
+  phone: string
+  street?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  website: string
+  email: string
 }
 export type Peerly10DLCBrandSubmitResponseBody = {
   submission_key: string
