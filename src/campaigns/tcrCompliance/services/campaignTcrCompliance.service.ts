@@ -130,27 +130,27 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )) ||
       null
 
-    let exitingIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
+    let existingIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
       null
     try {
-      exitingIdentityProfileResponse =
+      existingIdentityProfileResponse =
         await this.peerlyIdentityService.getIdentityProfile(
           tcrComplianceIdentity!.identity_id,
           campaign,
         )
     } catch (error) {
       if (error instanceof NotFoundException) {
-        exitingIdentityProfileResponse = null
+        existingIdentityProfileResponse = null
       } else {
         throw error
       }
     }
 
-    exitingIdentityProfileResponse &&
+    existingIdentityProfileResponse &&
       this.logger.debug(`Existing Identity Profile found, skipping creation`)
 
     const peerlyIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
-      exitingIdentityProfileResponse ||
+      existingIdentityProfileResponse ||
       (await this.peerlyIdentityService.submitIdentityProfile(
         tcrComplianceIdentity!.identity_id,
         campaign,
