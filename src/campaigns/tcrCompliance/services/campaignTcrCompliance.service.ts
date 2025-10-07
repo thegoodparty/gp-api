@@ -286,7 +286,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     campaignVerifyToken: string,
   ) {
     return this.peerlyIdentityService.approve10DLCBrand(
-      user,
       tcrCompliance,
       campaignVerifyToken,
     )
