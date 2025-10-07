@@ -28,9 +28,13 @@ import {
   PersonListItem,
   PersonOutput,
 } from '../schemas/person.schema'
+import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -50,6 +54,7 @@ export class ContactsService {
     private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
+    private readonly slack: SlackService,
   ) {}
 
   async findContacts(
@@ -143,6 +148,40 @@ export class ContactsService {
     } catch (error) {
       this.logger.error('Failed to search contacts from people API', error)
       throw new BadGatewayException('Failed to search contacts from people API')
+    }
+  }
+
+  async sampleContacts(
+    dto: SampleContacts,
+    campaign: CampaignWithPathToVictory,
+  ) {
+    const locationData = this.extractLocationFromCampaign(campaign)
+
+    const params = new URLSearchParams({
+      state: locationData.state,
+      districtType: locationData.districtType,
+      districtName: locationData.districtName,
+      size: String(dto.size ?? 500),
+      full: 'true',
+    })
+
+    try {
+      const token = this.getValidS2SToken()
+      const response = await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}/v1/people/sample?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      )
+      const people = this.normalizePeopleResponse(response.data)
+      return people.map((p) => this.transformPerson(p))
+    } catch (error) {
+      this.logger.error('Failed to sample contacts from people API', error)
+      throw new BadGatewayException('Failed to sample contacts from people API')
     }
   }
 
@@ -605,6 +644,22 @@ export class ContactsService {
     }
   }
 
+  private normalizePeopleResponse(
+    data:
+      | PeopleListResponse
+      | PersonListItem[]
+      | { people: PersonListItem[] }
+      | Record<string, PersonListItem>,
+  ): PersonListItem[] {
+    if (Array.isArray(data)) return data
+    if (typeof data === 'object' && data !== null) {
+      if ('people' in data) return (data as { people: PersonListItem[] }).people
+      const values = Object.values(data as Record<string, PersonListItem>)
+      return values
+    }
+    return []
+  }
+
   private transformPerson(p: PersonInput): PersonOutput {
     const firstName = p.FirstName || ''
     const lastName = p.LastName || ''
@@ -765,5 +820,23 @@ export class ContactsService {
       return 'African American'
     if (v.includes('other')) return 'Other'
     return 'Unknown'
+  }
+
+  async sendTevynApiMessage(
+    message: string,
+    userInfo: { name?: string; email: string; phone?: string },
+    campaignSlug: string,
+    csvFileUrl?: string,
+    imageUrl?: string,
+  ) {
+    const blocks = buildTevynApiSlackBlocks({
+      message,
+      csvFileUrl,
+      imageUrl,
+      userInfo,
+      campaignSlug,
+    })
+
+    await this.slack.message({ blocks }, SlackChannel.botTevynApi)
   }
 }
