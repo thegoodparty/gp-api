@@ -12,6 +12,9 @@ import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {
   CampaignWithPathToVictory,
@@ -32,8 +35,6 @@ import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
@@ -294,6 +295,7 @@ export class ContactsService {
       params.set('electionYear', String(electionYear))
 
     try {
+      // keep error-level logging only; avoid leaking token payloads
       const token = usingStatewideFallback
         ? this.generateScopedS2SToken(state)
         : this.getValidS2SToken()
@@ -381,7 +383,7 @@ export class ContactsService {
     if (!state || state.length !== 2) {
       throw new BadRequestException('Invalid state code in campaign data')
     }
-    return state
+    return state.toUpperCase()
   }
 
   private resolveLocationForRequest(campaign: CampaignWithPathToVictory): {
@@ -399,10 +401,26 @@ export class ContactsService {
     const electionLocation = ptv?.electionLocation
 
     if (electionType && electionLocation) {
+      const cleanedName = this.elections.cleanDistrictName(electionLocation)
+      const isStatewide = this.isStatewideSelection(
+        state,
+        electionType,
+        cleanedName,
+      )
+
+      if (isStatewide) {
+        if (!this.canUseStatewideFallback(campaign)) {
+          throw new BadRequestException(
+            'Statewide or federal contacts require admin approval',
+          )
+        }
+        return { state, usingStatewideFallback: true }
+      }
+
       return {
         state,
         districtType: electionType,
-        districtName: this.elections.cleanDistrictName(electionLocation),
+        districtName: cleanedName,
         usingStatewideFallback: false,
       }
     }
@@ -414,6 +432,21 @@ export class ContactsService {
     throw new BadRequestException(
       'Campaign path to victory data is missing required election information',
     )
+  }
+
+  private isStatewideSelection(
+    stateCode: string,
+    electionType: string,
+    districtName: string,
+  ): boolean {
+    const type = electionType.toLowerCase()
+    const stateLong =
+      SHORT_TO_LONG_STATE[stateCode as keyof typeof SHORT_TO_LONG_STATE]
+    const matchesCode = districtName.toUpperCase() === stateCode.toUpperCase()
+    const matchesLong =
+      typeof stateLong === 'string' &&
+      districtName.toLowerCase() === stateLong.toLowerCase()
+    return type === 'state' ? matchesCode || matchesLong : false
   }
 
   private generateScopedS2SToken(state: string): string {
