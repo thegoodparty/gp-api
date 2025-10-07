@@ -62,15 +62,18 @@ export class ContactsService {
   ) {
     const { resultsPerPage, page, segment } = dto
 
-    const locationData = this.extractLocationFromCampaign(campaign)
+    const { state, districtType, districtName, usingStatewideFallback } =
+      this.resolveLocationForRequest(campaign)
 
     const params = new URLSearchParams({
-      state: locationData.state,
-      districtType: locationData.districtType,
-      districtName: locationData.districtName,
+      state,
       resultsPerPage: resultsPerPage.toString(),
       page: page.toString(),
     })
+    if (districtType && districtName) {
+      params.set('districtType', districtType)
+      params.set('districtName', districtName)
+    }
 
     // Build demographic filter from full segment when custom segment id is used
     const demographicFilter = await this.buildDemographicFilterFromSegmentId(
@@ -83,7 +86,9 @@ export class ContactsService {
     params.set('full', 'true')
 
     try {
-      const token = this.getValidS2SToken()
+      const token = usingStatewideFallback
+        ? this.generateScopedS2SToken(state)
+        : this.getValidS2SToken()
       const response = await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}/v1/people?${params.toString()}`,
@@ -116,15 +121,18 @@ export class ContactsService {
       )
     }
 
-    const locationData = this.extractLocationFromCampaign(campaign)
+    const { state, districtType, districtName, usingStatewideFallback } =
+      this.resolveLocationForRequest(campaign)
 
     const params = new URLSearchParams({
-      state: locationData.state,
-      districtType: locationData.districtType,
-      districtName: locationData.districtName,
+      state,
       resultsPerPage: resultsPerPage.toString(),
       page: page.toString(),
     })
+    if (districtType && districtName) {
+      params.set('districtType', districtType)
+      params.set('districtName', districtName)
+    }
     if (name) params.set('name', name)
     if (firstName) params.set('firstName', firstName)
     if (lastName) params.set('lastName', lastName)
@@ -132,7 +140,9 @@ export class ContactsService {
     params.set('full', 'true')
 
     try {
-      const token = this.getValidS2SToken()
+      const token = usingStatewideFallback
+        ? this.generateScopedS2SToken(state)
+        : this.getValidS2SToken()
       const response = await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}/v1/people/search?${params.toString()}`,
@@ -184,13 +194,14 @@ export class ContactsService {
     }
     const segment = dto.segment as string | undefined
 
-    const locationData = this.extractLocationFromCampaign(campaign)
+    const { state, districtType, districtName, usingStatewideFallback } =
+      this.resolveLocationForRequest(campaign)
 
-    const params = new URLSearchParams({
-      state: locationData.state,
-      districtType: locationData.districtType,
-      districtName: locationData.districtName,
-    })
+    const params = new URLSearchParams({ state })
+    if (districtType && districtName) {
+      params.set('districtType', districtType)
+      params.set('districtName', districtName)
+    }
 
     // Build demographic filter from full segment when custom segment id is used
     const demographicFilter = await this.buildDemographicFilterFromSegmentId(
@@ -203,7 +214,9 @@ export class ContactsService {
     params.set('full', 'true')
 
     try {
-      const token = this.getValidS2SToken()
+      const token = usingStatewideFallback
+        ? this.generateScopedS2SToken(state)
+        : this.getValidS2SToken()
       const response = await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}/v1/people/download?${params.toString()}`,
@@ -230,13 +243,14 @@ export class ContactsService {
   }
 
   async getDistrictStats(campaign: CampaignWithPathToVictory) {
-    const locationData = this.extractLocationFromCampaign(campaign)
+    const { state, districtType, districtName, usingStatewideFallback } =
+      this.resolveLocationForRequest(campaign)
 
-    const params = new URLSearchParams({
-      state: locationData.state,
-      districtType: locationData.districtType,
-      districtName: locationData.districtName,
-    })
+    const params = new URLSearchParams({ state })
+    if (districtType && districtName) {
+      params.set('districtType', districtType)
+      params.set('districtName', districtName)
+    }
     const details = campaign.details as { electionDate?: string } | undefined
     const electionYear = details?.electionDate
       ? Number(String(details.electionDate).slice(0, 4))
@@ -245,7 +259,9 @@ export class ContactsService {
       params.set('electionYear', String(electionYear))
 
     try {
-      const token = this.getValidS2SToken()
+      const token = usingStatewideFallback
+        ? this.generateScopedS2SToken(state)
+        : this.getValidS2SToken()
       const response = await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}/v1/people/stats?${params.toString()}`,
@@ -304,6 +320,79 @@ export class ContactsService {
     this.cachedToken = jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
 
     return this.cachedToken
+  }
+
+  private canUseStatewideFallback(
+    campaign: CampaignWithPathToVictory,
+  ): boolean {
+    const ballotLevel = (campaign.details as { ballotLevel?: string } | null)
+      ?.ballotLevel
+    const canDownloadFederal = (
+      campaign as {
+        canDownloadFederal?: boolean
+      }
+    ).canDownloadFederal
+    return (
+      (ballotLevel === 'FEDERAL' || ballotLevel === 'STATE') &&
+      Boolean(canDownloadFederal)
+    )
+  }
+
+  private getCampaignState(campaign: CampaignWithPathToVictory): string {
+    if (!campaign.details) {
+      throw new BadRequestException('Campaign details are missing')
+    }
+    const { state } = campaign.details as { state?: string }
+    if (!state || state.length !== 2) {
+      throw new BadRequestException('Invalid state code in campaign data')
+    }
+    return state
+  }
+
+  private resolveLocationForRequest(campaign: CampaignWithPathToVictory): {
+    state: string
+    districtType?: string
+    districtName?: string
+    usingStatewideFallback: boolean
+  } {
+    const state = this.getCampaignState(campaign)
+
+    const ptv = campaign.pathToVictory?.data as
+      | { electionType?: string; electionLocation?: string }
+      | undefined
+    const electionType = ptv?.electionType
+    const electionLocation = ptv?.electionLocation
+
+    if (electionType && electionLocation) {
+      return {
+        state,
+        districtType: electionType,
+        districtName: this.elections.cleanDistrictName(electionLocation),
+        usingStatewideFallback: false,
+      }
+    }
+
+    if (this.canUseStatewideFallback(campaign)) {
+      return { state, usingStatewideFallback: true }
+    }
+
+    throw new BadRequestException(
+      'Campaign path to victory data is missing required election information',
+    )
+  }
+
+  private generateScopedS2SToken(state: string): string {
+    const now = Math.floor(Date.now() / 1000)
+    const payload = {
+      iss: 'gp-api',
+      aud: 'people-api',
+      sub: 'contacts',
+      iat: now,
+      exp: now + 300,
+      allowStatewide: true,
+      state,
+    }
+    return jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
   }
 
   private extractLocationFromCampaign(campaign: CampaignWithPathToVictory): {
