@@ -64,6 +64,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     super()
   }
 
+  getTCRIdentityName(userFullName: string, campaignEIN: string) {
+    return this.isTestEnvironment
+      ? `TEST-${userFullName} - ${campaignEIN}`
+      : `${userFullName} - ${campaignEIN}`
+  }
+
   private async handleApiError({
     error,
     requestConfig,
@@ -141,9 +147,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       method: this.httpService.post,
       data: {
         account_id: this.accountNumber,
-        identity_name: this.isTestEnvironment
-          ? `TEST-${identityName}`
-          : identityName,
+        identity_name: identityName,
         usecases: [PEERLY_USECASE],
       },
       config: await this.getAxiosRequestConfig(),
@@ -169,7 +173,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async getIdentities(campaign?: Campaign): Promise<PeerlyIdentity[]> {
     this.logger.debug('Fetching list of identities from Peerly')
     const requestConfig = {
-      url: `${this.baseUrl}/api/identities/listByAccount`,
+      url: `${this.baseUrl}/identities/listByAccount`,
       method: this.httpService.get,
       config: {
         ...(await this.getAxiosRequestConfig()),
@@ -185,7 +189,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { data } = response
       const { identities } = data
       this.logger.debug(
-        `Successfully fetched ${identities.length} identities: ${JSON.stringify(identities)}`,
+        `Successfully fetched ${identities.length} identities: ${JSON.stringify(identities.map((identity) => identity.identity_name))}`,
       )
       result = identities
     } catch (error) {
@@ -342,7 +346,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
     }
 
-    this.logger.debug(`Submitting 10DLC brand with data: ${submitBrandData}`)
+    this.logger.debug(
+      `Submitting 10DLC brand with data: ${JSON.stringify(submitBrandData)}`,
+    )
     const requestConfig = {
       url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit`,
       method: this.httpService.post,

@@ -12,7 +12,6 @@ import {
   TcrComplianceStatus,
   User,
 } from '@prisma/client'
-import { getTCRIdentityName } from '../util/trcCompliance.util'
 import { getUserFullName } from '../../../users/util/users.util'
 import { WebsitesService } from '../../../websites/services/websites.service'
 import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
@@ -21,7 +20,6 @@ import {
   PeerlyIdentity,
   PeerlyIdentityProfile,
   PeerlyIdentityUseCase,
-  PeerlySubmitCVResponseBody,
   PeerlyGetCvRequestResponseBody,
 } from '../../../vendors/peerly/peerly.types'
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
@@ -107,16 +105,22 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     let identities: PeerlyIdentity[] = [],
       tcrComplianceIdentity: PeerlyIdentity | null = null,
       peerlyIdentityProfileLink: string | null = null,
-      peerly10DLCBrandSubmissionKey: string | null = null,
-      campaignVerifySubmissionData: PeerlySubmitCVResponseBody | null = null
+      peerly10DLCBrandSubmissionKey: string | null = null
 
-    const tcrIdentityName = getTCRIdentityName(getUserFullName(user!), ein)
-    this.logger.debug('tcrIdentityName', tcrIdentityName)
+    const tcrIdentityName = this.peerlyIdentityService.getTCRIdentityName(
+      getUserFullName(user!),
+      ein,
+    )
+    this.logger.debug(`tcrIdentityName => ${tcrIdentityName}`)
 
     identities = await this.peerlyIdentityService.getIdentities(campaign)
     const existingIdentity = identities.find(
       (identity) => identity.identity_name === tcrIdentityName,
     )
+
+    existingIdentity &&
+      this.logger.debug(`Existing Identity found, skipping creation`)
+    this.logger.debug(`existingIdentity => ${JSON.stringify(existingIdentity)}`)
 
     tcrComplianceIdentity =
       existingIdentity ||
@@ -142,6 +146,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       }
     }
 
+    exitingIdentityProfileResponse &&
+      this.logger.debug(`Existing Identity Profile found, skipping creation`)
+
     const peerlyIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
       exitingIdentityProfileResponse ||
       (await this.peerlyIdentityService.submitIdentityProfile(
@@ -161,6 +168,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     //  _only_ way to determine whether or not the given Identity has a 10DLC
     //  "brand" submitted for it or not. See Peerly Slack discussion here:
     //  https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759788426640679
+    identityProfile?.vertical &&
+      this.logger.debug(
+        `Existing 10DLC Brand derived from IdentityProfile, skipping creation`,
+      )
     if (!identityProfile?.vertical) {
       peerly10DLCBrandSubmissionKey =
         (await this.peerlyIdentityService.submit10DlcBrand(
@@ -187,20 +198,23 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       }
     }
 
-    campaignVerifySubmissionData =
-      existingCampaignVerifyRequest?.verification_status
-        ? await this.peerlyIdentityService.submitCampaignVerifyRequest(
-            {
-              ein,
-              filingUrl,
-              peerlyIdentityId: tcrComplianceIdentity!.identity_id,
-              email,
-            },
-            user,
-            campaign,
-            domain!,
-          )
-        : null
+    existingCampaignVerifyRequest?.verification_status &&
+      this.logger.debug(
+        `Existing Campaign Verify Request found w/ status ${existingCampaignVerifyRequest?.verification_status}, skipping creation`,
+      )
+
+    !existingCampaignVerifyRequest?.verification_status &&
+      (await this.peerlyIdentityService.submitCampaignVerifyRequest(
+        {
+          ein,
+          filingUrl,
+          peerlyIdentityId: tcrComplianceIdentity!.identity_id,
+          email,
+        },
+        user,
+        campaign,
+        domain!,
+      ))
 
     const newTcrCompliance = {
       ...tcrComplianceCreatePayload,
@@ -209,7 +223,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       peerlyIdentityId: tcrComplianceIdentity!.identity_id,
       peerlyIdentityProfileLink,
       peerly10DLCBrandSubmissionKey,
-      peerlyCvVerificationId: campaignVerifySubmissionData?.verification_id,
     }
 
     this.logger.debug('Creating TCR Compliance:', newTcrCompliance)
