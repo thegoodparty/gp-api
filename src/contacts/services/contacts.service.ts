@@ -11,6 +11,7 @@ import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
+import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -362,15 +363,17 @@ export class ContactsService {
   private canUseStatewideFallback(
     campaign: CampaignWithPathToVictory,
   ): boolean {
-    const ballotLevel = (campaign.details as { ballotLevel?: string } | null)
-      ?.ballotLevel
+    const ballotLevel = (
+      campaign.details as { ballotLevel?: BallotReadyPositionLevel } | null
+    )?.ballotLevel
     const canDownloadFederal = (
       campaign as {
         canDownloadFederal?: boolean
       }
     ).canDownloadFederal
     return (
-      (ballotLevel === 'FEDERAL' || ballotLevel === 'STATE') &&
+      (ballotLevel === BallotReadyPositionLevel.FEDERAL ||
+        ballotLevel === BallotReadyPositionLevel.STATE) &&
       Boolean(canDownloadFederal)
     )
   }
