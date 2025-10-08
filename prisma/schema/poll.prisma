@@ -1,12 +1,12 @@
 enum PollStatus {
-  PENDING
+  SCHEDULED
   IN_PROGRESS
   COMPLETED
 }
 
 model Poll {
   id                Int                @id @default(autoincrement())
-  status            PollStatus         @default(PENDING) @map("status")
+  status            PollStatus         @default(SCHEDULED) @map("status")
 
   messageContent    String             @map("message_content")
   imageUrl          String?            @map("image_url")

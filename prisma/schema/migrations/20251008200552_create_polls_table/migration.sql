@@ -1,10 +1,10 @@
 -- CreateEnum
-CREATE TYPE "PollStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED');
+CREATE TYPE "PollStatus" AS ENUM ('SCHEDULED', 'IN_PROGRESS', 'COMPLETED');
 
 -- CreateTable
 CREATE TABLE "Poll" (
     "id" SERIAL NOT NULL,
-    "status" "PollStatus" NOT NULL DEFAULT 'PENDING',
+    "status" "PollStatus" NOT NULL DEFAULT 'SCHEDULED',
     "message_content" TEXT NOT NULL,
     "image_url" TEXT,
     "scheduled_date" TIMESTAMP(3) NOT NULL,
