@@ -1,12 +1,10 @@
-import { Controller, Get, Put, Logger, UsePipes } from '@nestjs/common'
+import { Controller, Get, Put, Logger, UsePipes, Param } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 @Controller('polls')
 @UsePipes(ZodValidationPipe)
 export class PollsController {
-  logger = new Logger(this.constructor.name)
-
-  constructor() {}
+  private readonly logger = new Logger(this.constructor.name)
 
   @Get('/')
   async listPolls() {
@@ -14,22 +12,22 @@ export class PollsController {
   }
 
   @Get('/:pollId')
-  async getPoll() {
+  async getPoll(@Param('pollId') pollId: string) {
     return {}
   }
 
   @Get('/:pollId/top-issues')
-  async getTopIssues() {
+  async getTopIssues(@Param('pollId') pollId: string) {
     return {}
   }
 
   @Put('/:pollId/internal/result')
-  async submitPollResultData() {
+  async submitPollResultData(@Param('pollId') pollId: string) {
     return {}
   }
 
   @Put('/:pollId/internal/complete')
-  async markPollComplete() {
+  async markPollComplete(@Param('pollId') pollId: string) {
     return {}
   }
 }
