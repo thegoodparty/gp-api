@@ -1,9 +1,11 @@
 import { Controller, Get, Put, Logger, UsePipes, Param } from '@nestjs/common'
+import { PollsService } from './services/polls.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 
 @Controller('polls')
 @UsePipes(ZodValidationPipe)
 export class PollsController {
+  constructor(private readonly pollsService: PollsService) {}
   private readonly logger = new Logger(this.constructor.name)
 
   @Get('/')
