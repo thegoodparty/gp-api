@@ -171,7 +171,6 @@ export default $config({
       throw new Error('DATABASE_URL, VPC_CIDR keys must be set in the secret.')
     }
 
-
     const sqsQueueName = `${$app.stage}-Queue.fifo`
     const sqsDlqName = `${$app.stage}-DLQ.fifo`
 
@@ -231,6 +230,19 @@ export default $config({
       })
     }
 
+    const pollInsightsDynamoTable = new aws.dynamodb.Table(
+      `${$app.stage}-poll-insights`,
+      {
+        billingMode: 'PAY_PER_REQUEST',
+        hashKey: 'poll_id',
+        rangeKey: 'record_id',
+        attributes: [
+          { name: 'poll_id', type: 'S' },
+          { name: 'record_id', type: 'S' },
+        ],
+      },
+    )
+
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
@@ -282,6 +294,7 @@ export default $config({
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
+        POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
         ...secretsJson,
       },
       image: {
@@ -302,6 +315,12 @@ export default $config({
           idleTimeout: 120,
         },
       },
+      permissions: [
+        {
+          actions: ['dynamodb:PutItem', 'dynamodb:Query'],
+          resources: [pollInsightsDynamoTable.arn],
+        },
+      ],
     })
 
     // Create a Security Group for the RDS Cluster
@@ -393,7 +412,10 @@ export default $config({
           minCapacity: 0.5,
         },
       }
-      const voterCluster = new aws.rds.Cluster('voterCluster', voterDbProdConfig)
+      const voterCluster = new aws.rds.Cluster(
+        'voterCluster',
+        voterDbProdConfig,
+      )
 
       new aws.rds.ClusterInstance('voterInstance', {
         clusterIdentifier: voterCluster.id,
@@ -415,7 +437,6 @@ export default $config({
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterClusterLatest.engineVersion,
       })
-
     } else if ($app.stage === 'qa') {
       rdsCluster = new aws.rds.Cluster('rdsCluster', {
         clusterIdentifier: 'gp-api-db-qa',
