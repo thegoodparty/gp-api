@@ -240,6 +240,7 @@ export default $config({
           { name: 'poll_id', type: 'S' },
           { name: 'record_id', type: 'S' },
         ],
+        deletionProtectionEnabled: $app.stage === 'master',
       },
     )
 
