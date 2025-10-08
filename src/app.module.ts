@@ -32,7 +32,7 @@ import { WebsitesModule } from './websites/websites.module'
 import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
 import { PeerlyModule } from './vendors/peerly/peerly.module'
 import { ContactsModule } from './contacts/contacts.module'
-import { PollsModule } from './polls/pollsModule'
+import { PollsModule } from './polls/polls.module'
 
 @Module({
   imports: [
