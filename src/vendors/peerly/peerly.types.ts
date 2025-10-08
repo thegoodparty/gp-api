@@ -1,5 +1,5 @@
 import { AxiosRequestConfig, AxiosResponse } from 'axios'
-import { HttpException } from '@nestjs/common'
+import { HttpException, HttpExceptionOptions } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { Observable } from 'rxjs'
 export type PeerlyIdentity = {
@@ -8,16 +8,81 @@ export type PeerlyIdentity = {
   start_date: string
   account_id: string
   tcr_identity_status: string | null
+  vetting_expire_date?: string
+  usecases?: string[]
 }
 export type PeerlyIdentityCreateResponseBody = {
   Data: PeerlyIdentity
 }
-export type PeerlySubmitIdentityProfileResponseBody = {
+
+export interface PeerlyCampaignConfig {
+  autoRenewal: number
+  description: string
+  embeddedLink: number
+  embeddedPhone: number
+  sample1: string
+  subscriberOptin: number
+  subscriberOptout: number
+  usecase: string
+  vertical: string
+}
+
+export interface PeerlyIdentityProfile {
+  account_id: string
+  base_account_id: string
+  campaignVerifyToken: string | null
+  campaigns: Record<string, PeerlyCampaignConfig>
+  city: string
+  companyName: string
+  country: string | null
+  displayName: string
+  ein: string
+  email: string
+  entityType: string
+  is_political: boolean
+  legal_entity_type: string
+  phone: string
+  postalCode: string
+  state: string
+  status: string
+  street: string
+  usecase: string
+  vertical?: string
+  usecases: string[]
+  website: string
+  will_send_over_2k: boolean
+}
+
+export interface PeerlyIdentityProfileResponseBody {
   link: string
+  profile?: PeerlyIdentityProfile
+}
+
+export type PeerlyGetIdentitiesResponseBody = {
+  identities: PeerlyIdentity[]
+}
+
+export interface PeerlyGetCvRequestResponseBody {
+  verification_status: string
 }
 export interface PeerlySubmitCVResponseBody {
   message: string
   verification_id: string
+}
+export interface Peerly10DlcBrandData {
+  entityType: string
+  vertical: string
+  is_political: boolean
+  displayName: string
+  companyName: string
+  ein: string
+  phone: string
+  street?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  website: string
+  email: string
 }
 export type Peerly10DLCBrandSubmitResponseBody = {
   submission_key: string
@@ -170,8 +235,21 @@ export type PeerlyGetIdentityBrandInfoResponse = {
   tcr_vertical: string
 }
 export type PeerlyCreateCVTokenResponse = {
-  message: string
   campaign_verify_token: string
+}
+
+export enum PeerlyCvVerificationStatus {
+  REQUESTED = 'REQUESTED',
+  IN_REVIEW = 'IN_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
+// TODO: make this an enum once we have the answer to this question:
+//  https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759423143435669
+export type PeerlyRetrieveCampaignVerifyStatusResponseBody = {
+  verification_status: PeerlyCvVerificationStatus
 }
 export enum PEERLY_COMMITTEE_TYPE {
   Candidate = 'CA',
@@ -211,7 +289,10 @@ export interface PeerlyHttpRequestConfig {
   config?: AxiosRequestConfig
 }
 
-type HttpExceptionConstructor<T = {}> = new (message: string) => T
+type HttpExceptionConstructor<T = {}> = new (
+  message: string,
+  options?: HttpExceptionOptions,
+) => T
 
 export interface HandleApiErrorParams {
   error: unknown

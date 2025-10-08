@@ -50,10 +50,11 @@ export class AnalyticsService {
     )
 
     try {
-      await this.segment.trackEvent(userId, eventName, eventData)
+      const result = await this.segment.trackEvent(userId, eventName, eventData)
       this.logger.debug(
-        `[ANALYTICS] Successfully tracked event: ${eventName} for user: ${userId}`,
+        `[ANALYTICS] Successfully tracked event "${eventName}" for user ${userId}: ${JSON.stringify(result)}`,
       )
+      return result
     } catch (e) {
       this.logger.error(
         `[ANALYTICS] Failed to track event: ${eventName} for user: ${userId}`,

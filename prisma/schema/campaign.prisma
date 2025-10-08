@@ -43,7 +43,7 @@ model Campaign {
   website               Website?
   outreach              Outreach[]
   communityIssue        CommunityIssue[]
-
+  polls                 Poll[]
   @@index([slug])
   @@map("campaign")
 }
