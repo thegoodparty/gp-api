@@ -1,6 +1,4 @@
-import { Campaign, PathToVictory } from '@prisma/client'
-import { VoterFileFilter } from '@prisma/client'
-
+import { Campaign, PathToVictory, VoterFileFilter } from '@prisma/client'
 
 export type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
