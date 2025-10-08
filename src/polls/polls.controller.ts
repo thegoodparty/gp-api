@@ -1,5 +1,6 @@
 import { Controller, Get, Put, Logger, UsePipes, Param } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { queryTopIssues } from './dynamo-helpers'
 
 @Controller('polls')
 @UsePipes(ZodValidationPipe)
@@ -18,7 +19,10 @@ export class PollsController {
 
   @Get('/:pollId/top-issues')
   async getTopIssues(@Param('pollId') pollId: string) {
-    return {}
+    const issues = await queryTopIssues(this.logger, pollId)
+    return {
+      results: issues,
+    }
   }
 
   @Put('/:pollId/internal/result')
