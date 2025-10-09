@@ -2,7 +2,7 @@ name: Deploy and Test
 
 on:
   push:
-    branches: ['develop', 'qa', 'master']
+    branches: ["develop", "qa", "master"]
 
 jobs:
   deploy:
@@ -10,6 +10,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - run: npm install
+      - run: npm run generate
+      - run: npx tsc --noEmit
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
