@@ -14,6 +14,8 @@
     "start:prod": "node -r ./newrelic.js dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint-format": "npm run lint && npm run format",
+    "test": "npx vitest run",
+    "test:watch": "npx vitest",
     "migrate:dev": "npx prisma migrate dev",
     "migrate:deploy": "npx prisma migrate deploy",
     "migrate:reset": "npx prisma migrate reset --force",
@@ -115,6 +117,7 @@
     "pg-copy-streams": "^6.0.6",
     "prisma": "^6.3.0",
     "reflect-metadata": "^0.2.0",
+    "rollup-plugin-swc": "^0.2.1",
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.14.0",
     "serialize-error": "^12.0.0",
@@ -124,6 +127,8 @@
     "tsx": "^4.20.6",
     "turndown": "^7.2.1",
     "validator": "^13.12.0",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.0.15",
     "zipcodes": "^8.0.0",
     "zod": "^3.23.8"
   },
@@ -136,11 +141,11 @@
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.9",
     "@playwright/test": "^1.56.1",
+    "@testcontainers/postgresql": "^11.7.1",
     "@types/async": "^3.2.24",
     "@types/async-retry": "^1.4.9",
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.0",
-    "@types/jest": "^29.5.2",
     "@types/lodash": "^4.17.13",
     "@types/node": "^20.3.1",
     "@types/node-fetch": "^2.6.12",
@@ -154,48 +159,21 @@
     "@types/zipcodes": "^8.0.5",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/ui": "^4.0.15",
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
     "eslint-plugin-unused-imports": "^4.1.4",
-    "jest": "^29.5.0",
     "prettier": "^3.0.0",
     "prisma-case-format": "^2.2.1",
     "prisma-json-types-generator": "^3.2.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
-    "ts-jest": "^29.1.0",
+    "testcontainers": "^11.7.1",
     "ts-loader": "^9.4.3",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.6.3",
     "zod-prisma-types": "^3.2.4"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": ["ts-jest", {
-        "diagnostics": {
-          "ignoreCodes": [151002]
-        }
-      }]
-    },
-    "transformIgnorePatterns": [
-      "node_modules/(?!(p-throttle|es-toolkit|serialize-error)/)"
-    ],
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node",
-    "moduleNameMapper": {
-      "^src/(.*)$": "<rootDir>/$1",
-      "^@/(.*)$": "<rootDir>/$1"
-    }
   }
 }
