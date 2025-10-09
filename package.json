@@ -27,7 +27,7 @@
     "postinstall": "echo 'Note: This project requires --legacy-peer-deps flag due to peer dependency conflicts'"
   },
   "prisma": {
-    "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts",
+    "seed": "tsx ./seed/seed.ts",
     "schema": "prisma/schema"
   },
   "engines": {
@@ -103,6 +103,7 @@
     "slugify": "^1.6.6",
     "states-us": "^1.1.1",
     "stripe": "^17.5.0",
+    "tsx": "^4.20.6",
     "validator": "^13.12.0",
     "zipcodes": "^8.0.0",
     "zod": "^3.23.8"
@@ -143,7 +144,6 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.3",
-    "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.3",
     "zod-prisma-types": "^3.2.4"
