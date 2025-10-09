@@ -3,7 +3,7 @@ import { DynamoDBDocument, QueryCommandInput } from '@aws-sdk/lib-dynamodb'
 import { Logger } from '@nestjs/common'
 import { v4 as uuidv4 } from 'uuid'
 import z from 'zod'
-import { PollIssue } from './polls-types'
+import { PollIssue } from './polls.types'
 import { uniq } from 'lodash'
 
 const dynamo = DynamoDBDocument.from(new DynamoDBClient({}))
