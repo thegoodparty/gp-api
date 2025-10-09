@@ -1,17 +1,14 @@
 // -- API Resources -- //
-export type Poll = {
-  id: string
-  questionContent: string
+export type APIPoll = {
+  id: number
+  name: string
+  status: 'in_progress' | 'completed'
+  messageContent: string
   imageUrl?: string
-  startDate: string
-  estimatedCompletionDate: string
-  lowConfidence: boolean
+  scheduledDate: string
+  completedDate: string
   audienceSize: number
-  // "in-progress" means "this poll is actively running"
-  // "completed" means "it's done, there are results!
-  // In the future, we'll support "scheduled" as well, but not
-  // necessary for the current scope.
-  status: 'in-progress' | 'completed'
+  lowConfidence: boolean
 }
 
 export type PollIssue = {

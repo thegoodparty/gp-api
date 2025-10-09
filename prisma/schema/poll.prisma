@@ -5,19 +5,23 @@ enum PollStatus {
 }
 
 model Poll {
-  id                Int                @id @default(autoincrement())
-  name              String             @map("name")
-  status            PollStatus         @default(SCHEDULED) @map("status")
+  id                 Int                @id @default(autoincrement())
+  name               String
+  status             PollStatus         @default(SCHEDULED)
 
-  messageContent    String             @map("message_content")
-  imageUrl          String?            @map("image_url")
+  messageContent     String             @map("message_content")
+  imageUrl           String?            @map("image_url")
 
-  scheduledDate     DateTime           @map("scheduled_date")
-  completedDate     DateTime?          @map("completed_date")
+  targetAudienceSize Int
 
-  campaign          Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId        Int                @map("campaign_id")
+  confidence         Float?
 
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
+  scheduledDate      DateTime           @map("scheduled_date")
+  completedDate      DateTime           @map("completed_date")
+
+  campaign           Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId         Int                @map("campaign_id")
+
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
 }
