@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import Analytics from '@segment/analytics-node'
+import Analytics, { TrackParams } from '@segment/analytics-node'
 import { pickKeys } from 'src/shared/util/objects.util'
 import { SEGMENT_KEYS } from './segment.schema'
 import {
@@ -26,17 +26,19 @@ export class SegmentService {
     userId: number,
     event: string,
     properties: SegmentTrackEventProperties = {},
-  ): Promise<void> {
+  ): Promise<TrackParams> {
     try {
       const stringId = String(userId)
-      this.analytics.track({
+      const eventConfig: TrackParams = {
         event,
         userId: stringId,
         properties,
-      })
+      }
+      this.analytics.track(eventConfig)
       this.logger.debug(
         `[SEGMENT] Event queued for tracking - Event: ${event}, User: ${userId}`,
       )
+      return eventConfig
     } catch (err) {
       this.logger.error(
         `[SEGMENT] Failed to track event: ${event} for user: ${userId}`,
