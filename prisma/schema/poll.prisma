@@ -12,7 +12,7 @@ enum PollConfidence {
 model Poll {
   id                      String          @id @default(cuid())
   name                    String
-  status                  PollStatus      @default(SCHEDULED)
+  status                  PollStatus
   messageContent          String          @map("message_content")
   imageUrl                String?         @map("image_url")
   targetAudienceSize      Int

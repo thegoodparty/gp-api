@@ -22,6 +22,8 @@ import { SampleContactsDTO } from './schemas/sampleContacts.schema'
 import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
 import type { TevynApiDto } from './schemas/tevynApi.schema'
+import { PollsService } from 'src/polls/services/polls.service'
+import dayjs from 'dayjs'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -31,7 +33,10 @@ type CampaignWithPathToVictory = Campaign & {
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(
+    private readonly contactsService: ContactsService,
+    private readonly pollsService: PollsService,
+  ) {}
 
   @Get()
   listContacts(
@@ -79,7 +84,7 @@ export class ContactsController {
   }
 
   @Post('tevyn-api')
-  sendTevynSlack(
+  async sendTevynSlack(
     @ReqUser() user: User,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @Body() { message, csvFileUrl, imageUrl }: TevynApiDto,
@@ -90,6 +95,23 @@ export class ContactsController {
       phone: user.phone || undefined,
     }
     const campaignSlug = campaign.slug
+
+    const now = new Date()
+
+    await this.pollsService.create({
+      data: {
+        name: 'Top Community Issues',
+        status: 'IN_PROGRESS',
+        messageContent: message,
+        targetAudienceSize: 500,
+        scheduledDate: new Date(),
+        estimatedCompletionDate: dayjs(now).add(1, 'week').toDate(),
+        imageUrl: imageUrl,
+        campaignId: campaign.id,
+      },
+    })
+
+    // TODO: include poll id in subsequent message
 
     return this.contactsService.sendTevynApiMessage(
       message,
