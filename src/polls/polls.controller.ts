@@ -74,7 +74,7 @@ export class PollsController {
       orderBy: { id: 'asc' },
       take: query.limit + 1,
     })
-    const nextCursor = polls.at(query.limit)?.createdAt
+    const nextCursor = polls.at(query.limit)?.id
     const results = polls.slice(0, query.limit).map(toAPIPoll)
     return { results, pagination: { nextCursor } }
   }
