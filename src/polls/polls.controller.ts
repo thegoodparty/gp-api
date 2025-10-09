@@ -19,8 +19,28 @@ import {
   queryTopIssues,
   uploadPollResultData,
 } from './dynamo-helpers'
+import z from 'zod'
+import { Poll } from '@prisma/client'
+import { APIPoll } from './polls-types'
 
 class SubmitPollResultDataDTO extends createZodDto(PollResponseInsight) {}
+
+class MarkPollCompleteDTO extends createZodDto(
+  z.object({
+    confidence: z.number().min(0).max(1),
+  }),
+) {}
+
+const toAPIPoll = (poll: Poll): APIPoll => ({
+  id: poll.id,
+  name: poll.name,
+  status: poll.status === 'COMPLETED' ? 'completed' : 'in_progress',
+  messageContent: poll.messageContent,
+  imageUrl: poll.imageUrl ?? undefined,
+  scheduledDate: poll.scheduledDate.toISOString(),
+  completedDate: poll.completedDate.toISOString(),
+  targetAudienceSize: poll.targetAudienceSize,
+})
 
 @Controller('polls')
 @UseCampaign()
@@ -40,7 +60,7 @@ export class PollsController {
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
     const poll = await this.ensurePollAccess(pollId, campaign)
-    return poll
+    return toAPIPoll(poll)
   }
 
   @Get('/:pollId/top-issues')
@@ -69,8 +89,18 @@ export class PollsController {
   }
 
   @Put('/:pollId/internal/complete')
-  async markPollComplete(@Param('pollId') pollId: string) {
-    return {}
+  async markPollComplete(
+    @Param('pollId') pollId: string,
+    @Body() data: MarkPollCompleteDTO,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+  ) {
+    await this.ensurePollAccess(pollId, campaign)
+
+    const poll = await this.pollsService.update({
+      where: { id: Number(pollId) },
+      data: { status: 'COMPLETED', confidence: data.confidence },
+    })
+    return toAPIPoll(poll)
   }
 
   private async ensurePollAccess(
