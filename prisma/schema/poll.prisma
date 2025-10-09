@@ -6,6 +6,7 @@ enum PollStatus {
 
 model Poll {
   id                Int                @id @default(autoincrement())
+  name              String             @map("name")
   status            PollStatus         @default(SCHEDULED) @map("status")
 
   messageContent    String             @map("message_content")
