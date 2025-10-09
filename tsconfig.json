@@ -1,4 +1,5 @@
 {
+  "exclude": ["node_modules", "deploy"],
   "compilerOptions": {
     "module": "NodeNext",
     "declaration": true,
@@ -20,6 +21,6 @@
     "noFallthroughCasesInSwitch": false,
     "lib": ["esnext"],
     "resolveJsonModule": true,
-    "esModuleInterop": true,
+    "esModuleInterop": true
   }
 }
