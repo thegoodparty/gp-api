@@ -1,14 +1,16 @@
 // -- API Resources -- //
 export type APIPoll = {
-  id: number
+  id: string
   name: string
   status: 'in_progress' | 'completed'
   messageContent: string
   imageUrl?: string
   scheduledDate: string
-  completedDate: string
+  estimatedCompletionDate: string
+  completedDate?: string
   audienceSize: number
-  lowConfidence: boolean
+  // Will only be set if the poll is completed.
+  lowConfidence?: boolean
 }
 
 export type PollIssue = {

@@ -8,6 +8,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Body,
+  BadRequestException,
 } from '@nestjs/common'
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
@@ -21,13 +22,13 @@ import {
 } from './dynamo-helpers'
 import z from 'zod'
 import { Poll } from '@prisma/client'
-import { APIPoll } from './polls-types'
+import { APIPoll } from './polls.types'
 
 class SubmitPollResultDataDTO extends createZodDto(PollResponseInsight) {}
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
-    confidence: z.number().min(0).max(1),
+    confidence: z.enum(['low', 'high']),
   }),
 ) {}
 
@@ -38,8 +39,10 @@ const toAPIPoll = (poll: Poll): APIPoll => ({
   messageContent: poll.messageContent,
   imageUrl: poll.imageUrl ?? undefined,
   scheduledDate: poll.scheduledDate.toISOString(),
-  completedDate: poll.completedDate.toISOString(),
-  targetAudienceSize: poll.targetAudienceSize,
+  estimatedCompletionDate: poll.estimatedCompletionDate.toISOString(),
+  completedDate: poll.completedDate?.toISOString(),
+  audienceSize: poll.targetAudienceSize,
+  lowConfidence: poll.confidence === 'LOW',
 })
 
 @Controller('polls')
@@ -83,7 +86,12 @@ export class PollsController {
     @Body() data: SubmitPollResultDataDTO,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
-    await this.ensurePollAccess(pollId, campaign)
+    const poll = await this.ensurePollAccess(pollId, campaign)
+
+    if (poll.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('Poll is not currently in-progress')
+    }
+
     await uploadPollResultData(data)
     return {}
   }
@@ -94,11 +102,19 @@ export class PollsController {
     @Body() data: MarkPollCompleteDTO,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
-    await this.ensurePollAccess(pollId, campaign)
+    const existing = await this.ensurePollAccess(pollId, campaign)
+
+    if (existing.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('Poll is not currently in-progress')
+    }
 
     const poll = await this.pollsService.update({
-      where: { id: Number(pollId) },
-      data: { status: 'COMPLETED', confidence: data.confidence },
+      where: { id: existing.id },
+      data: {
+        status: 'COMPLETED',
+        confidence: data.confidence === 'low' ? 'LOW' : 'HIGH',
+        completedDate: new Date(),
+      },
     })
     return toAPIPoll(poll)
   }
@@ -108,7 +124,7 @@ export class PollsController {
     campaign: CampaignWithPathToVictory,
   ) {
     const poll = await this.pollsService.findUnique({
-      where: { id: Number(pollId) },
+      where: { id: pollId },
     })
 
     if (!poll) {
