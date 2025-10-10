@@ -27,5 +27,5 @@ model Poll {
   createdAt               DateTime        @default(now()) @map("created_at")
   updatedAt               DateTime        @updatedAt @map("updated_at")
 
-  @@index([campaignId])
+  @@index([campaignId, id])
 }
