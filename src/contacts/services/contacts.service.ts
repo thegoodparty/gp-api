@@ -951,11 +951,13 @@ export class ContactsService {
     message: string,
     userInfo: { name?: string; email: string; phone?: string },
     campaignSlug: string,
+    pollId?: string,
     csvFileUrl?: string,
     imageUrl?: string,
   ) {
     const blocks = buildTevynApiSlackBlocks({
       message,
+      pollId,
       csvFileUrl,
       imageUrl,
       userInfo,
