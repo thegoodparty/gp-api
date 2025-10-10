@@ -4,19 +4,28 @@ enum PollStatus {
   COMPLETED
 }
 
+enum PollConfidence {
+  LOW
+  HIGH
+}
+
 model Poll {
-  id                Int                @id @default(autoincrement())
-  status            PollStatus         @default(SCHEDULED) @map("status")
+  // Using UUID7 here gives us time-based ordering of IDs. This is important for
+  // the cursor-based pagination model supported by the Polls API.
+  id                      String          @id @default(uuid(7))
+  name                    String
+  status                  PollStatus
+  messageContent          String          @map("message_content")
+  imageUrl                String?         @map("image_url")
+  targetAudienceSize      Int
+  confidence              PollConfidence?
+  scheduledDate           DateTime        @map("scheduled_date")
+  estimatedCompletionDate DateTime
+  completedDate           DateTime?       @map("completed_date")
+  campaign                Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId              Int             @map("campaign_id")
+  createdAt               DateTime        @default(now()) @map("created_at")
+  updatedAt               DateTime        @updatedAt @map("updated_at")
 
-  messageContent    String             @map("message_content")
-  imageUrl          String?            @map("image_url")
-
-  scheduledDate     DateTime           @map("scheduled_date")
-  completedDate     DateTime?          @map("completed_date")
-
-  campaign          Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId        Int                @map("campaign_id")
-
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
+  @@index([campaignId, id])
 }
