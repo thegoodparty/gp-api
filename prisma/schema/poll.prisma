@@ -10,7 +10,9 @@ enum PollConfidence {
 }
 
 model Poll {
-  id                      String          @id @default(cuid())
+  // Using UUID7 here gives us time-based ordering of IDs. This is important for
+  // the cursor-based pagination model supported by the Polls API.
+  id                      String          @id @default(uuid(7))
   name                    String
   status                  PollStatus      @default(SCHEDULED)
   messageContent          String          @map("message_content")
@@ -24,4 +26,6 @@ model Poll {
   campaignId              Int             @map("campaign_id")
   createdAt               DateTime        @default(now()) @map("created_at")
   updatedAt               DateTime        @updatedAt @map("updated_at")
+
+  @@index([campaignId, id])
 }

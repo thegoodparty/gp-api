@@ -9,6 +9,7 @@ import {
   ForbiddenException,
   Body,
   BadRequestException,
+  Query,
 } from '@nestjs/common'
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
@@ -23,12 +24,20 @@ import {
 import z from 'zod'
 import { Poll } from '@prisma/client'
 import { APIPoll } from './polls.types'
+import { orderBy } from 'lodash'
 
 class SubmitPollResultDataDTO extends createZodDto(PollResponseInsight) {}
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
     confidence: z.enum(['low', 'high']),
+  }),
+) {}
+
+class ListPollsQueryDTO extends createZodDto(
+  z.object({
+    cursor: z.string().optional(),
+    limit: z.coerce.number().min(1).max(100).default(20),
   }),
 ) {}
 
@@ -53,8 +62,21 @@ export class PollsController {
   private readonly logger = new Logger(this.constructor.name)
 
   @Get('/')
-  async listPolls() {
-    return {}
+  async listPolls(
+    @Query() query: ListPollsQueryDTO,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+  ) {
+    const polls = await this.pollsService.findMany({
+      cursor: query.cursor ? { id: query.cursor } : undefined,
+      where: { campaignId: campaign.id },
+      // Ordering is essential! Don't forget that without this, Postgres will
+      // return results in a non-deterministic order.
+      orderBy: { id: 'asc' },
+      take: query.limit + 1,
+    })
+    const nextCursor = polls.at(query.limit)?.id
+    const results = polls.slice(0, query.limit).map(toAPIPoll)
+    return { results, pagination: { nextCursor } }
   }
 
   @Get('/:pollId')
@@ -75,9 +97,9 @@ export class PollsController {
 
     const issues = await queryTopIssues(this.logger, pollId)
 
-    return {
-      results: issues,
-    }
+    const byMentionCount = orderBy(issues, (i) => i.mentionCount, 'desc')
+
+    return { results: byMentionCount }
   }
 
   @Put('/:pollId/internal/result')
