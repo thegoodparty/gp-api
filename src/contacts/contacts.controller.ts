@@ -22,8 +22,6 @@ import { SampleContactsDTO } from './schemas/sampleContacts.schema'
 import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
 import type { TevynApiDto } from './schemas/tevynApi.schema'
-import { PollsService } from 'src/polls/services/polls.service'
-import dayjs from 'dayjs'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -33,10 +31,7 @@ type CampaignWithPathToVictory = Campaign & {
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
-  constructor(
-    private readonly contactsService: ContactsService,
-    private readonly pollsService: PollsService,
-  ) {}
+  constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
   listContacts(
@@ -84,7 +79,7 @@ export class ContactsController {
   }
 
   @Post('tevyn-api')
-  async sendTevynSlack(
+  sendTevynSlack(
     @ReqUser() user: User,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @Body() { message, csvFileUrl, imageUrl, createPoll }: TevynApiDto,
@@ -94,31 +89,12 @@ export class ContactsController {
       email: user.email,
       phone: user.phone || undefined,
     }
-    const campaignSlug = campaign.slug
-
-    let pollId: string | undefined = undefined
-    if (createPoll) {
-      const now = new Date()
-      const poll = await this.pollsService.create({
-        data: {
-          name: 'Top Community Issues',
-          status: 'IN_PROGRESS',
-          messageContent: message,
-          targetAudienceSize: 500,
-          scheduledDate: now,
-          estimatedCompletionDate: dayjs(now).add(1, 'week').toDate(),
-          imageUrl: imageUrl,
-          campaignId: campaign.id,
-        },
-      })
-      pollId = poll.id
-    }
 
     return this.contactsService.sendTevynApiMessage(
       message,
       userInfo,
-      campaignSlug,
-      pollId,
+      campaign,
+      createPoll,
       csvFileUrl || undefined,
       imageUrl || undefined,
     )
