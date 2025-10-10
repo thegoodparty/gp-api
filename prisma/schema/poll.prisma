@@ -14,7 +14,7 @@ model Poll {
   // the cursor-based pagination model supported by the Polls API.
   id                      String          @id @default(uuid(7))
   name                    String
-  status                  PollStatus      @default(SCHEDULED)
+  status                  PollStatus
   messageContent          String          @map("message_content")
   imageUrl                String?         @map("image_url")
   targetAudienceSize      Int
