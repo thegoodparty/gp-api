@@ -1,18 +1,13 @@
-import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common'
 import { VoterFileFilter } from '@prisma/client'
-import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
-import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
-import { ElectionsService } from 'src/elections/services/elections.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
@@ -26,12 +21,6 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
-import {
-  PeopleListResponse,
-  PersonInput,
-  PersonListItem,
-  PersonOutput,
-} from '../schemas/person.schema'
 import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
@@ -39,6 +28,13 @@ import { transformStatsResponse } from '../stats.transformer'
 import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
 import { PollsService } from 'src/polls/services/polls.service'
 import dayjs from 'dayjs'
+import { cleanL2DistrictName } from 'src/elections/util/clean-district.util'
+import { PeopleService } from 'src/people/services/people.service'
+import {
+  PeopleListResponse,
+  PersonListItem,
+  PersonOutput,
+} from 'src/people/schemas/person.schema'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -52,12 +48,10 @@ if (!PEOPLE_API_S2S_SECRET) {
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
-  private cachedToken: string | null = null
 
   constructor(
-    private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
-    private readonly elections: ElectionsService,
+    private readonly peopleService: PeopleService,
     private readonly slack: SlackService,
     private readonly pollsService: PollsService,
   ) {}
@@ -92,18 +86,15 @@ export class ContactsService {
     params.set('full', 'true')
 
     try {
-      const token = usingStatewideFallback
-        ? this.generateScopedS2SToken(state)
-        : this.getValidS2SToken()
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+      const response = await this.peopleService.client.get(
+        `/v1/people?${params.toString()}`,
+        {
+          headers: {
+            Authorization: usingStatewideFallback
+              ? `Bearer ${this.generateScopedS2SToken(state)}`
+              : undefined,
           },
-        ),
+        },
       )
       return this.transformListResponse(response.data)
     } catch (error) {
@@ -119,51 +110,7 @@ export class ContactsService {
     dto: SearchContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    const { resultsPerPage, page, name, phone, firstName, lastName } = dto
-
-    if (!campaign.isPro) {
-      throw new BadRequestException(
-        'Search contacts is only available for pro campaigns',
-      )
-    }
-
-    const { state, districtType, districtName, usingStatewideFallback } =
-      this.resolveLocationForRequest(campaign)
-
-    const params = new URLSearchParams({
-      state,
-      resultsPerPage: resultsPerPage.toString(),
-      page: page.toString(),
-    })
-    if (districtType && districtName) {
-      params.set('districtType', districtType)
-      params.set('districtName', districtName)
-    }
-    if (name) params.set('name', name)
-    if (firstName) params.set('firstName', firstName)
-    if (lastName) params.set('lastName', lastName)
-    if (phone) params.set('phone', phone)
-    params.set('full', 'true')
-
-    try {
-      const token = usingStatewideFallback
-        ? this.generateScopedS2SToken(state)
-        : this.getValidS2SToken()
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/search?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        ),
-      )
-      return this.transformListResponse(response.data)
-    } catch (error) {
-      this.logger.error('Failed to search contacts from people API', error)
-      throw new BadGatewayException('Failed to search contacts from people API')
-    }
+    return this.peopleService.searchPeople(dto, campaign)
   }
 
   async sampleContacts(
@@ -181,19 +128,11 @@ export class ContactsService {
     })
 
     try {
-      const token = this.getValidS2SToken()
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/sample?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        ),
+      const response = await this.peopleService.client.get(
+        `/v1/people/sample?${params.toString()}`,
       )
       const people = this.normalizePeopleResponse(response.data)
-      return people.map((p) => this.transformPerson(p))
+      return people.map((p) => this.peopleService.transformPerson(p))
     } catch (error) {
       this.logger.error('Failed to sample contacts from people API', error)
       throw new BadGatewayException('Failed to sample contacts from people API')
@@ -201,27 +140,7 @@ export class ContactsService {
   }
 
   async findPerson(id: string): Promise<PersonOutput> {
-    try {
-      const response = await lastValueFrom(
-        this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
-          headers: {
-            Authorization: `Bearer ${this.getValidS2SToken()}`,
-          },
-        }),
-      )
-      return this.transformPerson(response.data)
-    } catch (error) {
-      this.logger.error(
-        'Failed to fetch person from people API',
-        JSON.stringify(error),
-      )
-
-      if (isAxiosError(error) && error.response?.status === 404) {
-        throw new NotFoundException('Person not found')
-      }
-
-      throw new BadGatewayException('Failed to fetch person from people API')
-    }
+    return this.peopleService.findPerson(id)
   }
 
   async downloadContacts(
@@ -254,19 +173,16 @@ export class ContactsService {
     params.set('full', 'true')
 
     try {
-      const token = usingStatewideFallback
-        ? this.generateScopedS2SToken(state)
-        : this.getValidS2SToken()
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/download?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            responseType: 'stream',
+      const response = await this.peopleService.client.get(
+        `/v1/people/download?${params.toString()}`,
+        {
+          headers: {
+            Authorization: usingStatewideFallback
+              ? `Bearer ${this.generateScopedS2SToken(state)}`
+              : undefined,
           },
-        ),
+          responseType: 'stream',
+        },
       )
 
       return new Promise<void>((resolve, reject) => {
@@ -300,18 +216,15 @@ export class ContactsService {
 
     try {
       // keep error-level logging only; avoid leaking token payloads
-      const token = usingStatewideFallback
-        ? this.generateScopedS2SToken(state)
-        : this.getValidS2SToken()
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/stats?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+      const response = await this.peopleService.client.get(
+        `/v1/people/stats?${params.toString()}`,
+        {
+          headers: {
+            Authorization: usingStatewideFallback
+              ? `Bearer ${this.generateScopedS2SToken(state)}`
+              : undefined,
           },
-        ),
+        },
       )
       const transformed = transformStatsResponse(response.data)
       return transformed
@@ -323,44 +236,6 @@ export class ContactsService {
       this.logger.error('Failed to fetch stats from people API', errStr)
       throw new BadGatewayException('Failed to fetch stats from people API')
     }
-  }
-
-  private getValidS2SToken(): string {
-    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
-      return this.cachedToken
-    }
-
-    return this.generateAndCacheS2SToken()
-  }
-
-  private isTokenValid(token: string): boolean {
-    try {
-      const decoded = jwt.decode(token) as { exp?: number }
-      if (!decoded || !decoded.exp) {
-        return false
-      }
-
-      const now = Math.floor(Date.now() / 1000)
-      const bufferTime = 60
-
-      return decoded.exp > now + bufferTime
-    } catch {
-      return false
-    }
-  }
-
-  private generateAndCacheS2SToken(): string {
-    const now = Math.floor(Date.now() / 1000)
-
-    const payload = {
-      iss: 'gp-api',
-      iat: now,
-      exp: now + 300,
-    }
-
-    this.cachedToken = jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
-
-    return this.cachedToken
   }
 
   private canUseStatewideFallback(
@@ -407,7 +282,7 @@ export class ContactsService {
     const electionLocation = ptv?.electionLocation
 
     if (electionType && electionLocation) {
-      const cleanedName = this.elections.cleanDistrictName(electionLocation)
+      const cleanedName = cleanL2DistrictName(electionLocation)
       const isStatewide = this.isStatewideSelection(
         state,
         electionType,
@@ -500,7 +375,7 @@ export class ContactsService {
     return {
       state,
       districtType: electionType,
-      districtName: this.elections.cleanDistrictName(electionLocation),
+      districtName: cleanL2DistrictName(electionLocation),
     }
   }
 
@@ -768,7 +643,9 @@ export class ContactsService {
   private transformListResponse(data: PeopleListResponse) {
     return {
       pagination: data.pagination,
-      people: data.people.map((p: PersonListItem) => this.transformPerson(p)),
+      people: data.people.map((p: PersonListItem) =>
+        this.peopleService.transformPerson(p),
+      ),
     }
   }
 
@@ -786,168 +663,6 @@ export class ContactsService {
       return values
     }
     return []
-  }
-
-  private transformPerson(p: PersonInput): PersonOutput {
-    const firstName = p.FirstName || ''
-    const lastName = p.LastName || ''
-    const gender =
-      p.Gender === 'M' ? 'Male' : p.Gender === 'F' ? 'Female' : 'Unknown'
-    const age =
-      typeof p.Age_Int === 'number' && Number.isFinite(p.Age_Int)
-        ? p.Age_Int
-        : p.Age && Number.isFinite(parseInt(p.Age, 10))
-          ? parseInt(p.Age, 10)
-          : 'Unknown'
-    const politicalParty = p.Parties_Description || 'Unknown'
-    const registeredVoter =
-      p.Registered_Voter === true
-        ? 'Yes'
-        : p.Registered_Voter === false
-          ? 'No'
-          : 'Unknown'
-    const activeVoter = 'Unknown'
-    const voterStatus = p.Voter_Status || 'Unknown'
-    const zipPlus4 = p.Residence_Addresses_ZipPlus4
-      ? `-${p.Residence_Addresses_ZipPlus4}`
-      : ''
-    const addressParts = [
-      p.Residence_Addresses_AddressLine,
-      [p.Residence_Addresses_City, p.Residence_Addresses_State]
-        .filter((v) => Boolean(v))
-        .join(', '),
-      [p.Residence_Addresses_Zip, zipPlus4].filter((v) => Boolean(v)).join(''),
-    ].filter((v) => Boolean(v))
-    const address = addressParts.length ? addressParts.join(', ') : 'Unknown'
-    const cellPhone = p.VoterTelephones_CellPhoneFormatted || 'Unknown'
-    const landline = p.VoterTelephones_LandlineFormatted || 'Unknown'
-    const maritalStatus = this.mapMaritalStatus(p.Marital_Status)
-    const hasChildrenUnder18 = this.mapPresenceOfChildren(
-      p.Presence_Of_Children,
-    )
-    const veteranStatus = p.Veteran_Status === 'Yes' ? 'Yes' : 'Unknown'
-    const homeowner = this.mapHomeowner(p.Homeowner_Probability_Model)
-    const businessOwner =
-      p.Business_Owner && p.Business_Owner.toLowerCase().includes('owner')
-        ? 'Yes'
-        : 'Unknown'
-    const levelOfEducation = this.mapEducation(p.Education_Of_Person)
-    const ethnicityGroup = this.mapEthnicity(p.EthnicGroups_EthnicGroup1Desc)
-    const language = p.Language_Code ? p.Language_Code : 'Unknown'
-    const estimatedIncomeRange = p.Estimated_Income_Amount || 'Unknown'
-    const lat = p.Residence_Addresses_Latitude || null
-    const lng = p.Residence_Addresses_Longitude || null
-    return {
-      id: p.id,
-      firstName,
-      lastName,
-      gender,
-      age,
-      politicalParty,
-      registeredVoter,
-      activeVoter,
-      voterStatus,
-      address,
-      cellPhone,
-      landline,
-      maritalStatus,
-      hasChildrenUnder18,
-      veteranStatus,
-      homeowner,
-      businessOwner,
-      levelOfEducation,
-      ethnicityGroup,
-      language,
-      estimatedIncomeRange,
-      lat,
-      lng,
-    }
-  }
-
-  private mapMaritalStatus(
-    value: string | null | undefined,
-  ): 'Likely Married' | 'Likely Single' | 'Married' | 'Single' | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v.includes('inferred married')) return 'Likely Married'
-    if (v.includes('inferred single')) return 'Likely Single'
-    if (v === 'married') return 'Married'
-    if (v === 'single') return 'Single'
-    return 'Unknown'
-  }
-
-  private mapPresenceOfChildren(
-    value: string | null | undefined,
-  ): 'Yes' | 'No' | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v === 'y' || v === 'yes') return 'Yes'
-    if (v === 'n' || v === 'no') return 'No'
-    return 'Unknown'
-  }
-
-  private mapHomeowner(
-    value: string | null | undefined,
-  ): 'Yes' | 'Likely' | 'No' | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v.includes('home owner') || v.includes('yes homeowner')) return 'Yes'
-    if (v.includes('probable homeowner')) return 'Likely'
-    if (v.includes('renter')) return 'No'
-    return 'Unknown'
-  }
-
-  private mapEducation(
-    value: string | null | undefined,
-  ):
-    | 'None'
-    | 'High School Diploma'
-    | 'Technical School'
-    | 'Some College'
-    | 'College Degree'
-    | 'Graduate Degree'
-    | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v.includes('did not complete high school')) return 'None'
-    if (v.includes('completed high school')) return 'High School Diploma'
-    if (v.includes('vocational') || v.includes('technical school'))
-      return 'Technical School'
-    if (v.includes('did not complete college')) return 'Some College'
-    if (v.includes('completed college')) return 'College Degree'
-    if (v.includes('completed grad school') || v.includes('graduate'))
-      return 'Graduate Degree'
-    return 'Unknown'
-  }
-
-  private mapEthnicity(
-    value: string | null | undefined,
-  ):
-    | 'Asian'
-    | 'European'
-    | 'Hispanic'
-    | 'African American'
-    | 'Other'
-    | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (
-      v.includes('east & south asian') ||
-      v.includes('east and south asian') ||
-      v.includes('asian')
-    )
-      return 'Asian'
-    if (v.includes('european')) return 'European'
-    if (
-      v.includes('hispanic & portuguese') ||
-      v.includes('hispanic and portuguese') ||
-      v.includes('hispanic')
-    )
-      return 'Hispanic'
-    if (v.includes('likely african american') || v.includes('african american'))
-      return 'African American'
-    if (v.includes('other')) return 'Other'
-    return 'Unknown'
   }
 
   async sendTevynApiMessage(

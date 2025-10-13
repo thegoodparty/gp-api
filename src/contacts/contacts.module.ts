@@ -7,6 +7,7 @@ import { ContactsController } from './contacts.controller'
 import { ContactsService } from './services/contacts.service'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { PollsModule } from 'src/polls/polls.module'
+import { PeopleModule } from 'src/people/people.module'
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PollsModule } from 'src/polls/polls.module'
     ElectionsModule,
     SlackModule,
     PollsModule,
+    PeopleModule,
   ],
   controllers: [ContactsController],
   providers: [ContactsService],

@@ -19,6 +19,7 @@ import {
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
+import { cleanL2DistrictName } from '../util/clean-district.util'
 
 // TODO: Revisit this file after the stakeholders decide on the direction we're going...
 // ...for the win number / p2v solution. Remove any unneeded code at that time.
@@ -166,7 +167,7 @@ export class ElectionsService {
   ): Promise<PrismaJson.PathToVictoryData | null> {
     const query = {
       ...data,
-      L2DistrictName: this.cleanDistrictName(data.L2DistrictName),
+      L2DistrictName: cleanL2DistrictName(data.L2DistrictName),
     }
     try {
       const projectedTurnout = await this.electionApiGet<
@@ -235,19 +236,5 @@ export class ElectionsService {
       electionYear,
       excludeInvalid: true,
     })
-  }
-
-  cleanDistrictName(L2DistrictName: string) {
-    const segments = L2DistrictName.split('##')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-    if (segments.length === 0) return L2DistrictName
-    let longest = segments[0]
-    for (let i = 1; i < segments.length; i++) {
-      if (segments[i].length > longest.length) {
-        longest = segments[i]
-      }
-    }
-    return longest
   }
 }
