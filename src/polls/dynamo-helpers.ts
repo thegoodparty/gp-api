@@ -106,3 +106,62 @@ export const queryTopIssues = async (
       })),
     }))
 }
+
+export const exampleIssues = (pollId: string): PollIssue[] => [
+  {
+    title: 'Traffic Congestion & Infrastructure',
+    pollId,
+    summary:
+      'Traffic congestion and infrastructure are major issues for many people in the area.',
+    details:
+      'Traffic congestion and infrastructure are major issues for many people in the area. You need to do something about it.',
+    mentionCount: 10,
+    representativeComments: [
+      {
+        comment:
+          'Traffic congestion is a major issue for many people in the area.',
+        name: 'John Doe',
+      },
+      {
+        comment: 'I hate traffic!',
+        name: 'Jane Smith',
+      },
+    ],
+  },
+  {
+    title: 'Education Improvements',
+    pollId,
+    summary: 'Education is a major issue for many people in the area.',
+    details:
+      'Education is a major issue for many people in the area. You need to do something about it.',
+    mentionCount: 10,
+    representativeComments: [
+      {
+        comment: 'Education is a major issue for many people in the area.',
+        name: 'John Doe',
+      },
+      {
+        comment: 'I love education!',
+        name: 'Jane Smith',
+      },
+    ],
+  },
+  {
+    title: 'Healthcare Cost Inflation',
+    pollId,
+    summary: 'Healthcare is a major issue for many people in the area.',
+    details:
+      'Healthcare is a major issue for many people in the area. You need to do something about it.',
+    mentionCount: 10,
+    representativeComments: [
+      {
+        comment: 'Healthcare is a major issue for many people in the area.',
+        name: 'John Doe',
+      },
+      {
+        comment: 'I love healthcare!',
+        name: 'Jane Smith',
+      },
+    ],
+  },
+]
