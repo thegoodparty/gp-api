@@ -8,11 +8,13 @@ import {
 } from '@nestjs/common'
 import { VoterFileFilter } from '@prisma/client'
 import { isAxiosError } from 'axios'
+import dayjs from 'dayjs'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { PollsService } from 'src/polls/services/polls.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
@@ -37,8 +39,6 @@ import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
 import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
-import { PollsService } from 'src/polls/services/polls.service'
-import dayjs from 'dayjs'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -68,8 +68,13 @@ export class ContactsService {
   ) {
     const { resultsPerPage, page, segment } = dto
 
-    const { state, districtType, districtName, usingStatewideFallback } =
-      this.resolveLocationForRequest(campaign)
+    const {
+      state,
+      districtType,
+      districtName,
+      alternativeDistrictName,
+      usingStatewideFallback,
+    } = this.resolveLocationForRequest(campaign)
 
     const params = new URLSearchParams({
       state,
@@ -90,9 +95,9 @@ export class ContactsService {
     const listFilters = await this.segmentToFilters(segment, campaign)
     listFilters.forEach((f) => params.append('filters[]', f))
     params.set('full', 'true')
-
+    let token: string | undefined
     try {
-      const token = usingStatewideFallback
+      token = usingStatewideFallback
         ? this.generateScopedS2SToken(state)
         : this.getValidS2SToken()
       const response = await lastValueFrom(
@@ -111,6 +116,15 @@ export class ContactsService {
         'Failed to fetch contacts from people API',
         JSON.stringify(error),
       )
+      if (token) {
+        this.queryAlternativeDistrictName(
+          params,
+          token,
+          'people',
+          alternativeDistrictName,
+        )
+      }
+
       throw new BadGatewayException('Failed to fetch contacts from people API')
     }
   }
@@ -127,8 +141,13 @@ export class ContactsService {
       )
     }
 
-    const { state, districtType, districtName, usingStatewideFallback } =
-      this.resolveLocationForRequest(campaign)
+    const {
+      state,
+      districtType,
+      districtName,
+      alternativeDistrictName,
+      usingStatewideFallback,
+    } = this.resolveLocationForRequest(campaign)
 
     const params = new URLSearchParams({
       state,
@@ -144,9 +163,9 @@ export class ContactsService {
     if (lastName) params.set('lastName', lastName)
     if (phone) params.set('phone', phone)
     params.set('full', 'true')
-
+    let token: string | undefined
     try {
-      const token = usingStatewideFallback
+      token = usingStatewideFallback
         ? this.generateScopedS2SToken(state)
         : this.getValidS2SToken()
       const response = await lastValueFrom(
@@ -161,7 +180,19 @@ export class ContactsService {
       )
       return this.transformListResponse(response.data)
     } catch (error) {
-      this.logger.error('Failed to search contacts from people API', error)
+      this.logger.error(
+        'Failed to search contacts from people API',
+        JSON.stringify(error),
+      )
+      if (token) {
+        this.queryAlternativeDistrictName(
+          params,
+          token,
+          'search',
+          alternativeDistrictName,
+        )
+      }
+
       throw new BadGatewayException('Failed to search contacts from people API')
     }
   }
@@ -234,8 +265,13 @@ export class ContactsService {
     }
     const segment = dto.segment as string | undefined
 
-    const { state, districtType, districtName, usingStatewideFallback } =
-      this.resolveLocationForRequest(campaign)
+    const {
+      state,
+      districtType,
+      districtName,
+      alternativeDistrictName,
+      usingStatewideFallback,
+    } = this.resolveLocationForRequest(campaign)
 
     const params = new URLSearchParams({ state })
     if (districtType && districtName) {
@@ -252,9 +288,9 @@ export class ContactsService {
     const listFilters = await this.segmentToFilters(segment, campaign)
     listFilters.forEach((f) => params.append('filters[]', f))
     params.set('full', 'true')
-
+    let token: string | undefined
     try {
-      const token = usingStatewideFallback
+      token = usingStatewideFallback
         ? this.generateScopedS2SToken(state)
         : this.getValidS2SToken()
       const response = await lastValueFrom(
@@ -275,7 +311,25 @@ export class ContactsService {
         response.data.on('error', reject)
       })
     } catch (error) {
-      this.logger.error('Failed to download contacts from people API', error)
+      this.logger.error(
+        'Failed to download contacts from people API',
+        JSON.stringify(error),
+      )
+      if (token) {
+        const response = await this.queryAlternativeDistrictName(
+          params,
+          token,
+          'download',
+          alternativeDistrictName,
+          { responseType: 'stream' },
+        )
+        return new Promise<void>((resolve, reject) => {
+          response.data.pipe(res.raw)
+          response.data.on('end', resolve)
+          response.data.on('error', reject)
+        })
+      }
+
       throw new BadGatewayException(
         'Failed to download contacts from people API',
       )
@@ -283,8 +337,13 @@ export class ContactsService {
   }
 
   async getDistrictStats(campaign: CampaignWithPathToVictory) {
-    const { state, districtType, districtName, usingStatewideFallback } =
-      this.resolveLocationForRequest(campaign)
+    const {
+      state,
+      districtType,
+      districtName,
+      alternativeDistrictName,
+      usingStatewideFallback,
+    } = this.resolveLocationForRequest(campaign)
 
     const params = new URLSearchParams({ state })
     if (districtType && districtName) {
@@ -297,10 +356,9 @@ export class ContactsService {
       : undefined
     if (typeof electionYear === 'number' && Number.isFinite(electionYear))
       params.set('electionYear', String(electionYear))
-
+    let token: string | undefined
     try {
-      // keep error-level logging only; avoid leaking token payloads
-      const token = usingStatewideFallback
+      token = usingStatewideFallback
         ? this.generateScopedS2SToken(state)
         : this.getValidS2SToken()
       const response = await lastValueFrom(
@@ -321,6 +379,15 @@ export class ContactsService {
           ? error.stack || error.message
           : JSON.stringify(error)
       this.logger.error('Failed to fetch stats from people API', errStr)
+      if (token) {
+        this.queryAlternativeDistrictName(
+          params,
+          token,
+          'stats',
+          alternativeDistrictName,
+        )
+      }
+
       throw new BadGatewayException('Failed to fetch stats from people API')
     }
   }
@@ -396,6 +463,7 @@ export class ContactsService {
     state: string
     districtType?: string
     districtName?: string
+    alternativeDistrictName?: string
     usingStatewideFallback: boolean
   } {
     const state = this.getCampaignState(campaign)
@@ -408,6 +476,7 @@ export class ContactsService {
 
     if (electionType && electionLocation) {
       const cleanedName = this.elections.cleanDistrictName(electionLocation)
+      const alternativeCleanedName = cleanedName.replace(/^0/, '') // Delete 1 leading zero
       const isStatewide = this.isStatewideSelection(
         state,
         electionType,
@@ -427,6 +496,7 @@ export class ContactsService {
         state,
         districtType: electionType,
         districtName: cleanedName,
+        alternativeDistrictName: alternativeCleanedName,
         usingStatewideFallback: false,
       }
     }
@@ -948,6 +1018,54 @@ export class ContactsService {
       return 'African American'
     if (v.includes('other')) return 'Other'
     return 'Unknown'
+  }
+
+  private async queryAlternativeDistrictName(
+    params: URLSearchParams,
+    token: string,
+    endpoint: 'people' | 'search' | 'download' | 'stats',
+    alternativeDistrictName?: string,
+    options?: { responseType?: 'stream' },
+  ) {
+    if (!alternativeDistrictName) {
+      throw new BadGatewayException(
+        `Failed to fetch from people API (${endpoint})`,
+      )
+    }
+
+    const newParams = new URLSearchParams(params)
+    newParams.set('districtName', alternativeDistrictName)
+
+    const endpointMap = {
+      people: '/v1/people',
+      search: '/v1/people/search',
+      download: '/v1/people/download',
+      stats: '/v1/people/stats',
+    }
+
+    try {
+      return await lastValueFrom(
+        this.httpService.get(
+          `${PEOPLE_API_URL}${endpointMap[endpoint]}?${newParams.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            ...(options?.responseType && {
+              responseType: options.responseType,
+            }),
+          },
+        ),
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to query ${endpoint} from people API`,
+        JSON.stringify(error),
+      )
+      throw new BadGatewayException(
+        `Failed to fetch from people API (${endpoint})`,
+      )
+    }
   }
 
   async sendTevynApiMessage(
