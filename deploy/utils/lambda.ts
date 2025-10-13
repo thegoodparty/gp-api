@@ -1,5 +1,5 @@
-import AWS from '@pulumi/aws'
-import { FunctionArgs } from '@pulumi/aws/lambda'
+import type AWS from '@pulumi/aws'
+import type { FunctionArgs } from '@pulumi/aws/lambda'
 
 export type LambdaConfig = Omit<FunctionArgs, 'name' | 'role'> & {
   name: string
