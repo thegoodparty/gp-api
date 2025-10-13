@@ -51,6 +51,89 @@ interface PeerlyApiResponse {
   [key: string]: unknown
 }
 
+export enum JobStatus {
+  ACTIVE = 'active',
+  PAUSED = 'paused',
+  DELETED = 'deleted',
+  PENDING = 'pending',
+  ERROR = 'error',
+}
+
+export interface PeerlyJob {
+  id: string
+  account_id: string
+  identity_id: string
+  name: string
+  internal_name: string
+  status: JobStatus
+  job_type: string
+  created_date: string
+  created_by: string
+  last_touched_date: string
+  start_date: string
+  end_date: string
+  schedule_id: number
+  did_state: string
+  did_npa_subset: string[]
+  disable_did_purchase: boolean
+  can_use_mms: boolean
+  ai_enabled: boolean
+  ai_auto_opt_out_threshold: string
+  deliverability_check: boolean
+  deliverability_check_error?: string
+  dynamic_reassignment: boolean
+  can_add_new_lead: boolean
+  has_canvassers_scheduled: boolean
+  leads_remaining: number
+  agent_ids: string[]
+  agents: Record<string, never>
+  phone_lists: number[]
+  phone_list_assignments: Array<{
+    list_id: number
+    deduplicate: boolean
+  }>
+  suppression_list_assignments: string[]
+  templates: Array<{
+    id: string
+    title: string
+    text: string
+    is_default: boolean
+    has_dynamic_media: boolean
+    has_dynamic_media_rendered: boolean
+    media?: {
+      media_id: string
+      media_type: string
+      title: string
+    }
+    advanced?: {
+      show_stop: boolean
+      organization?: string
+      bodies?: string[]
+      minimized?: boolean
+      call_to_actions?: Array<{
+        text: string
+        url?: string
+      }>
+    }
+  }>
+  canvassers_schedule?: {
+    requested_initials: string
+    requested_date: string
+    requested_at: string
+    requested_start_time: string
+    requested_end_time: string
+    requested_timezone: string
+    requested_timeframe: string
+    requested_by: string
+    start_time: string
+    end_time: string
+    approved: boolean
+  }
+  questions: string[]
+  tracked_links: string[]
+  integrations: string[]
+}
+
 type PeerlyAxiosError = {
   response?: AxiosResponse<PeerlyApiErrorResponse>
   [key: string]: unknown
@@ -80,11 +163,9 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
         )
 
         const apiError = axiosError.response.data
+        const { error: errorField, message, Error: errorCapital } = apiError
         const errorMessage =
-          apiError.error ||
-          apiError.message ||
-          apiError.Error ||
-          'Unknown API error'
+          errorField || message || errorCapital || 'Unknown API error'
         throw new BadGatewayException(`Peerly API error: ${errorMessage}`)
       }
     }
@@ -123,7 +204,8 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
         this.httpService.post(`${this.baseUrl}/1to1/jobs`, body, config),
       )
 
-      const validated = this.validateCreateJobResponse(response.data)
+      const { data } = response
+      this.validateCreateJobResponse(data)
 
       // TODO: Verify where the job ID is actually returned by the Peerly API
       // Based on standard REST patterns, it should be in either:
@@ -134,20 +216,21 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       let jobId: string | undefined
 
       // First check response body for job ID (most likely location)
-      const responseData = response.data as PeerlyApiResponse
+      const responseData = data as PeerlyApiResponse
       if (responseData?.id) {
         jobId = responseData.id
       }
 
       // Fallback to Location header if not in body
-      if (!jobId && response.headers?.location) {
-        jobId = response.headers.location.split('/').pop()
+      const { headers } = response
+      if (!jobId && headers?.location) {
+        jobId = headers.location.split('/').pop()
       }
 
       if (!jobId) {
         this.logger.error('Job created but no job ID found in response', {
-          headers: response.headers,
-          data: response.data,
+          headers,
+          data,
         })
         throw new BadGatewayException(
           'Job creation succeeded but job ID not found in response body or headers. Please verify API response format.',
@@ -156,6 +239,41 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
       this.logger.log(`Created job with ID: ${jobId}`)
       return jobId
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+  async retrieveJobsListByIdentityId(identityId: string): Promise<PeerlyJob[]> {
+    try {
+      const config = await this.getBaseHttpHeaders()
+      const response: AxiosResponse<PeerlyJob[]> = await lastValueFrom(
+        this.httpService.get(
+          `${this.baseUrl}/1to1/jobs?account_id=${this.accountNumber}&identity_id=${identityId}`,
+          config,
+        ),
+      )
+
+      // Validate and return the job details
+      const { data: jobs } = response
+      this.logger.debug(`Retrieved P2P jobs: ${JSON.stringify(jobs)}`)
+      return jobs
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async retrieveJob(id: string): Promise<PeerlyJob> {
+    try {
+      const config = await this.getBaseHttpHeaders()
+      const response = await lastValueFrom(
+        this.httpService.get(`${this.baseUrl}/1to1/jobs/${id}`, config),
+      )
+
+      // Validate and return the job details
+      const { data } = response
+      const jobDetails = data as PeerlyJob
+      this.logger.debug(`Retrieved job details: ${JSON.stringify(jobDetails)}`)
+      return jobDetails
     } catch (error) {
       this.handleApiError(error)
     }
