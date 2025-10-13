@@ -36,7 +36,7 @@ export const lambda = (aws: typeof AWS, config: LambdaConfig) => {
       Statement: [
         {
           Actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-          Resources: [`${logGroup.arn}:*`],
+          Resources: [`${logGroup.arn.get()}:*`],
         },
         ...(config.policy ?? []),
       ],
