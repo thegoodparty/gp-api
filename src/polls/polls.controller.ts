@@ -16,17 +16,11 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWithPathToVictory } from 'src/contacts/contacts.types'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import {
-  PollResponseInsight,
-  queryTopIssues,
-  uploadPollResultData,
-} from './dynamo-helpers'
+import { queryTopIssues } from './dynamo-helpers'
 import z from 'zod'
 import { Poll } from '@prisma/client'
 import { APIPoll } from './polls.types'
 import { orderBy } from 'lodash'
-
-class SubmitPollResultDataDTO extends createZodDto(PollResponseInsight) {}
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
@@ -100,22 +94,6 @@ export class PollsController {
     const byMentionCount = orderBy(issues, (i) => i.mentionCount, 'desc')
 
     return { results: byMentionCount }
-  }
-
-  @Put('/:pollId/internal/result')
-  async submitPollResultData(
-    @Param('pollId') pollId: string,
-    @Body() data: SubmitPollResultDataDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
-  ) {
-    const poll = await this.ensurePollAccess(pollId, campaign)
-
-    if (poll.status !== 'IN_PROGRESS') {
-      throw new BadRequestException('Poll is not currently in-progress')
-    }
-
-    await uploadPollResultData(data)
-    return {}
   }
 
   @Put('/:pollId/internal/complete')

@@ -1,5 +1,7 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
 
+import { lambda } from './utils/lambda'
+
 export default $config({
   app(input) {
     return {
@@ -243,6 +245,53 @@ export default $config({
         deletionProtectionEnabled: $app.stage === 'master',
       },
     )
+
+    const HANDLER_TIMEOUT = 30
+    const pollInsightsQueueHandler = lambda(aws, {
+      name: `poll-insights-queue-handler-${$app.stage}`,
+      runtime: 'nodejs22.x',
+      timeout: HANDLER_TIMEOUT,
+      memorySize: 512,
+      code: new pulumi.asset.FileArchive('../dist/lambdas'),
+      handler: 'poll-response-analysis-queue-handler.handler',
+      policy: [
+        {
+          Actions: ['dynamodb:PutItem'],
+          Resources: [pollInsightsDynamoTable.arn.get()],
+        },
+      ],
+    })
+
+    const pollInsightsQueueDlq = new aws.sqs.Queue(
+      `poll-insights-queue-dlq-${$app.stage}`,
+      {
+        name: `poll-insights-queue-dlq-${$app.stage}.fifo`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+      },
+    )
+
+    const pollInsightsQueue = new aws.sqs.Queue(
+      `poll-insights-queue-${$app.stage}`,
+      {
+        name: `poll-insights-queue-${$app.stage}`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+        visibilityTimeoutSeconds: HANDLER_TIMEOUT + 5,
+        redrivePolicy: pulumi.interpolate`{
+          "deadLetterTargetArn": "${pollInsightsQueueDlq.arn}",
+          "maxReceiveCount": 3
+        }`,
+      },
+    )
+
+    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
+      eventSourceArn: pollInsightsQueue.arn,
+      functionName: pollInsightsQueueHandler.name,
+      enabled: true,
+      batchSize: 10,
+      bisectBatchOnFunctionError: true,
+    })
 
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
