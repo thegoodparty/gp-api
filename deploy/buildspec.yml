@@ -9,6 +9,8 @@ phases:
 
   pre_build:
     commands:
+      - npm install
+      - npm run build:lambdas
       - echo "Moving into deploy folder..."
       - cd deploy
       - echo "Installing local dependencies..."
@@ -20,7 +22,6 @@ phases:
 
   build:
     commands:
-      - npm run build:lambdas
       - echo "Deploying SST app to stage $STAGE"
       - sst deploy --stage=$STAGE --verbose --print-logs
       - aws ecs wait services-stable --cluster $CLUSTER_NAME --services $SERVICE_NAME
