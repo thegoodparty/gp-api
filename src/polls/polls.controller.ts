@@ -25,8 +25,6 @@ import z from 'zod'
 import { Poll } from '@prisma/client'
 import { APIPoll } from './polls.types'
 import { orderBy } from 'lodash'
-import { AnalyticsService } from 'src/analytics/analytics.service'
-import { EVENTS } from 'src/vendors/segment/segment.types'
 
 class SubmitPollResultDataDTO extends createZodDto(PollResponseInsight) {}
 
@@ -60,10 +58,7 @@ const toAPIPoll = (poll: Poll): APIPoll => ({
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class PollsController {
-  constructor(
-    private readonly pollsService: PollsService,
-    private readonly analytics: AnalyticsService,
-  ) {}
+  constructor(private readonly pollsService: PollsService) {}
   private readonly logger = new Logger(this.constructor.name)
 
   @Get('/')
@@ -143,17 +138,6 @@ export class PollsController {
         completedDate: new Date(),
       },
     })
-
-    await this.analytics.track(
-      campaign.userId,
-      EVENTS.Polls.ResultsSynthesisCompleted,
-      {
-        pollId: poll.id,
-        path: `/dashboard/polls/${poll.id}`,
-        constituencyName: campaign.pathToVictory?.data.electionLocation,
-      },
-    )
-
     return toAPIPoll(poll)
   }
 
