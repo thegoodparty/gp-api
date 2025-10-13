@@ -1,0 +1,52 @@
+import AWS from '@pulumi/aws'
+import { FunctionArgs } from '@pulumi/aws/lambda'
+
+export type LambdaConfig = Omit<FunctionArgs, 'name' | 'role'> & {
+  name: string
+  policy?: {
+    Resources: string[]
+    Actions: string[]
+  }[]
+}
+
+export const lambda = (aws: typeof AWS, config: LambdaConfig) => {
+  const role = new aws.iam.Role(`${config.name}-role`, {
+    name: `${config.name}-role`,
+    assumeRolePolicy: JSON.stringify({
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Action: 'sts:AssumeRole',
+          Principal: { Service: 'lambda.amazonaws.com' },
+        },
+      ],
+    }),
+  })
+
+  const logGroup = new aws.cloudwatch.LogGroup(`${config.name}-log-group`, {
+    name: `/aws/lambda/${config.name}`,
+    retentionInDays: 30,
+  })
+
+  new aws.iam.RolePolicy(`${config.name}-policy`, {
+    role: role.name,
+    policy: JSON.stringify({
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+          Resources: [`${logGroup.arn.get()}:*`],
+        },
+        ...(config.policy ?? []),
+      ],
+    }),
+  })
+
+  const lambda = new aws.lambda.Function(`${config.name}-function`, {
+    ...config,
+    role: role.arn,
+  })
+
+  return lambda
+}
