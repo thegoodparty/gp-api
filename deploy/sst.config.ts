@@ -1,7 +1,5 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
 
-import { lambda } from './utils/lambda'
-
 export default $config({
   app(input) {
     return {
@@ -19,6 +17,7 @@ export default $config({
   async run() {
     const { default: aws } = await import('@pulumi/aws')
     const { default: pulumi } = await import('@pulumi/pulumi')
+    const { lambda } = await import('./utils/lambda')
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
