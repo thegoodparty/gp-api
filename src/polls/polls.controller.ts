@@ -16,7 +16,7 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWithPathToVictory } from 'src/contacts/contacts.types'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { queryTopIssues } from './dynamo-helpers'
+import { exampleIssues, queryTopIssues } from './dynamo-helpers'
 import z from 'zod'
 import { Poll } from '@prisma/client'
 import { APIPoll } from './polls.types'
@@ -34,6 +34,8 @@ class ListPollsQueryDTO extends createZodDto(
     limit: z.coerce.number().min(1).max(100).default(20),
   }),
 ) {}
+
+const IS_LOCAL = process.env.NODE_ENV !== 'production'
 
 const toAPIPoll = (poll: Poll): APIPoll => ({
   id: poll.id,
@@ -88,6 +90,10 @@ export class PollsController {
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
     await this.ensurePollAccess(pollId, campaign)
+
+    if (IS_LOCAL) {
+      return { results: exampleIssues(pollId) }
+    }
 
     const issues = await queryTopIssues(this.logger, pollId)
 
