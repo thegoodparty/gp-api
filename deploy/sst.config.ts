@@ -271,7 +271,7 @@ export default $config({
       },
     )
 
-    const pollInsightsQueueHandler = lambda(aws, {
+    const pollInsightsQueueHandler = await lambda(aws, {
       name: `poll-insights-queue-handler-${$app.stage}`,
       runtime: 'nodejs22.x',
       timeout: HANDLER_TIMEOUT,
