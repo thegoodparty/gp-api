@@ -58,9 +58,7 @@ export const lambda = (
   // file, such that it must get moved around during the deploy or something.
   const filepath = path.join(__dirname, `../../../dist/lambdas/${filename}.zip`)
 
-  console.log('SWAIN FILEPATH: ', filepath)
-
-  const code = new pulumi.asset.FileAsset(filepath)
+  const code = new pulumi.asset.FileArchive(filepath)
 
   const lambda = new aws.lambda.Function(`${config.name}-function`, {
     ...config,
