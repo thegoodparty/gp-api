@@ -139,6 +139,18 @@ export default $config({
     try {
       secretsJson = JSON.parse(secretString || '{}')
 
+      // DO NOT REMOVE THESE. These are here so that we don't use the AWS credentials
+      // that were (at some point) hardcoded in the secret. Instead, we want to make sure
+      // our instances use their NATIVE IAM roles, so that we can easily manage their
+      // permissions as-code.
+      //
+      // Once the migration to IAM auth is complete, we can remove these values from the
+      // secret entirely, and then remove these lines.
+      delete secretsJson.AWS_ACCESS_KEY_ID
+      delete secretsJson.AWS_SECRET_ACCESS_KEY
+      delete secretsJson.AWS_S3_KEY
+      delete secretsJson.AWS_S3_SECRET
+
       for (const [key, value] of Object.entries(secretsJson)) {
         if (key === 'DATABASE_URL') {
           const { username, password, database } = extractDbCredentials(
@@ -379,6 +391,22 @@ export default $config({
         },
       },
       permissions: [
+        {
+          actions: ['route53domains:Get*', 'route53domains:List*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['route53domains:CheckDomainAvailability'],
+          resources: ['*'],
+        },
+        {
+          actions: ['s3:*', 's3-object-lambda:*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['sqs:*'],
+          resources: ['*'],
+        },
         {
           actions: ['dynamodb:PutItem', 'dynamodb:Query'],
           resources: [pollInsightsDynamoTable.arn],
