@@ -9,7 +9,8 @@ export type LambdaConfig = Omit<
 > & {
   name: string
   filename: string
-  policy?: {
+  policy: {
+    Effect: 'Allow' | 'Deny'
     Resources: (string | Output<string>)[]
     Actions: string[]
   }[]
@@ -49,6 +50,7 @@ export const lambda = (
           Action: ['logs:CreateLogStream', 'logs:PutLogEvents'],
           Resource: [pulumi.interpolate`${logGroup.arn}:*`],
         },
+        ...policy,
       ],
     },
   })

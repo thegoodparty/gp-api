@@ -296,6 +296,7 @@ export default $config({
       },
       policy: [
         {
+          Effect: 'Allow',
           Actions: [
             'sqs:ReceiveMessage',
             'sqs:DeleteMessage',
@@ -304,6 +305,7 @@ export default $config({
           Resources: [pollInsightsQueue.arn],
         },
         {
+          Effect: 'Allow',
           Actions: ['dynamodb:PutItem'],
           Resources: [pollInsightsDynamoTable.arn],
         },
