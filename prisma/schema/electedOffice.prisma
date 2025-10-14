@@ -8,7 +8,7 @@ model ElectedOffice {
     termLengthDays          Int?        @map("term_length_days")
     termEndDate             DateTime?   @db.Date @map("term_end_date")
 
-    isActive                Boolean     @map("is_active")
+    isActive                Boolean     @map("is_active") @default(true)
 
     user                    User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
     userId                  Int         @map("user_id")
@@ -25,4 +25,5 @@ model ElectedOffice {
 
     @@index([userId])
     @@index([campaignId])
+    @@map("elected_office")
 }

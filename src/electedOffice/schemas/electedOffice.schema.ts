@@ -7,13 +7,12 @@ export const ZDateOnlyOptional = ZDateOnly.optional()
 export const ZDateOnlyNullOptional = ZDateOnly.nullable().optional()
 
 export const CreateElectedOfficeSchema = z.object({
-  electedDate: ZDateOnlyOptional,
+  electedDate: ZDateOnly,
   swornInDate: ZDateOnlyOptional,
   termStartDate: ZDateOnlyOptional,
   termEndDate: ZDateOnlyOptional,
   termLengthDays: z.coerce.number().int().positive().optional(),
-  isActive: z.boolean(),
-  campaignId: z.number().int(),
+  isActive: z.boolean().optional().default(true),
 })
 
 export const UpdateElectedOfficeSchema = z.object({

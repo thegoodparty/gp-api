@@ -1,11 +1,8 @@
 import {
   Body,
   Controller,
-  Delete,
   ForbiddenException,
   Get,
-  HttpCode,
-  HttpStatus,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -31,7 +28,8 @@ export class ElectedOfficeController {
 
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
-      ...record,
+      id: record.id,
+      publicId: record.publicId,
       electedDate: toDateOnlyString(record.electedDate),
       swornInDate: toDateOnlyString(record.swornInDate),
       termStartDate: toDateOnlyString(record.termStartDate),
@@ -39,15 +37,15 @@ export class ElectedOfficeController {
     }
   }
 
-  // termLengthDays provided directly by DTO; no parsing needed
-
-  @Get('/')
-  async list(@ReqUser() user: User) {
-    const items = await this.electedOfficeService.findMany({
-      where: { userId: user.id },
-      orderBy: { id: 'asc' },
+  @Get('current')
+  async getCurrent(@ReqUser() user: User) {
+    const record = await this.electedOfficeService.findFirst({
+      where: { userId: user.id, isActive: true },
     })
-    return { results: items.map((i) => this.toApi(i)) }
+    if (!record) {
+      throw new NotFoundException('No active elected office found')
+    }
+    return this.toApi(record)
   }
 
   @Get(':id')
@@ -63,7 +61,7 @@ export class ElectedOfficeController {
   async create(@ReqUser() user: User, @Body() body: CreateElectedOfficeDto) {
     // Do this without guard to hopefully slowly move away from the hard link to campaign
     const campaign = await this.electedOfficeService.client.campaign.findFirst({
-      where: { id: body.campaignId, userId: user.id },
+      where: { userId: user.id },
       select: { id: true },
     })
     if (!campaign) {
@@ -77,7 +75,7 @@ export class ElectedOfficeController {
       termLengthDays: body.termLengthDays,
       isActive: body.isActive,
       user: { connect: { id: user.id } },
-      campaign: { connect: { id: body.campaignId } },
+      campaign: { connect: { id: campaign.id } },
     }
     const created = await this.electedOfficeService.create({ data })
     return this.toApi(created)
@@ -110,17 +108,5 @@ export class ElectedOfficeController {
       data,
     })
     return this.toApi(updated)
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseIntPipe) id: number, @ReqUser() user: User) {
-    const existing = await this.electedOfficeService.findUnique({
-      where: { id },
-    })
-    if (!existing || existing.userId !== user.id) {
-      throw new NotFoundException('Elected office not found')
-    }
-    await this.electedOfficeService.delete({ where: { id } })
   }
 }

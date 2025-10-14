@@ -15,7 +15,7 @@ ALTER TABLE "Poll" DROP COLUMN "campaign_id",
 ADD COLUMN     "elected_office_id" INTEGER;
 
 -- CreateTable
-CREATE TABLE "ElectedOffice" (
+CREATE TABLE "elected_office" (
     "id" SERIAL NOT NULL,
     "public_id" TEXT NOT NULL,
     "elected_date" DATE,
@@ -23,32 +23,32 @@ CREATE TABLE "ElectedOffice" (
     "term_start_date" DATE,
     "term_length_days" INTEGER,
     "term_end_date" DATE,
-    "is_active" BOOLEAN NOT NULL,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
     "user_id" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
     "campaign_id" INTEGER NOT NULL,
 
-    CONSTRAINT "ElectedOffice_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "elected_office_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ElectedOffice_public_id_key" ON "ElectedOffice"("public_id");
+CREATE UNIQUE INDEX "elected_office_public_id_key" ON "elected_office"("public_id");
 
 -- CreateIndex
-CREATE INDEX "ElectedOffice_user_id_idx" ON "ElectedOffice"("user_id");
+CREATE INDEX "elected_office_user_id_idx" ON "elected_office"("user_id");
 
 -- CreateIndex
-CREATE INDEX "ElectedOffice_campaign_id_idx" ON "ElectedOffice"("campaign_id");
+CREATE INDEX "elected_office_campaign_id_idx" ON "elected_office"("campaign_id");
 
 -- CreateIndex
 CREATE INDEX "Poll_elected_office_id_id_idx" ON "Poll"("elected_office_id", "id");
 
 -- AddForeignKey
-ALTER TABLE "ElectedOffice" ADD CONSTRAINT "ElectedOffice_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "elected_office" ADD CONSTRAINT "elected_office_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ElectedOffice" ADD CONSTRAINT "ElectedOffice_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
+ALTER TABLE "elected_office" ADD CONSTRAINT "elected_office_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Poll" ADD CONSTRAINT "Poll_elected_office_id_fkey" FOREIGN KEY ("elected_office_id") REFERENCES "ElectedOffice"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Poll" ADD CONSTRAINT "Poll_elected_office_id_fkey" FOREIGN KEY ("elected_office_id") REFERENCES "elected_office"("id") ON DELETE CASCADE ON UPDATE CASCADE;
