@@ -1,8 +1,0 @@
-@@ -298,6 +298,7 @@
-             if (isErrorReported(err)) {
-                 return;
-             }
-+            log.error(`SWAIN found error: ${err.message}`);
-             // First, log the error.
-             if (errors_1.RunError.isInstance(err)) {
-                 // Always hide the stack for RunErrors.

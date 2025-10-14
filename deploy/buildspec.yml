@@ -24,7 +24,6 @@ phases:
     commands:
       - echo "Deploying SST app to stage $STAGE"
       - sst install --stage=$STAGE --verbose --print-logs
-      - patch .sst/platform/node_modules/@pulumi/pulumi/cmd/run/run.js < tmp.patch
       - sst deploy --stage=$STAGE --verbose --print-logs
       - aws ecs wait services-stable --cluster $CLUSTER_NAME --services $SERVICE_NAME
       - echo "Done!"
