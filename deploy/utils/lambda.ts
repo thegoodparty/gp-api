@@ -11,7 +11,7 @@ export type LambdaConfig = Omit<
   filename: string
   policy: {
     Effect: 'Allow' | 'Deny'
-    Resources: (string | Output<string>)[]
+    Resource: (string | Output<string>)[]
     Actions: string[]
   }[]
 }
