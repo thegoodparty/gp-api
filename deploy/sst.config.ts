@@ -17,6 +17,7 @@ export default $config({
   async run() {
     const { default: aws } = await import('@pulumi/aws')
     const { default: pulumi } = await import('@pulumi/pulumi')
+    const { lambda } = await import('./utils/lambda')
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
@@ -138,6 +139,18 @@ export default $config({
     try {
       secretsJson = JSON.parse(secretString || '{}')
 
+      // DO NOT REMOVE THESE. These are here so that we don't use the AWS credentials
+      // that were (at some point) hardcoded in the secret. Instead, we want to make sure
+      // our instances use their NATIVE IAM roles, so that we can easily manage their
+      // permissions as-code.
+      //
+      // Once the migration to IAM auth is complete, we can remove these values from the
+      // secret entirely, and then remove these lines.
+      delete secretsJson.AWS_ACCESS_KEY_ID
+      delete secretsJson.AWS_SECRET_ACCESS_KEY
+      delete secretsJson.AWS_S3_KEY
+      delete secretsJson.AWS_S3_SECRET
+
       for (const [key, value] of Object.entries(secretsJson)) {
         if (key === 'DATABASE_URL') {
           const { username, password, database } = extractDbCredentials(
@@ -244,6 +257,69 @@ export default $config({
       },
     )
 
+    const HANDLER_TIMEOUT = 30
+
+    const pollInsightsQueueDlq = new aws.sqs.Queue(
+      `poll-insights-queue-dlq-${$app.stage}`,
+      {
+        name: `poll-insights-queue-dlq-${$app.stage}.fifo`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+      },
+    )
+
+    const pollInsightsQueue = new aws.sqs.Queue(
+      `poll-insights-queue-${$app.stage}`,
+      {
+        name: `poll-insights-queue-${$app.stage}.fifo`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+        visibilityTimeoutSeconds: HANDLER_TIMEOUT + 5,
+        contentBasedDeduplication: true,
+        redrivePolicy: pulumi.interpolate`{
+          "deadLetterTargetArn": "${pollInsightsQueueDlq.arn}",
+          "maxReceiveCount": 3
+        }`,
+      },
+    )
+
+    const pollInsightsQueueHandler = lambda(aws, pulumi, {
+      name: `poll-insights-queue-handler-${$app.stage}`,
+      runtime: 'nodejs22.x',
+      timeout: HANDLER_TIMEOUT,
+      memorySize: 512,
+      filename: 'poll-response-analysis-queue-handler',
+      environment: {
+        variables: {
+          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
+        },
+      },
+      policy: [
+        {
+          Effect: 'Allow',
+          Actions: [
+            'sqs:ReceiveMessage',
+            'sqs:DeleteMessage',
+            'sqs:GetQueueAttributes',
+          ],
+          Resources: [pollInsightsQueue.arn],
+        },
+        {
+          Effect: 'Allow',
+          Actions: ['dynamodb:PutItem'],
+          Resources: [pollInsightsDynamoTable.arn],
+        },
+      ],
+    })
+
+    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
+      eventSourceArn: pollInsightsQueue.arn,
+      functionName: pollInsightsQueueHandler.name,
+      enabled: true,
+      batchSize: 10,
+      functionResponseTypes: ['ReportBatchItemFailures'],
+    })
+
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
@@ -317,6 +393,22 @@ export default $config({
         },
       },
       permissions: [
+        {
+          actions: ['route53domains:Get*', 'route53domains:List*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['route53domains:CheckDomainAvailability'],
+          resources: ['*'],
+        },
+        {
+          actions: ['s3:*', 's3-object-lambda:*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['sqs:*'],
+          resources: ['*'],
+        },
         {
           actions: ['dynamodb:PutItem', 'dynamodb:Query'],
           resources: [pollInsightsDynamoTable.arn],

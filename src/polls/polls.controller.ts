@@ -16,17 +16,11 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignWithPathToVictory } from 'src/contacts/contacts.types'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import {
-  PollResponseInsight,
-  queryTopIssues,
-  uploadPollResultData,
-} from './dynamo-helpers'
+import { exampleIssues, queryTopIssues } from './dynamo-helpers'
 import z from 'zod'
 import { Poll } from '@prisma/client'
 import { APIPoll } from './polls.types'
 import { orderBy } from 'lodash'
-
-class SubmitPollResultDataDTO extends createZodDto(PollResponseInsight) {}
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
@@ -40,6 +34,8 @@ class ListPollsQueryDTO extends createZodDto(
     limit: z.coerce.number().min(1).max(100).default(20),
   }),
 ) {}
+
+const IS_LOCAL = process.env.NODE_ENV !== 'production'
 
 const toAPIPoll = (poll: Poll): APIPoll => ({
   id: poll.id,
@@ -95,27 +91,15 @@ export class PollsController {
   ) {
     await this.ensurePollAccess(pollId, campaign)
 
+    if (IS_LOCAL) {
+      return { results: exampleIssues(pollId) }
+    }
+
     const issues = await queryTopIssues(this.logger, pollId)
 
     const byMentionCount = orderBy(issues, (i) => i.mentionCount, 'desc')
 
     return { results: byMentionCount }
-  }
-
-  @Put('/:pollId/internal/result')
-  async submitPollResultData(
-    @Param('pollId') pollId: string,
-    @Body() data: SubmitPollResultDataDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
-  ) {
-    const poll = await this.ensurePollAccess(pollId, campaign)
-
-    if (poll.status !== 'IN_PROGRESS') {
-      throw new BadRequestException('Poll is not currently in-progress')
-    }
-
-    await uploadPollResultData(data)
-    return {}
   }
 
   @Put('/:pollId/internal/complete')

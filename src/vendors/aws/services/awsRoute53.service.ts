@@ -8,7 +8,6 @@ import {
 } from '@aws-sdk/client-route-53-domains'
 import { AwsService } from './aws.service'
 
-const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
 const AWS_ROUTE_53_REGION = 'us-east-1'
 
 @Injectable()
@@ -17,22 +16,9 @@ export class AwsRoute53Service extends AwsService {
 
   constructor() {
     super()
-
-    if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
-      throw new Error(
-        'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are not set in ENV',
-      )
-    }
-
-    const initOptions = {
+    this.domainsClient = new Route53DomainsClient({
       region: AWS_ROUTE_53_REGION,
-      credentials: {
-        accessKeyId: AWS_ACCESS_KEY_ID,
-        secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      },
-    }
-
-    this.domainsClient = new Route53DomainsClient(initOptions)
+    })
   }
 
   /**

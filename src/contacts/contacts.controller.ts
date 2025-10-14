@@ -82,19 +82,19 @@ export class ContactsController {
   sendTevynSlack(
     @ReqUser() user: User,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
-    @Body() { message, csvFileUrl, imageUrl }: TevynApiDto,
+    @Body() { message, csvFileUrl, imageUrl, createPoll }: TevynApiDto,
   ) {
     const userInfo = {
       name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
       email: user.email,
       phone: user.phone || undefined,
     }
-    const campaignSlug = campaign.slug
 
     return this.contactsService.sendTevynApiMessage(
       message,
       userInfo,
-      campaignSlug,
+      campaign,
+      createPoll,
       csvFileUrl || undefined,
       imageUrl || undefined,
     )
