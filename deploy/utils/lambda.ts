@@ -1,15 +1,20 @@
 import type AWS from '@pulumi/aws'
 import type { FunctionArgs } from '@pulumi/aws/lambda'
 
-export type LambdaConfig = Omit<FunctionArgs, 'name' | 'role'> & {
+export type LambdaConfig = Omit<
+  FunctionArgs,
+  'name' | 'role' | 'code' | 'handler'
+> & {
   name: string
+  filename: string
   policy?: {
     Resources: string[]
     Actions: string[]
   }[]
 }
 
-export const lambda = (aws: typeof AWS, config: LambdaConfig) => {
+export const lambda = async (aws: typeof AWS, config: LambdaConfig) => {
+  const pulumi = await import('@pulumi/pulumi')
   const role = new aws.iam.Role(`${config.name}-role`, {
     name: `${config.name}-role`,
     assumeRolePolicy: JSON.stringify({
@@ -45,6 +50,12 @@ export const lambda = (aws: typeof AWS, config: LambdaConfig) => {
 
   const lambda = new aws.lambda.Function(`${config.name}-function`, {
     ...config,
+    code: new pulumi.asset.AssetArchive({
+      'index.js': new pulumi.asset.FileAsset(
+        `../dist/lambdas/${config.filename}`,
+      ),
+    }),
+    handler: 'index.handler',
     role: role.arn,
   })
 

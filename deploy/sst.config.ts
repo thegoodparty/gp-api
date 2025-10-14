@@ -271,13 +271,12 @@ export default $config({
       },
     )
 
-    const pollInsightsQueueHandler = lambda(aws, {
+    const pollInsightsQueueHandler = await lambda(aws, {
       name: `poll-insights-queue-handler-${$app.stage}`,
       runtime: 'nodejs22.x',
       timeout: HANDLER_TIMEOUT,
       memorySize: 512,
-      code: new pulumi.asset.FileArchive('../dist/lambdas'),
-      handler: 'poll-response-analysis-queue-handler.handler',
+      filename: 'poll-response-analysis-queue-handler.js',
       environment: {
         variables: {
           POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name.get(),
