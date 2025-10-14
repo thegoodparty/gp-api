@@ -310,13 +310,13 @@ export default $config({
       ],
     })
 
-    // new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-    //   eventSourceArn: pollInsightsQueue.arn,
-    //   functionName: pollInsightsQueueHandler.name,
-    //   enabled: true,
-    //   batchSize: 10,
-    //   functionResponseTypes: ['ReportBatchItemFailures'],
-    // })
+    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
+      eventSourceArn: pollInsightsQueue.arn,
+      functionName: pollInsightsQueueHandler.name,
+      enabled: true,
+      batchSize: 10,
+      functionResponseTypes: ['ReportBatchItemFailures'],
+    })
 
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
