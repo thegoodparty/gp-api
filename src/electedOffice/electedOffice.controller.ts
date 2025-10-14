@@ -39,6 +39,8 @@ export class ElectedOfficeController {
     }
   }
 
+  // termLengthDays provided directly by DTO; no parsing needed
+
   @Get('/')
   async list(@ReqUser() user: User) {
     const items = await this.electedOfficeService.findMany({
@@ -58,17 +60,19 @@ export class ElectedOfficeController {
   }
 
   @Post('/')
-  create(@ReqUser() user: User, @Body() body: CreateElectedOfficeDto) {
+  async create(@ReqUser() user: User, @Body() body: CreateElectedOfficeDto) {
     const data: Prisma.ElectedOfficeCreateInput = {
       electedDate: body.electedDate,
       swornInDate: body.swornInDate,
       termStartDate: body.termStartDate,
       termEndDate: body.termEndDate,
+      termLengthDays: body.termLengthDays,
       isActive: body.isActive,
       user: { connect: { id: user.id } },
       campaign: { connect: { id: body.campaignId } },
     }
-    return this.electedOfficeService.create({ data })
+    const created = await this.electedOfficeService.create({ data })
+    return this.toApi(created)
   }
 
   @Put(':id')
@@ -88,9 +92,14 @@ export class ElectedOfficeController {
       swornInDate: body.swornInDate,
       termStartDate: body.termStartDate,
       termEndDate: body.termEndDate,
+      termLengthDays: body.termLengthDays,
       isActive: body.isActive,
     }
-    return this.electedOfficeService.update({ where: { id }, data })
+    const updated = await this.electedOfficeService.update({
+      where: { id },
+      data,
+    })
+    return this.toApi(updated)
   }
 
   @Delete(':id')

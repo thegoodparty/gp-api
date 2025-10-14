@@ -94,8 +94,8 @@ export class PollsController {
       message,
       userInfo,
       electedOffice,
-      csvFileUrl || undefined,
       imageUrl || undefined,
+      csvFileUrl || undefined,
     )
   }
 

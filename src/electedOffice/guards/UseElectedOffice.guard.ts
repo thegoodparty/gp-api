@@ -44,10 +44,12 @@ export class UseElectedOfficeGuard implements CanActivate {
       throw new NotFoundException()
     }
 
-    const electedOffice = await this.electedOfficeService.findUnique({
-      where: { id },
-      include,
-    })
+    const electedOffice = id
+      ? await this.electedOfficeService.findUnique({ where: { id }, include })
+      : await this.electedOfficeService.findFirst({
+          where: { userId: request.user.id, isActive: true },
+          include,
+        })
 
     if (electedOffice) {
       request.electedOffice = electedOffice

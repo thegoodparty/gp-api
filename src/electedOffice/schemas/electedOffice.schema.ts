@@ -11,7 +11,7 @@ export const CreateElectedOfficeSchema = z.object({
   swornInDate: ZDateOnlyOptional,
   termStartDate: ZDateOnlyOptional,
   termEndDate: ZDateOnlyOptional,
-  termLength: z.string().optional(),
+  termLengthDays: z.coerce.number().int().positive().optional(),
   isActive: z.boolean(),
   campaignId: z.number().int(),
 })
@@ -21,7 +21,7 @@ export const UpdateElectedOfficeSchema = z.object({
   swornInDate: ZDateOnlyNullOptional,
   termStartDate: ZDateOnlyNullOptional,
   termEndDate: ZDateOnlyNullOptional,
-  termLength: z.string().nullable().optional(),
+  termLengthDays: z.coerce.number().int().positive().nullable().optional(),
   isActive: z.boolean().optional(),
 })
 
