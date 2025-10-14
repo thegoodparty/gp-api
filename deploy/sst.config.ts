@@ -271,7 +271,7 @@ export default $config({
       },
     )
 
-    const pollInsightsQueueHandler = await lambda(aws, {
+    const pollInsightsQueueHandler = lambda(aws, pulumi, {
       name: `poll-insights-queue-handler-${$app.stage}`,
       runtime: 'nodejs22.x',
       timeout: HANDLER_TIMEOUT,
@@ -279,7 +279,7 @@ export default $config({
       filename: 'poll-response-analysis-queue-handler.js',
       environment: {
         variables: {
-          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name.get(),
+          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
         },
       },
       policy: [
@@ -289,18 +289,18 @@ export default $config({
             'sqs:DeleteMessage',
             'sqs:GetQueueAttributes',
           ],
-          Resources: [pollInsightsQueue.arn.get()],
+          Resources: [pollInsightsQueue.arn],
         },
         {
           Actions: ['dynamodb:PutItem'],
-          Resources: [pollInsightsDynamoTable.arn.get()],
+          Resources: [pollInsightsDynamoTable.arn],
         },
       ],
     })
 
     new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-      eventSourceArn: pollInsightsQueue.arn.get(),
-      functionName: pollInsightsQueueHandler.name.get(),
+      eventSourceArn: pollInsightsQueue.arn,
+      functionName: pollInsightsQueueHandler.name,
       enabled: true,
       batchSize: 10,
       functionResponseTypes: ['ReportBatchItemFailures'],
