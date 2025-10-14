@@ -38,18 +38,16 @@ export class UseElectedOfficeGuard implements CanActivate {
     const idRaw = request.params?.[idParam]
     const id = idRaw ? Number(idRaw) : undefined
 
-    if (!id || Number.isNaN(id)) {
-      this.logger.log('No elected office id provided on request params')
-      if (continueIfNotFound) return true
-      throw new NotFoundException()
-    }
-
-    const electedOffice = id
-      ? await this.electedOfficeService.findUnique({ where: { id }, include })
-      : await this.electedOfficeService.findFirst({
-          where: { userId: request.user.id, isActive: true },
-          include,
-        })
+    const electedOffice =
+      !id || Number.isNaN(id)
+        ? await this.electedOfficeService.findFirst({
+            where: { userId: request.user.id, isActive: true },
+            include,
+          })
+        : await this.electedOfficeService.findFirst({
+            where: { id, userId: request.user.id },
+            include,
+          })
 
     if (electedOffice) {
       request.electedOffice = electedOffice
