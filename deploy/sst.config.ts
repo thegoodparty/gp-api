@@ -296,18 +296,16 @@ export default $config({
       },
       policy: [
         {
-          Effect: 'Allow',
-          Actions: [
+          actions: [
             'sqs:ReceiveMessage',
             'sqs:DeleteMessage',
             'sqs:GetQueueAttributes',
           ],
-          Resource: [pollInsightsQueue.arn],
+          resources: [pollInsightsQueue.arn],
         },
         {
-          Effect: 'Allow',
-          Actions: ['dynamodb:PutItem'],
-          Resource: [pollInsightsDynamoTable.arn],
+          actions: ['dynamodb:PutItem'],
+          resources: [pollInsightsDynamoTable.arn],
         },
       ],
     })
