@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common'
 import { VoterFileFilter } from '@prisma/client'
 import { isAxiosError } from 'axios'
-import dayjs from 'dayjs'
+import { add } from 'date-fns'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
@@ -1144,7 +1144,7 @@ export class ContactsService {
           messageContent: message,
           targetAudienceSize: 500,
           scheduledDate: now,
-          estimatedCompletionDate: dayjs(now).add(1, 'week').toDate(),
+          estimatedCompletionDate: add(now, { weeks: 1 }),
           imageUrl: imageUrl,
           campaignId: campaign.id,
         },
