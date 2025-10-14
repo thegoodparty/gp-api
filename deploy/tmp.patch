@@ -1,8 +1,8 @@
-@@ -303,6 +303,7 @@
-                 // Always hide the stack for RunErrors.
-                 log.error(err.message);
+@@ -298,6 +298,7 @@
+             if (isErrorReported(err)) {
+                 return;
              }
 +            log.error(`SWAIN found error: ${err.message}`);
-             else if (err.name === "TSError" || err.name === SyntaxError.name) {
-                 // Hide stack frames as TSError/SyntaxError have messages containing
-                 // where the error is located
+             // First, log the error.
+             if (errors_1.RunError.isInstance(err)) {
+                 // Always hide the stack for RunErrors.
