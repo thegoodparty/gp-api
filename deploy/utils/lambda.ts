@@ -33,35 +33,35 @@ export const lambda = (
     },
   })
 
-  const logGroup = new aws.cloudwatch.LogGroup(`${config.name}-log-group`, {
-    name: `/aws/lambda/${config.name}`,
-    retentionInDays: 30,
-  })
+  // const logGroup = new aws.cloudwatch.LogGroup(`${config.name}-log-group`, {
+  //   name: `/aws/lambda/${config.name}`,
+  //   retentionInDays: 30,
+  // })
 
-  new aws.iam.RolePolicy(`${config.name}-policy`, {
-    role: role.name,
-    policy: {
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Effect: 'Allow',
-          Action: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-          Resource: ['*'],
-        },
-      ],
-    },
-  })
+  // new aws.iam.RolePolicy(`${config.name}-policy`, {
+  //   role: role.name,
+  //   policy: {
+  //     Version: '2012-10-17',
+  //     Statement: [
+  //       {
+  //         Effect: 'Allow',
+  //         Action: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+  //         Resource: ['*'],
+  //       },
+  //     ],
+  //   },
+  // })
 
-  const lambda = new aws.lambda.Function(`${config.name}-function`, {
-    ...config,
-    code: new pulumi.asset.AssetArchive({
-      'index.js': new pulumi.asset.FileAsset(
-        `${__dirname}/../dist/lambdas/${filename}`,
-      ),
-    }),
-    handler: 'index.handler',
-    role: role.arn,
-  })
+  // const lambda = new aws.lambda.Function(`${config.name}-function`, {
+  //   ...config,
+  //   code: new pulumi.asset.AssetArchive({
+  //     'index.js': new pulumi.asset.FileAsset(
+  //       `${__dirname}/../dist/lambdas/${filename}`,
+  //     ),
+  //   }),
+  //   handler: 'index.handler',
+  //   role: role.arn,
+  // })
 
-  return lambda
+  // return lambda
 }
