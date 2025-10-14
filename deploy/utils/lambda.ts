@@ -10,9 +10,8 @@ export type LambdaConfig = Omit<
   name: string
   filename: string
   policy: {
-    Effect: 'Allow' | 'Deny'
-    Resource: (string | Output<string>)[]
-    Actions: string[]
+    actions: string[]
+    resources: (string | Output<string>)[]
   }[]
 }
 
@@ -40,19 +39,19 @@ export const lambda = (
     retentionInDays: 30,
   })
 
+  const policyDocument = aws.iam.getPolicyDocumentOutput({
+    statements: [
+      {
+        actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+        resources: [pulumi.interpolate`${logGroup.arn}:*`],
+      },
+      ...policy,
+    ],
+  })
+
   new aws.iam.RolePolicy(`${config.name}-policy`, {
     role: role.name,
-    policy: {
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Effect: 'Allow',
-          Action: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-          Resource: [pulumi.interpolate`${logGroup.arn}:*`],
-        },
-        ...policy,
-      ],
-    },
+    policy: policyDocument.json,
   })
 
   // Swain: I have no idea why this is the right path to our dist directory during the
