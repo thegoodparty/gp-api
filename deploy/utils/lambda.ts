@@ -1,6 +1,7 @@
 import type AWS from '@pulumi/aws'
 import type { FunctionArgs } from '@pulumi/aws/lambda'
 import Pulumi, { Output } from '@pulumi/pulumi'
+import path from 'path'
 
 export type LambdaConfig = Omit<
   FunctionArgs,
@@ -52,9 +53,14 @@ export const lambda = (
     },
   })
 
-  const code = new pulumi.asset.FileAsset(
-    `${__dirname}/../dist/lambdas/${filename}.zip`,
-  )
+  // Swain: I have no idea why this is the right path to our dist directory during the
+  // SST deploy, but it is. SST is doing some kind of weird stuff with the sst.config.ts
+  // file, such that it must get moved around during the deploy or something.
+  const filepath = path.join(__dirname, `../../../dist/lambdas/${filename}.zip`)
+
+  console.log('SWAIN FILEPATH: ', filepath)
+
+  const code = new pulumi.asset.FileAsset(filepath)
 
   const lambda = new aws.lambda.Function(`${config.name}-function`, {
     ...config,
