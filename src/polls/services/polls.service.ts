@@ -55,5 +55,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     })
 
     await this.slack.message({ blocks }, SlackChannel.botTevynApi)
+
+    return poll
   }
 }
