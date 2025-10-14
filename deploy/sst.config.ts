@@ -302,12 +302,12 @@ export default $config({
             'sqs:DeleteMessage',
             'sqs:GetQueueAttributes',
           ],
-          Resources: [pollInsightsQueue.arn],
+          Resource: [pollInsightsQueue.arn],
         },
         {
           Effect: 'Allow',
           Actions: ['dynamodb:PutItem'],
-          Resources: [pollInsightsDynamoTable.arn],
+          Resource: [pollInsightsDynamoTable.arn],
         },
       ],
     })
