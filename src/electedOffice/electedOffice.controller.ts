@@ -61,6 +61,14 @@ export class ElectedOfficeController {
 
   @Post('/')
   async create(@ReqUser() user: User, @Body() body: CreateElectedOfficeDto) {
+    // Do this without guard to hopefully slowly move away from the hard link to campaign
+    const campaign = await this.electedOfficeService.client.campaign.findFirst({
+      where: { id: body.campaignId, userId: user.id },
+      select: { id: true },
+    })
+    if (!campaign) {
+      throw new ForbiddenException('Not allowed to link campaign')
+    }
     const data: Prisma.ElectedOfficeCreateInput = {
       electedDate: body.electedDate,
       swornInDate: body.swornInDate,
