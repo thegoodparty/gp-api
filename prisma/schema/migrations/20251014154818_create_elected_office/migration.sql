@@ -48,7 +48,7 @@ CREATE INDEX "Poll_elected_office_id_id_idx" ON "Poll"("elected_office_id", "id"
 ALTER TABLE "ElectedOffice" ADD CONSTRAINT "ElectedOffice_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ElectedOffice" ADD CONSTRAINT "ElectedOffice_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ElectedOffice" ADD CONSTRAINT "ElectedOffice_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaign"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Poll" ADD CONSTRAINT "Poll_elected_office_id_fkey" FOREIGN KEY ("elected_office_id") REFERENCES "ElectedOffice"("id") ON DELETE CASCADE ON UPDATE CASCADE;
