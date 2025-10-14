@@ -10,17 +10,20 @@ import {
   Body,
   BadRequestException,
   Query,
+  Post,
 } from '@nestjs/common'
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
-import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { CampaignWithPathToVictory } from 'src/contacts/contacts.types'
-import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { exampleIssues, queryTopIssues } from './dynamo-helpers'
 import z from 'zod'
-import { Poll } from '@prisma/client'
+import { ElectedOffice, Poll } from '@prisma/client'
 import { APIPoll } from './polls.types'
 import { orderBy } from 'lodash'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { User } from '@prisma/client'
+import { PollInitialDto } from './schemas/poll.schema'
+import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
+import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
@@ -51,7 +54,7 @@ const toAPIPoll = (poll: Poll): APIPoll => ({
 })
 
 @Controller('polls')
-@UseCampaign()
+@UseElectedOffice()
 @UsePipes(ZodValidationPipe)
 export class PollsController {
   constructor(private readonly pollsService: PollsService) {}
@@ -60,11 +63,11 @@ export class PollsController {
   @Get('/')
   async listPolls(
     @Query() query: ListPollsQueryDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
   ) {
     const polls = await this.pollsService.findMany({
       cursor: query.cursor ? { id: query.cursor } : undefined,
-      where: { campaignId: campaign.id },
+      where: { electedOfficeId: electedOffice.id },
       // Ordering is essential! Don't forget that without this, Postgres will
       // return results in a non-deterministic order.
       orderBy: { id: 'asc' },
@@ -75,21 +78,42 @@ export class PollsController {
     return { results, pagination: { nextCursor } }
   }
 
+  @Post('initial-poll')
+  createInitialPoll(
+    @ReqUser() user: User,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @Body() { message, csvFileUrl, imageUrl }: PollInitialDto,
+  ) {
+    const userInfo = {
+      name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      email: user.email,
+      phone: user.phone || undefined,
+    }
+
+    return this.pollsService.createInitialPoll(
+      message,
+      userInfo,
+      electedOffice,
+      csvFileUrl || undefined,
+      imageUrl || undefined,
+    )
+  }
+
   @Get('/:pollId')
   async getPoll(
     @Param('pollId') pollId: string,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
   ) {
-    const poll = await this.ensurePollAccess(pollId, campaign)
+    const poll = await this.ensurePollAccess(pollId, electedOffice)
     return toAPIPoll(poll)
   }
 
   @Get('/:pollId/top-issues')
   async getTopIssues(
     @Param('pollId') pollId: string,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
   ) {
-    await this.ensurePollAccess(pollId, campaign)
+    await this.ensurePollAccess(pollId, electedOffice)
 
     if (IS_LOCAL) {
       return { results: exampleIssues(pollId) }
@@ -106,9 +130,9 @@ export class PollsController {
   async markPollComplete(
     @Param('pollId') pollId: string,
     @Body() data: MarkPollCompleteDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
   ) {
-    const existing = await this.ensurePollAccess(pollId, campaign)
+    const existing = await this.ensurePollAccess(pollId, electedOffice)
 
     if (existing.status !== 'IN_PROGRESS') {
       throw new BadRequestException('Poll is not currently in-progress')
@@ -125,10 +149,7 @@ export class PollsController {
     return toAPIPoll(poll)
   }
 
-  private async ensurePollAccess(
-    pollId: string,
-    campaign: CampaignWithPathToVictory,
-  ) {
+  private async ensurePollAccess(pollId: string, electedOffice: ElectedOffice) {
     const poll = await this.pollsService.findUnique({
       where: { id: pollId },
     })
@@ -137,7 +158,7 @@ export class PollsController {
       throw new NotFoundException('Poll not found')
     }
 
-    if (poll.campaignId !== campaign.id) {
+    if (poll.electedOfficeId !== electedOffice.id) {
       throw new ForbiddenException(
         'You do not have permission to access this poll',
       )
