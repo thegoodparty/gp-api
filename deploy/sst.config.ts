@@ -279,7 +279,7 @@ export default $config({
       filename: 'poll-response-analysis-queue-handler.js',
       environment: {
         variables: {
-          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
+          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name.get(),
         },
       },
       policy: [
@@ -289,18 +289,18 @@ export default $config({
             'sqs:DeleteMessage',
             'sqs:GetQueueAttributes',
           ],
-          Resources: [pollInsightsQueue.arn],
+          Resources: [pollInsightsQueue.arn.get()],
         },
         {
           Actions: ['dynamodb:PutItem'],
-          Resources: [pollInsightsDynamoTable.arn],
+          Resources: [pollInsightsDynamoTable.arn.get()],
         },
       ],
     })
 
     new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-      eventSourceArn: pollInsightsQueue.arn,
-      functionName: pollInsightsQueueHandler.name,
+      eventSourceArn: pollInsightsQueue.arn.get(),
+      functionName: pollInsightsQueueHandler.name.get(),
       enabled: true,
       batchSize: 10,
       functionResponseTypes: ['ReportBatchItemFailures'],
