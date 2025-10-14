@@ -288,7 +288,7 @@ export default $config({
       runtime: 'nodejs22.x',
       timeout: HANDLER_TIMEOUT,
       memorySize: 512,
-      filename: 'poll-response-analysis-queue-handler.js',
+      filename: 'poll-response-analysis-queue-handler',
       environment: {
         variables: {
           POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
