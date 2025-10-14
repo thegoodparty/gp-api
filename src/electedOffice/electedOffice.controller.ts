@@ -93,7 +93,9 @@ export class ElectedOfficeController {
       where: { id },
     })
     if (!existing || existing.userId !== user.id) {
-      throw new ForbiddenException('Not allowed')
+      throw new ForbiddenException(
+        'You do not have permission to update this elected office',
+      )
     }
     const data: Prisma.ElectedOfficeUpdateInput = {
       electedDate: body.electedDate,

@@ -11,6 +11,7 @@ import {
   REQUIRE_ELECTED_OFFICE_META_KEY,
   RequireElectedOfficeMetadata,
 } from '../decorators/UseElectedOffice.decorator'
+import { ElectedOffice } from '@prisma/client'
 
 @Injectable()
 export class UseElectedOfficeGuard implements CanActivate {
@@ -25,7 +26,7 @@ export class UseElectedOfficeGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{
       params?: Record<string, string>
       user: { id: number }
-      electedOffice?: unknown
+      electedOffice?: ElectedOffice
     }>()
 
     const { continueIfNotFound, include, param } =
