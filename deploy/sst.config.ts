@@ -279,7 +279,7 @@ export default $config({
       filename: 'poll-response-analysis-queue-handler.js',
       environment: {
         variables: {
-          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name.get(),
+          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
         },
       },
       policy: [
@@ -289,11 +289,11 @@ export default $config({
             'sqs:DeleteMessage',
             'sqs:GetQueueAttributes',
           ],
-          Resources: [pollInsightsQueue.arn.get()],
+          Resources: [pollInsightsQueue.arn],
         },
         {
           Actions: ['dynamodb:PutItem'],
-          Resources: [pollInsightsDynamoTable.arn.get()],
+          Resources: [pollInsightsDynamoTable.arn],
         },
       ],
     })
