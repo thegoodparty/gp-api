@@ -1,5 +1,6 @@
 import type AWS from '@pulumi/aws'
 import type { FunctionArgs } from '@pulumi/aws/lambda'
+import type * as pulumi from '@pulumi/pulumi'
 
 export type LambdaConfig = Omit<
   FunctionArgs,
@@ -8,7 +9,7 @@ export type LambdaConfig = Omit<
   name: string
   filename: string
   policy?: {
-    Resources: string[]
+    Resources: (string | pulumi.Output<string>)[]
     Actions: string[]
   }[]
 }
@@ -34,18 +35,21 @@ export const lambda = async (aws: typeof AWS, config: LambdaConfig) => {
     retentionInDays: 30,
   })
 
+  // Build the policy with proper handling of Pulumi outputs
+  const policyDocument = pulumi.output({
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+        Resources: [pulumi.interpolate`${logGroup.arn}:*`],
+      },
+      ...(config.policy || []),
+    ],
+  })
+
   new aws.iam.RolePolicy(`${config.name}-policy`, {
     role: role.name,
-    policy: JSON.stringify({
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-          Resources: [`${logGroup.arn.get()}:*`],
-        },
-        ...(config.policy ?? []),
-      ],
-    }),
+    policy: policyDocument.apply((doc) => JSON.stringify(doc)),
   })
 
   const lambda = new aws.lambda.Function(`${config.name}-function`, {
