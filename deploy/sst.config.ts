@@ -271,40 +271,40 @@ export default $config({
       },
     )
 
-    const pollInsightsQueueHandler = lambda(aws, pulumi, {
-      name: `poll-insights-queue-handler-${$app.stage}`,
-      runtime: 'nodejs22.x',
-      timeout: HANDLER_TIMEOUT,
-      memorySize: 512,
-      filename: 'poll-response-analysis-queue-handler.js',
-      environment: {
-        variables: {
-          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
-        },
-      },
-      policy: [
-        {
-          Actions: [
-            'sqs:ReceiveMessage',
-            'sqs:DeleteMessage',
-            'sqs:GetQueueAttributes',
-          ],
-          Resources: [pollInsightsQueue.arn],
-        },
-        {
-          Actions: ['dynamodb:PutItem'],
-          Resources: [pollInsightsDynamoTable.arn],
-        },
-      ],
-    })
+    // const pollInsightsQueueHandler = lambda(aws, pulumi, {
+    //   name: `poll-insights-queue-handler-${$app.stage}`,
+    //   runtime: 'nodejs22.x',
+    //   timeout: HANDLER_TIMEOUT,
+    //   memorySize: 512,
+    //   filename: 'poll-response-analysis-queue-handler.js',
+    //   environment: {
+    //     variables: {
+    //       POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
+    //     },
+    //   },
+    //   policy: [
+    //     {
+    //       Actions: [
+    //         'sqs:ReceiveMessage',
+    //         'sqs:DeleteMessage',
+    //         'sqs:GetQueueAttributes',
+    //       ],
+    //       Resources: [pollInsightsQueue.arn],
+    //     },
+    //     {
+    //       Actions: ['dynamodb:PutItem'],
+    //       Resources: [pollInsightsDynamoTable.arn],
+    //     },
+    //   ],
+    // })
 
-    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-      eventSourceArn: pollInsightsQueue.arn,
-      functionName: pollInsightsQueueHandler.name,
-      enabled: true,
-      batchSize: 10,
-      functionResponseTypes: ['ReportBatchItemFailures'],
-    })
+    // new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
+    //   eventSourceArn: pollInsightsQueue.arn,
+    //   functionName: pollInsightsQueueHandler.name,
+    //   enabled: true,
+    //   batchSize: 10,
+    //   functionResponseTypes: ['ReportBatchItemFailures'],
+    // })
 
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
