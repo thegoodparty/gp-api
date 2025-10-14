@@ -1,9 +1,8 @@
-@@ -32,7 +32,7 @@
- function defaultErrorMessage(err) {
-     if (err === null || err === void 0 ? void 0 : err.stack) {
-         // colorize stack trace if exists
--        return util.inspect(err, { colors: true });
-+        return err.message;
-     }
-     if (err === null || err === void 0 ? void 0 : err.message) {
-         return err.message;
+@@ -303,6 +303,7 @@
+                 // Always hide the stack for RunErrors.
+                 log.error(err.message);
+             }
++            log.error(`SWAIN found error: ${err.message}`);
+             else if (err.name === "TSError" || err.name === SyntaxError.name) {
+                 // Hide stack frames as TSError/SyntaxError have messages containing
+                 // where the error is located
