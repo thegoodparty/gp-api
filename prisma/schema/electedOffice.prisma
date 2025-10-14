@@ -1,7 +1,7 @@
 model ElectedOffice {
     id                      Int         @id         @default(autoincrement())
     publicId                String      @unique     @default(cuid()) @map("public_id")
-    // UUID7 for time-based ordering of IDs. This is important for the cursor-based pagination model supported by the Elected Offices API.
+    
     electedDate             DateTime?   @db.Date @map("elected_date")
     swornInDate             DateTime?   @db.Date @map("sworn_in_date")
     termStartDate           DateTime?   @db.Date @map("term_start_date")
