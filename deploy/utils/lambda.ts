@@ -52,18 +52,16 @@ export const lambda = (
     },
   })
 
-  const code = new pulumi.asset.AssetArchive({
-    'index.js': new pulumi.asset.FileAsset(
-      `${__dirname}/../dist/lambdas/${filename}`,
-    ),
+  const code = new pulumi.asset.FileAsset(
+    `${__dirname}/../dist/lambdas/${filename}.zip`,
+  )
+
+  const lambda = new aws.lambda.Function(`${config.name}-function`, {
+    ...config,
+    code,
+    handler: 'index.handler',
+    role: role.arn,
   })
 
-  // const lambda = new aws.lambda.Function(`${config.name}-function`, {
-  //   ...config,
-  //   code,
-  //   handler: 'index.handler',
-  //   role: role.arn,
-  // })
-
-  // return lambda
+  return lambda
 }
