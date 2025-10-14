@@ -52,7 +52,7 @@ export const lambda = async (aws: typeof AWS, config: LambdaConfig) => {
     ...config,
     code: new pulumi.asset.AssetArchive({
       'index.js': new pulumi.asset.FileAsset(
-        `../dist/lambdas/${config.filename}`,
+        `../../../dist/lambdas/${config.filename}`,
       ),
     }),
     handler: 'index.handler',
