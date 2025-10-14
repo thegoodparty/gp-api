@@ -17,7 +17,7 @@ export const lambda = async (aws: typeof AWS, config: LambdaConfig) => {
   const pulumi = await import('@pulumi/pulumi')
   const role = new aws.iam.Role(`${config.name}-role`, {
     name: `${config.name}-role`,
-    assumeRolePolicy: JSON.stringify({
+    assumeRolePolicy: {
       Version: '2012-10-17',
       Statement: [
         {
@@ -26,7 +26,7 @@ export const lambda = async (aws: typeof AWS, config: LambdaConfig) => {
           Principal: { Service: 'lambda.amazonaws.com' },
         },
       ],
-    }),
+    },
   })
 
   const logGroup = new aws.cloudwatch.LogGroup(`${config.name}-log-group`, {
@@ -36,16 +36,10 @@ export const lambda = async (aws: typeof AWS, config: LambdaConfig) => {
 
   new aws.iam.RolePolicy(`${config.name}-policy`, {
     role: role.name,
-    policy: JSON.stringify({
+    policy: {
       Version: '2012-10-17',
-      Statement: [
-        // {
-        //   Actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-        //   Resources: [`${logGroup.arn.get()}:*`],
-        // },
-        // ...(config.policy ?? []),
-      ],
-    }),
+      Statement: [],
+    },
   })
 
   const lambda = new aws.lambda.Function(`${config.name}-function`, {
