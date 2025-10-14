@@ -38,7 +38,13 @@ export const lambda = async (aws: typeof AWS, config: LambdaConfig) => {
     role: role.name,
     policy: {
       Version: '2012-10-17',
-      Statement: [],
+      Statement: [
+        {
+          Effect: 'Allow',
+          Action: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+          Resource: ['*'],
+        },
+      ],
     },
   })
 
