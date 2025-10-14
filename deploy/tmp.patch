@@ -1,0 +1,9 @@
+@@ -32,7 +32,7 @@
+ function defaultErrorMessage(err) {
+     if (err === null || err === void 0 ? void 0 : err.stack) {
+         // colorize stack trace if exists
+-        return util.inspect(err, { colors: true });
++        return err.message;
+     }
+     if (err === null || err === void 0 ? void 0 : err.message) {
+         return err.message;
