@@ -14,8 +14,6 @@ import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {
   CampaignWithPathToVictory,
@@ -36,9 +34,7 @@ import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
-import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
 import { PollsService } from 'src/polls/services/polls.service'
-import dayjs from 'dayjs'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -58,7 +54,6 @@ export class ContactsService {
     private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
-    private readonly slack: SlackService,
     private readonly pollsService: PollsService,
   ) {}
 
@@ -950,41 +945,4 @@ export class ContactsService {
     return 'Unknown'
   }
 
-  async sendTevynApiMessage(
-    message: string,
-    userInfo: { name?: string; email: string; phone?: string },
-    campaign: CampaignWithPathToVictory,
-    createPoll: boolean,
-    csvFileUrl?: string,
-    imageUrl?: string,
-  ) {
-    let pollId: string | undefined
-    if (createPoll) {
-      const now = new Date()
-      const poll = await this.pollsService.create({
-        data: {
-          name: 'Top Community Issues',
-          status: 'IN_PROGRESS',
-          messageContent: message,
-          targetAudienceSize: 500,
-          scheduledDate: now,
-          estimatedCompletionDate: dayjs(now).add(1, 'week').toDate(),
-          imageUrl: imageUrl,
-          campaignId: campaign.id,
-        },
-      })
-      pollId = poll.id
-    }
-
-    const blocks = buildTevynApiSlackBlocks({
-      message,
-      pollId,
-      csvFileUrl,
-      imageUrl,
-      userInfo,
-      campaignSlug: campaign.slug,
-    })
-
-    await this.slack.message({ blocks }, SlackChannel.botTevynApi)
-  }
 }

@@ -22,10 +22,13 @@ model Poll {
   scheduledDate           DateTime        @map("scheduled_date")
   estimatedCompletionDate DateTime
   completedDate           DateTime?       @map("completed_date")
-  campaign                Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId              Int             @map("campaign_id")
+
+  electedOffice           ElectedOffice?  @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
+  electedOfficeId         String?         @map("elected_office_id")
+
   createdAt               DateTime        @default(now()) @map("created_at")
   updatedAt               DateTime        @updatedAt @map("updated_at")
 
-  @@index([campaignId, id])
+  @@index([electedOfficeId, id])
+  @@map("poll")
 }
