@@ -57,4 +57,10 @@ export class ElectedOfficeService extends createPrismaBase(
   delete(args: Prisma.ElectedOfficeDeleteArgs) {
     return this.model.delete(args)
   }
+
+  getCurrentElectedOffice(userId: number) {
+    return this.model.findFirst({
+      where: { userId, isActive: true },
+    })
+  }
 }

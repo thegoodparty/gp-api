@@ -37,9 +37,9 @@ export class ElectedOfficeController {
 
   @Get('current')
   async getCurrent(@ReqUser() user: User) {
-    const record = await this.electedOfficeService.findFirst({
-      where: { userId: user.id, isActive: true },
-    })
+    const record = await this.electedOfficeService.getCurrentElectedOffice(
+      user.id,
+    )
     if (!record) {
       throw new NotFoundException('No active elected office found')
     }

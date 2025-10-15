@@ -26,6 +26,7 @@ import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
@@ -62,6 +63,7 @@ export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
     private readonly analytics: AnalyticsService,
+    private readonly electedOfficeService: ElectedOfficeService,
   ) {}
   private readonly logger = new Logger(this.constructor.name)
 
@@ -84,11 +86,38 @@ export class PollsController {
   }
 
   @Post('initial-poll')
-  createInitialPoll(
+  async createInitialPoll(
     @ReqUser() user: User,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body() { message, csvFileUrl, imageUrl, createPoll }: PollInitialDto,
   ) {
+    // TEMPORARY FIX START
+    // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
+    //     This will be removed once we lock it down. If this is still here after 12/1/25, please remove it.
+    //     If you don't have an active elected office, temporary let's create
+    let electedOffice = await this.electedOfficeService.getCurrentElectedOffice(
+      user.id,
+    )
+    if (!electedOffice) {
+      const campaign =
+        await this.electedOfficeService.client.campaign.findFirst({
+          where: { userId: user.id },
+          select: { id: true },
+        })
+      if (!campaign) {
+        throw new ForbiddenException(
+          'Not allowed to create poll. No campaign found.',
+        )
+      }
+      electedOffice = await this.electedOfficeService.create({
+        data: {
+          isActive: true,
+          user: { connect: { id: user.id } },
+          campaign: { connect: { id: campaign.id } },
+        },
+      })
+    }
+    // END OF TEMPORARY FIX
+
     const userInfo = {
       name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
       email: user.email,
