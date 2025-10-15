@@ -1,9 +1,7 @@
 import {
-  Body,
   Controller,
   Get,
   Param,
-  Post,
   Query,
   Res,
   UsePipes,
@@ -21,7 +19,6 @@ import {
 import { SampleContactsDTO } from './schemas/sampleContacts.schema'
 import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
-import type { TevynApiDto } from './schemas/tevynApi.schema'
 
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
@@ -78,25 +75,4 @@ export class ContactsController {
     return this.contactsService.findPerson(id)
   }
 
-  @Post('tevyn-api')
-  sendTevynSlack(
-    @ReqUser() user: User,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
-    @Body() { message, csvFileUrl, imageUrl, createPoll }: TevynApiDto,
-  ) {
-    const userInfo = {
-      name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-      email: user.email,
-      phone: user.phone || undefined,
-    }
-
-    return this.contactsService.sendTevynApiMessage(
-      message,
-      userInfo,
-      campaign,
-      createPoll,
-      csvFileUrl || undefined,
-      imageUrl || undefined,
-    )
-  }
 }

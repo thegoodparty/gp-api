@@ -6,14 +6,12 @@ export function buildTevynApiSlackBlocks({
   csvFileUrl,
   imageUrl,
   userInfo,
-  campaignSlug,
 }: {
   message: string
   pollId?: string
   csvFileUrl?: string
   imageUrl?: string
   userInfo?: { name?: string; email?: string; phone?: string }
-  campaignSlug?: string
 }) {
   const blocks = [
     {
@@ -24,17 +22,6 @@ export function buildTevynApiSlackBlocks({
         emoji: true,
       },
     },
-    ...(campaignSlug
-      ? ([
-          {
-            type: SlackMessageType.SECTION,
-            text: {
-              type: SlackMessageType.MRKDWN,
-              text: `*Campaign:* ${campaignSlug}`,
-            },
-          },
-        ] as const)
-      : []),
     ...(pollId
       ? ([
           {
