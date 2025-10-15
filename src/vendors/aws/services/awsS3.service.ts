@@ -15,18 +15,7 @@ export type UploadOptions = {
   cacheControl?: string // Cache-Control header value
 }
 
-const {
-  AWS_S3_KEY: accessKeyId,
-  AWS_S3_SECRET: secretAccessKey,
-  AWS_REGION: region = 'us-west-2',
-} = process.env
-
-if (!accessKeyId) {
-  throw new Error('AWS_S3_KEY is required')
-}
-if (!secretAccessKey) {
-  throw new Error('AWS_S3_SECRET is required')
-}
+const { AWS_REGION: region = 'us-west-2' } = process.env
 
 @Injectable()
 export class AwsS3Service extends AwsService {
@@ -35,13 +24,7 @@ export class AwsS3Service extends AwsService {
   constructor() {
     super()
 
-    this.s3Client = new S3Client({
-      region,
-      credentials: {
-        accessKeyId: accessKeyId as string,
-        secretAccessKey: secretAccessKey as string,
-      },
-    })
+    this.s3Client = new S3Client({ region })
   }
 
   async uploadFile(

@@ -38,7 +38,7 @@ import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import { transformStatsResponse } from '../stats.transformer'
 import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
 import { PollsService } from 'src/polls/services/polls.service'
-import dayjs from 'dayjs'
+import { add } from 'date-fns'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -968,7 +968,7 @@ export class ContactsService {
           messageContent: message,
           targetAudienceSize: 500,
           scheduledDate: now,
-          estimatedCompletionDate: dayjs(now).add(1, 'week').toDate(),
+          estimatedCompletionDate: add(now, { weeks: 1 }),
           imageUrl: imageUrl,
           campaignId: campaign.id,
         },

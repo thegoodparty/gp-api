@@ -5,27 +5,10 @@ import { PrismaClient } from '@prisma/client'
 const googleServiceEmail =
   'good-party-service@thegoodparty-1562658240463.iam.gserviceaccount.com'
 
-const {
-  AWS_S3_KEY: accessKeyId,
-  AWS_S3_SECRET: secretAccessKey,
-  AWS_REGION: region = 'us-west-2',
-} = process.env
-
-if (!accessKeyId) {
-  throw new Error('AWS_S3_KEY is required')
-}
-if (!secretAccessKey) {
-  throw new Error('AWS_S3_SECRET is required')
-}
+const { AWS_REGION: region = 'us-west-2' } = process.env
 
 const s3Bucket = 'goodparty-keys'
-const s3 = new S3Client({
-  region,
-  credentials: {
-    accessKeyId,
-    secretAccessKey,
-  },
-})
+const s3 = new S3Client({ region })
 
 export default async function seedMtfcc(prisma: PrismaClient) {
   const jwtClient = await authenticateGoogleServiceAccount()
