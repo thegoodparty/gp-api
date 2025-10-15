@@ -1,6 +1,5 @@
 model ElectedOffice {
-    id                      Int         @id         @default(autoincrement())
-    publicId                String      @unique     @default(cuid()) @map("public_id")
+    id                      String          @id @default(uuid(7))
     
     electedDate             DateTime?   @db.Date @map("elected_date")
     swornInDate             DateTime?   @db.Date @map("sworn_in_date")

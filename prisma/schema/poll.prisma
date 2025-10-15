@@ -23,8 +23,8 @@ model Poll {
   estimatedCompletionDate DateTime
   completedDate           DateTime?       @map("completed_date")
 
-  electedOffice           ElectedOffice?   @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
-  electedOfficeId         Int?            @map("elected_office_id")
+  electedOffice           ElectedOffice?  @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
+  electedOfficeId         String?         @map("elected_office_id")
 
   createdAt               DateTime        @default(now()) @map("created_at")
   updatedAt               DateTime        @updatedAt @map("updated_at")

@@ -5,7 +5,6 @@ import {
   Get,
   NotFoundException,
   Param,
-  ParseIntPipe,
   Post,
   Put,
   UsePipes,
@@ -29,7 +28,6 @@ export class ElectedOfficeController {
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
       id: record.id,
-      publicId: record.publicId,
       electedDate: toDateOnlyString(record.electedDate),
       swornInDate: toDateOnlyString(record.swornInDate),
       termStartDate: toDateOnlyString(record.termStartDate),
@@ -49,7 +47,7 @@ export class ElectedOfficeController {
   }
 
   @Get(':id')
-  async getOne(@Param('id', ParseIntPipe) id: number, @ReqUser() user: User) {
+  async getOne(@Param('id') id: string, @ReqUser() user: User) {
     const record = await this.electedOfficeService.findUnique({ where: { id } })
     if (!record || record.userId !== user.id) {
       throw new NotFoundException('Elected office not found')
@@ -83,7 +81,7 @@ export class ElectedOfficeController {
 
   @Put(':id')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @ReqUser() user: User,
     @Body() body: UpdateElectedOfficeDto,
   ) {

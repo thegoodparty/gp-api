@@ -12,7 +12,7 @@ export class ElectedOfficeService extends createPrismaBase(
   //        If we did it without value check, then there could only be one inactive elected office
   private async validateActiveElectedOffice(
     userId: number,
-    excludeId?: number,
+    excludeId?: string,
   ) {
     const activeCount = await this.model.count({
       where: {

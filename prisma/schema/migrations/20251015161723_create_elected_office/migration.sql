@@ -12,12 +12,11 @@ DROP INDEX "Poll_campaign_id_id_idx";
 
 -- AlterTable
 ALTER TABLE "Poll" DROP COLUMN "campaign_id",
-ADD COLUMN     "elected_office_id" INTEGER;
+ADD COLUMN     "elected_office_id" TEXT;
 
 -- CreateTable
 CREATE TABLE "elected_office" (
-    "id" SERIAL NOT NULL,
-    "public_id" TEXT NOT NULL,
+    "id" TEXT NOT NULL,
     "elected_date" DATE,
     "sworn_in_date" DATE,
     "term_start_date" DATE,
@@ -31,9 +30,6 @@ CREATE TABLE "elected_office" (
 
     CONSTRAINT "elected_office_pkey" PRIMARY KEY ("id")
 );
-
--- CreateIndex
-CREATE UNIQUE INDEX "elected_office_public_id_key" ON "elected_office"("public_id");
 
 -- CreateIndex
 CREATE INDEX "elected_office_user_id_idx" ON "elected_office"("user_id");
