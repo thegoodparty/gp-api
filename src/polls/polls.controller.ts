@@ -14,10 +14,9 @@ import {
 } from '@nestjs/common'
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
-import { exampleIssues, queryTopIssues } from './dynamo-helpers'
 import z from 'zod'
-import { ElectedOffice, Poll } from '@prisma/client'
-import { APIPoll } from './polls.types'
+import { ElectedOffice, Poll, PollIssue } from '@prisma/client'
+import { APIPoll, APIPollIssue } from './polls.types'
 import { orderBy } from 'lodash'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
@@ -27,6 +26,7 @@ import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { PollIssuesService } from './services/pollIssues.service'
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
@@ -41,8 +41,6 @@ class ListPollsQueryDTO extends createZodDto(
   }),
 ) {}
 
-const IS_LOCAL = process.env.NODE_ENV !== 'production'
-
 const toAPIPoll = (poll: Poll): APIPoll => ({
   id: poll.id,
   name: poll.name,
@@ -56,11 +54,23 @@ const toAPIPoll = (poll: Poll): APIPoll => ({
   lowConfidence: poll.confidence === 'LOW',
 })
 
+const toAPIIssue = (issue: PollIssue): APIPollIssue => ({
+  pollId: issue.pollId,
+  title: issue.title,
+  summary: issue.summary,
+  details: issue.details,
+  mentionCount: issue.mentionCount,
+  representativeComments: issue.representativeComments.map((quote) => ({
+    comment: quote.quote,
+  })),
+})
+
 @Controller('polls')
 @UsePipes(ZodValidationPipe)
 export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
+    private readonly pollIssuesService: PollIssuesService,
     private readonly analytics: AnalyticsService,
     private readonly electedOfficeService: ElectedOfficeService,
   ) {}
@@ -152,15 +162,13 @@ export class PollsController {
   ) {
     await this.ensurePollAccess(pollId, electedOffice)
 
-    if (IS_LOCAL) {
-      return { results: exampleIssues(pollId) }
-    }
-
-    const issues = await queryTopIssues(this.logger, pollId)
+    const issues = await this.pollIssuesService.findMany({
+      where: { pollId },
+    })
 
     const byMentionCount = orderBy(issues, (i) => i.mentionCount, 'desc')
 
-    return { results: byMentionCount }
+    return { results: byMentionCount.map(toAPIIssue) }
   }
 
   @Put('/:pollId/internal/complete')
