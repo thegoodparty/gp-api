@@ -1004,6 +1004,20 @@ export class ContactsService {
     }
   }
 
+  private async updateCampaignDistrictNameIfSuccessful(
+    campaignId: number,
+    alternativeDistrictName: string,
+    hasResults: boolean,
+  ): Promise<void> {
+    if (hasResults) {
+      await this.campaigns.updateJsonFields(
+        campaignId,
+        { pathToVictory: { electionLocation: alternativeDistrictName } },
+        false,
+      )
+    }
+  }
+
   private async fetchPeopleWithFallback(
     endpoint: 'people' | 'search',
     params: URLSearchParams,
@@ -1035,15 +1049,11 @@ export class ContactsService {
           alternativeDistrictName,
         )
         const altData = alternativeResponse.data as PeopleListResponse
-        if (
-          (altData.pagination?.totalResults || 0) > 0 &&
-          campaignId &&
-          alternativeDistrictName
-        ) {
-          await this.campaigns.updateJsonFields(
+        if (campaignId && alternativeDistrictName) {
+          await this.updateCampaignDistrictNameIfSuccessful(
             campaignId,
-            { pathToVictory: { electionLocation: alternativeDistrictName } },
-            false,
+            alternativeDistrictName,
+            (altData.pagination?.totalResults || 0) > 0,
           )
         }
         return altData
@@ -1062,15 +1072,11 @@ export class ContactsService {
           alternativeDistrictName,
         )
         const altData = alternativeResponse.data as PeopleListResponse
-        if (
-          (altData.pagination?.totalResults || 0) > 0 &&
-          campaignId &&
-          alternativeDistrictName
-        ) {
-          await this.campaigns.updateJsonFields(
+        if (campaignId && alternativeDistrictName) {
+          await this.updateCampaignDistrictNameIfSuccessful(
             campaignId,
-            { pathToVictory: { electionLocation: alternativeDistrictName } },
-            false,
+            alternativeDistrictName,
+            (altData.pagination?.totalResults || 0) > 0,
           )
         }
         return altData
