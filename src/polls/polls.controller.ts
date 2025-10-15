@@ -57,7 +57,6 @@ const toAPIPoll = (poll: Poll): APIPoll => ({
 })
 
 @Controller('polls')
-@UseElectedOffice()
 @UsePipes(ZodValidationPipe)
 export class PollsController {
   constructor(
@@ -68,6 +67,7 @@ export class PollsController {
   private readonly logger = new Logger(this.constructor.name)
 
   @Get('/')
+  @UseElectedOffice()
   async listPolls(
     @Query() query: ListPollsQueryDTO,
     @ReqElectedOffice() electedOffice: ElectedOffice,
@@ -135,6 +135,7 @@ export class PollsController {
   }
 
   @Get('/:pollId')
+  @UseElectedOffice()
   async getPoll(
     @Param('pollId') pollId: string,
     @ReqElectedOffice() electedOffice: ElectedOffice,
@@ -144,6 +145,7 @@ export class PollsController {
   }
 
   @Get('/:pollId/top-issues')
+  @UseElectedOffice()
   async getTopIssues(
     @Param('pollId') pollId: string,
     @ReqElectedOffice() electedOffice: ElectedOffice,
@@ -162,6 +164,7 @@ export class PollsController {
   }
 
   @Put('/:pollId/internal/complete')
+  @UseElectedOffice()
   async markPollComplete(
     @Param('pollId') pollId: string,
     @Body() data: MarkPollCompleteDTO,
