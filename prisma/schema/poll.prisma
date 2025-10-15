@@ -30,4 +30,5 @@ model Poll {
   updatedAt               DateTime        @updatedAt @map("updated_at")
 
   @@index([electedOfficeId, id])
+  @@map("poll")
 }
