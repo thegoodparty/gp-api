@@ -109,7 +109,11 @@ export class PollsController {
         )
       }
       electedOffice = await this.electedOfficeService.create({
-        data: { userId: user.id, campaignId: campaign.id },
+        data: {
+          isActive: true,
+          user: { connect: { id: user.id } },
+          campaign: { connect: { id: campaign.id } },
+        },
       })
     }
     // END OF TEMPORARY FIX
