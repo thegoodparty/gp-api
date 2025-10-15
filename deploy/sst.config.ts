@@ -195,7 +195,7 @@ export default $config({
     })
 
     // Create Main Queue
-    new aws.sqs.Queue(`${$app.stage}-queue`, {
+    const queue = new aws.sqs.Queue(`${$app.stage}-queue`, {
       name: sqsQueueName,
       fifoQueue: true,
       visibilityTimeoutSeconds: 300, // 5 minutes
@@ -292,6 +292,7 @@ export default $config({
       environment: {
         variables: {
           POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
+          MONOLITH_QUEUE_URL: queue.url,
         },
       },
       policy: [
@@ -306,6 +307,10 @@ export default $config({
         {
           actions: ['dynamodb:PutItem'],
           resources: [pollInsightsDynamoTable.arn],
+        },
+        {
+          actions: ['sqs:SendMessage'],
+          resources: [queue.arn],
         },
       ],
     })

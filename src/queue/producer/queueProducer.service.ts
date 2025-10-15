@@ -3,7 +3,7 @@ import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
 import { queueConfig } from '../queue.config'
-import { MessageGroup } from '../queue.types'
+import { MessageGroup, QueueMessage } from '../queue.types'
 
 const config: SQSClientConfig = {
   region: process.env.AWS_REGION || '',
@@ -28,23 +28,33 @@ const producer = Producer.create({
   sqs: new SQSClient(config),
 })
 
+export const createMonolithQueueMessage = (
+  msg: QueueMessage,
+  group: MessageGroup = MessageGroup.default,
+) => {
+  const body = JSON.stringify(msg)
+
+  const uuid = Math.random().toString(36).substring(2, 12)
+
+  const message: Message = {
+    id: uuid,
+    body,
+    deduplicationId: uuid, // Required for FIFO queues
+    groupId: `gp-queue-${group}`, // Required for FIFO queues
+  }
+
+  return message
+}
+
 @Injectable()
 export class QueueProducerService {
   private readonly logger = new Logger(QueueProducerService.name)
   constructor() {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async sendMessage(msg: any, group: MessageGroup = MessageGroup.default) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body: any = JSON.stringify(msg)
-
-    const uuid = Math.random().toString(36).substring(2, 12)
-
-    const message: Message = {
-      id: uuid,
-      body,
-      deduplicationId: uuid, // Required for FIFO queues
-      groupId: `gp-queue-${group}`, // Required for FIFO queues
-    }
+  async sendMessage(
+    msg: QueueMessage,
+    group: MessageGroup = MessageGroup.default,
+  ) {
+    const message = createMonolithQueueMessage(msg, group)
 
     try {
       await producer.send(message)

@@ -9,6 +9,7 @@ import { QueueProducerModule } from '../producer/queueProducer.module'
 import { AnalyticsModule } from '../../analytics/analytics.module'
 import { WebsitesModule } from '../../websites/websites.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { PollsModule } from 'src/polls/polls.module'
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SlackModule } from 'src/vendors/slack/slack.module'
     AnalyticsModule,
     WebsitesModule,
     SlackModule,
+    PollsModule,
   ],
   providers: [QueueConsumerService],
 })

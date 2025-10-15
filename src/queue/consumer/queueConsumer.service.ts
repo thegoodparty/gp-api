@@ -4,6 +4,7 @@ import { Message } from '@aws-sdk/client-sqs'
 import {
   DomainEmailForwardingMessage,
   GenerateAiContentMessageData,
+  PollAnalysisCompleteMessage,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
@@ -30,6 +31,7 @@ import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEm
 import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { isNestJsHttpException } from '../../shared/util/http.util'
 import { isAxiosError } from 'axios'
+import { PollsService } from 'src/polls/services/polls.service'
 
 @Injectable()
 export class QueueConsumerService {
@@ -44,6 +46,7 @@ export class QueueConsumerService {
     private readonly campaignsService: CampaignsService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly domainsService: DomainsService,
+    private readonly pollsService: PollsService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -190,6 +193,11 @@ export class QueueConsumerService {
         this.logger.log('received domainEmailForwarding message')
         return await this.handleDomainEmailForwardingMessage(
           queueMessage.data as DomainEmailForwardingMessage,
+        )
+      case QueueType.POLL_ANALYSIS_COMPLETE:
+        this.logger.log('received pollAnalysisComplete message')
+        return await this.pollsService.markPollComplete(
+          queueMessage.data as PollAnalysisCompleteMessage,
         )
     }
     // Return true to delete the message from the queue

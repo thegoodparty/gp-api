@@ -102,29 +102,6 @@ export class PollsController {
     return { results: byMentionCount }
   }
 
-  @Put('/:pollId/internal/complete')
-  async markPollComplete(
-    @Param('pollId') pollId: string,
-    @Body() data: MarkPollCompleteDTO,
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
-  ) {
-    const existing = await this.ensurePollAccess(pollId, campaign)
-
-    if (existing.status !== 'IN_PROGRESS') {
-      throw new BadRequestException('Poll is not currently in-progress')
-    }
-
-    const poll = await this.pollsService.update({
-      where: { id: existing.id },
-      data: {
-        status: 'COMPLETED',
-        confidence: data.confidence === 'low' ? 'LOW' : 'HIGH',
-        completedDate: new Date(),
-      },
-    })
-    return toAPIPoll(poll)
-  }
-
   private async ensurePollAccess(
     pollId: string,
     campaign: CampaignWithPathToVictory,

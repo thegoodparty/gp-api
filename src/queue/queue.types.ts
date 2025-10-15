@@ -5,6 +5,7 @@ export enum QueueType {
   PATH_TO_VICTORY = 'pathToVictory',
   TCR_COMPLIANCE_STATUS_CHECK = 'tcrComplianceStatusCheck',
   DOMAIN_EMAIL_FORWARDING = 'domainEmailForwarding',
+  POLL_ANALYSIS_COMPLETE = 'pollAnalysisComplete',
 }
 
 export type QueueMessage = {
@@ -26,6 +27,11 @@ export type TcrComplianceStatusCheckMessage = {
 export type DomainEmailForwardingMessage = {
   domainId: number
   forwardingEmailAddress: string
+}
+
+export type PollAnalysisCompleteMessage = {
+  pollId: string
+  totalResponses: number
 }
 
 export enum MessageGroup {
