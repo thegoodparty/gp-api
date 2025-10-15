@@ -176,9 +176,9 @@ export class OutreachController {
         },
       })
     const outreaches = await this.outreachService.findByCampaignId(campaign.id)
-    const p2pJobs = await this.peerlyP2pJobService.getJobsByIdentityId(
-      peerlyIdentityId!,
-    )
+    const p2pJobs = peerlyIdentityId
+      ? await this.peerlyP2pJobService.getJobsByIdentityId(peerlyIdentityId)
+      : []
     return outreaches.map((outreach) => {
       const p2pJob = p2pJobs.find((p2pJob) => p2pJob.id === outreach.projectId)
       return {
