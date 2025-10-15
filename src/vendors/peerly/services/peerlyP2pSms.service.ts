@@ -51,7 +51,7 @@ interface PeerlyApiResponse {
   [key: string]: unknown
 }
 
-export enum JobStatus {
+export enum PeerlyJobStatus {
   ACTIVE = 'active',
   PAUSED = 'paused',
   DELETED = 'deleted',
@@ -65,7 +65,7 @@ export interface PeerlyJob {
   identity_id: string
   name: string
   internal_name: string
-  status: JobStatus
+  status: PeerlyJobStatus
   job_type: string
   created_date: string
   created_by: string
@@ -206,12 +206,6 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
       const { data } = response
       this.validateCreateJobResponse(data)
-
-      // TODO: Verify where the job ID is actually returned by the Peerly API
-      // Based on standard REST patterns, it should be in either:
-      // 1. Response body (most likely - update schema if needed)
-      // 2. Location header pointing to the created resource
-      // The API docs may be incomplete - need to test with real API response
 
       let jobId: string | undefined
 
