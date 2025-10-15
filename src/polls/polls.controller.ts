@@ -24,6 +24,8 @@ import { User } from '@prisma/client'
 import { PollInitialDto } from './schemas/poll.schema'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 
 class MarkPollCompleteDTO extends createZodDto(
   z.object({
@@ -57,7 +59,10 @@ const toAPIPoll = (poll: Poll): APIPoll => ({
 @UseElectedOffice()
 @UsePipes(ZodValidationPipe)
 export class PollsController {
-  constructor(private readonly pollsService: PollsService) {}
+  constructor(
+    private readonly pollsService: PollsService,
+    private readonly analytics: AnalyticsService,
+  ) {}
   private readonly logger = new Logger(this.constructor.name)
 
   @Get('/')
@@ -147,6 +152,27 @@ export class PollsController {
         completedDate: new Date(),
       },
     })
+
+    const campaign = await this.pollsService.client.campaign.findUnique({
+      where: { id: electedOffice.campaignId },
+      select: {
+        id: true,
+        userId: true,
+        pathToVictory: { select: { data: true } },
+      },
+    })
+    if (campaign) {
+      await this.analytics.track(
+        campaign.userId,
+        EVENTS.Polls.ResultsSynthesisCompleted,
+        {
+          pollId: poll.id,
+          path: `/dashboard/polls/${poll.id}`,
+          constituencyName: campaign.pathToVictory?.data.electionLocation,
+        },
+      )
+    }
+
     return toAPIPoll(poll)
   }
 

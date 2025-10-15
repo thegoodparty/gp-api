@@ -15,6 +15,9 @@ export const EVENTS = {
     GenerationStarted: 'Content Builder: Generation Started',
     ContentGenerated: 'Content Builder: Generation Completed',
   },
+  Polls: {
+    ResultsSynthesisCompleted: 'Poll - Results Synthesis Complete',
+  },
 }
 
 // TODO: Define event properties w/ a generic type. No reason this has to be a

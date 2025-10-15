@@ -139,6 +139,18 @@ export default $config({
     try {
       secretsJson = JSON.parse(secretString || '{}')
 
+      // DO NOT REMOVE THESE. These are here so that we don't use the AWS credentials
+      // that were (at some point) hardcoded in the secret. Instead, we want to make sure
+      // our instances use their NATIVE IAM roles, so that we can easily manage their
+      // permissions as-code.
+      //
+      // Once the migration to IAM auth is complete, we can remove these values from the
+      // secret entirely, and then remove these lines.
+      delete secretsJson.AWS_ACCESS_KEY_ID
+      delete secretsJson.AWS_SECRET_ACCESS_KEY
+      delete secretsJson.AWS_S3_KEY
+      delete secretsJson.AWS_S3_SECRET
+
       for (const [key, value] of Object.entries(secretsJson)) {
         if (key === 'DATABASE_URL') {
           const { username, password, database } = extractDbCredentials(
@@ -271,36 +283,36 @@ export default $config({
       },
     )
 
-    const pollInsightsQueueHandler = await lambda(aws, {
+    const pollInsightsQueueHandler = lambda(aws, pulumi, {
       name: `poll-insights-queue-handler-${$app.stage}`,
       runtime: 'nodejs22.x',
       timeout: HANDLER_TIMEOUT,
       memorySize: 512,
-      filename: 'poll-response-analysis-queue-handler.js',
+      filename: 'poll-response-analysis-queue-handler',
       environment: {
         variables: {
-          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name.get(),
+          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
         },
       },
       policy: [
         {
-          Actions: [
+          actions: [
             'sqs:ReceiveMessage',
             'sqs:DeleteMessage',
             'sqs:GetQueueAttributes',
           ],
-          Resources: [pollInsightsQueue.arn.get()],
+          resources: [pollInsightsQueue.arn],
         },
         {
-          Actions: ['dynamodb:PutItem'],
-          Resources: [pollInsightsDynamoTable.arn.get()],
+          actions: ['dynamodb:PutItem'],
+          resources: [pollInsightsDynamoTable.arn],
         },
       ],
     })
 
     new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-      eventSourceArn: pollInsightsQueue.arn.get(),
-      functionName: pollInsightsQueueHandler.name.get(),
+      eventSourceArn: pollInsightsQueue.arn,
+      functionName: pollInsightsQueueHandler.name,
       enabled: true,
       batchSize: 10,
       functionResponseTypes: ['ReportBatchItemFailures'],
@@ -322,18 +334,9 @@ export default $config({
         },
       },
       // https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html#fargate-tasks-size
-      capacity:
-        $app.stage === 'master'
-          ? {
-              // Use 50% regular Fargate and 50% Fargate Spot.
-              // But make sure the first instance is a regular Fargate instance.
-              fargate: { weight: 1, base: 1 },
-              spot: { weight: 1 },
-            }
-          : {
-              // Use 100% Fargate Spot.
-              spot: { weight: 1, base: 1 },
-            },
+      capacity: {
+        fargate: { weight: 1 },
+      },
       memory: $app.stage === 'master' ? '4 GB' : '2 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
       cpu: $app.stage === 'master' ? '1 vCPU' : '0.5 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
       scaling: {
@@ -379,6 +382,22 @@ export default $config({
         },
       },
       permissions: [
+        {
+          actions: ['route53domains:Get*', 'route53domains:List*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['route53domains:CheckDomainAvailability'],
+          resources: ['*'],
+        },
+        {
+          actions: ['s3:*', 's3-object-lambda:*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['sqs:*'],
+          resources: ['*'],
+        },
         {
           actions: ['dynamodb:PutItem', 'dynamodb:Query'],
           resources: [pollInsightsDynamoTable.arn],
