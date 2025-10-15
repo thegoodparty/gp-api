@@ -28,23 +28,27 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     message: string,
     userInfo: { name?: string; email: string; phone?: string },
     electedOffice: ElectedOffice,
+    createPoll: boolean,
     imageUrl?: string,
     csvFileUrl?: string,
   ) {
     const now = new Date()
-    const poll = await this.create({
-      data: {
-        name: 'Top Community Issues',
-        status: 'IN_PROGRESS',
-        messageContent: message,
-        targetAudienceSize: 500,
-        scheduledDate: now,
-        estimatedCompletionDate: add(now, { weeks: 1 }),
-        imageUrl: imageUrl,
-        electedOfficeId: electedOffice.id,
-      },
-    })
-    const pollId = poll.id
+    let pollId: string | undefined = undefined
+    if (createPoll) {
+      const poll = await this.create({
+        data: {
+          name: 'Top Community Issues',
+          status: 'IN_PROGRESS',
+          messageContent: message,
+          targetAudienceSize: 500,
+          scheduledDate: now,
+          estimatedCompletionDate: add(now, { weeks: 1 }),
+          imageUrl: imageUrl,
+          electedOfficeId: electedOffice.id,
+        },
+      })
+      pollId = poll.id
+    }
 
     const blocks = buildTevynApiSlackBlocks({
       message,
@@ -56,6 +60,6 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
 
     await this.slack.message({ blocks }, SlackChannel.botTevynApi)
 
-    return poll
+    return true
   }
 }

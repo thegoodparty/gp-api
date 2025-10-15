@@ -82,7 +82,7 @@ export class PollsController {
   createInitialPoll(
     @ReqUser() user: User,
     @ReqElectedOffice() electedOffice: ElectedOffice,
-    @Body() { message, csvFileUrl, imageUrl }: PollInitialDto,
+    @Body() { message, csvFileUrl, imageUrl, createPoll }: PollInitialDto,
   ) {
     const userInfo = {
       name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -94,6 +94,7 @@ export class PollsController {
       message,
       userInfo,
       electedOffice,
+      createPoll,
       imageUrl || undefined,
       csvFileUrl || undefined,
     )

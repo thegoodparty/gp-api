@@ -7,6 +7,7 @@ export const PollSchema = z.object({
 
 export const PollInitialSchema = PollSchema.extend({
   csvFileUrl: z.string().url().optional().nullable(),
+  createPoll: z.boolean(),
 })
 
 export type PollDto = z.infer<typeof PollSchema>
