@@ -58,7 +58,11 @@ export function typeToQuery(
       l2ColumnName = fixCityCountyColumns(l2ColumnName)
       logger.debug('after fix columns:', l2ColumnName)
     }
-    whereClause += `("${l2ColumnName}" = '${cleanValue}' OR "${l2ColumnName}" = '${cleanValue} (EST.)') `
+    if (cleanValue) {
+      whereClause += `("${l2ColumnName}" = '${cleanValue}' 
+      OR "${l2ColumnName}" = '${cleanValue} (EST.)' 
+      OR "${l2ColumnName}" = '${cleanValue.replace(/^0/, '')}) `
+    }
   }
 
   let columns: string

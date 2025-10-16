@@ -1,16 +1,8 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  Res,
-  UsePipes,
-} from '@nestjs/common'
-import { Campaign, PathToVictory, User } from '@prisma/client'
-import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
+import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
+import { Campaign, PathToVictory } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import {
   DownloadContactsDTO,
@@ -74,5 +66,4 @@ export class ContactsController {
   getContact(@Param('id') id: string) {
     return this.contactsService.findPerson(id)
   }
-
 }
