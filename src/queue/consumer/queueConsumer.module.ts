@@ -11,6 +11,7 @@ import { WebsitesModule } from '../../websites/websites.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { PollsModule } from 'src/polls/polls.module'
 import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
+import { ContactsModule } from 'src/contacts/contacts.module'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
     SlackModule,
     ElectedOfficeModule,
     PollsModule,
+    ContactsModule,
   ],
   providers: [QueueConsumerService],
 })
