@@ -1,8 +1,4 @@
 import z from 'zod'
-import {
-  PollResponseInsight,
-  uploadPollResultData,
-} from 'src/polls/dynamo-helpers'
 import { createSQSConsumer } from './utils/sqs-consumer'
 
 export const handler = createSQSConsumer(
@@ -12,7 +8,7 @@ export const handler = createSQSConsumer(
     schema: z.discriminatedUnion('type', [
       z.object({
         type: z.literal('poll-response-analysis'),
-        data: PollResponseInsight,
+        data: z.any(),
       }),
       z.object({
         type: z.literal('poll-analysis-complete'),
@@ -23,14 +19,8 @@ export const handler = createSQSConsumer(
       }),
     ]),
   },
-  async (_, event) => {
-    switch (event.type) {
-      case 'poll-response-analysis':
-        await uploadPollResultData(event.data)
-        break
-      case 'poll-analysis-complete':
-        // todo: handle poll complete
-        break
-    }
+  async (ctx) => {
+    // TODO: put stuff in prisma
+    ctx.logger.info('Poll response analysis')
   },
 )

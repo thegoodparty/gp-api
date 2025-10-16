@@ -13,7 +13,7 @@ export type APIPoll = {
   lowConfidence?: boolean
 }
 
-export type PollIssue = {
+export type APIPollIssue = {
   pollId: string
   title: string
   summary: string
@@ -21,6 +21,5 @@ export type PollIssue = {
   mentionCount: number
   representativeComments: Array<{
     comment: string
-    name: string
   }>
 }
