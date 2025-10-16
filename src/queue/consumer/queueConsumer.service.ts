@@ -582,13 +582,16 @@ export class QueueConsumerService {
       campaign,
     )
 
-    // High confidence is EITHER:
-    //  - 75 total responses
-    //  - responses from >=10%
-    // This was last decided here: https://goodparty.clickup.com/t/90132012119/ENG-4771
-    const highConfidence =
-      event.data.totalResponses > 75 ||
-      event.data.totalResponses / constituency.pagination.totalResults >= 0.1
+    let highConfidence = false
+    if (constituency.pagination.totalResults) {
+      // High confidence is EITHER:
+      //  - 75 total responses
+      //  - responses from >=10%
+      // This was last decided here: https://goodparty.clickup.com/t/90132012119/ENG-4771
+      highConfidence =
+        event.data.totalResponses > 75 ||
+        event.data.totalResponses / constituency.pagination.totalResults >= 0.1
+    }
 
     const poll = await this.pollsService.update({
       where: { id: existing.id },
