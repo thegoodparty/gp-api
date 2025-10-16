@@ -18,6 +18,7 @@ model Poll {
   messageContent          String          @map("message_content")
   imageUrl                String?         @map("image_url")
   targetAudienceSize      Int
+  responseCount           Int?            @map("response_count")
   confidence              PollConfidence?
   scheduledDate           DateTime        @map("scheduled_date")
   estimatedCompletionDate DateTime
