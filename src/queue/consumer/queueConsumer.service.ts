@@ -208,15 +208,13 @@ export class QueueConsumerService {
         )
       case QueueType.POLL_ISSUES_ANALYSIS:
         this.logger.log('received pollIssueAnalysis message')
-        const pollIssueAnalysisEvent = PollIssueAnalysisEventSchema.parse(
-          queueMessage.data,
-        )
+        const pollIssueAnalysisEvent =
+          PollIssueAnalysisEventSchema.parse(queueMessage)
         return await this.handlePollIssuesAnalysis(pollIssueAnalysisEvent)
       case QueueType.POLL_ANALYSIS_COMPLETE:
         this.logger.log('received pollAnalysisComplete message')
-        const pollAnalysisCompleteEvent = PollAnalysisCompleteEventSchema.parse(
-          queueMessage.data,
-        )
+        const pollAnalysisCompleteEvent =
+          PollAnalysisCompleteEventSchema.parse(queueMessage)
         return await this.handlePollAnalysisComplete(pollAnalysisCompleteEvent)
     }
     // Return true to delete the message from the queue
