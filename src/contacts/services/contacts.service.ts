@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common'
 import { VoterFileFilter } from '@prisma/client'
 import { isAxiosError } from 'axios'
-import { add } from 'date-fns'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
@@ -17,8 +16,6 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {
   CampaignWithPathToVictory,
@@ -40,7 +37,6 @@ import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import type { PeopleStats } from '../stats.transformer'
 import { transformStatsResponse } from '../stats.transformer'
-import { buildTevynApiSlackBlocks } from '../utils/contacts.utils'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -60,7 +56,6 @@ export class ContactsService {
     private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
-    private readonly slack: SlackService,
     private readonly pollsService: PollsService,
     private readonly campaigns: CampaignsService,
   ) {}
@@ -1130,43 +1125,5 @@ export class ContactsService {
       }
       throw new BadGatewayException('Failed to fetch stats from people API')
     }
-  }
-
-  async sendTevynApiMessage(
-    message: string,
-    userInfo: { name?: string; email: string; phone?: string },
-    campaign: CampaignWithPathToVictory,
-    createPoll: boolean,
-    csvFileUrl?: string,
-    imageUrl?: string,
-  ) {
-    let pollId: string | undefined
-    if (createPoll) {
-      const now = new Date()
-      const poll = await this.pollsService.create({
-        data: {
-          name: 'Top Community Issues',
-          status: 'IN_PROGRESS',
-          messageContent: message,
-          targetAudienceSize: 500,
-          scheduledDate: now,
-          estimatedCompletionDate: add(now, { weeks: 1 }),
-          imageUrl: imageUrl,
-          campaignId: campaign.id,
-        },
-      })
-      pollId = poll.id
-    }
-
-    const blocks = buildTevynApiSlackBlocks({
-      message,
-      pollId,
-      csvFileUrl,
-      imageUrl,
-      userInfo,
-      campaignSlug: campaign.slug,
-    })
-
-    await this.slack.message({ blocks }, SlackChannel.botTevynApi)
   }
 }

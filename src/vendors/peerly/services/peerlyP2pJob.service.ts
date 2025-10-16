@@ -1,6 +1,6 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { PeerlyMediaService } from './peerlyMedia.service'
-import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
+import { PeerlyJob, PeerlyP2pSmsService } from './peerlyP2pSms.service'
 import { Readable } from 'stream'
 import {
   P2P_ERROR_MESSAGES,
@@ -107,6 +107,31 @@ export class PeerlyP2pJobService {
       // For now, we'll let the error propagate and rely on manual cleanup if needed
 
       throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
+    }
+  }
+
+  async getJobsByIdentityId(identityId: string): Promise<PeerlyJob[]> {
+    try {
+      this.logger.debug(`Getting P2P jobs list for ${identityId}`)
+      const jobs =
+        await this.peerlyP2pSmsService.retrieveJobsListByIdentityId(identityId)
+      this.logger.debug(`Fetched P2P Jobs: ${JSON.stringify(jobs)}`)
+      return jobs
+    } catch (error) {
+      this.logger.error(P2P_ERROR_MESSAGES.RETRIEVE_JOBS_FAILED, error)
+      throw new BadGatewayException(P2P_ERROR_MESSAGES.RETRIEVE_JOBS_FAILED)
+    }
+  }
+
+  async getJob(jobId: string): Promise<PeerlyJob> {
+    try {
+      this.logger.debug(`Getting job ${jobId}`)
+      const job = await this.peerlyP2pSmsService.retrieveJob(jobId)
+      this.logger.debug(`Fetched P2P Job: ${JSON.stringify(job)}`)
+      return job
+    } catch (error) {
+      this.logger.error(P2P_ERROR_MESSAGES.RETRIEVE_JOB_FAILED, error)
+      throw new BadGatewayException(P2P_ERROR_MESSAGES.RETRIEVE_JOB_FAILED)
     }
   }
 }
