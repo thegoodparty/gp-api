@@ -243,20 +243,6 @@ export default $config({
       })
     }
 
-    const pollInsightsDynamoTable = new aws.dynamodb.Table(
-      `${$app.stage}-poll-insights`,
-      {
-        billingMode: 'PAY_PER_REQUEST',
-        hashKey: 'poll_id',
-        rangeKey: 'record_id',
-        attributes: [
-          { name: 'poll_id', type: 'S' },
-          { name: 'record_id', type: 'S' },
-        ],
-        deletionProtectionEnabled: $app.stage === 'master',
-      },
-    )
-
     const HANDLER_TIMEOUT = 30
 
     const pollInsightsQueueDlq = new aws.sqs.Queue(
@@ -289,11 +275,6 @@ export default $config({
       timeout: HANDLER_TIMEOUT,
       memorySize: 512,
       filename: 'poll-response-analysis-queue-handler',
-      environment: {
-        variables: {
-          POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
-        },
-      },
       policy: [
         {
           actions: [
@@ -302,10 +283,6 @@ export default $config({
             'sqs:GetQueueAttributes',
           ],
           resources: [pollInsightsQueue.arn],
-        },
-        {
-          actions: ['dynamodb:PutItem'],
-          resources: [pollInsightsDynamoTable.arn],
         },
       ],
     })
@@ -360,7 +337,6 @@ export default $config({
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
-        POLL_INSIGHTS_DYNAMO_TABLE_NAME: pollInsightsDynamoTable.name,
         ...secretsJson,
       },
       image: {
@@ -397,10 +373,6 @@ export default $config({
         {
           actions: ['sqs:*'],
           resources: ['*'],
-        },
-        {
-          actions: ['dynamodb:PutItem', 'dynamodb:Query'],
-          resources: [pollInsightsDynamoTable.arn],
         },
       ],
     })
