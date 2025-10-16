@@ -1,14 +1,12 @@
 import {
   Controller,
   Get,
-  Put,
   Logger,
   UsePipes,
   Param,
   NotFoundException,
   ForbiddenException,
   Body,
-  BadRequestException,
   Query,
   Post,
 } from '@nestjs/common'
@@ -24,15 +22,8 @@ import { PollInitialDto } from './schemas/poll.schema'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { EVENTS } from 'src/vendors/segment/segment.types'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PollIssuesService } from './services/pollIssues.service'
-
-class MarkPollCompleteDTO extends createZodDto(
-  z.object({
-    confidence: z.enum(['low', 'high']),
-  }),
-) {}
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -169,51 +160,6 @@ export class PollsController {
     const byMentionCount = orderBy(issues, (i) => i.mentionCount, 'desc')
 
     return { results: byMentionCount.map(toAPIIssue) }
-  }
-
-  @Put('/:pollId/internal/complete')
-  @UseElectedOffice()
-  async markPollComplete(
-    @Param('pollId') pollId: string,
-    @Body() data: MarkPollCompleteDTO,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
-  ) {
-    const existing = await this.ensurePollAccess(pollId, electedOffice)
-
-    if (existing.status !== 'IN_PROGRESS') {
-      throw new BadRequestException('Poll is not currently in-progress')
-    }
-
-    const poll = await this.pollsService.update({
-      where: { id: existing.id },
-      data: {
-        status: 'COMPLETED',
-        confidence: data.confidence === 'low' ? 'LOW' : 'HIGH',
-        completedDate: new Date(),
-      },
-    })
-
-    const campaign = await this.pollsService.client.campaign.findUnique({
-      where: { id: electedOffice.campaignId },
-      select: {
-        id: true,
-        userId: true,
-        pathToVictory: { select: { data: true } },
-      },
-    })
-    if (campaign) {
-      await this.analytics.track(
-        campaign.userId,
-        EVENTS.Polls.ResultsSynthesisCompleted,
-        {
-          pollId: poll.id,
-          path: `/dashboard/polls/${poll.id}`,
-          constituencyName: campaign.pathToVictory?.data.electionLocation,
-        },
-      )
-    }
-
-    return toAPIPoll(poll)
   }
 
   private async ensurePollAccess(pollId: string, electedOffice: ElectedOffice) {
