@@ -10,6 +10,14 @@ export default $config({
         aws: {
           region: 'us-west-2',
           version: '6.67.0',
+          defaultTags: {
+            Environment:
+              input.stage === 'master'
+                ? 'prod'
+                : input.stage === 'qa'
+                  ? 'qa'
+                  : 'dev',
+          },
         },
       },
     }
@@ -18,6 +26,7 @@ export default $config({
     const { default: aws } = await import('@pulumi/aws')
     const { default: pulumi } = await import('@pulumi/pulumi')
     const { lambda } = await import('./utils/lambda')
+
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
