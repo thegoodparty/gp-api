@@ -534,6 +534,7 @@ export class QueueConsumerService {
       update: issue,
     })
     this.logger.log('Successfully upserted poll issue', result)
+    return true
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
@@ -594,5 +595,6 @@ export class QueueConsumerService {
         },
       )
     }
+    return true
   }
 }
