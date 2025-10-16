@@ -605,6 +605,14 @@ export default $config({
         }`,
       },
     )
+
+    // THIS IS REALLY IMPORTANT. As of this comment, this maximum concurrency
+    // is what prevents us from overwhelming the database with connections
+    // during a burst of events.
+    //
+    // If we continue to use lambdas, we should eventually just setup RDS Proxy
+    // to allow lambdas to scale and automatically reuse connections in the proxy.
+    // Last discussed here: https://goodpartyorg.slack.com/archives/C09KVHM9ENM/p1760389158046649
     const LAMBDA_MAX_CONCURRENCY = 2
     const pollInsightsQueueHandler = lambda(aws, pulumi, {
       name: `poll-insights-queue-handler-${$app.stage}`,
