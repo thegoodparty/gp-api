@@ -42,6 +42,7 @@ import { isAxiosError } from 'axios'
 import { PollsService } from 'src/polls/services/polls.service'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { ContactsService } from 'src/contacts/services/contacts.service'
 
 @Injectable()
 export class QueueConsumerService {
@@ -59,6 +60,7 @@ export class QueueConsumerService {
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
     private readonly electedOfficeService: ElectedOfficeService,
+    private readonly contactsService: ContactsService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -565,23 +567,39 @@ export class QueueConsumerService {
       return
     }
 
+    const campaign = await this.campaignsService.findUnique({
+      where: { id: office.campaignId },
+      include: { pathToVictory: true },
+    })
+
+    if (!campaign) {
+      this.logger.log('No campagin found, ignoring event')
+      return
+    }
+
+    const constituency = await this.contactsService.findContacts(
+      { segment: 'all', resultsPerPage: 5, page: 1 },
+      campaign,
+    )
+
+    let highConfidence = false
+    if (constituency.pagination.totalResults) {
+      // High confidence is EITHER:
+      //  - 75 total responses
+      //  - responses from >=10%
+      // This was last decided here: https://goodparty.clickup.com/t/90132012119/ENG-4771
+      highConfidence =
+        event.data.totalResponses > 75 ||
+        event.data.totalResponses / constituency.pagination.totalResults >= 0.1
+    }
+
     const poll = await this.pollsService.update({
       where: { id: existing.id },
       data: {
         status: 'COMPLETED',
-        // TODO: set the confidence based on constituent size
-        confidence: 'LOW',
+        confidence: highConfidence ? 'HIGH' : 'LOW',
         responseCount: event.data.totalResponses,
         completedDate: new Date(),
-      },
-    })
-
-    const campaign = await this.pollsService.client.campaign.findUnique({
-      where: { id: office.campaignId },
-      select: {
-        id: true,
-        userId: true,
-        pathToVictory: { select: { data: true } },
       },
     })
     if (campaign) {

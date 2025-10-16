@@ -56,7 +56,6 @@ export class ContactsService {
     private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
-    private readonly pollsService: PollsService,
     private readonly campaigns: CampaignsService,
   ) {}
 

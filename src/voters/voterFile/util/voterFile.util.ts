@@ -61,7 +61,7 @@ export function typeToQuery(
     if (cleanValue) {
       whereClause += `("${l2ColumnName}" = '${cleanValue}' 
       OR "${l2ColumnName}" = '${cleanValue} (EST.)' 
-      OR "${l2ColumnName}" = '${cleanValue.replace(/^0/, '')}) `
+      OR "${l2ColumnName}" = '${cleanValue.replace(/^0/, '')}') `
     }
   }
 
