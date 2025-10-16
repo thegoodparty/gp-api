@@ -3,6 +3,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
 import {
@@ -20,6 +21,8 @@ const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
 @Injectable()
 export class UsersService extends createPrismaBase(MODELS.User) {
+  private readonly logger = new Logger(UsersService.name)
+
   constructor(
     @Inject(forwardRef(() => AnalyticsService))
     private readonly analytics: AnalyticsService,
@@ -191,7 +194,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       return null
     }
 
-    const currentMetaData = currentUser?.metaData
+    const currentMetaData = (currentUser?.metaData || {}) as Prisma.JsonObject
     return this.updateUser(
       {
         id: userId,
@@ -200,7 +203,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         metaData: {
           ...currentMetaData,
           ...newMetaData,
-        },
+        } as Prisma.JsonObject,
       },
     )
   }
