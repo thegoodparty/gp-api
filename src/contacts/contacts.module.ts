@@ -5,7 +5,6 @@ import { ElectionsModule } from 'src/elections/elections.module'
 import { VotersModule } from 'src/voters/voters.module'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './services/contacts.service'
-import { PollsModule } from 'src/polls/polls.module'
 
 @Module({
   imports: [HttpModule, CampaignsModule, VotersModule, ElectionsModule],
