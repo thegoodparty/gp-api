@@ -27,9 +27,10 @@ export const createSQSConsumer = <Event>(
     logger.info('Processing SQS event', { event })
 
     if (!prisma) {
-      prisma = new PrismaClient()
       try {
-        await prisma.$connect()
+        const _prisma = new PrismaClient()
+        await _prisma.$connect()
+        prisma = _prisma
       } catch (error) {
         logger.error('Failed to connect prisma client', { error })
         throw error
