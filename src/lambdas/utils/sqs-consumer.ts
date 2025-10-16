@@ -1,4 +1,5 @@
 import { Logger } from '@aws-lambda-powertools/logger'
+import { PrismaClient } from '@prisma/client'
 import { Context, SQSEvent, SQSRecord } from 'aws-lambda'
 import z from 'zod'
 
@@ -9,6 +10,7 @@ export type SQSConsumerConfig<Event> = {
 }
 
 export type SQSConsumerContext = {
+  prisma: PrismaClient
   logger: Logger
 }
 
@@ -18,9 +20,21 @@ export const createSQSConsumer = <Event>(
 ) => {
   const logger = new Logger({ serviceName: config.name })
 
+  let prisma: PrismaClient
+
   return async (event: SQSEvent, context: Context) => {
     logger.addContext(context)
     logger.info('Processing SQS event', { event })
+
+    if (!prisma) {
+      prisma = new PrismaClient()
+      try {
+        await prisma.$connect()
+      } catch (error) {
+        logger.error('Failed to connect prisma client', { error })
+        throw error
+      }
+    }
 
     const failedRecords: SQSRecord[] = []
 
@@ -38,6 +52,7 @@ export const createSQSConsumer = <Event>(
       try {
         await handler(
           {
+            prisma,
             logger: logger.createChild({
               persistentKeys: { messageId: record.messageId },
             }),

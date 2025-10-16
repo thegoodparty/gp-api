@@ -27,6 +27,8 @@ export default $config({
           })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
+    const subnetIds = ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f']
+
     if (
       $app.stage !== 'master' &&
       $app.stage !== 'develop' &&
@@ -237,64 +239,11 @@ export default $config({
         vpcId: 'vpc-0763fa52c32ebcf6a',
         serviceName: `com.amazonaws.us-west-2.sqs`,
         vpcEndpointType: 'Interface',
-        subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+        subnetIds,
         securityGroupIds: [sqsSecurityGroup.id],
         privateDnsEnabled: true,
       })
     }
-
-    const HANDLER_TIMEOUT = 30
-
-    const pollInsightsQueueDlq = new aws.sqs.Queue(
-      `poll-insights-queue-dlq-${$app.stage}`,
-      {
-        name: `poll-insights-queue-dlq-${$app.stage}.fifo`,
-        fifoQueue: true,
-        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-      },
-    )
-
-    const pollInsightsQueue = new aws.sqs.Queue(
-      `poll-insights-queue-${$app.stage}`,
-      {
-        name: `poll-insights-queue-${$app.stage}.fifo`,
-        fifoQueue: true,
-        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-        visibilityTimeoutSeconds: HANDLER_TIMEOUT + 5,
-        contentBasedDeduplication: true,
-        redrivePolicy: pulumi.interpolate`{
-          "deadLetterTargetArn": "${pollInsightsQueueDlq.arn}",
-          "maxReceiveCount": 3
-        }`,
-      },
-    )
-
-    const pollInsightsQueueHandler = lambda(aws, pulumi, {
-      name: `poll-insights-queue-handler-${$app.stage}`,
-      runtime: 'nodejs22.x',
-      timeout: HANDLER_TIMEOUT,
-      memorySize: 512,
-      filename: 'poll-response-analysis-queue-handler',
-      policy: [
-        {
-          actions: [
-            'sqs:ReceiveMessage',
-            'sqs:DeleteMessage',
-            'sqs:GetQueueAttributes',
-          ],
-          resources: [pollInsightsQueue.arn],
-        },
-      ],
-    })
-
-    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-      eventSourceArn: pollInsightsQueue.arn,
-      functionName: pollInsightsQueueHandler.name,
-      enabled: true,
-      batchSize: 10,
-      functionResponseTypes: ['ReportBatchItemFailures'],
-    })
-
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
@@ -416,7 +365,7 @@ export default $config({
         $app.stage === 'develop'
           ? 'api-rds-subnet-group'
           : `api-${$app.stage}-rds-subnet-group`,
-      subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+      subnetIds,
       tags: {
         Name: `api-${$app.stage}-rds-subnet-group`,
       },
@@ -631,6 +580,70 @@ export default $config({
           },
         ],
       }),
+    })
+
+    const HANDLER_TIMEOUT = 30
+    const pollInsightsQueueDlq = new aws.sqs.Queue(
+      `poll-insights-queue-dlq-${$app.stage}`,
+      {
+        name: `poll-insights-queue-dlq-${$app.stage}.fifo`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+      },
+    )
+    const pollInsightsQueue = new aws.sqs.Queue(
+      `poll-insights-queue-${$app.stage}`,
+      {
+        name: `poll-insights-queue-${$app.stage}.fifo`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+        visibilityTimeoutSeconds: HANDLER_TIMEOUT + 5,
+        contentBasedDeduplication: true,
+        redrivePolicy: pulumi.interpolate`{
+          "deadLetterTargetArn": "${pollInsightsQueueDlq.arn}",
+          "maxReceiveCount": 3
+        }`,
+      },
+    )
+    const LAMBDA_MAX_CONCURRENCY = 2
+    const pollInsightsQueueHandler = lambda(aws, pulumi, {
+      name: `poll-insights-queue-handler-${$app.stage}`,
+      runtime: 'nodejs22.x',
+      timeout: HANDLER_TIMEOUT,
+      memorySize: 512,
+      filename: 'poll-response-analysis-queue-handler',
+      reservedConcurrentExecutions: LAMBDA_MAX_CONCURRENCY,
+      vpcConfig: {
+        vpcId: vpc.id,
+        subnetIds,
+        securityGroupIds: [rdsSecurityGroup.id],
+      },
+      environment: {
+        variables: {
+          ...secretsJson,
+        },
+      },
+      policy: [
+        {
+          actions: [
+            'sqs:ReceiveMessage',
+            'sqs:DeleteMessage',
+            'sqs:GetQueueAttributes',
+          ],
+          resources: [pollInsightsQueue.arn],
+        },
+      ],
+    })
+
+    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
+      eventSourceArn: pollInsightsQueue.arn,
+      functionName: pollInsightsQueueHandler.name,
+      enabled: true,
+      batchSize: 10,
+      functionResponseTypes: ['ReportBatchItemFailures'],
+      scalingConfig: {
+        maximumConcurrency: LAMBDA_MAX_CONCURRENCY,
+      },
     })
   },
 })
