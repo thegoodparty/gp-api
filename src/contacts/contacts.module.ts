@@ -8,13 +8,7 @@ import { ContactsService } from './services/contacts.service'
 import { PollsModule } from 'src/polls/polls.module'
 
 @Module({
-  imports: [
-    HttpModule,
-    CampaignsModule,
-    VotersModule,
-    ElectionsModule,
-    PollsModule,
-  ],
+  imports: [HttpModule, CampaignsModule, VotersModule, ElectionsModule],
   controllers: [ContactsController],
   providers: [ContactsService],
   exports: [ContactsService],
