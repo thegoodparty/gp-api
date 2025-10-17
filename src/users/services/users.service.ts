@@ -191,7 +191,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       return null
     }
 
-    const currentMetaData = currentUser?.metaData
+    const currentMetaData = (currentUser?.metaData || {}) as Prisma.JsonObject
     return this.updateUser(
       {
         id: userId,
@@ -200,7 +200,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         metaData: {
           ...currentMetaData,
           ...newMetaData,
-        },
+        } as Prisma.JsonObject,
       },
     )
   }
