@@ -6,19 +6,19 @@ dotenv.config()
 
 const prisma = new PrismaClient()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
+const isDryRun = !process.argv.includes('--live')
 
 async function removeAutoCancellations() {
   console.log('Starting subscription cancellation check...')
 
-  // TODO: Fetch campaigns from database
   const campaigns = await prisma.campaign.findMany({
     where: {
-        isPro: true,
+      isPro: true,
     },
     select: {
-        id: true,
-        slug: true,
-        details: true,
+      id: true,
+      slug: true,
+      details: true,
     },
   })
 
@@ -45,18 +45,55 @@ async function removeAutoCancellations() {
       continue // No scheduled cancellation
     }
 
-    const wasUserInitiated = subscription.customer_portal_data?.cancellation_reason !== null
+    const wasUserInitiated = subscription.cancellation_details?.comment !== null
+      || subscription.cancellation_details?.feedback !== null
 
     if (wasUserInitiated) {
       manualCount++
-      console.log(`Manual cancellation for ${campaign.slug} - Reason: ${subscription.customer_portal_data?.cancellation_reason}`)
+      console.log(`Manual cancellation for ${campaign.slug} - Reason: ${subscription.cancellation_details?.reason} - Comment: ${subscription.cancellation_details?.comment}`)
     } else {
       autoCount++
-      // Auto-scheduled - we'll fix these
+
+      if (isDryRun) {
+        console.log(`Dry run: Would have fixed auto-scheduled cancellation for ${campaign.slug}`)
+      } else {
+        try {
+          await stripe.subscriptions.update(subscriptionId, {
+            cancel_at: null,
+            cancel_at_period_end: false,
+          })
+
+          await prisma.campaign.update({
+            where: { id: campaign.id },
+            data: {
+              details: {
+                ...(details as any),
+                subscriptionCancelAt: null,
+                endOfElectionSubscriptionCanceled: false,
+              },
+            },
+          })
+
+          console.log(`✅ Fixed auto-scheduled cancellation for ${campaign.slug}`)
+        } catch (error) {
+          console.error(`❌ Failed to fix ${campaign.slug}:`, error)
+        }
+
+        if (autoCount % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          console.log(`Processed ${autoCount} auto-scheduled cancellations`)
+        }
+      }
     }
   }
 
   console.log(`\nSummary: ${autoCount} auto-scheduled, ${manualCount} manual`)
+  if (isDryRun) {
+    console.log('\n✨ This was a DRY RUN - no changes were made')
+    console.log('Run with --live flag to actually fix the subscriptions')
+  } else {
+    console.log('\n✅ All auto-scheduled cancellations have been processed')
+  }
 }
 
 removeAutoCancellations()
