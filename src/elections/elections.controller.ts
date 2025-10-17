@@ -1,13 +1,13 @@
 import { Controller, Get, Query, UsePipes } from '@nestjs/common'
-import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
-import { RacesService } from './services/races.service'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { RacesByZipSchema } from './schemas/RacesByZip.schema'
 import {
   GetDistrictNamesDTO,
   GetDistrictTypesDTO,
 } from './schemas/districts.schema'
 import { ElectionsService } from './services/elections.service'
+import { RacesService } from './services/races.service'
 
 @Controller('elections')
 @PublicAccess()
@@ -34,6 +34,7 @@ export class ElectionsController {
     return await this.elections.getValidDistrictTypes(
       dto.state,
       dto.electionYear,
+      dto.excludeInvalid,
     )
   }
 
@@ -43,6 +44,7 @@ export class ElectionsController {
       dto.L2DistrictType,
       dto.state,
       dto.electionYear,
+      dto.excludeInvalid,
     )
   }
 }
