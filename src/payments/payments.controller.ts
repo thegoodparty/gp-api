@@ -6,6 +6,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Patch,
   Post,
   RawBodyRequest,
   Req,
@@ -15,7 +16,6 @@ import { Stripe } from 'stripe'
 import { PaymentEventsService } from './services/paymentEventsService'
 import { StripeService } from '../vendors/stripe/services/stripe.service'
 import { CampaignsService } from '../campaigns/services/campaigns.service'
-import { TEMP_MISSING_CUSTOMER_ID_EMAILS } from './tempMissingCustomerId'
 import { PaymentsService } from './services/payments.service'
 import { UserRole } from '@prisma/client'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
@@ -65,44 +65,10 @@ export class PaymentsController {
     }
   }
 
-  @Post('temp-missing-customer-id')
+  @Patch('fix-missing-customer-id')
   @Roles(UserRole.admin)
   @HttpCode(HttpStatus.OK)
   async tempMissingCustomerId() {
-    const emails = TEMP_MISSING_CUSTOMER_ID_EMAILS
-    const results: {
-      success: string[]
-      failed: { email: string; error: string }[]
-      skipped: string[]
-    } = {
-      success: [],
-      failed: [],
-      skipped: [],
-    }
-
-    for (const email of emails) {
-      try {
-        const user =
-          await this.paymentsService.tempUpdateMissingCustomerId(email)
-        if (user) {
-          results.success.push(email)
-          this.logger.log(`Updated customer ID for: ${email}`)
-        } else {
-          results.skipped.push(email)
-          this.logger.warn(`Skipped (no data): ${email}`)
-        }
-      } catch (error) {
-        results.failed.push({ email, error: (error as Error).message })
-        this.logger.error(`Failed for ${email}:`, error)
-      }
-    }
-
-    return {
-      message: `Processed ${emails.length} emails`,
-      success: results.success.length,
-      failed: results.failed.length,
-      skipped: results.skipped.length,
-      details: results,
-    }
+    return await this.paymentsService.fixMissingCustomerIds()
   }
 }

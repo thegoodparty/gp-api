@@ -2,14 +2,17 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
+  Logger,
 } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { Prisma, User } from '@prisma/client'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { PaymentIntentPayload, PaymentType } from '../payments.types'
 import { UsersService } from '../../users/services/users.service'
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name)
+
   constructor(
     private readonly stripe: StripeService,
     private readonly usersService: UsersService,
@@ -54,7 +57,7 @@ export class PaymentsService {
     return { paymentIntent, user }
   }
 
-  async tempUpdateMissingCustomerId(email: string) {
+  async updateMissingCustomerId(email: string) {
     const user = await this.usersService.findUserByEmail(email)
     if (!user) {
       return null
@@ -69,15 +72,71 @@ export class PaymentsService {
       return null
     }
     const customerId =
-      await this.stripe.tempCustomerIdFromCheckoutSession(checkoutSessionId)
+      await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
     if (!customerId) {
       return null
     }
 
     await this.usersService.patchUserMetaData(user!.id, {
-      customerId: customerId as string,
+      customerId,
       checkoutSessionId: null,
     })
     return user
+  }
+
+  async fixMissingCustomerIds() {
+    const users = await this.usersService.findMany({
+      where: {
+        metaData: {
+          path: ['customerId'],
+          equals: Prisma.JsonNull,
+        },
+        AND: {
+          metaData: {
+            path: ['checkoutSessionId'],
+            not: Prisma.JsonNull,
+          },
+        },
+      },
+      select: {
+        email: true,
+        id: true,
+      },
+    })
+
+    const results: {
+      success: string[]
+      failed: { email: string; error: string }[]
+      skipped: string[]
+    } = {
+      success: [],
+      failed: [],
+      skipped: [],
+    }
+
+    for (const dbUser of users) {
+      const { email } = dbUser
+      try {
+        const user = await this.updateMissingCustomerId(email)
+        if (!user) {
+          results.skipped.push(email)
+          continue
+        }
+        results.success.push(user.email)
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error'
+        results.failed.push({ email, error: errorMessage })
+        this.logger.error(`Failed for ${email}:`, error)
+      }
+    }
+
+    return {
+      message: `Processed ${users.length} users`,
+      success: results.success.length,
+      failed: results.failed.length,
+      skipped: results.skipped.length,
+      details: results,
+    }
   }
 }
