@@ -53,4 +53,26 @@ export class PaymentsService {
 
     return { paymentIntent, user }
   }
+
+  async tempUpdateMissingCustomerId(email: string) {
+    const user = await this.usersService.findUserByEmail(email)
+    if (!user) {
+      return null
+    }
+    const checkoutSessionId = user.metaData?.checkoutSessionId as string
+    if (!checkoutSessionId) {
+      return null
+    }
+    const customerId =
+      await this.stripe.tempCustomerIdFromCheckoutSession(checkoutSessionId)
+    if (!customerId) {
+      return null
+    }
+
+    await this.usersService.patchUserMetaData(user!.id, {
+      customerId: customerId as string,
+      checkoutSessionId: null,
+    })
+    return user
+  }
 }

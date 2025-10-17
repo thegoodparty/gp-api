@@ -129,4 +129,9 @@ export class StripeService {
       STRIPE_WEBSOCKET_SECRET as string,
     )
   }
+  async tempCustomerIdFromCheckoutSession(checkoutSessionId: string) {
+    const checkoutSession =
+      await this.stripe.checkout.sessions.retrieve(checkoutSessionId)
+    return checkoutSession.customer as string
+  }
 }
