@@ -62,8 +62,8 @@ async function removeAutoCancellations() {
       continue // No scheduled cancellation
     }
 
-    const wasUserInitiated = subscription.cancellation_details?.comment !== null
-      || subscription.cancellation_details?.feedback !== null
+    const wasUserInitiated = subscription.cancellation_details?.comment != null
+      || subscription.cancellation_details?.feedback != null
 
     if (wasUserInitiated) {
       manualCount++
