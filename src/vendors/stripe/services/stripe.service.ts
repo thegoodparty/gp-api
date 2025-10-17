@@ -132,6 +132,14 @@ export class StripeService {
   async tempCustomerIdFromCheckoutSession(checkoutSessionId: string) {
     const checkoutSession =
       await this.stripe.checkout.sessions.retrieve(checkoutSessionId)
+
+    if (checkoutSession.payment_status !== 'paid') {
+      this.logger.warn(
+        `Checkout session ${checkoutSessionId} has status: ${checkoutSession.payment_status}`,
+      )
+      return null
+    }
+
     return checkoutSession.customer as string
   }
 }

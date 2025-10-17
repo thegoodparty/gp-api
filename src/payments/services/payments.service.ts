@@ -59,6 +59,11 @@ export class PaymentsService {
     if (!user) {
       return null
     }
+
+    if (user.metaData?.customerId) {
+      return null
+    }
+
     const checkoutSessionId = user.metaData?.checkoutSessionId as string
     if (!checkoutSessionId) {
       return null
