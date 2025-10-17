@@ -85,29 +85,6 @@ export class PaymentsService {
   }
 
   async fixMissingCustomerIds() {
-    const users = await this.usersService.findMany({
-      where: {
-        AND: [
-          {
-            metaData: {
-              path: ['customerId'],
-              equals: Prisma.JsonNull,
-            },
-          },
-          {
-            metaData: {
-              path: ['checkoutSessionId'],
-              not: Prisma.JsonNull,
-            },
-          },
-        ],
-      },
-      select: {
-        email: true,
-        id: true,
-      },
-    })
-
     const results: {
       success: string[]
       failed: { email: string; error: string }[]
@@ -117,6 +94,30 @@ export class PaymentsService {
       failed: [],
       skipped: [],
     }
+
+    const batch = await this.usersService.findMany({
+      where: {
+        metaData: {
+          path: ['checkoutSessionId'],
+          not: Prisma.AnyNull,
+        },
+      },
+      select: {
+        email: true,
+        id: true,
+        metaData: true,
+      },
+      take: 50,
+    })
+
+    // Filter to only users without customerId
+    const users = batch.filter((user) => {
+      const metadata = user.metaData as {
+        customerId?: string
+        checkoutSessionId?: string
+      } | null
+      return !metadata?.customerId
+    })
 
     for (const dbUser of users) {
       const { email } = dbUser
