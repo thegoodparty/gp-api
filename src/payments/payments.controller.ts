@@ -68,7 +68,7 @@ export class PaymentsController {
   @Patch('fix-missing-customer-id')
   @Roles(UserRole.admin)
   @HttpCode(HttpStatus.OK)
-  async tempMissingCustomerId() {
-    return await this.paymentsService.fixMissingCustomerIds()
+  async fixMissingCustomerIds() {
+    return this.paymentsService.fixMissingCustomerIds()
   }
 }

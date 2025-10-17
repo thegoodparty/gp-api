@@ -129,12 +129,23 @@ export class StripeService {
       STRIPE_WEBSOCKET_SECRET as string,
     )
   }
-  
+
   async fetchCustomerIdFromCheckoutSession(
     checkoutSessionId: string,
   ): Promise<string | null> {
-    const checkoutSession =
-      await this.stripe.checkout.sessions.retrieve(checkoutSessionId)
+    let checkoutSession: Stripe.Checkout.Session
+    try {
+      checkoutSession =
+        await this.stripe.checkout.sessions.retrieve(checkoutSessionId)
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve checkout session ${checkoutSessionId}`,
+        error,
+      )
+      throw new BadGatewayException(
+        'Failed to retrieve checkout session from Stripe',
+      )
+    }
 
     if (checkoutSession.payment_status !== 'paid') {
       this.logger.warn(
@@ -143,19 +154,16 @@ export class StripeService {
       return null
     }
 
-    const { customer } = checkoutSession
+    const { customer } = checkoutSession as unknown as Stripe.Checkout.Session
 
-    // Handle all possible customer field types from Stripe API
     if (!customer) {
       return null
     }
 
-    // If customer is a string, it's the customer ID
     if (typeof customer === 'string') {
       return customer
     }
 
-    // If customer is an expanded Customer object, extract the ID
     return customer.id
   }
 }
