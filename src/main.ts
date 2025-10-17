@@ -9,11 +9,12 @@ import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import { AppModule } from './app.module'
-import { Logger } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
+import { Logger } from 'nestjs-pino'
+import { randomUUID } from 'crypto'
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
@@ -24,16 +25,15 @@ const bootstrap = async () => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
-      ...(process.env.LOG_LEVEL
-        ? {
-            logger: { level: process.env.LOG_LEVEL },
-          }
-        : {}),
+      disableRequestLogging: true,
+      genReqId: () => randomUUID(),
     }),
     {
       rawBody: true,
     },
   )
+
+  app.useLogger(app.get(Logger))
   app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()
@@ -78,9 +78,10 @@ const bootstrap = async () => {
   return app
 }
 
-bootstrap().then(() => {
-  const logger = new Logger('bootstrap')
-  logger.log(
-    `App bootstrap successful => ${APP_LISTEN_CONFIG.host}:${APP_LISTEN_CONFIG.port}`,
-  )
+bootstrap().then((app) => {
+  app
+    .get(Logger)
+    .log(
+      `App bootstrap successful => ${APP_LISTEN_CONFIG.host}:${APP_LISTEN_CONFIG.port}`,
+    )
 })
