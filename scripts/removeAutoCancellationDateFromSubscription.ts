@@ -4,6 +4,23 @@ import Stripe from 'stripe'
 
 dotenv.config()
 
+/*
+ * One-time script to fix auto-scheduled subscription cancellations.
+ *
+ * Problem: Previously, the system was automatically scheduling Stripe subscriptions
+ * to cancel at election end dates. This behavior was stopped, but 567 existing
+ * subscriptions still have scheduled cancellations that need to be removed.
+ *
+ * This script:
+ * 1. Identifies subscriptions with scheduled cancellations
+ * 2. Distinguishes between user-initiated cancellations (has comment/feedback)
+ *    and auto-scheduled ones (no comment/feedback)
+ * 3. Removes the scheduled cancellation from Stripe for auto-scheduled only
+ * 4. Updates the database to clear subscriptionCancelAt
+ *
+ * Run with --live flag to actually make changes, otherwise runs in dry-run mode.
+ */
+
 const prisma = new PrismaClient()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
 const isDryRun = !process.argv.includes('--live')
