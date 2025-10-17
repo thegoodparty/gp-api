@@ -87,16 +87,20 @@ export class PaymentsService {
   async fixMissingCustomerIds() {
     const users = await this.usersService.findMany({
       where: {
-        metaData: {
-          path: ['customerId'],
-          equals: Prisma.JsonNull,
-        },
-        AND: {
-          metaData: {
-            path: ['checkoutSessionId'],
-            not: Prisma.JsonNull,
+        AND: [
+          {
+            metaData: {
+              path: ['customerId'],
+              equals: Prisma.JsonNull,
+            },
           },
-        },
+          {
+            metaData: {
+              path: ['checkoutSessionId'],
+              not: Prisma.JsonNull,
+            },
+          },
+        ],
       },
       select: {
         email: true,
