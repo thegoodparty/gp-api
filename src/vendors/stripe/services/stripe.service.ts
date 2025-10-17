@@ -129,7 +129,9 @@ export class StripeService {
       STRIPE_WEBSOCKET_SECRET as string,
     )
   }
-  async tempCustomerIdFromCheckoutSession(checkoutSessionId: string) {
+  async tempCustomerIdFromCheckoutSession(
+    checkoutSessionId: string,
+  ): Promise<string | null> {
     const checkoutSession =
       await this.stripe.checkout.sessions.retrieve(checkoutSessionId)
 
@@ -140,6 +142,19 @@ export class StripeService {
       return null
     }
 
-    return checkoutSession.customer as string
+    const { customer } = checkoutSession
+
+    // Handle all possible customer field types from Stripe API
+    if (!customer) {
+      return null
+    }
+
+    // If customer is a string, it's the customer ID
+    if (typeof customer === 'string') {
+      return customer
+    }
+
+    // If customer is an expanded Customer object, extract the ID
+    return customer.id
   }
 }
