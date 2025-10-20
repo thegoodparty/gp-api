@@ -3,6 +3,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
 import {
@@ -183,26 +184,24 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     userId: number,
     newMetaData: PrismaJson.UserMetaData,
   ) {
-    const currentUser = await this.findUser({ id: userId })
-    if (!currentUser) {
-      this.logger.warn(
-        `User with id ${userId} not found. Skipping metadata update`,
-      )
-      return null
-    }
-
-    const currentMetaData = currentUser?.metaData
-    return this.updateUser(
-      {
-        id: userId,
-      },
-      {
-        metaData: {
-          ...currentMetaData,
-          ...newMetaData,
+    return this.client.$transaction(async (tx) => {
+      const user = await tx.user.findFirst({ where: { id: userId } })
+      if (!user) {
+        this.logger.warn(
+          `User with id ${userId} not found. Skipping metadata update`,
+        )
+        return null
+      }
+      return tx.user.update({
+        where: { id: userId },
+        data: {
+          metaData: {
+            ...(user.metaData ?? {}),
+            ...newMetaData,
+          },
         },
-      },
-    )
+      })
+    })
   }
 
   async deleteUser(id: number) {

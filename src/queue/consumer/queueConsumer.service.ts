@@ -4,6 +4,10 @@ import { Message } from '@aws-sdk/client-sqs'
 import {
   DomainEmailForwardingMessage,
   GenerateAiContentMessageData,
+  PollAnalysisCompleteEvent,
+  PollAnalysisCompleteEventSchema,
+  PollIssueAnalysisEvent,
+  PollIssueAnalysisEventSchema,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
@@ -11,7 +15,12 @@ import {
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { Campaign, PathToVictory, TcrComplianceStatus } from '@prisma/client'
+import {
+  Campaign,
+  PathToVictory,
+  PollIssue,
+  TcrComplianceStatus,
+} from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
@@ -30,6 +39,10 @@ import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEm
 import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { isNestJsHttpException } from '../../shared/util/http.util'
 import { isAxiosError } from 'axios'
+import { PollsService } from 'src/polls/services/polls.service'
+import { PollIssuesService } from 'src/polls/services/pollIssues.service'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { ContactsService } from 'src/contacts/services/contacts.service'
 
 @Injectable()
 export class QueueConsumerService {
@@ -44,6 +57,10 @@ export class QueueConsumerService {
     private readonly campaignsService: CampaignsService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly domainsService: DomainsService,
+    private readonly pollsService: PollsService,
+    private readonly pollIssuesService: PollIssuesService,
+    private readonly electedOfficeService: ElectedOfficeService,
+    private readonly contactsService: ContactsService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -191,6 +208,16 @@ export class QueueConsumerService {
         return await this.handleDomainEmailForwardingMessage(
           queueMessage.data as DomainEmailForwardingMessage,
         )
+      case QueueType.POLL_ISSUES_ANALYSIS:
+        this.logger.log('received pollIssueAnalysis message')
+        const pollIssueAnalysisEvent =
+          PollIssueAnalysisEventSchema.parse(queueMessage)
+        return await this.handlePollIssuesAnalysis(pollIssueAnalysisEvent)
+      case QueueType.POLL_ANALYSIS_COMPLETE:
+        this.logger.log('received pollAnalysisComplete message')
+        const pollAnalysisCompleteEvent =
+          PollAnalysisCompleteEventSchema.parse(queueMessage)
+        return await this.handlePollAnalysisComplete(pollAnalysisCompleteEvent)
     }
     // Return true to delete the message from the queue
     return true
@@ -487,5 +514,105 @@ export class QueueConsumerService {
         },
       })
     }
+  }
+
+  private async handlePollIssuesAnalysis(event: PollIssueAnalysisEvent) {
+    const issue: PollIssue = {
+      id: `${event.data.pollId}-${event.data.rank}`,
+      pollId: event.data.pollId,
+      title: event.data.theme,
+      summary: event.data.summary,
+      details: event.data.analysis,
+      mentionCount: event.data.responseCount,
+      representativeComments: event.data.quotes.map((quote) => ({
+        quote: quote.quote,
+      })),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    const result = await this.pollIssuesService.model.upsert({
+      where: { id: issue.id },
+      create: issue,
+      update: issue,
+    })
+    this.logger.log('Successfully upserted poll issue', result)
+    return true
+  }
+
+  private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
+    const existing = await this.pollsService.findUnique({
+      where: { id: event.data.pollId },
+    })
+    if (!existing) {
+      this.logger.log('Poll not found, ignoring event')
+      return
+    }
+
+    if (existing.status !== 'IN_PROGRESS') {
+      this.logger.log('Poll is not in-progress, ignoring event')
+      return
+    }
+
+    if (!existing.electedOfficeId) {
+      this.logger.log('Poll has no elected office, ignoring event')
+      return
+    }
+
+    const office = await this.electedOfficeService.findUnique({
+      where: { id: existing.electedOfficeId },
+    })
+
+    if (!office) {
+      this.logger.log('Elected office not found, ignoring event')
+      return
+    }
+
+    const campaign = await this.campaignsService.findUnique({
+      where: { id: office.campaignId },
+      include: { pathToVictory: true },
+    })
+
+    if (!campaign) {
+      this.logger.log('No campagin found, ignoring event')
+      return
+    }
+
+    const constituency = await this.contactsService.findContacts(
+      { segment: 'all', resultsPerPage: 5, page: 1 },
+      campaign,
+    )
+
+    let highConfidence = false
+    if (constituency.pagination.totalResults) {
+      // High confidence is EITHER:
+      //  - 75 total responses
+      //  - responses from >=10%
+      // This was last decided here: https://goodparty.clickup.com/t/90132012119/ENG-4771
+      highConfidence =
+        event.data.totalResponses > 75 ||
+        event.data.totalResponses / constituency.pagination.totalResults >= 0.1
+    }
+
+    const poll = await this.pollsService.update({
+      where: { id: existing.id },
+      data: {
+        status: 'COMPLETED',
+        confidence: highConfidence ? 'HIGH' : 'LOW',
+        responseCount: event.data.totalResponses,
+        completedDate: new Date(),
+      },
+    })
+    if (campaign) {
+      await this.analytics.track(
+        campaign.userId,
+        EVENTS.Polls.ResultsSynthesisCompleted,
+        {
+          pollId: poll.id,
+          path: `/dashboard/polls/${poll.id}`,
+          constituencyName: campaign.pathToVictory?.data.electionLocation,
+        },
+      )
+    }
+    return true
   }
 }

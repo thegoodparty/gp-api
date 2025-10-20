@@ -7,6 +7,7 @@
   "license": "CC0-1.0",
   "scripts": {
     "build": "nest build",
+    "build:lambdas": "tsx build-lambdas.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -27,7 +28,7 @@
     "postinstall": "echo 'Note: This project requires --legacy-peer-deps flag due to peer dependency conflicts'"
   },
   "prisma": {
-    "seed": "ts-node -r tsconfig-paths/register ./seed/seed.ts",
+    "seed": "tsx ./seed/seed.ts",
     "schema": "prisma/schema"
   },
   "engines": {
@@ -35,9 +36,12 @@
     "npm": ">=10.9.0"
   },
   "dependencies": {
+    "@aws-lambda-powertools/logger": "^2.27.0",
+    "@aws-sdk/client-dynamodb": "^3.902.0",
     "@aws-sdk/client-route-53": "^3.812.0",
     "@aws-sdk/client-route-53-domains": "^3.812.0",
     "@aws-sdk/client-s3": "^3.730.0",
+    "@aws-sdk/lib-dynamodb": "^3.902.0",
     "@aws-sdk/lib-storage": "^3.731.1",
     "@aws-sdk/s3-request-presigner": "^3.730.0",
     "@contentful/rich-text-plain-text-renderer": "^17.0.0",
@@ -65,7 +69,10 @@
     "@redtea/format-axios-error": "^2.1.1",
     "@segment/analytics-node": "^2.2.1",
     "@ssut/nestjs-sqs": "^3.0.1",
+    "@types/adm-zip": "^0.5.7",
+    "@types/aws-lambda": "^8.10.155",
     "@vercel/sdk": "^1.11.4",
+    "adm-zip": "^0.5.16",
     "async": "^3.2.6",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
@@ -75,6 +82,8 @@
     "deepmerge-ts": "^7.1.3",
     "dotenv": "^16.4.5",
     "es-toolkit": "^1.30.1",
+    "esbuild": "^0.25.10",
+    "fast-glob": "^3.3.3",
     "fastify": "^5.2.1",
     "google-auth-library": "^9.15.0",
     "googleapis": "^144.0.0",
@@ -101,6 +110,7 @@
     "slugify": "^1.6.6",
     "states-us": "^1.1.1",
     "stripe": "^17.5.0",
+    "tsx": "^4.20.6",
     "validator": "^13.12.0",
     "zipcodes": "^8.0.0",
     "zod": "^3.23.8"
@@ -141,7 +151,6 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.3",
-    "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.3",
     "zod-prisma-types": "^3.2.4"

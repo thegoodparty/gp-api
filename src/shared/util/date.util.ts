@@ -1,5 +1,9 @@
 import { DateArg, endOfDay, format, parse, startOfDay, subDays } from 'date-fns'
 
+export const toDateOnlyString = (d?: Date | null) => {
+  return d ? d.toISOString().slice(0, 10) : undefined
+}
+
 export enum DateFormats {
   isoDate = 'yyyy-MM-dd',
   usDate = 'MMMM d, yyyy',

@@ -2,16 +2,16 @@ import { SlackMessageType } from 'src/vendors/slack/slackService.types'
 
 export function buildTevynApiSlackBlocks({
   message,
+  pollId,
   csvFileUrl,
   imageUrl,
   userInfo,
-  campaignSlug,
 }: {
   message: string
+  pollId?: string
   csvFileUrl?: string
   imageUrl?: string
   userInfo?: { name?: string; email?: string; phone?: string }
-  campaignSlug?: string
 }) {
   const blocks = [
     {
@@ -22,13 +22,13 @@ export function buildTevynApiSlackBlocks({
         emoji: true,
       },
     },
-    ...(campaignSlug
+    ...(pollId
       ? ([
           {
             type: SlackMessageType.SECTION,
             text: {
               type: SlackMessageType.MRKDWN,
-              text: `*Campaign:* ${campaignSlug}`,
+              text: `*Poll ID:* \`${pollId}\``,
             },
           },
         ] as const)

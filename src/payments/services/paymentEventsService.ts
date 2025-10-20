@@ -227,15 +227,33 @@ export class PaymentEventsService {
       // Don't throw - we don't want to fail the webhook for analytics issues
     }
 
-    return await Promise.allSettled([
-      this.usersService.patchUserMetaData(user.id, {
-        customerId: customerId as string,
-        checkoutSessionId: null,
-      }),
+    // Critical: Update user metadata with customerId - must succeed
+    await this.usersService.patchUserMetaData(user.id, {
+      customerId: customerId as string,
+      checkoutSessionId: null,
+    })
+
+    // Non-critical: Send notifications - log failures but don't fail webhook
+    const results = await Promise.allSettled([
       this.sendProSignUpSlackMessage(user, campaign),
       this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
+
+    // Log any notification failures
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const action = [
+          'send Slack message',
+          'send email',
+          'send voter file alert',
+        ][index]
+        this.logger.error(
+          `[WEBHOOK] Failed to ${action} - User: ${user.id}, CustomerId: ${customerId}`,
+          result.reason,
+        )
+      }
+    })
   }
 
   async checkoutSessionExpiredHandler(

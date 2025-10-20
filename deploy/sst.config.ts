@@ -17,6 +17,7 @@ export default $config({
   async run() {
     const { default: aws } = await import('@pulumi/aws')
     const { default: pulumi } = await import('@pulumi/pulumi')
+    const { lambda } = await import('./utils/lambda')
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
@@ -138,6 +139,18 @@ export default $config({
     try {
       secretsJson = JSON.parse(secretString || '{}')
 
+      // DO NOT REMOVE THESE. These are here so that we don't use the AWS credentials
+      // that were (at some point) hardcoded in the secret. Instead, we want to make sure
+      // our instances use their NATIVE IAM roles, so that we can easily manage their
+      // permissions as-code.
+      //
+      // Once the migration to IAM auth is complete, we can remove these values from the
+      // secret entirely, and then remove these lines.
+      delete secretsJson.AWS_ACCESS_KEY_ID
+      delete secretsJson.AWS_SECRET_ACCESS_KEY
+      delete secretsJson.AWS_S3_KEY
+      delete secretsJson.AWS_S3_SECRET
+
       for (const [key, value] of Object.entries(secretsJson)) {
         if (key === 'DATABASE_URL') {
           const { username, password, database } = extractDbCredentials(
@@ -170,7 +183,6 @@ export default $config({
     if (!dbName || !dbUser || !dbPassword || !vpcCidr || !dbUrl) {
       throw new Error('DATABASE_URL, VPC_CIDR keys must be set in the secret.')
     }
-
 
     const sqsQueueName = `${$app.stage}-Queue.fifo`
     const sqsDlqName = `${$app.stage}-DLQ.fifo`
@@ -231,6 +243,58 @@ export default $config({
       })
     }
 
+    const HANDLER_TIMEOUT = 30
+
+    const pollInsightsQueueDlq = new aws.sqs.Queue(
+      `poll-insights-queue-dlq-${$app.stage}`,
+      {
+        name: `poll-insights-queue-dlq-${$app.stage}.fifo`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+      },
+    )
+
+    const pollInsightsQueue = new aws.sqs.Queue(
+      `poll-insights-queue-${$app.stage}`,
+      {
+        name: `poll-insights-queue-${$app.stage}.fifo`,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+        visibilityTimeoutSeconds: HANDLER_TIMEOUT + 5,
+        contentBasedDeduplication: true,
+        redrivePolicy: pulumi.interpolate`{
+          "deadLetterTargetArn": "${pollInsightsQueueDlq.arn}",
+          "maxReceiveCount": 3
+        }`,
+      },
+    )
+
+    const pollInsightsQueueHandler = lambda(aws, pulumi, {
+      name: `poll-insights-queue-handler-${$app.stage}`,
+      runtime: 'nodejs22.x',
+      timeout: HANDLER_TIMEOUT,
+      memorySize: 512,
+      filename: 'poll-response-analysis-queue-handler',
+      policy: [
+        {
+          actions: [
+            'sqs:ReceiveMessage',
+            'sqs:DeleteMessage',
+            'sqs:GetQueueAttributes',
+          ],
+          resources: [pollInsightsQueue.arn],
+        },
+      ],
+    })
+
+    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
+      eventSourceArn: pollInsightsQueue.arn,
+      functionName: pollInsightsQueueHandler.name,
+      enabled: true,
+      batchSize: 10,
+      functionResponseTypes: ['ReportBatchItemFailures'],
+    })
+
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
       loadBalancer: {
@@ -247,18 +311,9 @@ export default $config({
         },
       },
       // https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html#fargate-tasks-size
-      capacity:
-        $app.stage === 'master'
-          ? {
-              // Use 50% regular Fargate and 50% Fargate Spot.
-              // But make sure the first instance is a regular Fargate instance.
-              fargate: { weight: 1, base: 1 },
-              spot: { weight: 1 },
-            }
-          : {
-              // Use 100% Fargate Spot.
-              spot: { weight: 1, base: 1 },
-            },
+      capacity: {
+        fargate: { weight: 1 },
+      },
       memory: $app.stage === 'master' ? '4 GB' : '2 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
       cpu: $app.stage === 'master' ? '1 vCPU' : '0.5 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
       scaling: {
@@ -302,6 +357,24 @@ export default $config({
           idleTimeout: 120,
         },
       },
+      permissions: [
+        {
+          actions: ['route53domains:Get*', 'route53domains:List*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['route53domains:CheckDomainAvailability'],
+          resources: ['*'],
+        },
+        {
+          actions: ['s3:*', 's3-object-lambda:*'],
+          resources: ['*'],
+        },
+        {
+          actions: ['sqs:*'],
+          resources: ['*'],
+        },
+      ],
     })
 
     // Create a Security Group for the RDS Cluster
@@ -393,7 +466,10 @@ export default $config({
           minCapacity: 0.5,
         },
       }
-      const voterCluster = new aws.rds.Cluster('voterCluster', voterDbProdConfig)
+      const voterCluster = new aws.rds.Cluster(
+        'voterCluster',
+        voterDbProdConfig,
+      )
 
       new aws.rds.ClusterInstance('voterInstance', {
         clusterIdentifier: voterCluster.id,
@@ -415,7 +491,6 @@ export default $config({
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineVersion: voterClusterLatest.engineVersion,
       })
-
     } else if ($app.stage === 'qa') {
       rdsCluster = new aws.rds.Cluster('rdsCluster', {
         clusterIdentifier: 'gp-api-db-qa',

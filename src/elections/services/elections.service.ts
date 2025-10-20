@@ -8,9 +8,9 @@ import {
 import { isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
+import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
-import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
@@ -47,6 +47,18 @@ export class ElectionsService {
     query?: Q,
   ): Promise<Res | null> {
     const fullUrl = `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`
+    const rawParams = (query ?? {}) as Record<
+      string,
+      string | number | boolean | null | undefined
+    >
+    const filteredParams = Object.fromEntries(
+      Object.entries(rawParams).filter(
+        ([, v]) => v !== undefined && v !== null,
+      ),
+    ) as Record<string, string | number | boolean>
+    this.logger.debug(
+      `Election API GET ${path} params: ${JSON.stringify(filteredParams)}`,
+    )
     try {
       const { data, status } = await lastValueFrom(
         this.httpService.get(fullUrl, {
@@ -216,25 +228,40 @@ export class ElectionsService {
     }
   }
 
-  async getValidDistrictTypes(state: string, electionYear: string | number) {
-    return await this.electionApiGet(ElectionApiRoutes.districts.types.path, {
-      electionYear,
+  async getValidDistrictTypes(
+    state: string,
+    electionYear: string | number,
+    excludeInvalid = true,
+  ) {
+    const shouldExclude = excludeInvalid === true
+    const query = {
       state,
-      excludeInvalid: true,
-    })
+      excludeInvalid: shouldExclude,
+      ...(shouldExclude ? { electionYear } : {}),
+    }
+    return await this.electionApiGet(
+      ElectionApiRoutes.districts.types.path,
+      query,
+    )
   }
 
   async getValidDistrictNames(
     L2DistrictType: string,
     state?: string,
     electionYear?: string | number,
+    excludeInvalid = true,
   ) {
-    return await this.electionApiGet(ElectionApiRoutes.districts.names.path, {
+    const shouldExclude = excludeInvalid === true
+    const query = {
       L2DistrictType,
       state,
-      electionYear,
-      excludeInvalid: true,
-    })
+      excludeInvalid: shouldExclude,
+      ...(shouldExclude ? { electionYear } : {}),
+    }
+    return await this.electionApiGet(
+      ElectionApiRoutes.districts.names.path,
+      query,
+    )
   }
 
   cleanDistrictName(L2DistrictName: string) {

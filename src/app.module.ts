@@ -29,9 +29,11 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { SegmentModule } from './vendors/segment/segment.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { WebsitesModule } from './websites/websites.module'
+import { ElectedOfficeModule } from './electedOffice/electedOffice.module'
 import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
 import { PeerlyModule } from './vendors/peerly/peerly.module'
 import { ContactsModule } from './contacts/contacts.module'
+import { PollsModule } from './polls/polls.module'
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { ContactsModule } from './contacts/contacts.module'
     CommunityIssuesModule,
     PeerlyModule,
     ContactsModule,
+    PollsModule,
+    ElectedOfficeModule,
   ],
   providers: [
     SessionsService,
