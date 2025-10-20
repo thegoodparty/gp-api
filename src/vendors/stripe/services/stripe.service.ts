@@ -190,6 +190,7 @@ export class StripeService {
         this.logger.error(`Failed to remove subscription cancellation ${subscriptionId}`, e)
         throw new BadGatewayException(`Failed to remove subscription cancellation ${subscriptionId}`, e.message)
       }
+      throw e
     }
   }
 }
