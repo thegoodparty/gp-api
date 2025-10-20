@@ -169,13 +169,13 @@ export class OutreachController {
   @Get()
   @UseCampaign()
   async findAll(@ReqCampaign() campaign: Campaign) {
-    const { peerlyIdentityId } =
-      await this.tcrComplianceService.findUniqueOrThrow({
-        where: {
-          campaignId: campaign.id,
-        },
-      })
     const outreaches = await this.outreachService.findByCampaignId(campaign.id)
+    const tcrCompliance = await this.tcrComplianceService.findFirst({
+      where: {
+        campaignId: campaign.id,
+      },
+    })
+    const peerlyIdentityId = tcrCompliance?.peerlyIdentityId
     const p2pJobs = peerlyIdentityId
       ? await this.peerlyP2pJobService.getJobsByIdentityId(peerlyIdentityId)
       : []
