@@ -8,17 +8,18 @@ import {
   Logger,
   Patch,
   Post,
+  Query,
   RawBodyRequest,
   Req,
 } from '@nestjs/common'
-import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
-import { Stripe } from 'stripe'
-import { PaymentEventsService } from './services/paymentEventsService'
-import { StripeService } from '../vendors/stripe/services/stripe.service'
-import { CampaignsService } from '../campaigns/services/campaigns.service'
-import { PaymentsService } from './services/payments.service'
 import { UserRole } from '@prisma/client'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { Stripe } from 'stripe'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
+import { CampaignsService } from '../campaigns/services/campaigns.service'
+import { StripeService } from '../vendors/stripe/services/stripe.service'
+import { PaymentEventsService } from './services/paymentEventsService'
+import { PaymentsService } from './services/payments.service'
 
 @Controller('payments')
 export class PaymentsController {
@@ -29,7 +30,7 @@ export class PaymentsController {
     private readonly stripeEvents: PaymentEventsService,
     private readonly campaignsService: CampaignsService,
     private readonly paymentsService: PaymentsService,
-  ) {}
+  ) { }
 
   @Post('events')
   @PublicAccess()
@@ -70,5 +71,12 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   async fixMissingCustomerIds() {
     return this.paymentsService.fixMissingCustomerIds()
+  }
+
+  @Patch('fix-auto-scheduled-cancellations')
+  @Roles(UserRole.admin)
+  @HttpCode(HttpStatus.OK)
+  async fixAutoScheduledCancellations(@Query('dryRun') dryRun?: string) {
+    return this.paymentsService.fixAutoScheduledCancellations(dryRun !== 'false')
   }
 }
