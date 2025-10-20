@@ -12,4 +12,5 @@ model PollIssue {
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   @@index([pollId, id])
+  @@map("poll_issues")
 }
