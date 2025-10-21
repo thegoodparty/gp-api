@@ -199,7 +199,7 @@ export function buildSlackBlocks({
               elements: [
                 {
                   type: SlackMessageType.TEXT,
-                  text: 'AI-Generated Script: ',
+                  text: 'Message Script: ',
                   style: {
                     bold: true,
                   },
