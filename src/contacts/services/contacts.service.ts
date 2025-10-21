@@ -14,7 +14,6 @@ import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { PollsService } from 'src/polls/services/polls.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {

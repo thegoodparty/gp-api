@@ -199,6 +199,21 @@ export function buildTevynApiSlackBlocks({
           },
         ]
       : []),
+    ...(pollId
+      ? [
+          {
+            type: SlackMessageType.SECTION,
+            text: {
+              type: SlackMessageType.MRKDWN,
+              text: [
+                'Run the following command to upload the results CSV:',
+                '',
+                `\`aws s3 cp /path/to/local/file.csv s3://${process.env.SERVE_ANALYSIS_BUCKET_NAME}/input/${pollId}.csv\``,
+              ].join('\n'),
+            },
+          },
+        ]
+      : []),
     {
       type: SlackMessageType.DIVIDER,
     },
