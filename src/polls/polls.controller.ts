@@ -36,7 +36,8 @@ const API_STATUS_MAP: Record<PollStatus, APIPoll['status']> = {
   [PollStatus.COMPLETED]: 'completed',
   [PollStatus.IN_PROGRESS]: 'in_progress',
   [PollStatus.EXPANDING]: 'expanding',
-  [PollStatus.SCHEDULED]: 'scheduled',
+  // As of Oct 22 2025, we don't support scheduled polls, so we just map them to in_progress
+  [PollStatus.SCHEDULED]: 'in_progress',
 }
 
 const toAPIPoll = (poll: Poll): APIPoll => ({
