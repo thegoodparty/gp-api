@@ -13,8 +13,9 @@ import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
-import { Logger } from 'nestjs-pino'
 import { randomUUID } from 'crypto'
+import { CustomWinstonLogger } from './logging/winston-logger.service'
+import { HttpLoggingMiddleware } from './logging/http-logging.middleware'
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
@@ -29,11 +30,15 @@ const bootstrap = async () => {
       genReqId: () => randomUUID(),
     }),
     {
+      bufferLogs: true,
       rawBody: true,
     },
   )
 
-  app.useLogger(app.get(Logger))
+  const logger = await app.resolve(CustomWinstonLogger)
+  logger.setContext('Bootstrap')
+  app.useLogger(logger)
+
   app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()
@@ -71,17 +76,20 @@ const bootstrap = async () => {
     },
   })
 
+  app.use(
+    app.get(HttpLoggingMiddleware).use.bind(app.get(HttpLoggingMiddleware)),
+  )
+
   app.useGlobalFilters(new PrismaExceptionFilter())
   app.enableShutdownHooks()
 
   await app.listen(APP_LISTEN_CONFIG)
+
+  logger.log(
+    `App bootstrap successful => ${APP_LISTEN_CONFIG.host}:${APP_LISTEN_CONFIG.port}`,
+  )
+
   return app
 }
 
-bootstrap().then((app) => {
-  app
-    .get(Logger)
-    .log(
-      `App bootstrap successful => ${APP_LISTEN_CONFIG.host}:${APP_LISTEN_CONFIG.port}`,
-    )
-})
+bootstrap()

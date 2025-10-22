@@ -18,7 +18,7 @@ export class PaymentsService {
     private readonly stripe: StripeService,
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
-  ) { }
+  ) {}
 
   async createPayment<T extends PaymentType>(
     user: User,
@@ -169,7 +169,9 @@ export class PaymentsService {
       return details?.subscriptionCancelAt && details?.subscriptionCancelAt > 0
     })
 
-    this.logger.log(`Found ${campaignsWithScheduledCancellations.length} campaigns with scheduled cancellations`)
+    this.logger.log(
+      `Found ${campaignsWithScheduledCancellations.length} campaigns with scheduled cancellations`,
+    )
 
     for (const campaign of campaignsWithScheduledCancellations) {
       const { slug } = campaign
@@ -180,16 +182,20 @@ export class PaymentsService {
           continue
         }
 
-        const subscription = await this.stripe.retrieveSubscription(subscriptionId)
+        const subscription =
+          await this.stripe.retrieveSubscription(subscriptionId)
         if (!subscription.cancel_at) {
           continue
         }
 
-        const wasUserInitiated = subscription.cancellation_details?.comment != null
-          || subscription.cancellation_details?.feedback != null
+        const wasUserInitiated =
+          subscription.cancellation_details?.comment != null ||
+          subscription.cancellation_details?.feedback != null
         if (wasUserInitiated) {
           results.manual.push(slug)
-          this.logger.log(`Manual cancellation for ${slug} - Reason: ${subscription.cancellation_details?.reason} - Comment: ${subscription.cancellation_details?.comment}`)
+          this.logger.log(
+            `Manual cancellation for ${slug} - Reason: ${subscription.cancellation_details?.reason} - Comment: ${subscription.cancellation_details?.comment}`,
+          )
         } else {
           if (!dryRun) {
             await this.stripe.removeSubscriptionCancellation(subscriptionId)
@@ -201,8 +207,8 @@ export class PaymentsService {
                   ...details,
                   subscriptionCancelAt: null,
                   endOfElectionSubscriptionCanceled: false,
-                }
-              }
+                },
+              },
             })
 
             this.logger.log(`✅ Fixed auto-scheduled cancellation for ${slug}`)

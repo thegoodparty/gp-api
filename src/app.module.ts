@@ -34,12 +34,11 @@ import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
 import { PeerlyModule } from './vendors/peerly/peerly.module'
 import { ContactsModule } from './contacts/contacts.module'
 import { PollsModule } from './polls/polls.module'
-import { LoggerModule } from 'nestjs-pino'
-import { loggingConfig } from './logging/logging.config'
+import { LoggingModule } from './logging/logging.module'
 
 @Module({
   imports: [
-    LoggerModule.forRoot(loggingConfig),
+    LoggingModule,
     ScheduleModule.forRoot(),
     AnalyticsModule,
     UsersModule,

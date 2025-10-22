@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Query,
+  Res,
+  UsePipes,
+} from '@nestjs/common'
 import { Campaign, PathToVictory } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
@@ -20,6 +28,7 @@ type CampaignWithPathToVictory = Campaign & {
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
+  private readonly logger = new Logger(ContactsController.name)
   constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
@@ -27,6 +36,8 @@ export class ContactsController {
     @Query() filterDto: ListContactsDTO,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
+    this.logger.debug('SWAIN CONTACTS', { test: 'something' }, 'List param two')
+
     return this.contactsService.findContacts(filterDto, campaign)
   }
 

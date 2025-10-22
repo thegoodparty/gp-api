@@ -25,7 +25,7 @@ export class StripeService {
   readonly isTestMode = !STRIPE_SECRET_KEY?.includes('live')
   private readonly logger = new Logger(StripeService.name)
 
-  constructor(private readonly slack: SlackService) { }
+  constructor(private readonly slack: SlackService) {}
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
@@ -172,8 +172,14 @@ export class StripeService {
       return await this.stripe.subscriptions.retrieve(subscriptionId)
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error(`Failed to retrieve subscription ${subscriptionId}`, e)
-        throw new BadGatewayException(`Failed to retrieve subscription ${subscriptionId}`, e.message)
+        this.logger.error(
+          `Failed to retrieve subscription ${subscriptionId}`,
+          e,
+        )
+        throw new BadGatewayException(
+          `Failed to retrieve subscription ${subscriptionId}`,
+          e.message,
+        )
       }
       throw e
     }
@@ -187,11 +193,16 @@ export class StripeService {
       })
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error(`Failed to remove subscription cancellation ${subscriptionId}`, e)
-        throw new BadGatewayException(`Failed to remove subscription cancellation ${subscriptionId}`, e.message)
+        this.logger.error(
+          `Failed to remove subscription cancellation ${subscriptionId}`,
+          e,
+        )
+        throw new BadGatewayException(
+          `Failed to remove subscription cancellation ${subscriptionId}`,
+          e.message,
+        )
       }
       throw e
     }
   }
 }
-

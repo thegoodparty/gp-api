@@ -30,7 +30,7 @@ export class PaymentsController {
     private readonly stripeEvents: PaymentEventsService,
     private readonly campaignsService: CampaignsService,
     private readonly paymentsService: PaymentsService,
-  ) { }
+  ) {}
 
   @Post('events')
   @PublicAccess()
@@ -77,6 +77,8 @@ export class PaymentsController {
   @Roles(UserRole.admin)
   @HttpCode(HttpStatus.OK)
   async fixAutoScheduledCancellations(@Query('dryRun') dryRun?: string) {
-    return this.paymentsService.fixAutoScheduledCancellations(dryRun !== 'false')
+    return this.paymentsService.fixAutoScheduledCancellations(
+      dryRun !== 'false',
+    )
   }
 }
