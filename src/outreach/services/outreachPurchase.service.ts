@@ -32,7 +32,7 @@ export class OutreachPurchaseHandlerService
     outreachType,
   }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<number> {
     if (!campaignId || outreachType !== 'p2p') {
-      return contactCount * pricePerContact
+      return contactCount * pricePerContact * 100
     }
 
     const hasOffer =
@@ -43,12 +43,12 @@ export class OutreachPurchaseHandlerService
         0,
         contactCount - FREE_TEXTS_OFFER.COUNT,
       )
-      const finalAmount = discountedContactCount * pricePerContact
+      const finalAmount = discountedContactCount * pricePerContact * 100
 
       return finalAmount
     }
 
-    return contactCount * pricePerContact
+    return contactCount * pricePerContact * 100
   }
 
   async calculateDiscount(
