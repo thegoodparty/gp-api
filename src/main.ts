@@ -9,11 +9,14 @@ import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import { AppModule } from './app.module'
-import { Logger } from '@nestjs/common'
+import { ConsoleLogger, Logger } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
+import { randomUUID } from 'crypto'
+import { requestContextStore } from './logging/request-context.service'
+import { CustomLogger } from './logging/custom-logger'
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
@@ -21,19 +24,48 @@ const APP_LISTEN_CONFIG = {
 }
 
 const bootstrap = async () => {
+  const logger =
+    process.env.NODE_ENV === 'production'
+      ? new CustomLogger()
+      : new ConsoleLogger()
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
       ...(process.env.LOG_LEVEL
         ? {
+            disableRequestLogging: true,
             logger: { level: process.env.LOG_LEVEL },
+            genReqId: () => randomUUID(),
           }
         : {}),
     }),
     {
       rawBody: true,
+      logger,
     },
   )
+
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onRequest', (request, reply, done) => {
+      requestContextStore.run(request, () => {
+        logger.log('HTTP request received')
+        done()
+      })
+    })
+    .addHook('onResponse', (request, reply, done) => {
+      logger.log('HTTP request completed', {
+        response: {
+          contentLength: reply.getHeader('content-length'),
+          statusCode: reply.statusCode,
+        },
+      })
+      done()
+    })
+
+  app.useLogger(logger)
+
   app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()

@@ -62,19 +62,16 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       throw exception
     }
 
-    this.logger.error(
-      `Exception caught: ${message}`,
-      exception.stack || 'No stack trace available',
-      {
-        url: request.url,
-        method: request.method,
-        statusCode,
-      },
-    )
+    this.logger.error(`Exception caught: ${message}`, {
+      url: request.url,
+      method: request.method,
+      statusCode,
+      stack: exception.stack || 'No stack trace available',
+    })
 
     response.status(statusCode).send({
       statusCode,
-      timestamp: new Date().toISOString,
+      timestamp: new Date().toISOString(),
       path: request.url,
       error: message,
     })
