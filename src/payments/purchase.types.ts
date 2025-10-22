@@ -1,6 +1,7 @@
 export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
   TEXT = 'TEXT',
+  POLL = 'POLL',
 }
 
 export interface BasePurchaseMetadata {
