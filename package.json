@@ -111,6 +111,7 @@
     "states-us": "^1.1.1",
     "stripe": "^17.5.0",
     "tsx": "^4.20.6",
+    "turndown": "^7.2.1",
     "validator": "^13.12.0",
     "zipcodes": "^8.0.0",
     "zod": "^3.23.8"
@@ -135,6 +136,7 @@
     "@types/pg-copy-streams": "^1.2.5",
     "@types/sanitize-html": "^2.16.0",
     "@types/supertest": "^6.0.0",
+    "@types/turndown": "^5.0.5",
     "@types/validator": "^13.12.2",
     "@types/zipcodes": "^8.0.5",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
