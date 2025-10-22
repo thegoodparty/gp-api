@@ -146,10 +146,16 @@ export class VoterOutreachService {
     outreach: OutreachWithVoterFileFilter,
     audienceRequest?: string,
   ) {
+    const { aiContent = {} } = campaign
     const audience =
       await this.voterFileFilterService.voterFileFilterToAudience(
         outreach.voterFileFilter!,
       )
+
+    const { content: aiGeneratedScriptContent } =
+      aiContent[outreach.script!] || {}
+
+    const script = sanitizeHtml(aiGeneratedScriptContent || outreach.script!)
 
     const voterFileUrl = this.buildVoterFileUrl({
       audience,
@@ -163,7 +169,7 @@ export class VoterOutreachService {
       type: outreach.outreachType,
       date: outreach.date!,
       voterFileUrl,
-      script: outreach.script!,
+      script,
       imageUrl: outreach.imageUrl,
       message: outreach.message ? sanitizeHtml(outreach.message) : '',
       formattedAudience: this.formatAudienceFiltersForSlack(audience),
