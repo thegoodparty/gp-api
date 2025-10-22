@@ -38,7 +38,8 @@ export class PrismaService
     enableQueryLogging &&
       this.$on('query', (event: Prisma.QueryEvent) => {
         this.logger.debug(
-          `Query: ${event.query} | Parameters: ${event.params} | Duration: ${event.duration}ms`,
+          { query: event.query, params: event.params, durationMs: event.duration },
+          "Completed SQL Query"
         )
       })
   }
