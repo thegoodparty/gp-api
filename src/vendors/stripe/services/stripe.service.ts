@@ -1,8 +1,8 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
-import Stripe from 'stripe'
 import { User } from '@prisma/client'
 import { PaymentIntentPayload, PaymentType } from 'src/payments/payments.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
+import Stripe from 'stripe'
 
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
   process.env
@@ -25,7 +25,7 @@ export class StripeService {
   readonly isTestMode = !STRIPE_SECRET_KEY?.includes('live')
   private readonly logger = new Logger(StripeService.name)
 
-  constructor(private readonly slack: SlackService) {}
+  constructor(private readonly slack: SlackService) { }
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
@@ -166,4 +166,32 @@ export class StripeService {
 
     return customer.id
   }
+
+  async retrieveSubscription(subscriptionId: string) {
+    try {
+      return await this.stripe.subscriptions.retrieve(subscriptionId)
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error(`Failed to retrieve subscription ${subscriptionId}`, e)
+        throw new BadGatewayException(`Failed to retrieve subscription ${subscriptionId}`, e.message)
+      }
+      throw e
+    }
+  }
+
+  async removeSubscriptionCancellation(subscriptionId: string) {
+    try {
+      return await this.stripe.subscriptions.update(subscriptionId, {
+        cancel_at: null,
+        cancel_at_period_end: false,
+      })
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error(`Failed to remove subscription cancellation ${subscriptionId}`, e)
+        throw new BadGatewayException(`Failed to remove subscription cancellation ${subscriptionId}`, e.message)
+      }
+      throw e
+    }
+  }
 }
+
