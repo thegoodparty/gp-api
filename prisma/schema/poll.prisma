@@ -2,6 +2,7 @@ enum PollStatus {
   SCHEDULED
   IN_PROGRESS
   COMPLETED
+  EXPANDING
 }
 
 enum PollConfidence {

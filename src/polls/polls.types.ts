@@ -2,7 +2,7 @@
 export type APIPoll = {
   id: string
   name: string
-  status: 'in_progress' | 'completed'
+  status: 'scheduled' | 'in_progress' | 'expanding' | 'completed'
   messageContent: string
   imageUrl?: string
   scheduledDate: string

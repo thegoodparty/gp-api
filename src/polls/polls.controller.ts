@@ -13,7 +13,7 @@ import {
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import z from 'zod'
-import { ElectedOffice, Poll, PollIssue } from '@prisma/client'
+import { ElectedOffice, Poll, PollIssue, PollStatus } from '@prisma/client'
 import { APIPoll, APIPollIssue } from './polls.types'
 import { orderBy } from 'lodash'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
@@ -32,10 +32,17 @@ class ListPollsQueryDTO extends createZodDto(
   }),
 ) {}
 
+const API_STATUS_MAP: Record<PollStatus, APIPoll['status']> = {
+  [PollStatus.COMPLETED]: 'completed',
+  [PollStatus.IN_PROGRESS]: 'in_progress',
+  [PollStatus.EXPANDING]: 'expanding',
+  [PollStatus.SCHEDULED]: 'scheduled',
+}
+
 const toAPIPoll = (poll: Poll): APIPoll => ({
   id: poll.id,
   name: poll.name,
-  status: poll.status === 'COMPLETED' ? 'completed' : 'in_progress',
+  status: API_STATUS_MAP[poll.status],
   messageContent: poll.messageContent,
   imageUrl: poll.imageUrl ?? undefined,
   scheduledDate: poll.scheduledDate.toISOString(),

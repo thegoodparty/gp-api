@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { buildTevynApiSlackBlocks } from '../utils/polls.utils'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
@@ -61,5 +61,50 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     await this.slack.message({ blocks }, SlackChannel.botTevynApi)
 
     return true
+  }
+
+  async markPollComplete(params: {
+    pollId: string
+    totalResponses: number
+    confidence: PollConfidence
+  }) {
+    const result = await this.client.poll.updateManyAndReturn({
+      where: {
+        id: params.pollId,
+        OR: [{ status: 'IN_PROGRESS' }, { status: 'EXPANDING' }],
+      },
+      data: {
+        status: 'COMPLETED',
+        confidence: params.confidence,
+        responseCount: params.totalResponses,
+        completedDate: new Date(),
+      },
+    })
+
+    if (result.length === 0) {
+      throw new Error('Poll not in in-progress or expanding state')
+    }
+
+    return result[0]
+  }
+
+  async expandPoll(params: { pollId: string; newTotalAudienceSize: number }) {
+    const result = await this.client.poll.updateManyAndReturn({
+      // This is a database-level check to ensure the poll is in the completed state.
+      // Sadly, Prisma doesn't natively support row-level locking on transactions :(
+      // https://github.com/prisma/prisma/issues/8580
+      where: { id: params.pollId, status: 'COMPLETED' },
+      data: {
+        status: 'EXPANDING',
+        estimatedCompletionDate: add(new Date(), { weeks: 1 }),
+        targetAudienceSize: params.newTotalAudienceSize,
+      },
+    })
+
+    if (result.length === 0) {
+      throw new Error('Poll not in completed state')
+    }
+
+    return result[0]
   }
 }

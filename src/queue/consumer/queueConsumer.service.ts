@@ -593,14 +593,10 @@ export class QueueConsumerService {
         event.data.totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
-    const poll = await this.pollsService.update({
-      where: { id: existing.id },
-      data: {
-        status: 'COMPLETED',
-        confidence: highConfidence ? 'HIGH' : 'LOW',
-        responseCount: event.data.totalResponses,
-        completedDate: new Date(),
-      },
+    const poll = await this.pollsService.markPollComplete({
+      pollId: existing.id,
+      totalResponses: event.data.totalResponses,
+      confidence: highConfidence ? 'HIGH' : 'LOW',
     })
     if (campaign) {
       await this.analytics.track(
