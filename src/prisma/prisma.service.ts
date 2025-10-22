@@ -37,9 +37,9 @@ export class PrismaService
 
     enableQueryLogging &&
       this.$on('query', (event: Prisma.QueryEvent) => {
-        this.logger.debug('Query: ' + event.query)
-        this.logger.debug('Parameters: ' + event.params)
-        this.logger.debug('Duration: ' + event.duration + 'ms')
+        this.logger.debug(
+          `Query: ${event.query} | Parameters: ${event.params} | Duration: ${event.duration}ms`,
+        )
       })
   }
 
