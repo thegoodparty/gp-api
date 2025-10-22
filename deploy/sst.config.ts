@@ -6,16 +6,29 @@ const serveAnalysisBucketName = {
   master: 'serve-analyze-data-prod',
 }
 
+const environment = {
+  develop: 'dev',
+  qa: 'qa',
+  master: 'prod',
+}
+
 export default $config({
   app(input) {
     return {
       name: 'gp',
-      removal: input?.stage === 'master' ? 'retain' : 'remove',
+      removal: input.stage === 'master' ? 'retain' : 'remove',
       home: 'aws',
       providers: {
         aws: {
           region: 'us-west-2',
           version: '6.67.0',
+          defaultTags: {
+            tags: {
+              Project: 'gp-api',
+              // @ts-expect-error
+              Environment: environment[input.stage],
+            },
+          },
         },
       },
     }
