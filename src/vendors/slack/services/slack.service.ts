@@ -57,7 +57,6 @@ export class SlackService {
       return data
     } catch (e: unknown) {
       this.logger.error(`Failed to send slack message!`, e)
-      this.logger.error(e)
     }
   }
 

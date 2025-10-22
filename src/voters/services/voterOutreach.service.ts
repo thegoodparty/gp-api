@@ -27,6 +27,9 @@ import { PeerlyMediaService } from '../../vendors/peerly/services/peerlyMedia.se
 import { PeerlyP2pSmsService } from '../../vendors/peerly/services/peerlyP2pSms.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
 import { Readable } from 'stream'
+import TurndownService from 'turndown'
+
+const turndownService = new TurndownService()
 
 export interface OutreachSlackBlocksConfiguration {
   user: User
@@ -155,7 +158,9 @@ export class VoterOutreachService {
     const { content: aiGeneratedScriptContent } =
       aiContent[outreach.script!] || {}
 
-    const script = sanitizeHtml(aiGeneratedScriptContent || outreach.script!)
+    const script = turndownService.turndown(
+      sanitizeHtml(aiGeneratedScriptContent || outreach.script!),
+    )
 
     const voterFileUrl = this.buildVoterFileUrl({
       audience,

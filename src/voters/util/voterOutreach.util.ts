@@ -194,28 +194,6 @@ export function buildSlackBlocks({
                 },
               ],
             },
-            // {
-            //   type: SlackMessageType.RICH_TEXT_SECTION,
-            //   elements: [
-            //     {
-            //       type: SlackMessageType.RICH_TEXT_PREFORMATTED,
-            //       text: 'Message Script: ',
-            //       style: {
-            //         bold: true,
-            //       },
-            //       elements: [
-            //         {
-            //           type: SlackMessageType.TEXT,
-            //           text: String(script),
-            //         },
-            //       ],
-            //     },
-            //     // {
-            //     //   type: SlackMessageType.TEXT,
-            //     //   text: String(script),
-            //     // },
-            //   ],
-            // },
           ].filter((elem) => elem !== undefined),
         },
         {
