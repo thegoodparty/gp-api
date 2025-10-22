@@ -20,6 +20,7 @@ export enum PaymentStatus {
 export enum PaymentType {
   DOMAIN_REGISTRATION = 'domain_registration',
   OUTREACH_PURCHASE = 'outreach_purchase',
+  POLL = 'poll',
 }
 
 export type PaymentIntentPayload<T extends PaymentType> = {
@@ -34,4 +35,9 @@ export type PaymentIntentPayload<T extends PaymentType> = {
       domainName: string
       domainId?: number
     }
-  : never)
+  : T extends PaymentType.POLL
+    ? {
+        count: number
+        pollId: number
+      }
+    : never)
