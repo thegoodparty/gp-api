@@ -31,7 +31,8 @@ model Poll {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  issues PollIssue[]
+  issues             PollIssue[]
+  individualMessages PollIndividualMessage[]
 
   @@index([electedOfficeId, id])
   @@map("poll")
