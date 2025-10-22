@@ -32,7 +32,7 @@ export class OutreachPurchaseHandlerService
     outreachType,
   }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<number> {
     if (!campaignId || outreachType !== 'p2p') {
-      return contactCount * pricePerContact
+      return contactCount * pricePerContact * 100
     }
 
     const hasOffer =
