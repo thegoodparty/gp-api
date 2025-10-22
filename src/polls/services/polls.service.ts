@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { buildTevynApiSlackBlocks } from '../utils/polls.utils'
@@ -86,7 +86,13 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     })
 
     if (result.length === 0) {
-      throw new Error('Poll not in in-progress or expanding state')
+      this.logger.debug(
+        'Cannot mark poll as completed because it is not in in-progress or expanding state',
+        { pollId: params.pollId },
+      )
+      throw new BadRequestException(
+        'Poll not in in-progress or expanding state',
+      )
     }
 
     return result[0]
@@ -107,7 +113,11 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     })
 
     if (result.length === 0) {
-      throw new Error('Poll not in completed state')
+      this.logger.debug(
+        'Cannot mark poll as expanding because it is not in completed state',
+        { pollId: params.pollId },
+      )
+      throw new BadRequestException('Poll not in completed state')
     }
 
     // TODO: send message to tevyn to expand the poll
