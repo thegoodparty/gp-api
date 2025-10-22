@@ -27,11 +27,6 @@ const RESPONSE_LOGGED_HEADERS = ['content-type', 'content-length']
 
 export const loggingConfig: Params = {
   pinoHttp: {
-    level: 'debug',
-    transport:
-      process.env.NODE_ENV !== 'production'
-        ? { target: 'pino-pretty' }
-        : undefined,
     customErrorMessage: () => 'Sending HTTP response',
     customSuccessMessage: () => 'Sending HTTP response',
     customReceivedMessage: () => 'HTTP request received',
