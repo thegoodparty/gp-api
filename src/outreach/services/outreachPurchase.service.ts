@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { OutreachPurchaseMetadata } from '../types/outreach.types'
+import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
+import { OutreachPurchaseMetadata } from '../types/outreach.types'
 
 @Injectable()
 export class OutreachPurchaseHandlerService

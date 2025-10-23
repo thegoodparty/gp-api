@@ -1,15 +1,34 @@
 ///  <reference types="./.sst/platform/config.d.ts" />
 
+const serveAnalysisBucketName = {
+  develop: 'serve-analyze-data-dev',
+  qa: 'serve-analyze-data-qa',
+  master: 'serve-analyze-data-prod',
+}
+
+const environment = {
+  develop: 'dev',
+  qa: 'qa',
+  master: 'prod',
+}
+
 export default $config({
   app(input) {
     return {
       name: 'gp',
-      removal: input?.stage === 'master' ? 'retain' : 'remove',
+      removal: input.stage === 'master' ? 'retain' : 'remove',
       home: 'aws',
       providers: {
         aws: {
           region: 'us-west-2',
           version: '6.67.0',
+          defaultTags: {
+            tags: {
+              Project: 'gp-api',
+              // @ts-expect-error
+              Environment: environment[input.stage],
+            },
+          },
         },
       },
     }
@@ -337,6 +356,7 @@ export default $config({
         LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
+        SERVE_ANALYSIS_BUCKET_NAME: serveAnalysisBucketName[$app.stage],
         ...secretsJson,
       },
       image: {

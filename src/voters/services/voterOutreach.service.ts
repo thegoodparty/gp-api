@@ -27,6 +27,9 @@ import { PeerlyMediaService } from '../../vendors/peerly/services/peerlyMedia.se
 import { PeerlyP2pSmsService } from '../../vendors/peerly/services/peerlyP2pSms.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
 import { Readable } from 'stream'
+import TurndownService from 'turndown'
+
+const turndownService = new TurndownService()
 
 export interface OutreachSlackBlocksConfiguration {
   user: User
@@ -146,10 +149,18 @@ export class VoterOutreachService {
     outreach: OutreachWithVoterFileFilter,
     audienceRequest?: string,
   ) {
+    const { aiContent = {} } = campaign
     const audience =
       await this.voterFileFilterService.voterFileFilterToAudience(
         outreach.voterFileFilter!,
       )
+
+    const { content: aiGeneratedScriptContent } =
+      aiContent[outreach.script!] || {}
+
+    const script = turndownService.turndown(
+      sanitizeHtml(aiGeneratedScriptContent || outreach.script!),
+    )
 
     const voterFileUrl = this.buildVoterFileUrl({
       audience,
@@ -163,7 +174,7 @@ export class VoterOutreachService {
       type: outreach.outreachType,
       date: outreach.date!,
       voterFileUrl,
-      script: outreach.script!,
+      script,
       imageUrl: outreach.imageUrl,
       message: outreach.message ? sanitizeHtml(outreach.message) : '',
       formattedAudience: this.formatAudienceFiltersForSlack(audience),

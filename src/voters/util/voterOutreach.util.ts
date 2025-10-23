@@ -194,23 +194,28 @@ export function buildSlackBlocks({
                 },
               ],
             },
-            {
-              type: SlackMessageType.RICH_TEXT_SECTION,
-              elements: [
-                {
-                  type: SlackMessageType.TEXT,
-                  text: 'AI-Generated Script: ',
-                  style: {
-                    bold: true,
-                  },
-                },
-                {
-                  type: SlackMessageType.TEXT,
-                  text: String(script),
-                },
-              ],
-            },
           ].filter((elem) => elem !== undefined),
+        },
+        {
+          type: SlackMessageType.RICH_TEXT_SECTION,
+          elements: [
+            {
+              type: SlackMessageType.TEXT,
+              text: 'Message Script: ',
+              style: {
+                bold: true,
+              },
+            },
+          ],
+        },
+        {
+          type: SlackMessageType.RICH_TEXT_PREFORMATTED,
+          elements: [
+            {
+              type: SlackMessageType.TEXT,
+              text: String(script),
+            },
+          ],
         },
       ],
     },

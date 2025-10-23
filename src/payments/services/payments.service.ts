@@ -6,8 +6,9 @@ import {
 } from '@nestjs/common'
 import { Prisma, User } from '@prisma/client'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
-import { PaymentIntentPayload, PaymentType } from '../payments.types'
+import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/services/users.service'
+import { PaymentIntentPayload, PaymentType } from '../payments.types'
 
 @Injectable()
 export class PaymentsService {
@@ -16,7 +17,8 @@ export class PaymentsService {
   constructor(
     private readonly stripe: StripeService,
     private readonly usersService: UsersService,
-  ) {}
+    private readonly campaignsService: CampaignsService,
+  ) { }
 
   async createPayment<T extends PaymentType>(
     user: User,
@@ -141,6 +143,92 @@ export class PaymentsService {
       success: results.success.length,
       failed: results.failed.length,
       skipped: results.skipped.length,
+      details: results,
+    }
+  }
+
+  async fixAutoScheduledCancellations(dryRun = true) {
+    const results: {
+      auto: string[]
+      manual: string[]
+      failed: { slug: string; error: string }[]
+    } = {
+      auto: [],
+      manual: [],
+      failed: [],
+    }
+
+    const campaigns = await this.campaignsService.findMany({
+      where: {
+        isPro: true,
+      },
+    })
+
+    const campaignsWithScheduledCancellations = campaigns.filter((campaign) => {
+      const details = campaign.details as PrismaJson.CampaignDetails
+      return details?.subscriptionCancelAt && details?.subscriptionCancelAt > 0
+    })
+
+    this.logger.log(`Found ${campaignsWithScheduledCancellations.length} campaigns with scheduled cancellations`)
+
+    for (const campaign of campaignsWithScheduledCancellations) {
+      const { slug } = campaign
+      try {
+        const details = campaign.details as PrismaJson.CampaignDetails | null
+        const subscriptionId = details?.subscriptionId
+        if (!subscriptionId) {
+          continue
+        }
+
+        const subscription = await this.stripe.retrieveSubscription(subscriptionId)
+        if (!subscription.cancel_at) {
+          continue
+        }
+
+        const wasUserInitiated = subscription.cancellation_details?.comment != null
+          || subscription.cancellation_details?.feedback != null
+        if (wasUserInitiated) {
+          results.manual.push(slug)
+          this.logger.log(`Manual cancellation for ${slug} - Reason: ${subscription.cancellation_details?.reason} - Comment: ${subscription.cancellation_details?.comment}`)
+        } else {
+          if (!dryRun) {
+            await this.stripe.removeSubscriptionCancellation(subscriptionId)
+
+            await this.campaignsService.update({
+              where: { id: campaign.id },
+              data: {
+                details: {
+                  ...details,
+                  subscriptionCancelAt: null,
+                  endOfElectionSubscriptionCanceled: false,
+                }
+              }
+            })
+
+            this.logger.log(`✅ Fixed auto-scheduled cancellation for ${slug}`)
+          } else {
+            this.logger.log(
+              `Dry run: Would fix auto-scheduled cancellation for ${slug}`,
+            )
+          }
+          results.auto.push(slug)
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error'
+        results.failed.push({ slug, error: errorMessage })
+        this.logger.error(`Failed for ${slug}:`, error)
+      }
+    }
+
+    return {
+      message: dryRun
+        ? `DRY RUN: Would process ${results.auto.length} auto-scheduled cancellations`
+        : `Processed ${results.auto.length} auto-scheduled cancellations`,
+      dryRun,
+      auto: results.auto.length,
+      manual: results.manual.length,
+      failed: results.failed.length,
       details: results,
     }
   }

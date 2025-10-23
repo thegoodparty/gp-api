@@ -14,7 +14,6 @@ import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { PollsService } from 'src/polls/services/polls.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {
@@ -266,10 +265,9 @@ export class ContactsService {
         response.data.on('error', reject)
       })
     } catch (error) {
-      this.logger.error(
-        'Failed to download contacts from people API',
-        JSON.stringify(error),
-      )
+      this.logger.error('Failed to download contacts from people API', {
+        error,
+      })
       if (token) {
         const alternativeResponse = await this.queryAlternativeDistrictName(
           params,
@@ -988,10 +986,9 @@ export class ContactsService {
         ),
       )
     } catch (error) {
-      this.logger.error(
-        `Failed to query ${endpoint} from people API`,
-        JSON.stringify(error),
-      )
+      this.logger.error(`Failed to query ${endpoint} from people API`, {
+        error,
+      })
       throw new BadGatewayException(
         `Failed to fetch from people API (${endpoint})`,
       )
@@ -1054,10 +1051,7 @@ export class ContactsService {
       }
       return response.data as PeopleListResponse
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch ${endpoint} from people API`,
-        JSON.stringify(error),
-      )
+      this.logger.error(`Failed to fetch  from people API`, { endpoint, error })
       if (alternativeDistrictName) {
         const alternativeResponse = await this.queryAlternativeDistrictName(
           params,
@@ -1108,11 +1102,7 @@ export class ContactsService {
       }
       return response.data as PeopleStats
     } catch (error) {
-      const errStr =
-        error instanceof Error
-          ? error.stack || error.message
-          : JSON.stringify(error)
-      this.logger.error('Failed to fetch stats from people API', errStr)
+      this.logger.error('Failed to fetch stats from people API', { error })
       if (alternativeDistrictName) {
         const alternativeResponse = await this.queryAlternativeDistrictName(
           params,
