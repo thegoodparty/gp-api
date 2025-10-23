@@ -10,6 +10,9 @@ import { ElectedOffice } from '@prisma/client'
 export class PollsService extends createPrismaBase(MODELS.Poll) {
   constructor(private readonly slack: SlackService) {
     super()
+    this.subscribeToRowChanges(async (event) => {
+      // woohoo, do something here
+    })
   }
 
   async create(args: Prisma.PollCreateArgs) {
