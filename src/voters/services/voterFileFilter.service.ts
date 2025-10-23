@@ -81,7 +81,6 @@ export class VoterFileFilterService extends createPrismaBase(
     const {
       audienceSuperVoters: audience_superVoters,
       audienceLikelyVoters: audience_likelyVoters,
-      audienceUnreliableVoters: audience_unreliableVoters,
       audienceUnlikelyVoters: audience_unlikelyVoters,
       audienceFirstTimeVoters: audience_firstTimeVoters,
       partyIndependent: party_independent,
@@ -100,9 +99,6 @@ export class VoterFileFilterService extends createPrismaBase(
     return {
       ...(audience_superVoters === true ? { audience_superVoters } : {}),
       ...(audience_likelyVoters === true ? { audience_likelyVoters } : {}),
-      ...(audience_unreliableVoters === true
-        ? { audience_unreliableVoters }
-        : {}),
       ...(audience_unlikelyVoters === true ? { audience_unlikelyVoters } : {}),
       ...(audience_firstTimeVoters === true
         ? { audience_firstTimeVoters }
