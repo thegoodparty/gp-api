@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { PrismaService } from '../prisma.service'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { lowerFirst } from 'lodash'
+import { RowChangeEvent } from '../model-events'
 
 export const MODELS = Prisma.ModelName
 
@@ -31,6 +32,14 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
     readonly _prisma!: PrismaService
 
     readonly logger = new Logger(this.constructor.name)
+
+    subscribeToRowChanges(
+      listener: (
+        event: Omit<RowChangeEvent<T>, 'table'>,
+      ) => void | Promise<void>,
+    ) {
+      this._prisma.subscribeToRowChanges(modelName, listener)
+    }
 
     get model(): PrismaClient[Uncapitalize<T>] {
       return this._prisma[lowerModelName]
