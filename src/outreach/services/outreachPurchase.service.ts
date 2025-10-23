@@ -1,10 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { OutreachPurchaseMetadata } from '../types/outreach.types'
+import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
-
-const DOLLARS_TO_CENTS = 100
+import { OutreachPurchaseMetadata } from '../types/outreach.types'
 
 @Injectable()
 export class OutreachPurchaseHandlerService
@@ -34,7 +32,7 @@ export class OutreachPurchaseHandlerService
     outreachType,
   }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<number> {
     if (!campaignId || outreachType !== 'p2p') {
-      return contactCount * pricePerContact * DOLLARS_TO_CENTS
+      return contactCount * pricePerContact
     }
 
     const hasOffer =
@@ -45,12 +43,12 @@ export class OutreachPurchaseHandlerService
         0,
         contactCount - FREE_TEXTS_OFFER.COUNT,
       )
-      const finalAmount = discountedContactCount * pricePerContact * DOLLARS_TO_CENTS
+      const finalAmount = discountedContactCount * pricePerContact
 
       return finalAmount
     }
 
-    return contactCount * pricePerContact * DOLLARS_TO_CENTS
+    return contactCount * pricePerContact
   }
 
   async calculateDiscount(
@@ -69,7 +67,7 @@ export class OutreachPurchaseHandlerService
     if (hasOffer) {
       // Calculate discount amount for up to 5,000 texts
       const freeTexts = Math.min(contactCount, FREE_TEXTS_OFFER.COUNT)
-      return freeTexts * pricePerContact * DOLLARS_TO_CENTS
+      return freeTexts * pricePerContact
     }
 
     return 0
