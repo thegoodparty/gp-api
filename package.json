@@ -90,6 +90,7 @@
     "graphql": "^16.10.0",
     "graphql-request": "^7.1.2",
     "http-constants-ts": "^1.0.8",
+    "inngest": "^3.44.3",
     "jsonwebtoken": "^9.0.2",
     "libphonenumber-js": "^1.12.10",
     "mailgun.js": "^10.2.4",

@@ -14,6 +14,8 @@ import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
+import { serve } from 'inngest/fastify'
+import { inngest } from './inngest/inngest'
 
 const APP_LISTEN_CONFIG = {
   port: Number(process.env.PORT) || 3000,
@@ -44,6 +46,8 @@ const bootstrap = async () => {
 
   const document = SwaggerModule.createDocument(app, swaggerConfig)
   SwaggerModule.setup('api', app, document)
+
+  await app.use(serve({ client: inngest }))
 
   await app.register(helmet)
 
