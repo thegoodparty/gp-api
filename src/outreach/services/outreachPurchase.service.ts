@@ -4,8 +4,6 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { OutreachPurchaseMetadata } from '../types/outreach.types'
 import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
 
-const DOLLARS_TO_CENTS = 100
-
 @Injectable()
 export class OutreachPurchaseHandlerService
   implements PurchaseHandler<OutreachPurchaseMetadata>
@@ -34,7 +32,7 @@ export class OutreachPurchaseHandlerService
     outreachType,
   }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<number> {
     if (!campaignId || outreachType !== 'p2p') {
-      return contactCount * pricePerContact * DOLLARS_TO_CENTS
+      return contactCount * pricePerContact * 100
     }
 
     const hasOffer =
@@ -45,12 +43,12 @@ export class OutreachPurchaseHandlerService
         0,
         contactCount - FREE_TEXTS_OFFER.COUNT,
       )
-      const finalAmount = discountedContactCount * pricePerContact * DOLLARS_TO_CENTS
+      const finalAmount = discountedContactCount * pricePerContact * 100
 
       return finalAmount
     }
 
-    return contactCount * pricePerContact * DOLLARS_TO_CENTS
+    return contactCount * pricePerContact * 100
   }
 
   async calculateDiscount(
@@ -69,7 +67,7 @@ export class OutreachPurchaseHandlerService
     if (hasOffer) {
       // Calculate discount amount for up to 5,000 texts
       const freeTexts = Math.min(contactCount, FREE_TEXTS_OFFER.COUNT)
-      return freeTexts * pricePerContact * DOLLARS_TO_CENTS
+      return freeTexts * pricePerContact
     }
 
     return 0
