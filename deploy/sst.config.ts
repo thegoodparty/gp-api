@@ -376,6 +376,19 @@ export default $config({
         loadBalancer: {
           idleTimeout: 120,
         },
+        targetGroup: {
+          healthCheck: {
+            enabled: true,
+            path: '/v1/health',
+            protocol: 'HTTP',
+            port: 'traffic-port',
+            interval: 30,
+            timeout: 5,
+            healthyThreshold: 5,
+            unhealthyThreshold: 2,
+            matcher: '200',
+          },
+        },
       },
       permissions: [
         {
