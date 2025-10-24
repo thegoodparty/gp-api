@@ -14,9 +14,9 @@ const tasksWeek1: CampaignTask[] = [
   },
   {
     id: '5fc21abd-2792-4c09-96f1-de94a28b2b3c',
-    title: 'Schedule your election day reminder robocall',
+    title: 'Request to schedule your election day reminder robocall',
     description: 'Encourage people to get out and vote.',
-    cta: 'Schedule',
+    cta: 'Request',
     week: 1,
     flowType: CampaignTaskType.robocall,
     deadline: 3,
