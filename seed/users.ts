@@ -35,6 +35,13 @@ const CANDIDATE_USER = {
   roles: [UserRole.candidate],
 }
 
+export const SERVE_USER = {
+  email: 'serve@fightclub.org',
+  password: hashPasswordSync('serveFightClubGreatAgain123'),
+  hasPassword: true,
+  roles: [UserRole.candidate],
+}
+
 const USER_W_NO_CAMPAIGN = {
   email: 'visitor@fightclub.org',
   password: hashPasswordSync('tellMeAllAboutFightClub123'),
@@ -45,6 +52,7 @@ const FIXED_USERS: Partial<User>[] = [
   ADMIN_USER,
   SALES_USER,
   CANDIDATE_USER,
+  SERVE_USER,
   USER_W_NO_CAMPAIGN,
   {
     firstName: 'Homer',
