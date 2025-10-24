@@ -71,7 +71,9 @@ export default async function seedOffices(email: string, prisma: PrismaClient) {
     userId: user.id,
     campaignId: campaign.id,
   })
-  return await prisma.electedOffice.create({
+  const createdElectedOffice = await prisma.electedOffice.create({
     data: electedOffice,
   })
+  console.log('Created elected office')
+  return createdElectedOffice
 }
