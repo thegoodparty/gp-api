@@ -207,7 +207,7 @@ export function typeToQuery(
       columns += `, "VoterTelephones_LandlineFormatted",
       "Languages_Description"`
 
-      whereClause += ` AND "VoterTelephones_LandlineFormatted" IS NOT NULL`
+      whereClause += ` ${whereClause ? 'AND' : ''} "VoterTelephones_LandlineFormatted" IS NOT NULL`
     }
   }
 
