@@ -4,7 +4,7 @@ import { parseArgs } from 'util'
 // factory seeds
 import seedCampaigns from './campaigns'
 import seedTopIssues from './topIssues'
-import seedUsers, { ADMIN_USER } from './users'
+import seedUsers, { ADMIN_USER, SERVE_USER } from './users'
 import seedWebsiteData from './websiteData'
 // csv file seeds
 import seedElectionTypes from './electionTypes'
@@ -12,6 +12,7 @@ import seedMtfcc from './mtfcc'
 import seedCounties from './counties'
 import seedMunicipalities from './municipalities'
 import { seedEcanvasserDemoAccount } from './util/seedEcanvasserDemoAccount.util'
+import seedOffices from './offices'
 
 const LIMIT_SEEDS =
   process.env.NODE_ENV === 'production' ||
@@ -40,6 +41,7 @@ async function main() {
     await seedTopIssues(prisma, campaignIds)
     await seedEcanvasserDemoAccount(ADMIN_USER.email, prisma)
     await seedWebsiteData(prisma)
+    await seedOffices(SERVE_USER.email, prisma)
   }
 }
 
