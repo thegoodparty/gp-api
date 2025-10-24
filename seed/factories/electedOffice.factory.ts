@@ -11,8 +11,6 @@ export const electedOfficeFactory = generateFactory<ElectedOffice>(() => {
     termLengthDays: null,
     isActive: true,
     userId: faker.number.int({ min: 1, max: 1000 }),
-    createdAt: faker.date.past(),
-    updatedAt: faker.date.past(),
     campaignId: faker.number.int({ min: 1, max: 1000 }),
   }
 })
