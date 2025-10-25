@@ -28,6 +28,11 @@ if (
   )
 }
 
+// TODO: This is an absolute MESS. Building raw queries like this is absolutely a
+//  recipe for disaster and the cyclomatic complexity here is off the charts ridiculous.
+//  We should NOT be querying the Voter DB directly like this.  We need to be calling
+//  the PeopleAPI to fetch the segment of voters we want. Rip this out and replace
+//  it with a call to the PeopleAPI: https://goodparty.clickup.com/t/90132012119/ENG-5032
 export function typeToQuery(
   type: VoterFileType,
   campaign: CampaignWith<'pathToVictory'>,
@@ -242,6 +247,16 @@ function extractLocation(input: string, fixColumns?: boolean) {
       fixColumns ? '- with fixColumns' : ''
     }`,
   )
+  // ## denotes the old raw values coming from L2. If that's not present, we
+  //  don't need to do anything, it's already been normalized by our ETL pipeline.
+  if (!input.includes('##')) {
+    return input
+  }
+
+  // TODO: Figure out if we even need this.
+  //  I'm not event sure this works anymore. Given the example in typeToQuery,
+  //  "IN##CLARK##CLARK CNTY COMM DIST 1", this doesn't return "CLARK CNTY COMM DIST 1".
+  //  It just returns "CLARK": https://codesandbox.io/p/sandbox/4rs4vq
   const extracted = input.replace(/##$/, '')
 
   const res = extracted
