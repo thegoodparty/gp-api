@@ -376,6 +376,13 @@ export default $config({
         loadBalancer: {
           idleTimeout: 120,
         },
+        target: (targetArgs) => {
+          targetArgs.healthCheck = {
+            ...targetArgs.healthCheck,
+            path: '/v1/health',
+            interval: 30,
+          }
+        },
       },
       permissions: [
         {
@@ -453,7 +460,7 @@ export default $config({
         clusterIdentifier: 'gp-api-db-prod',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.6',
+        engineVersion: '16.8',
         databaseName: dbName,
         masterUsername: dbUser,
         masterPassword: dbPassword,
@@ -472,7 +479,7 @@ export default $config({
         clusterIdentifier: 'gp-voter-db',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.6',
+        engineVersion: '16.8',
         databaseName: voterDbName,
         masterUsername: voterDbUser,
         masterPassword: voterDbPassword,
@@ -516,7 +523,7 @@ export default $config({
         clusterIdentifier: 'gp-api-db-qa',
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.6',
+        engineVersion: '16.8',
         databaseName: dbName,
         masterUsername: dbUser,
         masterPassword: dbPassword,
@@ -537,7 +544,7 @@ export default $config({
         clusterIdentifier: `gp-voter-db-${$app.stage}`,
         engine: aws.rds.EngineType.AuroraPostgresql,
         engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.6',
+        engineVersion: '16.8',
         databaseName: voterDbName,
         masterUsername: voterDbUser,
         masterPassword: voterDbPassword,
