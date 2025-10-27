@@ -46,6 +46,86 @@ if (!PEOPLE_API_S2S_SECRET) {
   throw new Error('Please set PEOPLE_API_S2S_SECRET in your .env')
 }
 
+// This list was collected by examining the language values in the people-db in production
+// on Oct 27 2025.
+const OTHER_LANGUAGES = [
+  'Bantu',
+  'Afrikaans',
+  'Turkmeni',
+  'Swazi',
+  'Sotho',
+  'Malagasy',
+  'Kirghiz',
+  'Tajik',
+  'Xhosa',
+  'Samoan',
+  'Moldavian',
+  'Malay',
+  'Tswana',
+  'Macedonian',
+  'Bengali',
+  'Somali',
+  'Uzbeki',
+  'Tongan',
+  'Kazakh',
+  'Azeri',
+  'Mongolian',
+  'Zulu',
+  'Icelandic',
+  'Georgian',
+  'Nepali',
+  'Basque',
+  'Indonesian',
+  'Estonian',
+  'Dzongha',
+  'Slovakian',
+  'Pashto',
+  'Sinhalese',
+  'Swahili',
+  'Tibetan',
+  'Ashanti',
+  'Oromo',
+  'Burmese',
+  'Lithuanian',
+  'Latvian',
+  'Laotian',
+  'Albanian',
+  'Finnish',
+  'Slovenian',
+  'Czech',
+  'Ga',
+  'Khmer',
+  'Norwegian',
+  'Dutch',
+  'Danish',
+  'Bulgarian',
+  'Turkish',
+  'Thai',
+  'Serbo-Croatian',
+  'Swedish',
+  'Armenian',
+  'Urdu',
+  'Romanian',
+  'Tagalog',
+  'Amharic',
+  'Hungarian',
+  'Greek',
+  'French',
+  'Farsi',
+  'Japanese',
+  'German',
+  'Russian',
+  'Polish',
+  'Hebrew',
+  'Korean',
+  'Italian',
+  'Arabic',
+  'Hindi',
+  'Portuguese',
+  'Vietnamese',
+  'Chinese',
+]
+
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
@@ -632,8 +712,8 @@ export class ContactsService {
     // Presence of children; Unknown means null
     const children: string[] = []
     let childrenIncludeNull = false
-    if (seg.hasChildrenYes) children.push('Yes')
-    if (seg.hasChildrenNo) children.push('No')
+    if (seg.hasChildrenYes) children.push('Y')
+    if (seg.hasChildrenNo) children.push('N')
     if (seg.hasChildrenUnknown) childrenIncludeNull = true
     if (children.length || childrenIncludeNull) {
       filter.presenceOfChildren = {
@@ -657,8 +737,8 @@ export class ContactsService {
     // Homeowner probability model; Unknown means null
     const homeowner: string[] = []
     let homeownerIncludeNull = false
-    if (seg.homeownerYes) homeowner.push('Yes Homeowner')
-    if (seg.homeownerLikely) homeowner.push('Probable Homeowner')
+    if (seg.homeownerYes) homeowner.push('Home Owner')
+    if (seg.homeownerLikely) homeowner.push('Probable Home Owner')
     if (seg.homeownerNo) homeowner.push('Renter')
     if (seg.homeownerUnknown) homeownerIncludeNull = true
     if (homeowner.length || homeownerIncludeNull) {
@@ -697,7 +777,7 @@ export class ContactsService {
       edu.push('Completed college likely')
     }
     if (seg.educationGraduateDegree) {
-      edu.push('Completed grad school likely')
+      edu.push('Completed graduate school likely')
     }
     if (seg.educationUnknown) eduIncludeNull = true
     if (edu.length || eduIncludeNull) {
@@ -708,8 +788,26 @@ export class ContactsService {
     }
 
     // Language codes
-    if (seg.languageCodes && seg.languageCodes.length)
-      filter.languageCode = { in: seg.languageCodes }
+    if (seg.languageCodes.length) {
+      filter.languageCode = {
+        in: seg.languageCodes
+          .flatMap((code) => {
+            if (code === 'es') {
+              return 'Spanish'
+            }
+            if (code === 'en') {
+              return 'English'
+            }
+            if (code === 'other') {
+              return OTHER_LANGUAGES
+            }
+            // Ignore any other values for now.
+            return ''
+          })
+          .filter(Boolean),
+        is: seg.languageCodes.includes('other') ? 'null' : undefined,
+      }
+    }
 
     // Estimated income ranges (vendor domain strings)
     const income: string[] = []
@@ -728,10 +826,10 @@ export class ContactsService {
     // Ethnic groups broad categories; Unknown means null
     const eth: string[] = []
     let ethIncludeNull = false
-    if (seg.ethnicityAsian) eth.push('East & South Asian')
+    if (seg.ethnicityAsian) eth.push('East and South Asian')
     if (seg.ethnicityEuropean) eth.push('European')
-    if (seg.ethnicityHispanic) eth.push('Hispanic & Portuguese')
-    if (seg.ethnicityAfricanAmerican) eth.push('Likely African American')
+    if (seg.ethnicityHispanic) eth.push('Hispanic and Portuguese')
+    if (seg.ethnicityAfricanAmerican) eth.push('Likely African-American')
     if (seg.ethnicityOther) eth.push('Other')
     if (seg.ethnicityUnknown) ethIncludeNull = true
     if (eth.length || ethIncludeNull) {
