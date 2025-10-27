@@ -182,7 +182,6 @@ export class StripeService {
   async removeSubscriptionCancellation(subscriptionId: string) {
     try {
       return await this.stripe.subscriptions.update(subscriptionId, {
-        cancel_at: null,
         cancel_at_period_end: false,
       })
     } catch (e) {
