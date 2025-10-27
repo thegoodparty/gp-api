@@ -677,19 +677,6 @@ export class ContactsService {
     const seg = s as ExtendedVoterFileFilter
     const filter: DemographicFilter = {}
 
-    // Registered voter
-    const rv: Array<boolean> = []
-    let rvIncludeNull = false
-    if (seg.registeredVoterTrue) rv.push(true)
-    if (seg.registeredVoterFalse) rv.push(false)
-    if (seg.registeredVoterUnknown) rvIncludeNull = true
-    if (rv.length || rvIncludeNull) {
-      filter.registeredVoter = {
-        ...(rv.length ? { in: rv } : {}),
-        ...(rvIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
     // Voter status
     if (seg.voterStatus && seg.voterStatus.length)
       filter.voterStatus = { in: seg.voterStatus }
