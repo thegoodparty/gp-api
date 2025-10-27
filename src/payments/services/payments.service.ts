@@ -147,29 +147,39 @@ export class PaymentsService {
     }
   }
 
-  async fixAutoScheduledCancellations(dryRun = true) {
+  async fixAutoScheduledCancellations(dryRun = true, limit = 50, offset = 0) {
     const results: {
       auto: string[]
       manual: string[]
       failed: { slug: string; error: string }[]
+      skipped: number
+      totalWithCancellations: number
     } = {
       auto: [],
       manual: [],
       failed: [],
+      skipped: 0,
+      totalWithCancellations: 0,
     }
 
-    const campaigns = await this.campaignsService.findMany({
+    const allCampaigns = await this.campaignsService.findMany({
       where: {
         isPro: true,
       },
     })
 
-    const campaignsWithScheduledCancellations = campaigns.filter((campaign) => {
+    const allCampaignsWithScheduledCancellations = allCampaigns.filter((campaign) => {
       const details = campaign.details as PrismaJson.CampaignDetails
       return details?.subscriptionCancelAt && details?.subscriptionCancelAt > 0
     })
 
-    this.logger.log(`Found ${campaignsWithScheduledCancellations.length} campaigns with scheduled cancellations`)
+    results.totalWithCancellations = allCampaignsWithScheduledCancellations.length
+
+    const campaignsWithScheduledCancellations = allCampaignsWithScheduledCancellations.slice(offset, offset + limit)
+    results.skipped = offset
+
+    this.logger.log(`Found ${results.totalWithCancellations} total campaigns with scheduled cancellations`)
+    this.logger.log(`Processing batch: ${offset + 1} to ${offset + campaignsWithScheduledCancellations.length} (limit: ${limit})`)
 
     for (const campaign of campaignsWithScheduledCancellations) {
       const { slug } = campaign
@@ -222,11 +232,21 @@ export class PaymentsService {
       }
     }
 
+    const processed = results.auto.length + results.manual.length + results.failed.length
+    const remaining = results.totalWithCancellations - offset - processed
+
     return {
       message: dryRun
-        ? `DRY RUN: Would process ${results.auto.length} auto-scheduled cancellations`
-        : `Processed ${results.auto.length} auto-scheduled cancellations`,
+        ? `DRY RUN: Would process ${results.auto.length} auto-scheduled cancellations (batch ${offset + 1}-${offset + processed} of ${results.totalWithCancellations})`
+        : `Processed ${results.auto.length} auto-scheduled cancellations (batch ${offset + 1}-${offset + processed} of ${results.totalWithCancellations})`,
       dryRun,
+      batch: {
+        offset,
+        limit,
+        processed,
+        remaining: remaining > 0 ? remaining : 0,
+      },
+      totalWithCancellations: results.totalWithCancellations,
       auto: results.auto.length,
       manual: results.manual.length,
       failed: results.failed.length,
