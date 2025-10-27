@@ -200,6 +200,7 @@ export class PaymentsService {
                 details: {
                   ...details,
                   subscriptionCancelAt: null,
+                  subscriptionCanceledAt: null,
                   endOfElectionSubscriptionCanceled: false,
                 }
               }
