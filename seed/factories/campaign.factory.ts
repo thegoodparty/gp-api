@@ -4,7 +4,10 @@ import { STATE_CODES } from '../../src/shared/constants/states'
 import { LEVELS } from '../../src/shared/constants/governmentLevels'
 import { generateFactory } from './generate'
 import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
-import { CampaignLaunchStatus } from 'src/campaigns/campaigns.types'
+import {
+  CampaignLaunchStatus,
+  OnboardingStep,
+} from 'src/campaigns/campaigns.types'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.between({
@@ -30,7 +33,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         verified_candidates: faker.helpers.arrayElement(['Yes', 'No']),
         office_type: faker.lorem.word(),
       },
-      currentStep: 'onboarding-complete',
+      currentStep: OnboardingStep.complete,
       launchStatus: CampaignLaunchStatus.launched,
     },
     details: {
