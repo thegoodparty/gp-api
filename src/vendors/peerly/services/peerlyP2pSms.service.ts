@@ -184,8 +184,12 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     return this.validateData(data, CreateJobResponseDto, 'create job')
   }
 
-  async createJob(params: CreateJobParams): Promise<string> {
-    const { name, templates, didState, identityId } = params
+  async createJob({
+    name,
+    templates,
+    didState,
+    identityId,
+  }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
 
     const body = {
@@ -200,6 +204,9 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
     try {
       const config = await this.getBaseHttpHeaders()
+      this.logger.debug(
+        `Creating Peerly job with body: ${JSON.stringify(body)}`,
+      )
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/1to1/jobs`, body, config),
       )
