@@ -424,7 +424,7 @@ export class PathToVictoryService extends createPrismaBase(
         },
       })
 
-      this.analytics.identify(campaign.userId, {
+      await this.analytics.identify(campaign.userId, {
         winNumber: pathToVictoryResponse.counts.winNumber,
       })
 

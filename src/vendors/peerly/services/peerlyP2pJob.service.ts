@@ -32,17 +32,15 @@ export class PeerlyP2pJobService {
     private readonly peerlyP2pSmsService: PeerlyP2pSmsService,
   ) {}
 
-  async createPeerlyP2pJob(params: CreateP2pJobParams): Promise<string> {
-    const {
-      campaignId,
-      listId,
-      imageInfo,
-      scriptText,
-      identityId,
-      name = P2P_JOB_DEFAULTS.CAMPAIGN_NAME,
-      didState = P2P_JOB_DEFAULTS.DID_STATE,
-    } = params
-
+  async createPeerlyP2pJob({
+    campaignId,
+    listId,
+    imageInfo,
+    scriptText,
+    identityId,
+    name = P2P_JOB_DEFAULTS.CAMPAIGN_NAME,
+    didState = P2P_JOB_DEFAULTS.DID_STATE,
+  }: CreateP2pJobParams): Promise<string> {
     let mediaId: string | undefined
     let jobId: string | undefined
 
@@ -66,15 +64,6 @@ export class PeerlyP2pJobService {
             is_default: true,
             title: P2P_JOB_DEFAULTS.TEMPLATE_TITLE,
             text: scriptText,
-            advanced: {
-              show_stop: false,
-              organization: identityId,
-              bodies: [
-                {
-                  text: scriptText,
-                },
-              ],
-            },
             media: {
               media_type: 'IMAGE',
               media_id: mediaId,
