@@ -64,8 +64,8 @@ export class AnalyticsService {
     }
   }
 
-  identify(userId: number, traits: SegmentIdentityTraits) {
-    this.segment.identify(userId, traits)
+  async identify(userId: number, traits: SegmentIdentityTraits) {
+    await this.segment.identify(userId, traits)
   }
 
   async trackProPayment(userId: number, session: Stripe.Checkout.Session) {
