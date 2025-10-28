@@ -63,7 +63,10 @@ export class ContactsController {
   }
 
   @Get(':id')
-  getContact(@Param('id') id: string) {
-    return this.contactsService.findPerson(id)
+  getContact(
+    @Param('id') id: string,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+  ) {
+    return this.contactsService.findPerson(id, campaign)
   }
 }

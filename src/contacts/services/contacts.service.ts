@@ -265,7 +265,10 @@ export class ContactsService {
     }
   }
 
-  async findPerson(id: string): Promise<PersonOutput> {
+  async findPerson(
+    id: string,
+    campaign: CampaignWithPathToVictory,
+  ): Promise<PersonOutput> {
     try {
       const response = await lastValueFrom(
         this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
@@ -274,7 +277,48 @@ export class ContactsService {
           },
         }),
       )
-      return this.transformPerson(response.data)
+      const person = response.data as PersonInput &
+        Record<string, string | number | boolean | null | undefined>
+
+      const {
+        state,
+        districtType,
+        districtName,
+        alternativeDistrictName,
+        usingStatewideFallback,
+      } = this.resolveLocationForRequest(campaign)
+
+      const personState = String(
+        person.Residence_Addresses_State || '',
+      ).toUpperCase()
+      const stateMatches = personState === state.toUpperCase()
+
+      if (usingStatewideFallback) {
+        if (!stateMatches) throw new NotFoundException('Person not found')
+        return this.transformPerson(person)
+      }
+
+      if (!districtType || !districtName) {
+        throw new BadRequestException(
+          'Campaign path to victory data is missing required election information',
+        )
+      }
+
+      const rawDistrictValue = person[districtType]
+      const districtValue =
+        typeof rawDistrictValue === 'string' ? rawDistrictValue : ''
+      const cleanedPersonDistrict =
+        this.elections.cleanDistrictName(districtValue)
+      const personMatches =
+        cleanedPersonDistrict === districtName ||
+        cleanedPersonDistrict === `${districtName} (EST.)` ||
+        (alternativeDistrictName
+          ? cleanedPersonDistrict === alternativeDistrictName
+          : false)
+
+      if (!stateMatches || !personMatches)
+        throw new NotFoundException('Person not found')
+      return this.transformPerson(person)
     } catch (error) {
       this.logger.error(
         'Failed to fetch person from people API',
