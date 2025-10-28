@@ -13,7 +13,13 @@ import {
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import z from 'zod'
-import { ElectedOffice, Poll, PollIssue, PollStatus } from '@prisma/client'
+import {
+  ElectedOffice,
+  Poll,
+  PollIssue,
+  PollStatus,
+  UserRole,
+} from '@prisma/client'
 import { APIPoll, APIPollIssue } from './polls.types'
 import { orderBy } from 'lodash'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
@@ -21,9 +27,13 @@ import { User } from '@prisma/client'
 import { PollInitialDto } from './schemas/poll.schema'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
-import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PollIssuesService } from './services/pollIssues.service'
+import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { BACKFILL_POLLS } from './utils/polls.utils'
+import { UsersService } from 'src/users/services/users.service'
+import { sub } from 'date-fns'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -70,7 +80,8 @@ export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
-    private readonly analytics: AnalyticsService,
+    private readonly users: UsersService,
+    private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
   ) {}
   private readonly logger = new Logger(this.constructor.name)
@@ -99,33 +110,7 @@ export class PollsController {
     @ReqUser() user: User,
     @Body() { message, csvFileUrl, imageUrl, createPoll }: PollInitialDto,
   ) {
-    // TEMPORARY FIX START
-    // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
-    //     This will be removed once we lock it down. If this is still here after 12/1/25, please remove it.
-    //     If you don't have an active elected office, temporary let's create
-    let electedOffice = await this.electedOfficeService.getCurrentElectedOffice(
-      user.id,
-    )
-    if (!electedOffice) {
-      const campaign =
-        await this.electedOfficeService.client.campaign.findFirst({
-          where: { userId: user.id },
-          select: { id: true },
-        })
-      if (!campaign) {
-        throw new ForbiddenException(
-          'Not allowed to create poll. No campaign found.',
-        )
-      }
-      electedOffice = await this.electedOfficeService.create({
-        data: {
-          isActive: true,
-          user: { connect: { id: user.id } },
-          campaign: { connect: { id: campaign.id } },
-        },
-      })
-    }
-    // END OF TEMPORARY FIX
+    const electedOffice = await this.getElectedOffice(user.id)
 
     const userInfo = {
       name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -168,6 +153,93 @@ export class PollsController {
     const byMentionCount = orderBy(issues, (i) => i.mentionCount, 'desc')
 
     return { results: byMentionCount.map(toAPIIssue) }
+  }
+
+  @Post('/backfill-polls')
+  @Roles(UserRole.admin)
+  async backfillPolls() {
+    const now = new Date()
+    const polls: { userEmail: string; poll: Poll }[] = []
+    for (const { userEmail, imageUrl } of BACKFILL_POLLS) {
+      const user = await this.users.findUserByEmail(userEmail)
+      if (!user) {
+        this.logger.warn(`User ${userEmail} not found, skipping backfill`)
+        continue
+      }
+      const electedOffice = await this.getElectedOffice(user.id)
+
+      const campaign = await this.campaignService.findUnique({
+        where: { id: electedOffice.campaignId },
+      })
+      if (!campaign) {
+        this.logger.warn(
+          `Campaign not found for user email ${userEmail}, skipping backfill`,
+        )
+        continue
+      }
+
+      const existing = await this.pollsService.findMany({
+        where: {
+          electedOfficeId: electedOffice.id,
+        },
+      })
+
+      if (existing.length) {
+        this.logger.warn(
+          `Existing polls found for user email ${userEmail}, skipping backfill`,
+        )
+        polls.push({ userEmail, poll: existing[0] })
+        continue
+      }
+
+      const poll = await this.pollsService.create({
+        data: {
+          name: 'Top Community Issues',
+          status: 'IN_PROGRESS',
+          messageContent: `Hello {{firstname}}! I'm your ${campaign.details.otherOffice || campaign.details.office} ${user.firstName} ${user.lastName}, and I'm listening to residents about what matters most in our community. What issues do you think should be our top priority? Reply to share your input or text STOP to opt out.`,
+          targetAudienceSize: 500,
+          scheduledDate: sub(now, { days: 1 }),
+          estimatedCompletionDate: now,
+          imageUrl: imageUrl,
+          electedOfficeId: electedOffice.id,
+        },
+      })
+      this.logger.log(`Created poll ${poll.id} for user ${userEmail}`)
+      polls.push({ userEmail, poll })
+    }
+
+    return { polls }
+  }
+
+  private async getElectedOffice(userId: number) {
+    // TEMPORARY FIX START
+    // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
+    //     This will be removed once we lock it down. If this is still here after 12/1/25, please remove it.
+    //     If you don't have an active elected office, temporary let's create
+    let electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(userId)
+    if (!electedOffice) {
+      const campaign =
+        await this.electedOfficeService.client.campaign.findFirst({
+          where: { userId },
+          select: { id: true },
+        })
+      if (!campaign) {
+        throw new ForbiddenException(
+          'Not allowed to create poll. No campaign found.',
+        )
+      }
+      electedOffice = await this.electedOfficeService.create({
+        data: {
+          isActive: true,
+          user: { connect: { id: userId } },
+          campaign: { connect: { id: campaign.id } },
+        },
+      })
+    }
+
+    return electedOffice
+    // END OF TEMPORARY FIX
   }
 
   private async ensurePollAccess(pollId: string, electedOffice: ElectedOffice) {
