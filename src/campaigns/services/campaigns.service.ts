@@ -17,7 +17,6 @@ import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
-import { parseIsoDateString } from '../../shared/util/date.util'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
@@ -119,7 +118,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const campaign = await this.model.update(args)
     const isPro = args?.data?.isPro
     if (isPro) {
-      this.analytics.identify(campaign?.userId, { isPro })
+      await this.analytics.identify(campaign?.userId, { isPro })
     }
     await this.crm.trackCampaign(campaign.id)
     return campaign
@@ -321,7 +320,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (trackCampaign) {
       const updatedIsPro = campaign?.isPro
       if (updatedIsPro) {
-        this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
+        await this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
       }
       await this.crm.trackCampaign(campaignId)
     }
