@@ -13,9 +13,9 @@ const tasksWeek4: CampaignTask[] = [
   },
   {
     id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-    title: 'Schedule your 1 month to election persuasive robocall',
+    title: 'Request to schedule your 1 month to election persuasive robocall',
     description: 'Build trust and persuade voters.',
-    cta: 'Schedule',
+    cta: 'Request',
     week: 4,
     flowType: CampaignTaskType.robocall,
     proRequired: true,

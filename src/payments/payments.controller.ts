@@ -76,7 +76,15 @@ export class PaymentsController {
   @Patch('fix-auto-scheduled-cancellations')
   @Roles(UserRole.admin)
   @HttpCode(HttpStatus.OK)
-  async fixAutoScheduledCancellations(@Query('dryRun') dryRun?: string) {
-    return this.paymentsService.fixAutoScheduledCancellations(dryRun !== 'false')
+  async fixAutoScheduledCancellations(
+    @Query('dryRun') dryRun?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.paymentsService.fixAutoScheduledCancellations(
+      dryRun !== 'false',
+      limit ? parseInt(limit) : 50,
+      offset ? parseInt(offset) : 0,
+    )
   }
 }
