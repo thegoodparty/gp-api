@@ -5,6 +5,7 @@ import {
   EVENTS,
   SegmentIdentityTraits,
   SegmentTrackEventProperties,
+  UserContext,
 } from 'src/vendors/segment/segment.types'
 import { UsersService } from '../users/services/users.service'
 
@@ -18,6 +19,36 @@ export class AnalyticsService {
     private readonly usersService: UsersService,
   ) {}
 
+  private async getUserContext(
+    userId: number,
+  ): Promise<UserContext | undefined> {
+    try {
+      const user = await this.usersService.findFirst({ where: { id: userId } })
+      if (!user) {
+        this.logger.warn(`[ANALYTICS] User not found: ${userId}`)
+        return undefined
+      }
+
+      const metaData = user.metaData as PrismaJson.UserMetaData | null
+      const hubspotId = metaData?.hubspotId as string | undefined
+      const userContext: UserContext = {
+        email: user.email,
+        hubspotId,
+      }
+
+      this.logger.debug(
+        `[ANALYTICS] User context retrieved for user ${userId}: email=${!!userContext.email}, hubspotId=${!!userContext.hubspotId}`,
+      )
+      return userContext
+    } catch (e) {
+      this.logger.error(
+        `[ANALYTICS] Error fetching user context for analytics - User: ${userId}`,
+        e,
+      )
+      return undefined
+    }
+  }
+
   async track(
     userId: number,
     eventName: string,
@@ -27,45 +58,47 @@ export class AnalyticsService {
       `[ANALYTICS] Starting event tracking - Event: ${eventName}, User: ${userId}`,
     )
 
-    let email: string | undefined
-    try {
-      const user = await this.usersService.findFirst({ where: { id: userId } })
-      email = user?.email
-      this.logger.debug(
-        `[ANALYTICS] User email ${email ? 'found' : 'not found'} for user ${userId}`,
-      )
-    } catch (e) {
-      this.logger.error(
-        `[ANALYTICS] Error fetching user for analytics - User: ${userId}`,
-        e,
-      )
-    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const userContext = await this.getUserContext(userId)
 
     const eventData = {
-      ...(email ? { email } : {}),
+      ...(userContext?.email ? { email: userContext.email as string } : {}),
       ...properties,
     }
-    this.logger.debug(
-      `[ANALYTICS] Event data: ${JSON.stringify(eventData)} for user ${userId}`,
-    )
 
     try {
-      const result = await this.segment.trackEvent(userId, eventName, eventData)
-      this.logger.debug(
-        `[ANALYTICS] Successfully tracked event "${eventName}" for user ${userId}: ${JSON.stringify(result)}`,
+      const result = await this.segment.trackEvent(
+        userId,
+        eventName,
+        eventData,
+        userContext,
       )
+
       return result
     } catch (e) {
       this.logger.error(
         `[ANALYTICS] Failed to track event: ${eventName} for user: ${userId}`,
         e,
       )
-      throw e // Re-throw to propagate the error
+      throw e
     }
   }
 
   async identify(userId: number, traits: SegmentIdentityTraits) {
-    await this.segment.identify(userId, traits)
+    this.logger.debug(
+      `[ANALYTICS] Starting user identification - User: ${userId}`,
+    )
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const userContext = await this.getUserContext(userId)
+
+    try {
+      await this.segment.identify(userId, traits, userContext)
+      this.logger.debug(`[ANALYTICS] Successfully identified user ${userId}`)
+    } catch (e) {
+      this.logger.error(`[ANALYTICS] Failed to identify user: ${userId}`, e)
+      throw e
+    }
   }
 
   async trackProPayment(userId: number, session: Stripe.Checkout.Session) {

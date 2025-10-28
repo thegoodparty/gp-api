@@ -5,15 +5,15 @@ import { SEGMENT_KEYS } from './segment.schema'
 import {
   SegmentIdentityTraits,
   SegmentTrackEventProperties,
+  UserContext,
 } from './segment.types'
-import { UsersService } from 'src/users/services/users.service'
 
 @Injectable()
 export class SegmentService {
   private analytics: Analytics
   private readonly logger = new Logger(SegmentService.name)
 
-  constructor(private readonly users: UsersService) {
+  constructor() {
     const SEGMENT_WRITE_KEY = process.env.SEGMENT_WRITE_KEY
     if (!SEGMENT_WRITE_KEY) {
       throw new Error(
@@ -27,52 +27,73 @@ export class SegmentService {
     userId: number,
     event: string,
     properties: SegmentTrackEventProperties = {},
+    userContext?: UserContext,
   ): Promise<TrackParams> {
     try {
-      const user = await this.users.findUser({ id: userId })
       const stringId = String(userId)
-      const metaData = user?.metaData as PrismaJson.UserMetaData
-      const hubspotId = metaData?.hubspotId
 
       const eventConfig: TrackParams = {
         event,
         userId: stringId,
         properties,
-        context: {
-          traits: {
-            email: user?.email,
-            hubspotId,
-          },
-        },
       }
-      this.analytics.track(eventConfig)
+
+      if (userContext) {
+        const traits: Record<string, string> = {}
+
+        if (userContext.email !== undefined) {
+          traits.email = userContext.email as string
+        }
+        if (userContext.hubspotId !== undefined) {
+          traits.hubspotId = userContext.hubspotId as string
+        }
+
+        if (Object.keys(traits).length > 0) {
+          eventConfig.context = { traits }
+        }
+      }
+
+      await this.analytics.track(eventConfig)
       this.logger.debug(
-        `[SEGMENT] Event queued for tracking - Event: ${event}, User: ${userId}`,
+        `[SEGMENT] Event tracked - Event: ${event}, User: ${userId}`,
       )
       return eventConfig
     } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err))
       this.logger.error(
         `[SEGMENT] Failed to track event: ${event} for user: ${userId}`,
-        err,
+        error,
       )
-      throw err
+      throw error
     }
   }
 
-  async identify(userId: number, traits: SegmentIdentityTraits) {
-    const user = await this.users.findUser({ id: userId })
-    const metaData = user?.metaData as PrismaJson.UserMetaData
-    const hubspotId = metaData?.hubspotId
+  async identify(
+    userId: number,
+    traits: SegmentIdentityTraits,
+    userContext?: UserContext,
+  ): Promise<void> {
+    try {
+      const segmentProps = pickKeys(traits, SEGMENT_KEYS)
+      const stringId = String(userId)
 
-    const segmentProps = pickKeys(traits, SEGMENT_KEYS)
-    const stringId = String(userId)
-    this.analytics.identify({
-      userId: stringId,
-      traits: {
-        ...segmentProps,
-        email: user?.email,
-        hubspotId,
-      },
-    })
+      const identifyTraits: Record<string, unknown> = { ...segmentProps }
+      if (userContext?.email) {
+        identifyTraits.email = userContext.email
+      }
+      if (userContext?.hubspotId) {
+        identifyTraits.hubspotId = userContext.hubspotId
+      }
+
+      await this.analytics.identify({
+        userId: stringId,
+        traits: identifyTraits,
+      })
+      this.logger.debug(`[SEGMENT] User identified - User: ${userId}`)
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err))
+      this.logger.error(`[SEGMENT] Failed to identify user: ${userId}`, error)
+      throw error
+    }
   }
 }
