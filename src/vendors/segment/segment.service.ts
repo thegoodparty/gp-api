@@ -85,7 +85,7 @@ export class SegmentService {
         identifyTraits.hubspotId = userContext.hubspotId
       }
 
-      await this.analytics.identify({
+      this.analytics.identify({
         userId: stringId,
         traits: identifyTraits,
       })
