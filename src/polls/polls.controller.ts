@@ -1,29 +1,34 @@
 import {
+  Body,
   Controller,
+  ForbiddenException,
   Get,
   Logger,
-  UsePipes,
-  Param,
   NotFoundException,
-  ForbiddenException,
-  Body,
-  Query,
+  Param,
   Post,
+  Query,
+  UsePipes,
 } from '@nestjs/common'
-import { PollsService } from './services/polls.service'
-import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
-import z from 'zod'
-import { ElectedOffice, Poll, PollIssue, PollStatus } from '@prisma/client'
-import { APIPoll, APIPollIssue } from './polls.types'
+import {
+  ElectedOffice,
+  Poll,
+  PollIssue,
+  PollStatus,
+  User,
+} from '@prisma/client'
 import { orderBy } from 'lodash'
-import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
-import { PollInitialDto } from './schemas/poll.schema'
-import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
-import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
+import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import z from 'zod'
+import { APIPoll, APIPollIssue } from './polls.types'
+import { PollInitialDto } from './schemas/poll.schema'
 import { PollIssuesService } from './services/pollIssues.service'
+import { PollsService } from './services/polls.service'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -97,7 +102,8 @@ export class PollsController {
   @Post('initial-poll')
   async createInitialPoll(
     @ReqUser() user: User,
-    @Body() { message, csvFileUrl, imageUrl, createPoll }: PollInitialDto,
+    @Body()
+    { message, csvFileUrl, imageUrl, createPoll, swornInDate }: PollInitialDto,
   ) {
     // TEMPORARY FIX START
     // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
@@ -119,13 +125,21 @@ export class PollsController {
       }
       electedOffice = await this.electedOfficeService.create({
         data: {
+          swornInDate,
           isActive: true,
           user: { connect: { id: user.id } },
           campaign: { connect: { id: campaign.id } },
         },
       })
+      // END OF TEMPORARY FIX
+    } else {
+      electedOffice = await this.electedOfficeService.update({
+        where: { id: electedOffice.id },
+        data: {
+          swornInDate,
+        },
+      })
     }
-    // END OF TEMPORARY FIX
 
     const userInfo = {
       name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
