@@ -2,6 +2,7 @@ import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   BadRequestException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -320,6 +321,9 @@ export class ContactsService {
         throw new NotFoundException('Person not found')
       return this.transformPerson(person)
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error
+      }
       this.logger.error(
         'Failed to fetch person from people API',
         JSON.stringify(error),
