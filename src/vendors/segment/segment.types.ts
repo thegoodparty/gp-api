@@ -20,6 +20,11 @@ export const EVENTS = {
   },
 }
 
+export type UserContext = {
+  email?: string
+  hubspotId?: string
+}
+
 // TODO: Define event properties w/ a generic type. No reason this has to be a
 //  Record<string, unknown>
 //  https://goodparty.atlassian.net/browse/WEB-4530
