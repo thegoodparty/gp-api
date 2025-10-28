@@ -18,12 +18,14 @@ import { APIPoll, APIPollIssue } from './polls.types'
 import { orderBy } from 'lodash'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
-import { PollInitialDto } from './schemas/poll.schema'
+import { CreatePollDto } from './schemas/poll.schema'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
-import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PollIssuesService } from './services/pollIssues.service'
+import { add } from 'date-fns'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
+import { QueueType } from 'src/queue/queue.types'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -70,8 +72,8 @@ export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
-    private readonly analytics: AnalyticsService,
     private readonly electedOfficeService: ElectedOfficeService,
+    private readonly queueProducerService: QueueProducerService,
   ) {}
   private readonly logger = new Logger(this.constructor.name)
 
@@ -97,7 +99,7 @@ export class PollsController {
   @Post('initial-poll')
   async createInitialPoll(
     @ReqUser() user: User,
-    @Body() { message, csvFileUrl, imageUrl, createPoll }: PollInitialDto,
+    @Body() { message, imageUrl }: CreatePollDto,
   ) {
     // TEMPORARY FIX START
     // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
@@ -127,20 +129,29 @@ export class PollsController {
     }
     // END OF TEMPORARY FIX
 
-    const userInfo = {
-      name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-      email: user.email,
-      phone: user.phone || undefined,
-    }
+    const now = new Date()
+    const poll = await this.pollsService.create({
+      data: {
+        name: 'Top Community Issues',
+        status: 'IN_PROGRESS',
+        messageContent: message,
+        targetAudienceSize: 500,
+        scheduledDate: now,
+        estimatedCompletionDate: add(now, { weeks: 1 }),
+        imageUrl: imageUrl,
+        electedOfficeId: electedOffice.id,
+      },
+    })
 
-    return this.pollsService.createInitialPoll(
-      message,
-      userInfo,
-      electedOffice,
-      createPoll,
-      imageUrl || undefined,
-      csvFileUrl || undefined,
+    await this.queueProducerService.sendMessage(
+      {
+        type: QueueType.POLL_CREATION,
+        data: { pollId: poll.id },
+      },
+      `polls-${poll.id}`,
     )
+
+    return toAPIPoll(poll)
   }
 
   @Get('/:pollId')
