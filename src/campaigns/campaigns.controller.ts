@@ -341,8 +341,6 @@ export class CampaignsController {
       where: { slug },
     })
 
-    console.log('Query is: ', query)
-
     if (!campaign?.details?.positionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
