@@ -198,6 +198,9 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       templates,
       did_state: didState,
       can_use_mms: hasMms,
+      // TODO: This doesn't appear to be used. But we _also_ aren't sending the
+      //  `date` value to Peerly either. So how in the world are we setting send
+      //  dates for messages? 🤔
       schedule_id: this.scheduleId,
       ...(identityId && { identity_id: identityId }),
     }

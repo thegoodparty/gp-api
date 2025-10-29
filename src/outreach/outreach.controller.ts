@@ -22,6 +22,7 @@ import { MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PeerlyP2pJobService } from '../vendors/peerly/services/peerlyP2pJob.service'
 import { Readable } from 'stream'
+import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 
 @Controller('outreach')
@@ -133,6 +134,12 @@ export class OutreachController {
         )
       }
 
+      const name = `${campaign.slug}${
+        createOutreachDto.date
+          ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
+          : ''
+      }`
+
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         listId: createOutreachDto.phoneListId!,
@@ -144,7 +151,7 @@ export class OutreachController {
         },
         scriptText: createOutreachDto.script!,
         identityId: peerlyIdentityId!,
-        name: createOutreachDto.name,
+        name,
         didState: createOutreachDto.didState,
       })
 

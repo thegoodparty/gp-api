@@ -1,7 +1,8 @@
+import { QueueType } from 'src/queue/queue.types'
 import { VoterCounts } from 'src/voters/voters.types'
 
 export interface PathToVictoryQueueMessage {
-  type: 'pathToVictory'
+  type: QueueType.PATH_TO_VICTORY
   data: PathToVictoryInput
 }
 
