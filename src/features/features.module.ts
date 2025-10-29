@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common'
-import { FeaturesService } from './features.service'
+import { FeaturesService } from './services/features.service'
 import { UsersModule } from 'src/users/users.module'
 
 @Global()
