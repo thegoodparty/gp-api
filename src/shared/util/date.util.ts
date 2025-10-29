@@ -8,6 +8,7 @@ export enum DateFormats {
   isoDate = 'yyyy-MM-dd',
   usDate = 'MMMM d, yyyy',
   crmPropertyMonthDate = 'MMMyy',
+  usIsoSlashes = 'MM/dd/yyyy',
 }
 
 export function formatDate(
