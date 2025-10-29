@@ -8,9 +8,19 @@ import { PaymentsModule } from 'src/payments/payments.module'
 import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PollPurchaseHandlerService } from './services/pollPurchase.service'
+import { QueueProducerModule } from 'src/queue/producer/queueProducer.module'
+import { UsersModule } from 'src/users/users.module'
+import { CampaignsModule } from 'src/campaigns/campaigns.module'
 
 @Module({
-  imports: [SlackModule, ElectedOfficeModule, PaymentsModule],
+  imports: [
+    SlackModule,
+    ElectedOfficeModule,
+    PaymentsModule,
+    QueueProducerModule,
+    UsersModule,
+    CampaignsModule,
+  ],
   providers: [PollsService, PollIssuesService, PollPurchaseHandlerService],
   controllers: [PollsController],
   exports: [PollsService, PollIssuesService],
