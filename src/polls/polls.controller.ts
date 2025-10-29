@@ -1,14 +1,14 @@
 import {
+  Body,
   Controller,
+  ForbiddenException,
   Get,
   Logger,
-  UsePipes,
-  Param,
   NotFoundException,
-  ForbiddenException,
-  Body,
-  Query,
+  Param,
   Post,
+  Query,
+  UsePipes,
 } from '@nestjs/common'
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
@@ -20,7 +20,6 @@ import {
   PollStatus,
   UserRole,
 } from '@prisma/client'
-import { APIPoll, APIPollIssue } from './polls.types'
 import { orderBy } from 'lodash'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
@@ -28,6 +27,8 @@ import { PollInitialDto } from './schemas/poll.schema'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import z from 'zod'
+import { APIPoll, APIPollIssue } from './polls.types'
 import { PollIssuesService } from './services/pollIssues.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { BACKFILL_POLLS } from './utils/polls.utils'
@@ -108,9 +109,17 @@ export class PollsController {
   @Post('initial-poll')
   async createInitialPoll(
     @ReqUser() user: User,
-    @Body() { message, csvFileUrl, imageUrl, createPoll }: PollInitialDto,
+    @Body()
+    { message, csvFileUrl, imageUrl, createPoll, swornInDate }: PollInitialDto,
   ) {
-    const electedOffice = await this.getElectedOffice(user.id)
+    let electedOffice = await this.getElectedOffice(user.id)
+
+    electedOffice = await this.electedOfficeService.update({
+      where: { id: electedOffice.id },
+      data: {
+        swornInDate,
+      },
+    })
 
     const userInfo = {
       name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -234,6 +243,13 @@ export class PollsController {
           isActive: true,
           user: { connect: { id: userId } },
           campaign: { connect: { id: campaign.id } },
+        },
+      })
+    } else {
+      electedOffice = await this.electedOfficeService.update({
+        where: { id: electedOffice.id },
+        data: {
+          swornInDate,
         },
       })
     }

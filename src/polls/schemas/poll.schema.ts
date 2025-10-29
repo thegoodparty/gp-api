@@ -1,3 +1,4 @@
+import { ZDateOnly } from 'src/shared/schemas/DateOnly.schema'
 import { z } from 'zod'
 
 export const PollSchema = z.object({
@@ -7,6 +8,7 @@ export const PollSchema = z.object({
 
 export const PollInitialSchema = PollSchema.extend({
   csvFileUrl: z.string().url().optional().nullable(),
+  swornInDate: ZDateOnly,
   createPoll: z.boolean(),
 })
 
