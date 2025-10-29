@@ -245,15 +245,7 @@ export class PollsController {
           campaign: { connect: { id: campaign.id } },
         },
       })
-    } else {
-      electedOffice = await this.electedOfficeService.update({
-        where: { id: electedOffice.id },
-        data: {
-          swornInDate,
-        },
-      })
     }
-
     return electedOffice
     // END OF TEMPORARY FIX
   }
