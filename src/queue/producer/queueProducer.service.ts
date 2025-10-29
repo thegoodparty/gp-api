@@ -3,7 +3,7 @@ import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
 import { queueConfig } from '../queue.config'
-import { MessageGroup } from '../queue.types'
+import { MessageGroup, QueueMessage } from '../queue.types'
 
 const config: SQSClientConfig = {
   region: process.env.AWS_REGION || '',
@@ -32,8 +32,10 @@ const producer = Producer.create({
 export class QueueProducerService {
   private readonly logger = new Logger(QueueProducerService.name)
   constructor() {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async sendMessage(msg: any, group: MessageGroup = MessageGroup.default) {
+  async sendMessage(
+    msg: QueueMessage,
+    group: MessageGroup | string = MessageGroup.default,
+  ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = JSON.stringify(msg)
 

@@ -8,6 +8,7 @@ import { PaymentsModule } from 'src/payments/payments.module'
 import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PollPurchaseHandlerService } from './services/pollPurchase.service'
+import { QueueProducerModule } from 'src/queue/producer/queueProducer.module'
 import { UsersModule } from 'src/users/users.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 
@@ -16,6 +17,7 @@ import { CampaignsModule } from 'src/campaigns/campaigns.module'
     SlackModule,
     ElectedOfficeModule,
     PaymentsModule,
+    QueueProducerModule,
     UsersModule,
     CampaignsModule,
   ],
