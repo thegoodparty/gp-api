@@ -203,7 +203,7 @@ export class CampaignsController {
 
       if (body?.details) {
         const { city, office, electionDate, pledged, party } = body.details
-        this.analytics.identify(campaign.userId, {
+        await this.analytics.identify(campaign.userId, {
           ...(city && {
             officeMunicipality: city,
           }),

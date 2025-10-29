@@ -6,6 +6,8 @@ import {
   GenerateAiContentMessageData,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
+  PollCreationEvent,
+  PollCreationEventSchema,
   PollIssueAnalysisEvent,
   PollIssueAnalysisEventSchema,
   QueueMessage,
@@ -43,6 +45,10 @@ import { PollsService } from 'src/polls/services/polls.service'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ContactsService } from 'src/contacts/services/contacts.service'
+import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
+import { PersonOutput } from 'src/contacts/schemas/person.schema'
+import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
+import { UsersService } from 'src/users/services/users.service'
 
 @Injectable()
 export class QueueConsumerService {
@@ -61,6 +67,8 @@ export class QueueConsumerService {
     private readonly pollIssuesService: PollIssuesService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly contactsService: ContactsService,
+    private readonly awsS3Service: AwsS3Service,
+    private readonly usersService: UsersService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -218,6 +226,10 @@ export class QueueConsumerService {
         const pollAnalysisCompleteEvent =
           PollAnalysisCompleteEventSchema.parse(queueMessage)
         return await this.handlePollAnalysisComplete(pollAnalysisCompleteEvent)
+      case QueueType.POLL_CREATION:
+        this.logger.log('received pollCreation message')
+        const pollCreationEvent = PollCreationEventSchema.parse(queueMessage)
+        return await this.handlePollCreation(pollCreationEvent)
     }
     // Return true to delete the message from the queue
     return true
@@ -324,8 +336,8 @@ export class QueueConsumerService {
     })
 
     try {
-      this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
-      this.analytics.identify(userId, {
+      await this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+      await this.analytics.identify(userId, {
         '10DLC_compliant': true,
       })
     } catch (analyticsError) {
@@ -540,40 +552,15 @@ export class QueueConsumerService {
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
-    const existing = await this.pollsService.findUnique({
-      where: { id: event.data.pollId },
-    })
-    if (!existing) {
+    const data = await this.getPollAndCampaign(event.data.pollId)
+    if (!data) {
       this.logger.log('Poll not found, ignoring event')
       return
     }
+    const { poll, campaign } = data
 
-    if (existing.status !== 'IN_PROGRESS') {
+    if (poll.status !== 'IN_PROGRESS') {
       this.logger.log('Poll is not in-progress, ignoring event')
-      return
-    }
-
-    if (!existing.electedOfficeId) {
-      this.logger.log('Poll has no elected office, ignoring event')
-      return
-    }
-
-    const office = await this.electedOfficeService.findUnique({
-      where: { id: existing.electedOfficeId },
-    })
-
-    if (!office) {
-      this.logger.log('Elected office not found, ignoring event')
-      return
-    }
-
-    const campaign = await this.campaignsService.findUnique({
-      where: { id: office.campaignId },
-      include: { pathToVictory: true },
-    })
-
-    if (!campaign) {
-      this.logger.log('No campagin found, ignoring event')
       return
     }
 
@@ -593,8 +580,8 @@ export class QueueConsumerService {
         event.data.totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
-    const poll = await this.pollsService.markPollComplete({
-      pollId: existing.id,
+    await this.pollsService.markPollComplete({
+      pollId: poll.id,
       totalResponses: event.data.totalResponses,
       confidence: highConfidence ? 'HIGH' : 'LOW',
     })
@@ -611,4 +598,113 @@ export class QueueConsumerService {
     }
     return true
   }
+
+  private async handlePollCreation(event: PollCreationEvent) {
+    const data = await this.getPollAndCampaign(event.data.pollId)
+    if (!data) {
+      this.logger.log('Poll not found, ignoring event')
+      return
+    }
+    const { poll, campaign } = data
+
+    // 1. Get randomized list of contacts
+    const [sample, user] = await Promise.all([
+      this.contactsService.sampleContacts(
+        { size: poll.targetAudienceSize },
+        campaign,
+      ),
+      this.usersService.findUnique({ where: { id: campaign.userId } }),
+    ])
+    this.logger.log('Fetched sample and user')
+
+    if (!user) {
+      this.logger.log('User not found, ignoring event')
+      return
+    }
+
+    // 2. Create CSV file with contacts and upload to S3
+    const csv = buildCsvFromContacts(sample)
+    const csvUrl = await this.awsS3Service.uploadFile(
+      csv,
+      'tevyn-poll-csvs',
+      `${poll.id}-${Date.now()}.csv`,
+      'text/csv',
+    )
+    this.logger.log('Uploaded CSV to S3')
+
+    // 3. Send CSV file to Slack for Tevyn
+    const blocks = buildTevynApiSlackBlocks({
+      message: poll.messageContent,
+      pollId: poll.id,
+      csvFileUrl: csvUrl,
+      imageUrl: poll.imageUrl || undefined,
+      userInfo: {
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        email: user.email,
+        phone: user.phone || undefined,
+      },
+    })
+    await this.slackService.message({ blocks }, SlackChannel.botTevynApi)
+    this.logger.log('Slack message sent')
+
+    return true
+  }
+
+  private async getPollAndCampaign(pollId: string) {
+    const poll = await this.pollsService.findUnique({
+      where: { id: pollId },
+    })
+    if (!poll) {
+      this.logger.log('Poll not found, ignoring event')
+      return
+    }
+
+    if (!poll.electedOfficeId) {
+      this.logger.log('Poll has no elected office, ignoring event')
+      return
+    }
+
+    const office = await this.electedOfficeService.findUnique({
+      where: { id: poll.electedOfficeId },
+    })
+
+    if (!office) {
+      this.logger.log('Elected office not found, ignoring event')
+      return
+    }
+
+    const campaign = await this.campaignsService.findUnique({
+      where: { id: office.campaignId },
+      include: { pathToVictory: true },
+    })
+
+    if (!campaign) {
+      this.logger.log('No campagin found, ignoring event')
+      return
+    }
+    return { poll, office, campaign }
+  }
+}
+
+const csvEscape = (value) => {
+  if (value === null || value === undefined) return ''
+  const str = String(value)
+  const mustQuote = /[",\n]/.test(str)
+  const escaped = str.replace(/"/g, '""')
+  return mustQuote ? `"${escaped}"` : escaped
+}
+
+const buildCsvFromContacts = (people: PersonOutput[]) => {
+  const headers: (keyof PersonOutput)[] = [
+    'id',
+    'firstName',
+    'lastName',
+    'cellPhone',
+  ]
+  const lines = [headers.join(',')]
+  for (const person of people) {
+    const row = headers.map((key) => csvEscape(person?.[key] ?? ''))
+    lines.push(row.join(','))
+  }
+  return lines.join('\n')
 }
