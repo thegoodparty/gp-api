@@ -13,6 +13,7 @@ import { PollsModule } from 'src/polls/polls.module'
 import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
 import { ContactsModule } from 'src/contacts/contacts.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
+import { FeaturesModule } from 'src/features/features.module'
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AwsModule } from 'src/vendors/aws/aws.module'
     PollsModule,
     ContactsModule,
     AwsModule,
+    FeaturesModule,
   ],
   providers: [QueueConsumerService],
 })

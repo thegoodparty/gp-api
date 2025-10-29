@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import {
+  GetObjectCommand,
   ObjectCannedACL,
   PutObjectCommand,
   PutObjectCommandInput,
@@ -25,6 +26,22 @@ export class AwsS3Service extends AwsService {
     super()
 
     this.s3Client = new S3Client({ region })
+  }
+
+  async getFile(params: { bucket: string; fileName: string }) {
+    const filePath = `${params.bucket}/${slugify(params.fileName, {
+      lower: true,
+      trim: true,
+    })}`
+    return this.executeAwsOperation(async () => {
+      const response = await this.s3Client.send(
+        new GetObjectCommand({
+          Bucket: ASSET_DOMAIN,
+          Key: filePath,
+        }),
+      )
+      return response.Body?.transformToString()
+    }, 'getFile')
   }
 
   async uploadFile(
@@ -77,5 +94,20 @@ export class AwsS3Service extends AwsService {
         { expiresIn: 3600 },
       )
     }, 'getSignedS3Url')
+  }
+
+  async getSignedDownloadUrl(params: { bucket: string; fileName: string }) {
+    const filePath = `${params.bucket}/${params.fileName}`
+
+    return this.executeAwsOperation(async () => {
+      return await getSignedUrl(
+        this.s3Client,
+        new GetObjectCommand({
+          Bucket: ASSET_DOMAIN,
+          Key: filePath,
+        }),
+        { expiresIn: 3600 },
+      )
+    }, 'getSignedDownloadUrl')
   }
 }

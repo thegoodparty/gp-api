@@ -8,6 +8,8 @@ import {
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
   PollCreationEventSchema,
+  PollExpansionEvent,
+  PollExpansionEventSchema,
   PollIssueAnalysisEvent,
   PollIssueAnalysisEventSchema,
   QueueMessage,
@@ -20,6 +22,8 @@ import { SlackService } from 'src/vendors/slack/services/slack.service'
 import {
   Campaign,
   PathToVictory,
+  Poll,
+  PollIndividualMessage,
   PollIssue,
   TcrComplianceStatus,
 } from '@prisma/client'
@@ -49,6 +53,9 @@ import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
 import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
 import { UsersService } from 'src/users/services/users.service'
+import { FeaturesService } from 'src/features/services/features.service'
+import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
+import parseCsv from 'neat-csv'
 
 @Injectable()
 export class QueueConsumerService {
@@ -69,6 +76,7 @@ export class QueueConsumerService {
     private readonly contactsService: ContactsService,
     private readonly awsS3Service: AwsS3Service,
     private readonly usersService: UsersService,
+    private readonly featuresService: FeaturesService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -229,7 +237,17 @@ export class QueueConsumerService {
       case QueueType.POLL_CREATION:
         this.logger.log('received pollCreation message')
         const pollCreationEvent = PollCreationEventSchema.parse(queueMessage)
-        return await this.handlePollCreation(pollCreationEvent)
+        return await this.handlePollCreation(
+          pollCreationEvent,
+          message.MessageId!,
+        )
+      case QueueType.POLL_EXPANSION:
+        this.logger.log('received pollExpansion message')
+        const pollExpansionEvent = PollExpansionEventSchema.parse(queueMessage)
+        return await this.handlePollExpansion(
+          pollExpansionEvent,
+          message.MessageId!,
+        )
     }
     // Return true to delete the message from the queue
     return true
@@ -599,22 +617,61 @@ export class QueueConsumerService {
     return true
   }
 
-  private async handlePollCreation(event: PollCreationEvent) {
-    const data = await this.getPollAndCampaign(event.data.pollId)
+  private async handlePollCreation(
+    event: PollCreationEvent,
+    messageId: string,
+  ) {
+    return this.triggerPollExecution({
+      pollId: event.data.pollId,
+      messageId,
+      sampleParams: async (poll) => {
+        return { size: poll.targetAudienceSize }
+      },
+      isExpansion: false,
+    })
+  }
+
+  private async handlePollExpansion(
+    event: PollExpansionEvent,
+    messageId: string,
+  ) {
+    return this.triggerPollExecution({
+      pollId: event.data.pollId,
+      messageId,
+      sampleParams: async (poll) => {
+        const alreadySent =
+          await this.pollsService.client.pollIndividualMessage.findMany({
+            where: { pollId: poll.id },
+            select: { personId: true },
+            // Arbitrary limit for now.
+            take: 10000,
+          })
+
+        return {
+          size: poll.targetAudienceSize,
+          excludeIds: alreadySent.map((p) => p.personId),
+        }
+      },
+      isExpansion: true,
+    })
+  }
+
+  private async triggerPollExecution(params: {
+    pollId: string
+    messageId: string
+    sampleParams: (poll: Poll) => Promise<SampleContacts> | SampleContacts
+    isExpansion: boolean
+  }) {
+    const data = await this.getPollAndCampaign(params.pollId)
     if (!data) {
       this.logger.log('Poll not found, ignoring event')
       return
     }
     const { poll, campaign } = data
 
-    // 1. Get randomized list of contacts
-    const [sample, user] = await Promise.all([
-      this.contactsService.sampleContacts(
-        { size: poll.targetAudienceSize },
-        campaign,
-      ),
-      this.usersService.findUnique({ where: { id: campaign.userId } }),
-    ])
+    const user = await this.usersService.findUnique({
+      where: { id: campaign.userId },
+    })
     this.logger.log('Fetched sample and user')
 
     if (!user) {
@@ -622,15 +679,66 @@ export class QueueConsumerService {
       return
     }
 
-    // 2. Create CSV file with contacts and upload to S3
-    const csv = buildCsvFromContacts(sample)
-    const csvUrl = await this.awsS3Service.uploadFile(
-      csv,
-      'tevyn-poll-csvs',
-      `${poll.id}-${Date.now()}.csv`,
+    const isExpansionEnabled = await this.featuresService.isFeatureEnabled({
+      user,
+      feature: 'serve-polls-expansion',
+    })
+
+    const bucket = 'tevyn-poll-csvs'
+    // It's important that this filename be deterministic. That way, in the event of a failure
+    // and retry, we can safely re-use a previously generated CSV.
+    const fileName = `${poll.id}-${params.messageId}.csv`
+
+    // 1. Get or create the CSV file of a random sample of contacts.
+    // We do get-or-create here so that the logic remains retry-safe in the event of a failure.
+    let csv = await this.awsS3Service.getFile({
+      bucket,
+      fileName,
+    })
+
+    if (!csv) {
+      this.logger.log('No existing CSV found, generating new one')
+      const sampleParams = await params.sampleParams(poll)
+      const sample = await this.contactsService.sampleContacts(
+        sampleParams,
+        campaign,
+      )
+      csv = buildCsvFromContacts(sample)
+      await this.awsS3Service.uploadFile(csv, bucket, fileName, 'text/csv')
+    }
+
+    const csvUrl = await this.awsS3Service.getSignedS3Url(
+      bucket,
+      fileName,
       'text/csv',
     )
-    this.logger.log('Uploaded CSV to S3')
+    const people = await parseCsv<{ id: string }>(csv)
+
+    // 2. Create individual poll messages
+    if (isExpansionEnabled) {
+      const now = new Date()
+      await this.pollsService.client.$transaction(async (tx) => {
+        for (const person of people) {
+          const message: PollIndividualMessage = {
+            // It's important that this id be deterministic, so that we can safely re-upsert
+            // a previous CSV.
+            id: `${poll.id}-${person.id}`,
+            pollId: poll.id,
+            personId: person.id!,
+            sentAt: now,
+          }
+          tx.pollIndividualMessage.upsert({
+            where: { id: message.id },
+            create: message,
+            update: message,
+          })
+        }
+      })
+    }
+
+    this.logger.log('Created individual poll messages')
+
+    // SWAIN TODO: customize slack message based on param.
 
     // 3. Send CSV file to Slack for Tevyn
     const blocks = buildTevynApiSlackBlocks({
@@ -643,6 +751,7 @@ export class QueueConsumerService {
         email: user.email,
         phone: user.phone || undefined,
       },
+      isExpansion: params.isExpansion,
     })
     await this.slackService.message({ blocks }, SlackChannel.botTevynApi)
     this.logger.log('Slack message sent')

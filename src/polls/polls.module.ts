@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common'
 import { PollsController } from './polls.controller'
 import { PollsService } from './services/polls.service'
-import { SlackModule } from 'src/vendors/slack/slack.module'
 import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PaymentsModule } from 'src/payments/payments.module'
@@ -14,7 +13,6 @@ import { CampaignsModule } from 'src/campaigns/campaigns.module'
 
 @Module({
   imports: [
-    SlackModule,
     ElectedOfficeModule,
     PaymentsModule,
     QueueProducerModule,
