@@ -336,8 +336,8 @@ export class QueueConsumerService {
     })
 
     try {
-      this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
-      this.analytics.identify(userId, {
+      await this.analytics.track(userId, EVENTS.Outreach.ComplianceCompleted)
+      await this.analytics.identify(userId, {
         '10DLC_compliant': true,
       })
     } catch (analyticsError) {
