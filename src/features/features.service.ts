@@ -16,6 +16,11 @@ export class FeaturesService {
 
   constructor(private readonly usersService: UsersService) {}
 
+  /**
+   * Determines if the specified feature is enabled for the given user.
+   *
+   * Throws an error if the Amplitude service failes to return a value.
+   */
   async isFeatureEnabled(params: {
     user: number | User
     feature: string
