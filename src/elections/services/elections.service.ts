@@ -134,29 +134,51 @@ export class ElectionsService {
 
   async getBallotReadyMatchedRaceTargetDetails(
     ballotreadyPositionId: string,
-    electionDate: string,
+    electionDate?: string,
+    includeTurnout: boolean = true,
   ) {
     try {
       const positionWithDistrict = await this.electionApiGet<
         PositionWithMatchedDistrict,
-        { electionDate: string; includeDistrict: boolean }
+        {
+          electionDate: string | undefined
+          includeDistrict: boolean
+          includeTurnout: boolean
+        }
       >(
         ElectionApiRoutes.positions.findByBrId.path +
           `/${ballotreadyPositionId}`,
         {
-          electionDate,
+          electionDate: electionDate ?? undefined,
           includeDistrict: true,
+          includeTurnout,
         },
       )
       if (!positionWithDistrict) {
         throw new NotFoundException('No positionWithDistrict found')
       }
 
+      if (includeTurnout) {
+        if (
+          !positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
+        ) {
+          throw new NotFoundException(
+            'Failed to fetch a district with a projected turnout.',
+          )
+        }
+        return {
+          ...this.calculateRaceTargetMetrics(
+            positionWithDistrict?.district.projectedTurnout.projectedTurnout,
+          ),
+          district: positionWithDistrict.district,
+        }
+      }
       return {
-        ...this.calculateRaceTargetMetrics(
-          positionWithDistrict?.district.projectedTurnout.projectedTurnout,
-        ),
-        district: positionWithDistrict.district,
+        district: positionWithDistrict?.district,
+        // Sentinel values to overwrite previously assigned, no longer correct ones
+        winNumber: -1,
+        voterContactGoal: -1,
+        projectedTurnout: -1,
       }
     } catch (error) {
       const message = this.buildSlackErrorMessage(
@@ -169,7 +191,7 @@ export class ElectionsService {
         error,
         channel: SlackChannel.botPathToVictoryIssues,
       })
-      return null
+      throw error
     }
   }
 

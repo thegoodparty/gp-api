@@ -24,12 +24,13 @@ import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { userHasRole } from 'src/users/util/users.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
+import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
@@ -330,10 +331,17 @@ export class CampaignsController {
 
   @Put('admin/:slug/race-target-details')
   @Roles(UserRole.admin)
-  async updateRaceTargetDetailsBySlug(@Param('slug') slug: string) {
+  async updateRaceTargetDetailsBySlug(
+    @Param('slug') slug: string,
+    @Query() query: UpdateRaceTargetDetailsBySlugQueryDTO,
+  ) {
+    const { includeTurnout } =
+      UpdateRaceTargetDetailsBySlugQueryDTO.create(query)
     const campaign = await this.campaigns.findFirstOrThrow({
       where: { slug },
     })
+
+    console.log('Query is: ', query)
 
     if (!campaign?.details?.positionId || !campaign.details.electionDate) {
       throw new BadRequestException(
@@ -344,6 +352,7 @@ export class CampaignsController {
       await this.elections.getBallotReadyMatchedRaceTargetDetails(
         campaign.details.positionId,
         campaign.details.electionDate,
+        includeTurnout,
       )
     if (!raceTargetDetails) {
       throw new NotFoundException(
