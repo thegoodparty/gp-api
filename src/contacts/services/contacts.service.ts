@@ -257,7 +257,6 @@ export class ContactsService {
         }),
       )
       const people = this.normalizePeopleResponse(response.data)
-      console.log('people length', people.length)
       return people.map((p) => this.transformPerson(p))
     } catch (error) {
       this.logger.error('Failed to sample contacts from people API', error)
