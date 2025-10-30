@@ -36,6 +36,7 @@
     "npm": ">=10.9.0"
   },
   "dependencies": {
+    "@amplitude/experiment-node-server": "1.11.0",
     "@aws-lambda-powertools/logger": "^2.27.0",
     "@aws-sdk/client-dynamodb": "^3.902.0",
     "@aws-sdk/client-route-53": "^3.812.0",
