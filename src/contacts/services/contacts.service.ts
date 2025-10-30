@@ -242,10 +242,11 @@ export class ContactsService {
       state: locationData.state,
       districtType: locationData.districtType,
       districtName: locationData.districtName,
-      size: dto.size ?? 500,
-      full: true,
+      size: String(dto.size ?? 500),
+      hasCellPhone: 'true',
+      full: 'true',
       excludeIds: (dto.excludeIds ?? []) as string[],
-    }
+    })
 
     try {
       const token = this.getValidS2SToken()
