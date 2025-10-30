@@ -243,6 +243,7 @@ export class ContactsService {
       districtType: locationData.districtType,
       districtName: locationData.districtName,
       size: String(dto.size ?? 500),
+      hasCellPhone: 'true',
       full: 'true',
     })
 
