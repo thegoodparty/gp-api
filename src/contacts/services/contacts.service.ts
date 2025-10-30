@@ -246,7 +246,7 @@ export class ContactsService {
       hasCellPhone: 'true',
       full: 'true',
       excludeIds: (dto.excludeIds ?? []) as string[],
-    })
+    }
 
     try {
       const token = this.getValidS2SToken()
