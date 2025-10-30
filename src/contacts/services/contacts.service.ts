@@ -238,25 +238,24 @@ export class ContactsService {
   ) {
     const locationData = this.extractLocationFromCampaign(campaign)
 
-    const params = new URLSearchParams({
+    const body = {
       state: locationData.state,
       districtType: locationData.districtType,
       districtName: locationData.districtName,
       size: String(dto.size ?? 500),
+      hasCellPhone: 'true',
       full: 'true',
-    })
+      excludeIds: (dto.excludeIds ?? []) as string[],
+    }
 
     try {
       const token = this.getValidS2SToken()
       const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/sample?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+        this.httpService.post(`${PEOPLE_API_URL}/v1/people/sample`, body, {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-        ),
+        }),
       )
       const people = this.normalizePeopleResponse(response.data)
       return people.map((p) => this.transformPerson(p))
