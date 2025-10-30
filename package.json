@@ -22,7 +22,6 @@
     "seed:all": "npx prisma db seed -- --type all",
     "seed:csv": "npx prisma db seed -- --type csv",
     "generate": "npx prisma generate",
-    "prisma-format": "for file in prisma/schema/*.prisma; do npx prisma-case-format -c prisma/.prisma-case-format.yaml -f \"$file\"; done",
     "codegen": "graphql-codegen",
     "install:clean": "rm -rf node_modules package-lock.json && npm install --legacy-peer-deps",
     "postinstall": "echo 'Note: This project requires --legacy-peer-deps flag due to peer dependency conflicts'"
@@ -148,8 +147,7 @@
     "eslint-plugin-unused-imports": "^4.1.4",
     "jest": "^29.5.0",
     "prettier": "^3.0.0",
-    "prisma": "^6.3.0",
-    "prisma-case-format": "^2.2.1",
+    "prisma": "^6.5.0",
     "prisma-json-types-generator": "^3.2.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
