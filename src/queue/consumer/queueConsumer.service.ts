@@ -53,7 +53,6 @@ import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
 import { PersonOutput } from 'src/contacts/schemas/person.schema'
 import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
 import { UsersService } from 'src/users/services/users.service'
-import { FeaturesService } from 'src/features/services/features.service'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import parseCsv from 'neat-csv'
 
@@ -76,7 +75,6 @@ export class QueueConsumerService {
     private readonly contactsService: ContactsService,
     private readonly awsS3Service: AwsS3Service,
     private readonly usersService: UsersService,
-    private readonly featuresService: FeaturesService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -677,11 +675,6 @@ export class QueueConsumerService {
       return
     }
 
-    const isExpansionEnabled = await this.featuresService.isFeatureEnabled({
-      user,
-      feature: 'serve-polls-expansion',
-    })
-
     const bucket = 'tevyn-poll-csvs'
     // It's important that this filename be deterministic. That way, in the event of a failure
     // and retry, we can safely re-use a previously generated CSV.
@@ -712,26 +705,24 @@ export class QueueConsumerService {
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages
-    if (isExpansionEnabled) {
-      const now = new Date()
-      await this.pollsService.client.$transaction(async (tx) => {
-        for (const person of people) {
-          const message: PollIndividualMessage = {
-            // It's important that this id be deterministic, so that we can safely re-upsert
-            // a previous CSV.
-            id: `${poll.id}-${person.id}`,
-            pollId: poll.id,
-            personId: person.id!,
-            sentAt: now,
-          }
-          await tx.pollIndividualMessage.upsert({
-            where: { id: message.id },
-            create: message,
-            update: message,
-          })
+    const now = new Date()
+    await this.pollsService.client.$transaction(async (tx) => {
+      for (const person of people) {
+        const message: PollIndividualMessage = {
+          // It's important that this id be deterministic, so that we can safely re-upsert
+          // a previous CSV.
+          id: `${poll.id}-${person.id}`,
+          pollId: poll.id,
+          personId: person.id!,
+          sentAt: now,
         }
-      })
-    }
+        await tx.pollIndividualMessage.upsert({
+          where: { id: message.id },
+          create: message,
+          update: message,
+        })
+      }
+    })
 
     this.logger.log('Created individual poll messages')
 
