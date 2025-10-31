@@ -643,8 +643,6 @@ export class QueueConsumerService {
           await this.pollsService.client.pollIndividualMessage.findMany({
             where: { pollId: poll.id },
             select: { personId: true },
-            // Arbitrary limit for now.
-            take: 10000,
           })
 
         return {
@@ -707,11 +705,10 @@ export class QueueConsumerService {
       await this.awsS3Service.uploadFile(csv, bucket, fileName, 'text/csv')
     }
 
-    const csvUrl = await this.awsS3Service.getSignedS3Url(
+    const csvUrl = await this.awsS3Service.getSignedDownloadUrl({
       bucket,
       fileName,
-      'text/csv',
-    )
+    })
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages
