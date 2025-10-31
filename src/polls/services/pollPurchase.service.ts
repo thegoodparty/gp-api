@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { PollPurchaseMetadata } from '../types/pollPurchase.types'
+import { PollsService } from './polls.service'
 
 const PRICE_PER_TEXT = 0.03
 
@@ -9,6 +10,8 @@ export class PollPurchaseHandlerService
   implements PurchaseHandler<PollPurchaseMetadata>
 {
   private readonly logger = new Logger(PollPurchaseHandlerService.name)
+
+  constructor(private readonly pollsService: PollsService) {}
 
   async validatePurchase({
     pollId,
@@ -38,6 +41,10 @@ export class PollPurchaseHandlerService
     this.logger.log(
       `Poll purchase completed: pollId=${pollId}, count=${count}, paymentIntentId=${paymentIntentId}`,
     )
-    // TODO: Swain, please add the post-purchase logic here
+
+    await this.pollsService.expandPoll({
+      pollId,
+      additionalRecipientCount: count,
+    })
   }
 }

@@ -3,6 +3,8 @@ import {
   SlackMessageType,
 } from 'src/vendors/slack/slackService.types'
 
+export const pollMessageGroup = (pollId: string) => `polls-${pollId}`
+
 export const buildTevynApiSlackBlocks = ({
   message,
   pollId,
