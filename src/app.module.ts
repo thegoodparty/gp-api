@@ -34,12 +34,14 @@ import { CommunityIssuesModule } from './communityIssues/communityIssues.module'
 import { PeerlyModule } from './vendors/peerly/peerly.module'
 import { ContactsModule } from './contacts/contacts.module'
 import { PollsModule } from './polls/polls.module'
+import { FeaturesModule } from './features/features.module'
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     AnalyticsModule,
     UsersModule,
+    FeaturesModule,
     AuthenticationModule,
     ContentModule,
     HealthModule,
