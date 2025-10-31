@@ -9,6 +9,7 @@ export enum QueueType {
   POLL_ISSUES_ANALYSIS = 'pollIssueAnalysis',
   POLL_ANALYSIS_COMPLETE = 'pollAnalysisComplete',
   POLL_CREATION = 'pollCreation',
+  POLL_EXPANSION = 'pollExpansion',
 }
 
 export type QueueMessage = {
@@ -64,6 +65,12 @@ export const PollCreationEventSchema = z.object({
   data: z.object({ pollId: z.string() }),
 })
 export type PollCreationEvent = z.infer<typeof PollCreationEventSchema>
+
+export const PollExpansionEventSchema = z.object({
+  type: z.literal(QueueType.POLL_EXPANSION),
+  data: z.object({ pollId: z.string() }),
+})
+export type PollExpansionEvent = z.infer<typeof PollExpansionEventSchema>
 
 export enum MessageGroup {
   p2v = 'p2v',

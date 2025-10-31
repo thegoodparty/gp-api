@@ -32,6 +32,7 @@ export type SlackMessageBlock = {
   elements?: SlackMessageBlock[]
   style?: string | { bold: boolean }
   emoji?: boolean
+  name?: string
 }
 
 export type SlackMessage = {

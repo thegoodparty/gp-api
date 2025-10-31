@@ -95,6 +95,7 @@
     "libphonenumber-js": "^1.12.10",
     "mailgun.js": "^10.2.4",
     "nanoid": "^3.3.8",
+    "neat-csv": "^7.0.0",
     "nestjs-zod": "^4.2.1",
     "newrelic": "^13.3.2",
     "ngeohash": "^0.6.3",

@@ -1,5 +1,5 @@
 model PollIndividualMessage {
-  id       String   @id @default(uuid(7))
+  id       String   @id
   poll     Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
   pollId   String   @map("poll_id")
   personId String   @map("person_id")
