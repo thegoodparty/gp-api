@@ -735,8 +735,6 @@ export class QueueConsumerService {
 
     this.logger.log('Created individual poll messages')
 
-    // SWAIN TODO: customize slack message based on param.
-
     // 3. Send CSV file to Slack for Tevyn
     const blocks = buildTevynApiSlackBlocks({
       message: poll.messageContent,
