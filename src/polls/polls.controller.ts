@@ -194,8 +194,6 @@ export class PollsController {
     return { results: byMentionCount.map(toAPIIssue) }
   }
 
-  private async getElectedOffice(userId: number) {}
-
   private async ensurePollAccess(pollId: string, electedOffice: ElectedOffice) {
     const poll = await this.pollsService.findUnique({
       where: { id: pollId },
