@@ -28,6 +28,7 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { pollMessageGroup } from './utils/polls.utils'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -161,7 +162,7 @@ export class PollsController {
         type: QueueType.POLL_CREATION,
         data: { pollId: poll.id },
       },
-      `polls-${poll.id}`,
+      pollMessageGroup(poll.id),
     )
 
     return toAPIPoll(poll)
