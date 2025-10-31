@@ -724,7 +724,7 @@ export class QueueConsumerService {
             personId: person.id!,
             sentAt: now,
           }
-          tx.pollIndividualMessage.upsert({
+          await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
             create: message,
             update: message,
