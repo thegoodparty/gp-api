@@ -183,6 +183,46 @@ export class StripeService {
     }
   }
 
+  async listActiveSubscriptionCustomerEmails(): Promise<string[]> {
+    const emails = new Set<string>()
+    let startingAfter: string | undefined = undefined
+    try {
+      do {
+        const response: Stripe.ApiList<Stripe.Subscription> =
+          await this.stripe.subscriptions.list({
+            status: 'active',
+            limit: 100,
+            expand: ['data.customer'],
+            starting_after: startingAfter,
+          })
+
+        for (const subscription of response.data) {
+          const customer = subscription.customer as Stripe.Customer
+          const email = customer?.email
+          if (email) {
+            emails.add(email.toLowerCase())
+          }
+        }
+
+        const last =
+          response.data.length > 0
+            ? response.data[response.data.length - 1]
+            : undefined
+        startingAfter = response.has_more && last ? last.id : undefined
+      } while (startingAfter)
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error('Failed to list active subscriptions', e)
+        throw new BadGatewayException(
+          'Failed to list active subscriptions from Stripe',
+          e.message,
+        )
+      }
+      throw e
+    }
+    return Array.from(emails)
+  }
+
   async retrieveSubscription(subscriptionId: string) {
     try {
       return await this.stripe.subscriptions.retrieve(subscriptionId)

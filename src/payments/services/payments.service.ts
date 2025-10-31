@@ -87,20 +87,16 @@ export class PaymentsService {
 
   @Timeout(0)
   private async backfillMissingCustomerIdsOnBoot() {
-    const batch = await this.usersService.findMany({
-      where: {
-        metaData: {
-          path: ['customerId'],
-          equals: Prisma.AnyNull,
-        },
-      },
-      select: {
-        email: true,
-      },
-      take: 50,
-    })
-    for (const { email } of batch) {
+    const emails = await this.stripe.listActiveSubscriptionCustomerEmails()
+    for (const email of emails) {
       try {
+        const user = await this.usersService.findUserByEmail(email)
+        if (!user) {
+          continue
+        }
+        if (user.metaData?.customerId) {
+          continue
+        }
         await this.updateMissingCustomerId(email)
       } catch (e) {
         this.logger.error(`Failed backfill for ${email}`, e)
