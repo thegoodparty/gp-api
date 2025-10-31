@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import {
+  GetObjectCommand,
   ObjectCannedACL,
   PutObjectCommand,
   PutObjectCommandInput,
@@ -27,6 +28,25 @@ export class AwsS3Service extends AwsService {
     this.s3Client = new S3Client({ region })
   }
 
+  private slugifyPath(params: { bucket: string; fileName: string }) {
+    return `${params.bucket}/${slugify(params.fileName, {
+      lower: true,
+      trim: true,
+    })}`
+  }
+
+  async getFile(params: { bucket: string; fileName: string }) {
+    return this.executeAwsOperation(async () => {
+      const response = await this.s3Client.send(
+        new GetObjectCommand({
+          Bucket: ASSET_DOMAIN,
+          Key: this.slugifyPath(params),
+        }),
+      )
+      return response.Body?.transformToString()
+    }, 'getFile')
+  }
+
   async uploadFile(
     fileObject: PutObjectCommandInput['Body'],
     bucket: string,
@@ -34,11 +54,7 @@ export class AwsS3Service extends AwsService {
     fileType: string,
     options?: UploadOptions,
   ) {
-    const filePath = `${bucket}/${slugify(fileName, {
-      lower: true,
-      trim: true,
-    })}`
-
+    const filePath = this.slugifyPath({ bucket, fileName })
     return this.executeAwsOperation(async () => {
       const upload = new Upload({
         client: this.s3Client,
@@ -77,5 +93,18 @@ export class AwsS3Service extends AwsService {
         { expiresIn: 3600 },
       )
     }, 'getSignedS3Url')
+  }
+
+  async getSignedDownloadUrl(params: { bucket: string; fileName: string }) {
+    return this.executeAwsOperation(async () => {
+      return await getSignedUrl(
+        this.s3Client,
+        new GetObjectCommand({
+          Bucket: ASSET_DOMAIN,
+          Key: this.slugifyPath(params),
+        }),
+        { expiresIn: 3600 },
+      )
+    }, 'getSignedDownloadUrl')
   }
 }

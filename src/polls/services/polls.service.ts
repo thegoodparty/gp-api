@@ -1,14 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { add } from 'date-fns'
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
-  constructor(private readonly slack: SlackService) {
-    super()
-  }
-
   async create(args: Prisma.PollCreateArgs) {
     return this.model.create(args)
   }
