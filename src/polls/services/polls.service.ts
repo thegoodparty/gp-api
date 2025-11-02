@@ -16,6 +16,7 @@ import {
   PollToBackfill,
 } from '../types/pollPurchase.types'
 import parseCsv from 'neat-csv'
+import { Timeout } from '@nestjs/schedule'
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
   constructor(private readonly queueProducer: QueueProducerService) {
@@ -118,6 +119,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     return result[0]
   }
 
+  @Timeout(0)
   async backfillIndividualMessages(): Promise<number> {
     let pollsToBackfill: PollToBackfill[]
     try {
