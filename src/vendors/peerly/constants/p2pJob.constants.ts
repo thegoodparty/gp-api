@@ -20,3 +20,6 @@ export const P2P_PHONE_LIST_MAP = {
   city: 5,
   zip: 6,
 } as const
+
+export const P2P_DNC_SCRUBBING = 0
+export const P2P_DNC_SUPPRESS_INITIALS = 'GE' // GoodParty Engineering Peerly user
