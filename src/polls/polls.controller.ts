@@ -13,13 +13,7 @@ import {
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import z from 'zod'
-import {
-  ElectedOffice,
-  Poll,
-  PollIssue,
-  PollStatus,
-  UserRole,
-} from '@prisma/client'
+import { ElectedOffice, Poll, PollIssue, PollStatus } from '@prisma/client'
 import { orderBy } from 'lodash'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
@@ -35,7 +29,6 @@ import { QueueType } from 'src/queue/queue.types'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { pollMessageGroup } from './utils/polls.utils'
-import { Roles } from 'src/authentication/decorators/Roles.decorator'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -218,13 +211,5 @@ export class PollsController {
     }
 
     return poll
-  }
-
-  // temp backfill individual messages
-  @Post('/temp-backfill-individual-messages')
-  @Roles(UserRole.admin)
-  async tempBackfillIndividualMessages() {
-    const count = await this.pollsService.backfillIndividualMessages()
-    return { success: true, count }
   }
 }
