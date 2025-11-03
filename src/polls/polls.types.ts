@@ -9,6 +9,7 @@ export type APIPoll = {
   estimatedCompletionDate: string
   completedDate?: string
   audienceSize: number
+  responseCount?: number
   // Will only be set if the poll is completed.
   lowConfidence?: boolean
 }
