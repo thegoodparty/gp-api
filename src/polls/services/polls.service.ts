@@ -1,5 +1,4 @@
 import {
-  BadGatewayException,
   BadRequestException,
   ConflictException,
   Injectable,
@@ -10,11 +9,7 @@ import { add } from 'date-fns'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
-import {
-  PollIndividualMessageToBackfill,
-  PollToBackfill,
-} from '../types/pollPurchase.types'
-import parseCsv from 'neat-csv'
+
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
   constructor(private readonly queueProducer: QueueProducerService) {
@@ -115,78 +110,5 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     )
 
     return result[0]
-  }
-
-  async backfillIndividualMessages(): Promise<number> {
-    let pollsToBackfill: PollToBackfill[]
-    try {
-      const response = await fetch(
-        'https://assets.goodparty.org/temp-backfill-messages.json',
-      )
-      pollsToBackfill = (await response.json()) as PollToBackfill[]
-    } catch (error: unknown) {
-      this.logger.error('Failed to fetch backfill data', error)
-      throw new BadGatewayException(
-        `Failed to fetch backfill data: ${String(error)}`,
-      )
-    }
-
-    let i = 0
-    for (const pollToBackfill of pollsToBackfill) {
-      const pollId = pollToBackfill.pollId
-
-      const poll = await this.client.poll.findUnique({
-        where: { id: pollId },
-      })
-
-      if (!poll) {
-        this.logger.warn('Poll not found during backfill', { pollId })
-        continue
-      }
-
-      await this.createIndividualMessages(pollId, pollToBackfill.csvUrl)
-      i++
-    }
-
-    return i
-  }
-
-  async createIndividualMessages(pollId: string, csvUrl: string) {
-    let csv: string
-    try {
-      const response = await fetch(csvUrl)
-      csv = await response.text()
-    } catch (error: unknown) {
-      this.logger.error('Failed to fetch csv', error)
-      throw new BadGatewayException(`Failed to fetch csv: ${String(error)}`)
-    }
-    // 	"https://assets.goodparty.org/poll-text-images/227659-john-stuelke/sample-contacts-1761166866641.csv"
-    // the date is 1761166866641 - the last string between the last - and the .csv
-    const date = csvUrl.match(/-(\d+)\.csv$/)?.[1]
-    if (!date) {
-      throw new BadRequestException('Date not found in csvUrl')
-    }
-    const timestamp = parseInt(date)
-    if (isNaN(timestamp)) {
-      throw new BadRequestException('Invalid date format in csvUrl')
-    }
-    const sentAt = new Date(timestamp)
-
-    const people = await parseCsv<PollIndividualMessageToBackfill>(csv)
-
-    const messagesToCreate: Prisma.PollIndividualMessageCreateManyInput[] = []
-    for (const person of people) {
-      messagesToCreate.push({
-        id: `${pollId}-${person.id}`,
-        pollId,
-        personId: person.id,
-        sentAt,
-      })
-    }
-
-    await this.client.pollIndividualMessage.createMany({
-      data: messagesToCreate,
-      skipDuplicates: true,
-    })
   }
 }
