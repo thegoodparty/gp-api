@@ -13,7 +13,13 @@ import {
 import { PollsService } from './services/polls.service'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import z from 'zod'
-import { ElectedOffice, Poll, PollIssue, PollStatus, UserRole } from '@prisma/client'
+import {
+  ElectedOffice,
+  Poll,
+  PollIssue,
+  PollStatus,
+  UserRole,
+} from '@prisma/client'
 import { orderBy } from 'lodash'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
