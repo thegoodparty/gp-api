@@ -1,10 +1,10 @@
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
-import { StripeService } from '../vendors/stripe/services/stripe.service'
+import { User } from '@prisma/client'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Prisma, User } from '@prisma/client'
 import { UsersService } from '../users/services/users.service'
-import { PurchaseService } from './services/purchase.service'
+import { StripeService } from '../vendors/stripe/services/stripe.service'
 import { CompletePurchaseDto, CreatePurchaseIntentDto } from './purchase.types'
+import { PurchaseService } from './services/purchase.service'
 
 @Controller('payments/purchase')
 export class PurchaseController {
@@ -18,19 +18,8 @@ export class PurchaseController {
   async createCheckoutSession(@ReqUser() user: User) {
     const { redirectUrl, checkoutSessionId } =
       await this.stripeService.createCheckoutSession(user.id)
-    const currentUserMetaData = (user.metaData as Prisma.JsonObject) || {}
 
-    await this.usersService.updateUser(
-      {
-        id: user.id,
-      },
-      {
-        metaData: {
-          ...currentUserMetaData,
-          checkoutSessionId,
-        },
-      },
-    )
+    await this.usersService.patchUserMetaData(user.id, { checkoutSessionId })
 
     return { redirectUrl }
   }

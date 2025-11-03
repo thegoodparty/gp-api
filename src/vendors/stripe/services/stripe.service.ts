@@ -11,7 +11,6 @@ if (!STRIPE_SECRET_KEY || !WEBAPP_ROOT_URL) {
     'Please set STRIPE_SECRET_KEY and WEBAPP_ROOT_URL in your .env',
   )
 }
-
 if (!STRIPE_WEBSOCKET_SECRET) {
   throw new Error('Please set STRIPE_WEBSOCKET_SECRET in your .env')
 }
@@ -25,7 +24,7 @@ export class StripeService {
   readonly isTestMode = !STRIPE_SECRET_KEY?.includes('live')
   private readonly logger = new Logger(StripeService.name)
 
-  constructor(private readonly slack: SlackService) { }
+  constructor(private readonly slack: SlackService) {}
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
@@ -167,13 +166,76 @@ export class StripeService {
     return customer.id
   }
 
+  async fetchCustomerIdByEmail(email: string): Promise<string | null> {
+    try {
+      const customers = await this.stripe.customers.list({ email, limit: 1 })
+      const first = customers.data[0]
+      return first ? first.id : null
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error(`Failed to list customers by email ${email}`, e)
+        throw new BadGatewayException(
+          `Failed to query Stripe customers by email ${email}`,
+          e.message,
+        )
+      }
+      throw e
+    }
+  }
+
+  async listActiveSubscriptionCustomerEmails(): Promise<string[]> {
+    const emails = new Set<string>()
+    let startingAfter: string | undefined = undefined
+    try {
+      do {
+        const response: Stripe.ApiList<Stripe.Subscription> =
+          await this.stripe.subscriptions.list({
+            status: 'active',
+            limit: 100,
+            expand: ['data.customer'],
+            starting_after: startingAfter,
+          })
+
+        for (const subscription of response.data) {
+          const customer = subscription.customer as Stripe.Customer
+          const email = customer?.email
+          if (email) {
+            emails.add(email.toLowerCase())
+          }
+        }
+
+        const last =
+          response.data.length > 0
+            ? response.data[response.data.length - 1]
+            : undefined
+        startingAfter = response.has_more && last ? last.id : undefined
+      } while (startingAfter)
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error('Failed to list active subscriptions', e)
+        throw new BadGatewayException(
+          'Failed to list active subscriptions from Stripe',
+          e.message,
+        )
+      }
+      throw e
+    }
+    return Array.from(emails)
+  }
+
   async retrieveSubscription(subscriptionId: string) {
     try {
       return await this.stripe.subscriptions.retrieve(subscriptionId)
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error(`Failed to retrieve subscription ${subscriptionId}`, e)
-        throw new BadGatewayException(`Failed to retrieve subscription ${subscriptionId}`, e.message)
+        this.logger.error(
+          `Failed to retrieve subscription ${subscriptionId}`,
+          e,
+        )
+        throw new BadGatewayException(
+          `Failed to retrieve subscription ${subscriptionId}`,
+          e.message,
+        )
       }
       throw e
     }
@@ -186,11 +248,16 @@ export class StripeService {
       })
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error(`Failed to remove subscription cancellation ${subscriptionId}`, e)
-        throw new BadGatewayException(`Failed to remove subscription cancellation ${subscriptionId}`, e.message)
+        this.logger.error(
+          `Failed to remove subscription cancellation ${subscriptionId}`,
+          e,
+        )
+        throw new BadGatewayException(
+          `Failed to remove subscription cancellation ${subscriptionId}`,
+          e.message,
+        )
       }
       throw e
     }
   }
 }
-

@@ -15,7 +15,11 @@ import {
   PhoneListStatusResponseDto,
   UploadPhoneListResponseDto,
 } from '../schemas/peerlyPhoneList.schema'
-import { P2P_PHONE_LIST_MAP } from '../constants/p2pJob.constants'
+import {
+  P2P_DNC_SCRUBBING,
+  P2P_DNC_SUPPRESS_INITIALS,
+  P2P_PHONE_LIST_MAP,
+} from '../constants/p2pJob.constants'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB
@@ -67,7 +71,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     return this.validateData(data, PhoneListDetailsResponseDto, 'details')
   }
 
-  async uploadPhoneListToken(params: UploadPhoneListParams): Promise<string> {
+  async uploadPhoneList(params: UploadPhoneListParams): Promise<string> {
     const { listName, csvBuffer, identityId, fileSize } = params
 
     const actualFileSize = fileSize || csvBuffer.length
@@ -77,12 +81,21 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       )
     }
 
+    const formFields = {
+      account: this.accountNumber,
+      ...(identityId && { identity_id: identityId }),
+      list_name: listName,
+      suppress_cell_phones: P2P_SUPPRESS_CELL_PHONES,
+      list_map: JSON.stringify(P2P_PHONE_LIST_MAP),
+      use_nat_dnc: P2P_DNC_SCRUBBING,
+      dnc_suppress_initials: P2P_DNC_SUPPRESS_INITIALS,
+    }
+
     const form = new FormData()
-    form.append('account', this.accountNumber)
-    if (identityId) form.append('identity_id', identityId)
-    form.append('list_name', listName)
-    form.append('suppress_cell_phones', P2P_SUPPRESS_CELL_PHONES)
-    form.append('list_map', JSON.stringify(P2P_PHONE_LIST_MAP))
+    Object.entries(formFields).forEach(([key, value]) => {
+      form.append(key, value)
+    })
+
     form.append('file', csvBuffer, {
       filename: 'voters.csv',
       contentType: 'text/csv',
@@ -107,13 +120,6 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     } catch (error) {
       this.handleApiError(error)
     }
-  }
-
-  async uploadPhoneList(
-    params: UploadPhoneListParams,
-  ): Promise<PhoneListStatusResponseDto> {
-    const token = await this.uploadPhoneListToken(params)
-    return this.checkPhoneListStatus(token)
   }
 
   async checkPhoneListStatus(
