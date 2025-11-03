@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import {
   GetObjectCommand,
+  NoSuchKey,
   ObjectCannedACL,
   PutObjectCommand,
   PutObjectCommandInput,
@@ -37,13 +38,20 @@ export class AwsS3Service extends AwsService {
 
   async getFile(params: { bucket: string; fileName: string }) {
     return this.executeAwsOperation(async () => {
-      const response = await this.s3Client.send(
-        new GetObjectCommand({
-          Bucket: ASSET_DOMAIN,
-          Key: this.slugifyPath(params),
-        }),
-      )
-      return response.Body?.transformToString()
+      try {
+        const response = await this.s3Client.send(
+          new GetObjectCommand({
+            Bucket: ASSET_DOMAIN,
+            Key: this.slugifyPath(params),
+          }),
+        )
+        return response.Body?.transformToString()
+      } catch (error) {
+        if (error instanceof NoSuchKey) {
+          return undefined
+        }
+        throw error
+      }
     }, 'getFile')
   }
 
