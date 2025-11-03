@@ -28,6 +28,12 @@ export const determineUser = (req: FastifyRequest): string | undefined => {
   }
 }
 
+const serializeError = (error: Error) => ({
+  name: error.name,
+  message: error.message,
+  stack: error.stack,
+})
+
 export class CustomLogger implements LoggerService {
   log(...args: unknown[]): void {
     this.emit('info', args)
@@ -70,18 +76,40 @@ export class CustomLogger implements LoggerService {
       object.context = args[args.length - 1]
       args.pop()
     }
+
     // We want to retain all of the data from variadic arguments. So, reduce them all down into
     // a single object.
     for (const arg of args) {
       if (typeof arg === 'string') {
-        object.msg = arg
-      } else if (arg instanceof Error) {
-        object.error = {
-          name: arg.name,
-          message: arg.message,
-          stack: arg.stack,
+        if (!object.msg) {
+          object.msg = arg
+        } else {
+          object.msg2 = arg
         }
-      } else if (typeof arg === 'object') {
+      } else if (arg instanceof Error) {
+        if (!object.error) {
+          object.error = serializeError(arg)
+        } else {
+          object.error2 = serializeError(arg)
+        }
+      } else if (Array.isArray(arg)) {
+        if (!object.array) {
+          object.array = arg
+        } else {
+          object.array2 = arg
+        }
+      } else if (typeof arg === 'object' && arg !== null) {
+        // Serialize errors at the top-level of objects
+        for (const errorKey of ['error', 'err', 'e']) {
+          if (arg[errorKey] instanceof Error) {
+            const toLog = {
+              name: arg[errorKey].name,
+              message: arg[errorKey].message,
+              stack: arg[errorKey].stack,
+            }
+            arg[errorKey] = toLog
+          }
+        }
         Object.assign(object, arg)
       }
     }

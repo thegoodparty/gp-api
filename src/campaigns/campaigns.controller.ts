@@ -223,7 +223,7 @@ export class CampaignsController {
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign', campaign, { slug, body })
+    this.logger.debug('Updating campaign', { campaign, slug, body })
 
     return this.campaigns.updateJsonFields(campaign.id, body)
   }
@@ -264,7 +264,8 @@ export class CampaignsController {
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign with district', campaign, {
+    this.logger.debug('Updating campaign with district', {
+      campaign,
       slug,
       L2DistrictType,
       L2DistrictName,
