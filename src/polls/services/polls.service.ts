@@ -2,7 +2,6 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
-  HttpExceptionOptions,
   Injectable,
 } from '@nestjs/common'
 import { PollConfidence, Prisma } from '@prisma/client'
@@ -131,7 +130,6 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
       this.logger.error('Failed to fetch backfill data', error)
       throw new BadGatewayException(
         `Failed to fetch backfill data: ${String(error)}`,
-        error as HttpExceptionOptions,
       )
     }
 
@@ -162,18 +160,19 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
       csv = await response.text()
     } catch (error: unknown) {
       this.logger.error('Failed to fetch csv', error)
-      throw new BadGatewayException(
-        `Failed to fetch csv: ${String(error)}`,
-        error as HttpExceptionOptions,
-      )
+      throw new BadGatewayException(`Failed to fetch csv: ${String(error)}`)
     }
     // 	"https://assets.goodparty.org/poll-text-images/227659-john-stuelke/sample-contacts-1761166866641.csv"
     // the date is 1761166866641 - the last string between the last - and the .csv
     const date = csvUrl.match(/-(\d+)\.csv$/)?.[1]
     if (!date) {
-      throw new Error('Date not found in csvUrl')
+      throw new BadRequestException('Date not found in csvUrl')
     }
-    const sentAt = new Date(parseInt(date))
+    const timestamp = parseInt(date)
+    if (isNaN(timestamp)) {
+      throw new BadRequestException('Invalid date format in csvUrl')
+    }
+    const sentAt = new Date(timestamp)
 
     const people = await parseCsv<PollIndividualMessageToBackfill>(csv)
 
