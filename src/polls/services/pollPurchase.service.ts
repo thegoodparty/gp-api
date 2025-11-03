@@ -21,7 +21,8 @@ export class PollPurchaseHandlerService
       throw new BadRequestException('pollId is required')
     }
 
-    if (!count || count <= 0) {
+    const num = parseInt(count)
+    if (!num || num <= 0) {
       throw new BadRequestException('count must be a positive number')
     }
   }
@@ -29,7 +30,7 @@ export class PollPurchaseHandlerService
   async calculateAmount({
     count,
   }: PurchaseMetadata<PollPurchaseMetadata>): Promise<number> {
-    return count * PRICE_PER_TEXT * 100
+    return parseInt(count) * PRICE_PER_TEXT * 100
   }
 
   async executePostPurchase(
@@ -44,7 +45,7 @@ export class PollPurchaseHandlerService
 
     await this.pollsService.expandPoll({
       pollId,
-      additionalRecipientCount: count,
+      additionalRecipientCount: parseInt(count),
     })
   }
 }

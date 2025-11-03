@@ -2,7 +2,7 @@ import { BasePurchaseMetadata } from 'src/payments/purchase.types'
 
 export interface PollPurchaseMetadata extends BasePurchaseMetadata {
   pollId: string
-  count: number
+  count: string
 }
 // temporary type for backfilling individual messages
 export interface PollToBackfill {
