@@ -55,6 +55,7 @@ const toAPIPoll = (poll: Poll): APIPoll => ({
   estimatedCompletionDate: poll.estimatedCompletionDate.toISOString(),
   completedDate: poll.completedDate?.toISOString(),
   audienceSize: poll.targetAudienceSize,
+  responseCount: poll.responseCount ?? undefined,
   lowConfidence: poll.confidence === 'LOW',
 })
 
