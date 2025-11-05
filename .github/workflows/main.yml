@@ -2,7 +2,7 @@ name: Deploy and Test
 
 on:
   push:
-    branches: ["develop", "qa", "master"]
+    branches: ['develop', 'qa', 'master']
 
 jobs:
   deploy:
@@ -116,8 +116,6 @@ jobs:
       - name: Fetch Postman collections and environment from workspace
         id: fetch-postman
         shell: bash
-        env:
-          AUTH_HEADER: ${{ format('X-Api-Key: {0}', secrets.POSTMAN_API_KEY) }}
         run: |
           set -euo pipefail
           mkdir -p postman
@@ -128,27 +126,15 @@ jobs:
 
           echo "$COLLECTIONS_JSON" | jq -e . >/dev/null
 
-          echo "$COLLECTIONS_JSON" | jq -r '.collections[].uid' > postman/collection_uids.txt
+          COLLECTION_UIDS=$(echo "$COLLECTIONS_JSON" | jq -r '.collections[].uid' | tr '\n' ',' | sed 's/,$//')
 
-          COUNT=$(wc -l < postman/collection_uids.txt | tr -d ' ')
-          if [ "$COUNT" = "0" ]; then
+          if [ -z "$COLLECTION_UIDS" ]; then
             echo "No collections found in workspace ${POSTMAN_WORKSPACE_ID}"; exit 1
           fi
 
-          # OPTIONAL: Filter collections by name pattern
-          # Example: only run collections whose names start with "API -"
-          # echo "$COLLECTIONS_JSON" | jq -r '.collections[] | select(.name|test("^API -")) | .uid' > postman/collection_uids.txt
+          echo "collection_uids=${COLLECTION_UIDS}" >> "$GITHUB_OUTPUT"
 
-          # 2) Download each collection JSON
-          while read -r COLLECTION_UID; do
-            COL_JSON=$(curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
-              "https://api.getpostman.com/collections/${COLLECTION_UID}")
-            NAME=$(echo "$COL_JSON" | jq -r '.collection.info.name' | tr ' /' '__')
-            echo "$COL_JSON" > "postman/${NAME}.collection.json"
-            echo "Downloaded collection: ${NAME}"
-          done < postman/collection_uids.txt
-
-          # 3) Map environment to Postman environment name
+          # 2) Map environment to Postman environment name
           case "$TARGET_ENV" in
             dev)  POSTMAN_ENV_NAME="gp-api-dev" ;;
             qa)   POSTMAN_ENV_NAME="gp-api-qa" ;;
@@ -165,7 +151,7 @@ jobs:
             echo "No Postman environment named '$POSTMAN_ENV_NAME' found in workspace."
             exit 1
           fi
-          
+
           ENV_COUNT=$(echo "$ENVS_JSON" | jq -r --arg n "$POSTMAN_ENV_NAME" '[.environments[] | select(.name==$n)] | length')
           if [ "$ENV_COUNT" -gt 1 ]; then
             echo "Warning: Found $ENV_COUNT environments named '$POSTMAN_ENV_NAME'. Using the most recently updated one."
@@ -179,9 +165,9 @@ jobs:
           echo "Fetching Postman globals..."
           GLOBALS_JSON=$(curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
             "https://api.getpostman.com/workspaces/${POSTMAN_WORKSPACE_ID}")
-          
+
           GLOBALS_UID=$(echo "$GLOBALS_JSON" | jq -r '.workspace.globals.id // empty')
-          
+
           if [ -n "$GLOBALS_UID" ]; then
             curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
               "https://api.getpostman.com/environments/${GLOBALS_UID}" \
@@ -221,35 +207,49 @@ jobs:
         shell: bash
         run: |
           set -e
-          mkdir -p newman
+          mkdir -p newman postman
           ENV_FILE="${{ steps.fetch-postman.outputs.env_file }}"
           GLOBALS_FLAG="${{ steps.fetch-postman.outputs.globals_flag }}"
+          COLLECTION_UIDS="${{ steps.fetch-postman.outputs.collection_uids }}"
           # Optionally, run only a "Smoke" folder from each collection first:
           # FOLDER_FLAG='--folder "Smoke"'
           FOLDER_FLAG=''
           FAILED_COLLECTIONS=0
           TOTAL_COLLECTIONS=0
-          for COL in postman/*.collection.json; do
-            BASENAME=$(basename "$COL" .collection.json)
+          IFS=',' read -ra UIDS <<< "$COLLECTION_UIDS"
+          for COLLECTION_UID in "${UIDS[@]}"; do
             TOTAL_COLLECTIONS=$((TOTAL_COLLECTIONS + 1))
+            
             echo "========================================"
-            echo "Running collection: $BASENAME"
+            echo "Fetching collection: $COLLECTION_UID"
             echo "========================================"
-            if newman run "$COL" \
+            
+            COL_JSON=$(curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
+              "https://api.getpostman.com/collections/${COLLECTION_UID}")
+            NAME=$(echo "$COL_JSON" | jq -r '.collection.info.name' | tr ' /' '__')
+            COL_FILE="postman/${NAME}.collection.json"
+            echo "$COL_JSON" > "$COL_FILE"
+            
+            echo "========================================"
+            echo "Running collection: $NAME"
+            echo "========================================"
+            if newman run "$COL_FILE" \
               -e "$ENV_FILE" \
               $GLOBALS_FLAG \
               $FOLDER_FLAG \
               --reporters cli,htmlextra,junit \
-              --reporter-htmlextra-export "newman/${BASENAME}.html" \
-              --reporter-junit-export "newman/${BASENAME}.xml" \
+              --reporter-htmlextra-export "newman/${NAME}.html" \
+              --reporter-junit-export "newman/${NAME}.xml" \
               --timeout-request 120000 \
               --delay-request 50 \
               --env-var "apiToken=${API_TOKEN}"; then
-              echo "✅ Collection passed: $BASENAME"
+              echo "✅ Collection passed: $NAME"
             else
-              echo "❌ Collection failed: $BASENAME"
+              echo "❌ Collection failed: $NAME"
               FAILED_COLLECTIONS=$((FAILED_COLLECTIONS + 1))
             fi
+            
+            rm -f "$COL_FILE"
             echo ""
           done
           echo "========================================"
@@ -269,7 +269,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: newman-reports-${{ env.TARGET_ENV }}
+          name: newman-reports-${{ env.TARGET_ENV }}-${{ github.sha }}
           path: newman
 
       - name: Notify Slack on Test Success

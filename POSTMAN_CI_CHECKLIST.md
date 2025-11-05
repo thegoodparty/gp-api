@@ -4,18 +4,6 @@
 
 Your Postman tests are now integrated into the CI/CD pipeline! Here's what's configured:
 
-### Local Testing
-
-- ✅ Script to download and run Postman collections locally
-- ✅ Environment variable loading from `.env` file
-- ✅ Support for Postman environments (gp-api-dev, gp-api-qa, localhost)
-- ✅ Automatic globals fetching
-- ✅ HTML and JUnit report generation
-- ✅ Handles duplicate environment names (uses most recent)
-- ✅ Runs all collections even if some fail
-
-### CI/CD Pipeline
-
 - ✅ Automatically runs on push to `develop`, `qa`, and `master` branches
 - ✅ Runs after successful deployment
 - ✅ Waits for healthcheck before running tests
@@ -106,27 +94,17 @@ The workflow will:
 
 ## 📊 Viewing Test Results
 
-### In GitHub Actions:
-
 1. Go to your repository → Actions
 2. Click on the workflow run
 3. Scroll down to "Artifacts"
 4. Download `newman-reports-dev` (or qa/prod)
 5. Open the HTML files in your browser
 
-### Locally:
-
-After running `./test-postman-local.sh dev`:
-
-```bash
-open newman/*.html
-```
-
 ## 🔄 Making Tests Blocking (Later)
 
 Once you've fixed all the failing tests and want them to block deployments:
 
-1. Remove `continue-on-error: true` from line 83 in `.github/workflows/main.yml`
+1. Remove `continue-on-error: true` from `.github/workflows/main.yml`
 2. Update Slack notification messages to remove "(Informational)" and "(Non-blocking)"
 3. Commit and push
 
@@ -136,13 +114,13 @@ The tests will then fail the workflow if any collection fails.
 
 - **Local testing guide**: `POSTMAN_TESTING.md`
 - **Workflow file**: `.github/workflows/main.yml`
-- **Test script**: `test-postman-local.sh`
 
 ## ❓ Troubleshooting
 
-If tests fail in CI but work locally:
+If tests fail in CI:
 
 - Check that environment variables are set correctly in Postman
 - Verify the healthcheck URL is correct for that environment
 - Check the Newman reports in GitHub artifacts for detailed error messages
 - Ensure the deployed API is actually healthy and accessible
+- Test individual requests in Postman desktop to verify they work
