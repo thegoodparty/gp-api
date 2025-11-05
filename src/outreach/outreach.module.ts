@@ -21,6 +21,7 @@ export class OutreachModule {
     private readonly purchaseService: PurchaseService,
     private readonly outreachPurchaseHandler: OutreachPurchaseHandlerService,
   ) {
+    console.log('OutreachModule constructor', new Date().toISOString())
     this.purchaseService.registerPurchaseHandler(
       PurchaseType.TEXT,
       this.outreachPurchaseHandler,

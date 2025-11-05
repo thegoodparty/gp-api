@@ -19,7 +19,9 @@ export class PaymentsService {
     private readonly stripe: StripeService,
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
-  ) {}
+  ) {
+    console.log('PaymentsService constructor', new Date().toISOString())
+  }
 
   async createPayment<T extends PaymentType>(
     user: User,

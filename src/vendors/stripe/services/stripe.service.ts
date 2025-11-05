@@ -24,7 +24,9 @@ export class StripeService {
   readonly isTestMode = !STRIPE_SECRET_KEY?.includes('live')
   private readonly logger = new Logger(StripeService.name)
 
-  constructor(private readonly slack: SlackService) {}
+  constructor(private readonly slack: SlackService) {
+    console.log('StripeService constructor', new Date().toISOString())
+  }
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(

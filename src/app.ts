@@ -26,6 +26,8 @@ export const bootstrap = async () => {
     }),
     {
       rawBody: true,
+      abortOnError: false, // Don't abort immediately, show all errors
+      logger: ['log', 'error', 'warn', 'debug', 'verbose'], // Enable verbose logging
     },
   )
   app.setGlobalPrefix('v1')

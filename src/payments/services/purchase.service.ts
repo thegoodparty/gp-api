@@ -17,7 +17,9 @@ export class PurchaseService {
   private postPurchaseHandlers: Map<PurchaseType, PostPurchaseHandler> =
     new Map()
 
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(private readonly paymentsService: PaymentsService) {
+    console.log('PurchaseService constructor', new Date().toISOString())
+  }
 
   registerPurchaseHandler(type: PurchaseType, handler: PurchaseHandler): void {
     this.handlers.set(type, handler)

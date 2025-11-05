@@ -9,6 +9,12 @@ describe('Health API (Integration)', () => {
     test('should return OK when service is healthy', async () => {
       const response = await service.client.get('/v1/health')
 
+      console.log(
+        'SWAIN RESPONSE: ',
+        response.status,
+        JSON.stringify(response.data, null, 2),
+      )
+
       assert.strictEqual(response.status, 200)
       assert.strictEqual(response.data, 'OK')
     })
