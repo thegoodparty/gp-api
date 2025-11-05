@@ -38,10 +38,6 @@ jobs:
               echo "target_env=qa" >> "$GITHUB_OUTPUT"
               echo "health_url=${{ secrets.QA_HEALTHCHECK_URL }}" >> "$GITHUB_OUTPUT"
               ;;
-            master)
-              echo "target_env=prod" >> "$GITHUB_OUTPUT"
-              echo "health_url=${{ secrets.PROD_HEALTHCHECK_URL }}" >> "$GITHUB_OUTPUT"
-              ;;
             *)
               echo "Unsupported branch: $BRANCH"; exit 1
               ;;
@@ -156,7 +152,6 @@ jobs:
           case "$TARGET_ENV" in
             dev)  POSTMAN_ENV_NAME="gp-api-dev" ;;
             qa)   POSTMAN_ENV_NAME="gp-api-qa" ;;
-            prod) POSTMAN_ENV_NAME="gp-api-prod" ;;
             *)    echo "Unknown environment: $TARGET_ENV"; exit 1 ;;
           esac
           echo "Using Postman environment: $POSTMAN_ENV_NAME"
@@ -218,7 +213,6 @@ jobs:
           case "$TARGET_ENV" in
             dev)  TOKEN="${{ secrets.DEV_API_TOKEN }}" ;;
             qa)   TOKEN="${{ secrets.QA_API_TOKEN }}" ;;
-            prod) TOKEN="${{ secrets.PROD_API_TOKEN }}" ;;
             *)    TOKEN="" ;;
           esac
           echo "API_TOKEN=$TOKEN" >> "$GITHUB_ENV"
