@@ -99,8 +99,8 @@ jobs:
             echo "HEALTHCHECK_URL not set"; exit 1
           fi
           echo "Waiting for $HEALTHCHECK_URL to be healthy..."
-          ATTEMPTS=60
-          SLEEP=10
+          ATTEMPTS=100
+          SLEEP=30
           for i in $(seq 1 $ATTEMPTS); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTHCHECK_URL") || true
             if [ "$STATUS" = "200" ]; then
