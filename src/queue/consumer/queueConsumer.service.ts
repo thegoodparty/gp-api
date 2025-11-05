@@ -55,6 +55,7 @@ import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
 import { UsersService } from 'src/users/services/users.service'
 import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import parseCsv from 'neat-csv'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class QueueConsumerService {
@@ -545,6 +546,16 @@ export class QueueConsumerService {
   }
 
   private async handlePollIssuesAnalysis(event: PollIssueAnalysisEvent) {
+    if (event.data.rank === 1) {
+      this.logger.log(
+        'Detected first poll issue, deleting existing poll issues',
+      )
+      await this.pollIssuesService.model.deleteMany({
+        where: { pollId: event.data.pollId },
+      })
+      this.logger.log('Successfully deleted existing poll issues')
+    }
+
     const issue: PollIssue = {
       id: `${event.data.pollId}-${event.data.rank}`,
       pollId: event.data.pollId,
@@ -698,10 +709,7 @@ export class QueueConsumerService {
       await this.awsS3Service.uploadFile(csv, bucket, fileName, 'text/csv')
     }
 
-    const csvUrl = await this.awsS3Service.getSignedDownloadUrl({
-      bucket,
-      fileName,
-    })
+    const csvUrl = `${ASSET_DOMAIN}/${this.awsS3Service.getKey({ bucket, fileName })}`
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages
