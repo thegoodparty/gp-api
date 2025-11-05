@@ -656,6 +656,15 @@ export default $config({
             Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
             Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/*`,
           },
+          {
+            Effect: 'Allow',
+            Action: [
+              'ecs:DescribeServices',
+              'ecs:DescribeTasks',
+              'ecs:DescribeTaskDefinition',
+            ],
+            Resource: '*',
+          },
         ],
       }),
     })

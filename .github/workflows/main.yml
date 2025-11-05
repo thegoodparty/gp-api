@@ -55,6 +55,31 @@ jobs:
         with:
           project-name: gp-deploy-build-${{ github.ref_name }}
 
+      - name: Wait for ECS service to be stable
+        shell: bash
+        run: |
+          case "${{ github.ref_name }}" in
+            develop)
+              CLUSTER="gp-develop-fargateCluster"
+              SERVICE="gp-api-develop"
+              ;;
+            qa)
+              CLUSTER="gp-qa-fargateCluster"
+              SERVICE="gp-api-qa"
+              ;;
+            *)
+              echo "Unsupported branch"; exit 1
+              ;;
+          esac
+
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE" \
+            --region us-west-2
+
+          echo "✅ ECS service is stable and ready"
+
       - name: Notify Slack on Success (Deploy)
         if: success()
         uses: 8398a7/action-slack@v3
@@ -92,26 +117,20 @@ jobs:
           test -n "$POSTMAN_API_KEY" || (echo "POSTMAN_API_KEY not set" && exit 1)
           test -n "$POSTMAN_WORKSPACE_ID" || (echo "POSTMAN_WORKSPACE_ID not set" && exit 1)
 
-      - name: Wait for environment to be healthy
+      - name: Verify environment health
         shell: bash
         run: |
           if [ -z "$HEALTHCHECK_URL" ]; then
             echo "HEALTHCHECK_URL not set"; exit 1
           fi
-          echo "Waiting for $HEALTHCHECK_URL to be healthy..."
-          ATTEMPTS=100
-          SLEEP=30
-          for i in $(seq 1 $ATTEMPTS); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTHCHECK_URL") || true
-            if [ "$STATUS" = "200" ]; then
-              echo "Healthcheck passed with 200"
-              exit 0
-            fi
-            echo "Attempt $i/$ATTEMPTS: got $STATUS, retrying in ${SLEEP}s..."
-            sleep $SLEEP
-          done
-          echo "Environment did not become healthy in time"
-          exit 1
+          echo "Verifying $HEALTHCHECK_URL is responding..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTHCHECK_URL") || true
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Health endpoint is responding"
+          else
+            echo "⚠️ Health endpoint returned $STATUS (expected 200)"
+            exit 1
+          fi
 
       - name: Fetch Postman collections and environment from workspace
         id: fetch-postman
