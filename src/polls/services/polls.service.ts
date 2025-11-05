@@ -1,5 +1,4 @@
 import {
-  BadGatewayException,
   BadRequestException,
   ConflictException,
   Injectable,
@@ -10,46 +9,7 @@ import { add } from 'date-fns'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
-import { PollIndividualMessageToBackfill } from '../types/pollPurchase.types'
-import parseCsv from 'neat-csv'
 
-const CSVsToBackfill = [
-  {
-    pollId: '019a367a-8dcc-7f51-9774-46ad859c9c44',
-    url: 'https://assets.goodparty.org/tevyn-poll-csvs/019a367a-8dcc-7f51-9774-46ad859c9c44-1761850593514.csv',
-    date: new Date(1761850593514),
-  },
-  {
-    pollId: '019a367f-b7c2-71a3-b140-adefc9b7ba0a',
-    url: 'https://assets.goodparty.org/tevyn-poll-csvs/019a367f-b7c2-71a3-b140-adefc9b7ba0a-1761850932008.csv',
-    date: new Date(1761850932008),
-  },
-  {
-    pollId: '019a3684-30ca-7451-88c7-1328a327e025',
-    url: 'https://assets.goodparty.org/tevyn-poll-csvs/019a3684-30ca-7451-88c7-1328a327e025-1761851225486.csv',
-    date: new Date(1761851225486),
-  },
-  {
-    pollId: '019a3b1f-ef43-7511-8319-ed53edde0105',
-    url: 'https://assets.goodparty.org/tevyn-poll-csvs/019a3b1f-ef43-7511-8319-ed53edde0105-1761931141807.csv',
-    date: new Date(1761931141807),
-  },
-  {
-    pollId: '019a3b4b-31d9-7753-b0cf-e4030bc8d572',
-    url: 'https://assets.goodparty.org/tevyn-poll-csvs/019a3b4b-31d9-7753-b0cf-e4030bc8d572-1761931376299.csv',
-    date: new Date(1761931376299),
-  },
-  {
-    pollId: '019a3ba0-ffb4-7343-87aa-69dc44ddcca2',
-    url: 'https://assets.goodparty.org/tevyn-poll-csvs/019a3ba0-ffb4-7343-87aa-69dc44ddcca2-1761937000936.csv',
-    date: new Date(1761937000936),
-  },
-  {
-    pollId: '019a3bf6-af50-7fd2-94fe-39fe61e2bce9',
-    url: 'https://assets.goodparty.org/tevyn-poll-csvs/019a3bf6-af50-7fd2-94fe-39fe61e2bce9-1761942614518.csv',
-    date: new Date(1761942614518),
-  },
-]
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
   constructor(private readonly queueProducer: QueueProducerService) {
@@ -150,52 +110,5 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     )
 
     return result[0]
-  }
-
-  async backfillIndividualMessages(): Promise<number> {
-    for (const csvToBackfill of CSVsToBackfill) {
-      const { pollId, url, date } = csvToBackfill
-
-      const poll = await this.client.poll.findUnique({
-        where: { id: pollId },
-      })
-
-      if (!poll) {
-        this.logger.warn('Poll not found during backfill', { pollId })
-        continue
-      }
-
-      await this.createIndividualMessages(pollId, url, date)
-    }
-
-    return CSVsToBackfill.length
-  }
-
-  async createIndividualMessages(pollId: string, csvUrl: string, date: Date) {
-    let csv: string
-    try {
-      const response = await fetch(csvUrl)
-      csv = await response.text()
-    } catch (error: unknown) {
-      this.logger.error('Failed to fetch csv', error)
-      throw new BadGatewayException(`Failed to fetch csv: ${String(error)}`)
-    }
-
-    const people = await parseCsv<PollIndividualMessageToBackfill>(csv)
-
-    const messagesToCreate: Prisma.PollIndividualMessageCreateManyInput[] = []
-    for (const person of people) {
-      messagesToCreate.push({
-        id: `${pollId}-${person.id}`,
-        pollId,
-        personId: person.id,
-        sentAt: date,
-      })
-    }
-
-    await this.client.pollIndividualMessage.createMany({
-      data: messagesToCreate,
-      skipDuplicates: true,
-    })
   }
 }

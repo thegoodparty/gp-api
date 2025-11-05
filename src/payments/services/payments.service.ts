@@ -70,6 +70,8 @@ export class PaymentsService {
       return null
     }
 
+    this.logger.log(`userId: ${user.id} missing customerId`)
+
     const checkoutSessionId = user.metaData?.checkoutSessionId as string
     const customerId = checkoutSessionId
       ? await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
@@ -77,6 +79,9 @@ export class PaymentsService {
     if (!customerId) {
       return null
     }
+    this.logger.log(
+      `Successfully retrieved customerId ${customerId} for user ${user.id}`,
+    )
 
     await this.usersService.patchUserMetaData(user!.id, {
       customerId,
