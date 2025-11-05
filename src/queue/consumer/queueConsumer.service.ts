@@ -546,6 +546,16 @@ export class QueueConsumerService {
   }
 
   private async handlePollIssuesAnalysis(event: PollIssueAnalysisEvent) {
+    if (event.data.rank === 1) {
+      this.logger.log(
+        'Detected first poll issue, deleting existing poll issues',
+      )
+      await this.pollIssuesService.model.deleteMany({
+        where: { pollId: event.data.pollId },
+      })
+      this.logger.log('Successfully deleted existing poll issues')
+    }
+
     const issue: PollIssue = {
       id: `${event.data.pollId}-${event.data.rank}`,
       pollId: event.data.pollId,
