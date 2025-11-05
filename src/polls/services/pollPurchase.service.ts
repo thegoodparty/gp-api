@@ -2,8 +2,11 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { PollPurchaseMetadata } from '../types/pollPurchase.types'
 import { PollsService } from './polls.service'
+import z from 'zod'
 
 const PRICE_PER_TEXT = 0.03
+
+const parseNum = z.coerce.number().int().min(1).parse
 
 @Injectable()
 export class PollPurchaseHandlerService
@@ -21,7 +24,8 @@ export class PollPurchaseHandlerService
       throw new BadRequestException('pollId is required')
     }
 
-    if (!count || count <= 0) {
+    const num = parseNum(count)
+    if (!num || num <= 0) {
       throw new BadRequestException('count must be a positive number')
     }
   }
@@ -29,7 +33,7 @@ export class PollPurchaseHandlerService
   async calculateAmount({
     count,
   }: PurchaseMetadata<PollPurchaseMetadata>): Promise<number> {
-    return count * PRICE_PER_TEXT * 100
+    return parseNum(count) * PRICE_PER_TEXT * 100
   }
 
   async executePostPurchase(
@@ -44,7 +48,7 @@ export class PollPurchaseHandlerService
 
     await this.pollsService.expandPoll({
       pollId,
-      additionalRecipientCount: count,
+      additionalRecipientCount: parseNum(count),
     })
   }
 }
