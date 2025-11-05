@@ -709,7 +709,7 @@ export class QueueConsumerService {
       await this.awsS3Service.uploadFile(csv, bucket, fileName, 'text/csv')
     }
 
-    const csvUrl = `${ASSET_DOMAIN}/${this.awsS3Service.getKey({ bucket, fileName })}`
+    const csvUrl = `https://${ASSET_DOMAIN}/${this.awsS3Service.getKey({ bucket, fileName })}`
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages
