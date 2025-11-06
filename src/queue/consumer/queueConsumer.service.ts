@@ -546,6 +546,9 @@ export class QueueConsumerService {
   }
 
   private async handlePollIssuesAnalysis(event: PollIssueAnalysisEvent) {
+    this.logger.log(
+      `Handling poll issue analysis event for poll ${event.data.pollId}`,
+    )
     if (event.data.rank === 1) {
       this.logger.log(
         'Detected first poll issue, deleting existing poll issues',
@@ -579,6 +582,9 @@ export class QueueConsumerService {
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
+    this.logger.log(
+      `Handling poll analysis complete event for poll ${event.data.pollId}`,
+    )
     const data = await this.getPollAndCampaign(event.data.pollId)
     if (!data) {
       this.logger.log('Poll not found, ignoring event')
@@ -586,8 +592,10 @@ export class QueueConsumerService {
     }
     const { poll, campaign } = data
 
-    if (poll.status !== 'IN_PROGRESS') {
-      this.logger.log('Poll is not in-progress, ignoring event')
+    if (!['IN_PROGRESS', 'EXPANDING'].includes(poll.status)) {
+      this.logger.log('Poll is not in-progress or expanding, ignoring event', {
+        poll,
+      })
       return
     }
 
