@@ -128,6 +128,7 @@
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.9",
     "@types/async": "^3.2.24",
+    "@types/async-retry": "^1.4.9",
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.2",

@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { retry } from 'async-retry'
+import retry from 'async-retry'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { WithOptional } from 'src/shared/types/utility.types'
 import { AnalyticsService } from '../../analytics/analytics.service'
@@ -184,7 +184,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     userId: number,
     newMetaData: PrismaJson.UserMetaData,
   ) {
-    await retry(
+    return retry(
       async (bail) => {
         return this.client.$transaction(async (tx) => {
           const user = await tx.user.findFirst({ where: { id: userId } })
@@ -197,7 +197,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
           }
 
           this.logger.log(
-            `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData)}`,
+            `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData ?? {})}`,
           )
 
           const rows = await tx.$queryRaw<Array<{ id: number }>>`
@@ -216,23 +216,13 @@ export class UsersService extends createPrismaBase(MODELS.User) {
 
           // Refetch for typed, non-snake case user
           const updatedUser = await tx.user.findUniqueOrThrow({
-            where: { id: userId },
+            where: { id: rows[0].id },
           })
 
           this.logger.log(
-            `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData)}`,
+            `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData ?? {})}`,
           )
           return updatedUser
-
-          // return tx.user.update({
-          //   where: { id: userId },
-          //   data: {
-          //     metaData: {
-          //       ...(user.metaData ?? {}),
-          //       ...newMetaData,
-          //     },
-          //   },
-          // })
         })
       },
       {
