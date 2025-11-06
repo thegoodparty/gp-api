@@ -183,15 +183,6 @@ export class OutreachController {
       },
     })
     const peerlyIdentityId = tcrCompliance?.peerlyIdentityId
-    this.logger.debug(
-      'tcrCompliance, outreaches =>',
-      tcrCompliance,
-      peerlyIdentityId,
-      outreaches.slice(0, 2),
-    )
-    this.logger.log('method =>', () => 'does this output?')
-    const j = JSON.parse('foobar')
-    console.log(j)
     const p2pJobs = peerlyIdentityId
       ? await this.peerlyP2pJobService.getJobsByIdentityId(peerlyIdentityId)
       : []
