@@ -114,6 +114,6 @@ export class CustomLogger implements LoggerService {
       }
     }
     const message = prettify ? prettify(object) : JSON.stringify(object)
-    console[level](message)
+    console[level === 'verbose' ? 'debug' : level](message)
   }
 }
