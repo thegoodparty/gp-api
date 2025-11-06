@@ -1,8 +1,11 @@
-import { Inject, forwardRef, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Logger } from '@nestjs/common'
 import { User } from '@prisma/client'
 import { UsersService } from 'src/users/services/users.service'
 
 const SESSION_TIMEOUT = 1000 * 60 * 30 // 30 minutes (fullstory's inactivity timeout)
+const LAST_VISITED_UPDATE_THRESHOLD_MS = Number(
+  process.env.LAST_VISITED_UPDATE_THRESHOLD_MS ?? 60_000,
+)
 
 export class SessionsService {
   private readonly logger = new Logger(SessionsService.name)
@@ -31,10 +34,12 @@ export class SessionsService {
           sessionCount: sessionCount + 1,
         })
       } else {
-        // Just update last visited time
-        await this.users.patchUserMetaData(user.id, {
-          lastVisited: currentTime,
-        })
+        // Only update lastVisited if older than threshold
+        if (currentTime - lastVisited >= LAST_VISITED_UPDATE_THRESHOLD_MS) {
+          await this.users.patchUserMetaData(user.id, {
+            lastVisited: currentTime,
+          })
+        }
       }
     } catch (err) {
       if (err instanceof Error) {
