@@ -9,7 +9,7 @@ import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import { AppModule } from './app.module'
-import { Logger } from '@nestjs/common'
+import { ConsoleLogger, Logger } from '@nestjs/common'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
@@ -24,7 +24,10 @@ const APP_LISTEN_CONFIG = {
 }
 
 const bootstrap = async () => {
-  const logger = new CustomLogger()
+  const logger =
+    process.env.NODE_ENV === 'production'
+      ? new CustomLogger()
+      : new ConsoleLogger()
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({

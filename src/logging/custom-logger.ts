@@ -2,12 +2,6 @@ import { LoggerService } from '@nestjs/common'
 import { requestContextStore } from './request-context.service'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import { FastifyRequest } from 'fastify'
-import { prettyFactory } from 'pino-pretty'
-
-const prettify =
-  process.env.NODE_ENV !== 'production'
-    ? prettyFactory({ colorize: true })
-    : undefined
 
 export const determineUser = (req: FastifyRequest): string | undefined => {
   if (!req.headers.authorization) {
@@ -71,49 +65,23 @@ export class CustomLogger implements LoggerService {
       }
     }
 
-    // If there are multiple arguments and the last one is a string, it's the context string.
-    if (args.length > 1 && typeof args[args.length - 1] === 'string') {
-      object.context = args[args.length - 1]
-      args.pop()
-    }
-
-    // We want to retain all of the data from variadic arguments. So, reduce them all down into
-    // a single object.
-    for (const arg of args) {
-      if (typeof arg === 'string') {
-        if (!object.msg) {
-          object.msg = arg
-        } else {
-          object.msg2 = arg
-        }
-      } else if (arg instanceof Error) {
-        if (!object.error) {
-          object.error = serializeError(arg)
-        } else {
-          object.error2 = serializeError(arg)
-        }
-      } else if (Array.isArray(arg)) {
-        if (!object.array) {
-          object.array = arg
-        } else {
-          object.array2 = arg
-        }
-      } else if (typeof arg === 'object' && arg !== null) {
-        // Serialize errors at the top-level of objects
-        for (const errorKey of ['error', 'err', 'e']) {
-          if (arg[errorKey] instanceof Error) {
-            const toLog = {
-              name: arg[errorKey].name,
-              message: arg[errorKey].message,
-              stack: arg[errorKey].stack,
-            }
-            arg[errorKey] = toLog
-          }
-        }
-        Object.assign(object, arg)
+    object.data = args.map((arg) => {
+      if (arg instanceof Error) {
+        return serializeError(arg)
       }
-    }
-    const message = prettify ? prettify(object) : JSON.stringify(object)
-    console[level === 'verbose' ? 'debug' : level](message)
+      for (const errorKey of ['error', 'err', 'e']) {
+        if (
+          typeof arg === 'object' &&
+          arg !== null &&
+          errorKey in arg &&
+          arg[errorKey] instanceof Error
+        ) {
+          arg[errorKey] = serializeError(arg[errorKey])
+        }
+      }
+
+      return arg
+    })
+    console[level === 'verbose' ? 'debug' : level](JSON.stringify(object))
   }
 }
