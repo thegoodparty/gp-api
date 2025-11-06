@@ -64,7 +64,7 @@ export class EnqueuePathToVictoryService {
           return { message: 'not ok' }
         }
 
-        this.logger.debug('race data', raceData)
+        this.logger.debug('race data', { raceData })
         // queueMessage.data = { campaignId, ...raceData }
 
         queueMessage = {
@@ -121,7 +121,7 @@ export class EnqueuePathToVictoryService {
         }
       }
 
-      this.logger.debug('queueing Message', queueMessage)
+      this.logger.debug('queueing Message', { queueMessage })
       await this.queueService.sendMessage(queueMessage, MessageGroup.p2v)
       return { message: 'ok' }
     } catch (e) {

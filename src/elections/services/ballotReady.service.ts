@@ -60,10 +60,9 @@ export class BallotReadyService {
       }>(query)
       return result?.node?.normalizedPosition?.name ?? null
     } catch (error) {
-      this.logger.error(
-        `Error at getNormalizedPosition for id ${raceId}:`,
+      this.logger.error(`Error at getNormalizedPosition for id ${raceId}:`, {
         error,
-      )
+      })
       return null
     }
   }
@@ -115,7 +114,7 @@ export class BallotReadyService {
     try {
       return await this.graphQLClient.request(query)
     } catch (error) {
-      this.logger.error('Error at fetchRaceById:', error)
+      this.logger.error('Error at fetchRaceById:', { error })
       return null
     }
   }
@@ -209,7 +208,7 @@ export class BallotReadyService {
     try {
       return await this.graphQLClient.request(query)
     } catch (error) {
-      this.logger.error('Error at fetchRacesByZipcode: ', error)
+      this.logger.error('Error at fetchRacesByZipcode: ', { error })
       return null
     }
   }
@@ -242,7 +241,7 @@ export class BallotReadyService {
     try {
       return await this.graphQLClient.request(query)
     } catch (error) {
-      this.logger.error('Error at fetchRacesWithElectionDates: ', error)
+      this.logger.error('Error at fetchRacesWithElectionDates: ', { error })
       return null
     }
   }
@@ -364,7 +363,7 @@ export class BallotReadyService {
         await this.graphQLClient.request<RaceWithOfficeHolders>(query)
       return response?.node || null
     } catch (error) {
-      this.logger.error('Error at fetchRacesWithOfficeHolders:', error)
+      this.logger.error('Error at fetchRacesWithOfficeHolders:', { error })
       return null
     }
   }

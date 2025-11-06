@@ -59,9 +59,9 @@ export function typeToQuery(
     // value is like "IN##CLARK##CLARK CNTY COMM DIST 1" we need just CLARK CNTY COMM DIST 1
     const cleanValue = extractLocation(l2ColumnValue, fixColumns)
     if (fixColumns) {
-      logger.debug('before fix columns:', l2ColumnName)
+      logger.debug('before fix columns:', { l2ColumnName })
       l2ColumnName = fixCityCountyColumns(l2ColumnName)
-      logger.debug('after fix columns:', l2ColumnName)
+      logger.debug('after fix columns:', { l2ColumnName })
     }
     if (cleanValue) {
       whereClause += `("${l2ColumnName}" = '${cleanValue}' 
@@ -263,7 +263,7 @@ function extractLocation(input: string, fixColumns?: boolean) {
     ?.split('##')
     ?.at(fixColumns ? 1 : -1)
     ?.replace(' (EST.)', '')
-  logger.debug('Extracted:', res)
+  logger.debug('Extracted:', { res })
   return res
 }
 

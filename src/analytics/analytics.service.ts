@@ -25,7 +25,7 @@ export class AnalyticsService {
     try {
       const user = await this.usersService.findFirst({ where: { id: userId } })
       if (!user) {
-        this.logger.warn(`[ANALYTICS] User not found: ${userId}`)
+        this.logger.warn(`[ANALYTICS] User not found`, { userId })
         return undefined
       }
 
@@ -36,14 +36,19 @@ export class AnalyticsService {
         hubspotId,
       }
 
-      this.logger.debug(
-        `[ANALYTICS] User context retrieved for user ${userId}: email=${!!userContext.email}, hubspotId=${!!userContext.hubspotId}`,
-      )
+      this.logger.debug(`[ANALYTICS] User context retrieved`, {
+        userId,
+        hasEmail: !!userContext.email,
+        hasHubspotId: !!userContext.hubspotId,
+      })
       return userContext
     } catch (e) {
       this.logger.error(
-        `[ANALYTICS] Error fetching user context for analytics - User: ${userId}`,
-        e,
+        `[ANALYTICS] Error fetching user context for analytics`,
+        {
+          userId,
+          error: e,
+        },
       )
       return undefined
     }
@@ -54,9 +59,10 @@ export class AnalyticsService {
     eventName: string,
     properties?: SegmentTrackEventProperties,
   ) {
-    this.logger.debug(
-      `[ANALYTICS] Starting event tracking - Event: ${eventName}, User: ${userId}`,
-    )
+    this.logger.debug(`[ANALYTICS] Starting event tracking`, {
+      eventName,
+      userId,
+    })
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userContext = await this.getUserContext(userId)
@@ -76,49 +82,54 @@ export class AnalyticsService {
 
       return result
     } catch (e) {
-      this.logger.error(
-        `[ANALYTICS] Failed to track event: ${eventName} for user: ${userId}`,
-        e,
-      )
+      this.logger.error(`[ANALYTICS] Failed to track event`, {
+        eventName,
+        userId,
+        error: e,
+      })
       throw e
     }
   }
 
   async identify(userId: number, traits: SegmentIdentityTraits) {
-    this.logger.debug(
-      `[ANALYTICS] Starting user identification - User: ${userId}`,
-    )
+    this.logger.debug(`[ANALYTICS] Starting user identification`, { userId })
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userContext = await this.getUserContext(userId)
 
     try {
       await this.segment.identify(userId, traits, userContext)
-      this.logger.debug(`[ANALYTICS] Successfully identified user ${userId}`)
+      this.logger.debug(`[ANALYTICS] Successfully identified user`, { userId })
     } catch (e) {
-      this.logger.error(`[ANALYTICS] Failed to identify user: ${userId}`, e)
+      this.logger.error(`[ANALYTICS] Failed to identify user`, {
+        userId,
+        error: e,
+      })
       throw e
     }
   }
 
   async trackProPayment(userId: number, session: Stripe.Checkout.Session) {
-    this.logger.debug(
-      `[ANALYTICS] Starting pro payment tracking - User: ${userId}, Session: ${session.id}`,
-    )
+    this.logger.debug(`[ANALYTICS] Starting pro payment tracking`, {
+      userId,
+      sessionId: session.id,
+    })
 
     try {
       // Validate session has required data
       if (!session.subscription) {
-        this.logger.warn(
-          `[ANALYTICS] No subscription found in session ${session.id} for user ${userId}`,
-        )
+        this.logger.warn(`[ANALYTICS] No subscription found in session`, {
+          sessionId: session.id,
+          userId,
+        })
         return
       }
 
       if (!session.payment_intent) {
-        this.logger.warn(
-          `[ANALYTICS] No payment_intent found in session ${session.id} for user ${userId}`,
-        )
+        this.logger.warn(`[ANALYTICS] No payment_intent found in session`, {
+          sessionId: session.id,
+          userId,
+        })
         return
       }
 
@@ -126,7 +137,8 @@ export class AnalyticsService {
       let subscription: Stripe.Subscription
       if (typeof session.subscription === 'string') {
         this.logger.warn(
-          `[ANALYTICS] Subscription is string ID in session ${session.id}, cannot extract detailed data for user ${userId}. Tracking with limited data.`,
+          `[ANALYTICS] Subscription is string ID in session; tracking with limited data`,
+          { sessionId: session.id, userId },
         )
         await this.track(userId, EVENTS.Account.ProSubscriptionConfirmed, {
           price: 0,
@@ -136,28 +148,26 @@ export class AnalyticsService {
           renewalDate: new Date().toISOString(),
         })
         this.logger.debug(
-          `[ANALYTICS] Successfully tracked pro payment with limited data - User: ${userId}`,
+          `[ANALYTICS] Successfully tracked pro payment with limited data`,
+          { userId },
         )
         return
       } else {
         subscription = session.subscription
-        this.logger.debug(
-          `[ANALYTICS] Subscription object found for user ${userId}`,
-        )
+        this.logger.debug(`[ANALYTICS] Subscription object found`, { userId })
       }
 
       // Handle payment intent data - could be string ID or full object
       let paymentIntent: Stripe.PaymentIntent | null = null
       if (typeof session.payment_intent === 'string') {
         this.logger.warn(
-          `[ANALYTICS] Payment intent is string ID in session ${session.id}, cannot extract payment method for user ${userId}`,
+          `[ANALYTICS] Payment intent is string ID in session; cannot extract payment method`,
+          { sessionId: session.id, userId },
         )
         paymentIntent = null
       } else {
         paymentIntent = session.payment_intent
-        this.logger.debug(
-          `[ANALYTICS] Payment intent object found for user ${userId}`,
-        )
+        this.logger.debug(`[ANALYTICS] Payment intent object found`, { userId })
       }
 
       // Extract price data safely
@@ -165,9 +175,7 @@ export class AnalyticsService {
       const price = item?.price?.unit_amount_decimal
         ? Number(item.price.unit_amount_decimal) / 100
         : 0
-      this.logger.debug(
-        `[ANALYTICS] Extracted price: $${price} for user ${userId}`,
-      )
+      this.logger.debug(`[ANALYTICS] Extracted price`, { price, userId })
 
       // Extract payment method safely
       let paymentMethodType: Stripe.PaymentMethod.Type | null = null
@@ -181,13 +189,13 @@ export class AnalyticsService {
           walletType = pm.card.wallet.type
         }
 
-        this.logger.debug(
-          `[ANALYTICS] Extracted payment method type: ${paymentMethodType}, wallet type: ${walletType} for user ${userId}`,
-        )
+        this.logger.debug(`[ANALYTICS] Extracted payment method`, {
+          paymentMethodType,
+          walletType,
+          userId,
+        })
       } else {
-        this.logger.warn(
-          `[ANALYTICS] No payment method found for user ${userId}`,
-        )
+        this.logger.warn(`[ANALYTICS] No payment method found`, { userId })
       }
 
       // Extract renewal date safely
@@ -196,12 +204,14 @@ export class AnalyticsService {
         renewalDate = new Date(
           subscription.current_period_end * 1000,
         ).toISOString()
-        this.logger.debug(
-          `[ANALYTICS] Extracted renewal date: ${renewalDate} for user ${userId}`,
-        )
+        this.logger.debug(`[ANALYTICS] Extracted renewal date`, {
+          renewalDate,
+          userId,
+        })
       } else {
         this.logger.warn(
-          `[ANALYTICS] No current_period_end found in subscription for user ${userId}`,
+          `[ANALYTICS] No current_period_end found in subscription`,
+          { userId },
         )
         renewalDate = new Date().toISOString()
       }
@@ -225,23 +235,25 @@ export class AnalyticsService {
         walletType, // New structured field
         renewalDate,
       }
-      this.logger.debug(
-        `[ANALYTICS] Tracking pro payment with properties: ${JSON.stringify(eventProperties)} for user ${userId}`,
-      )
+      this.logger.debug(`[ANALYTICS] Tracking pro payment with properties`, {
+        eventProperties,
+        userId,
+      })
 
       await this.track(
         userId,
         EVENTS.Account.ProSubscriptionConfirmed,
         eventProperties,
       )
-      this.logger.debug(
-        `[ANALYTICS] Successfully tracked pro payment for user ${userId}`,
-      )
+      this.logger.debug(`[ANALYTICS] Successfully tracked pro payment`, {
+        userId,
+      })
     } catch (e) {
-      this.logger.error(
-        `[ANALYTICS] Error tracking pro payment for user ${userId}, session ${session.id}`,
-        e,
-      )
+      this.logger.error(`[ANALYTICS] Error tracking pro payment`, {
+        userId,
+        sessionId: session.id,
+        error: e,
+      })
       throw e // Re-throw to propagate the error
     }
   }

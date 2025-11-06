@@ -81,7 +81,7 @@ export class CrmController {
           )
         } catch (error) {
           const message = `CRM Webhook Error: objectId: ${objectId}, key: ${propertyName}, value: ${propertyValue}`
-          this.logger.error(message, error)
+          this.logger.error(message, { error })
           await this.slack.errorMessage({
             message,
             error,

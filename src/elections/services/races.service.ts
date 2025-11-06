@@ -358,7 +358,7 @@ export class RacesService {
           officeName + ' - ' + electionState,
           level,
         )
-        this.logger.debug({ slug }, 'locationResp', locationResp)
+        this.logger.debug({ slug }, 'locationResp', { locationResp })
       }
 
       if (locationResp?.level) {
@@ -377,10 +377,10 @@ export class RacesService {
     }
 
     if (county) {
-      this.logger.debug({ slug }, 'Found county', county)
+      this.logger.debug({ slug }, 'Found county', { county })
     }
     if (city) {
-      this.logger.debug({ slug }, 'Found city', city)
+      this.logger.debug({ slug }, 'Found city', { city })
     }
 
     let priorElectionDates: string[] = []
@@ -541,7 +541,7 @@ export class RacesService {
     } catch (e) {
       this.logger.debug('error at extract-location-ai helper', e)
     }
-    this.logger.debug('extract ai location response', decodedContent)
+    this.logger.debug('extract ai location response', { decodedContent })
     return decodedContent
   }
 
@@ -573,7 +573,7 @@ export class RacesService {
           }
         }
       }
-      this.logger.debug({ slug }, 'electionDates', electionDates)
+      this.logger.debug({ slug }, 'electionDates', { electionDates })
 
       return electionDates
     } catch (e) {

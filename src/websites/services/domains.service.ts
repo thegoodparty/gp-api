@@ -87,7 +87,8 @@ export class DomainsService
         forwardingEmailAddress,
       }
       this.logger.debug(
-        `Found domain with no email forwarding, enqueuing task: ${JSON.stringify(messageData)}`,
+        `Found domain with no email forwarding, enqueuing task`,
+        { messageData },
       )
       await this.queueService.sendMessage(
         {
@@ -479,7 +480,7 @@ export class DomainsService
         }
       } catch (e) {
         if (!this.vercel.isVercelNotFoundError(e)) {
-          this.logger.error(`Error getting domain details from Vercel: ${e}`)
+          this.logger.error(`Error getting domain details from Vercel`, e)
           throw new Error('Error getting domain details from Vercel:', {
             cause: e,
           })
@@ -516,7 +517,7 @@ export class DomainsService
           }
         } catch (e) {
           if (!this.vercel.isVercelNotFoundError(e)) {
-            this.logger.error(`Error getting project domain from Vercel: ${e}`)
+            this.logger.error(`Error getting project domain from Vercel`, e)
             throw new Error('Error getting project domain from Vercel: ', {
               cause: e,
             })
@@ -589,7 +590,7 @@ export class DomainsService
 
     try {
       verifyResult = await this.vercel.verifyProjectDomain(domain.name)
-      this.logger.debug('Domain verification result:', verifyResult)
+      this.logger.debug('Domain verification result:', { verifyResult })
     } catch (error) {
       this.logger.error('Error configuring domain:', error)
       throw new BadGatewayException(

@@ -13,10 +13,7 @@ export class HealthService {
       return true
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (e: unknown) {
-      this.logger.error(
-        'Health check failed => ',
-        e instanceof Error ? e.message : e,
-      )
+      this.logger.error('Health check failed => ', e)
       return false
     }
   }

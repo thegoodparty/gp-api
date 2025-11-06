@@ -41,14 +41,11 @@ export class FeaturesService {
 
     const value = variants[params.feature]?.value === 'on'
 
-    this.logger.log(
-      JSON.stringify({
-        userId: user.id,
-        feature: params.feature,
-        value,
-        msg: 'Calculated feature toggle for user',
-      }),
-    )
+    this.logger.log('Calculated feature toggle for user', {
+      userId: user.id,
+      feature: params.feature,
+      value,
+    })
 
     return value
   }

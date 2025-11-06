@@ -22,7 +22,7 @@ export class QueueProducerController {
       return await this.queueService.sendMessage(body)
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.log(`Error at queueController e.message: ${e.message}`, e)
+        this.logger.log(`Error at queueController`, e)
         throw new BadGatewayException(
           e.message || 'Error occurred while enqueueing message',
         )

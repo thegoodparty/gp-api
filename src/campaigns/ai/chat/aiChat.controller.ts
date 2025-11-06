@@ -88,13 +88,13 @@ export class AiChatController {
       return await this.aiChatService.create(campaign, body)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      this.logger.error('Error generating AI chat', e)
+      this.logger.error('Error generating AI chat', { error: e })
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
         error: e,
       })
       if (e.data && e.data.error) {
-        this.logger.error('*** error*** :', e.data.error)
+        this.logger.error('*** error*** :', { error: e.data.error })
       }
 
       throw e

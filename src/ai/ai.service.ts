@@ -143,8 +143,10 @@ export class AiService {
       completion = await modelWithFallback.invoke(sanitizedMessages)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      this.logger.error('Error in utils/ai/llmChatCompletion', error)
-      this.logger.error('error response', error?.response)
+      this.logger.error('Error in utils/ai/llmChatCompletion', {
+        error,
+        response: error?.response,
+      })
 
       await this.slack.errorMessage({
         message: 'Error in AI completion (raw)',
@@ -184,7 +186,7 @@ export class AiService {
     for (const model of models) {
       // Lama 3.3 supports native function calling
       // so we can modify the OpenAI base url to use the together.ai api
-      this.logger.debug('model', model)
+      this.logger.debug('model', { model })
       const togetherAi = model.includes('meta-llama') || model.includes('Qwen')
       const client = new OpenAI({
         apiKey: togetherAi ? TOGETHER_AI_KEY : OPEN_AI_KEY,
@@ -257,13 +259,13 @@ export class AiService {
           content = match?.length ? match[1] : content
         }
         content = content.replace('/n', '<br/><br/>')
-        this.logger.debug('completion success', content)
+        this.logger.debug('completion success', { content })
         return {
           content,
           tokens: completion?.usage?.total_tokens || 0,
         }
       } catch (error) {
-        this.logger.error('error', error)
+        this.logger.error('error', { error })
         await this.slack.formattedMessage({
           message: `Error in getChatToolCompletion. model: ${model}`,
           error,
@@ -292,7 +294,7 @@ export class AiService {
             arguments: args,
           }
         } catch (error) {
-          this.logger.error(`Error parsing function arguments: ${error}`)
+          this.logger.error(`Error parsing function arguments`, { error })
           return undefined
         }
       }
@@ -313,9 +315,10 @@ export class AiService {
   }: GetAssistantCompletionArgs) {
     try {
       if (!assistantId || !systemPrompt) {
-        this.logger.log('missing assistantId or systemPrompt')
-        this.logger.log('assistantId', assistantId)
-        this.logger.log('systemPrompt', systemPrompt)
+        this.logger.log('missing assistantId or systemPrompt', {
+          assistantId,
+          systemPrompt,
+        })
         return
       }
 
@@ -324,7 +327,10 @@ export class AiService {
         return
       }
 
-      this.logger.log(`running assistant ${assistantId} on thread ${threadId}`)
+      this.logger.log(`running assistant on thread`, {
+        assistantId,
+        threadId,
+      })
 
       let messages: AiChatMessage[] = []
       messages.push({
@@ -339,7 +345,7 @@ export class AiService {
       }
 
       if (messageId) {
-        this.logger.log('deleting message', messageId)
+        this.logger.log('deleting message', { messageId })
         messages = messages.filter((m) => m.id !== messageId)
       } else {
         messages.push({
@@ -350,7 +356,7 @@ export class AiService {
         })
       }
 
-      this.logger.log('messages', messages)
+      this.logger.log('messages', { messages })
 
       const result = await this.llmChatCompletion(
         messages,
@@ -368,7 +374,7 @@ export class AiService {
         usage: result?.tokens,
       }
     } catch (error) {
-      this.logger.log('error', error)
+      this.logger.log('error', { error })
       await this.slack.message(
         {
           body: `Error in getAssistantCompletion. Error: ${error}`,
@@ -698,7 +704,7 @@ export class AiService {
             item.replace ? item.replace.toString().trim() : '',
           )
         } catch (e) {
-          this.logger.error('error at prompt replace', e)
+          this.logger.error('error at prompt replace', { error: e })
         }
       })
 
@@ -708,7 +714,7 @@ export class AiService {
 
       return newPrompt
     } catch (e) {
-      this.logger.error('Error in helpers/ai/promptReplace', e)
+      this.logger.error('Error in helpers/ai/promptReplace', { error: e })
       return ''
     }
   }

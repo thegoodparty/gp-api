@@ -35,7 +35,9 @@ export class VoterFileDownloadAccessService {
       (!campaign.pathToVictory?.data?.electionType ||
         !campaign.pathToVictory?.data?.electionLocation)
     ) {
-      this.logger.log('Campaign is not eligible for download.', campaign.id)
+      this.logger.log('Campaign is not eligible for download.', {
+        campaignId: campaign.id,
+      })
       return false
     } else {
       return true

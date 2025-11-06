@@ -107,7 +107,7 @@ export class P2pPhoneListUploadService {
       P2P_CSV_COLUMN_MAPPINGS,
     )
 
-    this.logger.debug('Generated P2P phone list query:', query)
+    this.logger.debug('Generated P2P phone list query:', { query })
 
     const stream = await this.voterDatabaseService.csvReadableStream(
       query,

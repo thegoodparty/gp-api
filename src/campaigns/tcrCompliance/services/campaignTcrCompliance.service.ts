@@ -54,10 +54,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       },
     })
     if (pendingTcrCompliances.length) {
-      this.logger.debug(
-        `Queuing up pendingTcrCompliances =>`,
+      this.logger.debug(`Queuing up pendingTcrCompliances =>`, {
         pendingTcrCompliances,
-      )
+      })
       await Promise.allSettled(
         pendingTcrCompliances.map((tcrCompliance) =>
           this.queueService.sendMessage({
@@ -123,7 +122,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     existingIdentity &&
       this.logger.debug(`Existing Identity found, skipping creation`)
-    this.logger.debug(`existingIdentity => ${JSON.stringify(existingIdentity)}`)
+    this.logger.debug(`existingIdentity`, { existingIdentity })
 
     tcrComplianceIdentity =
       existingIdentity ||
@@ -228,7 +227,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       peerly10DLCBrandSubmissionKey,
     }
 
-    this.logger.debug('Creating TCR Compliance:', newTcrCompliance)
+    this.logger.debug('Creating TCR Compliance:', { newTcrCompliance })
 
     return this.model.create({
       data: newTcrCompliance,

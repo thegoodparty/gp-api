@@ -34,7 +34,7 @@ export class ScheduledMessagingService extends createPrismaBase(
       return []
     }
 
-    this.logger.debug(`Found ${messages.length} messages to send`, messages)
+    this.logger.debug(`Found ${messages.length} messages to send`, { messages })
 
     return this.sendMessagesAndUpdate(messages)
   }
@@ -81,7 +81,7 @@ export class ScheduledMessagingService extends createPrismaBase(
 
   private async sendMessagesAndUpdate(messages: ScheduledMessage[]) {
     const updatedMessages: ScheduledMessage[] = []
-    this.logger.debug('Sending messages:', messages)
+    this.logger.debug('Sending messages:', { messages })
     await this.client.$transaction(async (tx) => {
       for (const m of messages) {
         let updatedScheduledMsg: ScheduledMessage

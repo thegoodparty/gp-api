@@ -260,7 +260,7 @@ export class ContactsService {
       const people = this.normalizePeopleResponse(response.data)
       return people.map((p) => this.transformPerson(p))
     } catch (error) {
-      this.logger.error('Failed to sample contacts from people API', error)
+      this.logger.error('Failed to sample contacts from people API', { error })
       throw new BadGatewayException('Failed to sample contacts from people API')
     }
   }
@@ -323,10 +323,7 @@ export class ContactsService {
       if (error instanceof HttpException) {
         throw error
       }
-      this.logger.error(
-        'Failed to fetch person from people API',
-        JSON.stringify(error),
-      )
+      this.logger.error('Failed to fetch person from people API', { error })
 
       if (isAxiosError(error) && error.response?.status === 404) {
         throw new NotFoundException('Person not found')

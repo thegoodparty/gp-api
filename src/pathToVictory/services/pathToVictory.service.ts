@@ -105,7 +105,7 @@ export class PathToVictoryService extends createPrismaBase(
           )
 
         if (locationColumns.length > 0) {
-          this.logger.debug('locationColumns', locationColumns)
+          this.logger.debug('locationColumns', { locationColumns })
           searchColumns = searchColumns.concat(locationColumns)
         }
       }
@@ -308,10 +308,9 @@ export class PathToVictoryService extends createPrismaBase(
       })
 
       if (campaign.pathToVictory?.data?.p2vStatus === P2VStatus.complete) {
-        this.logger.debug(
-          'Path To Victory already completed for',
-          campaign.slug,
-        )
+        this.logger.debug('Path To Victory already completed for', {
+          slug: campaign.slug,
+        })
         await this.completePathToVictory(
           campaign.slug,
           pathToVictoryResponse,
@@ -371,8 +370,8 @@ export class PathToVictoryService extends createPrismaBase(
     },
     sendEmail = true,
   ): Promise<void> {
-    this.logger.debug('completing path to victory for', slug)
-    this.logger.debug('pathToVictoryResponse', pathToVictoryResponse)
+    this.logger.debug('completing path to victory for', { slug })
+    this.logger.debug('pathToVictoryResponse', { pathToVictoryResponse })
 
     try {
       const campaign = await this.prisma.campaign.findUnique({
@@ -381,7 +380,7 @@ export class PathToVictoryService extends createPrismaBase(
       })
 
       if (!campaign) {
-        this.logger.error('no campaign found for slug', slug)
+        this.logger.error('no campaign found for slug', { slug })
         await this.slackService.errorMessage({
           message: `no campaign found for slug ${slug}`,
         })
@@ -441,7 +440,9 @@ export class PathToVictoryService extends createPrismaBase(
           process.env.WEBAPP_ROOT === 'https://goodparty.org' &&
           campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN
         ) {
-          this.logger.debug('sending email to user', campaign.user.email)
+          this.logger.debug('sending email to user', {
+            email: campaign.user.email,
+          })
           await this.emailService.sendTemplateEmail({
             to: campaign.user.email,
             subject: 'Exciting News: Your Customized Campaign Plan is Updated!',

@@ -52,7 +52,7 @@ export class VotersService {
       electionState,
       searchJson,
     )
-    this.logger.debug('partisanCounts', partisanCounts)
+    this.logger.debug('partisanCounts', { partisanCounts })
 
     if (partisanCounts.total === 0) {
       // don't get electionHistory if we don't have a match.
@@ -66,7 +66,7 @@ export class VotersService {
       electionState,
       searchJson,
     )
-    this.logger.debug('genderCounts', genderCounts)
+    this.logger.debug('genderCounts', { genderCounts })
 
     // sleep for 5 seconds to avoid rate limiting.
     await new Promise((resolve) => setTimeout(resolve, 5000))
@@ -74,7 +74,7 @@ export class VotersService {
       electionState,
       searchJson,
     )
-    this.logger.debug('ethnicityCounts', ethnicityCounts)
+    this.logger.debug('ethnicityCounts', { ethnicityCounts })
 
     let counts: VoterCounts = {
       ...partisanCounts,
@@ -106,14 +106,14 @@ export class VotersService {
     ) {
       partisanRace = true
     }
-    this.logger.debug('partisanRace', partisanRace)
+    this.logger.debug('partisanRace', { partisanRace })
     let electionDates: string[] | undefined
     if (partisanRace) {
       // update the electionDate to the first Tuesday of November.
       const year = electionDate.split('-')[0]
       const electionDateObj = this.getFirstTuesdayOfNovember(year)
       electionDate = electionDateObj.toISOString().slice(0, 10)
-      this.logger.debug('updated electionDate to GE date:', electionDate)
+      this.logger.debug('updated electionDate to GE date:', { electionDate })
     } else {
       electionDates = priorElectionDates
     }
@@ -130,7 +130,7 @@ export class VotersService {
           columns,
           electionDates[y],
         )
-        this.logger.debug('columnResults', columnResults)
+        this.logger.debug('columnResults', { columnResults })
         if (columnResults?.column) {
           foundColumns.push(columnResults)
         }
@@ -145,13 +145,13 @@ export class VotersService {
           columns,
           undefined,
         )
-        this.logger.debug('columnResults', columnResults)
+        this.logger.debug('columnResults', { columnResults })
         if (columnResults?.column) {
           foundColumns.push(columnResults)
         }
       }
     }
-    this.logger.debug('foundColumns', foundColumns)
+    this.logger.debug('foundColumns', { foundColumns })
 
     // we now have the columns for the last 3 elections.
     // we store it on counts for debugging purposes.
@@ -162,14 +162,14 @@ export class VotersService {
     for (const column of foundColumns) {
       const historyJson = cloneDeep(searchJson)
       historyJson.filters[column.column] = 1
-      this.logger.debug('historyJson', historyJson)
+      this.logger.debug('historyJson', { historyJson })
       // sleep for 5 seconds to avoid rate limiting.
       await new Promise((resolve) => setTimeout(resolve, 5000))
       const estimatedCount: number = await this.getEstimatedCounts(
         electionState,
         historyJson,
       )
-      this.logger.debug(`estimatedCount ${column.column} `, estimatedCount)
+      this.logger.debug(`estimatedCount ${column.column} `, { estimatedCount })
       if (estimatedCount > 0) {
         turnoutCounts.push(estimatedCount)
       }
@@ -177,7 +177,7 @@ export class VotersService {
 
     // update counts with the average and projected turnouts.
     counts = this.getProjectedTurnout(counts, turnoutCounts)
-    this.logger.debug('counts', counts)
+    this.logger.debug('counts', { counts })
 
     return counts
   }
@@ -264,7 +264,7 @@ export class VotersService {
       totalTurnout += count
     }
     const averageTurnout = Math.ceil(totalTurnout / turnoutCounts.length)
-    this.logger.debug('averageTurnout', averageTurnout)
+    this.logger.debug('averageTurnout', { averageTurnout })
     return averageTurnout
   }
 
@@ -374,7 +374,7 @@ export class VotersService {
       return count
     }
     if (!response?.data || !response?.data?.results) {
-      this.logger.debug('no results found', response?.data)
+      this.logger.debug('no results found', { results: response?.data })
       return count
     }
     this.logger.debug('found results')

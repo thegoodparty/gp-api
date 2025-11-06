@@ -97,10 +97,9 @@ export class PeerlyAuthenticationService extends PeerlyBaseConfig {
         throw new Error('Peerly token renewal failed: No token received')
       }
     } catch (error) {
-      this.logger.error(
-        'Failed to renew Peerly token',
-        isAxiosResponse(error) ? format(error) : error,
-      )
+      this.logger.error('Failed to renew Peerly token', {
+        error: isAxiosResponse(error) ? format(error) : error,
+      })
       throw new Error('Peerly token renewal failed')
     }
   }

@@ -30,7 +30,7 @@ export class PaymentsController {
     private readonly stripeEvents: PaymentEventsService,
     private readonly campaignsService: CampaignsService,
     private readonly paymentsService: PaymentsService,
-  ) { }
+  ) {}
 
   @Post('events')
   @PublicAccess()
@@ -55,7 +55,7 @@ export class PaymentsController {
       throw new BadRequestException('Failed to parse Stripe event')
     }
 
-    this.logger.debug(`processing event.type => ${event.type}`, event)
+    this.logger.debug(`processing event.type => ${event.type}`, { event })
     try {
       await this.stripeEvents.handleEvent(event)
     } catch (e) {

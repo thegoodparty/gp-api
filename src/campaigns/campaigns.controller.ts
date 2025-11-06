@@ -236,7 +236,7 @@ export class CampaignsController {
       const launchResult = await this.campaigns.launch(user, campaign)
       return launchResult
     } catch (e) {
-      this.logger.error('Error at campaign launch', e)
+      this.logger.error('Error at campaign launch', { error: e })
       await this.slack.errorMessage({
         message: 'Error at campaign launch',
         error: e,

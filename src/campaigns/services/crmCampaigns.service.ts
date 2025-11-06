@@ -60,7 +60,7 @@ export class CrmCampaignsService {
       )
     } catch (error) {
       const message = 'hubspot error - get-company-by-id'
-      this.logger.error(message, error)
+      this.logger.error(message, { error })
       await this.slack.errorMessage({
         message,
         error,
@@ -75,7 +75,7 @@ export class CrmCampaignsService {
       )
     } catch (error) {
       const message = 'hubspot error - get-company-owner'
-      this.logger.error(message, error)
+      this.logger.error(message, { error })
       await this.slack.errorMessage({
         message,
         error,
@@ -94,7 +94,7 @@ export class CrmCampaignsService {
         parseInt(crmCompany?.properties?.hubspot_owner_id as string),
       )
     } catch (e) {
-      this.logger.error('error getting crm company owner', e)
+      this.logger.error('error getting crm company owner', { error: e })
     }
   }
 
@@ -113,7 +113,7 @@ export class CrmCampaignsService {
         properties: companyObj,
       })
     } catch (error) {
-      this.logger.error('error creating company', error)
+      this.logger.error('error creating company', { error })
       await this.slack.errorMessage({
         message: `Error creating company for ${companyObj.candidate_name} in hubspot`,
         error,
@@ -127,7 +127,7 @@ export class CrmCampaignsService {
       return
     }
 
-    this.logger.debug('CRM Company created:', crmCompany)
+    this.logger.debug('CRM Company created:', { crmCompany })
 
     return crmCompany
   }
@@ -147,7 +147,7 @@ export class CrmCampaignsService {
       )
     } catch (e) {
       const { candidate_name: name } = crmCompanyProperties
-      this.logger.error('error updating crm', e)
+      this.logger.error('error updating crm', { error: e })
       if (e instanceof ApiException && e.code === 404) {
         await this.slack.errorMessage({
           message: `Could not find hubspot company for ${name} with hubspotId ${hubspotId}`,
@@ -416,8 +416,9 @@ export class CrmCampaignsService {
         },
       )
     } catch (error) {
-      this.logger.error({
-        message: `failure to associate company to contact w/ ids, respectively: ${crmCompanyId} and ${crmContactId}`,
+      this.logger.error('failure to associate company to contact w/ ids', {
+        crmCompanyId,
+        crmContactId,
         error,
       })
     }
@@ -438,7 +439,7 @@ export class CrmCampaignsService {
       return
     }
 
-    this.logger.debug('CRM Company Properties:', crmCompanyProperties)
+    this.logger.debug('CRM Company Properties:', { crmCompanyProperties })
 
     let crmCompany: SimplePublicObject | undefined
     if (existingHubspotId) {
@@ -479,10 +480,10 @@ export class CrmCampaignsService {
         const crmContact = await this.crmUsers.trackUserUpdate(campaign.userId)
         crmContactId = crmContact?.id
       } catch (error) {
-        this.logger.error(
-          `Error tracking user for campaign ${campaignId} in hubspot`,
+        this.logger.error(`Error tracking user for campaign in hubspot`, {
+          campaignId,
           error,
-        )
+        })
         return
       }
     }
@@ -572,7 +573,7 @@ export class CrmCampaignsService {
         updated++
       } catch (error) {
         failures.push(campaignId)
-        this.logger.error('error updating campaign', error)
+        this.logger.error('error updating campaign', { error })
         await this.slack.errorMessage({
           message: `Error updating campaign ${campaignId} in hubspot`,
           error,
@@ -673,7 +674,11 @@ export class CrmCampaignsService {
 
   private logBatchProgress(offset: number, batchSize: number, count: number) {
     const batchNumber = Math.floor(offset / batchSize) + 1
-    this.logger.log(`Processing batch ${batchNumber}: ${count} campaigns`)
+    this.logger.log(`Processing batch campaigns`, {
+      batchNumber,
+      batchSize,
+      count,
+    })
   }
 
   private async processCampaignBatch(
@@ -692,7 +697,10 @@ export class CrmCampaignsService {
           companyUpdateMap.set(updateObject.id, updateObject)
         }
       } catch (error) {
-        this.logger.error(`Error processing campaign ${campaign.id}:`, error)
+        this.logger.error(`Error processing campaign`, {
+          campaignId: campaign.id,
+          error,
+        })
       }
     }
 
@@ -757,7 +765,7 @@ export class CrmCampaignsService {
       this.logger.log(`Batch completed: ${updatedCount} companies updated`)
       return updatedCount
     } catch (error) {
-      this.logger.error('Error updating batch in HubSpot:', error)
+      this.logger.error('Error updating batch in HubSpot:', { error })
       await this.slack.errorMessage({
         message: `Error updating batch of ${companyUpdateObjects.length} companies in HubSpot`,
         error,
@@ -827,7 +835,7 @@ export class CrmCampaignsService {
               updated++
             }
           } catch (error) {
-            this.logger.error('error at crm/sync', error)
+            this.logger.error('error at crm/sync', { error })
             await this.slack.errorMessage({
               message: `error at crm/sync - campaignSlug: ${campaign?.slug}`,
               error,

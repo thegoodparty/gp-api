@@ -72,7 +72,7 @@ export class AiContentController {
       return result
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error(e)
+        this.logger.error('Error creating content', { error: e })
         throw new InternalServerErrorException('Failed to create content', {
           cause: e,
         })

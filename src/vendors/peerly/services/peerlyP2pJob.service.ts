@@ -104,7 +104,7 @@ export class PeerlyP2pJobService {
       this.logger.debug(`Getting P2P jobs list for ${identityId}`)
       const jobs =
         await this.peerlyP2pSmsService.retrieveJobsListByIdentityId(identityId)
-      this.logger.debug(`Fetched P2P Jobs: ${JSON.stringify(jobs)}`)
+      this.logger.debug(`Fetched P2P Jobs`, { jobs })
       return jobs
     } catch (error) {
       this.logger.error(P2P_ERROR_MESSAGES.RETRIEVE_JOBS_FAILED, error)
@@ -116,7 +116,7 @@ export class PeerlyP2pJobService {
     try {
       this.logger.debug(`Getting job ${jobId}`)
       const job = await this.peerlyP2pSmsService.retrieveJob(jobId)
-      this.logger.debug(`Fetched P2P Job: ${JSON.stringify(job)}`)
+      this.logger.debug(`Fetched P2P Job`, { job })
       return job
     } catch (error) {
       this.logger.error(P2P_ERROR_MESSAGES.RETRIEVE_JOB_FAILED, error)

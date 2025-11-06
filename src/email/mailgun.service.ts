@@ -35,7 +35,7 @@ export class MailgunService {
       } catch (_error) {
         this.logger.error(
           `Failed to stringify variables for email ${emailData.to}:`,
-          variables,
+          { variables },
         )
         throw new Error(
           `Failed to stringify variables for email: ${emailData.to}`,

@@ -105,7 +105,7 @@ export class VercelService {
         teamId: VERCEL_TEAM_ID,
       })
 
-      this.logger.debug(`Price check for ${domainName}:`, result)
+      this.logger.debug(`Price check for ${domainName}:`, { result })
       return result
     } catch (error) {
       this.logger.error(`Error checking price for domain ${domainName}:`, error)
@@ -155,7 +155,7 @@ export class VercelService {
         },
       })
 
-      this.logger.debug(`Domain purchase result for ${domainName}:`, result)
+      this.logger.debug(`Domain purchase result for ${domainName}:`, { result })
       return result
     } catch (error) {
       this.logger.error(`Error purchasing domain ${domainName}:`, error)

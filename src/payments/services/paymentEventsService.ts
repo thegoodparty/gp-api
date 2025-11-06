@@ -250,7 +250,7 @@ export class PaymentEventsService {
         ][index]
         this.logger.error(
           `[WEBHOOK] Failed to ${action} - User: ${user.id}, CustomerId: ${customerId}`,
-          result.reason,
+          { reason: result.reason },
         )
       }
     })

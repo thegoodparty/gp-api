@@ -119,7 +119,8 @@ export class AuthenticationService {
     if (!this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider]) {
       throw new BadRequestException('Invalid social provider')
     }
-    this.logger.debug(`Validating user with ${socialProvider} token:`, {
+    this.logger.debug(`Validating user with social provider token:`, {
+      socialProvider,
       socialToken,
       socialPic,
       email,
@@ -135,7 +136,7 @@ export class AuthenticationService {
       const msg = 'User not found by email'
       throw new UnauthorizedException(msg)
     }
-    this.logger.debug(`User found by email:`, user)
+    this.logger.debug(`User found by email`, { user })
     return this.usersService.updateUser(
       {
         id: user.id,

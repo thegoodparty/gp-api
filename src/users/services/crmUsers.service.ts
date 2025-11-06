@@ -102,7 +102,7 @@ export class CrmUsersService {
   }
 
   private async findCrmContactIdByEmail(email: string) {
-    this.logger.debug('Looking up contact by email:', email)
+    this.logger.debug('Looking up contact by email:', { email })
     let crmContactId: string
     try {
       const searchResultObj =
@@ -120,7 +120,7 @@ export class CrmUsersService {
             },
           ],
         })
-      this.logger.debug('Search result:', searchResultObj)
+      this.logger.debug('Search result:', { searchResultObj })
       const { total, results } = searchResultObj
 
       if (!total) {
@@ -181,7 +181,7 @@ export class CrmUsersService {
 
     if (!crmContactId) {
       crmContactId = await this.findCrmContactIdByEmail(email)
-      this.logger.debug('Found CRM Contact ID by email:', crmContactId)
+      this.logger.debug('Found CRM Contact ID by email:', { crmContactId })
       crmContactId &&
         (await this.users.patchUserMetaData(userId, {
           hubspotId: crmContactId,
@@ -195,10 +195,9 @@ export class CrmUsersService {
         : {}),
     }
 
-    this.logger.debug(
-      'Aggregated CRM Contact Properties:',
+    this.logger.debug('Aggregated CRM Contact Properties:', {
       aggregatedCrmContactProperties,
-    )
+    })
 
     if (crmContactId) {
       return await this.updateCrmContact(
@@ -209,7 +208,7 @@ export class CrmUsersService {
       const newCrmContact = await this.createCrmContact(
         aggregatedCrmContactProperties,
       )
-      this.logger.debug('New CRM Contact:', newCrmContact)
+      this.logger.debug('New CRM Contact:', { newCrmContact })
       const { id: newCrmContactId } = newCrmContact || {}
       newCrmContactId &&
         (await this.users.patchUserMetaData(userId, {
@@ -266,7 +265,7 @@ export class CrmUsersService {
       } else {
         this.logger.error('Unexpected Error:', error)
       }
-      this.logger.error('hubspot error', message, error)
+      this.logger.error('hubspot error', { message }, error)
       await this.slack.errorMessage({ message: 'Error submitting form', error })
       throw new BadGatewayException(message)
     }

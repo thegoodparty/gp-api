@@ -149,18 +149,16 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   }
 
   private handleApiError(error: unknown): never {
-    this.logger.error(
-      'Failed to communicate with Peerly API',
-      isAxiosResponse(error) ? format(error) : error,
-    )
+    this.logger.error('Failed to communicate with Peerly API', {
+      error: isAxiosResponse(error) ? format(error) : error,
+    })
 
     if (isAxiosResponse(error)) {
       const axiosError = error as PeerlyAxiosError
       if (axiosError.response?.data) {
-        this.logger.error(
-          'Peerly API error response:',
-          JSON.stringify(axiosError.response.data, null, 2),
-        )
+        this.logger.error('Peerly API error response:', {
+          responseData: axiosError.response.data,
+        })
 
         const apiError = axiosError.response.data
         const { error: errorField, message, Error: errorCapital } = apiError
@@ -207,9 +205,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
     try {
       const config = await this.getBaseHttpHeaders()
-      this.logger.debug(
-        `Creating Peerly job with body: ${JSON.stringify(body)}`,
-      )
+      this.logger.debug(`Creating Peerly job with body`, { body })
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/1to1/jobs`, body, config),
       )
@@ -259,7 +255,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
       // Validate and return the job details
       const { data: jobs } = response
-      this.logger.debug(`Retrieved P2P jobs: ${JSON.stringify(jobs)}`)
+      this.logger.debug(`Retrieved P2P jobs`, { jobs })
       return jobs
     } catch (error) {
       this.handleApiError(error)
@@ -276,7 +272,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       // Validate and return the job details
       const { data } = response
       const jobDetails = data as PeerlyJob
-      this.logger.debug(`Retrieved job details: ${JSON.stringify(jobDetails)}`)
+      this.logger.debug(`Retrieved job details`, { jobDetails })
       return jobDetails
     } catch (error) {
       this.handleApiError(error)

@@ -129,8 +129,8 @@ export class AdminCampaignsService {
         )
       } catch (error) {
         this.logger.error(
-          `[ADMIN] Failed to track admin pro subscription analytics - User: ${updatedCampaign?.userId}, Campaign: ${id}`,
-          error,
+          `[ADMIN] Failed to track admin pro subscription analytics`,
+          { user: updatedCampaign?.userId, error, campaign: id },
         )
         // Don't throw - we don't want to fail the admin operation for analytics issues
       }

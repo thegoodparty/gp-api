@@ -45,10 +45,9 @@ export class ForwardEmailService {
   constructor(private readonly httpService: HttpService) {}
 
   private handleApiError(error: Error | AxiosResponse | string): never {
-    this.logger.error(
-      'Failed to communicate with Forward Email API',
-      isAxiosResponse(error) ? format(error) : error,
-    )
+    this.logger.error('Failed to communicate with Forward Email API', {
+      error: isAxiosResponse(error) ? format(error) : error,
+    })
     throw new BadGatewayException(
       'Failed to communicate with Forward Email API',
     )
@@ -159,7 +158,7 @@ export class ForwardEmailService {
           ),
         )
       const { data } = response
-      this.logger.debug('Successfully created Forward Email domain', data)
+      this.logger.debug('Successfully created Forward Email domain', { data })
       return data
     } catch (error) {
       this.handleApiError(error as Error)
@@ -189,7 +188,7 @@ export class ForwardEmailService {
     )
     this.logger.debug(
       'Successfully retrieved Forward Email catch-all aliases',
-      aliases,
+      { aliases },
     )
     return aliases
   }
@@ -208,9 +207,9 @@ export class ForwardEmailService {
           ),
         )
       const { data } = response
-      this.logger.debug(
-        `Successfully created Forward Email catch-all alias: ${JSON.stringify(data)}`,
-      )
+      this.logger.debug(`Successfully created Forward Email catch-all alias`, {
+        data,
+      })
       return data
     } catch (error) {
       this.handleApiError(error as Error)
@@ -233,9 +232,9 @@ export class ForwardEmailService {
         )
 
       const { data } = response
-      this.logger.debug(
-        `Successfully updated Forward Email catch-all alias: ${JSON.stringify(data)}`,
-      )
+      this.logger.debug(`Successfully updated Forward Email catch-all alias`, {
+        data,
+      })
       return data
     } catch (error) {
       this.handleApiError(error as Error)

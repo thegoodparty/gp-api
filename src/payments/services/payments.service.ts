@@ -152,7 +152,7 @@ export class PaymentsService {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error'
         results.failed.push({ email, error: errorMessage })
-        this.logger.error(`Failed for ${email}:`, error)
+        this.logger.error(`Failed for ${email}:`, { error })
       }
     }
 

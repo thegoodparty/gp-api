@@ -71,7 +71,7 @@ export class ElectionsService {
         }),
       )
       if (status >= 200 && status < 300) return data
-      this.logger.warn(`Election API GET ${path}} responded ${status}`)
+      this.logger.warn(`Election API GET ${path} responded ${status}`)
       return null
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (error: unknown) {
@@ -88,7 +88,7 @@ export class ElectionsService {
         throw new BadGatewayException(finalMessage)
       }
       const finalMessage = `${baseMessage}: ${String(error)}`
-      this.logger.error(`Election API GET ${fullUrl} failed: ${String(error)}`)
+      this.logger.error(`Election API GET ${fullUrl} failed`, { error })
       throw new BadGatewayException(finalMessage)
     }
   }

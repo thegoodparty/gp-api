@@ -19,10 +19,9 @@ export const candidateContentPromptsTransformer: Transformer<
         [camelCase(template.data.name)]: template.data.content,
       }
     } else {
-      logger.warn(
-        'template.data.name and/or template.data.content not found',
+      logger.warn('template.data.name and/or template.data.content not found', {
         template,
-      )
+      })
     }
     return acc
   }, {})

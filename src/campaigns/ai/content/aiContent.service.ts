@@ -121,7 +121,7 @@ export class AiContentService {
     )
 
     try {
-      this.logger.log(aiContent)
+      this.logger.log('Created ai content', { aiContent })
       await this.campaignsService.update({
         where: { id: campaign.id },
         data: { aiContent },
@@ -250,9 +250,9 @@ export class AiContentService {
           content: chatResponse,
         }
 
-        this.logger.log('saving campaign version', key)
-        this.logger.log('inputValues', inputValues)
-        this.logger.log('oldVersion', oldVersion)
+        this.logger.log('saving campaign version', { key })
+        this.logger.log('inputValues', { inputValues })
+        this.logger.log('oldVersion', { oldVersion })
 
         await this.campaignsService.saveCampaignPlanVersion({
           aiContent,
@@ -290,8 +290,8 @@ export class AiContentService {
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      this.logger.error('error at consumer', e)
-      this.logger.error('messages', messages)
+      this.logger.error('error at consumer', { error: e })
+      this.logger.error('messages', { messages })
       generateError = true
 
       if (e.data) {
@@ -303,7 +303,7 @@ export class AiContentService {
           message: 'error at AI queue consumer (with msg): ',
           error: e.data.error,
         })
-        this.logger.error('error', e.data?.error)
+        this.logger.error('error', { error: e.data?.error })
       } else {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer. Queue Message: ',
@@ -365,7 +365,7 @@ export class AiContentService {
           message: `Error at consumer updating campaign with ai. key: ${key}`,
           error: e,
         })
-        this.logger.error('error at consumer', e)
+        this.logger.error('error at consumer', { error: e })
       }
       // throw an Error so that the message goes back to the queue or the DLQ.
       throw new Error(`error generating ai content. slug: ${slug}, key: ${key}`)

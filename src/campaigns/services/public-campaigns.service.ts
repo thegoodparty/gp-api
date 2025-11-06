@@ -90,7 +90,7 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
         ? campaignsWithBothNames[0]
         : campaignsWithLastName[0]
     } catch (error) {
-      this.logger.error('Error in findCampaignByRaceId:', error)
+      this.logger.error('Error in findCampaignByRaceId:', { error })
       return null
     }
   }

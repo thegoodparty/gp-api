@@ -125,10 +125,7 @@ export class EmailService {
           )
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
-          this.logger.error(
-            'Error sending email via Mailgun:',
-            error.message || error,
-          )
+          this.logger.error('Error sending email via Mailgun:', { error })
           throw new BadGatewayException(
             'error communicating w/ mail service: ',
             error,

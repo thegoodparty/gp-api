@@ -91,7 +91,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     })
   }
   async createForUser(user: User) {
-    this.logger.debug('Creating campaign for user', user)
+    this.logger.debug('Creating campaign for user', { user })
     const slug = await this.findSlug(user)
 
     const newCampaign = await this.create({
@@ -108,7 +108,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         },
       },
     })
-    this.logger.debug('Created campaign', newCampaign)
+    this.logger.debug('Created campaign', { newCampaign })
     await this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
@@ -519,7 +519,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const existingVersions =
       await this.planVersionService.findByCampaignId(campaignId)
 
-    this.logger.log('existingVersions', existingVersions)
+    this.logger.log('existingVersions', { existingVersions })
 
     let versions = {}
     if (existingVersions) {

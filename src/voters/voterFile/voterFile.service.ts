@@ -74,7 +74,7 @@ export class VoterFileService {
       true,
       false,
     )
-    this.logger.debug('Count Query:', countQuery)
+    this.logger.debug('Count Query:', { countQuery })
 
     const sqlResponse = await this.voterDb.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
@@ -88,7 +88,7 @@ export class VoterFileService {
         true,
         true,
       )
-      this.logger.debug('Count Query with Fix Columns:', countQueryWithFix)
+      this.logger.debug('Count Query with Fix Columns:', { countQueryWithFix })
       const sqlResponseWithFix = await this.voterDb.query(countQueryWithFix)
       return parseInt(sqlResponseWithFix.rows[0].count)
     }
@@ -111,13 +111,13 @@ export class VoterFileService {
       true,
       false,
     )
-    this.logger.debug('Count Query:', countQuery)
+    this.logger.debug('Count Query:', { countQuery })
 
     const sqlResponse = await this.voterDb.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
     const withFixColumns = count === 0
 
-    this.logger.debug('count', count)
+    this.logger.debug('count', { count })
 
     // Generate CSV with appropriate fixColumns setting
     const query = typeToQuery(
@@ -129,7 +129,7 @@ export class VoterFileService {
       selectedColumns,
       limit,
     )
-    this.logger.debug('Constructed Query:', query)
+    this.logger.debug('Constructed Query:', { query })
     return this.voterDb.csvStream(query, 'voters', selectedColumns)
   }
 

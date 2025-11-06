@@ -36,7 +36,7 @@ export class DeclareService {
     } catch (error: any) {
       this.logger.error(
         `Failed to fetch data from HubSpot API: ${error.message}`,
-        error?.response?.data || error.stack,
+        { error, responseData: error?.response?.data },
       )
       throw new BadGatewayException('Failed to fetch data from Hubspot API')
     }

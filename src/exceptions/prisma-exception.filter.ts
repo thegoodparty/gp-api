@@ -29,7 +29,10 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     let message: string | null = null
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      this.logger.error(exception, exception.meta)
+      this.logger.error('Detected Primsa Error', {
+        error: exception,
+        meta: exception.meta,
+      })
       switch (exception.code) {
         case 'P2002': // Unique constraint violation
           statusCode = HttpStatus.CONFLICT

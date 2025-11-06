@@ -23,9 +23,11 @@ export class PublicCampaignsController {
   async findByRaceId(
     @Query() dto: FindByRaceIdDto,
   ): Promise<FindByRaceIdResponseDto> {
-    this.logger.debug(
-      `Finding campaign by race ID: ${dto.raceId}, name: ${dto.firstName} ${dto.lastName}`,
-    )
+    this.logger.debug('Finding campaign by race ID and name', {
+      raceId: dto.raceId,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+    })
 
     const result = await this.publicCampaignsService.findCampaignByRaceId(dto)
 

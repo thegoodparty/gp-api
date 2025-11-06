@@ -97,13 +97,15 @@ export class QueueConsumerService {
       const shouldRequeue = this.shouldRequeueError(error as Error)
 
       if (shouldRequeue) {
-        this.logger.error('Message processing failed, will requeue:', error)
-        this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
+        this.logger.error('Message processing failed, will requeue:', {
+          error,
+          message,
+        })
         return true // Indicate that we should requeue
       } else {
         this.logger.error(
-          `Message processing failed with non-retryable error, discarding message: ${JSON.stringify(message)}`,
-          error,
+          `Message processing failed with non-retryable error, discarding message`,
+          { error, message },
         )
 
         // Send error notification to Slack for non-retryable errors
@@ -116,7 +118,9 @@ export class QueueConsumerService {
             },
           })
         } catch (slackError) {
-          this.logger.error('Failed to send Slack notification:', slackError)
+          this.logger.error('Failed to send Slack notification:', {
+            error: slackError,
+          })
         }
 
         return false // Don't requeue, delete the message
@@ -194,10 +198,9 @@ export class QueueConsumerService {
               regenerate: generateAiContentMessage.regenerate,
             })
           } catch (analyticsError) {
-            this.logger.error(
-              'Failed to track analytics for AI content:',
-              analyticsError,
-            )
+            this.logger.error('Failed to track analytics for AI content:', {
+              error: analyticsError,
+            })
           }
         } catch (error) {
           this.logger.error(
@@ -304,7 +307,8 @@ export class QueueConsumerService {
     const { peerlyIdentityId } = tcrCompliance
     if (!peerlyIdentityId) {
       this.logger.error(
-        `No peerlyIdentityId found on TcrCompliance provided, skipping: ${JSON.stringify(tcrCompliance)}`,
+        `No peerlyIdentityId found on TcrCompliance provided, skipping`,
+        { tcrCompliance },
       )
       return true // remove message from the queue
     }
@@ -334,9 +338,9 @@ export class QueueConsumerService {
       )
 
     if (!registrationStatus) {
-      this.logger.debug(
-        `TCR Registration is not active at this time: ${JSON.stringify(tcrCompliance)}`,
-      )
+      this.logger.debug(`TCR Registration is not active at this time`, {
+        tcrCompliance,
+      })
       return true // delete from the queue
     }
 
@@ -357,10 +361,10 @@ export class QueueConsumerService {
         '10DLC_compliant': true,
       })
     } catch (analyticsError) {
-      this.logger.error(
-        `Failed to track analytics for TCR compliance: ${JSON.stringify(tcrCompliance)}`,
-        analyticsError,
-      )
+      this.logger.error(`Failed to track analytics for TCR compliance`, {
+        error: analyticsError,
+        tcrCompliance,
+      })
     }
 
     return true
@@ -417,7 +421,7 @@ export class QueueConsumerService {
         await this.pathToVictoryService.handlePathToVictory({
           ...message,
         })
-      this.logger.debug('p2vResponse', p2vResponse)
+      this.logger.debug('p2vResponse', { p2vResponse })
 
       campaign = await this.campaignsService.findUnique({
         where: { id: Number(message.campaignId) },
@@ -488,7 +492,7 @@ export class QueueConsumerService {
           },
         })
       }
-      this.logger.debug('viability', viability)
+      this.logger.debug('viability', { viability })
       await this.slackService.message(
         {
           body: `Viability score calculated for ${campaign?.slug}: ${viability.score}`,
@@ -563,7 +567,7 @@ export class QueueConsumerService {
       create: issue,
       update: issue,
     })
-    this.logger.log('Successfully upserted poll issue', result)
+    this.logger.log('Successfully upserted poll issue', { result })
     return true
   }
 
@@ -774,7 +778,7 @@ export class QueueConsumerService {
     })
 
     if (!campaign) {
-      this.logger.log('No campagin found, ignoring event')
+      this.logger.log('No campaign found, ignoring event')
       return
     }
     return { poll, office, campaign }

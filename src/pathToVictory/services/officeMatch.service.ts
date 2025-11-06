@@ -43,7 +43,7 @@ export class OfficeMatchService {
         electionLevel,
       )
 
-      this.logger.debug('miscDistricts', searchColumns)
+      this.logger.debug('miscDistricts', { searchColumns })
       return searchColumns
     } catch (error) {
       this.logger.error('error', error)
@@ -284,7 +284,7 @@ export class OfficeMatchService {
     if (subColumns.length > 0) {
       // if we have subColumns, we want to prioritize them at the top.
       // since they are more specific.
-      this.logger.debug('adding to searchColumns', subColumns)
+      this.logger.debug('adding to searchColumns', { subColumns })
       searchColumns = subColumns.concat(searchColumns)
     }
 
@@ -319,13 +319,15 @@ export class OfficeMatchService {
     }
 
     for (const column of searchColumns) {
-      this.logger.debug('searching for sub columns', column)
+      this.logger.debug('searching for sub columns', { column })
       if (districtMap[column]) {
-        this.logger.debug('adding to searchColumns', districtMap[column])
+        this.logger.debug('adding to searchColumns', {
+          column: districtMap[column],
+        })
         subColumns.push(...districtMap[column])
       }
     }
-    this.logger.debug('electionDistricts', subColumns)
+    this.logger.debug('electionDistricts', { subColumns })
     return subColumns
   }
 
@@ -479,7 +481,7 @@ export class OfficeMatchService {
           searchValues.join('\n'),
           search,
         )
-        this.logger.debug('match', match)
+        this.logger.debug('match', { match })
 
         if (
           match &&
@@ -494,7 +496,7 @@ export class OfficeMatchService {
         }
       }
 
-      this.logger.debug('getSearchColumn foundColumn', foundColumn)
+      this.logger.debug('getSearchColumn foundColumn', { foundColumn })
     } catch (error) {
       this.logger.error('Error in getSearchColumn', error)
       return undefined
@@ -578,8 +580,8 @@ export class OfficeMatchService {
     const content = completion?.content
     const tokens = completion?.tokens
 
-    this.logger.debug('content', content)
-    this.logger.debug('tokens', tokens)
+    this.logger.debug('content', { content })
+    this.logger.debug('tokens', { tokens })
 
     if (!tokens || tokens === 0) {
       await this.slack.message(
@@ -588,7 +590,7 @@ export class OfficeMatchService {
         },
         SlackChannel.botPathToVictoryIssues,
       )
-      this.logger.error('No Response from AI! For', searchValues)
+      this.logger.error('No Response from AI! For', { searchValues })
     }
 
     if (content && content !== '') {

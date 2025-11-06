@@ -46,8 +46,8 @@ export class ViabilityService {
       if (campaign?.details?.raceId && campaign?.details?.positionId) {
         raceId = campaign.details.raceId
         positionId = campaign.details.positionId
-        this.logger.debug('raceId', raceId)
-        this.logger.debug('positionId', positionId)
+        this.logger.debug('raceId', { raceId })
+        this.logger.debug('positionId', { positionId })
       } else {
         throw new Error('RaceId not found')
       }
@@ -69,7 +69,7 @@ export class ViabilityService {
       this.logger.debug('Checking officeHolders')
       const officeHolders = race?.position?.officeHolders || []
       if (officeHolders.nodes.length > 0) {
-        this.logger.debug('officeHolders', officeHolders)
+        this.logger.debug('officeHolders', { officeHolders })
         for (const officeHolder of officeHolders.nodes) {
           if (
             officeHolder &&
@@ -86,7 +86,7 @@ export class ViabilityService {
 
       let candidates = this.getBallotReadyCandidates(race, campaign)
       // openSeat is when the number of incumbents running is less than the number of seats available
-      this.logger.debug('candidates', candidates)
+      this.logger.debug('candidates', { candidates })
       let openSeat = false
       if (candidates === 1) {
         candidates = 1
@@ -100,14 +100,16 @@ export class ViabilityService {
       const opponents = candidates - 1
       const officeType = this.getOfficeType(race.position?.name)
 
-      this.logger.debug('state', state)
-      this.logger.debug('officeLevel', officeLevel)
-      this.logger.debug('officeType', officeType)
-      this.logger.debug('isPartisan', isPartisan)
-      this.logger.debug('isIncumbent', isIncumbent)
-      this.logger.debug('seats', seats)
-      this.logger.debug('opponents', opponents)
-      this.logger.debug('openSeat', openSeat)
+      this.logger.debug('data', {
+        state,
+        officeLevel,
+        officeType,
+        isPartisan,
+        isIncumbent,
+        seats,
+        opponents,
+        openSeat,
+      })
 
       if (
         state === undefined ||
@@ -120,18 +122,17 @@ export class ViabilityService {
         openSeat === undefined
       ) {
         this.logger.error(
-          `Cannot run Viability score. Missing required parameters => ${JSON.stringify(
-            {
-              state,
-              officeLevel,
-              officeType,
-              isPartisan,
-              seats,
-              isIncumbent,
-              opponents,
-              openSeat,
-            },
-          )}`,
+          `Cannot run Viability score. Missing required parameters`,
+          {
+            state,
+            officeLevel,
+            officeType,
+            isPartisan,
+            seats,
+            isIncumbent,
+            opponents,
+            openSeat,
+          },
         )
       } else {
         const viability = this.calculateNewViabilityScore(
@@ -145,7 +146,7 @@ export class ViabilityService {
           openSeat,
         )
 
-        this.logger.debug('viability', viability)
+        this.logger.debug('viability', { viability })
 
         return viability
       }
@@ -273,13 +274,7 @@ export class ViabilityService {
       return viabilityScore
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error'
-      const errorStack = error instanceof Error ? error.stack : undefined
-      this.logger.error(
-        `Error calculating new viability score: ${errorMessage}`,
-        errorStack,
-      )
+      this.logger.error(`Error calculating new viability score`, { error })
       throw error
     }
   }
