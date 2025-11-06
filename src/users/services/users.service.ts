@@ -3,18 +3,18 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
+import { retry } from 'async-retry'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { WithOptional } from 'src/shared/types/utility.types'
+import { AnalyticsService } from '../../analytics/analytics.service'
+import { trimMany } from '../../shared/util/strings.util'
 import {
   CreateUserInputDto,
   SIGN_UP_MODE,
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
-import { trimMany } from '../../shared/util/strings.util'
-import { WithOptional } from 'src/shared/types/utility.types'
-import { AnalyticsService } from '../../analytics/analytics.service'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmUsersService } from './crmUsers.service'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
@@ -184,24 +184,61 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     userId: number,
     newMetaData: PrismaJson.UserMetaData,
   ) {
-    return this.client.$transaction(async (tx) => {
-      const user = await tx.user.findFirst({ where: { id: userId } })
-      if (!user) {
-        this.logger.warn(
-          `User with id ${userId} not found. Skipping metadata update`,
-        )
-        return null
-      }
-      return tx.user.update({
-        where: { id: userId },
-        data: {
-          metaData: {
-            ...(user.metaData ?? {}),
-            ...newMetaData,
-          },
-        },
-      })
-    })
+    await retry(
+      async (bail) => {
+        return this.client.$transaction(async (tx) => {
+          const user = await tx.user.findFirst({ where: { id: userId } })
+          if (!user) {
+            this.logger.warn(
+              `User with id ${userId} not found. Skipping metadata update`,
+            )
+            bail(new Error(`User with id ${userId} not found. Bailing retry.`))
+            return null
+          }
+
+          this.logger.log(
+            `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData)}`,
+          )
+
+          const rows = await tx.$queryRaw<Array<{ id: number }>>`
+          UPDATE "user"
+          SET
+            meta_data = COALESCE(meta_data, '{}'::jsonb) || ${newMetaData}::jsonb,
+            updated_at = NOW()
+          WHERE id = ${userId}
+            AND updated_at = ${user.updatedAt}
+          RETURNING id
+          `
+          if (!rows || rows.length === 0) {
+            // Throwing triggers the retry
+            throw new Error('Failed to update userMetaData')
+          }
+
+          // Refetch for typed, non-snake case user
+          const updatedUser = await tx.user.findUniqueOrThrow({
+            where: { id: userId },
+          })
+
+          this.logger.log(
+            `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData)}`,
+          )
+          return updatedUser
+
+          // return tx.user.update({
+          //   where: { id: userId },
+          //   data: {
+          //     metaData: {
+          //       ...(user.metaData ?? {}),
+          //       ...newMetaData,
+          //     },
+          //   },
+          // })
+        })
+      },
+      {
+        retries: 3,
+      },
+    )
   }
 
   async deleteUser(id: number) {
