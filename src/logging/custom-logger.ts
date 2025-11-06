@@ -49,23 +49,8 @@ export class CustomLogger implements LoggerService {
     this.emit('verbose', args)
   }
 
-  private emit(level: string, args: unknown[]): void {
-    const object: Record<string, unknown> = {
-      level: level,
-      timestamp: new Date().toISOString(),
-    }
-
-    const request = requestContextStore.getStore()
-    if (request) {
-      object.user = determineUser(request)
-      object.requestId = request.id
-      object.request = {
-        method: request.method,
-        url: request.url,
-      }
-    }
-
-    object.data = args.map((arg) => {
+  private parseLogArgs(args: unknown[]) {
+    return args.map((arg) => {
       if (arg instanceof Error) {
         return serializeError(arg)
       }
@@ -82,6 +67,35 @@ export class CustomLogger implements LoggerService {
 
       return arg
     })
+  }
+
+  private emit(level: string, args: unknown[]): void {
+    const request = requestContextStore.getStore()
+    const object: Record<string, unknown> = {
+      level: level,
+      timestamp: new Date().toISOString(),
+      ...(request
+        ? {
+            user: determineUser(request),
+            requestId: request.id,
+            request: {
+              method: request.method,
+              url: request.url,
+            },
+          }
+        : {}),
+      ...(args.length
+        ? {
+            message: args.shift(),
+          }
+        : {}),
+      ...(args.length
+        ? {
+            data: this.parseLogArgs(args),
+          }
+        : {}),
+    }
+
     console[level === 'verbose' ? 'debug' : level](JSON.stringify(object))
   }
 }
