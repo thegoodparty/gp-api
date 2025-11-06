@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       target_env: ${{ steps.set-env.outputs.target_env }}
-      health_url: ${{ steps.set-env.outputs.health_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,11 +31,9 @@ jobs:
           case "$BRANCH" in
             develop)
               echo "target_env=dev" >> "$GITHUB_OUTPUT"
-              echo "health_url=${{ secrets.DEV_HEALTHCHECK_URL }}" >> "$GITHUB_OUTPUT"
               ;;
             qa)
               echo "target_env=qa" >> "$GITHUB_OUTPUT"
-              echo "health_url=${{ secrets.QA_HEALTHCHECK_URL }}" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unsupported branch: $BRANCH"; exit 1
@@ -104,7 +101,6 @@ jobs:
     continue-on-error: true
     env:
       TARGET_ENV: ${{ needs.deploy.outputs.target_env }}
-      HEALTHCHECK_URL: ${{ needs.deploy.outputs.health_url }}
       POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
       POSTMAN_WORKSPACE_ID: ${{ secrets.POSTMAN_WORKSPACE_ID }}
     steps:
@@ -120,11 +116,20 @@ jobs:
       - name: Verify environment health
         shell: bash
         run: |
-          if [ -z "$HEALTHCHECK_URL" ]; then
-            echo "HEALTHCHECK_URL not set"; exit 1
-          fi
-          echo "Verifying $HEALTHCHECK_URL is responding..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTHCHECK_URL") || true
+          case "$TARGET_ENV" in
+            dev)
+              HEALTH_URL="https://gp-api-dev.goodparty.org/v1/health"
+              ;;
+            qa)
+              HEALTH_URL="https://gp-api-qa.goodparty.org/v1/health"
+              ;;
+            *)
+              echo "Unknown environment: $TARGET_ENV"; exit 1
+              ;;
+          esac
+
+          echo "Verifying $HEALTH_URL is responding..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL") || true
           if [ "$STATUS" = "200" ]; then
             echo "✅ Health endpoint is responding"
           else
