@@ -240,7 +240,6 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     })
   }
 
-  // Flush a buffered lastVisited timestamp and conditionally increment sessionCount
   async flushLastVisited(
     userId: number,
     pendingLastVisitedMs: number,
