@@ -43,7 +43,21 @@ export class SessionsService {
       const entries = Array.from(this.pendingLastVisited.entries())
       this.pendingLastVisited.clear()
       for (const [userId, pending] of entries) {
-        await this.users.flushLastVisited(userId, pending, SESSION_TIMEOUT)
+        try {
+          await this.users.flushLastVisited(userId, pending, SESSION_TIMEOUT)
+        } catch (err) {
+          if (err instanceof Error) {
+            this.logger.warn(
+              `Failed to flush lastVisited for user ${userId}: ${err.message}`,
+            )
+          } else {
+            this.logger.warn(
+              `Failed to flush lastVisited for user ${userId}: Unknown error`,
+            )
+          }
+          // Continue processing remaining users even if one fails
+          continue
+        }
       }
     } catch (err) {
       if (err instanceof Error) {
