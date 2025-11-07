@@ -55,7 +55,6 @@ export class SessionsService {
               `Failed to flush lastVisited for user ${userId}: Unknown error`,
             )
           }
-          // Continue processing remaining users even if one fails
           continue
         }
       }
