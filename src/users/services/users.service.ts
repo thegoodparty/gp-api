@@ -226,7 +226,8 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         })
       },
       {
-        retries: 3,
+        retries: 5,
+        minTimeout: 1000,
       },
     )
   }
@@ -237,5 +238,40 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         id,
       },
     })
+  }
+
+  // Flush a buffered lastVisited timestamp and conditionally increment sessionCount
+  async flushLastVisited(
+    userId: number,
+    pendingLastVisitedMs: number,
+    sessionTimeoutMs: number,
+  ) {
+    // Update lastVisited to the max of existing and pending; increment sessionCount if a new session
+    return this.client.$executeRaw`
+      UPDATE "user" u
+      SET
+        meta_data = jsonb_set(
+          jsonb_set(
+            COALESCE(u.meta_data, '{}'::jsonb),
+            '{lastVisited}',
+            to_jsonb(GREATEST(
+              COALESCE((u.meta_data->>'lastVisited')::bigint, 0),
+              ${pendingLastVisitedMs}::bigint
+            )),
+            true
+          ),
+          '{sessionCount}',
+          to_jsonb(
+            CASE
+              WHEN COALESCE((u.meta_data->>'lastVisited')::bigint, 0) + ${sessionTimeoutMs}::bigint < ${pendingLastVisitedMs}::bigint
+                THEN COALESCE((u.meta_data->>'sessionCount')::bigint, 0) + 1
+              ELSE COALESCE((u.meta_data->>'sessionCount')::bigint, 0)
+            END
+          ),
+          true
+        ),
+        updated_at = NOW()
+      WHERE u.id = ${userId}
+    `
   }
 }
