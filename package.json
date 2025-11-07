@@ -21,6 +21,7 @@
     "seed": "npx prisma db seed",
     "seed:all": "npx prisma db seed -- --type all",
     "seed:csv": "npx prisma db seed -- --type csv",
+    "sync:cms": "tsx ./seed/contentfulSync.ts",
     "generate": "npx prisma generate",
     "prisma-format": "for file in prisma/schema/*.prisma; do npx prisma-case-format -c prisma/.prisma-case-format.yaml -f \"$file\"; done",
     "codegen": "graphql-codegen",
