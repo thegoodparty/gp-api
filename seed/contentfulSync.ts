@@ -12,14 +12,30 @@ type ContentSyncResult = {
 async function seedContentful() {
   console.log('🔄 Syncing Contentful content...')
 
-  const response = await fetch('http://localhost:3000/v1/content/sync')
-  const result = (await response.json()) as ContentSyncResult
+  const API_URL = 'http://localhost:3000/v1/content/sync'
 
-  console.log('✅ Contentful sync complete!')
-  console.log(`   Total entries: ${result.entriesCount}`)
-  console.log(`   Created: ${result.createEntriesCount}`)
-  console.log(`   Updated: ${result.updateEntriesCount}`)
-  console.log(`   Deleted: ${result.deletedEntriesCount}`)
+  try {
+    const response = await fetch(API_URL)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const result = (await response.json()) as ContentSyncResult
+
+    console.log('✅ Contentful sync complete!')
+    console.log(`   Total entries: ${result.entriesCount}`)
+    console.log(`   Created: ${result.createEntriesCount}`)
+    console.log(`   Updated: ${result.updateEntriesCount}`)
+    console.log(`   Deleted: ${result.deletedEntriesCount}`)
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error(
+        `Cannot connect to ${API_URL}\nMake sure the API server is running (npm run start:dev)`,
+      )
+    }
+    throw error
+  }
 }
 
 seedContentful()
