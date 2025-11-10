@@ -3,7 +3,6 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
 import {
