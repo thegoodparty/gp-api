@@ -43,24 +43,40 @@ e2e-tests/
 │   │   ├── user-metadata.spec.ts
 │   │   ├── upload-image.spec.ts
 │   │   └── delete-user.spec.ts
-│   └── campaigns/             # Campaign tests
-│       ├── map/               # Campaign map tests
-│       │   ├── get-map.spec.ts
-│       │   └── get-map-count.spec.ts
-│       ├── update-history/    # Update history tests
-│       │   └── update-history.spec.ts
-│       ├── tasks/             # Campaign tasks tests
-│       │   ├── list-tasks.spec.ts
-│       │   └── complete-tasks.spec.ts
-│       ├── base/              # Base campaign operations
-│       │   ├── list-campaigns.spec.ts
-│       │   └── user-campaigns.spec.ts
-│       ├── race-target-details/  # Race target details tests
-│       │   └── race-target-details.spec.ts
-│       ├── tcr-compliance/    # TCR compliance tests
-│       │   └── tcr-compliance.spec.ts
-│       └── mass-updates/      # Mass update tests
-│           └── mass-updates.spec.ts
+│   ├── campaigns/             # Campaign tests
+│   │   ├── map/               # Campaign map tests
+│   │   │   ├── get-map.spec.ts
+│   │   │   └── get-map-count.spec.ts
+│   │   ├── update-history/    # Update history tests
+│   │   │   └── update-history.spec.ts
+│   │   ├── tasks/             # Campaign tasks tests
+│   │   │   ├── list-tasks.spec.ts
+│   │   │   └── complete-tasks.spec.ts
+│   │   ├── base/              # Base campaign operations
+│   │   │   ├── list-campaigns.spec.ts
+│   │   │   └── user-campaigns.spec.ts
+│   │   ├── race-target-details/  # Race target details tests
+│   │   │   └── race-target-details.spec.ts
+│   │   ├── tcr-compliance/    # TCR compliance tests
+│   │   │   └── tcr-compliance.spec.ts
+│   │   └── mass-updates/      # Mass update tests
+│   │       └── mass-updates.spec.ts
+│   ├── websites/              # Candidate website tests
+│   │   ├── website-crud.spec.ts
+│   │   ├── website-vanity-path.spec.ts
+│   │   ├── website-contacts.spec.ts
+│   │   ├── website-views.spec.ts
+│   │   └── domains.spec.ts
+│   └── cmsContent/            # CMS content tests
+│       ├── aiContent.spec.ts
+│       ├── articleTags.spec.ts
+│       ├── blogArticles.spec.ts
+│       ├── blogSections.spec.ts
+│       ├── faqArticles.spec.ts
+│       ├── general.spec.ts
+│       ├── glossaryItems.spec.ts
+│       ├── staticContent.spec.ts
+│       └── sync.spec.ts
 └── postman-old-tests/         # Original Postman collections for reference
 ```
 
@@ -181,6 +197,59 @@ npm run test:e2e:report
 - ✅ **Missing Win Numbers** - Admin mass update missing win numbers
 - ✅ **Mass Hubspot Push** - Admin mass refresh companies
 - ✅ **Authorization** - Deny unauthorized access to mass update endpoints
+
+### Websites (`/v1/websites`)
+
+#### CRUD Operations
+
+- ✅ **Create Website** - Create candidate website
+- ✅ **Get My Website** - Retrieve authenticated user's website
+- ✅ **Update Website** - Update website content with text fields
+- ✅ **Update Website Images** - Upload logo and hero images
+- ✅ **Merge Content** - Merge updates with existing website content
+- ✅ **Authorization** - Deny unauthorized access to website operations
+
+#### Vanity Path
+
+- ✅ **Validate Vanity Path** - Check if vanity path is available
+- ✅ **Detect Conflict** - Detect vanity path conflicts
+- ✅ **View Published Website** - View published website by vanity path
+- ✅ **Preview Website** - Preview website content (authenticated)
+- ✅ **Access Control** - Deny access to unpublished websites
+
+#### Contacts
+
+- ✅ **Submit Contact Form** - Submit contact form on published website
+- ✅ **Get Website Contacts** - Retrieve website contacts with pagination
+- ✅ **Pagination** - Test contact pagination and filtering
+- ✅ **Access Control** - Deny contact form on unpublished websites
+
+#### Views
+
+- ✅ **Track Website View** - Track website view with visitor ID
+- ✅ **Multiple Visitors** - Track multiple views from different visitors
+- ✅ **Get Views by Date Range** - Retrieve views within date range
+- ✅ **Filter Views** - Test date range filtering
+- ✅ **Authorization** - Deny unauthorized access to view analytics
+
+#### Domains
+
+- ✅ **Search Domain** - Search for domain availability and pricing
+- ✅ **Domain Suggestions** - Retrieve alternative domain suggestions
+- ✅ **Get Website by Domain** - Retrieve website by domain name
+- ⚠️ **Domain Registration** - Skipped (actual purchase would cost money)
+- ⚠️ **Domain Configuration** - Skipped (requires actual domain)
+
+### CMS Content (`/v1/content`)
+
+- ✅ **Blog Articles** - Fetch and filter blog articles
+- ✅ **Blog Sections** - Retrieve blog sections
+- ✅ **FAQ Articles** - Fetch FAQ articles
+- ✅ **Glossary Items** - Retrieve glossary items
+- ✅ **Static Content** - Fetch static content
+- ✅ **AI Content** - Retrieve AI-generated content
+- ✅ **Article Tags** - Fetch article tags
+- ✅ **Sync Content** - Sync content from external sources
 
 ### Health (`/v1/health`)
 

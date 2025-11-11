@@ -274,7 +274,8 @@ test.describe('Campaigns - Admin Update Operations', () => {
     expect(response.status()).toBe(200)
 
     const campaign = await response.json()
-    expect(campaign.details.website).toBe(randomWebsite)
+    expect(campaign.details).toBeTruthy()
+    expect(campaign.details?.website).toBe(randomWebsite)
   })
 })
 
