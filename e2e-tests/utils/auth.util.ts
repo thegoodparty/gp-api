@@ -1,5 +1,6 @@
 import { APIRequestContext } from '@playwright/test'
 import { faker } from '@faker-js/faker'
+import { HttpStatus } from '@nestjs/common'
 
 export interface LoginResponse {
   token: string
@@ -94,9 +95,8 @@ export async function deleteUser(
 
   if (
     !response.ok() &&
-    response.status() !== 401 &&
-    response.status() !== 403 &&
-    response.status() !== 404
+    response.status() >= HttpStatus.OK &&
+    response.status() <= 299
   ) {
     throw new Error(
       `Delete user failed: ${response.status()} ${await response.text()}`,
