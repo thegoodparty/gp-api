@@ -615,6 +615,30 @@ export class QueueConsumerService {
         event.data.totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
+    if (event.data.issues) {
+      this.logger.log('Detected poll issues, clearing existing poll issues')
+      await this.pollIssuesService.model.deleteMany({
+        where: { pollId: event.data.pollId },
+      })
+      this.logger.log('Successfully deleted existing poll issues')
+      await this.pollIssuesService.client.pollIssue.createMany({
+        data: event.data.issues.map((issue) => ({
+          id: `${issue.pollId}-${issue.rank}`,
+          pollId: event.data.pollId,
+          title: issue.theme,
+          summary: issue.summary,
+          details: issue.analysis,
+          mentionCount: issue.responseCount,
+          representativeComments: issue.quotes.map((quote) => ({
+            quote: quote.quote,
+          })),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      })
+      this.logger.log('Successfully created new poll issues')
+    }
+
     await this.pollsService.markPollComplete({
       pollId: poll.id,
       totalResponses: event.data.totalResponses,
