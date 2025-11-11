@@ -40,7 +40,7 @@ test.describe('Campaigns - TCR Compliance', () => {
       },
     })
 
-    expect([201, 400, 404]).toContain(response.status())
+    expect([201, 404, 400]).toContain(response.status())
 
     if (response.status() === 201) {
       const body = (await response.json()) as TcrCompliance
