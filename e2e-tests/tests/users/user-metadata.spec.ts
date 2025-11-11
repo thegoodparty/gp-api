@@ -20,8 +20,8 @@ interface UserWithMetadata {
 }
 
 test.describe('Users - User Metadata', () => {
-  let testUserId: number
-  let authToken: string
+  let testUserId: number | undefined
+  let authToken: string | undefined
 
   test.afterEach(async ({ request }) => {
     if (testUserId && authToken) {

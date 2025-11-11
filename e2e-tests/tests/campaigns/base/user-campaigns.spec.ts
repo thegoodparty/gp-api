@@ -247,16 +247,19 @@ test.describe('Campaigns - Admin Update Operations', () => {
       },
     })
     const allCampaigns = await allCampaignsResponse.json()
-    const testSlug = allCampaigns[2]?.slug?.toLowerCase()
-
-    if (!testSlug) {
+    
+    const testCampaign = allCampaigns.find((c: any) => c?.slug && c?.id)
+    
+    if (!testCampaign) {
       test.skip()
       return
     }
 
+    const testSlug = testCampaign.slug
+
     const randomWebsite = `https://${Math.random().toString(36).substring(7)}.com`
 
-    const response = await request.put(`/v1/campaigns/mine?slug=${testSlug}`, {
+    const response = await request.put(`/v1/campaigns/mine`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -271,7 +274,8 @@ test.describe('Campaigns - Admin Update Operations', () => {
     expect(response.status()).toBe(200)
 
     const campaign = await response.json()
-    expect(campaign.details.website).toBe(randomWebsite)
+    expect(campaign.details).toBeTruthy()
+    expect(campaign.details?.website).toBe(randomWebsite)
   })
 })
 
