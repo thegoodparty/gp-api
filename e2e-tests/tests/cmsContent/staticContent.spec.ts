@@ -43,4 +43,3 @@ test.describe('CMS Content - Static Content', () => {
     expect(response.status()).toBe(200)
   })
 })
-

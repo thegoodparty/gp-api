@@ -6,25 +6,31 @@ test.describe('CMS Content - Blog Sections', () => {
 
     expect(response.status()).toBe(200)
 
-    const sections = await response.json()
+    const sections = (await response.json()) as Array<{ id: string }>
     expect(Array.isArray(sections)).toBe(true)
     expect(sections.length).toBeGreaterThan(0)
 
     const uniqueIds = new Set()
-    sections.forEach((section: any) => {
+    sections.forEach((section) => {
       expect(section).toHaveProperty('id')
       expect(uniqueIds.has(section.id)).toBe(false)
       uniqueIds.add(section.id)
     })
   })
 
-  test('should fetch specific blog article section by slug', async ({ request }) => {
+  test('should fetch specific blog article section by slug', async ({
+    request,
+  }) => {
     const sectionSlug = 'news'
-    const response = await request.get(`/v1/content/blog-articles/sections/${sectionSlug}`)
+    const response = await request.get(
+      `/v1/content/blog-articles/sections/${sectionSlug}`,
+    )
 
     expect(response.status()).toBe(200)
 
-    const section = await response.json()
+    const section = (await response.json()) as {
+      fields: { slug: string }
+    }
     expect(section).toHaveProperty('fields')
     expect(section.fields.slug).toBe(sectionSlug)
   })
@@ -34,10 +40,14 @@ test.describe('CMS Content - Blog Sections', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as Array<{
+      fields: object
+      id: string
+      articles: unknown[]
+    }>
     expect(Array.isArray(body)).toBe(true)
 
-    body.forEach((item: any) => {
+    body.forEach((item) => {
       expect(item).toHaveProperty('fields')
       expect(item).toHaveProperty('id')
       expect(item).toHaveProperty('articles')
@@ -46,4 +56,3 @@ test.describe('CMS Content - Blog Sections', () => {
     })
   })
 })
-

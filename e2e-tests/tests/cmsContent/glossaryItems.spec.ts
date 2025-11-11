@@ -6,11 +6,17 @@ test.describe('CMS Content - Glossary Items', () => {
 
     expect(response.status()).toBe(200)
 
-    const items = await response.json()
+    const items = (await response.json()) as Array<{
+      slug: string
+      banner?: {
+        largeImage: object
+        smallImage: object
+      }
+    }>
     expect(Array.isArray(items)).toBe(true)
     expect(items.length).toBeGreaterThan(0)
 
-    items.forEach((item: any) => {
+    items.forEach((item) => {
       expect(item).toHaveProperty('slug')
       expect(typeof item.slug).toBe('string')
 
@@ -24,11 +30,16 @@ test.describe('CMS Content - Glossary Items', () => {
   })
 
   test('should fetch glossary items grouped by alpha', async ({ request }) => {
-    const response = await request.get('/v1/content/type/glossaryItem/by-letter')
+    const response = await request.get(
+      '/v1/content/type/glossaryItem/by-letter',
+    )
 
     expect(response.status()).toBe(200)
 
-    const groupedItems = await response.json()
+    const groupedItems = (await response.json()) as Record<
+      string,
+      Array<{ title: string; slug: string }>
+    >
     const letters = Object.keys(groupedItems)
 
     expect(letters.length).toBeGreaterThan(0)
@@ -37,8 +48,10 @@ test.describe('CMS Content - Glossary Items', () => {
       const group = groupedItems[letter]
       expect(Array.isArray(group)).toBe(true)
 
-      group.forEach((item: any) => {
-        expect(item.title.toLowerCase().startsWith(letter.toLowerCase())).toBe(true)
+      group.forEach((item) => {
+        expect(item.title.toLowerCase().startsWith(letter.toLowerCase())).toBe(
+          true,
+        )
         expect(item.slug.startsWith(letter.toLowerCase())).toBe(true)
       })
     })
@@ -49,7 +62,10 @@ test.describe('CMS Content - Glossary Items', () => {
 
     expect(response.status()).toBe(200)
 
-    const mappedItems = await response.json()
+    const mappedItems = (await response.json()) as Record<
+      string,
+      { slug: string }
+    >
     const slugs = Object.keys(mappedItems)
 
     expect(slugs.length).toBeGreaterThan(0)
@@ -60,4 +76,3 @@ test.describe('CMS Content - Glossary Items', () => {
     })
   })
 })
-

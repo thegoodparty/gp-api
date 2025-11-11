@@ -6,13 +6,16 @@ test.describe('CMS Content - Article Tags', () => {
 
     expect(response.status()).toBe(200)
 
-    const tags = await response.json()
+    const tags = (await response.json()) as Array<{
+      name: string
+      slug: string
+    }>
     expect(Array.isArray(tags)).toBe(true)
 
     const tagNames = new Set()
     const tagSlugs = new Set()
 
-    tags.forEach((tag: any) => {
+    tags.forEach((tag) => {
       expect(tag).toHaveProperty('name')
       expect(tag).toHaveProperty('slug')
       expect(tagNames.has(tag.name)).toBe(false)
@@ -27,7 +30,9 @@ test.describe('CMS Content - Article Tags', () => {
 
     expect(response.status()).toBe(200)
 
-    const tagsArray = await response.json()
+    const tagsArray = (await response.json()) as Array<
+      Record<string, { tagName: string; articleSlugs: string[] }>
+    >
     expect(Array.isArray(tagsArray)).toBe(true)
     expect(tagsArray.length).toBeGreaterThan(0)
 
@@ -52,4 +57,3 @@ test.describe('CMS Content - Article Tags', () => {
     })
   })
 })
-
