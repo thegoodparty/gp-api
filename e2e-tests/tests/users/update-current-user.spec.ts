@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
   deleteUser,
@@ -59,7 +60,7 @@ test.describe('Users - Update Current User', () => {
       },
     })
 
-    expect(response.status()).toBe(200)
+    expect(response.status()).toBe(HttpStatus.OK)
 
     const body = (await response.json()) as UserResponse
     expect(body.firstName).toBe(newFirstName)
@@ -75,6 +76,6 @@ test.describe('Users - Update Current User', () => {
       },
     })
 
-    expect(response.status()).toBe(401)
+    expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
   })
 })

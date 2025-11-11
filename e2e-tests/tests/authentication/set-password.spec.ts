@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import { loginUser } from '../../utils/auth.util'
 
 test.describe('Authentication - Set Password Email', () => {
@@ -27,7 +28,7 @@ test.describe('Authentication - Set Password Email', () => {
       },
     )
 
-    expect(response.status()).toBe(200)
+    expect(response.status()).toBe(HttpStatus.OK)
 
     const body = (await response.json()) as { token: string }
     expect(body.token).toBeTruthy()

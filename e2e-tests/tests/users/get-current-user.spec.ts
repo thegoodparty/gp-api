@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
-  deleteUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  cleanupTestUser,
+  TestUserCleanup,
 } from '../../utils/auth.util'
 
 interface UserResponse {
@@ -18,13 +20,11 @@ interface UserResponse {
 }
 
 test.describe('Users - Get Current User', () => {
-  let testUserId: number
-  let authToken: string
+  let testUserCleanup: TestUserCleanup | null = null
 
   test.afterEach(async ({ request }) => {
-    if (testUserId && authToken) {
-      await deleteUser(request, testUserId, authToken)
-    }
+    await cleanupTestUser(request, testUserCleanup)
+    testUserCleanup = null
   })
 
   test('should get currently authenticated user', async ({ request }) => {
@@ -43,8 +43,12 @@ test.describe('Users - Get Current User', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    authToken = registerResponse.token
+    testUserCleanup = {
+      userId: registerResponse.user.id,
+      authToken: registerResponse.token,
+    }
+
+    const { userId: testUserId, authToken } = testUserCleanup
 
     const response = await request.get('/v1/users/me', {
       headers: {
@@ -52,7 +56,7 @@ test.describe('Users - Get Current User', () => {
       },
     })
 
-    expect(response.status()).toBe(200)
+    expect(response.status()).toBe(HttpStatus.OK)
 
     const body = (await response.json()) as UserResponse
     expect(body.id).toBe(testUserId)
@@ -65,6 +69,6 @@ test.describe('Users - Get Current User', () => {
   test('should return 401 when not authenticated', async ({ request }) => {
     const response = await request.get('/v1/users/me')
 
-    expect(response.status()).toBe(401)
+    expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
   })
 })

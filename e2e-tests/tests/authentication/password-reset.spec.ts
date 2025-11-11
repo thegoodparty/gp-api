@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
   deleteUser,
@@ -46,7 +47,7 @@ test.describe('Authentication - Password Reset', () => {
       },
     )
 
-    expect(response.status()).toBe(204)
+    expect(response.status()).toBe(HttpStatus.NO_CONTENT)
   })
 
   test('should return 204 when email not found (security)', async ({
@@ -61,7 +62,7 @@ test.describe('Authentication - Password Reset', () => {
       },
     )
 
-    expect(response.status()).toBe(204)
+    expect(response.status()).toBe(HttpStatus.NO_CONTENT)
   })
 
   test('should return 403 for invalid reset token', async ({ request }) => {
@@ -73,6 +74,6 @@ test.describe('Authentication - Password Reset', () => {
       },
     })
 
-    expect(response.status()).toBe(403)
+    expect(response.status()).toBe(HttpStatus.FORBIDDEN)
   })
 })

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
   deleteUser,
@@ -53,7 +54,7 @@ test.describe('Users - User Metadata', () => {
       },
     })
 
-    expect(response.status()).toBe(200)
+    expect(response.status()).toBe(HttpStatus.OK)
 
     const body = (await response.json()) as MetadataResponse
     expect(body).toBeTruthy()
@@ -94,7 +95,7 @@ test.describe('Users - User Metadata', () => {
       },
     })
 
-    expect(response.status()).toBe(200)
+    expect(response.status()).toBe(HttpStatus.OK)
 
     const body = (await response.json()) as UserWithMetadata
     expect(body.metaData).toBeTruthy()
@@ -109,7 +110,7 @@ test.describe('Users - User Metadata', () => {
   }) => {
     const response = await request.get('/v1/users/me/metadata')
 
-    expect(response.status()).toBe(401)
+    expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
   })
 
   test('should return 401 when updating metadata without authentication', async ({
@@ -121,6 +122,6 @@ test.describe('Users - User Metadata', () => {
       },
     })
 
-    expect(response.status()).toBe(401)
+    expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
   })
 })

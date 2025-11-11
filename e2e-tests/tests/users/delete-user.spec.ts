@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
   deleteUser,
@@ -34,7 +35,7 @@ test.describe('Users - Delete User', () => {
       },
     })
 
-    expect(response.status()).toBe(204)
+    expect(response.status()).toBe(HttpStatus.NO_CONTENT)
   })
 
   test('should return 204 even when user does not exist', async ({
@@ -84,13 +85,13 @@ test.describe('Users - Delete User', () => {
       },
     })
 
-    expect(secondResponse.status()).toBe(204)
+    expect(secondResponse.status()).toBe(HttpStatus.NO_CONTENT)
   })
 
   test('should return 401 when not authenticated', async ({ request }) => {
     const response = await request.delete('/v1/users/999999')
 
-    expect(response.status()).toBe(401)
+    expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
   })
 
   test('should only allow owner or admin to delete user', async ({
@@ -129,7 +130,7 @@ test.describe('Users - Delete User', () => {
       },
     })
 
-    expect(response.status()).toBe(403)
+    expect(response.status()).toBe(HttpStatus.FORBIDDEN)
 
     await deleteUser(request, user1Response.user.id, user1Token)
     await deleteUser(request, user2Id, user2Token)
