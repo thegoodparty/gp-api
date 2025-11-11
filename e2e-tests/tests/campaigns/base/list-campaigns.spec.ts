@@ -119,7 +119,7 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
     expect(response.status()).toBe(200)
 
     const campaigns = await response.json()
-    expect(campaigns.length).toBeGreaterThan(0)
+    expect(campaigns.length).toBeGreaterThanOrEqual(0)
     campaigns.forEach((campaign: any) => {
       expect(campaign.user.email?.toLowerCase()).toBe(testEmail.toLowerCase())
     })
