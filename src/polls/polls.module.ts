@@ -1,16 +1,24 @@
 import { Module } from '@nestjs/common'
 import { PollsController } from './polls.controller'
 import { PollsService } from './services/polls.service'
-import { SlackModule } from 'src/vendors/slack/slack.module'
 import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PaymentsModule } from 'src/payments/payments.module'
 import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PollPurchaseHandlerService } from './services/pollPurchase.service'
+import { QueueProducerModule } from 'src/queue/producer/queueProducer.module'
+import { UsersModule } from 'src/users/users.module'
+import { CampaignsModule } from 'src/campaigns/campaigns.module'
 
 @Module({
-  imports: [SlackModule, ElectedOfficeModule, PaymentsModule],
+  imports: [
+    ElectedOfficeModule,
+    PaymentsModule,
+    QueueProducerModule,
+    UsersModule,
+    CampaignsModule,
+  ],
   providers: [PollsService, PollIssuesService, PollPurchaseHandlerService],
   controllers: [PollsController],
   exports: [PollsService, PollIssuesService],

@@ -77,15 +77,12 @@ export class SegmentService {
       const segmentProps = pickKeys(traits, SEGMENT_KEYS)
       const stringId = String(userId)
 
-      const identifyTraits: Record<string, unknown> = { ...segmentProps }
-      if (userContext?.email) {
-        identifyTraits.email = userContext.email
-      }
-      if (userContext?.hubspotId) {
-        identifyTraits.hubspotId = userContext.hubspotId
-      }
+      const identifyTraits = {
+        ...segmentProps,
+        ...(userContext ?? {}),
+      } as Record<string, unknown>
 
-      this.analytics.identify({
+      await this.analytics.identify({
         userId: stringId,
         traits: identifyTraits,
       })

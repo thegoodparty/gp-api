@@ -60,7 +60,7 @@ export class P2pPhoneListUploadService {
 
     let token: string
     try {
-      token = await this.peerlyPhoneListService.uploadPhoneListToken({
+      token = await this.peerlyPhoneListService.uploadPhoneList({
         listName,
         csvBuffer,
         identityId: tcrCompliance.peerlyIdentityId,

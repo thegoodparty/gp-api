@@ -1,14 +1,20 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
 import { PollPurchaseMetadata } from '../types/pollPurchase.types'
+import { PollsService } from './polls.service'
+import z from 'zod'
 
 const PRICE_PER_TEXT = 0.03
+
+const parseNum = z.coerce.number().int().min(1).parse
 
 @Injectable()
 export class PollPurchaseHandlerService
   implements PurchaseHandler<PollPurchaseMetadata>
 {
   private readonly logger = new Logger(PollPurchaseHandlerService.name)
+
+  constructor(private readonly pollsService: PollsService) {}
 
   async validatePurchase({
     pollId,
@@ -18,7 +24,8 @@ export class PollPurchaseHandlerService
       throw new BadRequestException('pollId is required')
     }
 
-    if (!count || count <= 0) {
+    const num = parseNum(count)
+    if (!num || num <= 0) {
       throw new BadRequestException('count must be a positive number')
     }
   }
@@ -26,7 +33,7 @@ export class PollPurchaseHandlerService
   async calculateAmount({
     count,
   }: PurchaseMetadata<PollPurchaseMetadata>): Promise<number> {
-    return count * PRICE_PER_TEXT * 100
+    return parseNum(count) * PRICE_PER_TEXT * 100
   }
 
   async executePostPurchase(
@@ -38,6 +45,10 @@ export class PollPurchaseHandlerService
     this.logger.log(
       `Poll purchase completed: pollId=${pollId}, count=${count}, paymentIntentId=${paymentIntentId}`,
     )
-    // TODO: Swain, please add the post-purchase logic here
+
+    await this.pollsService.expandPoll({
+      pollId,
+      additionalRecipientCount: parseNum(count),
+    })
   }
 }

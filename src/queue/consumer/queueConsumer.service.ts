@@ -6,6 +6,10 @@ import {
   GenerateAiContentMessageData,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
+  PollCreationEvent,
+  PollCreationEventSchema,
+  PollExpansionEvent,
+  PollExpansionEventSchema,
   PollIssueAnalysisEvent,
   PollIssueAnalysisEventSchema,
   QueueMessage,
@@ -18,6 +22,8 @@ import { SlackService } from 'src/vendors/slack/services/slack.service'
 import {
   Campaign,
   PathToVictory,
+  Poll,
+  PollIndividualMessage,
   PollIssue,
   TcrComplianceStatus,
 } from '@prisma/client'
@@ -43,6 +49,13 @@ import { PollsService } from 'src/polls/services/polls.service'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ContactsService } from 'src/contacts/services/contacts.service'
+import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
+import { PersonOutput } from 'src/contacts/schemas/person.schema'
+import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
+import { UsersService } from 'src/users/services/users.service'
+import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
+import parseCsv from 'neat-csv'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class QueueConsumerService {
@@ -61,6 +74,8 @@ export class QueueConsumerService {
     private readonly pollIssuesService: PollIssuesService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly contactsService: ContactsService,
+    private readonly awsS3Service: AwsS3Service,
+    private readonly usersService: UsersService,
   ) {}
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
@@ -218,6 +233,20 @@ export class QueueConsumerService {
         const pollAnalysisCompleteEvent =
           PollAnalysisCompleteEventSchema.parse(queueMessage)
         return await this.handlePollAnalysisComplete(pollAnalysisCompleteEvent)
+      case QueueType.POLL_CREATION:
+        this.logger.log('received pollCreation message')
+        const pollCreationEvent = PollCreationEventSchema.parse(queueMessage)
+        return await this.handlePollCreation(
+          pollCreationEvent,
+          message.MessageId!,
+        )
+      case QueueType.POLL_EXPANSION:
+        this.logger.log('received pollExpansion message')
+        const pollExpansionEvent = PollExpansionEventSchema.parse(queueMessage)
+        return await this.handlePollExpansion(
+          pollExpansionEvent,
+          message.MessageId!,
+        )
     }
     // Return true to delete the message from the queue
     return true
@@ -517,6 +546,19 @@ export class QueueConsumerService {
   }
 
   private async handlePollIssuesAnalysis(event: PollIssueAnalysisEvent) {
+    this.logger.log(
+      `Handling poll issue analysis event for poll ${event.data.pollId}`,
+    )
+    if (event.data.rank === 1) {
+      this.logger.log(
+        'Detected first poll issue, deleting existing poll issues',
+      )
+      await this.pollIssuesService.model.deleteMany({
+        where: { pollId: event.data.pollId },
+      })
+      this.logger.log('Successfully deleted existing poll issues')
+    }
+
     const issue: PollIssue = {
       id: `${event.data.pollId}-${event.data.rank}`,
       pollId: event.data.pollId,
@@ -540,40 +582,20 @@ export class QueueConsumerService {
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
-    const existing = await this.pollsService.findUnique({
-      where: { id: event.data.pollId },
-    })
-    if (!existing) {
+    this.logger.log(
+      `Handling poll analysis complete event for poll ${event.data.pollId}`,
+    )
+    const data = await this.getPollAndCampaign(event.data.pollId)
+    if (!data) {
       this.logger.log('Poll not found, ignoring event')
       return
     }
+    const { poll, campaign } = data
 
-    if (existing.status !== 'IN_PROGRESS') {
-      this.logger.log('Poll is not in-progress, ignoring event')
-      return
-    }
-
-    if (!existing.electedOfficeId) {
-      this.logger.log('Poll has no elected office, ignoring event')
-      return
-    }
-
-    const office = await this.electedOfficeService.findUnique({
-      where: { id: existing.electedOfficeId },
-    })
-
-    if (!office) {
-      this.logger.log('Elected office not found, ignoring event')
-      return
-    }
-
-    const campaign = await this.campaignsService.findUnique({
-      where: { id: office.campaignId },
-      include: { pathToVictory: true },
-    })
-
-    if (!campaign) {
-      this.logger.log('No campagin found, ignoring event')
+    if (!['IN_PROGRESS', 'EXPANDING'].includes(poll.status)) {
+      this.logger.log('Poll is not in-progress or expanding, ignoring event', {
+        poll,
+      })
       return
     }
 
@@ -593,8 +615,8 @@ export class QueueConsumerService {
         event.data.totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
-    const poll = await this.pollsService.markPollComplete({
-      pollId: existing.id,
+    await this.pollsService.markPollComplete({
+      pollId: poll.id,
       totalResponses: event.data.totalResponses,
       confidence: highConfidence ? 'HIGH' : 'LOW',
     })
@@ -611,4 +633,189 @@ export class QueueConsumerService {
     }
     return true
   }
+
+  private async handlePollCreation(
+    event: PollCreationEvent,
+    messageId: string,
+  ) {
+    return this.triggerPollExecution({
+      pollId: event.data.pollId,
+      messageId,
+      sampleParams: async (poll) => {
+        return { size: poll.targetAudienceSize }
+      },
+      isExpansion: false,
+    })
+  }
+
+  private async handlePollExpansion(
+    event: PollExpansionEvent,
+    messageId: string,
+  ) {
+    return this.triggerPollExecution({
+      pollId: event.data.pollId,
+      messageId,
+      sampleParams: async (poll) => {
+        const alreadySent =
+          await this.pollsService.client.pollIndividualMessage.findMany({
+            where: { pollId: poll.id },
+            select: { personId: true },
+          })
+
+        return {
+          size: poll.targetAudienceSize,
+          excludeIds: alreadySent.map((p) => p.personId),
+        }
+      },
+      isExpansion: true,
+    })
+  }
+
+  private async triggerPollExecution(params: {
+    pollId: string
+    messageId: string
+    sampleParams: (poll: Poll) => Promise<SampleContacts> | SampleContacts
+    isExpansion: boolean
+  }) {
+    const data = await this.getPollAndCampaign(params.pollId)
+    if (!data) {
+      this.logger.log('Poll not found, ignoring event')
+      return
+    }
+    const { poll, campaign } = data
+
+    const user = await this.usersService.findUnique({
+      where: { id: campaign.userId },
+    })
+    this.logger.log('Fetched sample and user')
+
+    if (!user) {
+      this.logger.log('User not found, ignoring event')
+      return
+    }
+
+    const bucket = 'tevyn-poll-csvs'
+    // It's important that this filename be deterministic. That way, in the event of a failure
+    // and retry, we can safely re-use a previously generated CSV.
+    const fileName = `${poll.id}-${params.messageId}.csv`
+
+    // 1. Get or create the CSV file of a random sample of contacts.
+    // We do get-or-create here so that the logic remains retry-safe in the event of a failure.
+    let csv = await this.awsS3Service.getFile({
+      bucket,
+      fileName,
+    })
+
+    if (!csv) {
+      this.logger.log('No existing CSV found, generating new one')
+      const sampleParams = await params.sampleParams(poll)
+      const sample = await this.contactsService.sampleContacts(
+        sampleParams,
+        campaign,
+      )
+      csv = buildCsvFromContacts(sample)
+      await this.awsS3Service.uploadFile(csv, bucket, fileName, 'text/csv')
+    }
+
+    const csvUrl = `https://${ASSET_DOMAIN}/${this.awsS3Service.getKey({ bucket, fileName })}`
+    const people = await parseCsv<{ id: string }>(csv)
+
+    // 2. Create individual poll messages
+    const now = new Date()
+    await this.pollsService.client.$transaction(async (tx) => {
+      for (const person of people) {
+        const message: PollIndividualMessage = {
+          // It's important that this id be deterministic, so that we can safely re-upsert
+          // a previous CSV.
+          id: `${poll.id}-${person.id}`,
+          pollId: poll.id,
+          personId: person.id!,
+          sentAt: now,
+        }
+        await tx.pollIndividualMessage.upsert({
+          where: { id: message.id },
+          create: message,
+          update: message,
+        })
+      }
+    })
+
+    this.logger.log('Created individual poll messages')
+
+    // 3. Send CSV file to Slack for Tevyn
+    const blocks = buildTevynApiSlackBlocks({
+      message: poll.messageContent,
+      pollId: poll.id,
+      csvFileUrl: csvUrl,
+      imageUrl: poll.imageUrl || undefined,
+      userInfo: {
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        email: user.email,
+        phone: user.phone || undefined,
+      },
+      isExpansion: params.isExpansion,
+    })
+    await this.slackService.message({ blocks }, SlackChannel.botTevynApi)
+    this.logger.log('Slack message sent')
+
+    return true
+  }
+
+  private async getPollAndCampaign(pollId: string) {
+    const poll = await this.pollsService.findUnique({
+      where: { id: pollId },
+    })
+    if (!poll) {
+      this.logger.log('Poll not found, ignoring event')
+      return
+    }
+
+    if (!poll.electedOfficeId) {
+      this.logger.log('Poll has no elected office, ignoring event')
+      return
+    }
+
+    const office = await this.electedOfficeService.findUnique({
+      where: { id: poll.electedOfficeId },
+    })
+
+    if (!office) {
+      this.logger.log('Elected office not found, ignoring event')
+      return
+    }
+
+    const campaign = await this.campaignsService.findUnique({
+      where: { id: office.campaignId },
+      include: { pathToVictory: true },
+    })
+
+    if (!campaign) {
+      this.logger.log('No campagin found, ignoring event')
+      return
+    }
+    return { poll, office, campaign }
+  }
+}
+
+const csvEscape = (value) => {
+  if (value === null || value === undefined) return ''
+  const str = String(value)
+  const mustQuote = /[",\n]/.test(str)
+  const escaped = str.replace(/"/g, '""')
+  return mustQuote ? `"${escaped}"` : escaped
+}
+
+const buildCsvFromContacts = (people: PersonOutput[]) => {
+  const headers: (keyof PersonOutput)[] = [
+    'id',
+    'firstName',
+    'lastName',
+    'cellPhone',
+  ]
+  const lines = [headers.join(',')]
+  for (const person of people) {
+    const row = headers.map((key) => csvEscape(person?.[key] ?? ''))
+    lines.push(row.join(','))
+  }
+  return lines.join('\n')
 }

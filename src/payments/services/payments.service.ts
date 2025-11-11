@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common'
+import { Timeout } from '@nestjs/schedule'
 import { Prisma, User } from '@prisma/client'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
@@ -18,7 +19,7 @@ export class PaymentsService {
     private readonly stripe: StripeService,
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
-  ) { }
+  ) {}
 
   async createPayment<T extends PaymentType>(
     user: User,
@@ -69,21 +70,43 @@ export class PaymentsService {
       return null
     }
 
+    this.logger.log(`userId: ${user.id} missing customerId`)
+
     const checkoutSessionId = user.metaData?.checkoutSessionId as string
-    if (!checkoutSessionId) {
-      return null
-    }
-    const customerId =
-      await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
+    const customerId = checkoutSessionId
+      ? await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
+      : await this.stripe.fetchCustomerIdByEmail(user.email)
     if (!customerId) {
       return null
     }
+    this.logger.log(
+      `Successfully retrieved customerId ${customerId} for user ${user.id}`,
+    )
 
     await this.usersService.patchUserMetaData(user!.id, {
       customerId,
       checkoutSessionId: null,
     })
     return user
+  }
+
+  @Timeout(0)
+  private async backfillMissingCustomerIdsOnBoot() {
+    const emails = await this.stripe.listActiveSubscriptionCustomerEmails()
+    for (const email of emails) {
+      try {
+        const user = await this.usersService.findUserByEmail(email)
+        if (!user) {
+          continue
+        }
+        if (user.metaData?.customerId) {
+          continue
+        }
+        await this.updateMissingCustomerId(email)
+      } catch (e) {
+        this.logger.error(`Failed backfill for ${email}`, e)
+      }
+    }
   }
 
   async fixMissingCustomerIds() {
@@ -168,18 +191,28 @@ export class PaymentsService {
       },
     })
 
-    const allCampaignsWithScheduledCancellations = allCampaigns.filter((campaign) => {
-      const details = campaign.details as PrismaJson.CampaignDetails
-      return details?.subscriptionCancelAt && details?.subscriptionCancelAt > 0
-    })
+    const allCampaignsWithScheduledCancellations = allCampaigns.filter(
+      (campaign) => {
+        const details = campaign.details as PrismaJson.CampaignDetails
+        return (
+          details?.subscriptionCancelAt && details?.subscriptionCancelAt > 0
+        )
+      },
+    )
 
-    results.totalWithCancellations = allCampaignsWithScheduledCancellations.length
+    results.totalWithCancellations =
+      allCampaignsWithScheduledCancellations.length
 
-    const campaignsWithScheduledCancellations = allCampaignsWithScheduledCancellations.slice(offset, offset + limit)
+    const campaignsWithScheduledCancellations =
+      allCampaignsWithScheduledCancellations.slice(offset, offset + limit)
     results.skipped = offset
 
-    this.logger.log(`Found ${results.totalWithCancellations} total campaigns with scheduled cancellations`)
-    this.logger.log(`Processing batch: ${offset + 1} to ${offset + campaignsWithScheduledCancellations.length} (limit: ${limit})`)
+    this.logger.log(
+      `Found ${results.totalWithCancellations} total campaigns with scheduled cancellations`,
+    )
+    this.logger.log(
+      `Processing batch: ${offset + 1} to ${offset + campaignsWithScheduledCancellations.length} (limit: ${limit})`,
+    )
 
     for (const campaign of campaignsWithScheduledCancellations) {
       const { slug } = campaign
@@ -190,16 +223,20 @@ export class PaymentsService {
           continue
         }
 
-        const subscription = await this.stripe.retrieveSubscription(subscriptionId)
+        const subscription =
+          await this.stripe.retrieveSubscription(subscriptionId)
         if (!subscription.cancel_at) {
           continue
         }
 
-        const wasUserInitiated = subscription.cancellation_details?.comment != null
-          || subscription.cancellation_details?.feedback != null
+        const wasUserInitiated =
+          subscription.cancellation_details?.comment != null ||
+          subscription.cancellation_details?.feedback != null
         if (wasUserInitiated) {
           results.manual.push(slug)
-          this.logger.log(`Manual cancellation for ${slug} - Reason: ${subscription.cancellation_details?.reason} - Comment: ${subscription.cancellation_details?.comment}`)
+          this.logger.log(
+            `Manual cancellation for ${slug} - Reason: ${subscription.cancellation_details?.reason} - Comment: ${subscription.cancellation_details?.comment}`,
+          )
         } else {
           if (!dryRun) {
             await this.stripe.removeSubscriptionCancellation(subscriptionId)
@@ -212,8 +249,8 @@ export class PaymentsService {
                   subscriptionCancelAt: null,
                   subscriptionCanceledAt: null,
                   endOfElectionSubscriptionCanceled: false,
-                }
-              }
+                },
+              },
             })
 
             this.logger.log(`✅ Fixed auto-scheduled cancellation for ${slug}`)
@@ -232,7 +269,8 @@ export class PaymentsService {
       }
     }
 
-    const processed = results.auto.length + results.manual.length + results.failed.length
+    const processed =
+      results.auto.length + results.manual.length + results.failed.length
     const remaining = results.totalWithCancellations - offset - processed
 
     return {

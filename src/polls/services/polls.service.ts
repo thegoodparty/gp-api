@@ -1,17 +1,20 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common'
 import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { buildTevynApiSlackBlocks } from '../utils/polls.utils'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { add } from 'date-fns'
-import { ElectedOffice } from '@prisma/client'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
+import { QueueType } from 'src/queue/queue.types'
+import { pollMessageGroup } from '../utils/polls.utils'
+
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
-  constructor(private readonly slack: SlackService) {
+  constructor(private readonly queueProducer: QueueProducerService) {
     super()
   }
-
   async create(args: Prisma.PollCreateArgs) {
     return this.model.create(args)
   }
@@ -22,45 +25,6 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
 
   async delete(args: Prisma.PollDeleteArgs) {
     return this.model.delete(args)
-  }
-
-  async createInitialPoll(
-    message: string,
-    userInfo: { name?: string; email: string; phone?: string },
-    electedOffice: ElectedOffice,
-    createPoll: boolean,
-    imageUrl?: string,
-    csvFileUrl?: string,
-  ) {
-    const now = new Date()
-    let pollId: string | undefined = undefined
-    if (createPoll) {
-      const poll = await this.create({
-        data: {
-          name: 'Top Community Issues',
-          status: 'IN_PROGRESS',
-          messageContent: message,
-          targetAudienceSize: 500,
-          scheduledDate: now,
-          estimatedCompletionDate: add(now, { weeks: 1 }),
-          imageUrl: imageUrl,
-          electedOfficeId: electedOffice.id,
-        },
-      })
-      pollId = poll.id
-    }
-
-    const blocks = buildTevynApiSlackBlocks({
-      message,
-      pollId,
-      csvFileUrl,
-      imageUrl,
-      userInfo,
-    })
-
-    await this.slack.message({ blocks }, SlackChannel.botTevynApi)
-
-    return true
   }
 
   async markPollComplete(params: {
@@ -98,17 +62,37 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     return result[0]
   }
 
-  async expandPoll(params: { pollId: string; newTotalAudienceSize: number }) {
+  async expandPoll(params: {
+    pollId: string
+    additionalRecipientCount: number
+  }) {
+    const poll = await this.client.poll.findUnique({
+      where: { id: params.pollId },
+    })
+    if (!poll) {
+      throw new BadRequestException('Poll not found')
+    }
+
+    if (poll.status !== 'COMPLETED') {
+      throw new BadRequestException('Poll is not completed')
+    }
+
+    const newTotalAudienceSize =
+      poll.targetAudienceSize + params.additionalRecipientCount
     const result = await this.client.poll.updateManyAndReturn({
       // This is a database-level check to ensure the poll is in the expected state.
-      // Sadly, Prisma doesn't natively support row-level locking on transactions,
-      // which would be a little cleaner :(
+      // Sadly, Prisma doesn't natively support row-level read-then-write locking on
+      // transactions, which would be a lot cleaner :(
       // https://github.com/prisma/prisma/issues/8580
-      where: { id: params.pollId, status: 'COMPLETED' },
+      where: {
+        id: params.pollId,
+        status: 'COMPLETED',
+        targetAudienceSize: poll.targetAudienceSize,
+      },
       data: {
         status: 'EXPANDING',
         estimatedCompletionDate: add(new Date(), { weeks: 1 }),
-        targetAudienceSize: params.newTotalAudienceSize,
+        targetAudienceSize: newTotalAudienceSize,
       },
     })
 
@@ -117,10 +101,13 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
         'Cannot mark poll as expanding because it is not in completed state',
         { pollId: params.pollId },
       )
-      throw new BadRequestException('Poll not in completed state')
+      throw new ConflictException('Poll is not in expected state')
     }
 
-    // TODO: send message to tevyn to expand the poll
+    await this.queueProducer.sendMessage(
+      { type: QueueType.POLL_EXPANSION, data: { pollId: params.pollId } },
+      pollMessageGroup(params.pollId),
+    )
 
     return result[0]
   }

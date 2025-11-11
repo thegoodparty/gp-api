@@ -214,7 +214,7 @@ export class VoterOutreachService {
   }: OutreachSlackBlocksConfiguration) {
     return await this.slack.message(
       buildSlackBlocks({
-        name: `${firstName} ${lastName}`,
+        name: `${(firstName || '').trim()} ${(lastName || '').trim()}`,
         email,
         ...(phone ? { phone } : {}),
         assignedPa: crmCompanyId

@@ -54,16 +54,11 @@ export class ContactsController {
     return this.contactsService.searchContacts(dto, campaign)
   }
 
-  @Get('sample')
-  sampleContacts(
-    @Query() dto: SampleContactsDTO,
+  @Get(':id')
+  getContact(
+    @Param('id') id: string,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
-    return this.contactsService.sampleContacts(dto, campaign)
-  }
-
-  @Get(':id')
-  getContact(@Param('id') id: string) {
-    return this.contactsService.findPerson(id)
+    return this.contactsService.findPerson(id, campaign)
   }
 }
