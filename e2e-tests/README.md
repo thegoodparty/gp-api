@@ -37,12 +37,30 @@ e2e-tests/
 │   │   ├── password-update.spec.ts
 │   │   ├── set-password.spec.ts
 │   │   └── social-login.spec.ts (skipped)
-│   └── users/                 # User management tests
-│       ├── get-current-user.spec.ts
-│       ├── update-current-user.spec.ts
-│       ├── user-metadata.spec.ts
-│       ├── upload-image.spec.ts
-│       └── delete-user.spec.ts
+│   ├── users/                 # User management tests
+│   │   ├── get-current-user.spec.ts
+│   │   ├── update-current-user.spec.ts
+│   │   ├── user-metadata.spec.ts
+│   │   ├── upload-image.spec.ts
+│   │   └── delete-user.spec.ts
+│   └── campaigns/             # Campaign tests
+│       ├── map/               # Campaign map tests
+│       │   ├── get-map.spec.ts
+│       │   └── get-map-count.spec.ts
+│       ├── update-history/    # Update history tests
+│       │   └── update-history.spec.ts
+│       ├── tasks/             # Campaign tasks tests
+│       │   ├── list-tasks.spec.ts
+│       │   └── complete-tasks.spec.ts
+│       ├── base/              # Base campaign operations
+│       │   ├── list-campaigns.spec.ts
+│       │   └── user-campaigns.spec.ts
+│       ├── race-target-details/  # Race target details tests
+│       │   └── race-target-details.spec.ts
+│       ├── tcr-compliance/    # TCR compliance tests
+│       │   └── tcr-compliance.spec.ts
+│       └── mass-updates/      # Mass update tests
+│           └── mass-updates.spec.ts
 └── postman-old-tests/         # Original Postman collections for reference
 ```
 
@@ -106,6 +124,63 @@ npm run test:e2e:report
 - ✅ **Upload Image** - Upload user avatar image
 - ✅ **Upload Invalid File** - Reject invalid file types
 - ✅ **Delete User** - Delete user account with authorization checks
+
+### Campaigns (`/v1/campaigns`)
+
+#### Map (`/v1/campaigns/map`)
+
+- ✅ **Get Map** - Retrieve campaigns map with filters (results, party, level, office)
+- ✅ **Get Map Count** - Get campaigns count with filters (results, state)
+
+#### Update History (`/v1/campaigns/mine/update-history`)
+
+- ✅ **Get Update History** - Retrieve current user's update history
+- ✅ **Create Update History** - Create new update history entry
+- ✅ **Delete Update History** - Delete update history entry
+- ✅ **Access Control** - Deny/allow access to other users' update history
+
+#### Tasks (`/v1/campaigns/tasks`)
+
+- ✅ **List All Tasks** - List all campaign tasks across all weeks
+- ✅ **List Tasks by Week** - Filter tasks by specific weeks (1-8)
+- ✅ **Complete Task** - Mark task as completed
+- ✅ **Uncomplete Task** - Mark task as not completed
+
+#### Base Operations
+
+- ✅ **List Campaigns** - Admin list all campaigns with various filters
+- ✅ **Get Campaign by Slug** - Retrieve campaign by slug
+- ✅ **Get User Campaign** - Get logged-in user's campaign
+- ✅ **Get Campaign Status** - Get user campaign status
+- ✅ **Get Plan Version** - Get campaign plan version
+- ✅ **Create Campaign** - Create new campaign for user
+- ✅ **Update Campaign** - Update campaign data and details
+- ✅ **Set Campaign Office** - Set campaign office details
+- ✅ **Launch Campaign** - Launch a campaign
+- ✅ **Admin Update by Slug** - Admin update campaign by slug
+
+#### Race Target Details (`/v1/campaigns/mine/race-target-details`)
+
+- ✅ **Update Race Target Details** - Update race target details for current user
+- ✅ **Manually Set L2District** - Set district manually
+- ✅ **Admin Update by Slug** - Admin update race target details by slug
+- ✅ **Admin with excludeTurnout** - Admin update with includeTurnout flag
+- ✅ **Access Control** - Deny unauthorized access to admin endpoints
+
+#### TCR Compliance (`/v1/campaigns/tcr-compliance`)
+
+- ✅ **Create TCR Compliance** - Create new TCR compliance record
+- ✅ **Duplicate Conflict** - Reject duplicate TCR compliance
+- ✅ **Validation** - Reject invalid matching contact fields
+- ✅ **Check Status** - Check TCR compliance status
+- ✅ **Submit PIN** - Submit campaign verify PIN
+- ✅ **Delete** - Delete TCR compliance record
+
+#### Mass Updates
+
+- ✅ **Missing Win Numbers** - Admin mass update missing win numbers
+- ✅ **Mass Hubspot Push** - Admin mass refresh companies
+- ✅ **Authorization** - Deny unauthorized access to mass update endpoints
 
 ### Health (`/v1/health`)
 
