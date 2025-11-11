@@ -10,30 +10,44 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { PollsService } from './services/polls.service'
-import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
-import z from 'zod'
-import { ElectedOffice, Poll, PollIssue, PollStatus } from '@prisma/client'
-import { orderBy } from 'lodash'
-import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
-import { CreatePollDto } from './schemas/poll.schema'
-import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
-import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import { APIPoll, APIPollIssue } from './polls.types'
-import { PollIssuesService } from './services/pollIssues.service'
+import {
+  ElectedOffice,
+  Poll,
+  PollIssue,
+  PollStatus,
+  User,
+} from '@prisma/client'
 import { add } from 'date-fns'
+import { orderBy } from 'lodash'
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
+import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { UsersService } from 'src/users/services/users.service'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
+import z from 'zod'
+import { APIPoll, APIPollIssue } from './polls.types'
+import { CreatePollDto } from './schemas/poll.schema'
+import { PollIssuesService } from './services/pollIssues.service'
+import { PollsService } from './services/polls.service'
 import { pollMessageGroup } from './utils/polls.utils'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
     cursor: z.string().optional(),
     limit: z.coerce.number().min(1).max(100).default(20),
+  }),
+) {}
+
+class PollImageUploadUrlDto extends createZodDto(
+  z.object({
+    fileName: z.string(),
+    contentType: z.string().optional(),
   }),
 ) {}
 
@@ -80,6 +94,7 @@ export class PollsController {
     private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly queueProducerService: QueueProducerService,
+    private readonly s3Service: S3Service,
   ) {}
   private readonly logger = new Logger(this.constructor.name)
 
@@ -212,5 +227,44 @@ export class PollsController {
     }
 
     return poll
+  }
+
+  @Post('image-upload-url')
+  @UseElectedOffice()
+  async getPollImageUploadUrl(
+    @ReqUser() user: User,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @Body() dto: PollImageUploadUrlDto,
+  ) {
+    const campaign = await this.campaignService.findUnique({
+      where: { id: electedOffice.campaignId },
+    })
+
+    if (!campaign || campaign.userId !== user.id) {
+      throw new ForbiddenException(
+        'You do not have permission to upload images for this poll',
+      )
+    }
+
+    const folderPath = `poll-text-images/${campaign.id}-${campaign.slug}`
+    const signedUrl = await this.s3Service.getSignedUrlForUpload(
+      ASSET_DOMAIN,
+      dto.fileName,
+      folderPath,
+      {
+        contentType: dto.contentType,
+      },
+    )
+
+    const publicUrl = this.s3Service.getFileUrl(
+      ASSET_DOMAIN,
+      dto.fileName,
+      folderPath,
+      {
+        baseUrl: `https://${ASSET_DOMAIN}`,
+      },
+    )
+
+    return { signedUrl, publicUrl }
   }
 }

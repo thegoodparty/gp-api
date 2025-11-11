@@ -6,6 +6,12 @@ const serveAnalysisBucketName = {
   master: 'serve-analyze-data-prod',
 }
 
+const tevynPollCsvsBucketName = {
+  develop: 'tevyn-poll-csvs-develop',
+  qa: 'tevyn-poll-csvs-qa',
+  master: 'tevyn-poll-csvs-master',
+}
+
 const environment = {
   develop: 'dev',
   qa: 'qa',
@@ -229,6 +235,22 @@ export default $config({
       }`,
     })
 
+    const tevynPollCsvsBucket = new aws.s3.Bucket(
+      `tevyn-poll-csvs-${$app.stage}`,
+      {
+        bucket: tevynPollCsvsBucketName[$app.stage],
+        forceDestroy: $app.stage !== 'master',
+      },
+    )
+
+    new aws.s3.BucketPublicAccessBlock(`tevyn-poll-csvs-pab-${$app.stage}`, {
+      bucket: tevynPollCsvsBucket.id,
+      blockPublicAcls: true,
+      blockPublicPolicy: true,
+      ignorePublicAcls: true,
+      restrictPublicBuckets: true,
+    })
+
     // Create shared VPC Endpoint for SQS (only in master stage)
     if ($app.stage === 'master') {
       // Create security group for SQS
@@ -357,6 +379,7 @@ export default $config({
         SQS_QUEUE: sqsQueueName,
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
         SERVE_ANALYSIS_BUCKET_NAME: serveAnalysisBucketName[$app.stage],
+        TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucketName[$app.stage],
         ...secretsJson,
       },
       image: {
