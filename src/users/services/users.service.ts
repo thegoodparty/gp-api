@@ -186,48 +186,46 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   ) {
     return retry(
       async (bail) => {
-        return this.client.$transaction(async (tx) => {
-          const user = await tx.user.findFirst({ where: { id: userId } })
-          if (!user) {
-            this.logger.warn(
-              `User with id ${userId} not found. Skipping metadata update`,
-            )
-            bail(new Error(`User with id ${userId} not found. Bailing retry.`))
-            return null
-          }
-
-          this.logger.log(
-            `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData ?? {})}`,
-          )
-
-          const rows = await tx.$queryRaw<Array<{ id: number }>>`
-          UPDATE "user"
-          SET
-            meta_data = COALESCE(meta_data, '{}'::jsonb) || ${newMetaData}::jsonb,
-            updated_at = NOW()
-          WHERE id = ${userId}
-            AND updated_at = ${user.updatedAt}
-          RETURNING id
-          `
-          if (!rows || rows.length === 0) {
-            // Throwing triggers the retry
-            throw new Error('Failed to update userMetaData')
-          }
-
-          // Refetch for typed, non-snake case user
-          const updatedUser = await tx.user.findUniqueOrThrow({
-            where: { id: rows[0].id },
-          })
-
-          this.logger.log(
-            `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData ?? {})}`,
-          )
-          return updatedUser
+        const user = await this.client.user.findUnique({
+          where: { id: userId },
         })
+        if (!user) {
+          this.logger.warn(
+            `User with id ${userId} not found. Skipping metadata update`,
+          )
+          bail(new Error(`User with id ${userId} not found. Bailing retry.`))
+          return null
+        }
+
+        this.logger.log(
+          `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData ?? {})}`,
+        )
+
+        const mergedMetaData = {
+          ...(user.metaData ?? {}),
+          ...(newMetaData ?? {}),
+        } as PrismaJson.UserMetaData
+
+        const updatedUsers = await this.client.user.updateManyAndReturn({
+          where: { id: userId, updatedAt: user.updatedAt },
+          data: {
+            metaData: mergedMetaData,
+          },
+        })
+        if (!updatedUsers || updatedUsers.length === 0) {
+          // Throwing triggers the retry
+          throw new ConflictException('Failed to update userMetaData')
+        }
+        const updatedUser = updatedUsers[0]
+
+        this.logger.log(
+          `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData ?? {})}`,
+        )
+        return updatedUser
       },
       {
         retries: 5,
-        minTimeout: 1000,
+        minTimeout: 100,
       },
     )
   }
