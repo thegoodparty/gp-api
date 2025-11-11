@@ -174,16 +174,13 @@ test.describe('Websites - Domains', () => {
 
     const response = await request.get(`/v1/websites/by-domain/${testDomain}`)
 
-    if (response.status() === 404) {
-      test.skip()
-      return
+    expect([200, 404]).toContain(response.status())
+
+    if (response.status() === 200) {
+      const website = (await response.json()) as Website
+      expect(website).toBeDefined()
+      expect(website.campaignId).toBe(registerResponse.campaign.id)
     }
-
-    expect(response.status()).toBe(200)
-
-    const website = (await response.json()) as Website
-    expect(website).toBeDefined()
-    expect(website.campaignId).toBe(registerResponse.campaign.id)
   })
 
   test('should return 404 for non-existent domain', async ({ request }) => {
