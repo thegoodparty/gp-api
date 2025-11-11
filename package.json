@@ -66,6 +66,7 @@
     "@nestjs/platform-fastify": "^11.0.8",
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.0.3",
+    "@poppanator/http-constants": "^3.0.0",
     "@prisma/client": "^6.3.0",
     "@redtea/format-axios-error": "^2.1.1",
     "@segment/analytics-node": "^2.2.1",
