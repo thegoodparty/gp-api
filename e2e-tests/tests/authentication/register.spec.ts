@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   deleteUser,
   generateRandomEmail,
@@ -43,7 +44,7 @@ test.describe('Authentication - Register', () => {
     if (!response.ok()) {
       console.log('Registration failed:', await response.text())
     }
-    expect(response.status()).toBe(201)
+    expect(response.status()).toBe(HttpStatus.CREATED)
 
     const body = (await response.json()) as RegisterResponse
 
@@ -80,7 +81,7 @@ test.describe('Authentication - Register', () => {
       },
     })
 
-    expect(response.status()).toBe(201)
+    expect(response.status()).toBe(HttpStatus.CREATED)
 
     const setCookieHeader = response.headers()['set-cookie']
     expect(setCookieHeader).toBeTruthy()
@@ -112,7 +113,7 @@ test.describe('Authentication - Register', () => {
       },
     })
 
-    expect(response.status()).toBe(201)
+    expect(response.status()).toBe(HttpStatus.CREATED)
 
     const body = (await response.json()) as RegisterResponse
     expect(body.user.roles).not.toContain('admin')

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
   deleteUser,
@@ -65,7 +66,7 @@ test.describe('Users - Upload Image', () => {
       },
     })
 
-    expect(response.status()).toBe(201)
+    expect(response.status()).toBe(HttpStatus.CREATED)
 
     const body = (await response.json()) as UserResponse
     expect(body.avatar).toBeTruthy()
@@ -109,7 +110,7 @@ test.describe('Users - Upload Image', () => {
       },
     })
 
-    expect(response.status()).toBe(400)
+    expect(response.status()).toBe(HttpStatus.BAD_REQUEST)
   })
 
   test('should return 400 when no file is provided', async ({ request }) => {
@@ -138,7 +139,7 @@ test.describe('Users - Upload Image', () => {
       multipart: {},
     })
 
-    expect(response.status()).toBe(400)
+    expect(response.status()).toBe(HttpStatus.BAD_REQUEST)
   })
 
   test('should return 401 when not authenticated', async ({ request }) => {
@@ -155,6 +156,6 @@ test.describe('Users - Upload Image', () => {
       },
     })
 
-    expect(response.status()).toBe(401)
+    expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
   })
 })

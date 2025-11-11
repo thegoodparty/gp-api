@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
   deleteUser,
@@ -51,7 +52,7 @@ test.describe('Authentication - Password Update', () => {
       },
     })
 
-    expect(response.status()).toBe(200)
+    expect(response.status()).toBe(HttpStatus.OK)
   })
 
   test('should login with updated password', async ({ request }) => {
@@ -74,7 +75,7 @@ test.describe('Authentication - Password Update', () => {
       },
     })
 
-    expect(loginResponse.status()).toBe(201)
+    expect(loginResponse.status()).toBe(HttpStatus.CREATED)
 
     const body = (await loginResponse.json()) as LoginResponse
     expect(body.token).toBeTruthy()

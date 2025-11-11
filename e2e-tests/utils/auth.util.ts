@@ -100,9 +100,13 @@ export async function deleteUser(
 }
 
 export function generateRandomEmail(): string {
-  const timestamp = Date.now()
-  const random = Math.random().toString(36).substring(2, 15)
-  return `test-${timestamp}-${random}@goodparty.org`.toLowerCase()
+  return faker.internet
+    .email({
+      provider: 'goodparty.org',
+      firstName: 'test',
+      lastName: faker.string.alphanumeric(10),
+    })
+    .toLowerCase()
 }
 
 export function generateRandomName(): string {
@@ -112,8 +116,23 @@ export function generateRandomName(): string {
 export function getBearerToken(token: string): string {
   return `Bearer ${token}`
 }
+
 export function generateRandomPassword(): string {
   const letters = faker.string.alpha({ length: 8, casing: 'mixed' })
   const numbers = faker.string.numeric({ length: 4 })
   return faker.helpers.shuffle([...letters, ...numbers]).join('')
+}
+
+export interface TestUserCleanup {
+  userId: number
+  authToken: string
+}
+
+export async function cleanupTestUser(
+  request: APIRequestContext,
+  cleanup: TestUserCleanup | null,
+): Promise<void> {
+  if (cleanup && cleanup.userId && cleanup.authToken) {
+    await deleteUser(request, cleanup.userId, cleanup.authToken)
+  }
 }

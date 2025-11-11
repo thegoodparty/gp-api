@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import { loginUser, LoginResponse } from '../../utils/auth.util'
 
 test.describe('Authentication - Login', () => {
@@ -26,7 +27,7 @@ test.describe('Authentication - Login', () => {
       },
     })
 
-    expect(response.status()).toBe(201)
+    expect(response.status()).toBe(HttpStatus.CREATED)
 
     const body = (await response.json()) as LoginResponse
 
@@ -51,7 +52,7 @@ test.describe('Authentication - Login', () => {
       },
     })
 
-    expect(response.status()).toBe(201)
+    expect(response.status()).toBe(HttpStatus.CREATED)
 
     const body = (await response.json()) as LoginResponse
 
@@ -72,7 +73,7 @@ test.describe('Authentication - Login', () => {
       },
     })
 
-    expect(response.status()).toBe(401)
+    expect(response.status()).toBe(HttpStatus.UNAUTHORIZED)
   })
 
   test('should set auth token in response', async ({ request }) => {
