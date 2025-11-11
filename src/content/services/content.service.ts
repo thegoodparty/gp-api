@@ -177,7 +177,12 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
               id: entry.sys.id,
             },
             data: {
-              data: entry.fields as InputJsonObject,
+              data: {
+                ...entry.fields,
+                updateDate: new Date(entry.sys.updatedAt)
+                  .toISOString()
+                  .split('T')[0], // lets keep the same format as publishDate e.g "2024-06-14"
+              } as InputJsonObject,
             },
           })
           if (contentTypeDef.name === ContentType.blogArticle) {
@@ -198,7 +203,12 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
           const contentRecord = {
             id: entry.sys.id,
             type: contentTypeDef.name,
-            data: entry.fields as InputJsonObject,
+            data: {
+              ...entry.fields,
+              updateDate: new Date(entry.sys.updatedAt)
+                .toISOString()
+                .split('T')[0],
+            } as InputJsonObject,
           }
           const record = await tx.content.create({
             data: contentRecord,
