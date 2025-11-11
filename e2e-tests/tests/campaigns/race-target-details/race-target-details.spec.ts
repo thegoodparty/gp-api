@@ -35,12 +35,11 @@ interface Campaign {
 }
 
 test.describe('Campaigns - Race Target Details', () => {
-  let testUserId: number
-  let testUserToken: string
+  const testUsers: Array<{ id: number; token: string }> = []
 
   test.afterAll(async ({ request }) => {
-    if (testUserId && testUserToken) {
-      await deleteUser(request, testUserId, testUserToken)
+    for (const { id, token } of testUsers) {
+      await deleteUser(request, id, token)
     }
   })
 
@@ -62,12 +61,11 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    testUserToken = registerResponse.token
+    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
 
     const updateResponse = await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${testUserToken}`,
+        Authorization: `Bearer ${registerResponse.token}`,
       },
       data: {
         details: {
@@ -101,12 +99,11 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    testUserToken = registerResponse.token
+    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
 
     await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${testUserToken}`,
+        Authorization: `Bearer ${registerResponse.token}`,
       },
       data: {
         details: {
@@ -123,7 +120,7 @@ test.describe('Campaigns - Race Target Details', () => {
       '/v1/campaigns/mine/race-target-details',
       {
         headers: {
-          Authorization: `Bearer ${testUserToken}`,
+          Authorization: `Bearer ${registerResponse.token}`,
         },
       },
     )
@@ -168,12 +165,11 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    testUserToken = registerResponse.token
+    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
 
     await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${testUserToken}`,
+        Authorization: `Bearer ${registerResponse.token}`,
       },
       data: {
         details: {
@@ -188,7 +184,7 @@ test.describe('Campaigns - Race Target Details', () => {
 
     const response = await request.put('/v1/campaigns/mine/district', {
       headers: {
-        Authorization: `Bearer ${testUserToken}`,
+        Authorization: `Bearer ${registerResponse.token}`,
       },
       data: {
         L2DistrictType: 'Town_District',
@@ -216,8 +212,7 @@ test.describe('Campaigns - Race Target Details', () => {
 test.describe('Campaigns - Race Target Details (Admin)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
-  let testUserId: number
-  let testUserToken: string
+  const testUsers: Array<{ id: number; token: string }> = []
   let testSlug: string
 
   test.beforeAll(() => {
@@ -225,8 +220,8 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
   })
 
   test.afterAll(async ({ request }) => {
-    if (testUserId && testUserToken) {
-      await deleteUser(request, testUserId, testUserToken)
+    for (const { id, token } of testUsers) {
+      await deleteUser(request, id, token)
     }
   })
 
@@ -248,13 +243,12 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    testUserToken = registerResponse.token
+    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
     testSlug = registerResponse.campaign.slug
 
     await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${testUserToken}`,
+        Authorization: `Bearer ${registerResponse.token}`,
       },
       data: {
         details: {
@@ -271,7 +265,7 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       `/v1/campaigns/admin/${testSlug}/race-target-details`,
       {
         headers: {
-          Authorization: `Bearer ${testUserToken}`,
+          Authorization: `Bearer ${registerResponse.token}`,
         },
       },
     )
@@ -305,13 +299,12 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    testUserToken = registerResponse.token
+    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
     testSlug = registerResponse.campaign.slug
 
     await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${testUserToken}`,
+        Authorization: `Bearer ${registerResponse.token}`,
       },
       data: {
         details: {
@@ -369,13 +362,12 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    testUserToken = registerResponse.token
+    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
     testSlug = registerResponse.campaign.slug
 
     await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${testUserToken}`,
+        Authorization: `Bearer ${registerResponse.token}`,
       },
       data: {
         details: {

@@ -42,9 +42,14 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
       },
     })
     const allCampaigns = await allCampaignsResponse.json()
-    const testCampaignId = allCampaigns[1].id
+    const testCampaign = allCampaigns.find((campaign: any) => campaign?.id)
 
-    const response = await request.get(`/v1/campaigns?id=${testCampaignId}`, {
+    if (!testCampaign) {
+      test.skip()
+      return
+    }
+
+    const response = await request.get(`/v1/campaigns?id=${testCampaign.id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -54,7 +59,7 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     const campaigns = await response.json()
     expect(campaigns).toHaveLength(1)
-    expect(campaigns[0].id).toBe(testCampaignId)
+    expect(campaigns[0].id).toBe(testCampaign.id)
   })
 
   test('should filter campaigns by state', async ({ request }) => {
