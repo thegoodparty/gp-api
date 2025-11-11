@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common'
-import { AiService } from './ai.service'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { AiService } from './ai.service'
+import { AreaCodeFromZipService } from './util/areaCodeFromZip.util'
 
 @Module({
-  imports: [SlackModule],
-  providers: [AiService],
-  exports: [AiService],
+  imports: [SlackModule, AwsModule],
+  providers: [AiService, AreaCodeFromZipService],
+  exports: [AiService, AreaCodeFromZipService],
 })
-export class AiModule {}
+export class AiModule { }

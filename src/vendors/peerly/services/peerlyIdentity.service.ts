@@ -1,8 +1,4 @@
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { format } from '@redtea/format-axios-error'
 import {
   BadGatewayException,
   BadRequestException,
@@ -10,9 +6,23 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
+import { format } from '@redtea/format-axios-error'
+import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
+import { parsePhoneNumberWithError } from 'libphonenumber-js'
+import { lastValueFrom } from 'rxjs'
+import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
+import { CampaignsService } from '../../../campaigns/services/campaigns.service'
+import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import { DateFormats, formatDate } from '../../../shared/util/date.util'
+import { ensureUrlHasProtocol } from '../../../shared/util/strings.util'
+import { UsersService } from '../../../users/services/users.service'
 import { getUserFullName } from '../../../users/util/users.util'
+import { GooglePlacesService } from '../../google/services/google-places.service'
+import { extractAddressComponents } from '../../google/util/GooglePlaces.util'
+import { SlackService } from '../../slack/services/slack.service'
+import { SlackChannel, SlackMessageType } from '../../slack/slackService.types'
+import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import {
   Approve10DLCBrandResponseBody,
   BuildPeerlyErrorSlackMessageBlocksParams,
@@ -25,32 +35,22 @@ import {
   PeerlyCreateCVTokenResponse,
   PeerlyGetCvRequestResponseBody,
   PeerlyGetIdentitiesResponseBody,
-  PeerlyIdentityProfileResponseBody,
   PeerlyHttpRequestConfig,
   PeerlyIdentity,
   PeerlyIdentityCreateResponseBody,
+  PeerlyIdentityProfileResponseBody,
   PeerlyIdentityUseCaseResponseBody,
   PeerlyRetrieveCampaignVerifyStatusResponseBody,
   PeerlySubmitCVResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { GooglePlacesService } from '../../google/services/google-places.service'
-import { extractAddressComponents } from '../../google/util/GooglePlaces.util'
-import { DateFormats, formatDate } from '../../../shared/util/date.util'
-import { parsePhoneNumberWithError } from 'libphonenumber-js'
-import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
-import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
+import { getPeerlyLocaleFromBallotLevel } from '../utils/getPeerlyLocaleFromBallotLevel.util'
 import {
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
   PEERLY_USECASE,
 } from './peerly.const'
-import { ensureUrlHasProtocol } from '../../../shared/util/strings.util'
-import { getPeerlyLocaleFromBallotLevel } from '../utils/getPeerlyLocaleFromBallotLevel.util'
-import { SlackService } from '../../slack/services/slack.service'
-import { SlackChannel, SlackMessageType } from '../../slack/slackService.types'
-import { UsersService } from '../../../users/services/users.service'
-import { CampaignsService } from '../../../campaigns/services/campaigns.service'
+import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -338,6 +338,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.isTestEnvironment ? `TEST-${campaignCommittee}` : campaignCommittee
     ).substring(0, 255) // Limit to 255 characters per Peerly API docs
 
+    const stateCode = state?.short_name
+    const areaCode = parsePhoneNumberWithError(phone, 'US').countryCallingCode
     const submitBrandData: Peerly10DlcBrandData = {
       entityType: PEERLY_ENTITY_TYPE,
       vertical: PEERLY_USECASE,
@@ -352,6 +354,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
+      jobAreas: stateCode && areaCode ? [{
+        didState: stateCode,
+        disNpaSubset: [areaCode],
+      }] : undefined
     }
 
     this.logger.debug(
@@ -521,11 +527,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       campaign_website: domain ? `https://${domain?.name}` : undefined,
       ...(peerlyLocale === PEERLY_LOCALITIES.local
         ? {
-            city_county:
-              ballotLevel === BallotReadyPositionLevel.COUNTY
-                ? county?.long_name
-                : city?.long_name,
-          }
+          city_county:
+            ballotLevel === BallotReadyPositionLevel.COUNTY
+              ? county?.long_name
+              : city?.long_name,
+        }
         : {}),
     }
 
