@@ -24,16 +24,25 @@ e2e-tests/
 ├── playwright.config.ts        # Playwright configuration
 ├── utils/
 │   └── auth.util.ts           # Shared authentication utilities
+├── fixtures/
+│   ├── test-image.png         # Test image for upload tests
+│   └── test-file.txt          # Test file for invalid upload tests
 ├── tests/
 │   ├── health/                # Health check tests
 │   │   └── health.spec.ts
-│   └── authentication/        # Authentication tests
-│       ├── register.spec.ts
-│       ├── login.spec.ts
-│       ├── password-reset.spec.ts
-│       ├── password-update.spec.ts
-│       ├── set-password.spec.ts
-│       └── social-login.spec.ts (skipped)
+│   ├── authentication/        # Authentication tests
+│   │   ├── register.spec.ts
+│   │   ├── login.spec.ts
+│   │   ├── password-reset.spec.ts
+│   │   ├── password-update.spec.ts
+│   │   ├── set-password.spec.ts
+│   │   └── social-login.spec.ts (skipped)
+│   └── users/                 # User management tests
+│       ├── get-current-user.spec.ts
+│       ├── update-current-user.spec.ts
+│       ├── user-metadata.spec.ts
+│       ├── upload-image.spec.ts
+│       └── delete-user.spec.ts
 └── postman-old-tests/         # Original Postman collections for reference
 ```
 
@@ -87,6 +96,16 @@ npm run test:e2e:report
 - ✅ **Password Update** - Update password for authenticated users
 - ✅ **Set Password Email** - Admin/sales sending password set emails
 - ⏭️ **Social Login** - OAuth authentication (skipped - requires OAuth setup)
+
+### Users (`/v1/users`)
+
+- ✅ **Get Current User** - Retrieve authenticated user's profile
+- ✅ **Update Current User** - Update authenticated user's profile
+- ✅ **Get User Metadata** - Retrieve user metadata
+- ✅ **Update User Metadata** - Update user metadata with various data types
+- ✅ **Upload Image** - Upload user avatar image
+- ✅ **Upload Invalid File** - Reject invalid file types
+- ✅ **Delete User** - Delete user account with authorization checks
 
 ### Health (`/v1/health`)
 

@@ -113,5 +113,7 @@ export function getBearerToken(token: string): string {
   return `Bearer ${token}`
 }
 export function generateRandomPassword(): string {
-  return faker.string.alphanumeric({ length: 12, casing: 'mixed' })
+  const letters = faker.string.alpha({ length: 8, casing: 'mixed' })
+  const numbers = faker.string.numeric({ length: 4 })
+  return faker.helpers.shuffle([...letters, ...numbers]).join('')
 }
