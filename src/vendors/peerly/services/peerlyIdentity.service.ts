@@ -142,7 +142,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const twoArgMethods = [HttpMethod.Get, HttpMethod.Delete, HttpMethod.Head]
     return lastValueFrom(
       twoArgMethods.includes(method.name.toUpperCase())
-        ? this.httpService.get(url, config)
+        ? this.httpService[method.name](url, config)
         : data
           ? this.httpService[method.name](url, data, config)
           : this.httpService[method.name](url, null, config),
