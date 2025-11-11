@@ -10,8 +10,6 @@ import {
   PollCreationEventSchema,
   PollExpansionEvent,
   PollExpansionEventSchema,
-  PollIssueAnalysisEvent,
-  PollIssueAnalysisEventSchema,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
@@ -24,7 +22,6 @@ import {
   PathToVictory,
   Poll,
   PollIndividualMessage,
-  PollIssue,
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
@@ -223,11 +220,6 @@ export class QueueConsumerService {
         return await this.handleDomainEmailForwardingMessage(
           queueMessage.data as DomainEmailForwardingMessage,
         )
-      case QueueType.POLL_ISSUES_ANALYSIS:
-        this.logger.log('received pollIssueAnalysis message')
-        const pollIssueAnalysisEvent =
-          PollIssueAnalysisEventSchema.parse(queueMessage)
-        return await this.handlePollIssuesAnalysis(pollIssueAnalysisEvent)
       case QueueType.POLL_ANALYSIS_COMPLETE:
         this.logger.log('received pollAnalysisComplete message')
         const pollAnalysisCompleteEvent =
@@ -543,42 +535,6 @@ export class QueueConsumerService {
         },
       })
     }
-  }
-
-  private async handlePollIssuesAnalysis(event: PollIssueAnalysisEvent) {
-    this.logger.log(
-      `Handling poll issue analysis event for poll ${event.data.pollId}`,
-    )
-    if (event.data.rank === 1) {
-      this.logger.log(
-        'Detected first poll issue, deleting existing poll issues',
-      )
-      await this.pollIssuesService.model.deleteMany({
-        where: { pollId: event.data.pollId },
-      })
-      this.logger.log('Successfully deleted existing poll issues')
-    }
-
-    const issue: PollIssue = {
-      id: `${event.data.pollId}-${event.data.rank}`,
-      pollId: event.data.pollId,
-      title: event.data.theme,
-      summary: event.data.summary,
-      details: event.data.analysis,
-      mentionCount: event.data.responseCount,
-      representativeComments: event.data.quotes.map((quote) => ({
-        quote: quote.quote,
-      })),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
-    const result = await this.pollIssuesService.model.upsert({
-      where: { id: issue.id },
-      create: issue,
-      update: issue,
-    })
-    this.logger.log('Successfully upserted poll issue', result)
-    return true
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
