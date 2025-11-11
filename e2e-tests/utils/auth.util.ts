@@ -92,7 +92,12 @@ export async function deleteUser(
     },
   })
 
-  if (!response.ok() && response.status() !== 404) {
+  if (
+    !response.ok() &&
+    response.status() !== 401 &&
+    response.status() !== 403 &&
+    response.status() !== 404
+  ) {
     throw new Error(
       `Delete user failed: ${response.status()} ${await response.text()}`,
     )
