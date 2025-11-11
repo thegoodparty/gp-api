@@ -141,7 +141,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     return lastValueFrom(
       data
         ? this.httpService[method.name](url, data, config)
-        : this.httpService[method.name](url, config),
+        : this.httpService[method.name](url, null, config),
     )
   }
 
