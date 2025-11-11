@@ -1,4 +1,5 @@
 import { APIRequestContext } from '@playwright/test'
+import { faker } from '@faker-js/faker'
 
 export interface LoginResponse {
   token: string
@@ -105,11 +106,12 @@ export function generateRandomEmail(): string {
 }
 
 export function generateRandomName(): string {
-  const random = Math.random().toString(36).substring(2, 15)
-  const timestamp = Date.now().toString().slice(-6)
-  return `Test${timestamp}${random}`
+  return faker.person.firstName()
 }
 
 export function getBearerToken(token: string): string {
   return `Bearer ${token}`
+}
+export function generateRandomPassword(): string {
+  return faker.string.alphanumeric({ length: 12, casing: 'mixed' })
 }

@@ -3,6 +3,7 @@ import {
   deleteUser,
   generateRandomEmail,
   generateRandomName,
+  generateRandomPassword,
   RegisterResponse,
 } from '../../utils/auth.util'
 
@@ -23,7 +24,7 @@ test.describe('Authentication - Register', () => {
     const firstName: string = generateRandomName()
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const lastName: string = generateRandomName()
-    const password = 'no1TalksAboutFightClub'
+    const password: string = generateRandomPassword()
     const phone = '5555555555'
     const zip = '12345-1234'
 
@@ -39,6 +40,9 @@ test.describe('Authentication - Register', () => {
       },
     })
 
+    if (!response.ok()) {
+      console.log('Registration failed:', await response.text())
+    }
     expect(response.status()).toBe(201)
 
     const body = (await response.json()) as RegisterResponse
@@ -69,7 +73,7 @@ test.describe('Authentication - Register', () => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         lastName,
         email: testUserEmail,
-        password: 'no1TalksAboutFightClub',
+        password: generateRandomPassword(),
         phone: '5555555555',
         zip: '12345-1234',
         signUpMode: 'candidate',
@@ -100,7 +104,7 @@ test.describe('Authentication - Register', () => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         lastName,
         email: testUserEmail,
-        password: 'no1TalksAboutFightClub',
+        password: generateRandomPassword(),
         phone: '5555555555',
         zip: '12345-1234',
         signUpMode: 'candidate',

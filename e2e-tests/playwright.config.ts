@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test'
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { join } from 'path'
+
+config({ path: join(__dirname, '.env') })
 
 export default defineConfig({
   testDir: './tests',
