@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
-import { loginUser } from '../../utils/auth.util'
+import { loginUser } from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Authentication - Set Password Email', () => {
   const adminEmail = process.env.ADMIN_EMAIL

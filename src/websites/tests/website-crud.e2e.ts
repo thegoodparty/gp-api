@@ -5,7 +5,7 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -199,7 +199,10 @@ test.describe('Websites - CRUD Operations', () => {
       },
     })
 
-    const imagePath = path.join(__dirname, '../../fixtures/test-image.png')
+    const imagePath = path.join(
+      __dirname,
+      '../../../e2e-tests/fixtures/test-image.png',
+    )
     const imageBuffer = fs.readFileSync(imagePath)
 
     const updateResponse = await request.put('/v1/websites/mine', {

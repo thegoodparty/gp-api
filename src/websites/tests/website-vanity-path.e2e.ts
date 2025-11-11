@@ -5,7 +5,7 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 
 interface Website {
   id: number

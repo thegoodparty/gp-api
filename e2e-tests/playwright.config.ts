@@ -5,8 +5,8 @@ import { join } from 'path'
 config({ path: join(__dirname, '.env') })
 
 export default defineConfig({
-  testDir: './tests',
-  testMatch: '**/*.e2e.ts',
+  testDir: '../src',
+  testMatch: '**/tests/**/*.e2e.ts',
   outputDir: join(__dirname, 'test-results'),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

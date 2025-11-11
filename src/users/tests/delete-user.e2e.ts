@@ -7,7 +7,7 @@ import {
   generateRandomName,
   generateRandomPassword,
   loginUser,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Users - Delete User', () => {
   test('should delete user successfully', async ({ request }) => {

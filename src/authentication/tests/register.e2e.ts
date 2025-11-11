@@ -7,7 +7,7 @@ import {
   cleanupTestUser,
   TestUser,
   RegisterResponse,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Authentication - Register', () => {
   let testUserCleanup: TestUser | null = null

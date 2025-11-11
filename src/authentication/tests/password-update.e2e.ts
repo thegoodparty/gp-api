@@ -7,7 +7,7 @@ import {
   cleanupTestUser,
   TestUser,
   LoginResponse,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Authentication - Password Update', () => {
   let testUserCleanup: TestUser | null = null

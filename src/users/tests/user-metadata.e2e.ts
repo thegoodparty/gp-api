@@ -7,7 +7,7 @@ import {
   generateRandomPassword,
   cleanupTestUser,
   TestUser,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 
 interface MetadataResponse {

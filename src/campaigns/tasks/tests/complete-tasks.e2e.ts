@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginUser } from '../../../utils/auth.util'
+import { loginUser } from '../../../../e2e-tests/utils/auth.util'
 
 interface Task {
   id: string

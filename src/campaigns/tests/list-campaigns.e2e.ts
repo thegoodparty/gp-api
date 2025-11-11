@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginUser } from '../../../utils/auth.util'
+import { loginUser } from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Campaigns - List Campaigns (Admin)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
@@ -275,7 +275,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
     const dateFilter = new Date(testDate)
     campaigns.forEach((campaign: any) => {
       if (campaign.details.primaryElectionDate) {
-        expect(new Date(campaign.details.primaryElectionDate).getTime()).toBeGreaterThanOrEqual(dateFilter.getTime())
+        expect(
+          new Date(campaign.details.primaryElectionDate).getTime(),
+        ).toBeGreaterThanOrEqual(dateFilter.getTime())
       }
     })
   })
@@ -313,7 +315,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
     expect(campaigns.length).toBeGreaterThan(0)
     const dateFilter = new Date(testDate)
     campaigns.forEach((campaign: any) => {
-      expect(new Date(campaign.details.electionDate).getTime()).toBeGreaterThanOrEqual(dateFilter.getTime())
+      expect(
+        new Date(campaign.details.electionDate).getTime(),
+      ).toBeGreaterThanOrEqual(dateFilter.getTime())
     })
   })
 
@@ -351,7 +355,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
     const dateFilter = new Date(testDate)
     campaigns.forEach((campaign: any) => {
       if (campaign.details.primaryElectionDate) {
-        expect(new Date(campaign.details.primaryElectionDate).getTime()).toBeLessThanOrEqual(dateFilter.getTime())
+        expect(
+          new Date(campaign.details.primaryElectionDate).getTime(),
+        ).toBeLessThanOrEqual(dateFilter.getTime())
       }
     })
   })
@@ -389,7 +395,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
     expect(campaigns.length).toBeGreaterThan(0)
     const dateFilter = new Date(testDate)
     campaigns.forEach((campaign: any) => {
-      expect(new Date(campaign.details.electionDate).getTime()).toBeLessThanOrEqual(dateFilter.getTime())
+      expect(
+        new Date(campaign.details.electionDate).getTime(),
+      ).toBeLessThanOrEqual(dateFilter.getTime())
     })
   })
 
@@ -425,4 +433,3 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
     expect(campaign).toHaveProperty('pathToVictory')
   })
 })
-

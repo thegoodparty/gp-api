@@ -6,7 +6,7 @@ import {
   generateRandomName,
   generateRandomPassword,
   loginUser,
-} from '../../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Campaigns - User Campaign Operations', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL

@@ -6,7 +6,7 @@ import {
   generateRandomName,
   cleanupTestUser,
   TestUser,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Authentication - Password Reset', () => {
   let testUserCleanup: TestUser | null = null

@@ -6,7 +6,7 @@ import {
   generateRandomName,
   generateRandomPassword,
   loginUser,
-} from '../../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 
 interface PathToVictory {
   id: number
@@ -61,7 +61,10 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
+    testUsers.push({
+      id: registerResponse.user.id,
+      token: registerResponse.token,
+    })
 
     const updateResponse = await request.put('/v1/campaigns/mine', {
       headers: {
@@ -99,7 +102,10 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
+    testUsers.push({
+      id: registerResponse.user.id,
+      token: registerResponse.token,
+    })
 
     await request.put('/v1/campaigns/mine', {
       headers: {
@@ -165,7 +171,10 @@ test.describe('Campaigns - Race Target Details', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
+    testUsers.push({
+      id: registerResponse.user.id,
+      token: registerResponse.token,
+    })
 
     await request.put('/v1/campaigns/mine', {
       headers: {
@@ -243,7 +252,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
+    testUsers.push({
+      id: registerResponse.user.id,
+      token: registerResponse.token,
+    })
     testSlug = registerResponse.campaign.slug
 
     await request.put('/v1/campaigns/mine', {
@@ -299,7 +311,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
+    testUsers.push({
+      id: registerResponse.user.id,
+      token: registerResponse.token,
+    })
     testSlug = registerResponse.campaign.slug
 
     await request.put('/v1/campaigns/mine', {
@@ -362,7 +377,10 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
       signUpMode: 'candidate',
     })
 
-    testUsers.push({ id: registerResponse.user.id, token: registerResponse.token })
+    testUsers.push({
+      id: registerResponse.user.id,
+      token: registerResponse.token,
+    })
     testSlug = registerResponse.campaign.slug
 
     await request.put('/v1/campaigns/mine', {
@@ -407,4 +425,3 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     }
   })
 })
-

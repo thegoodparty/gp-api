@@ -6,7 +6,7 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
-} from '../../utils/auth.util'
+} from '../../../e2e-tests/utils/auth.util'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -50,7 +50,10 @@ test.describe('Users - Upload Image', () => {
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
 
-    const imagePath = path.join(__dirname, '../../fixtures/test-image.png')
+    const imagePath = path.join(
+      __dirname,
+      '../../../e2e-tests/fixtures/test-image.png',
+    )
     const imageBuffer = fs.readFileSync(imagePath)
 
     const response = await request.post('/v1/users/me/upload-image', {
@@ -94,7 +97,10 @@ test.describe('Users - Upload Image', () => {
     testUserId = registerResponse.user.id
     authToken = registerResponse.token
 
-    const textFilePath = path.join(__dirname, '../../fixtures/test-file.txt')
+    const textFilePath = path.join(
+      __dirname,
+      '../../../e2e-tests/fixtures/test-file.txt',
+    )
     const textBuffer = fs.readFileSync(textFilePath)
 
     const response = await request.post('/v1/users/me/upload-image', {
@@ -143,7 +149,10 @@ test.describe('Users - Upload Image', () => {
   })
 
   test('should return 401 when not authenticated', async ({ request }) => {
-    const imagePath = path.join(__dirname, '../../fixtures/test-image.png')
+    const imagePath = path.join(
+      __dirname,
+      '../../../e2e-tests/fixtures/test-image.png',
+    )
     const imageBuffer = fs.readFileSync(imagePath)
 
     const response = await request.post('/v1/users/me/upload-image', {
