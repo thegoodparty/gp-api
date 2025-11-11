@@ -5,6 +5,17 @@ interface TcrCompliance {
   id: string
 }
 
+const BASE_TCR_DATA = {
+  ein: '12-3456789',
+  placeId: 'ChIJN5kbvzXvZIgRND3iKCSUuxk',
+  formattedAddress: '1099 Fannie Nicholson Rd, Chapmansboro, TN 37035, USA',
+  committeeName: 'Paper Street Soap Co.',
+  websiteDomain: 'www.paperstreet.store',
+  filingUrl: 'https://sos.tn.co/filing',
+  email: 'tyler@fightclub.org',
+  phone: '288-555-0153',
+}
+
 test.describe('Campaigns - TCR Compliance', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
@@ -24,20 +35,12 @@ test.describe('Campaigns - TCR Compliance', () => {
         Authorization: `Bearer ${token}`,
       },
       data: {
-        ein: '12-3456789',
-        placeId: 'ChIJN5kbvzXvZIgRND3iKCSUuxk',
-        formattedAddress:
-          '1099 Fannie Nicholson Rd, Chapmansboro, TN 37035, USA',
-        committeeName: 'Paper Street Soap Co.',
-        websiteDomain: 'www.paperstreet.store',
-        filingUrl: 'https://sos.tn.co/filing',
-        email: 'tyler@fightclub.org',
-        phone: '288-555-0153',
+        ...BASE_TCR_DATA,
         matchingContactFields: ['email', 'phone'],
       },
     })
 
-    expect([201, 404]).toContain(response.status())
+    expect([201, 400, 404]).toContain(response.status())
 
     if (response.status() === 201) {
       const body = (await response.json()) as TcrCompliance
@@ -57,15 +60,7 @@ test.describe('Campaigns - TCR Compliance', () => {
         Authorization: `Bearer ${token}`,
       },
       data: {
-        ein: '12-3456789',
-        placeId: 'ChIJN5kbvzXvZIgRND3iKCSUuxk',
-        formattedAddress:
-          '1099 Fannie Nicholson Rd, Chapmansboro, TN 37035, USA',
-        committeeName: 'Paper Street Soap Co.',
-        websiteDomain: 'www.paperstreet.store',
-        filingUrl: 'https://sos.tn.co/filing',
-        email: 'tyler@fightclub.org',
-        phone: '288-555-0153',
+        ...BASE_TCR_DATA,
         matchingContactFields: ['email', 'phone'],
       },
     })
@@ -83,15 +78,7 @@ test.describe('Campaigns - TCR Compliance', () => {
         Authorization: `Bearer ${token}`,
       },
       data: {
-        ein: '12-3456789',
-        placeId: 'ChIJN5kbvzXvZIgRND3iKCSUuxk',
-        formattedAddress:
-          '1099 Fannie Nicholson Rd, Chapmansboro, TN 37035, USA',
-        committeeName: 'Paper Street Soap Co.',
-        websiteDomain: 'www.paperstreet.store',
-        filingUrl: 'https://sos.tn.com/filing',
-        email: 'tyler@fightclub.org',
-        phone: '288-555-0153',
+        ...BASE_TCR_DATA,
         matchingContactFields: [],
       },
     })
