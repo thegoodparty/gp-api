@@ -652,6 +652,9 @@ export class QueueConsumerService {
           pollId: poll.id,
           path: `/dashboard/polls/${poll.id}`,
           constituencyName: campaign.pathToVictory?.data.electionLocation,
+          'issue 1': event.data.issues?.at(0)?.theme || null,
+          'issue 2': event.data.issues?.at(1)?.theme || null,
+          'issue 3': event.data.issues?.at(2)?.theme || null,
         },
       )
     }
