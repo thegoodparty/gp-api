@@ -6,7 +6,7 @@ import {
   generateRandomName,
   generateRandomPassword,
   cleanupTestUser,
-  TestUserCleanup,
+  TestUser,
 } from '../../utils/auth.util'
 
 interface UserResponse {
@@ -20,7 +20,7 @@ interface UserResponse {
 }
 
 test.describe('Users - Get Current User', () => {
-  let testUserCleanup: TestUserCleanup | null = null
+  let testUserCleanup: TestUser | null = null
 
   test.afterEach(async ({ request }) => {
     await cleanupTestUser(request, testUserCleanup)

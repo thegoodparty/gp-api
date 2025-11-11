@@ -2,24 +2,22 @@ import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
-  deleteUser,
   generateRandomEmail,
   generateRandomName,
+  cleanupTestUser,
+  TestUser,
   LoginResponse,
 } from '../../utils/auth.util'
 
 test.describe('Authentication - Password Update', () => {
-  let testUserId: number
+  let testUserCleanup: TestUser | null = null
   let testUserEmail: string
-  let authToken: string
   const initialPassword = 'initialPassword123'
 
   test.beforeEach(async ({ request }) => {
     testUserEmail = generateRandomEmail()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const firstName: string = generateRandomName()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const lastName: string = generateRandomName()
+    const firstName = generateRandomName()
+    const lastName = generateRandomName()
     const result = await registerUser(request, {
       firstName,
       lastName,
@@ -29,38 +27,44 @@ test.describe('Authentication - Password Update', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
-    testUserId = result.user.id
-    authToken = result.token
-  })
-
-  test.afterEach(async ({ request }) => {
-    if (testUserId && authToken) {
-      await deleteUser(request, testUserId, authToken)
+    testUserCleanup = {
+      userId: result.user.id,
+      authToken: result.token,
     }
   })
 
+  test.afterEach(async ({ request }) => {
+    await cleanupTestUser(request, testUserCleanup)
+    testUserCleanup = null
+  })
+
   test('should update user password', async ({ request }) => {
+    if (!testUserCleanup) throw new Error('Test setup failed')
     const newPassword = 'updatedPassword456'
 
-    const response = await request.put(`/v1/users/${testUserId}/password`, {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
+    const response = await request.put(
+      `/v1/users/${testUserCleanup.userId}/password`,
+      {
+        headers: {
+          Authorization: `Bearer ${testUserCleanup.authToken}`,
+        },
+        data: {
+          oldPassword: initialPassword,
+          newPassword: newPassword,
+        },
       },
-      data: {
-        oldPassword: initialPassword,
-        newPassword: newPassword,
-      },
-    })
+    )
 
     expect(response.status()).toBe(HttpStatus.OK)
   })
 
   test('should login with updated password', async ({ request }) => {
+    if (!testUserCleanup) throw new Error('Test setup failed')
     const newPassword = 'updatedPassword456'
 
-    await request.put(`/v1/users/${testUserId}/password`, {
+    await request.put(`/v1/users/${testUserCleanup.userId}/password`, {
       headers: {
-        Authorization: `Bearer ${authToken}`,
+        Authorization: `Bearer ${testUserCleanup.authToken}`,
       },
       data: {
         oldPassword: initialPassword,
@@ -83,6 +87,6 @@ test.describe('Authentication - Password Update', () => {
     expect(body.user.password).toBeUndefined()
     expect(body.user.hasPassword).toBe(true)
 
-    authToken = body.token
+    testUserCleanup.authToken = body.token
   })
 })

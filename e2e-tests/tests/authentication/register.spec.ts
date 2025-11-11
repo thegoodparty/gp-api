@@ -1,31 +1,27 @@
 import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import {
-  deleteUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  cleanupTestUser,
+  TestUser,
   RegisterResponse,
 } from '../../utils/auth.util'
 
 test.describe('Authentication - Register', () => {
-  let testUserId: number
-  let testUserEmail: string
-  let authToken: string
+  let testUserCleanup: TestUser | null = null
 
   test.afterEach(async ({ request }) => {
-    if (testUserId && authToken) {
-      await deleteUser(request, testUserId, authToken)
-    }
+    await cleanupTestUser(request, testUserCleanup)
+    testUserCleanup = null
   })
 
   test('should register a new user', async ({ request }) => {
-    testUserEmail = generateRandomEmail()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const firstName: string = generateRandomName()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const lastName: string = generateRandomName()
-    const password: string = generateRandomPassword()
+    const testUserEmail = generateRandomEmail()
+    const firstName = generateRandomName()
+    const lastName = generateRandomName()
+    const password = generateRandomPassword()
     const phone = '5555555555'
     const zip = '12345-1234'
 
@@ -56,22 +52,20 @@ test.describe('Authentication - Register', () => {
     expect(body.user.hasPassword).toBe(true)
     expect(body.campaign).toBeTruthy()
 
-    testUserId = body.user.id
-    authToken = body.token
+    testUserCleanup = {
+      userId: body.user.id,
+      authToken: body.token,
+    }
   })
 
   test('should have set-cookie header on registration', async ({ request }) => {
-    testUserEmail = generateRandomEmail()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const lastName = generateRandomName()
 
     const response = await request.post('/v1/authentication/register', {
       data: {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         firstName,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         lastName,
         email: testUserEmail,
         password: generateRandomPassword(),
@@ -87,22 +81,20 @@ test.describe('Authentication - Register', () => {
     expect(setCookieHeader).toBeTruthy()
 
     const body = (await response.json()) as RegisterResponse
-    testUserId = body.user.id
-    authToken = body.token
+    testUserCleanup = {
+      userId: body.user.id,
+      authToken: body.token,
+    }
   })
 
   test('should ignore admin role on registration', async ({ request }) => {
-    testUserEmail = generateRandomEmail()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const lastName = generateRandomName()
 
     const response = await request.post('/v1/authentication/register', {
       data: {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         firstName,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         lastName,
         email: testUserEmail,
         password: generateRandomPassword(),
@@ -118,7 +110,9 @@ test.describe('Authentication - Register', () => {
     const body = (await response.json()) as RegisterResponse
     expect(body.user.roles).not.toContain('admin')
 
-    testUserId = body.user.id
-    authToken = body.token
+    testUserCleanup = {
+      userId: body.user.id,
+      authToken: body.token,
+    }
   })
 })

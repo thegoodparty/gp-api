@@ -2,10 +2,11 @@ import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
-  deleteUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  cleanupTestUser,
+  TestUser,
 } from '../../utils/auth.util'
 
 interface UserResponse {
@@ -19,13 +20,11 @@ interface UserResponse {
 }
 
 test.describe('Users - Update Current User', () => {
-  let testUserId: number
-  let authToken: string
+  let testUserCleanup: TestUser | null = null
 
   test.afterEach(async ({ request }) => {
-    if (testUserId && authToken) {
-      await deleteUser(request, testUserId, authToken)
-    }
+    await cleanupTestUser(request, testUserCleanup)
+    testUserCleanup = null
   })
 
   test('should update current user', async ({ request }) => {
@@ -44,15 +43,17 @@ test.describe('Users - Update Current User', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    authToken = registerResponse.token
+    testUserCleanup = {
+      userId: registerResponse.user.id,
+      authToken: registerResponse.token,
+    }
 
     const newFirstName = generateRandomName()
     const newLastName = generateRandomName()
 
     const response = await request.put('/v1/users/me', {
       headers: {
-        Authorization: `Bearer ${authToken}`,
+        Authorization: `Bearer ${testUserCleanup.authToken}`,
       },
       data: {
         firstName: newFirstName,

@@ -2,22 +2,20 @@ import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
-  deleteUser,
   generateRandomEmail,
   generateRandomName,
+  cleanupTestUser,
+  TestUser,
 } from '../../utils/auth.util'
 
 test.describe('Authentication - Password Reset', () => {
-  let testUserId: number
+  let testUserCleanup: TestUser | null = null
   let testUserEmail: string
-  let authToken: string
 
   test.beforeEach(async ({ request }) => {
     testUserEmail = generateRandomEmail()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const firstName: string = generateRandomName()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const lastName: string = generateRandomName()
+    const firstName = generateRandomName()
+    const lastName = generateRandomName()
     const result = await registerUser(request, {
       firstName,
       lastName,
@@ -27,14 +25,15 @@ test.describe('Authentication - Password Reset', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
-    testUserId = result.user.id
-    authToken = result.token
+    testUserCleanup = {
+      userId: result.user.id,
+      authToken: result.token,
+    }
   })
 
   test.afterEach(async ({ request }) => {
-    if (testUserId && authToken) {
-      await deleteUser(request, testUserId, authToken)
-    }
+    await cleanupTestUser(request, testUserCleanup)
+    testUserCleanup = null
   })
 
   test('should send recover password email', async ({ request }) => {

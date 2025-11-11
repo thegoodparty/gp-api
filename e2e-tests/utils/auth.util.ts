@@ -123,14 +123,14 @@ export function generateRandomPassword(): string {
   return faker.helpers.shuffle([...letters, ...numbers]).join('')
 }
 
-export interface TestUserCleanup {
+export interface TestUser {
   userId: number
   authToken: string
 }
 
 export async function cleanupTestUser(
   request: APIRequestContext,
-  cleanup: TestUserCleanup | null,
+  cleanup: TestUser | null,
 ): Promise<void> {
   if (cleanup && cleanup.userId && cleanup.authToken) {
     await deleteUser(request, cleanup.userId, cleanup.authToken)
