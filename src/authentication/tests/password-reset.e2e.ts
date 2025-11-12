@@ -8,12 +8,14 @@ import {
   TestUser,
 } from '../../../e2e-tests/utils/auth.util'
 
-test.describe('Authentication - Password Reset', () => {
-  let testUserCleanup: TestUser | null = null
-  let testUserEmail: string
+interface TestContext {
+  testUser: TestUser
+  testUserEmail: string
+}
 
-  test.beforeEach(async ({ request }) => {
-    testUserEmail = generateRandomEmail()
+test.describe('Authentication - Password Reset', () => {
+  test.beforeEach(async ({ request }, testInfo) => {
+    const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
     const result = await registerUser(request, {
@@ -25,23 +27,47 @@ test.describe('Authentication - Password Reset', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
-    testUserCleanup = {
-      userId: result.user.id,
-      authToken: result.token,
+
+    const testContext: TestContext = {
+      testUser: {
+        userId: result.user.id,
+        authToken: result.token,
+      },
+      testUserEmail,
+    }
+
+    testInfo.annotations.push({
+      type: 'testContext',
+      description: JSON.stringify(testContext),
+    })
+  })
+
+  test.afterEach(async ({ request }, testInfo) => {
+    const contextAnnotation = testInfo.annotations.find(
+      (annotation) => annotation.type === 'testContext',
+    )
+
+    if (contextAnnotation?.description) {
+      const testContext: TestContext = JSON.parse(
+        contextAnnotation.description,
+      ) as TestContext
+      await cleanupTestUser(request, testContext.testUser)
     }
   })
 
-  test.afterEach(async ({ request }) => {
-    await cleanupTestUser(request, testUserCleanup)
-    testUserCleanup = null
-  })
+  test('should send recover password email', async ({ request }, testInfo) => {
+    const contextAnnotation = testInfo.annotations.find(
+      (annotation) => annotation.type === 'testContext',
+    )
+    const testContext: TestContext = JSON.parse(
+      contextAnnotation!.description!,
+    ) as TestContext
 
-  test('should send recover password email', async ({ request }) => {
     const response = await request.post(
       '/v1/authentication/send-recover-password-email',
       {
         data: {
-          email: testUserEmail,
+          email: testContext.testUserEmail,
         },
       },
     )
@@ -64,10 +90,19 @@ test.describe('Authentication - Password Reset', () => {
     expect(response.status()).toBe(HttpStatus.NO_CONTENT)
   })
 
-  test('should return 403 for invalid reset token', async ({ request }) => {
+  test('should return 403 for invalid reset token', async ({
+    request,
+  }, testInfo) => {
+    const contextAnnotation = testInfo.annotations.find(
+      (annotation) => annotation.type === 'testContext',
+    )
+    const testContext: TestContext = JSON.parse(
+      contextAnnotation!.description!,
+    ) as TestContext
+
     const response = await request.post('/v1/authentication/reset-password', {
       data: {
-        email: testUserEmail,
+        email: testContext.testUserEmail,
         password: 'newPassword123',
         token: 'notgood',
       },
