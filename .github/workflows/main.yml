@@ -75,7 +75,10 @@ jobs:
             --services "$SERVICE" \
             --region us-west-2
 
-          echo "✅ ECS service is stable and ready"
+          echo "✅ ECS service is stable"
+          echo "Waiting 90 seconds for health checks to pass..."
+          sleep 90
+          echo "✅ Ready"
 
       - name: Notify Slack on Success (Deploy)
         if: success()
