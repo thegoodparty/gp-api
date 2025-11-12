@@ -169,6 +169,26 @@ jobs:
             e2e-tests/playwright-report
             e2e-tests/test-results
 
+      - name: Parse test results
+        if: failure()
+        id: test-results
+        shell: bash
+        run: |
+          if [ -f "e2e-tests/test-results/results.json" ]; then
+            FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '.suites[].specs[] | select(.ok == false) | .title' | head -10 | sed 's/^/• /')
+            if [ -z "$FAILED_TESTS" ]; then
+              FAILED_TESTS="• Unable to parse test results"
+            fi
+            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[].specs[] | select(.ok == false)] | length')
+            echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
+            echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "failed_tests=• Test results file not found" >> $GITHUB_OUTPUT
+            echo "failed_count=Unknown" >> $GITHUB_OUTPUT
+          fi
+
       - name: Notify Slack on Test Success
         if: success()
         uses: 8398a7/action-slack@v3
@@ -179,7 +199,7 @@ jobs:
               text: '✅ Playwright Tests Completed (Informational)',
               attachments: [{
                 color: 'good',
-                text: `${process.env.AS_REPO} - ${process.env.AS_REF} by ${process.env.AS_AUTHOR}\nTests passed but are non-blocking during stabilization.`
+                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\nTests passed but are non-blocking during stabilization.\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
               }]
             }
         env:
@@ -195,7 +215,7 @@ jobs:
               text: '⚠️ Playwright Tests Failed (Non-blocking)',
               attachments: [{
                 color: 'warning',
-                text: `${process.env.AS_REPO} - ${process.env.AS_REF} by ${process.env.AS_AUTHOR}\nSome tests failed. This is informational only and does not block deployment.`
+                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\nFailed: ${{ steps.test-results.outputs.failed_count || 'Unknown' }} test(s)\n\nFailed Tests:\n${{ steps.test-results.outputs.failed_tests || 'Unable to determine' }}\n\nThis is informational only and does not block deployment.\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
               }]
             }
         env:
