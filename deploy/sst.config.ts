@@ -239,6 +239,7 @@ export default $config({
       `tevyn-poll-csvs-${$app.stage}`,
       {
         bucket: tevynPollCsvsBucketName[$app.stage],
+        forceDestroy: false,
       },
     )
 
