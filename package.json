@@ -28,8 +28,7 @@
     "test:e2e:ui": "playwright test --config=e2e-tests/playwright.config.ts --ui",
     "test:e2e:debug": "playwright test --config=e2e-tests/playwright.config.ts --debug",
     "test:e2e:report": "playwright show-report e2e-tests/playwright-report",
-    "install:clean": "rm -rf node_modules package-lock.json && npm install --legacy-peer-deps",
-    "postinstall": "echo 'Note: This project requires --legacy-peer-deps flag due to peer dependency conflicts'"
+    "install:clean": "rm -rf node_modules package-lock.json && npm install"
   },
   "prisma": {
     "seed": "tsx ./seed/seed.ts",
@@ -150,7 +149,7 @@
     "@types/zipcodes": "^8.0.5",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "^16.4.5",
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
