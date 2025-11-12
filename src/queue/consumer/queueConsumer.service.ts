@@ -25,6 +25,7 @@ import {
   Poll,
   PollIndividualMessage,
   PollIssue,
+  PollStatus,
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
@@ -615,22 +616,56 @@ export class QueueConsumerService {
         event.data.totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
+    if (event.data.issues) {
+      this.logger.log('Detected poll issues, clearing existing poll issues')
+      await this.pollIssuesService.model.deleteMany({
+        where: { pollId: event.data.pollId },
+      })
+      this.logger.log('Successfully deleted existing poll issues')
+      await this.pollIssuesService.client.pollIssue.createMany({
+        data: event.data.issues.map((issue) => ({
+          id: `${event.data.pollId}-${issue.rank}`,
+          pollId: event.data.pollId,
+          title: issue.theme,
+          summary: issue.summary,
+          details: issue.analysis,
+          mentionCount: issue.responseCount,
+          representativeComments: issue.quotes.map((quote) => ({
+            quote: quote.quote,
+          })),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      })
+      this.logger.log('Successfully created new poll issues')
+    }
+
     await this.pollsService.markPollComplete({
       pollId: poll.id,
       totalResponses: event.data.totalResponses,
       confidence: highConfidence ? 'HIGH' : 'LOW',
     })
-    if (campaign) {
-      await this.analytics.track(
-        campaign.userId,
-        EVENTS.Polls.ResultsSynthesisCompleted,
-        {
-          pollId: poll.id,
-          path: `/dashboard/polls/${poll.id}`,
-          constituencyName: campaign.pathToVictory?.data.electionLocation,
-        },
-      )
-    }
+
+    const pollCount = await this.pollsService.model.count({
+      where: {
+        electedOfficeId: poll.electedOfficeId,
+        status: PollStatus.COMPLETED,
+      },
+    })
+
+    await this.analytics.identify(campaign.userId, { pollcount: pollCount })
+    await this.analytics.track(
+      campaign.userId,
+      EVENTS.Polls.ResultsSynthesisCompleted,
+      {
+        pollId: poll.id,
+        path: `/dashboard/polls/${poll.id}`,
+        constituencyName: campaign.pathToVictory?.data.electionLocation,
+        'issue 1': event.data.issues?.at(0)?.theme || null,
+        'issue 2': event.data.issues?.at(1)?.theme || null,
+        'issue 3': event.data.issues?.at(2)?.theme || null,
+      },
+    )
     return true
   }
 

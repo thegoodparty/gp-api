@@ -5,15 +5,16 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
+import retry from 'async-retry'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { WithOptional } from 'src/shared/types/utility.types'
+import { AnalyticsService } from '../../analytics/analytics.service'
+import { trimMany } from '../../shared/util/strings.util'
 import {
   CreateUserInputDto,
   SIGN_UP_MODE,
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
-import { trimMany } from '../../shared/util/strings.util'
-import { WithOptional } from 'src/shared/types/utility.types'
-import { AnalyticsService } from '../../analytics/analytics.service'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmUsersService } from './crmUsers.service'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
@@ -183,24 +184,50 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     userId: number,
     newMetaData: PrismaJson.UserMetaData,
   ) {
-    return this.client.$transaction(async (tx) => {
-      const user = await tx.user.findFirst({ where: { id: userId } })
-      if (!user) {
-        this.logger.warn(
-          `User with id ${userId} not found. Skipping metadata update`,
+    return retry(
+      async (bail) => {
+        const user = await this.client.user.findUnique({
+          where: { id: userId },
+        })
+        if (!user) {
+          this.logger.warn(
+            `User with id ${userId} not found. Skipping metadata update`,
+          )
+          bail(new Error(`User with id ${userId} not found. Bailing retry.`))
+          return null
+        }
+
+        this.logger.log(
+          `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData ?? {})}`,
         )
-        return null
-      }
-      return tx.user.update({
-        where: { id: userId },
-        data: {
-          metaData: {
-            ...(user.metaData ?? {}),
-            ...newMetaData,
+
+        const mergedMetaData = {
+          ...(user.metaData ?? {}),
+          ...(newMetaData ?? {}),
+        } as PrismaJson.UserMetaData
+
+        const updatedUsers = await this.client.user.updateManyAndReturn({
+          where: { id: userId, updatedAt: user.updatedAt },
+          data: {
+            metaData: mergedMetaData,
           },
-        },
-      })
-    })
+        })
+        if (!updatedUsers || updatedUsers.length === 0) {
+          // Throwing triggers the retry
+          throw new ConflictException('Failed to update userMetaData')
+        }
+        const updatedUser = updatedUsers[0]
+
+        this.logger.log(
+          `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData ?? {})}`,
+        )
+        return updatedUser
+      },
+      {
+        retries: 5,
+        minTimeout: 100,
+      },
+    )
   }
 
   async deleteUser(id: number) {
@@ -209,5 +236,39 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         id,
       },
     })
+  }
+
+  async flushLastVisited(
+    userId: number,
+    pendingLastVisitedMs: number,
+    sessionTimeoutMs: number,
+  ) {
+    // Update lastVisited to the max of existing and pending; increment sessionCount if a new session
+    return this.client.$executeRaw`
+      UPDATE "user" u
+      SET
+        meta_data = jsonb_set(
+          jsonb_set(
+            COALESCE(u.meta_data, '{}'::jsonb),
+            '{lastVisited}',
+            to_jsonb(GREATEST(
+              COALESCE((u.meta_data->>'lastVisited')::bigint, 0),
+              ${pendingLastVisitedMs}::bigint
+            )),
+            true
+          ),
+          '{sessionCount}',
+          to_jsonb(
+            CASE
+              WHEN COALESCE((u.meta_data->>'lastVisited')::bigint, 0) + ${sessionTimeoutMs}::bigint < ${pendingLastVisitedMs}::bigint
+                THEN COALESCE((u.meta_data->>'sessionCount')::bigint, 0) + 1
+              ELSE COALESCE((u.meta_data->>'sessionCount')::bigint, 0)
+            END
+          ),
+          true
+        ),
+        updated_at = NOW()
+      WHERE u.id = ${userId}
+    `
   }
 }

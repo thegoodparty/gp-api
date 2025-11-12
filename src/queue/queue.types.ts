@@ -33,17 +33,19 @@ export type DomainEmailForwardingMessage = {
   forwardingEmailAddress: string
 }
 
+const PollIssueAnalysis = z.object({
+  pollId: z.string(),
+  rank: z.number().min(1).max(3),
+  theme: z.string(),
+  summary: z.string(),
+  analysis: z.string(),
+  responseCount: z.number(),
+  quotes: z.array(z.object({ quote: z.string(), phone_number: z.string() })),
+})
+
 export const PollIssueAnalysisEventSchema = z.object({
   type: z.literal(QueueType.POLL_ISSUES_ANALYSIS),
-  data: z.object({
-    pollId: z.string(),
-    rank: z.number().min(1).max(3),
-    theme: z.string(),
-    summary: z.string(),
-    analysis: z.string(),
-    responseCount: z.number(),
-    quotes: z.array(z.object({ quote: z.string(), phone_number: z.string() })),
-  }),
+  data: PollIssueAnalysis,
 })
 export type PollIssueAnalysisEvent = z.infer<
   typeof PollIssueAnalysisEventSchema
@@ -54,6 +56,7 @@ export const PollAnalysisCompleteEventSchema = z.object({
   data: z.object({
     pollId: z.string(),
     totalResponses: z.number(),
+    issues: z.array(PollIssueAnalysis).optional(),
   }),
 })
 export type PollAnalysisCompleteEvent = z.infer<
