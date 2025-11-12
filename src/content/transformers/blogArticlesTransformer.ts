@@ -17,7 +17,7 @@ export const blogArticlesTransformer: Transformer<
   BlogArticleAugmented
 > = (content: BlogArticleContentRaw[]): BlogArticleAugmented[] =>
   content.map((rawContent: BlogArticleContentRaw): BlogArticleAugmented => {
-    const { data, id, updatedAt, type } = rawContent
+    const { data, id, type } = rawContent
     const {
       author: rawAuthor,
       section: rawSection,
@@ -35,7 +35,6 @@ export const blogArticlesTransformer: Transformer<
       id,
       type,
       text,
-      updateDate: updatedAt,
       mainImage: transformContentMedia(rawMainImage),
       tags: [...transformBlogArticleRawTags(rawTags).values()],
       ...(rawSection

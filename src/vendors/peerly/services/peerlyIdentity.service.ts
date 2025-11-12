@@ -51,6 +51,7 @@ import { SlackService } from '../../slack/services/slack.service'
 import { SlackChannel, SlackMessageType } from '../../slack/slackService.types'
 import { UsersService } from '../../../users/services/users.service'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
+import { method as HttpMethod } from '@poppanator/http-constants'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
@@ -138,10 +139,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         config,
       })}`,
     )
+    const twoArgMethods = [HttpMethod.Get, HttpMethod.Delete, HttpMethod.Head]
     return lastValueFrom(
-      data
-        ? this.httpService[method.name](url, data, config)
-        : this.httpService[method.name](url, config),
+      twoArgMethods.includes(method.name.toUpperCase())
+        ? this.httpService[method.name](url, config)
+        : data
+          ? this.httpService[method.name](url, data, config)
+          : this.httpService[method.name](url, null, config),
     )
   }
 

@@ -193,6 +193,7 @@ export type BlogArticleContentRaw = ContentRaw<{
     publishDate: string
     slug: string
     summary: string
+    updateDate?: string
   }
 }>
 
@@ -200,7 +201,6 @@ export type BlogArticleAugmented = ContentAugmented<
   FieldsType & {
     id: string
     text: string
-    updateDate: Date | null
     tags: PrismaJson.BlogArticleTag[]
     mainImage: ContentMedia
     author?: PrismaJson.BlogArticleAuthor
@@ -211,6 +211,7 @@ export type BlogArticleAugmented = ContentAugmented<
     slug: string
     title: string
     publishDate: string
+    updateDate?: string
     summary: string
   }
 >
