@@ -25,6 +25,7 @@ import {
   Poll,
   PollIndividualMessage,
   PollIssue,
+  PollStatus,
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
@@ -644,20 +645,27 @@ export class QueueConsumerService {
       totalResponses: event.data.totalResponses,
       confidence: highConfidence ? 'HIGH' : 'LOW',
     })
-    if (campaign) {
-      await this.analytics.track(
-        campaign.userId,
-        EVENTS.Polls.ResultsSynthesisCompleted,
-        {
-          pollId: poll.id,
-          path: `/dashboard/polls/${poll.id}`,
-          constituencyName: campaign.pathToVictory?.data.electionLocation,
-          'issue 1': event.data.issues?.at(0)?.theme || null,
-          'issue 2': event.data.issues?.at(1)?.theme || null,
-          'issue 3': event.data.issues?.at(2)?.theme || null,
-        },
-      )
-    }
+
+    const pollCount = await this.pollsService.model.count({
+      where: {
+        electedOfficeId: poll.electedOfficeId,
+        status: PollStatus.COMPLETED,
+      },
+    })
+
+    await this.analytics.identify(campaign.userId, { pollcount: pollCount })
+    await this.analytics.track(
+      campaign.userId,
+      EVENTS.Polls.ResultsSynthesisCompleted,
+      {
+        pollId: poll.id,
+        path: `/dashboard/polls/${poll.id}`,
+        constituencyName: campaign.pathToVictory?.data.electionLocation,
+        'issue 1': event.data.issues?.at(0)?.theme || null,
+        'issue 2': event.data.issues?.at(1)?.theme || null,
+        'issue 3': event.data.issues?.at(2)?.theme || null,
+      },
+    )
     return true
   }
 
