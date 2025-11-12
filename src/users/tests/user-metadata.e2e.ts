@@ -6,22 +6,23 @@ import {
   generateRandomName,
   generateRandomPassword,
   cleanupTestUser,
-  TestUser,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
+import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 type MetadataResponse = Record<string, unknown>
 
 test.describe('Users - User Metadata', () => {
-  let testUserCleanup: TestUser | null = null
+  test.afterEach(async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext
 
-  test.afterEach(async ({ request }) => {
-    await cleanupTestUser(request, testUserCleanup)
-    testUserCleanup = null
+    if (testContext) {
+      await cleanupTestUser(request, testContext.testUser)
+    }
   })
 
-  test('should get current user metadata', async ({ request }) => {
+  test('should get current user metadata', async ({ request }, testInfo) => {
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -37,14 +38,16 @@ test.describe('Users - User Metadata', () => {
       signUpMode: 'candidate',
     })
 
-    testUserCleanup = {
-      userId: registerResponse.user.id,
-      authToken: registerResponse.token,
+    ;(testInfo as TestInfoWithContext).testContext = {
+      testUser: {
+        userId: registerResponse.user.id,
+        authToken: registerResponse.token,
+      },
     }
 
     const response = await request.get('/v1/users/me/metadata', {
       headers: {
-        Authorization: `Bearer ${testUserCleanup.authToken}`,
+        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser.authToken}`,
       },
     })
 
@@ -54,7 +57,7 @@ test.describe('Users - User Metadata', () => {
     expect(body).toBeTruthy()
   })
 
-  test('should update current user metadata', async ({ request }) => {
+  test('should update current user metadata', async ({ request }, testInfo) => {
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -70,9 +73,11 @@ test.describe('Users - User Metadata', () => {
       signUpMode: 'candidate',
     })
 
-    testUserCleanup = {
-      userId: registerResponse.user.id,
-      authToken: registerResponse.token,
+    ;(testInfo as TestInfoWithContext).testContext = {
+      testUser: {
+        userId: registerResponse.user.id,
+        authToken: registerResponse.token,
+      },
     }
 
     const metaData = {
@@ -84,7 +89,7 @@ test.describe('Users - User Metadata', () => {
 
     const response = await request.put('/v1/users/me/metadata', {
       headers: {
-        Authorization: `Bearer ${testUserCleanup.authToken}`,
+        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser.authToken}`,
       },
       data: {
         meta: metaData,

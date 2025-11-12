@@ -6,19 +6,20 @@ import {
   generateRandomName,
   generateRandomPassword,
   cleanupTestUser,
-  TestUser,
 } from '../../../e2e-tests/utils/auth.util'
 import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
+import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 test.describe('Users - Update Current User', () => {
-  let testUserCleanup: TestUser | null = null
+  test.afterEach(async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext
 
-  test.afterEach(async ({ request }) => {
-    await cleanupTestUser(request, testUserCleanup)
-    testUserCleanup = null
+    if (testContext) {
+      await cleanupTestUser(request, testContext.testUser)
+    }
   })
 
-  test('should update current user', async ({ request }) => {
+  test('should update current user', async ({ request }, testInfo) => {
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -34,9 +35,11 @@ test.describe('Users - Update Current User', () => {
       signUpMode: 'candidate',
     })
 
-    testUserCleanup = {
-      userId: registerResponse.user.id,
-      authToken: registerResponse.token,
+    ;(testInfo as TestInfoWithContext).testContext = {
+      testUser: {
+        userId: registerResponse.user.id,
+        authToken: registerResponse.token,
+      },
     }
 
     const newFirstName = generateRandomName()
@@ -44,7 +47,7 @@ test.describe('Users - Update Current User', () => {
 
     const response = await request.put('/v1/users/me', {
       headers: {
-        Authorization: `Bearer ${testUserCleanup.authToken}`,
+        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser.authToken}`,
       },
       data: {
         firstName: newFirstName,

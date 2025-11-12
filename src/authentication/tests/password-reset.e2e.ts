@@ -1,21 +1,12 @@
-import { test, expect, TestInfo } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
   generateRandomEmail,
   generateRandomName,
   cleanupTestUser,
-  TestUser,
 } from '../../../e2e-tests/utils/auth.util'
-
-interface TestContext {
-  testUser: TestUser
-  testUserEmail: string
-}
-
-interface TestInfoWithContext extends TestInfo {
-  testContext?: TestContext
-}
+import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 test.describe('Authentication - Password Reset', () => {
   test.beforeEach(async ({ request }, testInfo) => {

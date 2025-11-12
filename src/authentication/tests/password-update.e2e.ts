@@ -5,17 +5,15 @@ import {
   generateRandomEmail,
   generateRandomName,
   cleanupTestUser,
-  TestUser,
   LoginResponse,
 } from '../../../e2e-tests/utils/auth.util'
+import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 test.describe('Authentication - Password Update', () => {
-  let testUserCleanup: TestUser | null = null
-  let testUserEmail: string
   const initialPassword = 'initialPassword123'
 
-  test.beforeEach(async ({ request }) => {
-    testUserEmail = generateRandomEmail()
+  test.beforeEach(async ({ request }, testInfo) => {
+    const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
     const result = await registerUser(request, {
@@ -27,26 +25,32 @@ test.describe('Authentication - Password Update', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
-    testUserCleanup = {
-      userId: result.user.id,
-      authToken: result.token,
+    ;(testInfo as TestInfoWithContext).testContext = {
+      testUser: {
+        userId: result.user.id,
+        authToken: result.token,
+      },
+      testUserEmail,
     }
   })
 
-  test.afterEach(async ({ request }) => {
-    await cleanupTestUser(request, testUserCleanup)
-    testUserCleanup = null
+  test.afterEach(async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext
+
+    if (testContext) {
+      await cleanupTestUser(request, testContext.testUser)
+    }
   })
 
-  test('should update user password', async ({ request }) => {
-    if (!testUserCleanup) throw new Error('Test setup failed')
+  test('should update user password', async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext!
     const newPassword = 'updatedPassword456'
 
     const response = await request.put(
-      `/v1/users/${testUserCleanup.userId}/password`,
+      `/v1/users/${testContext.testUser.userId}/password`,
       {
         headers: {
-          Authorization: `Bearer ${testUserCleanup.authToken}`,
+          Authorization: `Bearer ${testContext.testUser.authToken}`,
         },
         data: {
           oldPassword: initialPassword,
@@ -58,13 +62,13 @@ test.describe('Authentication - Password Update', () => {
     expect(response.status()).toBe(HttpStatus.OK)
   })
 
-  test('should login with updated password', async ({ request }) => {
-    if (!testUserCleanup) throw new Error('Test setup failed')
+  test('should login with updated password', async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext!
     const newPassword = 'updatedPassword456'
 
-    await request.put(`/v1/users/${testUserCleanup.userId}/password`, {
+    await request.put(`/v1/users/${testContext.testUser.userId}/password`, {
       headers: {
-        Authorization: `Bearer ${testUserCleanup.authToken}`,
+        Authorization: `Bearer ${testContext.testUser.authToken}`,
       },
       data: {
         oldPassword: initialPassword,
@@ -74,7 +78,7 @@ test.describe('Authentication - Password Update', () => {
 
     const loginResponse = await request.post('/v1/authentication/login', {
       data: {
-        email: testUserEmail,
+        email: testContext.testUserEmail,
         password: newPassword,
       },
     })
@@ -83,10 +87,10 @@ test.describe('Authentication - Password Update', () => {
 
     const body = (await loginResponse.json()) as LoginResponse
     expect(body.token).toBeTruthy()
-    expect(body.user.email).toBe(testUserEmail)
+    expect(body.user.email).toBe(testContext.testUserEmail)
     expect(body.user.password).toBeUndefined()
     expect(body.user.hasPassword).toBe(true)
 
-    testUserCleanup.authToken = body.token
+    testContext.testUser.authToken = body.token
   })
 })

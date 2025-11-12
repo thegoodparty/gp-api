@@ -5,19 +5,20 @@ import {
   generateRandomName,
   generateRandomPassword,
   cleanupTestUser,
-  TestUser,
   RegisterResponse,
 } from '../../../e2e-tests/utils/auth.util'
+import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 test.describe('Authentication - Register', () => {
-  let testUserCleanup: TestUser | null = null
+  test.afterEach(async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext
 
-  test.afterEach(async ({ request }) => {
-    await cleanupTestUser(request, testUserCleanup)
-    testUserCleanup = null
+    if (testContext) {
+      await cleanupTestUser(request, testContext.testUser)
+    }
   })
 
-  test('should register a new user', async ({ request }) => {
+  test('should register a new user', async ({ request }, testInfo) => {
     const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -51,14 +52,17 @@ test.describe('Authentication - Register', () => {
     expect(body.user.password).toBeUndefined()
     expect(body.user.hasPassword).toBe(true)
     expect(body.campaign).toBeTruthy()
-
-    testUserCleanup = {
-      userId: body.user.id,
-      authToken: body.token,
+    ;(testInfo as TestInfoWithContext).testContext = {
+      testUser: {
+        userId: body.user.id,
+        authToken: body.token,
+      },
     }
   })
 
-  test('should have set-cookie header on registration', async ({ request }) => {
+  test('should have set-cookie header on registration', async ({
+    request,
+  }, testInfo) => {
     const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -81,13 +85,17 @@ test.describe('Authentication - Register', () => {
     expect(setCookieHeader).toBeTruthy()
 
     const body = (await response.json()) as RegisterResponse
-    testUserCleanup = {
-      userId: body.user.id,
-      authToken: body.token,
+    ;(testInfo as TestInfoWithContext).testContext = {
+      testUser: {
+        userId: body.user.id,
+        authToken: body.token,
+      },
     }
   })
 
-  test('should ignore admin role on registration', async ({ request }) => {
+  test('should ignore admin role on registration', async ({
+    request,
+  }, testInfo) => {
     const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
@@ -109,10 +117,11 @@ test.describe('Authentication - Register', () => {
 
     const body = (await response.json()) as RegisterResponse
     expect(body.user.roles).not.toContain('admin')
-
-    testUserCleanup = {
-      userId: body.user.id,
-      authToken: body.token,
+    ;(testInfo as TestInfoWithContext).testContext = {
+      testUser: {
+        userId: body.user.id,
+        authToken: body.token,
+      },
     }
   })
 })
