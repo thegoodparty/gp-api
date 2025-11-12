@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, TestInfo } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import {
   registerUser,
@@ -11,6 +11,10 @@ import {
 interface TestContext {
   testUser: TestUser
   testUserEmail: string
+}
+
+interface TestInfoWithContext extends TestInfo {
+  testContext?: TestContext
 }
 
 test.describe('Authentication - Password Reset', () => {
@@ -28,40 +32,25 @@ test.describe('Authentication - Password Reset', () => {
       signUpMode: 'candidate',
     })
 
-    const testContext: TestContext = {
+    ;(testInfo as TestInfoWithContext).testContext = {
       testUser: {
         userId: result.user.id,
         authToken: result.token,
       },
       testUserEmail,
     }
-
-    testInfo.annotations.push({
-      type: 'testContext',
-      description: JSON.stringify(testContext),
-    })
   })
 
   test.afterEach(async ({ request }, testInfo) => {
-    const contextAnnotation = testInfo.annotations.find(
-      (annotation) => annotation.type === 'testContext',
-    )
+    const testContext = (testInfo as TestInfoWithContext).testContext
 
-    if (contextAnnotation?.description) {
-      const testContext: TestContext = JSON.parse(
-        contextAnnotation.description,
-      ) as TestContext
+    if (testContext) {
       await cleanupTestUser(request, testContext.testUser)
     }
   })
 
   test('should send recover password email', async ({ request }, testInfo) => {
-    const contextAnnotation = testInfo.annotations.find(
-      (annotation) => annotation.type === 'testContext',
-    )
-    const testContext: TestContext = JSON.parse(
-      contextAnnotation!.description!,
-    ) as TestContext
+    const testContext = (testInfo as TestInfoWithContext).testContext!
 
     const response = await request.post(
       '/v1/authentication/send-recover-password-email',
@@ -93,12 +82,7 @@ test.describe('Authentication - Password Reset', () => {
   test('should return 403 for invalid reset token', async ({
     request,
   }, testInfo) => {
-    const contextAnnotation = testInfo.annotations.find(
-      (annotation) => annotation.type === 'testContext',
-    )
-    const testContext: TestContext = JSON.parse(
-      contextAnnotation!.description!,
-    ) as TestContext
+    const testContext = (testInfo as TestInfoWithContext).testContext!
 
     const response = await request.post('/v1/authentication/reset-password', {
       data: {
