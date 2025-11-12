@@ -334,7 +334,7 @@ export default $config({
         fargate: { weight: 1 },
       },
       memory: $app.stage === 'master' ? '4 GB' : '3 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
-      cpu: $app.stage === '1 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
+      cpu: '1 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
       scaling: {
         min: $app.stage === 'master' ? 2 : 1,
         max: $app.stage === 'master' ? 16 : 4,
