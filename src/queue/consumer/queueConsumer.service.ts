@@ -623,7 +623,7 @@ export class QueueConsumerService {
       this.logger.log('Successfully deleted existing poll issues')
       await this.pollIssuesService.client.pollIssue.createMany({
         data: event.data.issues.map((issue) => ({
-          id: `${issue.pollId}-${issue.rank}`,
+          id: `${event.data.pollId}-${issue.rank}`,
           pollId: event.data.pollId,
           title: issue.theme,
           summary: issue.summary,
