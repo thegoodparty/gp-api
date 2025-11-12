@@ -1,9 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
 
-interface TcrCompliance {
-  id: string
-}
+type TcrCompliance = { id: string }
 
 const BASE_TCR_DATA = {
   ein: '12-3456789',

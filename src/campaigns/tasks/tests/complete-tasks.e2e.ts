@@ -1,11 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
+import { CampaignTask } from '../campaignTasks.types'
 
-interface Task {
-  id: string
-  week: number
-  completed: boolean
-}
+type CampaignTaskWithCompletion = CampaignTask & { completed: boolean }
 
 test.describe('Campaigns Tasks - Complete Tasks', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
@@ -38,7 +35,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       },
     )
 
-    const tasks = (await listResponse.json()) as Task[]
+    const tasks = (await listResponse.json()) as CampaignTask[]
     testTaskId = tasks[0].id
 
     const response = await request.put(
@@ -52,7 +49,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const updatedTask = (await response.json()) as Task
+    const updatedTask = (await response.json()) as CampaignTaskWithCompletion
     expect(updatedTask.id).toBe(testTaskId)
     expect(updatedTask.completed).toBe(true)
   })
@@ -76,7 +73,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       },
     )
 
-    const tasks = (await listResponse.json()) as Task[]
+    const tasks = (await listResponse.json()) as CampaignTask[]
     testTaskId = tasks[0].id
 
     await request.put(`/v1/campaigns/tasks/complete/${testTaskId}`, {
@@ -96,9 +93,8 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const updatedTask = (await response.json()) as Task
+    const updatedTask = (await response.json()) as CampaignTaskWithCompletion
     expect(updatedTask.id).toBe(testTaskId)
     expect(updatedTask.completed).toBe(false)
   })
 })
-

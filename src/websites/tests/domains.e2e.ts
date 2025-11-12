@@ -7,32 +7,14 @@ import {
   generateRandomPassword,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
+import { DomainSearchResult } from '../domains.types'
+import { Prisma } from '@prisma/client'
 
-interface DomainSearchResponse {
-  domainName: string
-  availability: string
-  price?: number
-  suggestions: Array<{
-    Availability: string
-    DomainName: string
-    price?: number
-  }>
-}
-
-interface Website {
-  id: number
-  campaignId: number
-  status: string
-  vanityPath: string | null
-  content: unknown
-  createdAt: string
-  updatedAt: string
-  domain?: {
-    id: number
-    name: string
-    status: string
+type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
+  include: {
+    domain: true
   }
-}
+}>
 
 test.describe('Websites - Domains', () => {
   let testUserId: number
@@ -76,7 +58,7 @@ test.describe('Websites - Domains', () => {
 
     expect(response.status()).toBe(200)
 
-    const result = (await response.json()) as DomainSearchResponse
+    const result = (await response.json()) as DomainSearchResult
     expect(result.domainName).toBe(domainName)
     expect(result.availability).toBeDefined()
     expect(typeof result.availability).toBe('string')
@@ -117,7 +99,7 @@ test.describe('Websites - Domains', () => {
 
     expect(response.status()).toBe(200)
 
-    const result = (await response.json()) as DomainSearchResponse
+    const result = (await response.json()) as DomainSearchResult
     expect(result.suggestions).toBeDefined()
     expect(Array.isArray(result.suggestions)).toBe(true)
     expect(result.suggestions.length).toBeGreaterThan(0)
@@ -177,7 +159,7 @@ test.describe('Websites - Domains', () => {
     expect([200, 404]).toContain(response.status())
 
     if (response.status() === 200) {
-      const website = (await response.json()) as Website
+      const website = (await response.json()) as WebsiteWithDomain
       expect(website).toBeDefined()
       expect(website.campaignId).toBe(registerResponse.campaign.id)
     }

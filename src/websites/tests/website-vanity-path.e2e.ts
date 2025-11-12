@@ -6,23 +6,23 @@ import {
   generateRandomName,
   generateRandomPassword,
 } from '../../../e2e-tests/utils/auth.util'
+import { Prisma } from '@prisma/client'
 
-interface Website {
-  id: number
-  campaignId: number
-  status: string
-  vanityPath: string | null
-  content: unknown
-  createdAt: string
-  updatedAt: string
-  campaign?: {
-    details: unknown
-    user: {
-      firstName: string
-      lastName: string
+type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
+  include: {
+    campaign: {
+      select: {
+        details: true
+        user: {
+          select: {
+            firstName: true
+            lastName: true
+          }
+        }
+      }
     }
   }
-}
+}>
 
 test.describe('Websites - Vanity Path', () => {
   let testUserId: number | undefined
@@ -194,7 +194,7 @@ test.describe('Websites - Vanity Path', () => {
 
     expect(response.status()).toBe(200)
 
-    const website = (await response.json()) as Website
+    const website = (await response.json()) as WebsiteWithDomain
     expect(website.vanityPath).toBe(vanityPath)
     expect(website.status).toBe('published')
     expect(website.campaign).toBeDefined()

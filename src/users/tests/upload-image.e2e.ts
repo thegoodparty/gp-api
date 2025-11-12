@@ -9,17 +9,7 @@ import {
 } from '../../../e2e-tests/utils/auth.util'
 import * as fs from 'fs'
 import * as path from 'path'
-
-interface UserResponse {
-  id: number
-  email: string
-  firstName: string
-  lastName: string
-  avatar?: string
-  password?: undefined
-  roles: string[]
-  hasPassword: boolean
-}
+import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 
 test.describe('Users - Upload Image', () => {
   let testUserId: number
@@ -71,7 +61,7 @@ test.describe('Users - Upload Image', () => {
 
     expect(response.status()).toBe(HttpStatus.CREATED)
 
-    const body = (await response.json()) as UserResponse
+    const body = (await response.json()) as ReadUserOutput
     expect(body.avatar).toBeTruthy()
     expect(body.avatar).toMatch(
       /^https:\/\/assets(-dev|-qa)?\.goodparty\.org\/uploads\/.+\.(png|jpg|jpeg)$/,

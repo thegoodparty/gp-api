@@ -8,16 +8,7 @@ import {
   cleanupTestUser,
   TestUser,
 } from '../../../e2e-tests/utils/auth.util'
-
-interface UserResponse {
-  id: number
-  email: string
-  firstName: string
-  lastName: string
-  password?: undefined
-  roles: string[]
-  hasPassword: boolean
-}
+import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 
 test.describe('Users - Update Current User', () => {
   let testUserCleanup: TestUser | null = null
@@ -63,7 +54,7 @@ test.describe('Users - Update Current User', () => {
 
     expect(response.status()).toBe(HttpStatus.OK)
 
-    const body = (await response.json()) as UserResponse
+    const body = (await response.json()) as ReadUserOutput
     expect(body.firstName).toBe(newFirstName)
     expect(body.lastName).toBe(newLastName)
     expect(body.email).toBe(email)

@@ -19,9 +19,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
     )
   })
 
-  test('should get campaign status for logged in user', async ({
-    request,
-  }) => {
+  test('should get campaign status for logged in user', async ({ request }) => {
     const { token } = await loginUser(
       request,
       candidateEmail!,
@@ -236,9 +234,7 @@ test.describe('Campaigns - Admin Update Operations', () => {
     test.skip(!adminEmail || !adminPassword, 'Admin credentials not configured')
   })
 
-  test('should allow admin to update campaign by slug', async ({
-    request,
-  }) => {
+  test('should allow admin to update campaign by slug', async ({ request }) => {
     const { token } = await loginUser(request, adminEmail!, adminPassword!)
 
     const allCampaignsResponse = await request.get('/v1/campaigns', {
@@ -247,9 +243,9 @@ test.describe('Campaigns - Admin Update Operations', () => {
       },
     })
     const allCampaigns = await allCampaignsResponse.json()
-    
+
     const testCampaign = allCampaigns.find((c: any) => c?.slug && c?.id)
-    
+
     if (!testCampaign) {
       test.skip()
       return
@@ -278,4 +274,3 @@ test.describe('Campaigns - Admin Update Operations', () => {
     expect(campaign.details?.website).toBe(randomWebsite)
   })
 })
-

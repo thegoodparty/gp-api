@@ -8,21 +8,13 @@ import {
 } from '../../../e2e-tests/utils/auth.util'
 import * as fs from 'fs'
 import * as path from 'path'
+import { Prisma } from '@prisma/client'
 
-interface Website {
-  id: number
-  campaignId: number
-  status: string
-  vanityPath: string | null
-  content: unknown
-  createdAt: string
-  updatedAt: string
-  domain?: {
-    id: number
-    name: string
-    status: string
+type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
+  include: {
+    domain: true
   }
-}
+}>
 
 test.describe('Websites - CRUD Operations', () => {
   let testUserId: number | undefined
@@ -63,7 +55,7 @@ test.describe('Websites - CRUD Operations', () => {
 
     expect(response.status()).toBe(201)
 
-    const website = (await response.json()) as Website
+    const website = (await response.json()) as WebsiteWithDomain
     expect(website.status).toBe('unpublished')
     expect(website.campaignId).toBe(registerResponse.campaign.id)
   })
@@ -101,7 +93,7 @@ test.describe('Websites - CRUD Operations', () => {
 
     expect(response.status()).toBe(200)
 
-    const website = (await response.json()) as Website
+    const website = (await response.json()) as WebsiteWithDomain
     expect(website.campaignId).toBe(registerResponse.campaign.id)
     expect(website).toHaveProperty('id')
     expect(website).toHaveProperty('status')
@@ -155,14 +147,15 @@ test.describe('Websites - CRUD Operations', () => {
 
     expect(updateResponse.status()).toBe(200)
 
-    const updatedWebsite = (await updateResponse.json()) as Website & {
-      content: {
-        main?: { title?: string; tagline?: string; image?: string }
-        logo?: string
-        about?: { issues?: Array<{ title: string; description: string }> }
-        contact?: { email?: string }
+    const updatedWebsite =
+      (await updateResponse.json()) as WebsiteWithDomain & {
+        content: {
+          main?: { title?: string; tagline?: string; image?: string }
+          logo?: string
+          about?: { issues?: Array<{ title: string; description: string }> }
+          contact?: { email?: string }
+        }
       }
-    }
 
     expect(updatedWebsite.content.main?.title).toBe(mainTitle)
     expect(updatedWebsite.content.about?.issues?.[0]?.title).toBe(issueTitle)
@@ -226,12 +219,13 @@ test.describe('Websites - CRUD Operations', () => {
 
     expect(updateResponse.status()).toBe(200)
 
-    const updatedWebsite = (await updateResponse.json()) as Website & {
-      content: {
-        logo?: string
-        main?: { image?: string }
+    const updatedWebsite =
+      (await updateResponse.json()) as WebsiteWithDomain & {
+        content: {
+          logo?: string
+          main?: { image?: string }
+        }
       }
-    }
 
     expect(updatedWebsite.content.logo).toBeTruthy()
     expect(updatedWebsite.content.logo).toMatch(
@@ -291,11 +285,12 @@ test.describe('Websites - CRUD Operations', () => {
 
     expect(updateResponse.status()).toBe(200)
 
-    const updatedWebsite = (await updateResponse.json()) as Website & {
-      content: {
-        main?: { title?: string; tagline?: string }
+    const updatedWebsite =
+      (await updateResponse.json()) as WebsiteWithDomain & {
+        content: {
+          main?: { title?: string; tagline?: string }
+        }
       }
-    }
 
     expect(updatedWebsite.content.main?.title).toBe('Updated Title')
     expect(updatedWebsite.content.main?.tagline).toBe('Original Tagline')

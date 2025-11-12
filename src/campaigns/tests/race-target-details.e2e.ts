@@ -7,32 +7,7 @@ import {
   generateRandomPassword,
   loginUser,
 } from '../../../e2e-tests/utils/auth.util'
-
-interface PathToVictory {
-  id: number
-  createdAt: string
-  updatedAt: string
-  campaignId: number
-  data: {
-    source: string
-    p2vStatus: string
-    winNumber: number
-    districtId: string
-    electionType: string
-    electionLocation: string
-    projectedTurnout: number
-    voterContactGoal: number
-    p2vCompleteDate: string
-    districtManuallySet: boolean
-  }
-}
-
-interface Campaign {
-  id: number
-  slug: string
-  details: any
-  pathToVictory: PathToVictory
-}
+import { CampaignWithPathToVictory } from '../campaigns.types'
 
 test.describe('Campaigns - Race Target Details', () => {
   const testUsers: Array<{ id: number; token: string }> = []
@@ -134,22 +109,22 @@ test.describe('Campaigns - Race Target Details', () => {
     expect([200, 404, 502]).toContain(response.status())
 
     if (response.status() === 200) {
-      const campaign = (await response.json()) as Campaign
+      const campaign = (await response.json()) as CampaignWithPathToVictory
       expect(campaign.pathToVictory).toBeTruthy()
       expect(campaign.pathToVictory).toHaveProperty('id')
       expect(campaign.pathToVictory).toHaveProperty('data')
 
-      const { data } = campaign.pathToVictory
-      expect(data.source).toBeTruthy()
-      expect(data.p2vStatus).toBeTruthy()
-      expect(data.winNumber).toBeGreaterThan(0)
-      expect(data.districtId).toBeTruthy()
-      expect(data.electionType).toBeTruthy()
-      expect(data.electionLocation).toBeTruthy()
-      expect(data.projectedTurnout).toBeGreaterThan(0)
-      expect(data.voterContactGoal).toBeGreaterThan(0)
-      expect(data.p2vCompleteDate).toBeTruthy()
-      expect(data.districtManuallySet).toBe(false)
+      const { data } = campaign.pathToVictory!
+      expect(data?.source).toBeTruthy()
+      expect(data?.p2vStatus).toBeTruthy()
+      expect(data?.winNumber).toBeGreaterThan(0)
+      expect(data?.districtId).toBeTruthy()
+      expect(data?.electionType).toBeTruthy()
+      expect(data?.electionLocation).toBeTruthy()
+      expect(data?.projectedTurnout).toBeGreaterThan(0)
+      expect(data?.voterContactGoal).toBeGreaterThan(0)
+      expect(data?.p2vCompleteDate).toBeTruthy()
+      expect(data?.districtManuallySet).toBe(false)
     }
   })
 
@@ -204,16 +179,16 @@ test.describe('Campaigns - Race Target Details', () => {
     expect([200, 500, 502]).toContain(response.status())
 
     if (response.status() === 200) {
-      const campaign = (await response.json()) as Campaign
+      const campaign = (await response.json()) as CampaignWithPathToVictory
       expect(campaign).toHaveProperty('id')
       expect(campaign).toHaveProperty('details')
       expect(campaign).toHaveProperty('pathToVictory')
 
       const { pathToVictory } = campaign
       expect(pathToVictory).toHaveProperty('data')
-      expect(pathToVictory.data.projectedTurnout).toBeGreaterThan(0)
-      expect(pathToVictory.data.voterContactGoal).toBeGreaterThan(0)
-      expect(pathToVictory.data.winNumber).toBeGreaterThan(0)
+      expect(pathToVictory?.data?.projectedTurnout).toBeGreaterThan(0)
+      expect(pathToVictory?.data?.voterContactGoal).toBeGreaterThan(0)
+      expect(pathToVictory?.data?.winNumber).toBeGreaterThan(0)
     }
   })
 })
@@ -284,7 +259,11 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
 
     expect([401, 403]).toContain(response.status())
 
-    const body = await response.json()
+    const body = (await response.json()) as {
+      message: string
+      error: string
+      statusCode: number
+    }
     expect(body.message).toBeTruthy()
     expect(['Unauthorized', 'Forbidden']).toContain(body.error)
     expect([401, 403]).toContain(body.statusCode)
@@ -350,12 +329,12 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     expect([200, 404, 502]).toContain(response.status())
 
     if (response.status() === 200) {
-      const campaign = (await response.json()) as Campaign
+      const campaign = (await response.json()) as CampaignWithPathToVictory
       expect(campaign.pathToVictory).toBeTruthy()
-      expect(campaign.pathToVictory.data).toBeTruthy()
-      expect(campaign.pathToVictory.data.winNumber).toBeGreaterThan(0)
-      expect(campaign.pathToVictory.data.projectedTurnout).toBeGreaterThan(0)
-      expect(campaign.pathToVictory.data.voterContactGoal).toBeGreaterThan(0)
+      expect(campaign.pathToVictory?.data).toBeTruthy()
+      expect(campaign.pathToVictory?.data?.winNumber).toBeGreaterThan(0)
+      expect(campaign.pathToVictory?.data?.projectedTurnout).toBeGreaterThan(0)
+      expect(campaign.pathToVictory?.data?.voterContactGoal).toBeGreaterThan(0)
     }
   })
 
@@ -416,12 +395,12 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     expect([200, 404, 502]).toContain(response.status())
 
     if (response.status() === 200) {
-      const campaign = (await response.json()) as Campaign
+      const campaign = (await response.json()) as CampaignWithPathToVictory
       expect(campaign.pathToVictory).toBeTruthy()
-      expect(campaign.pathToVictory.data).toBeTruthy()
-      expect(campaign.pathToVictory.data.winNumber).toBeGreaterThan(0)
-      expect(campaign.pathToVictory.data.projectedTurnout).toBeGreaterThan(0)
-      expect(campaign.pathToVictory.data.voterContactGoal).toBeGreaterThan(0)
+      expect(campaign.pathToVictory?.data).toBeTruthy()
+      expect(campaign.pathToVictory?.data?.winNumber).toBeGreaterThan(0)
+      expect(campaign.pathToVictory?.data?.projectedTurnout).toBeGreaterThan(0)
+      expect(campaign.pathToVictory?.data?.voterContactGoal).toBeGreaterThan(0)
     }
   })
 })

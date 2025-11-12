@@ -1,11 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
-
-interface Task {
-  id: string
-  week: number
-  completed: boolean
-}
+import { CampaignTask } from '../campaignTasks.types'
 
 test.describe('Campaigns Tasks - List Tasks', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
@@ -33,7 +28,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
 
     const tasksByWeek = tasks.reduce(
@@ -42,7 +37,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
         acc[task.week].push(task)
         return acc
       },
-      {} as Record<number, Task[]>,
+      {} as Record<number, CampaignTask[]>,
     )
 
     const expectedWeeks = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -75,7 +70,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(tasks.every((task) => task.week === 1)).toBe(true)
 
     const ids = new Set(tasks.map((t) => t.id))
@@ -103,7 +98,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
     expect(tasks.length).toBeGreaterThan(0)
     expect(tasks.some((task) => task.week === 1)).toBe(true)
@@ -133,7 +128,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
     expect(tasks.length).toBeGreaterThan(0)
     expect(tasks.some((task) => task.week === 2)).toBe(true)
@@ -163,7 +158,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
     expect(tasks.length).toBeGreaterThan(0)
     expect(tasks.some((task) => task.week === 3)).toBe(true)
@@ -193,7 +188,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
     expect(tasks.length).toBeGreaterThan(0)
     expect(tasks.some((task) => task.week === 4)).toBe(true)
@@ -223,7 +218,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
     expect(tasks.length).toBeGreaterThan(0)
     expect(tasks.some((task) => task.week === 5)).toBe(true)
@@ -253,7 +248,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
     expect(tasks.length).toBeGreaterThan(0)
     expect(tasks.some((task) => task.week === 6)).toBe(true)
@@ -283,7 +278,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     expect(response.status()).toBe(200)
 
-    const tasks = (await response.json()) as Task[]
+    const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
     expect(tasks.length).toBeGreaterThan(0)
     expect(tasks.some((task) => task.week === 7)).toBe(true)
@@ -292,4 +287,3 @@ test.describe('Campaigns Tasks - List Tasks', () => {
     expect(ids.size).toBe(tasks.length)
   })
 })
-

@@ -7,18 +7,7 @@ import {
   generateRandomPassword,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
-
-interface WebsiteContact {
-  id: number
-  websiteId: number
-  name: string
-  email: string
-  phone: string | null
-  message: string
-  smsConsent: boolean
-  createdAt: string
-  updatedAt: string
-}
+import { WebsiteContact } from '@prisma/client'
 
 test.describe('Websites - Contacts', () => {
   let testUserId: number | undefined

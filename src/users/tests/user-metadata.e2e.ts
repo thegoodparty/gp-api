@@ -9,16 +9,9 @@ import {
   TestUser,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
+import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 
-interface MetadataResponse {
-  [key: string]: unknown
-}
-
-interface UserWithMetadata {
-  id: number
-  email: string
-  metaData: MetadataResponse | null
-}
+type MetadataResponse = Record<string, unknown>
 
 test.describe('Users - User Metadata', () => {
   let testUserCleanup: TestUser | null = null
@@ -100,12 +93,13 @@ test.describe('Users - User Metadata', () => {
 
     expect(response.status()).toBe(HttpStatus.OK)
 
-    const body = (await response.json()) as UserWithMetadata
+    const body = (await response.json()) as ReadUserOutput
     expect(body.metaData).toBeTruthy()
-    expect(body.metaData?.someString).toBe(metaData.someString)
-    expect(body.metaData?.someBoolean).toBe(metaData.someBoolean)
-    expect(body.metaData?.someNumber).toBe(metaData.someNumber)
-    expect(body.metaData?.someNull).toBe(metaData.someNull)
+    const metadata = body.metaData as MetadataResponse
+    expect(metadata?.someString).toBe(metaData.someString)
+    expect(metadata?.someBoolean).toBe(metaData.someBoolean)
+    expect(metadata?.someNumber).toBe(metaData.someNumber)
+    expect(metadata?.someNull).toBe(metaData.someNull)
   })
 
   test('should return 401 when getting metadata without authentication', async ({

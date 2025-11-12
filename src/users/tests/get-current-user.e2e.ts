@@ -8,16 +8,7 @@ import {
   cleanupTestUser,
   TestUser,
 } from '../../../e2e-tests/utils/auth.util'
-
-interface UserResponse {
-  id: number
-  email: string
-  firstName: string
-  lastName: string
-  password?: undefined
-  roles: string[]
-  hasPassword: boolean
-}
+import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 
 test.describe('Users - Get Current User', () => {
   let testUserCleanup: TestUser | null = null
@@ -58,12 +49,12 @@ test.describe('Users - Get Current User', () => {
 
     expect(response.status()).toBe(HttpStatus.OK)
 
-    const body = (await response.json()) as UserResponse
+    const body = (await response.json()) as ReadUserOutput
     expect(body.id).toBe(testUserId)
     expect(body.email).toBe(email)
     expect(body.firstName).toBe(firstName)
     expect(body.lastName).toBe(lastName)
-    expect(body.password).toBeUndefined()
+    expect('password' in body).toBe(false)
   })
 
   test('should return 401 when not authenticated', async ({ request }) => {

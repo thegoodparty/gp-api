@@ -42,4 +42,3 @@ test.describe('Campaigns Map - Get Map Count', () => {
     expect(body.count).toBeGreaterThanOrEqual(0)
   })
 })
-

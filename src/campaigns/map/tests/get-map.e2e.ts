@@ -12,9 +12,7 @@ test.describe('Campaigns Map - Get Map', () => {
   })
 
   test('should filter campaigns by party', async ({ request }) => {
-    const response = await request.get(
-      '/v1/campaigns/map?party=Independent',
-    )
+    const response = await request.get('/v1/campaigns/map?party=Independent')
 
     expect(response.status()).toBe(200)
 
@@ -43,4 +41,3 @@ test.describe('Campaigns Map - Get Map', () => {
     expect(body.length).toBeGreaterThanOrEqual(0)
   })
 })
-

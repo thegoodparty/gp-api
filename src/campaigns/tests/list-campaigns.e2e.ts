@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { loginUser } from '../../../e2e-tests/utils/auth.util'
+import { CampaignListResponse } from '../campaigns.types'
 
 test.describe('Campaigns - List Campaigns (Admin)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
@@ -20,11 +21,11 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(Array.isArray(campaigns)).toBe(true)
     expect(campaigns.length).toBeGreaterThan(0)
 
-    const campaign = campaigns[0]
+    const campaign = campaigns[0] as CampaignListResponse
     expect(campaign).toHaveProperty('id')
     expect(campaign).toHaveProperty('slug')
     expect(campaign).toHaveProperty('data')
@@ -41,8 +42,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
-    const testCampaign = allCampaigns.find((campaign: any) => campaign?.id)
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
+    const testCampaign = allCampaigns.find((campaign) => campaign?.id)
 
     if (!testCampaign) {
       test.skip()
@@ -57,7 +59,7 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns).toHaveLength(1)
     expect(campaigns[0].id).toBe(testCampaign.id)
   })
@@ -70,7 +72,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testState = allCampaigns[3]?.details?.state?.toLowerCase()
 
     if (!testState) {
@@ -86,9 +89,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThan(0)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       expect(campaign.details.state?.toLowerCase()).toBe(testState)
     })
   })
@@ -101,8 +104,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
-    const campaignWithEmail = allCampaigns.find((c: any) => c.user?.email)
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
+    const campaignWithEmail = allCampaigns.find((c) => c.user?.email)
     const testEmail = campaignWithEmail?.user?.email
 
     if (!testEmail) {
@@ -118,10 +122,10 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThanOrEqual(0)
-    campaigns.forEach((campaign: any) => {
-      expect(campaign.user.email?.toLowerCase()).toBe(testEmail.toLowerCase())
+    campaigns.forEach((campaign) => {
+      expect(campaign.user?.email?.toLowerCase()).toBe(testEmail.toLowerCase())
     })
   })
 
@@ -133,7 +137,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testSlug = allCampaigns[2]?.slug?.toLowerCase()
 
     if (!testSlug) {
@@ -149,7 +154,7 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns).toHaveLength(1)
     expect(campaigns[0].slug?.toLowerCase()).toBe(testSlug)
   })
@@ -162,7 +167,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testLevel = allCampaigns[5]?.details?.ballotLevel?.toUpperCase()
 
     if (!testLevel) {
@@ -178,9 +184,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThan(0)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       expect(campaign.details.ballotLevel?.toLowerCase()).toBe(
         testLevel.toLowerCase(),
       )
@@ -195,7 +201,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testP2vStatus = allCampaigns[6]?.pathToVictory?.data?.p2vStatus
 
     if (!testP2vStatus) {
@@ -214,9 +221,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThan(0)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       expect(campaign.pathToVictory?.data?.p2vStatus?.toLowerCase()).toBe(
         testP2vStatus.toLowerCase(),
       )
@@ -234,9 +241,9 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThan(0)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       expect(campaign.isActive).toBe(true)
     })
   })
@@ -251,7 +258,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testDate = allCampaigns[0]?.details?.electionDate
 
     if (!testDate) {
@@ -270,10 +278,10 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThanOrEqual(0)
     const dateFilter = new Date(testDate)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       if (campaign.details.primaryElectionDate) {
         expect(
           new Date(campaign.details.primaryElectionDate).getTime(),
@@ -292,7 +300,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testDate = allCampaigns[0]?.details?.electionDate
 
     if (!testDate) {
@@ -311,12 +320,12 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThan(0)
     const dateFilter = new Date(testDate)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       expect(
-        new Date(campaign.details.electionDate).getTime(),
+        new Date(campaign.details.electionDate!).getTime(),
       ).toBeGreaterThanOrEqual(dateFilter.getTime())
     })
   })
@@ -331,7 +340,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testDate = allCampaigns[0]?.details?.electionDate
 
     if (!testDate) {
@@ -350,10 +360,10 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThan(0)
     const dateFilter = new Date(testDate)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       if (campaign.details.primaryElectionDate) {
         expect(
           new Date(campaign.details.primaryElectionDate).getTime(),
@@ -372,7 +382,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testDate = allCampaigns[0]?.details?.electionDate
 
     if (!testDate) {
@@ -391,12 +402,12 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaigns = await response.json()
+    const campaigns = (await response.json()) as CampaignListResponse[]
     expect(campaigns.length).toBeGreaterThan(0)
     const dateFilter = new Date(testDate)
-    campaigns.forEach((campaign: any) => {
+    campaigns.forEach((campaign) => {
       expect(
-        new Date(campaign.details.electionDate).getTime(),
+        new Date(campaign.details.electionDate!).getTime(),
       ).toBeLessThanOrEqual(dateFilter.getTime())
     })
   })
@@ -409,7 +420,8 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const allCampaigns = await allCampaignsResponse.json()
+    const allCampaigns =
+      (await allCampaignsResponse.json()) as CampaignListResponse[]
     const testSlug = allCampaigns[2]?.slug?.toLowerCase()
 
     if (!testSlug) {
@@ -425,7 +437,7 @@ test.describe('Campaigns - List Campaigns (Admin)', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaign = await response.json()
+    const campaign = (await response.json()) as CampaignListResponse
     expect(campaign.slug?.toLowerCase()).toBe(testSlug)
     expect(campaign).toHaveProperty('id')
     expect(campaign).toHaveProperty('data')

@@ -1,11 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
-
-interface UpdateHistory {
-  id: number
-  type: string
-  quantity: number
-}
+import { CampaignUpdateHistory } from '@prisma/client'
 
 test.describe('Campaigns - Update History', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
@@ -60,7 +55,7 @@ test.describe('Campaigns - Update History', () => {
 
     expect(response.status()).toBe(201)
 
-    const body = (await response.json()) as UpdateHistory
+    const body = (await response.json()) as CampaignUpdateHistory
     expect(body.type).toBe('doorKnocking')
     expect(body.quantity).toBe(quantity)
     expect(body.id).toBeTruthy()
@@ -89,7 +84,7 @@ test.describe('Campaigns - Update History', () => {
       },
     )
 
-    const created = (await createResponse.json()) as UpdateHistory
+    const created = (await createResponse.json()) as CampaignUpdateHistory
 
     const response = await request.delete(
       `/v1/campaigns/mine/update-history/${created.id}`,
@@ -182,4 +177,3 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
     expect(body.length).toBeGreaterThan(0)
   })
 })
-
