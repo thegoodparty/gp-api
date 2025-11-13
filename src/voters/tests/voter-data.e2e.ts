@@ -65,19 +65,6 @@ test.describe('VoterData', () => {
     expect(Array.isArray(locations)).toBe(true)
   })
 
-  test.skip('should get voter file help message', async ({ request }) => {
-    const response = await request.post('/v1/voters/voter-file/help-message', {
-      headers: {
-        Authorization: `Bearer ${candidateToken}`,
-      },
-      data: {
-        message: 'I need help with voter data',
-      },
-    })
-
-    expect(response.status()).toBe(HttpStatus.CREATED)
-  })
-
   test('should not allow user without campaign to download voter file', async ({
     request,
   }) => {

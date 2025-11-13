@@ -124,44 +124,4 @@ test.describe('Candidate Website', () => {
 
     expect([HttpStatus.OK, HttpStatus.NOT_FOUND]).toContain(response.status())
   })
-
-  test.skip('should submit contact form', async ({ request }) => {
-    const createResponse = await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    })
-
-    if (!createResponse.ok()) {
-      test.skip()
-      return
-    }
-
-    const website = (await createResponse.json()) as { vanityPath: string }
-
-    await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-      data: {
-        status: 'published',
-      },
-    })
-
-    const contactResponse = await request.post(
-      `/v1/websites/${website.vanityPath}/contact`,
-      {
-        data: {
-          name: faker.person.fullName(),
-          email: faker.internet.email(),
-          phone: faker.phone.number(),
-          message: faker.lorem.paragraph(),
-          smsConsent: true,
-        },
-      },
-    )
-
-    expect(contactResponse.status()).toBe(HttpStatus.CREATED)
-  })
 })

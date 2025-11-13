@@ -35,23 +35,4 @@ test.describe('Payments', () => {
       /^https:\/\/checkout\.stripe\.com\/c\/pay\//,
     )
   })
-
-  test.skip('should create payment portal session', async ({ request }) => {
-    const response = await request.post(
-      '/v1/payments/purchase/portal-session',
-      {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(HttpStatus.CREATED)
-
-    const body = (await response.json()) as { redirectUrl: string }
-    expect(body).toHaveProperty('redirectUrl')
-    expect(body.redirectUrl).toMatch(
-      /^https:\/\/billing\.stripe\.com\/p\/session\//,
-    )
-  })
 })

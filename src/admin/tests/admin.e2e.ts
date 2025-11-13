@@ -53,10 +53,6 @@ test.describe('Admin - Campaign Management', () => {
       },
     })
 
-    if (!response.ok()) {
-      console.log('Request failed:', await response.text())
-    }
-
     expect(response.status()).toBe(HttpStatus.CREATED)
 
     const campaign = (await response.json()) as {
@@ -103,32 +99,5 @@ test.describe('Admin - Campaign Management', () => {
 
     const updatedCampaign = (await updateResponse.json()) as { id: number }
     expect(updatedCampaign.id).toBe(campaignId)
-  })
-
-  test.skip('should delete a campaign as admin', async ({ request }) => {
-    const registerResponse = await registerUser(request, {
-      firstName: generateRandomName(),
-      lastName: generateRandomName(),
-      email: generateRandomEmail(),
-      password: 'password123',
-      phone: '5555555555',
-      zip: '12345-1234',
-      signUpMode: 'candidate',
-    })
-
-    const campaignId = registerResponse.campaign.id
-
-    const deleteResponse = await request.delete(
-      `/v1/admin/campaigns/${campaignId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
-      },
-    )
-
-    expect(deleteResponse.status()).toBe(HttpStatus.NO_CONTENT)
-
-    await deleteUser(request, registerResponse.user.id, registerResponse.token)
   })
 })
