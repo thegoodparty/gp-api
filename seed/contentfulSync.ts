@@ -1,49 +1,45 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
-
-type ContentSyncResult = {
-  entriesCount: number
-  createEntriesCount: number
-  updateEntriesCount: number
-  deletedEntriesCount: number
-}
+import { PrismaService } from '../src/prisma/prisma.service'
+import { ContentfulService } from '../src/vendors/contentful/contentful.service'
+import { ContentService } from '../src/content/services/content.service'
+import { ProcessTimersService } from '../src/shared/services/process-timers.service'
 
 async function seedContentful() {
-  console.log('🔄 Syncing Contentful content...')
+  console.log('🌱 Syncing Contentful content...')
 
-  const API_URL = 'http://localhost:3000/v1/content/sync'
+  const prismaService = new PrismaService()
+  await prismaService.onModuleInit()
 
   try {
-    const response = await fetch(API_URL)
+    const contentfulService = new ContentfulService()
+    const processTimersService = new ProcessTimersService()
+    const contentService = new ContentService(
+      contentfulService,
+      processTimersService,
+    )
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
+    // We need to manually inject Prisma service
+    // @ts-expect-error - Accessing private property for manual DI
+    contentService._prisma = prismaService
+    contentService.onModuleInit()
 
-    const result = (await response.json()) as ContentSyncResult
+    const { entries, createEntries, updateEntries, deletedEntries } =
+      await contentService.syncContent()
 
-    console.log('✅ Contentful sync complete!')
-    console.log(`   Total entries: ${result.entriesCount}`)
-    console.log(`   Created: ${result.createEntriesCount}`)
-    console.log(`   Updated: ${result.updateEntriesCount}`)
-    console.log(`   Deleted: ${result.deletedEntriesCount}`)
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error(
-        `Cannot connect to ${API_URL}\nMake sure the API server is running (npm run start:dev)`,
-      )
-    }
-    throw error
+    console.log('🌳 Contentful sync complete!')
+    console.log(`   Total entries: ${entries.length}`)
+    console.log(`   Created: ${createEntries.length}`)
+    console.log(`   Updated: ${updateEntries.length}`)
+    console.log(`   Deleted: ${deletedEntries.length}`)
+  } finally {
+    await prismaService.onModuleDestroy()
   }
 }
 
 seedContentful()
-  .then(async () => {
-    await prisma.$disconnect()
+  .then(() => {
+    process.exit(0)
   })
-  .catch(async (error) => {
+  .catch((error) => {
     console.error(error)
-    await prisma.$disconnect()
     process.exit(1)
   })
