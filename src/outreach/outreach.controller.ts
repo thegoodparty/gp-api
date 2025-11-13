@@ -12,7 +12,7 @@ import {
 import { OutreachService } from './services/outreach.service'
 import { CreateOutreachSchema } from './schemas/createOutreachSchema'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType, User } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ReqFile } from '../files/decorators/ReqFiles.decorator'
 import { FileUpload } from '../files/files.types'
@@ -24,6 +24,13 @@ import { PeerlyP2pJobService } from '../vendors/peerly/services/peerlyP2pJob.ser
 import { Readable } from 'stream'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { SlackService } from '../vendors/slack/services/slack.service'
+import { SlackChannel } from '../vendors/slack/slackService.types'
+import { IS_PROD } from '../shared/util/appEnvironment.util'
+import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
+import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
+import { buildSlackBlocks } from '../voters/util/voterOutreach.util'
+import { OutreachWithVoterFileFilter } from './types/outreach.types'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -35,6 +42,8 @@ export class OutreachController {
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
+    private readonly slackService: SlackService,
+    private readonly crmCampaignsService: CrmCampaignsService,
   ) {}
 
   @Post()
@@ -51,6 +60,7 @@ export class OutreachController {
   )
   async create(
     @ReqCampaign() campaign: Campaign,
+    @ReqUser() user: User,
     @Body() createOutreachDto: CreateOutreachSchema,
     @ReqFile() image?: FileUpload,
   ) {
@@ -85,6 +95,7 @@ export class OutreachController {
       }
       const outreach = await this.createP2pOutreach(
         campaign,
+        user,
         createOutreachDto,
         image,
         imageUrl,
@@ -98,6 +109,7 @@ export class OutreachController {
 
   private async createP2pOutreach(
     campaign: Campaign,
+    user: User,
     createOutreachDto: CreateOutreachSchema,
     image: FileUpload,
     imageUrl: string,
@@ -155,6 +167,18 @@ export class OutreachController {
         didState: createOutreachDto.didState,
       })
 
+      const peerlyJob = await this.peerlyP2pJobService.getJob(jobId)
+      if (!peerlyJob?.account_id) {
+        throw new BadRequestException(
+          'Failed to retrieve Peerly job account information',
+        )
+      }
+
+      const peerlyJobUrl: string = this.peerlyP2pJobService.getPeerlyJobUrl(
+        jobId,
+        peerlyJob.account_id,
+      )
+
       const outreach = await this.outreachService.create(
         {
           ...createOutreachDto,
@@ -163,6 +187,15 @@ export class OutreachController {
         },
         imageUrl,
       )
+
+      // Send Slack notification
+      void this.sendP2pSlackNotification({
+        user,
+        campaign,
+        outreach,
+        peerlyJobUrl,
+        imageUrl,
+      })
 
       return outreach
     } catch (error) {
@@ -197,5 +230,46 @@ export class OutreachController {
           : {}),
       }
     })
+  }
+
+  private async sendP2pSlackNotification({
+    user,
+    campaign,
+    outreach,
+    peerlyJobUrl,
+    imageUrl,
+  }: {
+    user: User
+    campaign: Campaign
+    outreach: OutreachWithVoterFileFilter
+    peerlyJobUrl: string
+    imageUrl: string
+  }) {
+    const hubspotId = campaign.data?.hubspotId as string | undefined
+    const assignedPa = hubspotId
+      ? await this.crmCampaignsService.getCrmCompanyOwnerName(hubspotId)
+      : ''
+
+    const blocks = buildSlackBlocks({
+      name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      email: user.email,
+      phone: user.phone || undefined,
+      assignedPa,
+      crmCompanyId: hubspotId,
+      voterFileUrl: undefined, // P2P doesn't use voter files
+      type: outreach.outreachType,
+      date: outreach.date ? new Date(outreach.date) : undefined,
+      script: outreach.script || undefined,
+      imageUrl,
+      message: outreach.message || '',
+      formattedAudience: [], // P2P doesn't use audience filters
+      audienceRequest: outreach.audienceRequest || '',
+      peerlyJobUrl,
+    })
+
+    await this.slackService.message(
+      blocks,
+      IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
+    )
   }
 }
