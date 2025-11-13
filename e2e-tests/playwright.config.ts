@@ -8,7 +8,6 @@ export default defineConfig({
   testDir: '../src',
   testMatch: '**/tests/**/*.e2e.ts',
   outputDir: join(__dirname, 'test-results'),
-  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
