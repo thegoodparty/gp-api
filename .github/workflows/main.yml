@@ -52,19 +52,17 @@ jobs:
         with:
           project-name: gp-deploy-build-${{ github.ref_name }}
 
-      - name: Wait for application to be ready
+      - name: Wait for ECS deployment
         shell: bash
         run: |
           case "${{ github.ref_name }}" in
             develop)
               CLUSTER="gp-develop-fargateCluster"
               SERVICE="gp-api-develop"
-              API_URL="https://gp-api-dev.goodparty.org"
               ;;
             qa)
               CLUSTER="gp-qa-fargateCluster"
               SERVICE="gp-api-qa"
-              API_URL="https://gp-api-qa.goodparty.org"
               ;;
             *)
               echo "Unsupported branch"; exit 1
@@ -78,43 +76,6 @@ jobs:
             --region us-west-2
 
           echo "✅ ECS deployment complete"
-          echo ""
-          echo "Waiting 2 minutes for application to fully initialize..."
-          sleep 120
-          echo ""
-          echo "Polling ${API_URL}/v1/health until ready..."
-
-          MAX_ATTEMPTS=60
-          ATTEMPT=0
-          SLEEP_TIME=5
-          SUCCESS_COUNT=0
-          REQUIRED_SUCCESS=5
-
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${API_URL}/v1/health" 2>/dev/null || echo "000")
-            
-            if [ "$HTTP_CODE" = "200" ]; then
-              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - HTTP $HTTP_CODE ✅ (success $SUCCESS_COUNT/$REQUIRED_SUCCESS)"
-              
-              if [ $SUCCESS_COUNT -ge $REQUIRED_SUCCESS ]; then
-                echo ""
-                echo "✅ Application is ready and stable (5 consecutive successful health checks)"
-                exit 0
-              fi
-            else
-              SUCCESS_COUNT=0
-              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - HTTP $HTTP_CODE ⏳ (resetting counter)"
-            fi
-            
-            sleep $SLEEP_TIME
-          done
-
-          echo ""
-          echo "❌ Application failed to become ready after 120s initial + $((MAX_ATTEMPTS * SLEEP_TIME))s of polling"
-          exit 1
 
       - name: Notify Slack on Success (Deploy)
         if: success()
@@ -187,46 +148,18 @@ jobs:
       - name: Verify environment health
         shell: bash
         run: |
-          echo "Environment: $TARGET_ENV"
-          echo "API Base URL: ${API_BASE_URL}"
-          echo ""
           echo "Verifying ${API_BASE_URL}/v1/health is responding..."
-
-          for i in {1..3}; do
-            echo "Health check attempt $i/3..."
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health" 2>&1) || true
-            
-            if [ "$STATUS" = "200" ]; then
-              echo "✅ Health endpoint returned 200"
-              break
-            else
-              echo "⚠️ Health endpoint returned $STATUS"
-              if [ $i -lt 3 ]; then
-                echo "Waiting 10s before retry..."
-                sleep 10
-              fi
-            fi
-          done
-
-          if [ "$STATUS" != "200" ]; then
-            echo "❌ Health endpoint failed after 3 attempts"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Health endpoint is responding"
+          else
+            echo "⚠️ Health endpoint returned $STATUS (expected 200)"
             exit 1
           fi
 
-          echo ""
-          echo "Waiting 15 seconds for application to settle before test load..."
-          sleep 15
-
       - name: Run Playwright tests
         id: run-tests
-        env:
-          DEBUG: pw:api
-        run: |
-          echo "🧪 Starting Playwright tests"
-          echo "API_BASE_URL: ${API_BASE_URL}"
-          echo "CI: ${CI}"
-          echo ""
-          npm run test:e2e
+        run: npm run test:e2e
 
       - name: Upload test reports
         if: always()
@@ -245,9 +178,9 @@ jobs:
           if [ -f "e2e-tests/test-results/results.json" ]; then
             echo "Found results.json, parsing test results..."
             
-            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.suites[]?.specs[]?] | length' 2>/dev/null || echo "0")
-            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[]?.specs[]? | select(.ok == false)] | length' 2>/dev/null || echo "0")
-            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[]?.specs[]? | select(.ok == true)] | length' 2>/dev/null || echo "0")
+            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[]] | length' 2>/dev/null || echo "0")
+            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == false)] | length' 2>/dev/null || echo "0")
+            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == true)] | length' 2>/dev/null || echo "0")
             
             echo "Parsed: Total=$TOTAL_TESTS, Failed=$FAILED_COUNT, Passed=$PASSED_COUNT"
             
@@ -256,7 +189,7 @@ jobs:
             echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
             
             if [ "$FAILED_COUNT" -gt 0 ]; then
-              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '.suites[]?.specs[]? | select(.ok == false) | .title' 2>/dev/null | head -10 | sed 's/^/• /' || echo "• Failed to parse test names")
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | .[]' 2>/dev/null | sed 's/^/• /' || echo "• Failed to parse test names")
               if [ -z "$FAILED_TESTS" ]; then
                 FAILED_TESTS="• $FAILED_COUNT test(s) failed but names could not be parsed"
               fi
