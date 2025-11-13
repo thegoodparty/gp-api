@@ -52,7 +52,7 @@ jobs:
         with:
           project-name: gp-deploy-build-${{ github.ref_name }}
 
-      - name: Wait for ECS service to be stable
+      - name: Wait for ECS service and target group to be healthy
         shell: bash
         run: |
           case "${{ github.ref_name }}" in
@@ -69,16 +69,62 @@ jobs:
               ;;
           esac
 
-          echo "Waiting for ECS service to stabilize..."
+          echo "Waiting for ECS service deployment to complete..."
           aws ecs wait services-stable \
             --cluster "$CLUSTER" \
             --services "$SERVICE" \
             --region us-west-2
 
-          echo "✅ ECS service is stable"
-          echo "Waiting 90 seconds for health checks to pass..."
-          sleep 90
-          echo "✅ Ready"
+          echo "✅ ECS deployment complete"
+          echo ""
+
+          echo "Getting target group ARN from ECS service..."
+          TARGET_GROUP_ARN=$(aws ecs describe-services \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE" \
+            --region us-west-2 \
+            --query 'services[0].loadBalancers[0].targetGroupArn' \
+            --output text)
+
+          echo "Target Group: $TARGET_GROUP_ARN"
+          echo ""
+
+          echo "Waiting for targets to be healthy in target group..."
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            
+            HEALTH_STATUS=$(aws elbv2 describe-target-health \
+              --target-group-arn "$TARGET_GROUP_ARN" \
+              --region us-west-2 \
+              --query 'TargetHealthDescriptions[*].TargetHealth.State' \
+              --output text)
+            
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - Target health status: $HEALTH_STATUS"
+            
+            if echo "$HEALTH_STATUS" | grep -q "healthy"; then
+              UNHEALTHY_COUNT=$(echo "$HEALTH_STATUS" | tr '\t' '\n' | grep -cv "healthy" || true)
+              if [ "$UNHEALTHY_COUNT" -eq 0 ]; then
+                echo "✅ All targets are healthy"
+                exit 0
+              else
+                echo "⏳ Some targets still not healthy, waiting 5s..."
+                sleep 5
+              fi
+            else
+              echo "⏳ No healthy targets yet, waiting 5s..."
+              sleep 5
+            fi
+          done
+
+          echo "❌ Targets failed to become healthy after 5 minutes"
+          echo "Final target health status:"
+          aws elbv2 describe-target-health \
+            --target-group-arn "$TARGET_GROUP_ARN" \
+            --region us-west-2
+          exit 1
 
       - name: Notify Slack on Success (Deploy)
         if: success()
