@@ -265,10 +265,10 @@ jobs:
           status: custom
           custom_payload: |
             {
-              text: '${{ steps.test-results.outputs.tests_ran == ''true'' && ''⚠️ Playwright Tests Failed (Non-blocking)'' || ''❌ Test Environment Not Ready'' }}',
-              attachments: [{
-                color: '${{ steps.test-results.outputs.tests_ran == ''true'' && ''warning'' || ''danger'' }}',
-                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('❌ {0}/{1} tests failed\n✅ {2}/{1} tests passed\n\nFailed Tests:\n{3}\n\nTests are non-blocking during stabilization.', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || '❌ Tests did not run - environment health check failed or test setup error occurred.\n\nThe application may not be ready or there was an issue with test initialization.' }}\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
+              "text": "${{ steps.test-results.outputs.tests_ran == 'true' && '⚠️ Playwright Tests Failed (Non-blocking)' || '❌ Test Environment Not Ready' }}",
+              "attachments": [{
+                "color": "${{ steps.test-results.outputs.tests_ran == 'true' && 'warning' || 'danger' }}",
+                "text": "${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('❌ {0}/{1} tests failed\n✅ {2}/{1} tests passed\n\nFailed Tests:\n{3}\n\nTests are non-blocking during stabilization.', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || '❌ Tests did not run - environment health check failed or test setup error occurred.\n\nThe application may not be ready or there was an issue with test initialization.' }}\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
               }]
             }
         env:
