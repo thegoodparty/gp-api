@@ -79,28 +79,41 @@ jobs:
 
           echo "✅ ECS deployment complete"
           echo ""
+          echo "Waiting 60 seconds for application to initialize..."
+          sleep 60
+          echo ""
           echo "Polling ${API_URL}/v1/health until ready..."
 
-          MAX_ATTEMPTS=60
+          MAX_ATTEMPTS=120
           ATTEMPT=0
-          SLEEP_TIME=5
+          SLEEP_TIME=3
+          SUCCESS_COUNT=0
+          REQUIRED_SUCCESS=3
 
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             ATTEMPT=$((ATTEMPT + 1))
             
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${API_URL}/v1/health" 2>/dev/null || echo "000")
-            
-            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - HTTP $HTTP_CODE"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${API_URL}/v1/health" 2>/dev/null || echo "000")
             
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Application is ready"
-              exit 0
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - HTTP $HTTP_CODE ✅ (success $SUCCESS_COUNT/$REQUIRED_SUCCESS)"
+              
+              if [ $SUCCESS_COUNT -ge $REQUIRED_SUCCESS ]; then
+                echo ""
+                echo "✅ Application is ready and stable"
+                exit 0
+              fi
+            else
+              SUCCESS_COUNT=0
+              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - HTTP $HTTP_CODE ⏳"
             fi
             
             sleep $SLEEP_TIME
           done
 
-          echo "❌ Application failed to become ready after $((MAX_ATTEMPTS * SLEEP_TIME)) seconds"
+          echo ""
+          echo "❌ Application failed to become ready after initial 60s + $((MAX_ATTEMPTS * SLEEP_TIME))s of polling"
           exit 1
 
       - name: Notify Slack on Success (Deploy)
@@ -184,7 +197,9 @@ jobs:
           fi
 
       - name: Run Playwright tests
+        id: run-tests
         run: npm run test:e2e
+        continue-on-error: true
 
       - name: Upload test reports
         if: always()
@@ -196,52 +211,64 @@ jobs:
             e2e-tests/test-results
 
       - name: Parse test results
-        if: failure()
+        if: always()
         id: test-results
         shell: bash
         run: |
           if [ -f "e2e-tests/test-results/results.json" ]; then
-            FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '.suites[].specs[] | select(.ok == false) | .title' | head -10 | sed 's/^/• /')
-            if [ -z "$FAILED_TESTS" ]; then
-              FAILED_TESTS="• Unable to parse test results"
-            fi
+            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.suites[].specs[]] | length')
             FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[].specs[] | select(.ok == false)] | length')
-            echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
-            echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[].specs[] | select(.ok == true)] | length')
+            
+            echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
             echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
+            echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
+            
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '.suites[].specs[] | select(.ok == false) | .title' | head -10 | sed 's/^/• /')
+              echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
+              echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              echo "tests_ran=true" >> $GITHUB_OUTPUT
+            else
+              echo "failed_tests=" >> $GITHUB_OUTPUT
+              echo "tests_ran=true" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "failed_tests=• Test results file not found" >> $GITHUB_OUTPUT
-            echo "failed_count=Unknown" >> $GITHUB_OUTPUT
+            echo "failed_tests=" >> $GITHUB_OUTPUT
+            echo "failed_count=0" >> $GITHUB_OUTPUT
+            echo "passed_count=0" >> $GITHUB_OUTPUT
+            echo "total_tests=0" >> $GITHUB_OUTPUT
+            echo "tests_ran=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Notify Slack on Test Success
-        if: success()
+        if: steps.run-tests.outcome == 'success'
         uses: 8398a7/action-slack@v3
         with:
           status: custom
           custom_payload: |
             {
-              text: '✅ Playwright Tests Completed (Informational)',
+              text: '✅ Playwright Tests Passed',
               attachments: [{
                 color: 'good',
-                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\nTests passed but are non-blocking during stabilization.\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
+                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n✅ ${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
               }]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify Slack on Test Failure
-        if: failure()
+        if: steps.run-tests.outcome == 'failure' || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: custom
           custom_payload: |
             {
-              text: '⚠️ Playwright Tests Failed (Non-blocking)',
+              text: '${{ steps.test-results.outputs.tests_ran == ''true'' && ''⚠️ Playwright Tests Failed (Non-blocking)'' || ''❌ Test Environment Not Ready'' }}',
               attachments: [{
-                color: 'warning',
-                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\nFailed: ${{ steps.test-results.outputs.failed_count || 'Unknown' }} test(s)\n\nFailed Tests:\n${{ steps.test-results.outputs.failed_tests || 'Unable to determine' }}\n\nThis is informational only and does not block deployment.\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
+                color: '${{ steps.test-results.outputs.tests_ran == ''true'' && ''warning'' || ''danger'' }}',
+                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('❌ {0}/{1} tests failed\n✅ {2}/{1} tests passed\n\nFailed Tests:\n{3}\n\nTests are non-blocking during stabilization.', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || '❌ Tests did not run - environment health check failed or test setup error occurred.\n\nThe application may not be ready or there was an issue with test initialization.' }}\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
               }]
             }
         env:
