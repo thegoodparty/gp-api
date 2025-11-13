@@ -672,6 +672,14 @@ export default $config({
             ],
             Resource: '*',
           },
+          {
+            Effect: 'Allow',
+            Action: [
+              'elasticloadbalancing:DescribeTargetHealth',
+              'elasticloadbalancing:DescribeTargetGroups',
+            ],
+            Resource: '*',
+          },
         ],
       }),
     })
