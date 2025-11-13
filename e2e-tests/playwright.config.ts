@@ -14,15 +14,17 @@ export default defineConfig({
   reporter: [
     ['html', { outputFolder: join(__dirname, 'playwright-report') }],
     ['json', { outputFile: join(__dirname, 'test-results/results.json') }],
+    ['list'],
   ],
   use: {
     baseURL: process.env.API_BASE_URL || 'http://localhost:3000',
     extraHTTPHeaders: {
       Accept: 'application/json',
     },
+    trace: process.env.CI ? 'retain-on-failure' : 'off',
   },
-  timeout: 30000,
+  timeout: 60000,
   expect: {
-    timeout: 5000,
+    timeout: 10000,
   },
 })

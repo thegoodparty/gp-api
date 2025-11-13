@@ -187,18 +187,46 @@ jobs:
       - name: Verify environment health
         shell: bash
         run: |
+          echo "Environment: $TARGET_ENV"
+          echo "API Base URL: ${API_BASE_URL}"
+          echo ""
           echo "Verifying ${API_BASE_URL}/v1/health is responding..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ Health endpoint is responding"
-          else
-            echo "⚠️ Health endpoint returned $STATUS (expected 200)"
+
+          for i in {1..3}; do
+            echo "Health check attempt $i/3..."
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health" 2>&1) || true
+            
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health endpoint returned 200"
+              break
+            else
+              echo "⚠️ Health endpoint returned $STATUS"
+              if [ $i -lt 3 ]; then
+                echo "Waiting 10s before retry..."
+                sleep 10
+              fi
+            fi
+          done
+
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Health endpoint failed after 3 attempts"
             exit 1
           fi
 
+          echo ""
+          echo "Waiting 15 seconds for application to settle before test load..."
+          sleep 15
+
       - name: Run Playwright tests
         id: run-tests
-        run: npm run test:e2e
+        env:
+          DEBUG: pw:api
+        run: |
+          echo "🧪 Starting Playwright tests"
+          echo "API_BASE_URL: ${API_BASE_URL}"
+          echo "CI: ${CI}"
+          echo ""
+          npm run test:e2e
 
       - name: Upload test reports
         if: always()
