@@ -79,16 +79,16 @@ jobs:
 
           echo "✅ ECS deployment complete"
           echo ""
-          echo "Waiting 60 seconds for application to initialize..."
-          sleep 60
+          echo "Waiting 2 minutes for application to fully initialize..."
+          sleep 120
           echo ""
           echo "Polling ${API_URL}/v1/health until ready..."
 
-          MAX_ATTEMPTS=120
+          MAX_ATTEMPTS=60
           ATTEMPT=0
-          SLEEP_TIME=3
+          SLEEP_TIME=5
           SUCCESS_COUNT=0
-          REQUIRED_SUCCESS=3
+          REQUIRED_SUCCESS=5
 
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             ATTEMPT=$((ATTEMPT + 1))
@@ -101,19 +101,19 @@ jobs:
               
               if [ $SUCCESS_COUNT -ge $REQUIRED_SUCCESS ]; then
                 echo ""
-                echo "✅ Application is ready and stable"
+                echo "✅ Application is ready and stable (5 consecutive successful health checks)"
                 exit 0
               fi
             else
               SUCCESS_COUNT=0
-              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - HTTP $HTTP_CODE ⏳"
+              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - HTTP $HTTP_CODE ⏳ (resetting counter)"
             fi
             
             sleep $SLEEP_TIME
           done
 
           echo ""
-          echo "❌ Application failed to become ready after initial 60s + $((MAX_ATTEMPTS * SLEEP_TIME))s of polling"
+          echo "❌ Application failed to become ready after 120s initial + $((MAX_ATTEMPTS * SLEEP_TIME))s of polling"
           exit 1
 
       - name: Notify Slack on Success (Deploy)
@@ -199,7 +199,6 @@ jobs:
       - name: Run Playwright tests
         id: run-tests
         run: npm run test:e2e
-        continue-on-error: true
 
       - name: Upload test reports
         if: always()
@@ -216,26 +215,38 @@ jobs:
         shell: bash
         run: |
           if [ -f "e2e-tests/test-results/results.json" ]; then
-            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.suites[].specs[]] | length')
-            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[].specs[] | select(.ok == false)] | length')
-            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[].specs[] | select(.ok == true)] | length')
+            echo "Found results.json, parsing test results..."
+            
+            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.suites[]?.specs[]?] | length' 2>/dev/null || echo "0")
+            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[]?.specs[]? | select(.ok == false)] | length' 2>/dev/null || echo "0")
+            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.suites[]?.specs[]? | select(.ok == true)] | length' 2>/dev/null || echo "0")
+            
+            echo "Parsed: Total=$TOTAL_TESTS, Failed=$FAILED_COUNT, Passed=$PASSED_COUNT"
             
             echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
             echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
             echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
             
             if [ "$FAILED_COUNT" -gt 0 ]; then
-              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '.suites[].specs[] | select(.ok == false) | .title' | head -10 | sed 's/^/• /')
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '.suites[]?.specs[]? | select(.ok == false) | .title' 2>/dev/null | head -10 | sed 's/^/• /' || echo "• Failed to parse test names")
+              if [ -z "$FAILED_TESTS" ]; then
+                FAILED_TESTS="• $FAILED_COUNT test(s) failed but names could not be parsed"
+              fi
               echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
               echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
               echo "tests_ran=true" >> $GITHUB_OUTPUT
             else
               echo "failed_tests=" >> $GITHUB_OUTPUT
-              echo "tests_ran=true" >> $GITHUB_OUTPUT
+              if [ "$TOTAL_TESTS" -gt 0 ]; then
+                echo "tests_ran=true" >> $GITHUB_OUTPUT
+              else
+                echo "tests_ran=false" >> $GITHUB_OUTPUT
+              fi
             fi
           else
-            echo "failed_tests=" >> $GITHUB_OUTPUT
+            echo "⚠️  results.json file not found - tests may not have run"
+            echo "failed_tests=• Test results file not found (tests may not have started)" >> $GITHUB_OUTPUT
             echo "failed_count=0" >> $GITHUB_OUTPUT
             echo "passed_count=0" >> $GITHUB_OUTPUT
             echo "total_tests=0" >> $GITHUB_OUTPUT
