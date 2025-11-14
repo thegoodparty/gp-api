@@ -47,7 +47,7 @@ test.describe('Users - User Metadata', () => {
 
     const response = await request.get('/v1/users/me/metadata', {
       headers: {
-        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser.authToken}`,
+        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser!.authToken}`,
       },
     })
 
@@ -89,7 +89,7 @@ test.describe('Users - User Metadata', () => {
 
     const response = await request.put('/v1/users/me/metadata', {
       headers: {
-        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser.authToken}`,
+        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser!.authToken}`,
       },
       data: {
         meta: metaData,
