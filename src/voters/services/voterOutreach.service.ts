@@ -25,6 +25,7 @@ import { VoterFileFilterService } from './voterFileFilter.service'
 import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types'
 import { PeerlyMediaService } from '../../vendors/peerly/services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from '../../vendors/peerly/services/peerlyP2pSms.service'
+import { PeerlyP2pJobService } from '../../vendors/peerly/services/peerlyP2pJob.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
 import { Readable } from 'stream'
 import TurndownService from 'turndown'
@@ -42,6 +43,7 @@ export interface OutreachSlackBlocksConfiguration {
   message?: string
   formattedAudience?: AudienceSlackBlock[]
   audienceRequest?: string
+  peerlyJobUrl?: string
 }
 
 export type Audience = {
@@ -97,6 +99,7 @@ export class VoterOutreachService {
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly mediaService: PeerlyMediaService,
     private readonly p2pSmsService: PeerlyP2pSmsService,
+    private readonly peerlyP2pJobService: PeerlyP2pJobService,
   ) {}
 
   private formatAudienceFiltersForSlack(
@@ -168,6 +171,10 @@ export class VoterOutreachService {
       campaignSlug: campaign.slug,
     })
 
+    const peerlyJobUrl = outreach.projectId
+      ? this.peerlyP2pJobService.getPeerlyJobUrl(outreach.projectId)
+      : undefined
+
     await this.sendSlackOutreachMessage({
       user,
       campaign,
@@ -179,6 +186,7 @@ export class VoterOutreachService {
       message: outreach.message ? sanitizeHtml(outreach.message) : '',
       formattedAudience: this.formatAudienceFiltersForSlack(audience),
       audienceRequest,
+      peerlyJobUrl,
     })
 
     // this is sent to hubspot on update
@@ -211,6 +219,7 @@ export class VoterOutreachService {
     message = '',
     formattedAudience = [],
     audienceRequest = '',
+    peerlyJobUrl,
   }: OutreachSlackBlocksConfiguration) {
     return await this.slack.message(
       buildSlackBlocks({
@@ -229,6 +238,7 @@ export class VoterOutreachService {
         message,
         formattedAudience,
         audienceRequest,
+        peerlyJobUrl,
       }),
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )

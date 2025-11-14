@@ -9,7 +9,6 @@ import { PurchaseService } from 'src/payments/services/purchase.service'
 import { PurchaseType } from 'src/payments/purchase.types'
 import { PaymentsModule } from '../payments/payments.module'
 import { PeerlyModule } from '../vendors/peerly/peerly.module'
-import { SlackModule } from '../vendors/slack/slack.module'
 
 @Module({
   imports: [
@@ -18,7 +17,6 @@ import { SlackModule } from '../vendors/slack/slack.module'
     FilesModule,
     PaymentsModule,
     PeerlyModule,
-    SlackModule,
   ],
   controllers: [OutreachController],
   providers: [OutreachService, OutreachPurchaseHandlerService],

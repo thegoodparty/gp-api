@@ -7,7 +7,7 @@ import {
   P2P_JOB_DEFAULTS,
 } from '../constants/p2pJob.constants'
 
-const { PEERLY_API_BASE_URL } = process.env
+const { PEERLY_API_BASE_URL, PEERLY_ACCOUNT_NUMBER } = process.env
 
 interface CreateP2pJobParams {
   campaignId: number
@@ -126,11 +126,14 @@ export class PeerlyP2pJobService {
     }
   }
 
-  getPeerlyJobUrl(jobId: string, accountId: string): string {
+  getPeerlyJobUrl(jobId: string): string {
     if (!PEERLY_API_BASE_URL) {
       throw new BadGatewayException('PEERLY_API_BASE_URL is not configured')
     }
+    if (!PEERLY_ACCOUNT_NUMBER) {
+      throw new BadGatewayException('PEERLY_ACCOUNT_NUMBER is not configured')
+    }
     const peerlyWebUrl = PEERLY_API_BASE_URL.replace('/api', '')
-    return `${peerlyWebUrl}/accounts/${accountId}/jobs/${jobId}`
+    return `${peerlyWebUrl}/accounts/${PEERLY_ACCOUNT_NUMBER}/jobs/${jobId}`
   }
 }
