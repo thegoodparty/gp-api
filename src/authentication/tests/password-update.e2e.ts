@@ -47,10 +47,10 @@ test.describe('Authentication - Password Update', () => {
     const newPassword = 'updatedPassword456'
 
     const response = await request.put(
-      `/v1/users/${testContext.testUser.userId}/password`,
+      `/v1/users/${testContext.testUser!.userId}/password`,
       {
         headers: {
-          Authorization: `Bearer ${testContext.testUser.authToken}`,
+          Authorization: `Bearer ${testContext.testUser!.authToken}`,
         },
         data: {
           oldPassword: initialPassword,
@@ -66,9 +66,9 @@ test.describe('Authentication - Password Update', () => {
     const testContext = (testInfo as TestInfoWithContext).testContext!
     const newPassword = 'updatedPassword456'
 
-    await request.put(`/v1/users/${testContext.testUser.userId}/password`, {
+    await request.put(`/v1/users/${testContext.testUser!.userId}/password`, {
       headers: {
-        Authorization: `Bearer ${testContext.testUser.authToken}`,
+        Authorization: `Bearer ${testContext.testUser!.authToken}`,
       },
       data: {
         oldPassword: initialPassword,
@@ -91,6 +91,6 @@ test.describe('Authentication - Password Update', () => {
     expect(body.user.password).toBeUndefined()
     expect(body.user.hasPassword).toBe(true)
 
-    testContext.testUser.authToken = body.token
+    testContext.testUser!.authToken = body.token
   })
 })
