@@ -135,7 +135,7 @@ export interface TestUser {
 
 export async function cleanupTestUser(
   request: APIRequestContext,
-  cleanup: TestUser | null,
+  cleanup: TestUser | null | undefined,
 ): Promise<void> {
   if (cleanup && cleanup.userId && cleanup.authToken) {
     await deleteUser(request, cleanup.userId, cleanup.authToken)

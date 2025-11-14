@@ -3,10 +3,11 @@ import { HttpStatus } from '@nestjs/common'
 import {
   loginUser,
   registerUser,
-  deleteUser,
+  cleanupTestUser,
   generateRandomEmail,
   generateRandomName,
 } from '../../../e2e-tests/utils/auth.util'
+import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 test.describe('Admin - Campaign Management', () => {
   const adminEmail = process.env.ADMIN_EMAIL
@@ -16,31 +17,30 @@ test.describe('Admin - Campaign Management', () => {
     test.skip(!adminEmail || !adminPassword, 'Admin credentials not configured')
   })
 
-  let adminToken: string
-  let testUserId: number | undefined
-  let testAuthToken: string | undefined
-
-  test.afterEach(async ({ request }) => {
-    if (testUserId && testAuthToken) {
-      await deleteUser(request, testUserId, testAuthToken)
-      testUserId = undefined
-      testAuthToken = undefined
+  test.beforeEach(async ({ request }, testInfo) => {
+    const { token } = await loginUser(request, adminEmail!, adminPassword!)
+    ;(testInfo as TestInfoWithContext).testContext = {
+      adminToken: token,
     }
   })
 
-  test.beforeEach(async ({ request }) => {
-    const { token } = await loginUser(request, adminEmail!, adminPassword!)
-    adminToken = token
+  test.afterEach(async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext
+
+    if (testContext?.testUser) {
+      await cleanupTestUser(request, testContext.testUser)
+    }
   })
 
-  test('should create a campaign as admin', async ({ request }) => {
+  test('should create a campaign as admin', async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext!
     const email = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()
 
     const response = await request.post('/v1/admin/campaigns', {
       headers: {
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${testContext.adminToken}`,
       },
       data: {
         email,
@@ -63,11 +63,14 @@ test.describe('Admin - Campaign Management', () => {
     expect(campaign).toHaveProperty('id')
     expect(campaign).toHaveProperty('slug')
 
-    testUserId = campaign.userId
-    testAuthToken = adminToken
+    testContext.testUser = {
+      userId: campaign.userId,
+      authToken: testContext.adminToken!,
+    }
   })
 
-  test('should update a campaign as admin', async ({ request }) => {
+  test('should update a campaign as admin', async ({ request }, testInfo) => {
+    const testContext = (testInfo as TestInfoWithContext).testContext!
     const registerResponse = await registerUser(request, {
       firstName: generateRandomName(),
       lastName: generateRandomName(),
@@ -78,8 +81,10 @@ test.describe('Admin - Campaign Management', () => {
       signUpMode: 'candidate',
     })
 
-    testUserId = registerResponse.user.id
-    testAuthToken = registerResponse.token
+    testContext.testUser = {
+      userId: registerResponse.user.id,
+      authToken: registerResponse.token,
+    }
 
     const campaignId = registerResponse.campaign.id
 
@@ -87,7 +92,7 @@ test.describe('Admin - Campaign Management', () => {
       `/v1/admin/campaigns/${campaignId}`,
       {
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: `Bearer ${testContext.adminToken}`,
         },
         data: {
           isVerified: true,
