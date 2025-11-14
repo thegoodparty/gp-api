@@ -1,9 +1,9 @@
 import { HttpModule } from '@nestjs/axios'
 import { forwardRef, Module } from '@nestjs/common'
+import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AiModule } from '../ai/ai.module'
 import { CampaignsModule } from '../campaigns/campaigns.module'
 import { EmailModule } from '../email/email.module'
-import { VotersModule } from '../voters/voters.module'
 import { ElectionsController } from './elections.controller'
 import { BallotReadyService } from './services/ballotReady.service'
 import { CensusEntitiesService } from './services/censusEntities.service'
@@ -12,7 +12,6 @@ import { ElectionsService } from './services/elections.service'
 import { ElectionTypeService } from './services/electionType.service'
 import { MunicipalitiesService } from './services/municipalities.service'
 import { RacesService } from './services/races.service'
-import { SlackModule } from 'src/vendors/slack/slack.module'
 
 @Module({
   controllers: [ElectionsController],
@@ -29,7 +28,7 @@ import { SlackModule } from 'src/vendors/slack/slack.module'
   imports: [
     AiModule,
     EmailModule,
-    VotersModule,
+    //VotersModule,
     forwardRef(() => CampaignsModule),
     HttpModule,
     SlackModule,

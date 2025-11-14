@@ -3,8 +3,8 @@ import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { VotersService } from 'src/voters/services/voters.service'
 import { VoterCounts } from 'src/voters/voters.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -128,12 +128,13 @@ export class PathToVictoryService extends createPrismaBase(
         } else if (electionType && electionLocation) {
           // if already specified, skip the search
         } else {
-          await new Promise((resolve) => setTimeout(resolve, 7000))
           const columnResponse = await this.officeMatchService.getSearchColumn(
             input.slug,
             searchColumn,
             input.electionState,
             this.getSearchString(input),
+            '',
+            input.electionDate,
           )
 
           if (!columnResponse) continue
@@ -164,6 +165,9 @@ export class PathToVictoryService extends createPrismaBase(
           const { projectedTurnout, winNumber, voterContactGoal } =
             raceTargetDetails
 
+          // We only accept matches that we have a projected turnout for
+          if (projectedTurnout <= 0) continue
+
           pathToVictoryResponse.electionType = electionType
           pathToVictoryResponse.electionLocation = electionLocation
           pathToVictoryResponse.counts = {
@@ -172,23 +176,6 @@ export class PathToVictoryService extends createPrismaBase(
             voterContactGoal,
           }
           break
-        } else {
-          const counts = await this.votersService.getVoterCounts(
-            input.electionTerm,
-            input.electionDate || new Date().toISOString().slice(0, 10),
-            state,
-            electionType,
-            electionLocation,
-            input.partisanType,
-            input.priorElectionDates,
-          )
-
-          if (counts?.total && counts.total > 0) {
-            pathToVictoryResponse.electionType = electionType
-            pathToVictoryResponse.electionLocation = electionLocation
-            pathToVictoryResponse.counts = counts
-            break
-          }
         }
 
         if (++attempts > 10) break
@@ -322,28 +309,28 @@ export class PathToVictoryService extends createPrismaBase(
         await this.completePathToVictory(campaign.slug, pathToVictoryResponse)
         return true
       }
-    } else if (
-      pathToVictoryResponse?.electionType &&
-      pathToVictoryResponse?.counts?.total &&
-      pathToVictoryResponse.counts.total > 0
-    ) {
-      const debugMessage = 'Was not able to get the turnout numbers.\n'
-      await this.slackService.formattedMessage({
-        message:
-          candidateSlackMessage + pathToVictorySlackMessage + debugMessage,
-        channel: SlackChannel.botPathToVictoryIssues,
-      })
+      // } else if (
+      //   pathToVictoryResponse?.electionType &&
+      //   pathToVictoryResponse?.counts?.total &&
+      //   pathToVictoryResponse.counts.total > 0
+      // ) {
+      //   const debugMessage = 'Was not able to get the turnout numbers.\n'
+      //   await this.slackService.formattedMessage({
+      //     message:
+      //       candidateSlackMessage + pathToVictorySlackMessage + debugMessage,
+      //     channel: SlackChannel.botPathToVictoryIssues,
+      //   })
 
-      if (campaign.pathToVictory?.data?.p2vStatus !== 'Complete') {
-        await this.completePathToVictory(
-          campaign.slug,
-          pathToVictoryResponse,
-          false,
-        )
-        return true
-      }
+      //   if (campaign.pathToVictory?.data?.p2vStatus !== 'Complete') {
+      //     await this.completePathToVictory(
+      //       campaign.slug,
+      //       pathToVictoryResponse,
+      //       false,
+      //     )
+      //     return true
+      //   }
     } else {
-      let debugMessage = 'No Path To Victory Found.\n'
+      let debugMessage = 'No Path To Victory Found with projected turnout.\n'
       if (pathToVictoryResponse) {
         debugMessage +=
           'pathToVictoryResponse: ' + JSON.stringify(pathToVictoryResponse)
@@ -352,14 +339,20 @@ export class PathToVictoryService extends createPrismaBase(
         message: candidateSlackMessage + debugMessage,
         channel: SlackChannel.botPathToVictoryIssues,
       })
+      // Mark as Failed
+      await this.completePathToVictory(
+        campaign.slug,
+        pathToVictoryResponse,
+        false,
+        P2VStatus.failed,
+      )
+      await this.crmService.handleUpdateCampaign(
+        campaign,
+        'path_to_victory_status',
+        P2VStatus.failed,
+      )
+      return false
     }
-
-    await this.crmService.handleUpdateCampaign(
-      campaign,
-      'path_to_victory_status',
-      'Waiting',
-    )
-    return false
   }
 
   async completePathToVictory(
@@ -370,6 +363,7 @@ export class PathToVictoryService extends createPrismaBase(
       electionLocation: string
     },
     sendEmail = true,
+    p2vStatusOverride?: P2VStatus,
   ): Promise<void> {
     this.logger.debug('completing path to victory for', slug)
     this.logger.debug('pathToVictoryResponse', pathToVictoryResponse)
@@ -398,13 +392,12 @@ export class PathToVictoryService extends createPrismaBase(
         })
       }
 
-      let p2vStatus: P2VStatus = P2VStatus.waiting
-      if (
-        pathToVictoryResponse?.counts?.projectedTurnout &&
+      const p2vStatus: P2VStatus =
+        p2vStatusOverride ??
+        (pathToVictoryResponse?.counts?.projectedTurnout &&
         pathToVictoryResponse.counts.projectedTurnout > 0
-      ) {
-        p2vStatus = P2VStatus.complete
-      }
+          ? P2VStatus.complete
+          : P2VStatus.waiting)
 
       const p2vData = p2v.data || {}
       await this.prisma.pathToVictory.update({

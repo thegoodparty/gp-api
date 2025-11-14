@@ -1,15 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
-import { SlackService } from '../../vendors/slack/services/slack.service'
-import { SlackChannel } from '../../vendors/slack/slackService.types'
-import { AiService } from '../../ai/ai.service'
 import { ElectionType } from '@prisma/client'
 import {
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
 } from 'openai/resources/chat/completions'
-import { VotersService } from '../../voters/services/voters.service'
 import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
+import { ElectionsService } from 'src/elections/services/elections.service'
+import { AiService } from '../../ai/ai.service'
+import { PrismaService } from '../../prisma/prisma.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
+import { VotersService } from '../../voters/services/voters.service'
 
 interface SearchColumnResult {
   column: string
@@ -25,6 +26,7 @@ export class OfficeMatchService {
     private slack: SlackService,
     private aiService: AiService,
     private votersService: VotersService,
+    private elections: ElectionsService,
   ) {}
 
   async searchMiscDistricts(
@@ -165,15 +167,29 @@ export class OfficeMatchService {
     let foundMiscDistricts: string[] = []
     if (matchResp?.content) {
       try {
-        const contentJson = JSON.parse(matchResp.content)
-        const columns = contentJson?.columns || []
-
-        if (Array.isArray(columns) && columns.length > 0) {
-          foundMiscDistricts = columns
+        const parsed: unknown = JSON.parse(matchResp.content)
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          'columns' in parsed &&
+          Array.isArray((parsed as { columns?: unknown[] }).columns)
+        ) {
+          const cols = (parsed as { columns: unknown[] }).columns
+          const strings = cols.filter((c) => typeof c === 'string') as string[]
+          if (strings.length > 0) {
+            foundMiscDistricts = strings
+          } else {
+            await this.slack.message(
+              {
+                body: `Received invalid response while finding misc districts for ${officeName}. columns: ${JSON.stringify(cols)}. Raw Content: ${matchResp.content}`,
+              },
+              SlackChannel.botDev,
+            )
+          }
         } else {
           await this.slack.message(
             {
-              body: `Received invalid response while finding misc districts for ${officeName}. columns: ${columns}. typeof columns: ${typeof columns}. Raw Content: ${matchResp.content}`,
+              body: `Received invalid response while finding misc districts for ${officeName}. Raw Content: ${matchResp.content}`,
             },
             SlackChannel.botDev,
           )
@@ -419,21 +435,30 @@ export class OfficeMatchService {
 
     let districtValue: string | undefined
     if (subAreaName || subAreaValue) {
-      if (!subAreaValue && !isNaN(Number(subAreaValue))) {
+      const subAreaIsNumeric =
+        subAreaValue !== undefined &&
+        subAreaValue !== null &&
+        String(subAreaValue).trim() !== '' &&
+        !isNaN(Number(subAreaValue))
+
+      if (!subAreaIsNumeric) {
+        // subAreaValue is missing or not numeric, try to parse number from officeName
         for (const word of districtWords) {
           if (officeName.includes(word)) {
-            const regex = new RegExp(`${word} ([0-9]+)`)
+            const regex = new RegExp(`${word}\\s+([0-9]+)`, 'i')
             const match = officeName.match(regex)
             if (match) {
               districtValue = match[1]
-            } else {
-              // could not find a district number in officeName, it's probably a word like a county.
-              districtValue = subAreaValue
+              break
             }
           }
         }
+        // If still not found, use subAreaValue as a fallback (might be a named area like a county)
+        if (!districtValue && subAreaValue) {
+          districtValue = subAreaValue
+        }
       } else {
-        // subAreaValue is a number lets use that.
+        // subAreaValue is numeric; use it directly
         districtValue = subAreaValue
       }
     }
@@ -451,6 +476,7 @@ export class OfficeMatchService {
     electionState: string,
     searchString: string,
     searchString2: string = '',
+    electionDate?: string,
   ): Promise<SearchColumnResult | undefined> {
     let foundColumn: SearchColumnResult | undefined
     try {
@@ -460,10 +486,26 @@ export class OfficeMatchService {
 
       this.logger.debug(`searching for ${search}`)
 
-      let searchValues = await this.votersService.querySearchColumn(
+      const year =
+        electionDate && electionDate.length >= 4
+          ? Number(electionDate.slice(0, 4))
+          : undefined
+      const apiRes = await this.elections.getValidDistrictNames(
         searchColumn,
         electionState,
+        year ?? '',
       )
+      let searchValues: string[] = []
+      if (Array.isArray(apiRes)) {
+        searchValues = apiRes.filter((v) => typeof v === 'string') as string[]
+      } else if (
+        apiRes &&
+        typeof apiRes === 'object' &&
+        Array.isArray((apiRes as { names?: unknown[] }).names)
+      ) {
+        const names = (apiRes as { names: unknown[] }).names
+        searchValues = names.filter((v) => typeof v === 'string') as string[]
+      }
 
       // strip out any searchValues that are blank strings
       searchValues = searchValues.filter((value) => value !== '')
@@ -543,18 +585,18 @@ export class OfficeMatchService {
           matchedLabel: ''
         }
         Example Input: 'San Clemente City Council District 1 - San Clemente- CA'
-        Example Labels: 'CA####ALHAMBRA CITY CNCL 1'\n 'CA####BELLFLOWER CITY CNCL 1'\n 'CA####SAN CLEMENTE CITY CNCL 1'\n
+        Example Labels: 'ALHAMBRA CITY CNCL 1'\n 'BELLFLOWER CITY CNCL 1'\n 'SAN CLEMENTE CITY CNCL 1'\n
         Example Output:
         {
-          matchedLabel: 'CA####SAN CLEMENTE CITY CNCL 1'
+          matchedLabel: 'SAN CLEMENTE CITY CNCL 1'
         }
         Example Input: 'California State Senate District 5 - CA'
-        Example Labels: 'CA##04'\n 'CA##05'\n 'CA##06'\n
+        Example Labels: '04'\n '05'\n '06'\n
         Example Output: {
-          matchedLabel: 'CA##05'
+          matchedLabel: '05'
         }
         Example Input: 'Maine Village Board Chair - Wisconsin'
-        Example Labels: 'WI##MARATHON COMM COLL DIST'\n 'WI##MARINETTE COMM COLL DIST'\n 'WI##MARQUETTE COMM COLL DIST'\n
+        Example Labels: 'MARATHON COMM COLL DIST'\n 'MARINETTE COMM COLL DIST'\n 'MARQUETTE COMM COLL DIST'\n
         Example Output:
         {
              'matchedLabel': '',
@@ -593,9 +635,17 @@ export class OfficeMatchService {
 
     if (content && content !== '') {
       try {
-        const data = JSON.parse(content)
-        if (data?.matchedLabel && data.matchedLabel !== '') {
-          return data.matchedLabel.replace(/"/g, '')
+        const parsed: unknown = JSON.parse(content)
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          'matchedLabel' in parsed &&
+          typeof (parsed as { matchedLabel?: string }).matchedLabel === 'string'
+        ) {
+          const matched = (parsed as { matchedLabel: string }).matchedLabel
+          if (matched !== '') {
+            return matched.replace(/"/g, '')
+          }
         }
       } catch (error) {
         this.logger.error('error parsing AI response', error)
