@@ -11,6 +11,7 @@ import { format } from '@redtea/format-axios-error'
 import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { lastValueFrom } from 'rxjs'
+import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
@@ -61,6 +62,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     private readonly slackService: SlackService,
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
+    private readonly areaCodeFromZipService: AreaCodeFromZipService,
   ) {
     super()
   }
@@ -339,7 +341,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     ).substring(0, 255) // Limit to 255 characters per Peerly API docs
 
     const stateCode = state?.short_name
-    const areaCode = parsePhoneNumberWithError(phone, 'US').countryCallingCode
+    const postalCodeValue = postalCode?.long_name
+
+    let areaCodes: string[] | null = null
+    if (postalCodeValue) {
+      areaCodes = await this.areaCodeFromZipService.getAreaCodeFromZip(postalCodeValue)
+    }
+
     const submitBrandData: Peerly10DlcBrandData = {
       entityType: PEERLY_ENTITY_TYPE,
       vertical: PEERLY_USECASE,
@@ -354,9 +362,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
-      jobAreas: stateCode && areaCode ? [{
+      jobAreas: stateCode && areaCodes && areaCodes.length > 0 ? [{
         didState: stateCode,
-        disNpaSubset: [areaCode],
+        disNpaSubset: areaCodes,
       }] : undefined
     }
 
