@@ -45,7 +45,7 @@ test.describe('Users - Get Current User', () => {
     }
 
     const { userId: testUserId, authToken } = (testInfo as TestInfoWithContext)
-      .testContext!.testUser
+      .testContext!.testUser!
 
     const response = await request.get('/v1/users/me', {
       headers: {

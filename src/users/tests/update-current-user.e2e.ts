@@ -47,7 +47,7 @@ test.describe('Users - Update Current User', () => {
 
     const response = await request.put('/v1/users/me', {
       headers: {
-        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser.authToken}`,
+        Authorization: `Bearer ${(testInfo as TestInfoWithContext).testContext!.testUser!.authToken}`,
       },
       data: {
         firstName: newFirstName,
