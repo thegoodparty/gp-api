@@ -14,6 +14,9 @@ import { pollMessageGroup } from '../utils/polls.utils'
 export class PollsService extends createPrismaBase(MODELS.Poll) {
   constructor(private readonly queueProducer: QueueProducerService) {
     super()
+    this.subscribeToRowChanges(async (event) => {
+      // woohoo, do something here
+    })
   }
   async create(args: Prisma.PollCreateArgs) {
     return this.model.create(args)
