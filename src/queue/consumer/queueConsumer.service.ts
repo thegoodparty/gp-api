@@ -700,10 +700,11 @@ export class QueueConsumerService {
     // It's important that this filename be deterministic. That way, in the event of a failure
     // and retry, we can safely re-use a previously generated CSV.
     const fileName = `${poll.id}-${params.messageId}.csv`
+    const key = this.s3Service.buildKey(undefined, fileName)
 
     // 1. Get or create the CSV file of a random sample of contacts.
     // We do get-or-create here so that the logic remains retry-safe in the event of a failure.
-    let csv = await this.s3Service.getFile(bucket, fileName)
+    let csv = await this.s3Service.getFile(bucket, key)
 
     // expires in 7 days
     const expiresIn = 7 * 24 * 60 * 60
@@ -715,18 +716,13 @@ export class QueueConsumerService {
         campaign,
       )
       csv = buildCsvFromContacts(sample)
-      await this.s3Service.uploadFile(bucket, csv, fileName, undefined, {
+      await this.s3Service.uploadFile(bucket, csv, key, {
         contentType: 'text/csv',
       })
     }
-    const csvUrl = await this.s3Service.getSignedUrlForViewing(
-      bucket,
-      fileName,
-      undefined,
-      {
-        expiresIn,
-      },
-    )
+    const csvUrl = await this.s3Service.getSignedUrlForViewing(bucket, key, {
+      expiresIn,
+    })
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages

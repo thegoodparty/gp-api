@@ -247,23 +247,18 @@ export class PollsController {
     }
 
     const folderPath = `poll-text-images/${campaign.id}-${campaign.slug}`
+    const key = this.s3Service.buildKey(folderPath, dto.fileName)
     const signedUrl = await this.s3Service.getSignedUrlForUpload(
       ASSET_DOMAIN,
-      dto.fileName,
-      folderPath,
+      key,
       {
         contentType: dto.contentType,
       },
     )
 
-    const publicUrl = this.s3Service.getFileUrl(
-      ASSET_DOMAIN,
-      dto.fileName,
-      folderPath,
-      {
-        baseUrl: `https://${ASSET_DOMAIN}`,
-      },
-    )
+    const publicUrl = this.s3Service.getFileUrl(ASSET_DOMAIN, key, {
+      baseUrl: `https://${ASSET_DOMAIN}`,
+    })
 
     return { signedUrl, publicUrl }
   }
