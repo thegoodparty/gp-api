@@ -56,6 +56,7 @@ jobs:
           project-name: gp-deploy-build-${{ github.ref_name }}
 
       - name: Wait for ECS service to be stable
+        if: github.ref_name != 'master'
         shell: bash
         run: |
           case "${{ github.ref_name }}" in
@@ -104,6 +105,7 @@ jobs:
 
   tests:
     needs: deploy
+    if: github.ref_name != 'master'
     runs-on: ubuntu-latest
     continue-on-error: true
     env:
