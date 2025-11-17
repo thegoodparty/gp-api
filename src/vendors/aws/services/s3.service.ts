@@ -19,16 +19,14 @@ export type UploadFileOptions = {
   contentType?: string
   metadata?: Record<string, string>
   baseUrl?: string
-  slugifyFileName?: boolean
 }
 
 export type GetSignedUrlOptions = {
   expiresIn?: number
   contentType?: string
-  slugifyFileName?: boolean
 }
 
-export type GetFileOptions = {
+export type BuildKeyOptions = {
   slugifyFileName?: boolean
 }
 
@@ -41,11 +39,12 @@ export class S3Service extends AwsService {
     this.s3Client = new S3Client({ region })
   }
 
-  private buildKey(
+  buildKey(
     folderPath?: string,
     fileName?: string,
-    slugifyFileName: boolean = true,
+    options?: BuildKeyOptions,
   ): string {
+    const slugifyFileName = options?.slugifyFileName ?? true
     let processedFileName = fileName
     if (slugifyFileName && fileName) {
       processedFileName = slugify(fileName, { lower: true, trim: true })
@@ -79,16 +78,9 @@ export class S3Service extends AwsService {
   async uploadFile(
     bucket: string,
     fileObject: PutObjectCommandInput['Body'],
-    fileName: string,
-    folderPath?: string,
+    key: string,
     options?: UploadFileOptions,
   ) {
-    const key = this.buildKey(
-      folderPath,
-      fileName,
-      options?.slugifyFileName ?? true,
-    )
-
     return this.executeAwsOperation(async () => {
       const upload = new Upload({
         client: this.s3Client,
@@ -109,16 +101,9 @@ export class S3Service extends AwsService {
 
   async getSignedUrlForUpload(
     bucket: string,
-    fileName: string,
-    folderPath?: string,
+    key: string,
     options?: GetSignedUrlOptions,
   ) {
-    const key = this.buildKey(
-      folderPath,
-      fileName,
-      options?.slugifyFileName ?? true,
-    )
-
     return this.executeAwsOperation(async () => {
       return await getSignedUrl(
         this.s3Client,
@@ -134,16 +119,9 @@ export class S3Service extends AwsService {
 
   async getSignedUrlForViewing(
     bucket: string,
-    fileName: string,
-    folderPath?: string,
+    key: string,
     options?: GetSignedUrlOptions,
   ) {
-    const key = this.buildKey(
-      folderPath,
-      fileName,
-      options?.slugifyFileName ?? true,
-    )
-
     return this.executeAwsOperation(async () => {
       return await getSignedUrl(
         this.s3Client,
@@ -156,18 +134,7 @@ export class S3Service extends AwsService {
     }, 'getSignedUrlForViewing')
   }
 
-  async getFile(
-    bucket: string,
-    fileName: string,
-    folderPath?: string,
-    options?: GetFileOptions,
-  ): Promise<string | undefined> {
-    const key = this.buildKey(
-      folderPath,
-      fileName,
-      options?.slugifyFileName ?? true,
-    )
-
+  async getFile(bucket: string, key: string): Promise<string | undefined> {
     return this.executeAwsOperation(async () => {
       try {
         const response = await this.s3Client.send(
@@ -188,15 +155,9 @@ export class S3Service extends AwsService {
 
   getFileUrl(
     bucket: string,
-    fileName: string,
-    folderPath?: string,
-    options?: { baseUrl?: string; slugifyFileName?: boolean },
+    key: string,
+    options?: { baseUrl?: string },
   ): string {
-    const key = this.buildKey(
-      folderPath,
-      fileName,
-      options?.slugifyFileName ?? true,
-    )
     return this.buildUrl(bucket, key, options?.baseUrl)
   }
 }
