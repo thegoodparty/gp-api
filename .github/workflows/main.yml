@@ -35,6 +35,9 @@ jobs:
             qa)
               echo "target_env=qa" >> "$GITHUB_OUTPUT"
               ;;
+            master)
+              echo "target_env=prod" >> "$GITHUB_OUTPUT"
+              ;;
             *)
               echo "Unsupported branch: $BRANCH"; exit 1
               ;;
@@ -63,6 +66,10 @@ jobs:
             qa)
               CLUSTER="gp-qa-fargateCluster"
               SERVICE="gp-api-qa"
+              ;;
+            master)
+              CLUSTER="gp-prod-fargateCluster"
+              SERVICE="gp-api-prod"
               ;;
             *)
               echo "Unsupported branch"; exit 1
@@ -123,6 +130,9 @@ jobs:
             qa)
               HEALTH_URL="https://gp-api-qa.goodparty.org/v1/health"
               ;;
+            prod)
+              HEALTH_URL="https://gp-api.goodparty.org/v1/health"
+              ;;
             *)
               echo "Unknown environment: $TARGET_ENV"; exit 1
               ;;
@@ -162,6 +172,7 @@ jobs:
           case "$TARGET_ENV" in
             dev)  POSTMAN_ENV_NAME="gp-api-dev" ;;
             qa)   POSTMAN_ENV_NAME="gp-api-qa" ;;
+            prod) POSTMAN_ENV_NAME="gp-api-prod" ;;
             *)    echo "Unknown environment: $TARGET_ENV"; exit 1 ;;
           esac
           echo "Using Postman environment: $POSTMAN_ENV_NAME"
@@ -223,6 +234,7 @@ jobs:
           case "$TARGET_ENV" in
             dev)  TOKEN="${{ secrets.DEV_API_TOKEN }}" ;;
             qa)   TOKEN="${{ secrets.QA_API_TOKEN }}" ;;
+            prod) TOKEN="${{ secrets.PROD_API_TOKEN }}" ;;
             *)    TOKEN="" ;;
           esac
           echo "API_TOKEN=$TOKEN" >> "$GITHUB_ENV"
