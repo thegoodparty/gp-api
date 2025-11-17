@@ -29,6 +29,31 @@ export enum CampaignStatus {
 export type CampaignWith<T extends keyof Prisma.CampaignInclude> =
   Prisma.CampaignGetPayload<{ include: { [field in T]: true } }>
 
+export type CampaignListResponse = Prisma.CampaignGetPayload<{
+  include: {
+    user: {
+      select: {
+        firstName: true
+        lastName: true
+        phone: true
+        email: true
+        metaData: true
+      }
+    }
+    pathToVictory: {
+      select: {
+        data: true
+      }
+    }
+  }
+}>
+
+export type CampaignWithPathToVictory = Prisma.CampaignGetPayload<{
+  include: {
+    pathToVictory: true
+  }
+}>
+
 // TODO: this should be based off CampaignUpdateHistoryType, we're having to change these in too many places
 export type VoterGoals = {
   doorKnocking?: number
