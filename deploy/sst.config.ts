@@ -347,7 +347,10 @@ export default $config({
         health: {
           '80/http': {
             path: '/v1/health',
-            interval: '30 seconds',
+            interval: '10 seconds',
+            timeout: '5 seconds',
+            healthyThreshold: 2,
+            unhealthyThreshold: 3,
           },
         },
       },
@@ -403,7 +406,11 @@ export default $config({
           targetArgs.healthCheck = {
             ...targetArgs.healthCheck,
             path: '/v1/health',
-            interval: 30,
+            interval: 10,
+            timeout: 5,
+            healthyThreshold: 2,
+            unhealthyThreshold: 3,
+            matcher: '200',
           }
         },
       },
@@ -685,6 +692,14 @@ export default $config({
               'ecs:DescribeServices',
               'ecs:DescribeTasks',
               'ecs:DescribeTaskDefinition',
+            ],
+            Resource: '*',
+          },
+          {
+            Effect: 'Allow',
+            Action: [
+              'elasticloadbalancing:DescribeTargetHealth',
+              'elasticloadbalancing:DescribeTargetGroups',
             ],
             Resource: '*',
           },
