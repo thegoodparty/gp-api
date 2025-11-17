@@ -1,6 +1,46 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
-import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  Campaign,
+  PathToVictory,
+  Poll,
+  PollIndividualMessage,
+  PollIssue,
+  TcrComplianceStatus,
+} from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { isAxiosError } from 'axios'
+import parseCsv from 'neat-csv'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { PersonOutput } from 'src/contacts/schemas/person.schema'
+import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
+import { ContactsService } from 'src/contacts/services/contacts.service'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
+import { ViabilityService } from 'src/pathToVictory/services/viability.service'
+import {
+  PathToVictoryInput,
+  ViabilityScore,
+} from 'src/pathToVictory/types/pathToVictory.types'
+import { PollIssuesService } from 'src/polls/services/pollIssues.service'
+import { PollsService } from 'src/polls/services/polls.service'
+import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
+import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
+import { UsersService } from 'src/users/services/users.service'
+import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
+import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
+import { isNestJsHttpException } from '../../shared/util/http.util'
+import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
+import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
+import { EVENTS } from '../../vendors/segment/segment.types'
+import { DomainsService } from '../../websites/services/domains.service'
 import {
   DomainEmailForwardingMessage,
   GenerateAiContentMessageData,
@@ -16,46 +56,6 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import {
-  Campaign,
-  PathToVictory,
-  Poll,
-  PollIndividualMessage,
-  PollIssue,
-  TcrComplianceStatus,
-} from '@prisma/client'
-import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
-import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
-import {
-  PathToVictoryInput,
-  ViabilityScore,
-} from 'src/pathToVictory/types/pathToVictory.types'
-import { ViabilityService } from 'src/pathToVictory/services/viability.service'
-import { AnalyticsService } from 'src/analytics/analytics.service'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { EVENTS } from '../../vendors/segment/segment.types'
-import { DomainsService } from '../../websites/services/domains.service'
-import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
-import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
-import { isNestJsHttpException } from '../../shared/util/http.util'
-import { isAxiosError } from 'axios'
-import { PollsService } from 'src/polls/services/polls.service'
-import { PollIssuesService } from 'src/polls/services/pollIssues.service'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import { ContactsService } from 'src/contacts/services/contacts.service'
-import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
-import { PersonOutput } from 'src/contacts/schemas/person.schema'
-import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
-import { UsersService } from 'src/users/services/users.service'
-import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
-import parseCsv from 'neat-csv'
-import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class QueueConsumerService {
@@ -414,6 +414,9 @@ export class QueueConsumerService {
       null
 
     try {
+      this.logger.debug(
+        `P2V start for slug=${message.slug}, office="${message.officeName}", level=${message.electionLevel}, state=${message.electionState}, subAreaName=${message.subAreaName}, subAreaValue=${message.subAreaValue}, electionDate=${message.electionDate}`,
+      )
       const p2vResponse: P2VResponse =
         await this.pathToVictoryService.handlePathToVictory({
           ...message,
@@ -447,17 +450,45 @@ export class QueueConsumerService {
           partisanType: (p2vResponse.partisanType as string) || '',
           priorElectionDates:
             (p2vResponse.priorElectionDates as string[]) || [],
+          positionId: p2vResponse.positionId as string | undefined,
         },
       )
     } catch (e) {
-      this.logger.error('error in consumer/handlePathToVictoryMessage', e)
+      this.logger.error(
+        `error in consumer/handlePathToVictoryMessage for slug=${message.slug}, office="${message.officeName}"`,
+        e,
+      )
+      // Extra structured context for visibility in logs
+      this.logger.error('P2V context', {
+        slug: message.slug,
+        officeName: message.officeName,
+        electionLevel: message.electionLevel,
+        electionState: message.electionState,
+        subAreaName: message.subAreaName,
+        subAreaValue: message.subAreaValue,
+        electionDate: message.electionDate,
+      })
       await this.slackService.errorMessage({
         message: 'error in consumer/handlePathToVictoryMessage',
-        error: e,
+        error: {
+          error: e,
+          context: {
+            slug: message.slug,
+            officeName: message.officeName,
+            electionLevel: message.electionLevel,
+            electionState: message.electionState,
+            subAreaName: message.subAreaName,
+            subAreaValue: message.subAreaValue,
+            electionDate: message.electionDate,
+          },
+        },
       })
     }
 
     if (p2vSuccess === false && campaign) {
+      this.logger.error(
+        `analyzePathToVictoryResponse returned false; slug=${campaign.slug}`,
+      )
       await this.handlePathToVictoryFailure(campaign)
       throw new Error('error in consumer/handlePathToVictoryMessage')
     }

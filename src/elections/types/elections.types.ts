@@ -87,6 +87,16 @@ export enum DistrictSourceColumns {
   L2DistrictName = 'L2DistrictName',
 }
 
+export type DistrictTypeItem = {
+  id: string
+  L2DistrictType: string
+}
+
+export type DistrictNameItem = {
+  id: string
+  L2DistrictName: string
+}
+
 interface DistrictInfo {
   state: string
   L2DistrictType: string

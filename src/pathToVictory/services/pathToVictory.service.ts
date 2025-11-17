@@ -79,41 +79,42 @@ export class PathToVictoryService extends createPrismaBase(
     try {
       let searchColumns: string[] = ['']
 
-      if (!input.electionType || !input.electionLocation) {
-        if (
-          !input.officeName.includes('At Large') &&
-          !input.officeName.includes('President of the United States') &&
-          !input.officeName.includes('Senate') &&
-          !input.officeName.includes('Governor') &&
-          !input.officeName.includes('Mayor')
-        ) {
-          searchColumns = await this.officeMatchService.searchMiscDistricts(
-            input.slug,
-            input.officeName,
-            input.electionLevel,
-            input.electionState,
-          )
-        }
-
-        const locationColumns =
-          await this.officeMatchService.searchLocationDistricts(
-            input.slug,
-            input.electionLevel,
-            input.officeName,
-            input.subAreaName,
-            input.subAreaValue,
-          )
-
-        if (locationColumns.length > 0) {
-          this.logger.debug('locationColumns', locationColumns)
-          searchColumns = searchColumns.concat(locationColumns)
-        }
+      // Always recompute potential district columns based on the latest office info.
+      // Do not rely on any previously provided electionType/electionLocation values.
+      if (
+        !input.officeName.includes('At Large') &&
+        !input.officeName.includes('President of the United States') &&
+        !input.officeName.includes('Senate') &&
+        !input.officeName.includes('Governor') &&
+        !input.officeName.includes('Mayor')
+      ) {
+        // Use unified, API-driven district type discovery
+        searchColumns = await this.officeMatchService.searchDistrictTypes(
+          input.slug,
+          input.officeName,
+          input.electionLevel,
+          input.electionState,
+          input.subAreaName,
+          input.subAreaValue,
+        )
       }
 
+      // location-based heuristics are now handled inside searchDistrictTypes
+
       let attempts = 1
+      if (!searchColumns || searchColumns.length === 0) {
+        this.logger.warn(
+          `No district type candidates returned for slug=${input.slug}, office="${input.officeName}"`,
+        )
+      } else {
+        this.logger.debug(
+          `District type candidates for slug=${input.slug}: ${JSON.stringify(searchColumns)}`,
+        )
+      }
       for (const searchColumn of searchColumns) {
-        let electionType = input.electionType
-        let electionLocation = input.electionLocation
+        // Always start fresh for each attempt; do not carry forward any previous district values.
+        let electionType = ''
+        let electionLocation = ''
 
         if (
           input.electionLevel === 'federal' &&
@@ -125,9 +126,10 @@ export class PathToVictoryService extends createPrismaBase(
         } else if (input.officeName.includes('Governor')) {
           electionType = ''
           electionLocation = ''
-        } else if (electionType && electionLocation) {
-          // if already specified, skip the search
         } else {
+          this.logger.debug(
+            `Attempt ${attempts}: resolving column "${searchColumn}"`,
+          )
           const columnResponse = await this.officeMatchService.getSearchColumn(
             input.slug,
             searchColumn,
@@ -137,13 +139,26 @@ export class PathToVictoryService extends createPrismaBase(
             input.electionDate,
           )
 
-          if (!columnResponse) continue
+          if (!columnResponse) {
+            this.logger.debug(
+              `Attempt ${attempts}: no match from getSearchColumn for "${searchColumn}"`,
+            )
+            continue
+          }
 
           electionType = columnResponse.column
           electionLocation = columnResponse.value
         }
 
-        if (!electionType || !electionLocation) continue
+        // If not a special-case office and we still don't have a district mapping, try next option.
+        const isSpecialCaseOffice =
+          (input.electionLevel === 'federal' &&
+            (input.officeName.includes('President of the United States') ||
+              input.officeName.includes('Senate'))) ||
+          input.officeName.includes('Governor')
+        if (!isSpecialCaseOffice && (!electionType || !electionLocation)) {
+          continue
+        }
 
         this.logger.debug(
           `Found Column! Election Type: ${electionType}. Location: ${electionLocation}`,
@@ -178,6 +193,9 @@ export class PathToVictoryService extends createPrismaBase(
           break
         }
 
+        this.logger.debug(
+          `Attempt ${attempts}: no projectedTurnout for type=${electionType}, location="${electionLocation}"`,
+        )
         if (++attempts > 10) break
       }
 
@@ -228,6 +246,7 @@ export class PathToVictoryService extends createPrismaBase(
     subAreaValue?: string
     partisanType: string
     priorElectionDates: string[]
+    positionId?: string
   }): Promise<boolean> {
     const {
       campaign,
@@ -243,6 +262,7 @@ export class PathToVictoryService extends createPrismaBase(
       subAreaValue,
       partisanType,
       priorElectionDates,
+      positionId,
     } = p2vResponse
 
     const candidateSlackMessage = `
@@ -303,32 +323,38 @@ export class PathToVictoryService extends createPrismaBase(
           campaign.slug,
           pathToVictoryResponse,
           false,
+          undefined,
+          {
+            officeName,
+            electionLevel,
+            electionState,
+            electionCounty,
+            electionMunicipality,
+            subAreaName,
+            subAreaValue,
+            positionId,
+          },
         )
         return true
       } else {
-        await this.completePathToVictory(campaign.slug, pathToVictoryResponse)
+        await this.completePathToVictory(
+          campaign.slug,
+          pathToVictoryResponse,
+          true,
+          undefined,
+          {
+            officeName,
+            electionLevel,
+            electionState,
+            electionCounty,
+            electionMunicipality,
+            subAreaName,
+            subAreaValue,
+            positionId,
+          },
+        )
         return true
       }
-      // } else if (
-      //   pathToVictoryResponse?.electionType &&
-      //   pathToVictoryResponse?.counts?.total &&
-      //   pathToVictoryResponse.counts.total > 0
-      // ) {
-      //   const debugMessage = 'Was not able to get the turnout numbers.\n'
-      //   await this.slackService.formattedMessage({
-      //     message:
-      //       candidateSlackMessage + pathToVictorySlackMessage + debugMessage,
-      //     channel: SlackChannel.botPathToVictoryIssues,
-      //   })
-
-      //   if (campaign.pathToVictory?.data?.p2vStatus !== 'Complete') {
-      //     await this.completePathToVictory(
-      //       campaign.slug,
-      //       pathToVictoryResponse,
-      //       false,
-      //     )
-      //     return true
-      //   }
     } else {
       let debugMessage = 'No Path To Victory Found with projected turnout.\n'
       if (pathToVictoryResponse) {
@@ -345,6 +371,16 @@ export class PathToVictoryService extends createPrismaBase(
         pathToVictoryResponse,
         false,
         P2VStatus.failed,
+        {
+          officeName,
+          electionLevel,
+          electionState,
+          electionCounty,
+          electionMunicipality,
+          subAreaName,
+          subAreaValue,
+          positionId,
+        },
       )
       await this.crmService.handleUpdateCampaign(
         campaign,
@@ -364,6 +400,16 @@ export class PathToVictoryService extends createPrismaBase(
     },
     sendEmail = true,
     p2vStatusOverride?: P2VStatus,
+    officeContext?: {
+      officeName: string
+      electionLevel: string
+      electionState: string
+      electionCounty: string
+      electionMunicipality: string
+      subAreaName?: string
+      subAreaValue?: string
+      positionId?: string
+    },
   ): Promise<void> {
     this.logger.debug('completing path to victory for', slug)
     this.logger.debug('pathToVictoryResponse', pathToVictoryResponse)
@@ -399,20 +445,56 @@ export class PathToVictoryService extends createPrismaBase(
           ? P2VStatus.complete
           : P2VStatus.waiting)
 
-      const p2vData = p2v.data || {}
+      const p2vData = (p2v.data || {}) as Record<string, unknown>
+
+      // Detect office/district change using an office fingerprint stored on P2V.data
+      const previousOffice =
+        (p2vData.officeContext as Record<string, unknown> | undefined) || null
+      const hasOfficeChanged =
+        !!officeContext &&
+        JSON.stringify(officeContext) !== JSON.stringify(previousOffice)
+
+      if (hasOfficeChanged) {
+        this.logger.debug(
+          `Office changed; resetting prior P2V fields for ${slug}`,
+        )
+      }
+
+      // Build a base data object, optionally clearing stale fields if office changed
+      let baseData: Record<string, unknown>
+      if (hasOfficeChanged) {
+        const {
+          projectedTurnout: _pt,
+          winNumber: _wn,
+          voterContactGoal: _vcg,
+          viability: _viability,
+          p2vAttempts: _attempts,
+          p2vCompleteDate: _p2vCompleteDate,
+          p2vStatus: _p2vStatus,
+          // electionType and electionLocation will be overwritten below
+          electionType: _oldElectionType,
+          electionLocation: _oldElectionLocation,
+          ...rest
+        } = p2vData
+        baseData = rest
+      } else {
+        baseData = { ...p2vData }
+      }
       await this.prisma.pathToVictory.update({
         where: { id: p2v.id },
         data: {
           data: {
-            ...p2vData,
+            ...baseData,
             projectedTurnout: pathToVictoryResponse.counts.projectedTurnout,
             winNumber: pathToVictoryResponse.counts.winNumber,
             voterContactGoal: pathToVictoryResponse.counts.voterContactGoal,
             electionType: pathToVictoryResponse.electionType,
             electionLocation: pathToVictoryResponse.electionLocation,
+            ...(hasOfficeChanged ? { p2vAttempts: 0 } : {}),
             p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
             p2vStatus,
             source: P2VSource.GpApi,
+            ...(officeContext ? { officeContext } : {}),
           },
         },
       })

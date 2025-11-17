@@ -261,10 +261,10 @@ export class ElectionsService {
       excludeInvalid: shouldExclude,
       ...(shouldExclude ? { electionYear } : {}),
     }
-    return await this.electionApiGet(
-      ElectionApiRoutes.districts.types.path,
-      query,
-    )
+    return await this.electionApiGet<
+      import('../types/elections.types').DistrictTypeItem[],
+      typeof query
+    >(ElectionApiRoutes.districts.types.path, query)
   }
 
   async getValidDistrictNames(
@@ -280,10 +280,10 @@ export class ElectionsService {
       excludeInvalid: shouldExclude,
       ...(shouldExclude ? { electionYear } : {}),
     }
-    return await this.electionApiGet(
-      ElectionApiRoutes.districts.names.path,
-      query,
-    )
+    return await this.electionApiGet<
+      import('../types/elections.types').DistrictNameItem[],
+      typeof query
+    >(ElectionApiRoutes.districts.names.path, query)
   }
 
   cleanDistrictName(L2DistrictName: string) {
