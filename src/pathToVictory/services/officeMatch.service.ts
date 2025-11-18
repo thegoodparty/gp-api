@@ -1,8 +1,11 @@
+import { ElectionLevel } from '@/campaigns/campaigns.types'
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
+import { getYear } from 'date-fns'
 import {
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
@@ -33,34 +36,31 @@ export class OfficeMatchService {
   async searchDistrictTypes(
     slug: string,
     officeName: string,
-    electionLevel: string,
+    electionLevel: ElectionLevel,
     electionState: string,
     subAreaName?: string,
     subAreaValue?: string,
   ): Promise<string[]> {
     // 1) Pull valid district types from Elections API (state/year aware)
     let districtTypes: string[] = []
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { slug },
+      select: { details: true },
+    })
+    const details = campaign?.details as { electionDate?: string } | undefined
+    const electionYear = details?.electionDate
+      ? getYear(details?.electionDate)
+      : undefined
+    if (!electionYear) {
+      throw new BadRequestException(
+        `Error: Campaign must have an electionDate to be given an L2 district`,
+      )
+    }
     try {
-      const campaign = await this.prisma.campaign.findUnique({
-        where: { slug },
-        select: { details: true },
-      })
-      const details = campaign?.details as { electionDate?: string } | undefined
-      const electionYear =
-        details?.electionDate && String(details.electionDate).length >= 4
-          ? Number(String(details.electionDate).slice(0, 4))
-          : undefined
-      const apiRes =
-        electionYear !== undefined
-          ? await this.elections.getValidDistrictTypes(
-              electionState,
-              electionYear,
-            )
-          : await this.elections.getValidDistrictTypes(
-              electionState,
-              0 as unknown as number,
-              false,
-            )
+      const apiRes = await this.elections.getValidDistrictTypes(
+        electionState,
+        electionYear,
+      )
       districtTypes =
         (apiRes ?? []).map((r) => r.L2DistrictType).filter(Boolean) || []
     } catch (e) {
@@ -92,18 +92,12 @@ export class OfficeMatchService {
     )
 
     // 2a) Heuristic base types based on electionLevel/officeName (filtered to API types)
-    let heuristicLevelTypes: string[] = []
-    try {
-      const base = await this.determineSearchColumns(
-        slug,
-        electionLevel,
-        officeName,
-      )
-      heuristicLevelTypes = base.filter((t) => typesSet.has(t))
-    } catch (e) {
-      const msg = `Error determining heuristic level types: ${e instanceof Error ? e.message : String(e)}`
-      this.logger.error(msg)
-    }
+    const base = await this.determineSearchColumns(
+      slug,
+      electionLevel,
+      officeName,
+    )
+    const heuristicLevelTypes = base.filter((t) => typesSet.has(t))
     this.logger.debug(
       `searchDistrictTypes: heuristicLevelTypes=${JSON.stringify(heuristicLevelTypes)}`,
     )
@@ -117,8 +111,8 @@ export class OfficeMatchService {
       subAreaValue,
     )
     if (
-      electionLevel !== 'federal' &&
-      electionLevel !== 'state' &&
+      electionLevel !== ElectionLevel.federal &&
+      electionLevel !== ElectionLevel.state &&
       heuristicLevelTypes.length > 0 &&
       districtValue
     ) {
