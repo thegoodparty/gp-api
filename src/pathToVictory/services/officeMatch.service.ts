@@ -570,8 +570,7 @@ export class OfficeMatchService {
           : undefined
       if (!year) {
         throw new InternalServerErrorException(
-          'Could not determine year from electionDate: ',
-          electionDate,
+          `Could not determine year from electionDate: ${electionDate}`,
         )
       }
       const apiRes = await this.elections.getValidDistrictNames(
