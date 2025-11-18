@@ -6,10 +6,7 @@ import {
   Poll,
   PollIndividualMessage,
   PollIssue,
-<<<<<<< HEAD
-=======
   PollStatus,
->>>>>>> origin/develop
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
@@ -33,14 +30,8 @@ import {
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
-<<<<<<< HEAD
-import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
-import { UsersService } from 'src/users/services/users.service'
-import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
-=======
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
->>>>>>> origin/develop
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
