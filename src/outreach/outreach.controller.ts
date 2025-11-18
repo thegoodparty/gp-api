@@ -155,7 +155,7 @@ export class OutreachController {
         didState: createOutreachDto.didState,
       })
 
-      return this.outreachService.create(
+      return await this.outreachService.create(
         {
           ...createOutreachDto,
           projectId: jobId,
