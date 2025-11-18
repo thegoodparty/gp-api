@@ -10,6 +10,7 @@ import { PollPurchaseHandlerService } from './services/pollPurchase.service'
 import { QueueProducerModule } from 'src/queue/producer/queueProducer.module'
 import { UsersModule } from 'src/users/users.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
+import { AwsModule } from 'src/vendors/aws/aws.module'
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CampaignsModule } from 'src/campaigns/campaigns.module'
     QueueProducerModule,
     UsersModule,
     CampaignsModule,
+    AwsModule,
   ],
   providers: [PollsService, PollIssuesService, PollPurchaseHandlerService],
   controllers: [PollsController],
