@@ -11,5 +11,5 @@ if (!PEERLY_ACCOUNT_NUMBER) {
 
 export function getPeerlyJobUrl(jobId: string): string {
   const peerlyWebUrl = PEERLY_API_BASE_URL!.replace('/api', '')
-  return `${peerlyWebUrl}/accounts/${PEERLY_ACCOUNT_NUMBER}/jobs/${jobId}`
+  return `${peerlyWebUrl}/${PEERLY_ACCOUNT_NUMBER}/p2p/${jobId}`
 }
