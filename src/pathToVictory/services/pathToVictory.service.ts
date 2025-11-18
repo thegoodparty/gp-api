@@ -5,8 +5,6 @@ import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
-import { VotersService } from 'src/voters/services/voters.service'
-import { VoterCounts } from 'src/voters/voters.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
 import { EmailService } from '../../email/email.service'
@@ -15,6 +13,7 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { SlackService } from '../../vendors/slack/services/slack.service'
 import {
+  P2VCounts,
   P2VSource,
   PathToVictoryInput,
   PathToVictoryResponse,
@@ -27,7 +26,6 @@ export class PathToVictoryService extends createPrismaBase(
 ) {
   constructor(
     private prisma: PrismaService,
-    private votersService: VotersService,
     private officeMatchService: OfficeMatchService,
     private slackService: SlackService,
     private emailService: EmailService,
@@ -61,17 +59,10 @@ export class PathToVictoryService extends createPrismaBase(
       electionLocation: '',
       district: '',
       counts: {
-        total: 0,
-        democrat: 0,
-        republican: 0,
-        independent: 0,
-        men: 0,
-        women: 0,
-        white: 0,
-        africanAmerican: 0,
-        asian: 0,
-        hispanic: 0,
-      } as VoterCounts,
+        projectedTurnout: 0,
+        winNumber: 0,
+        voterContactGoal: 0,
+      },
     }
 
     this.logger.debug(`Starting p2v for ${input.slug}`)
@@ -99,8 +90,6 @@ export class PathToVictoryService extends createPrismaBase(
         )
       }
 
-      // location-based heuristics are now handled inside searchDistrictTypes
-
       let attempts = 1
       if (!searchColumns || searchColumns.length === 0) {
         this.logger.warn(
@@ -116,39 +105,27 @@ export class PathToVictoryService extends createPrismaBase(
         let electionType = ''
         let electionLocation = ''
 
-        if (
-          input.electionLevel === 'federal' &&
-          (input.officeName.includes('President of the United States') ||
-            input.officeName.includes('Senate'))
-        ) {
-          electionType = ''
-          electionLocation = ''
-        } else if (input.officeName.includes('Governor')) {
-          electionType = ''
-          electionLocation = ''
-        } else {
+        this.logger.debug(
+          `Attempt ${attempts}: resolving column "${searchColumn}"`,
+        )
+        const columnResponse = await this.officeMatchService.getSearchColumn(
+          input.slug,
+          searchColumn,
+          input.electionState,
+          this.getSearchString(input),
+          '',
+          input.electionDate,
+        )
+
+        if (!columnResponse) {
           this.logger.debug(
-            `Attempt ${attempts}: resolving column "${searchColumn}"`,
+            `Attempt ${attempts}: no match from getSearchColumn for "${searchColumn}"`,
           )
-          const columnResponse = await this.officeMatchService.getSearchColumn(
-            input.slug,
-            searchColumn,
-            input.electionState,
-            this.getSearchString(input),
-            '',
-            input.electionDate,
-          )
-
-          if (!columnResponse) {
-            this.logger.debug(
-              `Attempt ${attempts}: no match from getSearchColumn for "${searchColumn}"`,
-            )
-            continue
-          }
-
-          electionType = columnResponse.column
-          electionLocation = columnResponse.value
+          continue
         }
+
+        electionType = columnResponse.column
+        electionLocation = columnResponse.value
 
         // If not a special-case office and we still don't have a district mapping, try next option.
         const isSpecialCaseOffice =
@@ -186,9 +163,9 @@ export class PathToVictoryService extends createPrismaBase(
           pathToVictoryResponse.electionType = electionType
           pathToVictoryResponse.electionLocation = electionLocation
           pathToVictoryResponse.counts = {
-            projectedTurnout,
-            winNumber,
-            voterContactGoal,
+            projectedTurnout: projectedTurnout ?? 0,
+            winNumber: winNumber ?? 0,
+            voterContactGoal: voterContactGoal ?? 0,
           }
           break
         }
@@ -203,11 +180,12 @@ export class PathToVictoryService extends createPrismaBase(
         pathToVictoryResponse,
         ...input,
       }
-    } catch (e) {
-      this.logger.error('Error in handle-p2v', e)
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error))
+      this.logger.error('Error in handle-p2v', err)
       await this.slackService.errorMessage({
         message: 'Error in handle-p2v',
-        error: e,
+        error: err,
       })
       throw new Error('Error in handle-p2v')
     }
@@ -231,7 +209,7 @@ export class PathToVictoryService extends createPrismaBase(
   async analyzePathToVictoryResponse(p2vResponse: {
     campaign: Campaign & { pathToVictory: PathToVictory }
     pathToVictoryResponse: {
-      counts: VoterCounts
+      counts: P2VCounts
       electionType: string
       electionLocation: string
     }
@@ -270,11 +248,6 @@ export class PathToVictoryService extends createPrismaBase(
     • Office: ${officeName}
     • Election Date: ${electionDate}
     • Prior Election Dates: ${priorElectionDates}
-    • L2 Election Date Columns: ${
-      pathToVictoryResponse?.counts?.foundColumns
-        ? JSON.stringify(pathToVictoryResponse?.counts?.foundColumns)
-        : ''
-    }
     • Election Term: ${electionTerm}
     • Election Level: ${electionLevel}
     • Election State: ${electionState}
@@ -286,12 +259,8 @@ export class PathToVictoryService extends createPrismaBase(
     `
 
     const pathToVictorySlackMessage = `
-    ￮ L2 Election Type: ${pathToVictoryResponse.electionType}
-    ￮ L2 Location: ${pathToVictoryResponse.electionLocation}
-    ￮ Total Voters: ${pathToVictoryResponse.counts.total}
-    ￮ Democrats: ${pathToVictoryResponse.counts.democrat}
-    ￮ Republicans: ${pathToVictoryResponse.counts.republican}
-    ￮ Independents: ${pathToVictoryResponse.counts.independent}
+    ￮ L2 DistrictType/ElectionType: ${pathToVictoryResponse.electionType}
+    ￮ L2 DistrictName/ElectionLocation: ${pathToVictoryResponse.electionLocation}
     `
 
     if (
@@ -299,9 +268,7 @@ export class PathToVictoryService extends createPrismaBase(
       pathToVictoryResponse.counts.projectedTurnout > 0
     ) {
       const turnoutSlackMessage = `
-      ￮ Average Turnout %: ${pathToVictoryResponse.counts.averageTurnoutPercent}
       ￮ Projected Turnout: ${pathToVictoryResponse.counts.projectedTurnout}
-      ￮ Projected Turnout %: ${pathToVictoryResponse.counts.projectedTurnoutPercent}
       ￮ Win Number: ${pathToVictoryResponse.counts.winNumber}
       ￮ Voter Contact Goal: ${pathToVictoryResponse.counts.voterContactGoal}
       `
@@ -394,7 +361,7 @@ export class PathToVictoryService extends createPrismaBase(
   async completePathToVictory(
     slug: string,
     pathToVictoryResponse: {
-      counts: VoterCounts
+      counts: P2VCounts
       electionType: string
       electionLocation: string
     },
@@ -485,9 +452,13 @@ export class PathToVictoryService extends createPrismaBase(
         data: {
           data: {
             ...baseData,
-            projectedTurnout: pathToVictoryResponse.counts.projectedTurnout,
-            winNumber: pathToVictoryResponse.counts.winNumber,
-            voterContactGoal: pathToVictoryResponse.counts.voterContactGoal,
+            projectedTurnout: Number(
+              pathToVictoryResponse.counts.projectedTurnout ?? 0,
+            ),
+            winNumber: Number(pathToVictoryResponse.counts.winNumber ?? 0),
+            voterContactGoal: Number(
+              pathToVictoryResponse.counts.voterContactGoal ?? 0,
+            ),
             electionType: pathToVictoryResponse.electionType,
             electionLocation: pathToVictoryResponse.electionLocation,
             ...(hasOfficeChanged ? { p2vAttempts: 0 } : {}),
@@ -532,11 +503,12 @@ export class PathToVictoryService extends createPrismaBase(
         'path_to_victory_status',
         p2vStatus,
       )
-    } catch (e) {
-      this.logger.error('error updating campaign', e)
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error))
+      this.logger.error('error updating campaign', err)
       await this.slackService.errorMessage({
         message: 'error updating campaign with path to victory',
-        error: e,
+        error: err,
       })
     }
   }

@@ -1,5 +1,4 @@
 import { QueueType } from 'src/queue/queue.types'
-import { VoterCounts } from 'src/voters/voters.types'
 
 export interface PathToVictoryQueueMessage {
   type: QueueType.PATH_TO_VICTORY
@@ -24,18 +23,24 @@ export interface PathToVictoryInput {
   electionLocation?: string
 }
 
+export type P2VCounts = {
+  projectedTurnout: number
+  winNumber: number
+  voterContactGoal: number
+}
+
 export interface PathToVictoryResponse {
   electionType: string
   electionLocation: string
   district: string
-  counts: VoterCounts
+  counts: P2VCounts
 }
 
 export interface L2Count {
   electionType: string
   electionLocation: string
   electionDistrict: string
-  counts: VoterCounts
+  counts: P2VCounts
 }
 
 export interface ViabilityScore {

@@ -13,7 +13,6 @@ import { AiService } from '../../ai/ai.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackService } from '../../vendors/slack/services/slack.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
-import { VotersService } from '../../voters/services/voters.service'
 
 interface SearchColumnResult {
   column: string
@@ -28,7 +27,6 @@ export class OfficeMatchService {
     private prisma: PrismaService,
     private slack: SlackService,
     private aiService: AiService,
-    private votersService: VotersService,
     private elections: ElectionsService,
   ) {}
 
@@ -70,7 +68,6 @@ export class OfficeMatchService {
       this.logger.error(msg)
     }
 
-    // strip out blanks
     districtTypes = districtTypes.filter((t) => t && t !== '')
     this.logger.debug(
       `searchDistrictTypes: received ${districtTypes.length} API district types for state=${electionState}`,
@@ -223,21 +220,6 @@ export class OfficeMatchService {
     return foundDistrictTypes
   }
 
-  async searchMiscDistricts(
-    slug: string,
-    officeName: string,
-    electionLevel: string,
-    electionState: string,
-  ): Promise<string[]> {
-    // Delegate to unified API-driven approach; no subArea info here
-    return await this.searchDistrictTypes(
-      slug,
-      officeName,
-      electionLevel,
-      electionState,
-    )
-  }
-
   private getOfficeCategory(
     officeName: string,
     electionLevel: string,
@@ -295,119 +277,6 @@ export class OfficeMatchService {
     }
 
     return category
-  }
-
-  private async findMiscDistricts(
-    slug: string,
-    officeName: string,
-    state: string,
-    electionLevel: string,
-  ): Promise<string[]> {
-    const category = this.getOfficeCategory(officeName, electionLevel)
-    this.logger.debug(
-      `Determined category: ${category} for office ${officeName}`,
-    )
-
-    // Fetch district types from the Election API instead of ElectionTypes table
-    let districtTypes: string[] = []
-    try {
-      // Derive electionYear from campaign.details.electionDate
-      const campaign = await this.prisma.campaign.findUnique({
-        where: { slug },
-        select: { details: true },
-      })
-      const details = campaign?.details as { electionDate?: string } | undefined
-      const electionYear =
-        details?.electionDate && String(details.electionDate).length >= 4
-          ? Number(String(details.electionDate).slice(0, 4))
-          : undefined
-
-      const apiRes =
-        electionYear !== undefined
-          ? await this.elections.getValidDistrictTypes(state, electionYear)
-          : await this.elections.getValidDistrictTypes(
-              state,
-              0 as unknown as number,
-              false,
-            )
-      districtTypes =
-        (apiRes ?? []).map((r) => r.L2DistrictType).filter(Boolean) || []
-    } catch (e) {
-      const msg = `Election API error fetching district types: ${e instanceof Error ? e.message : String(e)}`
-      this.logger.error(msg)
-    }
-
-    // strip out any blank values
-    districtTypes = districtTypes.filter((t) => t && t !== '')
-
-    if (districtTypes.length === 0) {
-      this.logger.error(
-        `No district types returned by Election API for state ${state}.`,
-      )
-      await this.slack.message(
-        {
-          body: `Error! ${slug} No district types returned by Election API for state ${state}.`,
-        },
-        SlackChannel.botPathToVictoryIssues,
-      )
-      return []
-    }
-
-    // Prefer types matching the inferred category; fallback to all types
-    let miscellaneousDistricts: string[] = districtTypes
-    if (category) {
-      const cat = category.toLowerCase()
-      const filtered = districtTypes.filter((t) =>
-        String(t).toLowerCase().includes(cat),
-      )
-      if (filtered.length > 0) {
-        miscellaneousDistricts = filtered
-      }
-    }
-
-    const matchResp = await this.matchSearchColumns(
-      slug,
-      miscellaneousDistricts,
-      officeName,
-    )
-
-    let foundMiscDistricts: string[] = []
-    if (matchResp?.content) {
-      try {
-        const parsed: unknown = JSON.parse(matchResp.content)
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          'columns' in parsed &&
-          Array.isArray((parsed as { columns?: unknown[] }).columns)
-        ) {
-          const cols = (parsed as { columns: unknown[] }).columns
-          const strings = cols.filter((c) => typeof c === 'string') as string[]
-          if (strings.length > 0) {
-            foundMiscDistricts = strings
-          } else {
-            await this.slack.message(
-              {
-                body: `Received invalid response while finding misc districts for ${officeName}. columns: ${JSON.stringify(cols)}. Raw Content: ${matchResp.content}`,
-              },
-              SlackChannel.botDev,
-            )
-          }
-        } else {
-          await this.slack.message(
-            {
-              body: `Received invalid response while finding misc districts for ${officeName}. Raw Content: ${matchResp.content}`,
-            },
-            SlackChannel.botDev,
-          )
-        }
-      } catch (e) {
-        const msg = `Error parsing matchResp: ${e instanceof Error ? e.message : String(e)}`
-        this.logger.error(msg)
-      }
-    }
-
-    return foundMiscDistricts
   }
 
   private async matchSearchColumns(

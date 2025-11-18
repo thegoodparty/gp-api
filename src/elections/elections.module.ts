@@ -7,20 +7,14 @@ import { EmailModule } from '../email/email.module'
 import { ElectionsController } from './elections.controller'
 import { BallotReadyService } from './services/ballotReady.service'
 import { CensusEntitiesService } from './services/censusEntities.service'
-import { CountiesService } from './services/counties.service'
 import { ElectionsService } from './services/elections.service'
-import { ElectionTypeService } from './services/electionType.service'
-import { MunicipalitiesService } from './services/municipalities.service'
 import { RacesService } from './services/races.service'
 
 @Module({
   controllers: [ElectionsController],
   providers: [
     RacesService,
-    MunicipalitiesService,
-    CountiesService,
     CensusEntitiesService,
-    ElectionTypeService,
     BallotReadyService,
     ElectionsService,
   ],
@@ -28,7 +22,6 @@ import { RacesService } from './services/races.service'
   imports: [
     AiModule,
     EmailModule,
-    //VotersModule,
     forwardRef(() => CampaignsModule),
     HttpModule,
     SlackModule,

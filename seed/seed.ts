@@ -7,12 +7,9 @@ import seedTopIssues from './topIssues'
 import seedUsers, { ADMIN_USER, SERVE_USER } from './users'
 import seedWebsiteData from './websiteData'
 // csv file seeds
-import seedElectionTypes from './electionTypes'
 import seedMtfcc from './mtfcc'
-import seedCounties from './counties'
-import seedMunicipalities from './municipalities'
-import { seedEcanvasserDemoAccount } from './util/seedEcanvasserDemoAccount.util'
 import seedOffices from './offices'
+import { seedEcanvasserDemoAccount } from './util/seedEcanvasserDemoAccount.util'
 
 const LIMIT_SEEDS =
   process.env.NODE_ENV === 'production' ||
@@ -47,9 +44,6 @@ async function main() {
 
 async function csvSeeds(prisma: PrismaClient, loadAll = false) {
   await seedMtfcc(prisma)
-  await seedElectionTypes(prisma)
-  await seedCounties(prisma, loadAll)
-  await seedMunicipalities(prisma, loadAll)
 }
 
 main()

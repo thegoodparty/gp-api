@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
-import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign } from '@prisma/client'
-import { ViabilityScore } from '../types/pathToVictory.types'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { RaceWithOfficeHoldersNode } from 'src/elections/types/ballotReady.types'
+import { PrismaService } from '../../prisma/prisma.service'
 import { SHORT_TO_LONG_STATE } from '../../shared/constants/states'
+import { ViabilityScore } from '../types/pathToVictory.types'
 
 @Injectable()
 export class ViabilityService {
@@ -13,7 +12,6 @@ export class ViabilityService {
 
   constructor(
     private prisma: PrismaService,
-    private slackService: SlackService,
     private ballotReadyService: BallotReadyService,
   ) {}
 

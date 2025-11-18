@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { BallotReadyService } from 'src/elections/services/ballotReady.service'
 import { SegmentModule } from 'src/vendors/segment/segment.module'
+import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AiModule } from '../ai/ai.module'
 import { ElectionsModule } from '../elections/elections.module'
 import { EmailModule } from '../email/email.module'
@@ -13,7 +14,6 @@ import { OfficeMatchService } from './services/officeMatch.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
 import { ViabilityService } from './services/viability.service'
 import { ViabilityController } from './viability.controller'
-import { SlackModule } from 'src/vendors/slack/slack.module'
 
 @Module({
   imports: [
