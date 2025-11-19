@@ -125,6 +125,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
 
     await this.client.pollIndividualMessage.createMany({
       data: messages,
+      skipDuplicates: true,
     })
 
     this.logger.log('Backfilled poll responses', {
