@@ -1,6 +1,46 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
-import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { Message } from '@aws-sdk/client-sqs'
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  Campaign,
+  PathToVictory,
+  Poll,
+  PollIndividualMessage,
+  PollIssue,
+  PollStatus,
+  TcrComplianceStatus,
+} from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { SqsMessageHandler } from '@ssut/nestjs-sqs'
+import { isAxiosError } from 'axios'
+import parseCsv from 'neat-csv'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { PersonOutput } from 'src/contacts/schemas/person.schema'
+import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
+import { ContactsService } from 'src/contacts/services/contacts.service'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
+import { ViabilityService } from 'src/pathToVictory/services/viability.service'
+import {
+  PathToVictoryInput,
+  ViabilityScore,
+} from 'src/pathToVictory/types/pathToVictory.types'
+import { PollIssuesService } from 'src/polls/services/pollIssues.service'
+import { PollsService } from 'src/polls/services/polls.service'
+import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
+import { UsersService } from 'src/users/services/users.service'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
+import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
+import { isNestJsHttpException } from '../../shared/util/http.util'
+import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
+import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
+import { EVENTS } from '../../vendors/segment/segment.types'
+import { DomainsService } from '../../websites/services/domains.service'
 import {
   DomainEmailForwardingMessage,
   GenerateAiContentMessageData,
@@ -16,46 +56,6 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
-import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import {
-  Campaign,
-  PathToVictory,
-  Poll,
-  PollIndividualMessage,
-  PollIssue,
-  TcrComplianceStatus,
-} from '@prisma/client'
-import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
-import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
-import {
-  PathToVictoryInput,
-  ViabilityScore,
-} from 'src/pathToVictory/types/pathToVictory.types'
-import { ViabilityService } from 'src/pathToVictory/services/viability.service'
-import { AnalyticsService } from 'src/analytics/analytics.service'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { EVENTS } from '../../vendors/segment/segment.types'
-import { DomainsService } from '../../websites/services/domains.service'
-import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
-import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
-import { isNestJsHttpException } from '../../shared/util/http.util'
-import { isAxiosError } from 'axios'
-import { PollsService } from 'src/polls/services/polls.service'
-import { PollIssuesService } from 'src/polls/services/pollIssues.service'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import { ContactsService } from 'src/contacts/services/contacts.service'
-import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
-import { PersonOutput } from 'src/contacts/schemas/person.schema'
-import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
-import { UsersService } from 'src/users/services/users.service'
-import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
-import parseCsv from 'neat-csv'
-import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 
 @Injectable()
 export class QueueConsumerService {
@@ -74,7 +74,7 @@ export class QueueConsumerService {
     private readonly pollIssuesService: PollIssuesService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly contactsService: ContactsService,
-    private readonly awsS3Service: AwsS3Service,
+    private readonly s3Service: S3Service,
     private readonly usersService: UsersService,
   ) {}
 
@@ -615,22 +615,56 @@ export class QueueConsumerService {
         event.data.totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
+    if (event.data.issues) {
+      this.logger.log('Detected poll issues, clearing existing poll issues')
+      await this.pollIssuesService.model.deleteMany({
+        where: { pollId: event.data.pollId },
+      })
+      this.logger.log('Successfully deleted existing poll issues')
+      await this.pollIssuesService.client.pollIssue.createMany({
+        data: event.data.issues.map((issue) => ({
+          id: `${event.data.pollId}-${issue.rank}`,
+          pollId: event.data.pollId,
+          title: issue.theme,
+          summary: issue.summary,
+          details: issue.analysis,
+          mentionCount: issue.responseCount,
+          representativeComments: issue.quotes.map((quote) => ({
+            quote: quote.quote,
+          })),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      })
+      this.logger.log('Successfully created new poll issues')
+    }
+
     await this.pollsService.markPollComplete({
       pollId: poll.id,
       totalResponses: event.data.totalResponses,
       confidence: highConfidence ? 'HIGH' : 'LOW',
     })
-    if (campaign) {
-      await this.analytics.track(
-        campaign.userId,
-        EVENTS.Polls.ResultsSynthesisCompleted,
-        {
-          pollId: poll.id,
-          path: `/dashboard/polls/${poll.id}`,
-          constituencyName: campaign.pathToVictory?.data.electionLocation,
-        },
-      )
-    }
+
+    const pollCount = await this.pollsService.model.count({
+      where: {
+        electedOfficeId: poll.electedOfficeId,
+        status: PollStatus.COMPLETED,
+      },
+    })
+
+    await this.analytics.identify(campaign.userId, { pollcount: pollCount })
+    await this.analytics.track(
+      campaign.userId,
+      EVENTS.Polls.ResultsSynthesisCompleted,
+      {
+        pollId: poll.id,
+        path: `/dashboard/polls/${poll.id}`,
+        constituencyName: campaign.pathToVictory?.data.electionLocation,
+        'issue 1': event.data.issues?.at(0)?.theme || null,
+        'issue 2': event.data.issues?.at(1)?.theme || null,
+        'issue 3': event.data.issues?.at(2)?.theme || null,
+      },
+    )
     return true
   }
 
@@ -694,18 +728,21 @@ export class QueueConsumerService {
       return
     }
 
-    const bucket = 'tevyn-poll-csvs'
+    const bucket = process.env.TEVYN_POLL_CSVS_BUCKET
+    if (!bucket) {
+      throw new Error('TEVYN_POLL_CSVS_BUCKET environment variable is required')
+    }
     // It's important that this filename be deterministic. That way, in the event of a failure
     // and retry, we can safely re-use a previously generated CSV.
     const fileName = `${poll.id}-${params.messageId}.csv`
+    const key = this.s3Service.buildKey(undefined, fileName)
 
     // 1. Get or create the CSV file of a random sample of contacts.
     // We do get-or-create here so that the logic remains retry-safe in the event of a failure.
-    let csv = await this.awsS3Service.getFile({
-      bucket,
-      fileName,
-    })
+    let csv = await this.s3Service.getFile(bucket, key)
 
+    // expires in 7 days
+    const expiresIn = 7 * 24 * 60 * 60
     if (!csv) {
       this.logger.log('No existing CSV found, generating new one')
       const sampleParams = await params.sampleParams(poll)
@@ -714,10 +751,13 @@ export class QueueConsumerService {
         campaign,
       )
       csv = buildCsvFromContacts(sample)
-      await this.awsS3Service.uploadFile(csv, bucket, fileName, 'text/csv')
+      await this.s3Service.uploadFile(bucket, csv, key, {
+        contentType: 'text/csv',
+      })
     }
-
-    const csvUrl = `https://${ASSET_DOMAIN}/${this.awsS3Service.getKey({ bucket, fileName })}`
+    const csvUrl = await this.s3Service.getSignedUrlForViewing(bucket, key, {
+      expiresIn,
+    })
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages

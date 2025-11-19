@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
+import { method as HttpMethod } from '@poppanator/http-constants'
 import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
 import { format } from '@redtea/format-axios-error'
 import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
@@ -140,10 +141,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         config,
       })}`,
     )
+    const twoArgMethods = [HttpMethod.Get, HttpMethod.Delete, HttpMethod.Head]
     return lastValueFrom(
-      data
-        ? this.httpService[method.name](url, data, config)
-        : this.httpService[method.name](url, config),
+      twoArgMethods.includes(method.name.toUpperCase())
+        ? this.httpService[method.name](url, config)
+        : data
+          ? this.httpService[method.name](url, data, config)
+          : this.httpService[method.name](url, null, config),
     )
   }
 
