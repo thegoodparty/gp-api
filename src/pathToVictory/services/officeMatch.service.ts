@@ -11,6 +11,8 @@ import {
 } from 'openai/resources/chat/completions'
 import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { parseJsonString } from 'src/shared/util/zod.util'
+import { z } from 'zod'
 import { AiService } from '../../ai/ai.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackService } from '../../vendors/slack/services/slack.service'
@@ -20,6 +22,14 @@ interface SearchColumnResult {
   column: string
   value: string
 }
+
+const MatchColumnsResponseSchema = z.object({
+  columns: z.array(z.string()).max(5),
+})
+
+const MatchLabelResponseSchema = z.object({
+  matchedLabel: z.string(),
+})
 
 @Injectable()
 export class OfficeMatchService {
@@ -167,40 +177,30 @@ export class OfficeMatchService {
 
     let foundDistrictTypes: string[] = []
     if (matchResp?.content) {
-      try {
-        const parsed: unknown = JSON.parse(matchResp.content)
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          'columns' in parsed &&
-          Array.isArray((parsed as { columns?: unknown[] }).columns)
-        ) {
-          const cols = (parsed as { columns: unknown[] }).columns
-          const strings = cols.filter((c) => typeof c === 'string') as string[]
-          if (strings.length > 0) {
-            // Ensure all returned columns exist in API-provided list
-            foundDistrictTypes = strings.filter((c) =>
-              districtTypes.includes(c),
-            )
-          } else {
-            await this.slack.message(
-              {
-                body: `Received invalid response while finding district types for ${officeName}. columns: ${JSON.stringify(cols)}. Raw Content: ${matchResp.content}`,
-              },
-              SlackChannel.botDev,
-            )
-          }
+      const parsedResult = parseJsonString(
+        MatchColumnsResponseSchema,
+        'Invalid match columns JSON',
+      ).safeParse(matchResp.content)
+      if (parsedResult.success) {
+        const strings = parsedResult.data.columns
+        if (strings.length > 0) {
+          // Ensure all returned columns exist in API-provided list
+          foundDistrictTypes = strings.filter((c) => districtTypes.includes(c))
         } else {
           await this.slack.message(
             {
-              body: `Received invalid response while finding district types for ${officeName}. Raw Content: ${matchResp.content}`,
+              body: `Received invalid response while finding district types for ${officeName}. columns: ${JSON.stringify(strings)}. Raw Content: ${matchResp.content}`,
             },
             SlackChannel.botDev,
           )
         }
-      } catch (e) {
-        const msg = `Error parsing AI match response: ${e instanceof Error ? e.message : String(e)}`
-        this.logger.error(msg)
+      } else {
+        await this.slack.message(
+          {
+            body: `Received invalid response while finding district types for ${officeName}. Raw Content: ${matchResp.content}`,
+          },
+          SlackChannel.botDev,
+        )
       }
     } else {
       this.logger.debug(
@@ -704,22 +704,15 @@ export class OfficeMatchService {
     }
 
     if (content && content !== '') {
-      try {
-        const parsed: unknown = JSON.parse(content)
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          'matchedLabel' in parsed &&
-          typeof (parsed as { matchedLabel?: string }).matchedLabel === 'string'
-        ) {
-          const matched = (parsed as { matchedLabel: string }).matchedLabel
-          if (matched !== '') {
-            return matched.replace(/"/g, '')
-          }
+      const parsedResult = parseJsonString(
+        MatchLabelResponseSchema,
+        'Invalid matched label JSON',
+      ).safeParse(content)
+      if (parsedResult.success) {
+        const matched = parsedResult.data.matchedLabel
+        if (matched !== '') {
+          return matched.replace(/"/g, '')
         }
-      } catch (error) {
-        const msg = `error parsing AI response: ${error instanceof Error ? error.message : String(error)}`
-        this.logger.error(msg)
       }
     }
     return undefined
