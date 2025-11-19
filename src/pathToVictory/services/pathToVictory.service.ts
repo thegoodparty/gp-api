@@ -320,10 +320,14 @@ export class PathToVictoryService extends createPrismaBase(
     }
     const officeFingerprint = this.buildOfficeFingerprint(officeContext)
 
-    if (
-      pathToVictoryResponse.counts.projectedTurnout &&
+    const hasTurnout =
+      !!pathToVictoryResponse.counts.projectedTurnout &&
       pathToVictoryResponse.counts.projectedTurnout > 0
-    ) {
+
+    let sendEmailFlag = false
+    let statusOverride: P2VStatus | undefined
+
+    if (hasTurnout) {
       const turnoutSlackMessage = `
       ￮ Projected Turnout: ${pathToVictoryResponse.counts.projectedTurnout}
       ￮ Win Number: ${pathToVictoryResponse.counts.winNumber}
@@ -338,23 +342,9 @@ export class PathToVictoryService extends createPrismaBase(
         channel: SlackChannel.botPathToVictory,
       })
 
-      if (campaign.pathToVictory?.data?.p2vStatus === P2VStatus.complete) {
-        this.logger.debug(
-          'Path To Victory already completed for',
-          campaign.slug,
-        )
-        await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
-          sendEmail: false,
-          officeFingerprint,
-        })
-        return true
-      } else {
-        await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
-          sendEmail: true,
-          officeFingerprint,
-        })
-        return true
-      }
+      // Do not re-email if already completed previously
+      sendEmailFlag =
+        campaign.pathToVictory?.data?.p2vStatus !== P2VStatus.complete
     } else {
       let debugMessage = 'No Path To Victory Found with projected turnout.\n'
       if (pathToVictoryResponse) {
@@ -365,19 +355,20 @@ export class PathToVictoryService extends createPrismaBase(
         message: candidateSlackMessage + debugMessage,
         channel: SlackChannel.botPathToVictoryIssues,
       })
-      // Mark as Failed
-      await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
-        sendEmail: false,
-        p2vStatusOverride: P2VStatus.failed,
-        officeFingerprint,
-      })
+      statusOverride = P2VStatus.failed
       await this.crmService.handleUpdateCampaign(
         campaign,
         'path_to_victory_status',
         P2VStatus.failed,
       )
-      return false
     }
+
+    await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
+      sendEmail: sendEmailFlag,
+      p2vStatusOverride: statusOverride,
+      officeFingerprint,
+    })
+    return hasTurnout
   }
 
   async completePathToVictory(

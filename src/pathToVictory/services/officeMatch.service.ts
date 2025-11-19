@@ -92,13 +92,22 @@ const DISTRICT_WORDS = Object.freeze([
   'Seat',
   'Place',
   'Group',
-  'Court',
   'Courthouse',
+  'Court',
   'Department',
   'Area',
   'Office',
   'Post',
 ])
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const DISTRICT_WORDS_PATTERN = new RegExp(
+  `\\b(${[...DISTRICT_WORDS]
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegex)
+    .join('|')})\\s+([0-9]+)`,
+  'i',
+)
 
 const AI_TOOL = Object.freeze({
   MATCH_COLUMNS: 'match_columns',
@@ -683,15 +692,9 @@ export class OfficeMatchService {
 
       if (!subAreaIsNumeric) {
         // subAreaValue is missing or not numeric, try to parse number from officeName
-        for (const word of DISTRICT_WORDS) {
-          if (officeName.includes(word)) {
-            const regex = new RegExp(`${word}\\s+([0-9]+)`, 'i')
-            const match = officeName.match(regex)
-            if (match) {
-              districtValue = match[1]
-              break
-            }
-          }
+        const match = officeName.match(DISTRICT_WORDS_PATTERN)
+        if (match) {
+          districtValue = match[2]
         }
         // If still not found, use subAreaValue as a fallback (might be a named area like a county)
         if (!districtValue && subAreaValue) {
