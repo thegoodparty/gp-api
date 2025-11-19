@@ -349,7 +349,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
 
     let areaCodes: string[] | null = null
     if (postalCodeValue) {
-      areaCodes = await this.areaCodeFromZipService.getAreaCodeFromZip(postalCodeValue)
+      areaCodes =
+        await this.areaCodeFromZipService.getAreaCodeFromZip(postalCodeValue)
     }
 
     const submitBrandData: Peerly10DlcBrandData = {
@@ -366,10 +367,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
-      jobAreas: stateCode && areaCodes && areaCodes.length > 0 ? [{
-        didState: stateCode,
-        disNpaSubset: areaCodes,
-      }] : undefined
+      jobAreas:
+        stateCode && areaCodes && areaCodes.length > 0
+          ? [
+              {
+                didState: stateCode,
+                disNpaSubset: areaCodes,
+              },
+            ]
+          : undefined,
     }
 
     this.logger.debug(
@@ -539,11 +545,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       campaign_website: domain ? `https://${domain?.name}` : undefined,
       ...(peerlyLocale === PEERLY_LOCALITIES.local
         ? {
-          city_county:
-            ballotLevel === BallotReadyPositionLevel.COUNTY
-              ? county?.long_name
-              : city?.long_name,
-        }
+            city_county:
+              ballotLevel === BallotReadyPositionLevel.COUNTY
+                ? county?.long_name
+                : city?.long_name,
+          }
         : {}),
     }
 

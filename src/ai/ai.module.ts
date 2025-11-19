@@ -9,4 +9,4 @@ import { AreaCodeFromZipService } from './util/areaCodeFromZip.util'
   providers: [AiService, AreaCodeFromZipService],
   exports: [AiService, AreaCodeFromZipService],
 })
-export class AiModule { }
+export class AiModule {}

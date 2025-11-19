@@ -1,23 +1,26 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { AwsS3Service } from "src/vendors/aws/services/awsS3.service";
-import { AiService } from "../ai.service";
+import { Injectable, Logger } from '@nestjs/common'
+import { differenceInYears, formatISO } from 'date-fns'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
+import { AiService } from '../ai.service'
 
-const ZIP_TO_AREA_CODE_BUCKET = 'zip-to-area-code-mappings'
 const ZIP_TO_AREA_CODE_FILE = 'zip-to-area-code-mappings.json'
+const CACHE_EXPIRY_YEARS = 1
 
+type ZipToAreaCodeEntry = {
+  areaCodes: string[]
+  lastFetchedAt: string // ISO datestring
+}
 
-type ZipToAreaCodeMapping = Record<string, string[]>;
-
+type ZipToAreaCodeMapping = Record<string, ZipToAreaCodeEntry>
 
 @Injectable()
 export class AreaCodeFromZipService {
   private readonly logger = new Logger(AreaCodeFromZipService.name)
 
   constructor(
-    private readonly awsS3Service: AwsS3Service,
+    private readonly s3Service: S3Service,
     private readonly aiService: AiService,
   ) { }
-
 
   /**
    * Gets area codes for a given zip code.
@@ -31,13 +34,25 @@ export class AreaCodeFromZipService {
 
     const normalizedZipCode = zipCode.split('-')[0].trim()
 
-    const cachedAreaCodes = await this.getAreaCodesFromS3(normalizedZipCode)
-    if (cachedAreaCodes) {
-      this.logger.debug(`Found cached area codes for ${normalizedZipCode}`, cachedAreaCodes)
-      return cachedAreaCodes
+    // Check cache first
+    const cachedEntry = await this.getAreaCodesFromS3(normalizedZipCode)
+    if (cachedEntry) {
+      const isExpired = this.isCacheExpired(cachedEntry.lastFetchedAt)
+      if (!isExpired) {
+        this.logger.debug(
+          `Found valid cached area codes for ${normalizedZipCode}`,
+          cachedEntry.areaCodes,
+        )
+        return cachedEntry.areaCodes
+      }
+      this.logger.debug(
+        `Cached area codes for ${normalizedZipCode} expired, re-fetching from OpenAI`,
+      )
     }
 
-    this.logger.debug(`Area codes for zip code ${normalizedZipCode} not found in cache, calling OpenAI`)
+    this.logger.debug(
+      `Area codes for zip code ${normalizedZipCode} not found in cache, calling OpenAI`,
+    )
     const areaCodes = await this.getAreaCodesFromOpenAI(normalizedZipCode)
 
     if (areaCodes && areaCodes.length > 0) {
@@ -48,18 +63,31 @@ export class AreaCodeFromZipService {
     return null
   }
 
-  private async getAreaCodesFromS3(zipCode: string): Promise<string[] | null> {
-    try {
-      const fileContent = await this.awsS3Service.getFile({
-        bucket: ZIP_TO_AREA_CODE_BUCKET,
-        fileName: ZIP_TO_AREA_CODE_FILE,
-      })
+  private isCacheExpired(lastFetchedAt: string): boolean {
+    const lastFetched = new Date(lastFetchedAt)
+    const now = new Date()
 
-      if (!fileContent) {
+    return differenceInYears(lastFetched, now) >= CACHE_EXPIRY_YEARS
+  }
+
+  private async getAreaCodesFromS3(
+    zipCode: string,
+  ): Promise<ZipToAreaCodeEntry | null> {
+    try {
+      const bucket = process.env.ZIP_TO_AREA_CODE_BUCKET
+      if (!bucket) {
+        throw new Error(
+          'ZIP_TO_AREA_CODE_BUCKET environment variable is required',
+        )
+      }
+      const key = this.s3Service.buildKey(undefined, ZIP_TO_AREA_CODE_FILE)
+      const json = await this.s3Service.getFile(bucket, key)
+
+      if (!json) {
         return null
       }
 
-      const mappings: ZipToAreaCodeMapping = JSON.parse(fileContent)
+      const mappings = JSON.parse(json) as ZipToAreaCodeMapping
       return mappings[zipCode] || null
     } catch (error) {
       this.logger.error(`Error getting area code mappings from S3: ${error}`)
@@ -67,7 +95,9 @@ export class AreaCodeFromZipService {
     }
   }
 
-  private async getAreaCodesFromOpenAI(zipCode: string): Promise<string[] | null> {
+  private async getAreaCodesFromOpenAI(
+    zipCode: string,
+  ): Promise<string[] | null> {
     const prompt = `What are the area codes (NPA codes) for the zip code ${zipCode} in the United States?
       Please respond with ONLY a JSON array of ara code strings (3-digit numbers), for example: ["415", "510].
       If you cannot determin the ara codes, respond with an empty array: [].`
@@ -85,43 +115,59 @@ export class AreaCodeFromZipService {
         0.1,
       )
 
-      if (!response.content) {
+      if (!response?.content || typeof response.content !== 'string') {
         return null
       }
 
       const content = response.content.trim()
-      const jsonContent = content.replace(/\n?/g, '').replace(/```\n?/g, '').trim()
-      const areaCodes = JSON.parse(jsonContent)
+      const jsonContent = content
+        .replace(/\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim()
 
-      if (Array.isArray(areaCodes) && areaCodes.every(code => typeof code === 'string')) {
-        return areaCodes
+      const areaCodes = JSON.parse(jsonContent) as unknown
+
+      if (
+        Array.isArray(areaCodes) &&
+        areaCodes.every((code) => typeof code === 'string')
+      ) {
+        return areaCodes as string[]
       }
       return null
     } catch (error) {
-      this.logger.error(`Error getting area codes from OpenAI for zip ${zipCode}: ${error}`)
+      this.logger.error(
+        `Error getting area codes from OpenAI for zip ${zipCode}: ${error}`,
+      )
       return null
     }
   }
 
-  private async saveAreaCodesToS3(zipCode: string, areaCodes: string[]): Promise<void> {
+  private async saveAreaCodesToS3(
+    zipCode: string,
+    areaCodes: string[],
+  ): Promise<void> {
     try {
+      const bucket = process.env.ZIP_TO_AREA_CODE_BUCKET
+      if (!bucket) {
+        throw new Error(
+          'ZIP_TO_AREA_CODE_BUCKET environment variable is required',
+        )
+      }
+      const key = this.s3Service.buildKey(undefined, ZIP_TO_AREA_CODE_FILE)
       let mappings: ZipToAreaCodeMapping = {}
-      const existingFile = await this.awsS3Service.getFile({
-        bucket: ZIP_TO_AREA_CODE_BUCKET,
-        fileName: ZIP_TO_AREA_CODE_FILE,
-      })
 
-      if (existingFile) {
-        mappings = JSON.parse(existingFile)
+      const existingfile = await this.s3Service.getFile(bucket, key)
+      if (existingfile) {
+        mappings = JSON.parse(existingfile) as ZipToAreaCodeMapping
       }
 
-      mappings[zipCode] = areaCodes
+      mappings[zipCode] = { areaCodes, lastFetchedAt: formatISO(new Date()) }
 
-      await this.awsS3Service.uploadFile(
+      await this.s3Service.uploadFile(
+        bucket,
         JSON.stringify(mappings, null, 2),
-        ZIP_TO_AREA_CODE_BUCKET,
-        ZIP_TO_AREA_CODE_FILE,
-        'application/json'
+        key,
+        { contentType: 'application/json' },
       )
 
       this.logger.debug(`Saved area codes for ${zipCode} to S3`)

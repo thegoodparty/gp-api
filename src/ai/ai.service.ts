@@ -63,7 +63,7 @@ type GetAssistantCompletionArgs = {
 export class AiService {
   private readonly logger = new Logger(AiService.name)
 
-  constructor(private slack: SlackService) { }
+  constructor(private slack: SlackService) {}
 
   async llmChatCompletion(
     messages: AiChatMessage[],
@@ -405,63 +405,64 @@ export class AiService {
         find: string
         replace: string | boolean | number | undefined | null
       }[] = [
-          {
-            find: 'name',
-            replace: name,
-          },
-          {
-            find: 'zip',
-            replace: details.zip,
-          },
-          {
-            find: 'website',
-            replace: details.website,
-          },
-          {
-            find: 'party',
-            replace: party,
-          },
-          {
-            find: 'state',
-            replace: details.state,
-          },
-          {
-            find: 'primaryElectionDate',
-            replace: details.primaryElectionDate,
-          },
-          {
-            find: 'district',
-            replace: details.district,
-          },
-          {
-            find: 'office',
-            replace: `${office}${details.district ? ` in ${details.district}` : ''
-              }`,
-          },
-          {
-            find: 'positions',
-            replace: positionsStr,
-          },
-          {
-            find: 'pastExperience',
-            replace:
-              typeof details.pastExperience === 'string'
-                ? details.pastExperience
-                : JSON.stringify(details.pastExperience || {}),
-          },
-          {
-            find: 'occupation',
-            replace: details.occupation,
-          },
-          {
-            find: 'funFact',
-            replace: details.funFact,
-          },
-          {
-            find: 'campaignCommittee',
-            replace: details.campaignCommittee || 'unknown',
-          },
-        ]
+        {
+          find: 'name',
+          replace: name,
+        },
+        {
+          find: 'zip',
+          replace: details.zip,
+        },
+        {
+          find: 'website',
+          replace: details.website,
+        },
+        {
+          find: 'party',
+          replace: party,
+        },
+        {
+          find: 'state',
+          replace: details.state,
+        },
+        {
+          find: 'primaryElectionDate',
+          replace: details.primaryElectionDate,
+        },
+        {
+          find: 'district',
+          replace: details.district,
+        },
+        {
+          find: 'office',
+          replace: `${office}${
+            details.district ? ` in ${details.district}` : ''
+          }`,
+        },
+        {
+          find: 'positions',
+          replace: positionsStr,
+        },
+        {
+          find: 'pastExperience',
+          replace:
+            typeof details.pastExperience === 'string'
+              ? details.pastExperience
+              : JSON.stringify(details.pastExperience || {}),
+        },
+        {
+          find: 'occupation',
+          replace: details.occupation,
+        },
+        {
+          find: 'funFact',
+          replace: details.funFact,
+        },
+        {
+          find: 'campaignCommittee',
+          replace: details.campaignCommittee || 'unknown',
+        },
+      ]
       const againstStr = againstToStr(details.runningAgainst)
       replaceArr.push(
         {
@@ -711,5 +712,4 @@ export class AiService {
       return ''
     }
   }
-
 }

@@ -11,13 +11,7 @@ import { PaymentsModule } from '../payments/payments.module'
 import { PeerlyModule } from '../vendors/peerly/peerly.module'
 
 @Module({
-  imports: [
-    HttpModule,
-    EmailModule,
-    FilesModule,
-    PaymentsModule,
-    PeerlyModule,
-  ],
+  imports: [HttpModule, EmailModule, FilesModule, PaymentsModule, PeerlyModule],
   controllers: [OutreachController],
   providers: [OutreachService, OutreachPurchaseHandlerService],
   exports: [OutreachService, OutreachPurchaseHandlerService],

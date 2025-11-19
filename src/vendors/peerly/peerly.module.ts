@@ -48,4 +48,4 @@ import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
     PeerlyP2pJobService, // Export for use in OutreachModule
   ],
 })
-export class PeerlyModule { }
+export class PeerlyModule {}
