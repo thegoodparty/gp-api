@@ -1,6 +1,5 @@
 import { ElectionLevel } from '@/campaigns/campaigns.types'
 import {
-  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -52,9 +51,13 @@ export class OfficeMatchService {
       ? getYear(details?.electionDate)
       : undefined
     if (!electionYear) {
-      throw new BadRequestException(
-        `Error: Campaign must have an electionDate to be given an L2 district`,
+      await this.slack.message(
+        {
+          body: `Error! ${slug} Campaign must have an electionDate to be given an L2 district`,
+        },
+        SlackChannel.botPathToVictoryIssues,
       )
+      return []
     }
     try {
       const apiRes = await this.elections.getValidDistrictTypes(
@@ -83,8 +86,6 @@ export class OfficeMatchService {
       return []
     }
 
-    const typesSet = new Set(districtTypes)
-
     // 2) Build candidate list using ONLY API-provided types, ordered by heuristics
     const category = this.getOfficeCategory(officeName, electionLevel)
     this.logger.debug(
@@ -97,7 +98,7 @@ export class OfficeMatchService {
       electionLevel,
       officeName,
     )
-    const heuristicLevelTypes = base.filter((t) => typesSet.has(t))
+    const heuristicLevelTypes = base.filter((t) => districtTypes.includes(t))
     this.logger.debug(
       `searchDistrictTypes: heuristicLevelTypes=${JSON.stringify(heuristicLevelTypes)}`,
     )
@@ -121,7 +122,7 @@ export class OfficeMatchService {
         heuristicLevelTypes,
         officeName,
       )
-      subColumns = subs.filter((t) => typesSet.has(t))
+      subColumns = subs.filter((t) => districtTypes.includes(t))
     }
     this.logger.debug(
       `searchDistrictTypes: subColumns=${JSON.stringify(subColumns)} (districtValue=${districtValue})`,
@@ -143,27 +144,24 @@ export class OfficeMatchService {
     )
 
     // 2d) Combine candidates in priority order: subColumns → heuristicLevelTypes → categoryTypes → remaining
-    const orderedCandidates: string[] = []
-    const pushUnique = (arr: string[]) => {
+    const orderedCandidates = new Set<string>()
+    const pushInOrder = (arr: string[]) => {
       for (const t of arr) {
-        if (typesSet.has(t) && !orderedCandidates.includes(t)) {
-          orderedCandidates.push(t)
-        }
+        orderedCandidates.add(t)
       }
     }
-    pushUnique(subColumns)
-    pushUnique(heuristicLevelTypes)
-    pushUnique(categoryTypes)
-    // add remaining API types not yet included
-    pushUnique(districtTypes)
+    pushInOrder(subColumns)
+    pushInOrder(heuristicLevelTypes)
+    pushInOrder(categoryTypes)
+    pushInOrder(districtTypes)
     this.logger.debug(
-      `searchDistrictTypes: orderedCandidates size=${orderedCandidates.length}`,
+      `searchDistrictTypes: orderedCandidates size=${orderedCandidates.size}`,
     )
 
     // 3) Use AI to select the top 1-5 best matching district type columns
     const matchResp = await this.matchSearchColumns(
       slug,
-      orderedCandidates,
+      Array.from(orderedCandidates),
       officeName,
     )
 
@@ -181,7 +179,9 @@ export class OfficeMatchService {
           const strings = cols.filter((c) => typeof c === 'string') as string[]
           if (strings.length > 0) {
             // Ensure all returned columns exist in API-provided list
-            foundDistrictTypes = strings.filter((c) => typesSet.has(c))
+            foundDistrictTypes = strings.filter((c) =>
+              districtTypes.includes(c),
+            )
           } else {
             await this.slack.message(
               {
