@@ -1,7 +1,7 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { CampaignCreatedBy, ElectionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
@@ -20,10 +20,56 @@ import {
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 
+enum SpecialOfficePhrase {
+  AtLarge = 'At Large',
+  PresidentOfUS = 'President of the United States',
+  Senate = 'Senate',
+  Governor = 'Governor',
+  Mayor = 'Mayor',
+}
+
+const SPECIAL_OFFICE_PHRASES = Object.freeze(Object.values(SpecialOfficePhrase))
+
+const FEDERAL_SPECIAL_PHRASES = Object.freeze([
+  SpecialOfficePhrase.PresidentOfUS,
+  SpecialOfficePhrase.Senate,
+])
+
 @Injectable()
 export class PathToVictoryService extends createPrismaBase(
   MODELS.PathToVictory,
 ) {
+  private buildOfficeFingerprint(params: {
+    officeName: string
+    electionLevel: string
+    electionState: string
+    electionCounty: string
+    electionMunicipality: string
+    subAreaName?: string
+    subAreaValue?: string
+    positionId?: string
+  }): string {
+    const {
+      officeName,
+      electionLevel,
+      electionState,
+      electionCounty,
+      electionMunicipality,
+      subAreaName,
+      subAreaValue,
+      positionId,
+    } = params
+    return [
+      officeName,
+      electionLevel,
+      electionState,
+      electionCounty,
+      electionMunicipality,
+      subAreaName ?? '',
+      subAreaValue ?? '',
+      positionId ?? '',
+    ].join('|')
+  }
   constructor(
     private prisma: PrismaService,
     private officeMatchService: OfficeMatchService,
@@ -72,18 +118,17 @@ export class PathToVictoryService extends createPrismaBase(
 
       // Always recompute potential district columns based on the latest office info.
       // Do not rely on any previously provided electionType/electionLocation values.
+
       if (
-        !input.officeName.includes('At Large') &&
-        !input.officeName.includes('President of the United States') &&
-        !input.officeName.includes('Senate') &&
-        !input.officeName.includes('Governor') &&
-        !input.officeName.includes('Mayor')
+        !SPECIAL_OFFICE_PHRASES.some((phrase) =>
+          input.officeName.includes(phrase),
+        )
       ) {
         // Use unified, API-driven district type discovery
         searchColumns = await this.officeMatchService.searchDistrictTypes(
           input.slug,
           input.officeName,
-          input.electionLevel,
+          input.electionLevel as ElectionLevel,
           input.electionState,
           input.subAreaName,
           input.subAreaValue,
@@ -127,13 +172,12 @@ export class PathToVictoryService extends createPrismaBase(
         electionType = columnResponse.column
         electionLocation = columnResponse.value
 
-        // If not a special-case office and we still don't have a district mapping, try next option.
-        const isSpecialCaseOffice =
-          (input.electionLevel === 'federal' &&
-            (input.officeName.includes('President of the United States') ||
-              input.officeName.includes('Senate'))) ||
-          input.officeName.includes('Governor')
-        if (!isSpecialCaseOffice && (!electionType || !electionLocation)) {
+        if (
+          (input.electionLevel as ElectionLevel) === ElectionLevel.federal &&
+          (FEDERAL_SPECIAL_PHRASES.some((p) => input.officeName.includes(p)) ||
+            input.officeName.includes(SpecialOfficePhrase.Governor)) &&
+          (!electionType || !electionLocation)
+        ) {
           continue
         }
 
@@ -142,7 +186,7 @@ export class PathToVictoryService extends createPrismaBase(
         )
 
         const state =
-          input.officeName === 'President of the United States'
+          input.officeName === SpecialOfficePhrase.PresidentOfUS
             ? 'US'
             : input.electionState
 
@@ -181,11 +225,12 @@ export class PathToVictoryService extends createPrismaBase(
         ...input,
       }
     } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error))
+      const err: Error =
+        error instanceof Error ? error : new Error(String(error))
       this.logger.error('Error in handle-p2v', err)
       await this.slackService.errorMessage({
         message: 'Error in handle-p2v',
-        error: err,
+        error: { message: err.message, stack: err.stack },
       })
       throw new Error('Error in handle-p2v')
     }
@@ -263,6 +308,18 @@ export class PathToVictoryService extends createPrismaBase(
     ￮ L2 DistrictName/ElectionLocation: ${pathToVictoryResponse.electionLocation}
     `
 
+    const officeContext = {
+      officeName,
+      electionLevel,
+      electionState,
+      electionCounty,
+      electionMunicipality,
+      subAreaName,
+      subAreaValue,
+      positionId,
+    }
+    const officeFingerprint = this.buildOfficeFingerprint(officeContext)
+
     if (
       pathToVictoryResponse.counts.projectedTurnout &&
       pathToVictoryResponse.counts.projectedTurnout > 0
@@ -286,40 +343,16 @@ export class PathToVictoryService extends createPrismaBase(
           'Path To Victory already completed for',
           campaign.slug,
         )
-        await this.completePathToVictory(
-          campaign.slug,
-          pathToVictoryResponse,
-          false,
-          undefined,
-          {
-            officeName,
-            electionLevel,
-            electionState,
-            electionCounty,
-            electionMunicipality,
-            subAreaName,
-            subAreaValue,
-            positionId,
-          },
-        )
+        await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
+          sendEmail: false,
+          officeFingerprint,
+        })
         return true
       } else {
-        await this.completePathToVictory(
-          campaign.slug,
-          pathToVictoryResponse,
-          true,
-          undefined,
-          {
-            officeName,
-            electionLevel,
-            electionState,
-            electionCounty,
-            electionMunicipality,
-            subAreaName,
-            subAreaValue,
-            positionId,
-          },
-        )
+        await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
+          sendEmail: true,
+          officeFingerprint,
+        })
         return true
       }
     } else {
@@ -333,22 +366,11 @@ export class PathToVictoryService extends createPrismaBase(
         channel: SlackChannel.botPathToVictoryIssues,
       })
       // Mark as Failed
-      await this.completePathToVictory(
-        campaign.slug,
-        pathToVictoryResponse,
-        false,
-        P2VStatus.failed,
-        {
-          officeName,
-          electionLevel,
-          electionState,
-          electionCounty,
-          electionMunicipality,
-          subAreaName,
-          subAreaValue,
-          positionId,
-        },
-      )
+      await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
+        sendEmail: false,
+        p2vStatusOverride: P2VStatus.failed,
+        officeFingerprint,
+      })
       await this.crmService.handleUpdateCampaign(
         campaign,
         'path_to_victory_status',
@@ -365,17 +387,10 @@ export class PathToVictoryService extends createPrismaBase(
       electionType: string
       electionLocation: string
     },
-    sendEmail = true,
-    p2vStatusOverride?: P2VStatus,
-    officeContext?: {
-      officeName: string
-      electionLevel: string
-      electionState: string
-      electionCounty: string
-      electionMunicipality: string
-      subAreaName?: string
-      subAreaValue?: string
-      positionId?: string
+    options?: {
+      sendEmail?: boolean
+      p2vStatusOverride?: P2VStatus
+      officeFingerprint?: string
     },
   ): Promise<void> {
     this.logger.debug('completing path to victory for', slug)
@@ -406,20 +421,20 @@ export class PathToVictoryService extends createPrismaBase(
       }
 
       const p2vStatus: P2VStatus =
-        p2vStatusOverride ??
+        options?.p2vStatusOverride ??
         (pathToVictoryResponse?.counts?.projectedTurnout &&
         pathToVictoryResponse.counts.projectedTurnout > 0
           ? P2VStatus.complete
           : P2VStatus.waiting)
 
-      const p2vData = (p2v.data || {}) as Record<string, unknown>
+      const p2vData = (p2v.data || {}) as PrismaJson.PathToVictoryData
 
       // Detect office/district change using an office fingerprint stored on P2V.data
-      const previousOffice =
-        (p2vData.officeContext as Record<string, unknown> | undefined) || null
+      const previousOfficeFingerprint: string | null =
+        p2vData.officeContextFingerprint ?? null
       const hasOfficeChanged =
-        !!officeContext &&
-        JSON.stringify(officeContext) !== JSON.stringify(previousOffice)
+        !!options?.officeFingerprint &&
+        options.officeFingerprint !== previousOfficeFingerprint
 
       if (hasOfficeChanged) {
         this.logger.debug(
@@ -428,7 +443,7 @@ export class PathToVictoryService extends createPrismaBase(
       }
 
       // Build a base data object, optionally clearing stale fields if office changed
-      let baseData: Record<string, unknown>
+      let baseData: Partial<PrismaJson.PathToVictoryData>
       if (hasOfficeChanged) {
         const {
           projectedTurnout: _pt,
@@ -443,7 +458,7 @@ export class PathToVictoryService extends createPrismaBase(
           electionLocation: _oldElectionLocation,
           ...rest
         } = p2vData
-        baseData = rest
+        baseData = rest as Partial<PrismaJson.PathToVictoryData>
       } else {
         baseData = { ...p2vData }
       }
@@ -453,11 +468,11 @@ export class PathToVictoryService extends createPrismaBase(
           data: {
             ...baseData,
             projectedTurnout: Number(
-              pathToVictoryResponse.counts.projectedTurnout ?? 0,
+              pathToVictoryResponse.counts?.projectedTurnout ?? 0,
             ),
-            winNumber: Number(pathToVictoryResponse.counts.winNumber ?? 0),
+            winNumber: Number(pathToVictoryResponse.counts?.winNumber ?? 0),
             voterContactGoal: Number(
-              pathToVictoryResponse.counts.voterContactGoal ?? 0,
+              pathToVictoryResponse.counts?.voterContactGoal ?? 0,
             ),
             electionType: pathToVictoryResponse.electionType,
             electionLocation: pathToVictoryResponse.electionLocation,
@@ -465,7 +480,9 @@ export class PathToVictoryService extends createPrismaBase(
             p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
             p2vStatus,
             source: P2VSource.GpApi,
-            ...(officeContext ? { officeContext } : {}),
+            ...(options?.officeFingerprint
+              ? { officeContextFingerprint: options.officeFingerprint }
+              : {}),
           },
         },
       })
@@ -474,7 +491,8 @@ export class PathToVictoryService extends createPrismaBase(
         winNumber: pathToVictoryResponse.counts.winNumber,
       })
 
-      if (p2vStatus === 'Complete' && sendEmail && campaign.user?.email) {
+      const shouldSendEmail = options?.sendEmail ?? true
+      if (p2vStatus === 'Complete' && shouldSendEmail && campaign.user?.email) {
         const name = campaign.user
           ? await this.getUserName(campaign.user)
           : 'Friend'
@@ -504,11 +522,12 @@ export class PathToVictoryService extends createPrismaBase(
         p2vStatus,
       )
     } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error))
+      const err: Error =
+        error instanceof Error ? error : new Error(String(error))
       this.logger.error('error updating campaign', err)
       await this.slackService.errorMessage({
         message: 'error updating campaign with path to victory',
-        error: err,
+        error: { message: err.message, stack: err.stack },
       })
     }
   }

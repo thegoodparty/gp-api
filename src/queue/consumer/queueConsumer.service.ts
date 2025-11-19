@@ -23,10 +23,7 @@ import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.s
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { ViabilityService } from 'src/pathToVictory/services/viability.service'
-import {
-  PathToVictoryInput,
-  ViabilityScore,
-} from 'src/pathToVictory/types/pathToVictory.types'
+import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
@@ -413,9 +410,19 @@ export class QueueConsumerService {
     let campaign: (Campaign & { pathToVictory: PathToVictory | null }) | null =
       null
 
+    const {
+      slug,
+      officeName,
+      electionLevel,
+      electionState,
+      subAreaName,
+      subAreaValue,
+      electionDate,
+    } = message
+
     try {
       this.logger.debug(
-        `P2V start for slug=${message.slug}, office="${message.officeName}", level=${message.electionLevel}, state=${message.electionState}, subAreaName=${message.subAreaName}, subAreaValue=${message.subAreaValue}, electionDate=${message.electionDate}`,
+        `P2V start for slug=${slug}, office="${officeName}", level=${electionLevel}, state=${electionState}, subAreaName=${subAreaName}, subAreaValue=${subAreaValue}, electionDate=${electionDate}`,
       )
       const p2vResponse: P2VResponse =
         await this.pathToVictoryService.handlePathToVictory({
@@ -460,26 +467,26 @@ export class QueueConsumerService {
       )
       // Extra structured context for visibility in logs
       this.logger.error('P2V context', {
-        slug: message.slug,
-        officeName: message.officeName,
-        electionLevel: message.electionLevel,
-        electionState: message.electionState,
-        subAreaName: message.subAreaName,
-        subAreaValue: message.subAreaValue,
-        electionDate: message.electionDate,
+        slug,
+        officeName,
+        electionLevel,
+        electionState,
+        subAreaName,
+        subAreaValue,
+        electionDate,
       })
       await this.slackService.errorMessage({
         message: 'error in consumer/handlePathToVictoryMessage',
         error: {
           error: e,
           context: {
-            slug: message.slug,
-            officeName: message.officeName,
-            electionLevel: message.electionLevel,
-            electionState: message.electionState,
-            subAreaName: message.subAreaName,
-            subAreaValue: message.subAreaValue,
-            electionDate: message.electionDate,
+            slug,
+            officeName,
+            electionLevel,
+            electionState,
+            subAreaName,
+            subAreaValue,
+            electionDate,
           },
         },
       })
@@ -491,42 +498,6 @@ export class QueueConsumerService {
       )
       await this.handlePathToVictoryFailure(campaign)
       throw new Error('error in consumer/handlePathToVictoryMessage')
-    }
-
-    // Calculate viability score after a valid path to victory response
-    let viability: ViabilityScore | null = null
-    try {
-      viability = await this.viabilityService.calculateViabilityScore(
-        Number(message.campaignId),
-      )
-    } catch (e) {
-      this.logger.error('error calculating viability score', e)
-    }
-
-    if (viability) {
-      const pathToVictory = await this.pathToVictoryService.findUnique({
-        where: { campaignId: Number(message.campaignId) },
-      })
-
-      if (pathToVictory) {
-        const data = pathToVictory.data || {}
-        await this.pathToVictoryService.update({
-          where: { id: pathToVictory.id },
-          data: {
-            data: {
-              ...data,
-              viability,
-            },
-          },
-        })
-      }
-      this.logger.debug('viability', viability)
-      await this.slackService.message(
-        {
-          body: `Viability score calculated for ${campaign?.slug}: ${viability.score}`,
-        },
-        SlackChannel.botPathToVictory,
-      )
     }
 
     return true
