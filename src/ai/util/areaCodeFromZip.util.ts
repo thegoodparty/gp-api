@@ -67,7 +67,7 @@ export class AreaCodeFromZipService {
     const lastFetched = new Date(lastFetchedAt)
     const now = new Date()
 
-    return differenceInYears(lastFetched, now) >= CACHE_EXPIRY_YEARS
+    return differenceInYears(now, lastFetched) >= CACHE_EXPIRY_YEARS
   }
 
   private async getAreaCodesFromS3(
