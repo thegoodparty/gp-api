@@ -99,7 +99,7 @@ export class AreaCodeFromZipService {
     zipCode: string,
   ): Promise<string[] | null> {
     const prompt = `What are the area codes (NPA codes) for the zip code ${zipCode} in the United States?
-      Please respond with ONLY a JSON array of ara code strings (3-digit numbers), for example: ["415", "510].
+      Please respond with ONLY a JSON array of area code strings (3-digit numbers), for example: ["415", "510].
       If you cannot determin the ara codes, respond with an empty array: [].`
 
     try {
