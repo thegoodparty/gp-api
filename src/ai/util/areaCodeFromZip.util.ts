@@ -6,6 +6,11 @@ import { AiService } from '../ai.service'
 
 const ZIP_TO_AREA_CODE_FILE = 'zip-to-area-code-mappings.json'
 const CACHE_EXPIRY_YEARS = 1
+const ZIP_TO_AREA_CODE_BUCKET = process.env.ZIP_TO_AREA_CODE_BUCKET as string
+
+if (!ZIP_TO_AREA_CODE_BUCKET) {
+  throw new Error('ZIP_TO_AREA_CODE_BUCKET environment variable is required')
+}
 
 const AreaCodeResponseSchema = z.array(
   z.string().regex(/^\d{3}$/, 'Area code must be a 3-digit number'),
@@ -21,17 +26,11 @@ type ZipToAreaCodeMapping = Record<string, ZipToAreaCodeEntry>
 @Injectable()
 export class AreaCodeFromZipService {
   private readonly logger = new Logger(AreaCodeFromZipService.name)
-  private readonly zipToAreaCodeBucket: string
 
   constructor(
     private readonly s3Service: S3Service,
     private readonly aiService: AiService,
   ) {
-    const ZIP_TO_AREA_CODE_BUCKET = process.env.ZIP_TO_AREA_CODE_BUCKET as string
-    if (!ZIP_TO_AREA_CODE_BUCKET) {
-      throw new Error('ZIP_TO_AREA_CODE_BUCKET environment variable is required')
-    }
-    this.zipToAreaCodeBucket = ZIP_TO_AREA_CODE_BUCKET
   }
 
   /**
@@ -89,12 +88,12 @@ export class AreaCodeFromZipService {
     let json: string | undefined
 
     try {
-      json = await this.s3Service.getFile(this.zipToAreaCodeBucket, key)
+      json = await this.s3Service.getFile(ZIP_TO_AREA_CODE_BUCKET, key)
     } catch (error) {
       this.logger.error(
         `Error fetching area code mappings file from S3: ${error}`,
         key,
-        this.zipToAreaCodeBucket,
+        ZIP_TO_AREA_CODE_BUCKET,
       )
       return null
     }
@@ -188,12 +187,12 @@ export class AreaCodeFromZipService {
     let existingfile: string | undefined
 
     try {
-      existingfile = await this.s3Service.getFile(this.zipToAreaCodeBucket, key)
+      existingfile = await this.s3Service.getFile(ZIP_TO_AREA_CODE_BUCKET, key)
     } catch (error) {
       this.logger.error(
         `Error fetching existing area code mappings from S3: ${error}`,
         key,
-        this.zipToAreaCodeBucket,
+        ZIP_TO_AREA_CODE_BUCKET,
       )
     }
 
@@ -212,7 +211,7 @@ export class AreaCodeFromZipService {
 
     try {
       await this.s3Service.uploadFile(
-        this.zipToAreaCodeBucket,
+        ZIP_TO_AREA_CODE_BUCKET,
         JSON.stringify(mappings, null, 2),
         key,
         { contentType: 'application/json' },
@@ -223,7 +222,7 @@ export class AreaCodeFromZipService {
       this.logger.error(
         `Error uploading area codes to S3 for ${zipCode}: ${error}`,
         key,
-        this.zipToAreaCodeBucket,
+        ZIP_TO_AREA_CODE_BUCKET,
       )
     }
   }
