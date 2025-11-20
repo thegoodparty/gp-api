@@ -12,8 +12,6 @@ import { PathToVictoryController } from './pathToVictory.controller'
 import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 import { OfficeMatchService } from './services/officeMatch.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
-import { ViabilityService } from './services/viability.service'
-import { ViabilityController } from './viability.controller'
 
 @Module({
   imports: [
@@ -26,19 +24,17 @@ import { ViabilityController } from './viability.controller'
     SegmentModule,
     SlackModule,
   ],
-  controllers: [PathToVictoryController, ViabilityController],
+  controllers: [PathToVictoryController],
   providers: [
     PathToVictoryService,
     OfficeMatchService,
     EnqueuePathToVictoryService,
-    ViabilityService,
     BallotReadyService,
   ],
   exports: [
     PathToVictoryService,
     OfficeMatchService,
     EnqueuePathToVictoryService,
-    ViabilityService,
     BallotReadyService,
   ],
 })

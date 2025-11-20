@@ -22,7 +22,6 @@ import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { ViabilityService } from 'src/pathToVictory/services/viability.service'
 import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
@@ -62,7 +61,6 @@ export class QueueConsumerService {
     private readonly aiContentService: AiContentService,
     private readonly slackService: SlackService,
     private readonly pathToVictoryService: PathToVictoryService,
-    private readonly viabilityService: ViabilityService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,

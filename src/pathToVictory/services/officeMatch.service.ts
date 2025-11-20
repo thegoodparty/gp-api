@@ -125,7 +125,7 @@ const OPENAI_ROLE = Object.freeze({
 })
 
 const MATCH_COLUMNS_SYSTEM_PROMPT =
-  'You are a political assistant whose job is to find the top 5 columns that match the office name (ordered by the most likely at the top). If none of the labels are a good match then you will return an empty column array. Make sure you only return columns that are extremely relevant. For Example: for a City Council position you would not return a State position or a School District position. Please return valid JSON only. Do not return more than 5 columns.'
+  'You are a political assistant whose job is to find the top 5 columns that match the office name (ordered by the most likely at the top). The provided Columns list is ALREADY ORDERED by priority and specificity; strongly prefer earlier items and only choose later ones if earlier ones are not applicable. If none of the labels are a good match then you will return an empty column array. Make sure you only return columns that are extremely relevant. For Example: for a City Council position you would not return a State position or a School District position. Please return valid JSON only. Do not return more than 5 columns.'
 
 const CATEGORY_SEARCH_MAP: Record<OfficeCategory, string[]> = {
   [OfficeCategory.Judicial]: [
@@ -345,14 +345,21 @@ export class OfficeMatchService {
     )
 
     const orderedCandidates = new Set<string>()
+    const isGenericType = (t: string) =>
+      t === L2_DISTRICT_TYPES.COUNTY || t === L2_DISTRICT_TYPES.CITY
+    const excludeGenericForCategory =
+      category === OfficeCategory.Judicial ||
+      officeName.includes('Judge') ||
+      officeName.includes('Court')
     const pushInOrder = (arr: string[]) => {
       for (const t of arr) {
+        if (excludeGenericForCategory && isGenericType(t)) continue
         orderedCandidates.add(t)
       }
     }
     pushInOrder(subColumns)
-    pushInOrder(heuristicLevelTypes)
     pushInOrder(categoryTypes)
+    pushInOrder(heuristicLevelTypes)
     pushInOrder(districtTypes)
     this.logger.debug(
       `searchDistrictTypes: orderedCandidates size=${orderedCandidates.size}`,
@@ -480,7 +487,7 @@ export class OfficeMatchService {
         },
         {
           role: OPENAI_ROLE.USER as AiChatMessage['role'],
-          content: `Find the top 5 columns that matches the following office: "${searchString}.\n\nColumns: ${searchColumns}"`,
+          content: `Find the top 5 columns that matches the following office: "${searchString}.\n\nColumns (ordered by priority; prefer earlier ones): ${searchColumns}"`,
         },
       ],
       temperature: 0.1,
