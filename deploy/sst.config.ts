@@ -42,7 +42,6 @@ export default $config({
   async run() {
     const { default: aws } = await import('@pulumi/aws')
     const { default: pulumi } = await import('@pulumi/pulumi')
-    const { lambda } = await import('./utils/lambda')
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
@@ -283,58 +282,6 @@ export default $config({
         privateDnsEnabled: true,
       })
     }
-
-    const HANDLER_TIMEOUT = 30
-
-    const pollInsightsQueueDlq = new aws.sqs.Queue(
-      `poll-insights-queue-dlq-${$app.stage}`,
-      {
-        name: `poll-insights-queue-dlq-${$app.stage}.fifo`,
-        fifoQueue: true,
-        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-      },
-    )
-
-    const pollInsightsQueue = new aws.sqs.Queue(
-      `poll-insights-queue-${$app.stage}`,
-      {
-        name: `poll-insights-queue-${$app.stage}.fifo`,
-        fifoQueue: true,
-        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-        visibilityTimeoutSeconds: HANDLER_TIMEOUT + 5,
-        contentBasedDeduplication: true,
-        redrivePolicy: pulumi.interpolate`{
-          "deadLetterTargetArn": "${pollInsightsQueueDlq.arn}",
-          "maxReceiveCount": 3
-        }`,
-      },
-    )
-
-    const pollInsightsQueueHandler = lambda(aws, pulumi, {
-      name: `poll-insights-queue-handler-${$app.stage}`,
-      runtime: 'nodejs22.x',
-      timeout: HANDLER_TIMEOUT,
-      memorySize: 512,
-      filename: 'poll-response-analysis-queue-handler',
-      policy: [
-        {
-          actions: [
-            'sqs:ReceiveMessage',
-            'sqs:DeleteMessage',
-            'sqs:GetQueueAttributes',
-          ],
-          resources: [pollInsightsQueue.arn],
-        },
-      ],
-    })
-
-    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-      eventSourceArn: pollInsightsQueue.arn,
-      functionName: pollInsightsQueueHandler.name,
-      enabled: true,
-      batchSize: 10,
-      functionResponseTypes: ['ReportBatchItemFailures'],
-    })
 
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
