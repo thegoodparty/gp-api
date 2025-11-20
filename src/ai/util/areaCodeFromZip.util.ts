@@ -16,11 +16,18 @@ type ZipToAreaCodeMapping = Record<string, ZipToAreaCodeEntry>
 @Injectable()
 export class AreaCodeFromZipService {
   private readonly logger = new Logger(AreaCodeFromZipService.name)
+  private readonly zipToAreaCodeBucket: string
 
   constructor(
     private readonly s3Service: S3Service,
     private readonly aiService: AiService,
-  ) { }
+  ) {
+    const ZIP_TO_AREA_CODE_BUCKET = process.env.ZIP_TO_AREA_CODE_BUCKET as string
+    if (!ZIP_TO_AREA_CODE_BUCKET) {
+      throw new Error('ZIP_TO_AREA_CODE_BUCKET environment variable is required')
+    }
+    this.zipToAreaCodeBucket = ZIP_TO_AREA_CODE_BUCKET
+  }
 
   /**
    * Gets area codes for a given zip code.
@@ -73,24 +80,26 @@ export class AreaCodeFromZipService {
   private async getAreaCodesFromS3(
     zipCode: string,
   ): Promise<ZipToAreaCodeEntry | null> {
+    const key = this.s3Service.buildKey(undefined, ZIP_TO_AREA_CODE_FILE)
+    let json: string | undefined = undefined
     try {
-      const bucket = process.env.ZIP_TO_AREA_CODE_BUCKET
-      if (!bucket) {
-        throw new Error(
-          'ZIP_TO_AREA_CODE_BUCKET environment variable is required',
-        )
-      }
-      const key = this.s3Service.buildKey(undefined, ZIP_TO_AREA_CODE_FILE)
-      const json = await this.s3Service.getFile(bucket, key)
+      json = await this.s3Service.getFile(this.zipToAreaCodeBucket, key)
+    } catch (error) {
+      this.logger.error(`Error getting area code mappings from S3: ${error}`
+        , key, this.zipToAreaCodeBucket
+      )
+      return null
+    }
 
-      if (!json) {
-        return null
-      }
+    if (!json) {
+      return null
+    }
 
+    try {
       const mappings = JSON.parse(json) as ZipToAreaCodeMapping
       return mappings[zipCode] || null
     } catch (error) {
-      this.logger.error(`Error getting area code mappings from S3: ${error}`)
+      this.logger.error(`Error parsing area code mappings JSON from S3: ${error}`, json)
       return null
     }
   }
@@ -99,8 +108,8 @@ export class AreaCodeFromZipService {
     zipCode: string,
   ): Promise<string[] | null> {
     const prompt = `What are the area codes (NPA codes) for the zip code ${zipCode} in the United States?
-      Please respond with ONLY a JSON array of ara code strings (3-digit numbers), for example: ["415", "510].
-      If you cannot determin the ara codes, respond with an empty array: [].`
+      Please respond with ONLY a JSON array of ara code strings (3-digit numbers), for example: ["415", "510"].
+      If you cannot determine the area codes, respond with an empty array: [].`
 
     try {
       const response = await this.aiService.llmChatCompletion(
@@ -125,7 +134,7 @@ export class AreaCodeFromZipService {
         .replace(/```\n?/g, '')
         .trim()
 
-      const areaCodes = JSON.parse(jsonContent) as unknown
+      const areaCodes = JSON.parse(jsonContent) as string[]
 
       if (
         Array.isArray(areaCodes) &&
@@ -146,33 +155,40 @@ export class AreaCodeFromZipService {
     zipCode: string,
     areaCodes: string[],
   ): Promise<void> {
+    const key = this.s3Service.buildKey(undefined, ZIP_TO_AREA_CODE_FILE)
+    let mappings: ZipToAreaCodeMapping = {}
+
+    let existingfile: string | undefined = undefined
+
     try {
-      const bucket = process.env.ZIP_TO_AREA_CODE_BUCKET
-      if (!bucket) {
-        throw new Error(
-          'ZIP_TO_AREA_CODE_BUCKET environment variable is required',
-        )
-      }
-      const key = this.s3Service.buildKey(undefined, ZIP_TO_AREA_CODE_FILE)
-      let mappings: ZipToAreaCodeMapping = {}
+      existingfile = await this.s3Service.getFile(this.zipToAreaCodeBucket, key)
+    } catch (error) {
+      this.logger.error(`Error getting existing area code mappings from S3: ${error}`, key, this.zipToAreaCodeBucket)
+      return
+    }
 
-      const existingfile = await this.s3Service.getFile(bucket, key)
-      if (existingfile) {
+    if (existingfile) {
+      try {
         mappings = JSON.parse(existingfile) as ZipToAreaCodeMapping
+      } catch (error) {
+        this.logger.error(`Error parsing existing area code mappings JSON from S3: ${error}`, existingfile)
+        return
       }
+    }
 
-      mappings[zipCode] = { areaCodes, lastFetchedAt: formatISO(new Date()) }
+    mappings[zipCode] = { areaCodes, lastFetchedAt: formatISO(new Date()) }
 
+    try {
       await this.s3Service.uploadFile(
-        bucket,
+        this.zipToAreaCodeBucket,
         JSON.stringify(mappings, null, 2),
         key,
         { contentType: 'application/json' },
       )
 
-      this.logger.debug(`Saved area codes for ${zipCode} to S3`)
+      this.logger.debug(`Saved area codes for ${zipCode} to S3`, mappings)
     } catch (error) {
-      this.logger.error(`Error saving area codes to S3 for ${zipCode}:${error}`)
+      this.logger.error(`Error uploading area code mappings to S3: ${error}`, key, this.zipToAreaCodeBucket)
     }
   }
 }
