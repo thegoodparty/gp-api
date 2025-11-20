@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   ConflictException,
   forwardRef,
   Inject,
@@ -16,6 +17,8 @@ import {
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
+import Stripe from 'stripe'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
@@ -26,6 +29,8 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     private readonly analytics: AnalyticsService,
     @Inject(forwardRef(() => CrmUsersService))
     private readonly crm: CrmUsersService,
+    @Inject(forwardRef(() => StripeService))
+    private readonly stripeService: StripeService,
   ) {
     super()
   }
@@ -231,6 +236,44 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   }
 
   async deleteUser(id: number) {
+    const user = await this.model.findUnique({
+      where: { id },
+      include: { campaigns: true },
+    })
+
+    if (!user) {
+      return null
+    }
+
+    const campaign = user.campaigns?.[0]
+    const subscriptionId = (campaign?.details as { subscriptionId?: string })
+      ?.subscriptionId
+
+    if (subscriptionId) {
+      try {
+        await this.stripeService.cancelSubscription(subscriptionId)
+      } catch (error) {
+        if (error instanceof Stripe.errors.StripeError) {
+          this.logger.error(
+            `Failed to cancel subscription ${subscriptionId}: ${error.message} ${JSON.stringify(
+              {
+                code: error.code,
+                type: error.type,
+                statusCode: error.statusCode,
+              },
+            )}`,
+          )
+        } else {
+          this.logger.error(
+            `Unexpected error canceling subscription ${subscriptionId}`,
+            error,
+          )
+        }
+        throw new BadGatewayException(
+          `Failed to cancel subscription before user deletion`,
+        )
+      }
+    }
     return this.model.delete({
       where: {
         id,

@@ -260,4 +260,23 @@ export class StripeService {
       throw e
     }
   }
+
+  async cancelSubscription(subscriptionId: string) {
+    try {
+      return await this.stripe.subscriptions.cancel(subscriptionId)
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error(`Failed to cancel subscription ${subscriptionId}`, e)
+        await this.slack.errorMessage({
+          message: 'Error canceling subscription',
+          error: { subscriptionId, error: e },
+        })
+        throw new BadGatewayException(
+          `Failed to cancel subscription ${subscriptionId}`,
+          e.message,
+        )
+      }
+      throw e
+    }
+  }
 }
