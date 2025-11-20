@@ -330,41 +330,34 @@ export class OfficeMatchService {
       `searchDistrictTypes: subColumns=${JSON.stringify(subColumns)} (districtValue=${districtValue})`,
     )
 
-    let categoryTypes: string[] = districtTypes
+    let filteredDistrictTypes: string[] = districtTypes
     if (category) {
       const cat = category.toLowerCase()
       const filtered = districtTypes.filter((t) =>
         String(t).toLowerCase().includes(cat),
       )
       if (filtered.length > 0) {
-        categoryTypes = filtered
+        filteredDistrictTypes = filtered
       }
     }
     this.logger.debug(
-      `searchDistrictTypes: categoryTypes (post-filter) size=${categoryTypes.length}`,
+      `searchDistrictTypes: categoryTypes (post-filter) size=${filteredDistrictTypes.length}`,
     )
 
-    const orderedCandidates = new Set<string>()
-    const isGenericType = (t: string) =>
-      t === L2_DISTRICT_TYPES.COUNTY || t === L2_DISTRICT_TYPES.CITY
-    const excludeGenericForCategory =
-      category === OfficeCategory.Judicial ||
-      officeName.includes('Judge') ||
-      officeName.includes('Court')
+    const orderedDistrictTypes = new Set<string>()
     const pushInOrder = (arr: string[]) => {
       for (const t of arr) {
-        if (excludeGenericForCategory && isGenericType(t)) continue
-        orderedCandidates.add(t)
+        orderedDistrictTypes.add(t)
       }
     }
     pushInOrder(subColumns)
-    pushInOrder(categoryTypes)
+    pushInOrder(filteredDistrictTypes)
     pushInOrder(heuristicLevelTypes)
     pushInOrder(districtTypes)
     this.logger.debug(
-      `searchDistrictTypes: orderedCandidates size=${orderedCandidates.size}`,
+      `searchDistrictTypes: orderedCandidates size=${orderedDistrictTypes.size}`,
     )
-    return orderedCandidates
+    return orderedDistrictTypes
   }
 
   // Step 3 helper: Use AI to select the top 1-5 best matching district type columns
@@ -487,7 +480,7 @@ export class OfficeMatchService {
         },
         {
           role: OPENAI_ROLE.USER as AiChatMessage['role'],
-          content: `Find the top 5 columns that matches the following office: "${searchString}.\n\nColumns (ordered by priority; prefer earlier ones): ${searchColumns}"`,
+          content: `Find the top 5 columns that matches the following office: "${searchString}.\n\nColumns: ${searchColumns}"`,
         },
       ],
       temperature: 0.1,
