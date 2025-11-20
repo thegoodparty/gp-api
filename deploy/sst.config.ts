@@ -121,7 +121,14 @@ export default $config({
     }
 
     // Each stage will get its own Cluster.
-    const cluster = new sst.aws.Cluster('fargate', { vpc })
+    const cluster = new sst.aws.Cluster('fargate', {
+      vpc,
+      transform: {
+        cluster: {
+          settings: [{ name: 'containerInsights', value: 'enabled' }],
+        },
+      },
+    })
 
     let dbUrl: string | undefined
     let dbName: string | undefined
