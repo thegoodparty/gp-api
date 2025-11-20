@@ -273,7 +273,7 @@ export class StripeService {
         })
         throw new BadGatewayException(
           `Failed to cancel subscription ${subscriptionId}`,
-          e.message,
+          { cause: e },
         )
       }
       throw e

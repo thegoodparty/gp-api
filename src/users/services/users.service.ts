@@ -249,13 +249,17 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       try {
         await this.stripeService.cancelSubscription(subscriptionId)
       } catch (error) {
-        if (error instanceof Stripe.errors.StripeError) {
+        if (
+          error instanceof BadGatewayException &&
+          error.cause instanceof Stripe.errors.StripeError
+        ) {
+          const stripeError = error.cause
           this.logger.error(
-            `Failed to cancel subscription ${subscriptionId}: ${error.message} ${JSON.stringify(
+            `Failed to cancel subscription ${subscriptionId}: ${stripeError.message} ${JSON.stringify(
               {
-                code: error.code,
-                type: error.type,
-                statusCode: error.statusCode,
+                code: stripeError.code,
+                type: stripeError.type,
+                statusCode: stripeError.statusCode,
               },
             )}`,
           )
