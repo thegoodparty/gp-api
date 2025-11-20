@@ -22,6 +22,7 @@ import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.servi
 import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types'
 import { PeerlyMediaService } from '../../vendors/peerly/services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from '../../vendors/peerly/services/peerlyP2pSms.service'
+import { getPeerlyJobUrl } from '../../vendors/peerly/utils/peerlyJobUrl.util'
 import {
   AudienceSlackBlock,
   buildSlackBlocks,
@@ -42,6 +43,7 @@ export interface OutreachSlackBlocksConfiguration {
   message?: string
   formattedAudience?: AudienceSlackBlock[]
   audienceRequest?: string
+  peerlyJobUrl?: string
 }
 
 export type Audience = {
@@ -168,6 +170,10 @@ export class VoterOutreachService {
       campaignSlug: campaign.slug,
     })
 
+    const peerlyJobUrl = outreach.projectId
+      ? getPeerlyJobUrl(outreach.projectId)
+      : undefined
+
     await this.sendSlackOutreachMessage({
       user,
       campaign,
@@ -179,6 +185,7 @@ export class VoterOutreachService {
       message: outreach.message ? sanitizeHtml(outreach.message) : '',
       formattedAudience: this.formatAudienceFiltersForSlack(audience),
       audienceRequest,
+      peerlyJobUrl,
     })
 
     // this is sent to hubspot on update
@@ -211,6 +218,7 @@ export class VoterOutreachService {
     message = '',
     formattedAudience = [],
     audienceRequest = '',
+    peerlyJobUrl,
   }: OutreachSlackBlocksConfiguration) {
     return await this.slack.message(
       buildSlackBlocks({
@@ -229,6 +237,7 @@ export class VoterOutreachService {
         message,
         formattedAudience,
         audienceRequest,
+        peerlyJobUrl,
       }),
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
