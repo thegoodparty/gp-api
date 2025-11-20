@@ -241,11 +241,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       include: { campaigns: true },
     })
 
-    if (!user) {
-      return null
-    }
-
-    const campaign = user.campaigns?.[0]
+    const campaign = user?.campaigns?.[0]
     const subscriptionId = (campaign?.details as { subscriptionId?: string })
       ?.subscriptionId
 
