@@ -12,6 +12,12 @@ const tevynPollCsvsBucketName = {
   master: 'tevyn-poll-csvs-master',
 }
 
+const zipToAreaCodeBucketName = {
+  develop: 'zip-to-area-code-mappings-develop',
+  qa: 'zip-to-area-code-mappings-qa',
+  master: 'zip-to-area-code-mappings-master',
+}
+
 const environment = {
   develop: 'dev',
   qa: 'qa',
@@ -45,10 +51,10 @@ export default $config({
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
-            bastion: false,
-            nat: 'managed',
-            az: 2, // defaults to 2 availability zones and 2 NAT gateways
-          })
+          bastion: false,
+          nat: 'managed',
+          az: 2, // defaults to 2 availability zones and 2 NAT gateways
+        })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
     if (
@@ -257,6 +263,21 @@ export default $config({
       restrictPublicBuckets: true,
     })
 
+    const zipToAreaCodeBucket = new aws.s3.Bucket(
+      `zip-to-area-code-mappings-${$app.stage}`,
+      {
+        bucket: zipToAreaCodeBucketName[$app.stage],
+        forceDestroy: false,
+      },
+    )
+    new aws.s3.BucketPublicAccessBlock(`zip-to-area-code-mappings-pab-${$app.stage}`, {
+      bucket: zipToAreaCodeBucket.id,
+      blockPublicAcls: true,
+      blockPublicPolicy: true,
+      ignorePublicAcls: true,
+      restrictPublicBuckets: true,
+    })
+
     // Create shared VPC Endpoint for SQS (only in master stage)
     if ($app.stage === 'master') {
       // Create security group for SQS
@@ -337,6 +358,7 @@ export default $config({
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
         SERVE_ANALYSIS_BUCKET_NAME: serveAnalysisBucketName[$app.stage],
         TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucketName[$app.stage],
+        ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucketName[$app.stage],
         ...secretsJson,
       },
       image: {
