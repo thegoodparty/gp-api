@@ -1,18 +1,18 @@
-import { ChatOpenAI } from '@langchain/openai'
-import { OpenAI } from 'openai'
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
+import { ChatOpenAI } from '@langchain/openai'
 import { Injectable, Logger } from '@nestjs/common'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { Prisma, User } from '@prisma/client'
-import { getUserFullName } from 'src/users/util/users.util'
-import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
-import { SlackChannel } from '../vendors/slack/slackService.types'
+import { OpenAI } from 'openai'
 import {
   ChatCompletion,
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
 } from 'openai/resources/chat/completions'
+import { getUserFullName } from 'src/users/util/users.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
+import { SlackChannel } from '../vendors/slack/slackService.types'
+import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 
 const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 if (!TOGETHER_AI_KEY) {
@@ -59,6 +59,9 @@ type GetAssistantCompletionArgs = {
   topP?: number
 }
 
+/**
+ * @deprecated This service is deprecated. Use `LlmService` from `src/llm/services/llm.service` instead.
+ */
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name)
