@@ -21,11 +21,7 @@ import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { ViabilityService } from 'src/pathToVictory/services/viability.service'
-import {
-  PathToVictoryInput,
-  ViabilityScore,
-} from 'src/pathToVictory/types/pathToVictory.types'
+import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
 import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
@@ -62,7 +58,6 @@ export class QueueConsumerService {
     private readonly aiContentService: AiContentService,
     private readonly slackService: SlackService,
     private readonly pathToVictoryService: PathToVictoryService,
-    private readonly viabilityService: ViabilityService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
@@ -405,7 +400,20 @@ export class QueueConsumerService {
     let campaign: (Campaign & { pathToVictory: PathToVictory | null }) | null =
       null
 
+    const {
+      slug,
+      officeName,
+      electionLevel,
+      electionState,
+      subAreaName,
+      subAreaValue,
+      electionDate,
+    } = message
+
     try {
+      this.logger.debug(
+        `P2V start for slug=${slug}, office="${officeName}", level=${electionLevel}, state=${electionState}, subAreaName=${subAreaName}, subAreaValue=${subAreaValue}, electionDate=${electionDate}`,
+      )
       const p2vResponse: P2VResponse =
         await this.pathToVictoryService.handlePathToVictory({
           ...message,
@@ -439,55 +447,47 @@ export class QueueConsumerService {
           partisanType: (p2vResponse.partisanType as string) || '',
           priorElectionDates:
             (p2vResponse.priorElectionDates as string[]) || [],
+          positionId: p2vResponse.positionId as string | undefined,
         },
       )
     } catch (e) {
-      this.logger.error('error in consumer/handlePathToVictoryMessage', e)
+      this.logger.error(
+        `error in consumer/handlePathToVictoryMessage for slug=${message.slug}, office="${message.officeName}"`,
+        e,
+      )
+      // Extra structured context for visibility in logs
+      this.logger.error('P2V context', {
+        slug,
+        officeName,
+        electionLevel,
+        electionState,
+        subAreaName,
+        subAreaValue,
+        electionDate,
+      })
       await this.slackService.errorMessage({
         message: 'error in consumer/handlePathToVictoryMessage',
-        error: e,
+        error: {
+          error: e,
+          context: {
+            slug,
+            officeName,
+            electionLevel,
+            electionState,
+            subAreaName,
+            subAreaValue,
+            electionDate,
+          },
+        },
       })
     }
 
     if (p2vSuccess === false && campaign) {
+      this.logger.error(
+        `analyzePathToVictoryResponse returned false; slug=${campaign.slug}`,
+      )
       await this.handlePathToVictoryFailure(campaign)
       throw new Error('error in consumer/handlePathToVictoryMessage')
-    }
-
-    // Calculate viability score after a valid path to victory response
-    let viability: ViabilityScore | null = null
-    try {
-      viability = await this.viabilityService.calculateViabilityScore(
-        Number(message.campaignId),
-      )
-    } catch (e) {
-      this.logger.error('error calculating viability score', e)
-    }
-
-    if (viability) {
-      const pathToVictory = await this.pathToVictoryService.findUnique({
-        where: { campaignId: Number(message.campaignId) },
-      })
-
-      if (pathToVictory) {
-        const data = pathToVictory.data || {}
-        await this.pathToVictoryService.update({
-          where: { id: pathToVictory.id },
-          data: {
-            data: {
-              ...data,
-              viability,
-            },
-          },
-        })
-      }
-      this.logger.debug('viability', viability)
-      await this.slackService.message(
-        {
-          body: `Viability score calculated for ${campaign?.slug}: ${viability.score}`,
-        },
-        SlackChannel.botPathToVictory,
-      )
     }
 
     return true

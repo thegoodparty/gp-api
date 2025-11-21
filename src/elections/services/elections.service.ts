@@ -14,6 +14,8 @@ import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
+  DistrictNameItem,
+  DistrictTypeItem,
   PositionWithMatchedDistrict,
   ProjectedTurnout,
   RaceTargetMetrics,
@@ -261,7 +263,7 @@ export class ElectionsService {
       excludeInvalid: shouldExclude,
       ...(shouldExclude ? { electionYear } : {}),
     }
-    return await this.electionApiGet(
+    return await this.electionApiGet<DistrictTypeItem[], typeof query>(
       ElectionApiRoutes.districts.types.path,
       query,
     )
@@ -280,7 +282,7 @@ export class ElectionsService {
       excludeInvalid: shouldExclude,
       ...(shouldExclude ? { electionYear } : {}),
     }
-    return await this.electionApiGet(
+    return await this.electionApiGet<DistrictNameItem[], typeof query>(
       ElectionApiRoutes.districts.names.path,
       query,
     )

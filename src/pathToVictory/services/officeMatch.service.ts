@@ -1,20 +1,186 @@
+import { ElectionLevel } from '@/campaigns/campaigns.types'
 import { Injectable, Logger } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
-import { SlackService } from '../../vendors/slack/services/slack.service'
-import { SlackChannel } from '../../vendors/slack/slackService.types'
-import { AiService } from '../../ai/ai.service'
-import { ElectionType } from '@prisma/client'
+import { getYear } from 'date-fns'
 import {
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
 } from 'openai/resources/chat/completions'
-import { VotersService } from '../../voters/services/voters.service'
 import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
+import { ElectionsService } from 'src/elections/services/elections.service'
+import { parseJsonString } from 'src/shared/util/zod.util'
+import { z } from 'zod'
+import { AiService } from '../../ai/ai.service'
+import { PrismaService } from '../../prisma/prisma.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 
 interface SearchColumnResult {
   column: string
   value: string
 }
+
+// -------------------------
+// Constants and Enums
+// -------------------------
+
+enum OfficeCategory {
+  Judicial = 'Judicial',
+  Education = 'Education',
+  City = 'City',
+  County = 'County',
+  State = 'State',
+}
+
+const ELECTION_LEVEL_LOWER = Object.freeze({
+  city: 'city',
+  local: 'local',
+  county: 'county',
+})
+
+const L2_DISTRICT_TYPES = Object.freeze({
+  US_CONGRESSIONAL_DISTRICT: 'US_Congressional_District',
+  STATE_SENATE_DISTRICT: 'State_Senate_District',
+  STATE_HOUSE_DISTRICT: 'State_House_District',
+  COUNTY: 'County',
+  TOWNSHIP: 'Township',
+  TOWN_DISTRICT: 'Town_District',
+  TOWN_COUNCIL: 'Town_Council',
+  HAMLET_COMMUNITY_AREA: 'Hamlet_Community_Area',
+  VILLAGE: 'Village',
+  BOROUGH: 'Borough',
+  BOROUGH_WARD: 'Borough_Ward',
+  CITY: 'City',
+  CITY_COUNCIL_COMMISSIONER_DISTRICT: 'City_Council_Commissioner_District',
+  CITY_WARD: 'City_Ward',
+  COUNTY_SUPERVISORIAL_DISTRICT: 'County_Supervisorial_District',
+  COUNTY_COMMISSIONER_DISTRICT: 'County_Commissioner_District',
+  COUNTY_LEGISLATIVE_DISTRICT: 'County_Legislative_District',
+  PRECINCT: 'Precinct',
+  TOWN_WARD: 'Town_Ward',
+  TOWNSHIP_WARD: 'Township_Ward',
+  VILLAGE_WARD: 'Village_Ward',
+})
+
+const KEYWORDS = Object.freeze({
+  PRESIDENT_OF_US: 'President of the United States',
+  SENATE: 'Senate',
+  SENATOR: 'Senator',
+  HOUSE: 'House',
+  ASSEMBLY: 'Assembly',
+  REPRESENTATIVE: 'Representative',
+  TOWNSHIP: 'Township',
+  TWP: 'TWP',
+  VILLAGE: 'Village',
+  VLG: 'VLG',
+  HAMLET: 'Hamlet',
+  BOROUGH: 'Borough',
+  COMMISSION: 'Commission',
+  COUNCIL: 'Council',
+  SUPERVISOR: 'Supervisor',
+  COMMISSIONER: 'Commissioner',
+  PRECINCT: 'Precinct',
+})
+
+const DISTRICT_WORDS = Object.freeze([
+  'District',
+  'Ward',
+  'Precinct',
+  'Subdistrict',
+  'Division',
+  'Circuit',
+  'Position',
+  'Seat',
+  'Place',
+  'Group',
+  'Courthouse',
+  'Court',
+  'Department',
+  'Area',
+  'Office',
+  'Post',
+])
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const DISTRICT_WORDS_PATTERN = new RegExp(
+  `\\b(${[...DISTRICT_WORDS]
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegex)
+    .join('|')})\\s+([0-9]+)`,
+  'i',
+)
+
+const AI_TOOL = Object.freeze({
+  MATCH_COLUMNS: 'match_columns',
+  MATCH_LABELS: 'matchLabels',
+})
+
+const AI_JSON = Object.freeze({
+  COLUMNS: 'columns',
+  MATCHED_LABEL: 'matchedLabel',
+})
+
+const OPENAI_ROLE = Object.freeze({
+  SYSTEM: 'system',
+  USER: 'user',
+})
+
+const MATCH_COLUMNS_SYSTEM_PROMPT =
+  'You are a political assistant whose job is to find the top 5 columns that match the office name (ordered by the most likely at the top). The provided Columns list is ALREADY ORDERED by priority and specificity; strongly prefer earlier items and only choose later ones if earlier ones are not applicable. If none of the labels are a good match then you will return an empty column array. Make sure you only return columns that are extremely relevant. For Example: for a City Council position you would not return a State position or a School District position. Please return valid JSON only. Do not return more than 5 columns.'
+
+const CATEGORY_SEARCH_MAP: Record<OfficeCategory, string[]> = {
+  [OfficeCategory.Judicial]: [
+    'Judicial',
+    'Judge',
+    'Attorney',
+    'Court',
+    'Justice',
+  ],
+  [OfficeCategory.Education]: [
+    'Education',
+    'School',
+    'College',
+    'University',
+    'Elementary',
+  ],
+  [OfficeCategory.City]: [
+    'City Council',
+    'City Mayor',
+    'City Clerk',
+    'City Treasurer',
+    'City Commission',
+  ],
+  [OfficeCategory.County]: [
+    'County Commission',
+    'County Supervisor',
+    'County Legislative',
+    'County Board',
+  ],
+  [OfficeCategory.State]: [
+    'U.S. Congress',
+    'U.S. Senate',
+    'U.S. House',
+    'U.S. Representative',
+    'U.S. Senator',
+    'Senate',
+    'State House',
+    'House of Representatives',
+    'State Assembly',
+    'State Representative',
+    'State Senator',
+  ],
+}
+
+// -------------------------
+// Schemas
+// -------------------------
+
+const MatchColumnsResponseSchema = z.object({
+  [AI_JSON.COLUMNS]: z.array(z.string()).max(5),
+})
+
+const MatchLabelResponseSchema = z.object({
+  [AI_JSON.MATCHED_LABEL]: z.string(),
+})
 
 @Injectable()
 export class OfficeMatchService {
@@ -24,71 +190,228 @@ export class OfficeMatchService {
     private prisma: PrismaService,
     private slack: SlackService,
     private aiService: AiService,
-    private votersService: VotersService,
+    private elections: ElectionsService,
   ) {}
 
-  async searchMiscDistricts(
+  async searchDistrictTypes(
     slug: string,
     officeName: string,
-    electionLevel: string,
+    electionLevel: ElectionLevel,
     electionState: string,
+    subAreaName?: string,
+    subAreaValue?: string,
   ): Promise<string[]> {
-    let searchColumns: string[] = []
-    try {
-      this.logger.debug(`Searching misc districts for ${officeName}`)
-      searchColumns = await this.findMiscDistricts(
-        slug,
-        officeName,
-        electionState,
-        electionLevel,
-      )
+    // 1) Pull valid district types from Elections API (state/year aware)
+    const districtTypes = await this.getValidDistrictTypes(slug, electionState)
+    if (districtTypes.length === 0) return []
 
-      this.logger.debug('miscDistricts', searchColumns)
-      return searchColumns
-    } catch (error) {
-      this.logger.error('error', error)
-    }
-    return searchColumns
+    // 2) Build candidate list using ONLY API-provided types, ordered by heuristics
+    const orderedCandidates = await this.buildOrderedCandidateColumns(
+      slug,
+      officeName,
+      electionLevel,
+      districtTypes,
+      subAreaName,
+      subAreaValue,
+    )
+
+    // 3) Use AI to select the top 1-5 best matching district type columns
+    const foundDistrictTypes = await this.selectBestDistrictTypesWithAi(
+      slug,
+      Array.from(orderedCandidates),
+      officeName,
+      districtTypes,
+    )
+
+    this.logger.debug(
+      `searchDistrictTypes: returning ${foundDistrictTypes.length} matched district types: ${JSON.stringify(foundDistrictTypes)}`,
+    )
+    return foundDistrictTypes
   }
 
+  // Step 1 helper: Pull valid district types from Elections API (state/year aware)
+  private async getValidDistrictTypes(
+    slug: string,
+    electionState: string,
+  ): Promise<string[]> {
+    let districtTypes: string[] = []
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { slug },
+      select: { details: true },
+    })
+    const details = campaign?.details as { electionDate?: string } | undefined
+    const electionYear = details?.electionDate
+      ? getYear(details?.electionDate)
+      : undefined
+    if (!electionYear) {
+      await this.slack.message(
+        {
+          body: `Error! ${slug} Campaign must have an electionDate to be given an L2 district`,
+        },
+        SlackChannel.botPathToVictoryIssues,
+      )
+      return []
+    }
+    try {
+      const apiRes = await this.elections.getValidDistrictTypes(
+        electionState,
+        electionYear,
+      )
+      districtTypes =
+        (apiRes ?? []).map((r) => r.L2DistrictType).filter(Boolean) || []
+    } catch (e) {
+      const msg = `Election API error fetching district types: ${e instanceof Error ? e.message : String(e)}`
+      this.logger.error(msg)
+    }
+
+    districtTypes = districtTypes.filter((t) => t && t !== '')
+    this.logger.debug(
+      `searchDistrictTypes: received ${districtTypes.length} API district types for state=${electionState}`,
+    )
+
+    if (districtTypes.length === 0) {
+      await this.slack.message(
+        {
+          body: `Error! ${slug} No district types returned by Election API for state ${electionState}.`,
+        },
+        SlackChannel.botPathToVictoryIssues,
+      )
+      return []
+    }
+
+    return districtTypes
+  }
+
+  // Step 2 helper: Build candidate list using ONLY API-provided types, ordered by heuristics
+  private async buildOrderedCandidateColumns(
+    slug: string,
+    officeName: string,
+    electionLevel: ElectionLevel,
+    districtTypes: string[],
+    subAreaName?: string,
+    subAreaValue?: string,
+  ): Promise<Set<string>> {
+    const category = this.getOfficeCategory(officeName, electionLevel)
+    this.logger.debug(
+      `searchDistrictTypes: inferred category=${category} for office="${officeName}" level=${electionLevel}`,
+    )
+
+    const base = await this.determineSearchColumns(
+      slug,
+      electionLevel,
+      officeName,
+    )
+    const heuristicLevelTypes = base.filter((t) => districtTypes.includes(t))
+    this.logger.debug(
+      `searchDistrictTypes: heuristicLevelTypes=${JSON.stringify(heuristicLevelTypes)}`,
+    )
+
+    let subColumns: string[] = []
+    const districtValue = this.getDistrictValue(
+      slug,
+      officeName,
+      subAreaName,
+      subAreaValue,
+    )
+    if (
+      electionLevel !== ElectionLevel.federal &&
+      electionLevel !== ElectionLevel.state &&
+      heuristicLevelTypes.length > 0 &&
+      districtValue
+    ) {
+      const subs = this.determineElectionDistricts(
+        slug,
+        heuristicLevelTypes,
+        officeName,
+      )
+      subColumns = subs.filter((t) => districtTypes.includes(t))
+    }
+    this.logger.debug(
+      `searchDistrictTypes: subColumns=${JSON.stringify(subColumns)} (districtValue=${districtValue})`,
+    )
+
+    let filteredDistrictTypes: string[] = districtTypes
+    if (category) {
+      const cat = category.toLowerCase()
+      const filtered = districtTypes.filter((t) =>
+        String(t).toLowerCase().includes(cat),
+      )
+      if (filtered.length > 0) {
+        filteredDistrictTypes = filtered
+      }
+    }
+    this.logger.debug(
+      `searchDistrictTypes: categoryTypes (post-filter) size=${filteredDistrictTypes.length}`,
+    )
+
+    const orderedDistrictTypes = new Set<string>()
+    const pushInOrder = (arr: string[]) => {
+      for (const t of arr) {
+        orderedDistrictTypes.add(t)
+      }
+    }
+    pushInOrder(subColumns)
+    pushInOrder(filteredDistrictTypes)
+    pushInOrder(heuristicLevelTypes)
+    pushInOrder(districtTypes)
+    this.logger.debug(
+      `searchDistrictTypes: orderedCandidates size=${orderedDistrictTypes.size}`,
+    )
+    return orderedDistrictTypes
+  }
+
+  // Step 3 helper: Use AI to select the top 1-5 best matching district type columns
+  private async selectBestDistrictTypesWithAi(
+    slug: string,
+    orderedCandidates: string[],
+    officeName: string,
+    districtTypes: string[],
+  ): Promise<string[]> {
+    const matchResp = await this.matchSearchColumns(
+      orderedCandidates,
+      officeName,
+    )
+
+    let foundDistrictTypes: string[] = []
+    if (matchResp?.content) {
+      const parsedResult = parseJsonString(
+        MatchColumnsResponseSchema,
+        'Invalid match columns JSON',
+      ).safeParse(matchResp.content)
+      if (parsedResult.success) {
+        const strings = parsedResult.data[AI_JSON.COLUMNS]
+        if (strings.length > 0) {
+          foundDistrictTypes = strings.filter((c) => districtTypes.includes(c))
+        } else {
+          await this.slack.message(
+            {
+              body: `Received invalid response while finding district types for ${officeName}. columns: ${JSON.stringify(strings)}. Raw Content: ${matchResp.content}`,
+            },
+            SlackChannel.botDev,
+          )
+        }
+      } else {
+        await this.slack.message(
+          {
+            body: `Received invalid response while finding district types for ${officeName}. Raw Content: ${matchResp.content}`,
+          },
+          SlackChannel.botDev,
+        )
+      }
+    } else {
+      this.logger.debug(
+        `searchDistrictTypes: AI matching returned no content for office="${officeName}"`,
+      )
+    }
+    return foundDistrictTypes
+  }
   private getOfficeCategory(
     officeName: string,
     electionLevel: string,
   ): string | undefined {
-    const searchMap = {
-      Judicial: ['Judicial', 'Judge', 'Attorney', 'Court', 'Justice'],
-      Education: ['Education', 'School', 'College', 'University', 'Elementary'],
-      City: [
-        'City Council',
-        'City Mayor',
-        'City Clerk',
-        'City Treasurer',
-        'City Commission',
-      ],
-      County: [
-        'County Commission',
-        'County Supervisor',
-        'County Legislative',
-        'County Board',
-      ],
-      State: [
-        'U.S. Congress',
-        'U.S. Senate',
-        'U.S. House',
-        'U.S. Representative',
-        'U.S. Senator',
-        'Senate',
-        'State House',
-        'House of Representatives',
-        'State Assembly',
-        'State Representative',
-        'State Senator',
-      ],
-    }
-
     let category: string | undefined
 
-    for (const [key, value] of Object.entries(searchMap)) {
+    for (const [key, value] of Object.entries(CATEGORY_SEARCH_MAP)) {
       for (const search of value) {
         if (officeName.toLowerCase().includes(search.toLowerCase())) {
           category = key
@@ -100,94 +423,20 @@ export class OfficeMatchService {
 
     if (!category) {
       const lowerElectionLevel = electionLevel.toLowerCase()
-      if (lowerElectionLevel === 'city' || lowerElectionLevel === 'local') {
-        category = 'City'
-      } else if (lowerElectionLevel === 'county') {
-        category = 'County'
+      if (
+        lowerElectionLevel === ELECTION_LEVEL_LOWER.city ||
+        lowerElectionLevel === ELECTION_LEVEL_LOWER.local
+      ) {
+        category = OfficeCategory.City
+      } else if (lowerElectionLevel === ELECTION_LEVEL_LOWER.county) {
+        category = OfficeCategory.County
       }
     }
 
     return category
   }
 
-  private async findMiscDistricts(
-    slug: string,
-    officeName: string,
-    state: string,
-    electionLevel: string,
-  ): Promise<string[]> {
-    const category = this.getOfficeCategory(officeName, electionLevel)
-    this.logger.debug(
-      `Determined category: ${category} for office ${officeName}`,
-    )
-
-    let results: ElectionType[] = []
-    if (category) {
-      results = await this.prisma.electionType.findMany({
-        where: {
-          state: state,
-          category: category,
-        },
-      })
-    }
-
-    if (results.length === 0) {
-      results = await this.prisma.electionType.findMany({
-        where: {
-          state: state,
-        },
-      })
-    }
-
-    if (results.length === 0) {
-      this.logger.error(
-        `No ElectionType results found for state ${state}. You may need to run seed election-types.`,
-      )
-      await this.slack.message(
-        {
-          body: `Error! ${slug} No ElectionType results found for state ${state}. You may need to run seed election-types.`,
-        },
-        SlackChannel.botPathToVictoryIssues,
-      )
-      return []
-    }
-
-    const miscellaneousDistricts = results
-      .filter((result) => result.name && result.category)
-      .map((result) => result.name)
-
-    const matchResp = await this.matchSearchColumns(
-      slug,
-      miscellaneousDistricts,
-      officeName,
-    )
-
-    let foundMiscDistricts: string[] = []
-    if (matchResp?.content) {
-      try {
-        const contentJson = JSON.parse(matchResp.content)
-        const columns = contentJson?.columns || []
-
-        if (Array.isArray(columns) && columns.length > 0) {
-          foundMiscDistricts = columns
-        } else {
-          await this.slack.message(
-            {
-              body: `Received invalid response while finding misc districts for ${officeName}. columns: ${columns}. typeof columns: ${typeof columns}. Raw Content: ${matchResp.content}`,
-            },
-            SlackChannel.botDev,
-          )
-        }
-      } catch (e) {
-        this.logger.error('Error parsing matchResp', e)
-      }
-    }
-
-    return foundMiscDistricts
-  }
-
   private async matchSearchColumns(
-    slug: string,
     searchColumns: string[],
     searchString: string,
   ) {
@@ -198,12 +447,12 @@ export class OfficeMatchService {
     const matchColumnTool: ChatCompletionTool = {
       type: 'function',
       function: {
-        name: 'match_columns',
+        name: AI_TOOL.MATCH_COLUMNS,
         description: 'Determine the columns that best match the office name.',
         parameters: {
           type: 'object',
           properties: {
-            columns: {
+            [AI_JSON.COLUMNS]: {
               type: 'array',
               items: {
                 type: 'string',
@@ -213,25 +462,24 @@ export class OfficeMatchService {
               maxItems: 5,
             },
           },
-          required: ['columns'],
+          required: [AI_JSON.COLUMNS],
         },
       },
     }
 
     const toolChoice: ChatCompletionNamedToolChoice = {
       type: 'function',
-      function: { name: 'match_columns' },
+      function: { name: AI_TOOL.MATCH_COLUMNS },
     }
 
     return await this.aiService.getChatToolCompletion({
       messages: [
         {
-          role: 'system',
-          content:
-            'You are a political assistant whose job is to find the top 5 columns that match the office name (ordered by the most likely at the top). If none of the labels are a good match then you will return an empty column array. Make sure you only return columns that are extremely relevant. For Example: for a City Council position you would not return a State position or a School District position. Please return valid JSON only. Do not return more than 5 columns.',
+          role: OPENAI_ROLE.SYSTEM as AiChatMessage['role'],
+          content: MATCH_COLUMNS_SYSTEM_PROMPT,
         },
         {
-          role: 'user',
+          role: OPENAI_ROLE.USER as AiChatMessage['role'],
           content: `Find the top 5 columns that matches the following office: "${searchString}.\n\nColumns: ${searchColumns}"`,
         },
       ],
@@ -257,7 +505,8 @@ export class OfficeMatchService {
         officeName,
       )
     } catch (error) {
-      this.logger.error('error', error)
+      const msg = `Error determining search columns: ${error instanceof Error ? error.message : String(error)}`
+      this.logger.error(msg)
     }
 
     const districtValue = this.getDistrictValue(
@@ -269,8 +518,8 @@ export class OfficeMatchService {
 
     let subColumns: string[] = []
     if (
-      electionLevel !== 'federal' &&
-      electionLevel !== 'state' &&
+      electionLevel !== ElectionLevel.federal &&
+      electionLevel !== ElectionLevel.state &&
       searchColumns.length > 0 &&
       districtValue
     ) {
@@ -301,21 +550,28 @@ export class OfficeMatchService {
     // This district map is used to determine which sub columns to search for.
     // it was provided by L2.
     const districtMap: Record<string, string[]> = {
-      Borough: ['Borough_Ward'],
-      City:
-        officeName.includes('Commission') || officeName.includes('Council')
-          ? ['City_Council_Commissioner_District', 'City_Ward']
-          : ['City_Ward'],
-      County: officeName.includes('Supervisor')
-        ? ['County_Supervisorial_District']
-        : officeName.includes('Commissioner')
-          ? ['County_Commissioner_District', 'County_Legislative_District']
-          : officeName.includes('Precinct')
-            ? ['Precinct']
-            : ['County_Commissioner_District'],
-      Town_District: ['Town_Ward'],
-      Township: ['Township_Ward'],
-      Village: ['Village_Ward'],
+      [L2_DISTRICT_TYPES.BOROUGH]: [L2_DISTRICT_TYPES.BOROUGH_WARD],
+      [L2_DISTRICT_TYPES.CITY]:
+        officeName.includes(KEYWORDS.COMMISSION) ||
+        officeName.includes(KEYWORDS.COUNCIL)
+          ? [
+              L2_DISTRICT_TYPES.CITY_COUNCIL_COMMISSIONER_DISTRICT,
+              L2_DISTRICT_TYPES.CITY_WARD,
+            ]
+          : [L2_DISTRICT_TYPES.CITY_WARD],
+      [L2_DISTRICT_TYPES.COUNTY]: officeName.includes(KEYWORDS.SUPERVISOR)
+        ? [L2_DISTRICT_TYPES.COUNTY_SUPERVISORIAL_DISTRICT]
+        : officeName.includes(KEYWORDS.COMMISSIONER)
+          ? [
+              L2_DISTRICT_TYPES.COUNTY_COMMISSIONER_DISTRICT,
+              L2_DISTRICT_TYPES.COUNTY_LEGISLATIVE_DISTRICT,
+            ]
+          : officeName.includes(KEYWORDS.PRECINCT)
+            ? [L2_DISTRICT_TYPES.PRECINCT]
+            : [L2_DISTRICT_TYPES.COUNTY_COMMISSIONER_DISTRICT],
+      [L2_DISTRICT_TYPES.TOWN_DISTRICT]: [L2_DISTRICT_TYPES.TOWN_WARD],
+      [L2_DISTRICT_TYPES.TOWNSHIP]: [L2_DISTRICT_TYPES.TOWNSHIP_WARD],
+      [L2_DISTRICT_TYPES.VILLAGE]: [L2_DISTRICT_TYPES.VILLAGE_WARD],
     }
 
     for (const column of searchColumns) {
@@ -339,42 +595,70 @@ export class OfficeMatchService {
     )
     let searchColumns: string[] = []
 
-    if (electionLevel === 'federal') {
-      if (officeName.includes('President of the United States')) {
+    if (electionLevel === ElectionLevel.federal) {
+      if (officeName.includes(KEYWORDS.PRESIDENT_OF_US)) {
         searchColumns = ['']
       } else {
-        searchColumns = ['US_Congressional_District']
+        searchColumns = [L2_DISTRICT_TYPES.US_CONGRESSIONAL_DISTRICT]
       }
-    } else if (electionLevel === 'state') {
-      if (officeName.includes('Senate') || officeName.includes('Senator')) {
-        searchColumns = ['State_Senate_District']
-      } else if (
-        officeName.includes('House') ||
-        officeName.includes('Assembly') ||
-        officeName.includes('Representative')
+    } else if (electionLevel === ElectionLevel.state) {
+      if (
+        officeName.includes(KEYWORDS.SENATE) ||
+        officeName.includes(KEYWORDS.SENATOR)
       ) {
-        searchColumns = ['State_House_District']
+        searchColumns = [L2_DISTRICT_TYPES.STATE_SENATE_DISTRICT]
+      } else if (
+        officeName.includes(KEYWORDS.HOUSE) ||
+        officeName.includes(KEYWORDS.ASSEMBLY) ||
+        officeName.includes(KEYWORDS.REPRESENTATIVE)
+      ) {
+        searchColumns = [L2_DISTRICT_TYPES.STATE_HOUSE_DISTRICT]
       }
-    } else if (electionLevel === 'county') {
-      searchColumns = ['County']
-    } else if (electionLevel === 'city' || electionLevel === 'local') {
-      if (officeName.includes('Township') || officeName.includes('TWP')) {
-        searchColumns = ['Township', 'Town_District', 'Town_Council']
-      } else if (officeName.includes('Village') || officeName.includes('VLG')) {
-        searchColumns = ['Village', 'City', 'Town_District']
-      } else if (officeName.includes('Hamlet')) {
-        searchColumns = ['Hamlet_Community_Area', 'City', 'Town_District']
-      } else if (officeName.includes('Borough')) {
-        searchColumns = ['Borough', 'City', 'Town_District']
+    } else if (electionLevel === ElectionLevel.county) {
+      searchColumns = [L2_DISTRICT_TYPES.COUNTY]
+    } else if (
+      electionLevel === ElectionLevel.city ||
+      String(electionLevel).toLowerCase() === ELECTION_LEVEL_LOWER.local
+    ) {
+      if (
+        officeName.includes(KEYWORDS.TOWNSHIP) ||
+        officeName.includes(KEYWORDS.TWP)
+      ) {
+        searchColumns = [
+          L2_DISTRICT_TYPES.TOWNSHIP,
+          L2_DISTRICT_TYPES.TOWN_DISTRICT,
+          L2_DISTRICT_TYPES.TOWN_COUNCIL,
+        ]
+      } else if (
+        officeName.includes(KEYWORDS.VILLAGE) ||
+        officeName.includes(KEYWORDS.VLG)
+      ) {
+        searchColumns = [
+          L2_DISTRICT_TYPES.VILLAGE,
+          L2_DISTRICT_TYPES.CITY,
+          L2_DISTRICT_TYPES.TOWN_DISTRICT,
+        ]
+      } else if (officeName.includes(KEYWORDS.HAMLET)) {
+        searchColumns = [
+          L2_DISTRICT_TYPES.HAMLET_COMMUNITY_AREA,
+          L2_DISTRICT_TYPES.CITY,
+          L2_DISTRICT_TYPES.TOWN_DISTRICT,
+        ]
+      } else if (officeName.includes(KEYWORDS.BOROUGH)) {
+        searchColumns = [
+          L2_DISTRICT_TYPES.BOROUGH,
+          L2_DISTRICT_TYPES.CITY,
+          L2_DISTRICT_TYPES.TOWN_DISTRICT,
+        ]
       } else {
         searchColumns = [
-          'City',
-          'Town_District',
-          'Town_Council',
-          'Hamlet_Community_Area',
-          'Village',
-          'Borough',
-          'Township',
+          L2_DISTRICT_TYPES.CITY,
+          L2_DISTRICT_TYPES.TOWN_DISTRICT,
+          L2_DISTRICT_TYPES.TOWN_COUNCIL,
+          L2_DISTRICT_TYPES.HAMLET_COMMUNITY_AREA,
+          L2_DISTRICT_TYPES.VILLAGE,
+          L2_DISTRICT_TYPES.BOROUGH,
+          L2_DISTRICT_TYPES.TOWNSHIP,
         ]
       }
     } else {
@@ -394,46 +678,30 @@ export class OfficeMatchService {
     subAreaName?: string,
     subAreaValue?: string,
   ): string | undefined {
-    const districtWords = [
-      'District',
-      'Ward',
-      'Precinct',
-      'Subdistrict',
-      'Division',
-      'Circuit',
-      'Position',
-      'Seat',
-      'Place',
-      'Group',
-      'Court',
-      'Courthouse',
-      'Department',
-      'Area',
-      'Office',
-      'Post',
-    ]
-
     this.logger.debug(
       `getting DistrictValue: ${officeName}. subAreaName: ${subAreaName}. subAreaValue: ${subAreaValue}`,
     )
 
     let districtValue: string | undefined
     if (subAreaName || subAreaValue) {
-      if (!subAreaValue && !isNaN(Number(subAreaValue))) {
-        for (const word of districtWords) {
-          if (officeName.includes(word)) {
-            const regex = new RegExp(`${word} ([0-9]+)`)
-            const match = officeName.match(regex)
-            if (match) {
-              districtValue = match[1]
-            } else {
-              // could not find a district number in officeName, it's probably a word like a county.
-              districtValue = subAreaValue
-            }
-          }
+      const subAreaIsNumeric =
+        subAreaValue !== undefined &&
+        subAreaValue !== null &&
+        String(subAreaValue).trim() !== '' &&
+        !isNaN(Number(subAreaValue))
+
+      if (!subAreaIsNumeric) {
+        // subAreaValue is missing or not numeric, try to parse number from officeName
+        const match = officeName.match(DISTRICT_WORDS_PATTERN)
+        if (match) {
+          districtValue = match[2]
+        }
+        // If still not found, use subAreaValue as a fallback (might be a named area like a county)
+        if (!districtValue && subAreaValue) {
+          districtValue = subAreaValue
         }
       } else {
-        // subAreaValue is a number lets use that.
+        // subAreaValue is numeric; use it directly
         districtValue = subAreaValue
       }
     }
@@ -451,6 +719,7 @@ export class OfficeMatchService {
     electionState: string,
     searchString: string,
     searchString2: string = '',
+    electionDate: string,
   ): Promise<SearchColumnResult | undefined> {
     let foundColumn: SearchColumnResult | undefined
     try {
@@ -460,13 +729,27 @@ export class OfficeMatchService {
 
       this.logger.debug(`searching for ${search}`)
 
-      let searchValues = await this.votersService.querySearchColumn(
+      const electionYear = getYear(electionDate)
+      if (!electionYear) {
+        await this.slack.message(
+          {
+            body: `Error! ${slug} Campaign must have an electionDate to be given an L2 district`,
+          },
+          SlackChannel.botPathToVictoryIssues,
+        )
+        return
+      }
+      const apiRes = await this.elections.getValidDistrictNames(
         searchColumn,
         electionState,
+        electionYear,
       )
+      const searchValues: string[] =
+        (apiRes ?? [])
+          .map((r) => r.L2DistrictName)
+          .filter((value) => value !== '') || []
 
       // strip out any searchValues that are blank strings
-      searchValues = searchValues.filter((value) => value !== '')
 
       this.logger.debug(
         `found ${searchValues.length} searchValues for ${searchColumn}`,
@@ -496,7 +779,8 @@ export class OfficeMatchService {
 
       this.logger.debug('getSearchColumn foundColumn', foundColumn)
     } catch (error) {
-      this.logger.error('Error in getSearchColumn', error)
+      const msg = `Error in getSearchColumn: ${error instanceof Error ? error.message : String(error)}`
+      this.logger.error(msg)
       return undefined
     }
 
@@ -511,24 +795,24 @@ export class OfficeMatchService {
     const matchLabelsTool: ChatCompletionTool = {
       type: 'function',
       function: {
-        name: 'matchLabels',
+        name: AI_TOOL.MATCH_LABELS,
         description: 'Determine the label that closely matches the input.',
         parameters: {
           type: 'object',
           properties: {
-            matchedLabel: {
+            [AI_JSON.MATCHED_LABEL]: {
               type: 'string',
               description: 'The label that closely matches the input.',
             },
           },
-          required: ['matchedLabel'],
+          required: [AI_JSON.MATCHED_LABEL],
         },
       },
     }
 
     const toolChoice: ChatCompletionNamedToolChoice = {
       type: 'function',
-      function: { name: 'matchLabels' },
+      function: { name: AI_TOOL.MATCH_LABELS },
     }
 
     const messages = [
@@ -543,18 +827,18 @@ export class OfficeMatchService {
           matchedLabel: ''
         }
         Example Input: 'San Clemente City Council District 1 - San Clemente- CA'
-        Example Labels: 'CA####ALHAMBRA CITY CNCL 1'\n 'CA####BELLFLOWER CITY CNCL 1'\n 'CA####SAN CLEMENTE CITY CNCL 1'\n
+        Example Labels: 'ALHAMBRA CITY CNCL 1'\n 'BELLFLOWER CITY CNCL 1'\n 'SAN CLEMENTE CITY CNCL 1'\n
         Example Output:
         {
-          matchedLabel: 'CA####SAN CLEMENTE CITY CNCL 1'
+          matchedLabel: 'SAN CLEMENTE CITY CNCL 1'
         }
         Example Input: 'California State Senate District 5 - CA'
-        Example Labels: 'CA##04'\n 'CA##05'\n 'CA##06'\n
+        Example Labels: '04'\n '05'\n '06'\n
         Example Output: {
-          matchedLabel: 'CA##05'
+          matchedLabel: '05'
         }
         Example Input: 'Maine Village Board Chair - Wisconsin'
-        Example Labels: 'WI##MARATHON COMM COLL DIST'\n 'WI##MARINETTE COMM COLL DIST'\n 'WI##MARQUETTE COMM COLL DIST'\n
+        Example Labels: 'MARATHON COMM COLL DIST'\n 'MARINETTE COMM COLL DIST'\n 'MARQUETTE COMM COLL DIST'\n
         Example Output:
         {
              'matchedLabel': '',
@@ -588,17 +872,19 @@ export class OfficeMatchService {
         },
         SlackChannel.botPathToVictoryIssues,
       )
-      this.logger.error('No Response from AI! For', searchValues)
+      this.logger.error(`No Response from AI! For ${String(searchValues)}`)
     }
 
     if (content && content !== '') {
-      try {
-        const data = JSON.parse(content)
-        if (data?.matchedLabel && data.matchedLabel !== '') {
-          return data.matchedLabel.replace(/"/g, '')
+      const parsedResult = parseJsonString(
+        MatchLabelResponseSchema,
+        'Invalid matched label JSON',
+      ).safeParse(content)
+      if (parsedResult.success) {
+        const matched = parsedResult.data.matchedLabel
+        if (matched !== '') {
+          return matched.replace(/"/g, '')
         }
-      } catch (error) {
-        this.logger.error('error parsing AI response', error)
       }
     }
     return undefined
