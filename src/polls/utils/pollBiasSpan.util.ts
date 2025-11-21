@@ -9,14 +9,15 @@ export function normalizeWhitespace(text: string): string {
 }
 
 /**
- * Finds the actual index in the original text given a normalized index.
+ * Finds the actual index and length in the original text given a normalized index.
  * This handles cases where the LLM returns text with different whitespace.
+ * Returns an object with both the start index and the actual length of the match.
  */
-export function findActualIndex(
+export function findActualIndexAndLength(
   originalText: string,
   normalizedSubstring: string,
   normalizedIndex: number,
-): number {
+): { index: number; length: number } | null {
   let normalizedPos = 0
   let actualPos = 0
 
@@ -37,8 +38,20 @@ export function findActualIndex(
   }
 
   if (normalizedPos === normalizedIndex) {
+    if (normalizedSubstring.length === 0) {
+      return { index: actualPos, length: 0 }
+    }
+
+    const firstChar = normalizedSubstring[0]
+    if (
+      actualPos >= originalText.length ||
+      originalText[actualPos].toLowerCase() !== firstChar.toLowerCase()
+    ) {
+      return null
+    }
+
     const remainingSubstring = normalizedSubstring.substring(1)
-    let matchPos = actualPos
+    let matchPos = actualPos + 1
     let matchFound = true
 
     for (let i = 0; i < remainingSubstring.length; i++) {
@@ -63,36 +76,54 @@ export function findActualIndex(
     }
 
     if (matchFound) {
-      return actualPos
+      return { index: actualPos, length: matchPos - actualPos }
     }
   }
 
-  return -1
+  return null
 }
 
 /**
  * Finds the index of a substring in the original text, handling whitespace variations.
+ * Optionally searches from a specific starting position to find subsequent occurrences.
  */
 export function findSubstringIndex(
   substring: string,
   originalText: string,
+  startFrom: number = 0,
 ): number {
   const trimmedSubstring = substring.trim()
-  let index = originalText.indexOf(trimmedSubstring)
+  let index = originalText.indexOf(trimmedSubstring, startFrom)
 
   if (index === -1) {
     const normalizedSubstring = normalizeWhitespace(trimmedSubstring)
     const normalizedText = normalizeWhitespace(originalText)
-    const normalizedIndex = normalizedText.indexOf(normalizedSubstring)
+    let normalizedIndex = normalizedText.indexOf(normalizedSubstring)
 
     if (normalizedIndex !== -1) {
-      const actualIndex = findActualIndex(
+      let result = findActualIndexAndLength(
         originalText,
         normalizedSubstring,
         normalizedIndex,
       )
-      if (actualIndex !== -1) {
-        index = actualIndex
+
+      while (result !== null && result.index < startFrom) {
+        normalizedIndex = normalizedText.indexOf(
+          normalizedSubstring,
+          normalizedIndex + 1,
+        )
+        if (normalizedIndex === -1) {
+          break
+        }
+        result = findActualIndexAndLength(
+          originalText,
+          normalizedSubstring,
+          normalizedIndex,
+        )
+      }
+
+      if (result !== null && result.index >= startFrom) {
+        index = result.index
       }
     }
   }
@@ -152,7 +183,48 @@ export function hasOverlap(
 }
 
 /**
+ * Finds the actual length of a matched substring in the original text.
+ * This accounts for whitespace differences between the input substring and the original text.
+ */
+function findActualMatchLength(
+  originalText: string,
+  startIndex: number,
+  normalizedSubstring: string,
+): number {
+  const normalizedSubstringNormalized = normalizeWhitespace(normalizedSubstring)
+
+  let actualPos = startIndex
+  let matchedLength = 0
+
+  for (let i = 0; i < normalizedSubstringNormalized.length; i++) {
+    const char = normalizedSubstringNormalized[i]
+    if (char === ' ') {
+      while (
+        actualPos < originalText.length &&
+        /\s/.test(originalText[actualPos])
+      ) {
+        actualPos++
+        matchedLength++
+      }
+    } else {
+      if (
+        actualPos < originalText.length &&
+        originalText[actualPos].toLowerCase() === char.toLowerCase()
+      ) {
+        actualPos++
+        matchedLength++
+      } else {
+        break
+      }
+    }
+  }
+
+  return matchedLength > 0 ? matchedLength : normalizedSubstring.length
+}
+
+/**
  * Converts a single span input to a Span with indices.
+ * Tries multiple occurrences if the first one overlaps with existing spans.
  */
 export function convertSpanToIndices(
   spanInput: SpanInput,
@@ -169,43 +241,61 @@ export function convertSpanToIndices(
     return null
   }
 
-  const index = findSubstringIndex(substring, originalText)
+  let searchStart = 0
+  let index = findSubstringIndex(substring, originalText, searchStart)
 
-  if (index === -1) {
-    logger.warn(
-      `Could not find span substring "${substring}" in original text`,
-      {
-        substring,
-        substringLength: substring.length,
-        originalTextLength: originalText.length,
-        originalTextPreview: originalText.substring(0, 200),
-      },
+  while (index !== -1) {
+    const trimmedSubstring = substring.trim()
+    let actualLength = trimmedSubstring.length
+
+    const exactMatch = originalText.substring(
+      index,
+      index + trimmedSubstring.length,
     )
-    return null
-  }
+    if (exactMatch !== trimmedSubstring) {
+      const normalizedSubstring = normalizeWhitespace(trimmedSubstring)
+      actualLength = findActualMatchLength(
+        originalText,
+        index,
+        normalizedSubstring,
+      )
+    }
 
-  const start = index
-  const end = index + substring.length
+    const start = index
+    const end = index + actualLength
 
-  if (!validateSpanBounds(start, end, originalText.length, substring, logger)) {
-    return null
-  }
+    if (
+      !validateSpanBounds(start, end, originalText.length, substring, logger)
+    ) {
+      searchStart = index + 1
+      index = findSubstringIndex(substring, originalText, searchStart)
+      continue
+    }
 
-  if (hasOverlap(start, end, existingSpans)) {
-    logger.warn(`Skipping overlapping span for substring "${substring}"`, {
-      substring,
+    if (hasOverlap(start, end, existingSpans)) {
+      searchStart = index + 1
+      index = findSubstringIndex(substring, originalText, searchStart)
+      continue
+    }
+
+    return {
       start,
       end,
-    })
-    return null
+      reason: spanInput.reason,
+      suggestion: spanInput.suggestion,
+    }
   }
 
-  return {
-    start,
-    end,
-    reason: spanInput.reason,
-    suggestion: spanInput.suggestion,
-  }
+  logger.warn(
+    `Could not find span substring "${substring}" in original text (or all occurrences overlapped)`,
+    {
+      substring,
+      substringLength: substring.length,
+      originalTextLength: originalText.length,
+      originalTextPreview: originalText.substring(0, 200),
+    },
+  )
+  return null
 }
 
 /**
