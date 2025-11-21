@@ -10,14 +10,13 @@ import {
 
 export interface LlmChatCompletionOptions {
   messages: ChatCompletionMessageParam[]
-  model?: string
+  models?: string[]
   temperature?: number
   topP?: number
   maxTokens?: number
   timeout?: number
   userId?: string
   retries?: number
-  fallbackModels?: string[]
 }
 
 export interface LlmToolCompletionOptions extends LlmChatCompletionOptions {
@@ -82,17 +81,16 @@ export class LlmService {
   ): Promise<LlmCompletionResult> {
     const {
       messages,
-      model,
+      models: providedModels,
       temperature = 0.7,
       topP = 1.0,
       maxTokens,
       timeout = this.defaultTimeout,
       userId,
       retries = this.defaultRetries,
-      fallbackModels,
     } = options
 
-    const models = this.prepareModelList(model, fallbackModels)
+    const models = this.prepareModelList(providedModels)
 
     return retry(
       async (bail) => {
@@ -161,21 +159,20 @@ export class LlmService {
       messages,
       tools,
       toolChoice,
-      model,
+      models: providedModels,
       temperature = 0.1,
       topP = 0.1,
       maxTokens,
       timeout = this.defaultTimeout,
       userId,
       retries = this.defaultRetries,
-      fallbackModels,
     } = options
 
     if (!tools || tools.length === 0) {
       throw new Error('Tools must be provided for tool completion')
     }
 
-    const models = this.prepareModelList(model, fallbackModels)
+    const models = this.prepareModelList(providedModels)
 
     return retry(
       async (bail) => {
@@ -250,23 +247,14 @@ export class LlmService {
   }
 
   /**
-   * Prepares a list of models for fallback, using the provided model or default models.
+   * Prepares a list of models for fallback, using the provided models or default models.
    * Utility function for building model fallback chains.
    */
-  prepareModelList(primaryModel?: string, fallbackModels?: string[]): string[] {
-    const models: string[] = []
-
-    if (primaryModel) {
-      models.push(primaryModel)
+  prepareModelList(models?: string[]): string[] {
+    if (models && models.length > 0) {
+      return models
     }
-
-    if (fallbackModels && fallbackModels.length > 0) {
-      models.push(...fallbackModels)
-    } else if (!primaryModel) {
-      models.push(...this.defaultModels)
-    }
-
-    return models.length > 0 ? models : this.defaultModels
+    return this.defaultModels
   }
 
   /**
