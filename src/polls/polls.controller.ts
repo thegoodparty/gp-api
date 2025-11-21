@@ -32,9 +32,12 @@ import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import z from 'zod'
 import { APIPoll, APIPollIssue } from './polls.types'
+import { AnalyzePollBiasDto } from './schemas/analyzePollBias.schema'
 import { CreatePollDto } from './schemas/poll.schema'
+import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PollsService } from './services/polls.service'
+import { BiasAnalysisResponse } from './types/pollBias.types'
 import { pollMessageGroup } from './utils/polls.utils'
 
 class ListPollsQueryDTO extends createZodDto(
@@ -90,6 +93,7 @@ export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
+    private readonly pollBiasAnalysisService: PollBiasAnalysisService,
     private readonly users: UsersService,
     private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
@@ -261,5 +265,16 @@ export class PollsController {
     })
 
     return { signedUrl, publicUrl }
+  }
+
+  @Post('analyze-bias')
+  async analyzePollBias(
+    @ReqUser() user: User,
+    @Body() dto: AnalyzePollBiasDto,
+  ): Promise<BiasAnalysisResponse> {
+    return this.pollBiasAnalysisService.analyzePollText(
+      dto.pollText,
+      user.id.toString(),
+    )
   }
 }
