@@ -238,4 +238,3 @@ export function convertSubstringsToIndices(
 
   return result.sort((a, b) => a.start - b.start)
 }
-
