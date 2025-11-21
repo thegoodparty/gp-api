@@ -40,7 +40,7 @@ export class PollBiasAnalysisService {
     const messages = createPollBiasAnalysisPrompt(pollText)
 
     return retry(
-      async (bail) => {
+      async (bail): Promise<BiasAnalysisResponse> => {
         try {
           const result = await this.llmService.chatCompletion({
             messages,
@@ -53,18 +53,22 @@ export class PollBiasAnalysisService {
 
           return parsed
         } catch (error) {
-          if (!isValidationError(error)) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error)
-            this.logger.error('Error analyzing poll text for bias', {
-              error: errorMessage,
-            })
-            bail(
-              new BadGatewayException('Failed to analyze poll text for bias'),
-            )
+          const errorMessage =
+            error instanceof Error ? error.message : String(error)
+
+          if (isValidationError(error)) {
+            throw error
           }
 
-          throw error
+          this.logger.error('Error analyzing poll text for bias', {
+            error: errorMessage,
+          })
+          bail(new BadGatewayException('Failed to analyze poll text for bias'))
+          return {
+            bias_spans: [],
+            grammar_spans: [],
+            rewritten_text: '',
+          }
         }
       },
       {
