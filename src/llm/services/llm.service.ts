@@ -4,18 +4,9 @@ import { OpenAI } from 'openai'
 import {
   ChatCompletion,
   ChatCompletionMessageParam,
-  ChatCompletionNamedToolChoice,
   ChatCompletionTool,
+  ChatCompletionToolChoiceOption,
 } from 'openai/resources/chat/completions'
-
-const { TOGETHER_AI_KEY, AI_MODELS = '' } = process.env
-
-if (!TOGETHER_AI_KEY) {
-  throw new Error('Please set TOGETHER_AI_KEY in your .env')
-}
-if (!AI_MODELS) {
-  throw new Error('Please set AI_MODELS in your .env')
-}
 
 export interface LlmChatCompletionOptions {
   messages: ChatCompletionMessageParam[]
@@ -31,13 +22,23 @@ export interface LlmChatCompletionOptions {
 
 export interface LlmToolCompletionOptions extends LlmChatCompletionOptions {
   tools?: ChatCompletionTool[]
-  toolChoice?: ChatCompletionNamedToolChoice
+  toolChoice?: ChatCompletionToolChoiceOption
+}
+
+export interface ToolCall {
+  id: string
+  type: string
+  function: {
+    name: string
+    arguments: string
+  }
 }
 
 export interface LlmCompletionResult {
   content: string
   tokens: number
   model?: string
+  toolCalls?: ToolCall[]
 }
 
 @Injectable()
@@ -49,6 +50,15 @@ export class LlmService {
   private readonly client: OpenAI
 
   constructor() {
+    const { TOGETHER_AI_KEY, AI_MODELS = '' } = process.env
+
+    if (!TOGETHER_AI_KEY) {
+      throw new Error('Please set TOGETHER_AI_KEY in your .env')
+    }
+    if (!AI_MODELS) {
+      throw new Error('Please set AI_MODELS in your .env')
+    }
+
     this.defaultModels = AI_MODELS.split(',')
       .map((m) => m.trim())
       .filter((m) => m.length > 0)
@@ -250,6 +260,7 @@ export class LlmService {
   /**
    * Sanitizes an array of messages by cleaning their content.
    * Utility function for message preprocessing.
+   * Handles both string content and multimodal array content.
    */
   sanitizeMessages(
     messages: ChatCompletionMessageParam[],
@@ -261,24 +272,48 @@ export class LlmService {
           content: this.sanitizeMessageContent(message.content),
         }
       }
+      if (Array.isArray(message.content)) {
+        return {
+          ...message,
+          content: message.content.map((part) => {
+            if (
+              part &&
+              typeof part === 'object' &&
+              'type' in part &&
+              part.type === 'text' &&
+              'text' in part &&
+              typeof part.text === 'string'
+            ) {
+              return {
+                ...part,
+                text: this.sanitizeMessageContent(part.text),
+              }
+            }
+            return part
+          }),
+        } as ChatCompletionMessageParam
+      }
       return message
     })
   }
 
   /**
-   * Extracts content from a chat completion response, handling both regular content and tool calls.
-   * For tool calls, returns a JSON string containing all tool calls with their function names and arguments.
+   * Extracts content and tool calls from a chat completion response.
+   * Returns both content and tool calls separately for unambiguous handling.
    * Utility function for response processing.
    */
-  extractCompletionContent(completion: ChatCompletion): string {
+  extractCompletionContent(completion: ChatCompletion): {
+    content: string
+    toolCalls?: ToolCall[]
+  } {
     const message = completion.choices[0]?.message
 
     if (!message) {
-      return ''
+      return { content: '' }
     }
 
     if (message.tool_calls && message.tool_calls.length > 0) {
-      const toolCalls = message.tool_calls.map((toolCall) => ({
+      const toolCalls: ToolCall[] = message.tool_calls.map((toolCall) => ({
         id: toolCall.id,
         type: toolCall.type,
         function: {
@@ -286,10 +321,13 @@ export class LlmService {
           arguments: toolCall.function?.arguments || '',
         },
       }))
-      return JSON.stringify(toolCalls)
+      return {
+        content: message.content || '',
+        toolCalls,
+      }
     }
 
-    return message.content || ''
+    return { content: message.content || '' }
   }
 
   /**
@@ -343,12 +381,13 @@ export class LlmService {
         },
       )) as ChatCompletion
 
-      const content = this.extractCompletionContent(completion)
+      const { content, toolCalls } = this.extractCompletionContent(completion)
       const tokens = completion.usage?.total_tokens || 0
 
       return {
         content: content.trim(),
         tokens,
+        ...(toolCalls && { toolCalls }),
       }
     } catch (error) {
       this.logger.error('TogetherAI API request failed', {
@@ -379,7 +418,7 @@ export class LlmService {
     model: string
     messages: ChatCompletionMessageParam[]
     tools: ChatCompletionTool[]
-    toolChoice?: ChatCompletionNamedToolChoice
+    toolChoice?: ChatCompletionToolChoiceOption
     temperature: number
     topP: number
     maxTokens?: number
@@ -410,12 +449,13 @@ export class LlmService {
       },
     )) as ChatCompletion
 
-    const content = this.extractCompletionContent(completion)
+    const { content, toolCalls } = this.extractCompletionContent(completion)
     const tokens = completion.usage?.total_tokens || 0
 
     return {
       content: content.trim(),
       tokens,
+      ...(toolCalls && { toolCalls }),
     }
   }
 }
