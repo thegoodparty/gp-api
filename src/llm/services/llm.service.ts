@@ -241,8 +241,8 @@ export class LlmService {
    */
   private isPermanentClientError(error: unknown): boolean {
     if (error && typeof error === 'object') {
-      const status = (error as { status?: number })?.status
-      if (status && status >= 400 && status < 500) {
+      const status = (error as { status?: number | string })?.status
+      if (typeof status === 'number' && status >= 400 && status < 500) {
         return true
       }
     }
