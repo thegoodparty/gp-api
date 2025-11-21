@@ -1,25 +1,27 @@
-import { forwardRef, Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
+import { forwardRef, Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
-import { PeerlyAuthenticationService } from './services/peerlyAuthentication.service'
-import { PeerlyIdentityService } from './services/peerlyIdentity.service'
-import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
-import { PeerlyMediaService } from './services/peerlyMedia.service'
-import { PeerlyP2pSmsService } from './services/peerlyP2pSms.service'
-import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
-import { PeerlyP2pJobService } from './services/peerlyP2pJob.service'
-import { P2pController } from './p2p.controller'
-import { GoogleModule } from '../google/google.module'
-import { VoterSharedModule } from '../../shared/modules/voterShared.module'
+import { AiModule } from 'src/ai/ai.module'
 import { CampaignsModule } from '../../campaigns/campaigns.module'
 import { OutreachModule } from '../../outreach/outreach.module'
-import { SlackModule } from '../slack/slack.module'
+import { VoterSharedModule } from '../../shared/modules/voterShared.module'
 import { UsersModule } from '../../users/users.module'
+import { GoogleModule } from '../google/google.module'
+import { SlackModule } from '../slack/slack.module'
+import { P2pController } from './p2p.controller'
+import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
+import { PeerlyAuthenticationService } from './services/peerlyAuthentication.service'
+import { PeerlyIdentityService } from './services/peerlyIdentity.service'
+import { PeerlyMediaService } from './services/peerlyMedia.service'
+import { PeerlyP2pJobService } from './services/peerlyP2pJob.service'
+import { PeerlyP2pSmsService } from './services/peerlyP2pSms.service'
+import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 
 @Module({
   imports: [
     HttpModule,
     JwtModule,
+    AiModule,
     GoogleModule,
     VoterSharedModule,
     SlackModule,
