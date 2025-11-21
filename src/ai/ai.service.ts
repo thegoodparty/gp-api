@@ -706,7 +706,7 @@ export class AiService {
       })
 
       newPrompt += `\n
-        
+
       `
 
       return newPrompt
