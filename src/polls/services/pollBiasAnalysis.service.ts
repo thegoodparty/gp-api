@@ -47,8 +47,10 @@ export class PollBiasAnalysisService {
             temperature: 0.2,
             maxTokens: 512,
             userId,
-            model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
-            fallbackModels: ['Qwen/Qwen3-235B-A22B-fp8-tput'],
+            models: [
+              'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
+              'Qwen/Qwen3-235B-A22B-fp8-tput',
+            ],
           })
 
           const parsed = this.parseAndValidateResponse(result.content, pollText)
