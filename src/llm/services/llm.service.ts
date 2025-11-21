@@ -95,7 +95,7 @@ export class LlmService {
     const models = this.prepareModelList(model, fallbackModels)
 
     return retry(
-      async () => {
+      async (bail) => {
         let lastError: Error | undefined
         for (let i = 0; i < models.length; i++) {
           const currentModel = models[i]
@@ -117,6 +117,15 @@ export class LlmService {
           } catch (error) {
             lastError =
               error instanceof Error ? error : new Error(String(error))
+
+            if (this.isPermanentClientError(error)) {
+              this.logger.error(
+                `Permanent client error for model ${currentModel}, not retrying`,
+                lastError,
+              )
+              bail(lastError)
+            }
+
             this.logger.warn(
               `Model ${currentModel} failed, ${i < models.length - 1 ? 'trying fallback' : 'no more fallbacks'}`,
               lastError,
@@ -169,7 +178,7 @@ export class LlmService {
     const models = this.prepareModelList(model, fallbackModels)
 
     return retry(
-      async () => {
+      async (bail) => {
         let lastError: Error | undefined
         for (let i = 0; i < models.length; i++) {
           const currentModel = models[i]
@@ -193,6 +202,15 @@ export class LlmService {
           } catch (error) {
             lastError =
               error instanceof Error ? error : new Error(String(error))
+
+            if (this.isPermanentClientError(error)) {
+              this.logger.error(
+                `Permanent client error for model ${currentModel}, not retrying`,
+                lastError,
+              )
+              bail(lastError)
+            }
+
             this.logger.warn(
               `Model ${currentModel} failed for tool completion, ${i < models.length - 1 ? 'trying fallback' : 'no more fallbacks'}`,
               lastError,
@@ -215,6 +233,20 @@ export class LlmService {
         },
       },
     )
+  }
+
+  /**
+   * Checks if an error is a permanent client error (4xx) that should not be retried.
+   * These errors indicate issues with the request itself, not transient failures.
+   */
+  private isPermanentClientError(error: unknown): boolean {
+    if (error && typeof error === 'object') {
+      const status = (error as { status?: number })?.status
+      if (status && status >= 400 && status < 500) {
+        return true
+      }
+    }
+    return false
   }
 
   /**
