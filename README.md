@@ -95,6 +95,63 @@ $ npm run migrate:reset
 - This also generates the Prisma Client and Typescript types.
 - This should also run seeds to populate your local DB with dummy data.
 
+### Content Sync
+
+After setting up the database, you need to sync content from Contentful:
+
+```bash
+$ npm run sync:cms
+```
+
+This fetches CMS content from Contentful and populates your local database. Without this step, blog pages and other content-dependent features will fail.
+
+**Prerequisites:** Ensure your `.env` file contains valid Contentful credentials:
+```bash
+CONTENTFUL_SPACE_ID=your_space_id
+CONTENTFUL_ACCESS_TOKEN=your_access_token
+```
+
+The sync imports **20 content types** from Contentful into two database tables:
+
+**Tables Populated:**
+- `content` - Raw Contentful data for all content types
+- `blog_article_meta` - Optimized blog article metadata (indexed for fast queries)
+
+<details>
+<summary><b>Content Types Synced</b></summary>
+
+1. **Blog Content**
+   - `blogArticle` - Full blog articles with rich text
+   - `blogSection` - Article categories/sections
+   - `blogHome` - Homepage featured content
+   - `articleCategory` - Additional categorization
+
+2. **AI & Campaign Tools**
+   - `aiChatPrompt` - AI conversation system prompts
+   - `aiContentTemplate` - Templates for AI-generated content
+   - `onboardingPrompts` - Candidate onboarding questions
+   - `promptInputFields` - Dynamic form definitions
+   - `candidateContentPrompts` - Campaign content prompts
+   - `contentPromptsQuestions` - Content creation questions
+
+3. **Platform Content**
+   - `glossaryItem` - Political terms/definitions
+   - `faqArticle` - FAQs
+   - `termsOfService` - Legal terms
+   - `privacyPage` - Privacy policy
+   - `pledge` - Platform pledges
+   - `redirects` - URL redirects
+
+4. **Team & Community**
+   - `goodPartyTeamMembers` - Team profiles
+   - `candidateTestimonial` - Success stories
+   - `teamMember` - Individual profiles
+   - `teamMilestone` - Company milestones
+
+</details>
+
+**Note:** The sync is idempotent - running it multiple times won't create duplicates. Existing entries are updated, new entries are created, and deleted Contentful entries are removed from your local database.
+
 
 ### Database Stop & Cleanup
 
