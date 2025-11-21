@@ -49,7 +49,9 @@ export class LlmService {
   private readonly client: OpenAI
 
   constructor() {
-    this.defaultModels = AI_MODELS.split(',').filter((m) => m.trim())
+    this.defaultModels = AI_MODELS.split(',')
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0)
     if (this.defaultModels.length === 0) {
       throw new Error('AI_MODELS must contain at least one model')
     }
@@ -237,11 +239,11 @@ export class LlmService {
   /**
    * Sanitizes message content by replacing problematic characters.
    * Utility function for message preprocessing.
+   * Note: Does not replace backticks to preserve Markdown code blocks.
    */
   sanitizeMessageContent(content: string): string {
     let sanitized = content
     sanitized = sanitized.replace(/\–/g, '-')
-    sanitized = sanitized.replace(/\`/g, "'")
     return sanitized
   }
 
@@ -265,6 +267,7 @@ export class LlmService {
 
   /**
    * Extracts content from a chat completion response, handling both regular content and tool calls.
+   * For tool calls, returns a JSON string containing all tool calls with their function names and arguments.
    * Utility function for response processing.
    */
   extractCompletionContent(completion: ChatCompletion): string {
@@ -275,8 +278,15 @@ export class LlmService {
     }
 
     if (message.tool_calls && message.tool_calls.length > 0) {
-      const toolCall = message.tool_calls[0]
-      return toolCall.function?.arguments || message.content || ''
+      const toolCalls = message.tool_calls.map((toolCall) => ({
+        id: toolCall.id,
+        type: toolCall.type,
+        function: {
+          name: toolCall.function?.name || '',
+          arguments: toolCall.function?.arguments || '',
+        },
+      }))
+      return JSON.stringify(toolCalls)
     }
 
     return message.content || ''
