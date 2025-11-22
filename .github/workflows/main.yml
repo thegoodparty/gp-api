@@ -35,6 +35,9 @@ jobs:
             qa)
               echo "target_env=qa" >> "$GITHUB_OUTPUT"
               ;;
+            master)
+              echo "target_env=prod" >> "$GITHUB_OUTPUT"
+              ;;
             *)
               echo "Unsupported branch: $BRANCH"; exit 1
               ;;
@@ -63,6 +66,10 @@ jobs:
             qa)
               CLUSTER="gp-qa-fargateCluster"
               SERVICE="gp-api-qa"
+              ;;
+            master)
+              CLUSTER="gp-prod-fargateCluster"
+              SERVICE="gp-api-prod"
               ;;
             *)
               echo "Unsupported branch"; exit 1
@@ -97,6 +104,7 @@ jobs:
 
   tests:
     needs: deploy
+    if: github.ref_name != 'master'
     runs-on: ubuntu-latest
     continue-on-error: true
     env:
@@ -139,6 +147,9 @@ jobs:
               echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
               echo "CANDIDATE_ID=${{ secrets.QA_CANDIDATE_ID }}" >> "$GITHUB_ENV"
               echo "CAMPAIGN_SLUG=${{ secrets.QA_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
+              ;;
+            prod)
+              HEALTH_URL="https://gp-api.goodparty.org/v1/health"
               ;;
             *)
               echo "Unknown environment: $TARGET_ENV"; exit 1
