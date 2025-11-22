@@ -32,6 +32,10 @@ lerna-debug.log*
 /test-scripts
 /postman
 /newman
+/test-results
+/e2e-tests/test-results
+/e2e-tests/playwright-report
+/e2e-tests/postman-old-tests
 
 # IDEs and editors
 /.vscode

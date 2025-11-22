@@ -155,7 +155,7 @@ export class OutreachController {
         didState: createOutreachDto.didState,
       })
 
-      const outreach = await this.outreachService.create(
+      return await this.outreachService.create(
         {
           ...createOutreachDto,
           projectId: jobId,
@@ -163,8 +163,6 @@ export class OutreachController {
         },
         imageUrl,
       )
-
-      return outreach
     } catch (error) {
       this.logger.error('Failed to create P2P outreach', error)
       throw new BadRequestException(

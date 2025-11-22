@@ -8,7 +8,6 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from './schemas/listContacts.schema'
-import { SampleContactsDTO } from './schemas/sampleContacts.schema'
 import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
 

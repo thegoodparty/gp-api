@@ -5,7 +5,7 @@ import type {
   Records as VercelDNSRecord,
 } from '@vercel/sdk/models/getrecordsop'
 import { ForwardEmailDomainResponse } from '../../forwardEmail/forwardEmail.types'
-import { VercelNotFoundError } from '@vercel/sdk/models/vercelnotfounderror'
+import { NotFound } from '@vercel/sdk/models/notfound'
 import { VercelError } from '@vercel/sdk/models/vercelerror'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
@@ -32,11 +32,9 @@ export class VercelService {
   private readonly logger = new Logger(VercelService.name)
   private readonly client = new Vercel({ bearerToken: VERCEL_TOKEN })
 
-  isVercelNotFoundError(e: unknown): e is VercelNotFoundError {
+  isVercelNotFoundError(e: unknown): e is NotFound {
     return (
-      e instanceof VercelNotFoundError ||
-      // We have to do this additional check because not all @vercel/sdk methods
-      //  throw an instance of VercelNotFoundError
+      e instanceof NotFound ||
       (e instanceof VercelError && e.statusCode === HttpStatus.NOT_FOUND)
     )
   }

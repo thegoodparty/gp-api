@@ -55,8 +55,7 @@ jobs:
         with:
           project-name: gp-deploy-build-${{ github.ref_name }}
 
-      - name: Wait for ECS service to be stable
-        if: github.ref_name != 'master'
+      - name: Wait for ECS deployment
         shell: bash
         run: |
           case "${{ github.ref_name }}" in
@@ -77,13 +76,13 @@ jobs:
               ;;
           esac
 
-          echo "Waiting for ECS service to stabilize..."
+          echo "Waiting for ECS service deployment to complete..."
           aws ecs wait services-stable \
             --cluster "$CLUSTER" \
             --services "$SERVICE" \
             --region us-west-2
 
-          echo "✅ ECS service is stable and ready"
+          echo "✅ ECS deployment complete"
 
       - name: Notify Slack on Success (Deploy)
         if: success()
@@ -110,27 +109,44 @@ jobs:
     continue-on-error: true
     env:
       TARGET_ENV: ${{ needs.deploy.outputs.target_env }}
-      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
-      POSTMAN_WORKSPACE_ID: ${{ secrets.POSTMAN_WORKSPACE_ID }}
+      CI: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ensure prerequisites
-        run: |
-          command -v jq >/dev/null || (echo "jq not found" && exit 1)
-          test -n "$POSTMAN_API_KEY" || (echo "POSTMAN_API_KEY not set" && exit 1)
-          test -n "$POSTMAN_WORKSPACE_ID" || (echo "POSTMAN_WORKSPACE_ID not set" && exit 1)
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
 
-      - name: Verify environment health
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Set API base URL and test credentials
         shell: bash
         run: |
           case "$TARGET_ENV" in
             dev)
-              HEALTH_URL="https://gp-api-dev.goodparty.org/v1/health"
+              echo "API_BASE_URL=https://gp-api-dev.goodparty.org" >> "$GITHUB_ENV"
+              echo "CANDIDATE_EMAIL=${{ secrets.CANDIDATE_EMAIL }}" >> "$GITHUB_ENV"
+              echo "CANDIDATE_PASSWORD=${{ secrets.CANDIDATE_PASSWORD }}" >> "$GITHUB_ENV"
+              echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> "$GITHUB_ENV"
+              echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
+              echo "CANDIDATE_ID=${{ secrets.DEV_CANDIDATE_ID }}" >> "$GITHUB_ENV"
+              echo "CAMPAIGN_SLUG=${{ secrets.DEV_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
               ;;
             qa)
-              HEALTH_URL="https://gp-api-qa.goodparty.org/v1/health"
+              echo "API_BASE_URL=https://gp-api-qa.goodparty.org" >> "$GITHUB_ENV"
+              echo "CANDIDATE_EMAIL=${{ secrets.CANDIDATE_EMAIL }}" >> "$GITHUB_ENV"
+              echo "CANDIDATE_PASSWORD=${{ secrets.CANDIDATE_PASSWORD }}" >> "$GITHUB_ENV"
+              echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> "$GITHUB_ENV"
+              echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
+              echo "CANDIDATE_ID=${{ secrets.QA_CANDIDATE_ID }}" >> "$GITHUB_ENV"
+              echo "CAMPAIGN_SLUG=${{ secrets.QA_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
               ;;
             prod)
               HEALTH_URL="https://gp-api.goodparty.org/v1/health"
@@ -140,8 +156,11 @@ jobs:
               ;;
           esac
 
-          echo "Verifying $HEALTH_URL is responding..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL") || true
+      - name: Verify environment health
+        shell: bash
+        run: |
+          echo "Verifying ${API_BASE_URL}/v1/health is responding..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
           if [ "$STATUS" = "200" ]; then
             echo "✅ Health endpoint is responding"
           else
@@ -149,194 +168,90 @@ jobs:
             exit 1
           fi
 
-      - name: Fetch Postman collections and environment from workspace
-        id: fetch-postman
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p postman
-
-          # 1) Discover all collection UIDs in the workspace
-          COLLECTIONS_JSON=$(curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
-            "https://api.getpostman.com/collections?workspace=${POSTMAN_WORKSPACE_ID}")
-
-          echo "$COLLECTIONS_JSON" | jq -e . >/dev/null
-
-          COLLECTION_UIDS=$(echo "$COLLECTIONS_JSON" | jq -r '.collections[].uid' | tr '\n' ',' | sed 's/,$//')
-
-          if [ -z "$COLLECTION_UIDS" ]; then
-            echo "No collections found in workspace ${POSTMAN_WORKSPACE_ID}"; exit 1
-          fi
-
-          echo "collection_uids=${COLLECTION_UIDS}" >> "$GITHUB_OUTPUT"
-
-          # 2) Map environment to Postman environment name
-          case "$TARGET_ENV" in
-            dev)  POSTMAN_ENV_NAME="gp-api-dev" ;;
-            qa)   POSTMAN_ENV_NAME="gp-api-qa" ;;
-            prod) POSTMAN_ENV_NAME="gp-api-prod" ;;
-            *)    echo "Unknown environment: $TARGET_ENV"; exit 1 ;;
-          esac
-          echo "Using Postman environment: $POSTMAN_ENV_NAME"
-
-          # 4) Find the Postman environment (use most recently updated if duplicates exist)
-          ENVS_JSON=$(curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
-            "https://api.getpostman.com/environments?workspace=${POSTMAN_WORKSPACE_ID}")
-
-          ENVIRONMENT_UID=$(echo "$ENVS_JSON" | jq -r --arg n "$POSTMAN_ENV_NAME" '.environments[] | select(.name==$n) | {uid, updatedAt} | "\(.updatedAt)|\(.uid)"' | sort -r | head -n1 | cut -d'|' -f2)
-          if [ -z "$ENVIRONMENT_UID" ] || [ "$ENVIRONMENT_UID" = "null" ]; then
-            echo "No Postman environment named '$POSTMAN_ENV_NAME' found in workspace."
-            exit 1
-          fi
-
-          ENV_COUNT=$(echo "$ENVS_JSON" | jq -r --arg n "$POSTMAN_ENV_NAME" '[.environments[] | select(.name==$n)] | length')
-          if [ "$ENV_COUNT" -gt 1 ]; then
-            echo "Warning: Found $ENV_COUNT environments named '$POSTMAN_ENV_NAME'. Using the most recently updated one."
-          fi
-
-          curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
-            "https://api.getpostman.com/environments/${ENVIRONMENT_UID}" \
-            -o "postman/${TARGET_ENV}.environment.json"
-
-          # 5) Fetch Postman globals if available
-          echo "Fetching Postman globals..."
-          GLOBALS_JSON=$(curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
-            "https://api.getpostman.com/workspaces/${POSTMAN_WORKSPACE_ID}")
-
-          GLOBALS_UID=$(echo "$GLOBALS_JSON" | jq -r '.workspace.globals.id // empty')
-
-          if [ -n "$GLOBALS_UID" ]; then
-            curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
-              "https://api.getpostman.com/environments/${GLOBALS_UID}" \
-              -o "postman/globals.json"
-            echo "Globals downloaded"
-            echo "globals_flag=-g postman/globals.json" >> "$GITHUB_OUTPUT"
-          else
-            echo "No globals found in workspace"
-            echo "globals_flag=" >> "$GITHUB_OUTPUT"
-          fi
-
-          echo "env_file=postman/${TARGET_ENV}.environment.json" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Node for Newman
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Install Newman
-        run: npm i -g newman newman-reporter-htmlextra
-
-      - name: Inject sensitive variables (optional)
-        if: always()
-        shell: bash
-        run: |
-          # If you keep sensitive secrets out of Postman, you can override here.
-          # Example: pass API tokens as Newman env-vars (picked in collection via {{apiToken}})
-          case "$TARGET_ENV" in
-            dev)  TOKEN="${{ secrets.DEV_API_TOKEN }}" ;;
-            qa)   TOKEN="${{ secrets.QA_API_TOKEN }}" ;;
-            prod) TOKEN="${{ secrets.PROD_API_TOKEN }}" ;;
-            *)    TOKEN="" ;;
-          esac
-          echo "API_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-
-      - name: Run all Postman collections with Newman
-        shell: bash
-        run: |
-          set -e
-          mkdir -p newman postman
-          ENV_FILE="${{ steps.fetch-postman.outputs.env_file }}"
-          GLOBALS_FLAG="${{ steps.fetch-postman.outputs.globals_flag }}"
-          COLLECTION_UIDS="${{ steps.fetch-postman.outputs.collection_uids }}"
-          # Optionally, run only a "Smoke" folder from each collection first:
-          # FOLDER_FLAG='--folder "Smoke"'
-          FOLDER_FLAG=''
-          FAILED_COLLECTIONS=0
-          TOTAL_COLLECTIONS=0
-          IFS=',' read -ra UIDS <<< "$COLLECTION_UIDS"
-          for COLLECTION_UID in "${UIDS[@]}"; do
-            TOTAL_COLLECTIONS=$((TOTAL_COLLECTIONS + 1))
-            
-            echo "========================================"
-            echo "Fetching collection: $COLLECTION_UID"
-            echo "========================================"
-            
-            COL_JSON=$(curl -s -H "X-Api-Key: ${POSTMAN_API_KEY}" \
-              "https://api.getpostman.com/collections/${COLLECTION_UID}")
-            NAME=$(echo "$COL_JSON" | jq -r '.collection.info.name' | tr ' /' '__')
-            COL_FILE="postman/${NAME}.collection.json"
-            echo "$COL_JSON" > "$COL_FILE"
-            
-            echo "========================================"
-            echo "Running collection: $NAME"
-            echo "========================================"
-            if newman run "$COL_FILE" \
-              -e "$ENV_FILE" \
-              $GLOBALS_FLAG \
-              $FOLDER_FLAG \
-              --reporters cli,htmlextra,junit \
-              --reporter-htmlextra-export "newman/${NAME}.html" \
-              --reporter-junit-export "newman/${NAME}.xml" \
-              --timeout-request 120000 \
-              --delay-request 50 \
-              --env-var "apiToken=${API_TOKEN}"; then
-              echo "✅ Collection passed: $NAME"
-            else
-              echo "❌ Collection failed: $NAME"
-              FAILED_COLLECTIONS=$((FAILED_COLLECTIONS + 1))
-            fi
-            
-            rm -f "$COL_FILE"
-            echo ""
-          done
-          echo "========================================"
-          echo "Test Summary"
-          echo "========================================"
-          echo "Total collections: $TOTAL_COLLECTIONS"
-          echo "Passed: $((TOTAL_COLLECTIONS - FAILED_COLLECTIONS))"
-          echo "Failed: $FAILED_COLLECTIONS"
-          if [ "$FAILED_COLLECTIONS" -gt 0 ]; then
-            echo "❌ Some collections failed"
-            exit 1
-          else
-            echo "✅ All collections passed!"
-          fi
+      - name: Run Playwright tests
+        id: run-tests
+        run: npm run test:e2e
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: newman-reports-${{ env.TARGET_ENV }}-${{ github.sha }}
-          path: newman
+          name: playwright-reports-${{ env.TARGET_ENV }}-${{ github.sha }}
+          path: |
+            e2e-tests/playwright-report
+            e2e-tests/test-results
+
+      - name: Parse test results
+        if: always()
+        id: test-results
+        shell: bash
+        run: |
+          if [ -f "e2e-tests/test-results/results.json" ]; then
+            echo "Found results.json, parsing test results..."
+            
+            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[]] | length' 2>/dev/null || echo "0")
+            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == false)] | length' 2>/dev/null || echo "0")
+            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == true)] | length' 2>/dev/null || echo "0")
+            
+            echo "Parsed: Total=$TOTAL_TESTS, Failed=$FAILED_COUNT, Passed=$PASSED_COUNT"
+            
+            echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+            echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
+            echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
+            
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | .[]' 2>/dev/null | sed 's/^/• /' || echo "• Failed to parse test names")
+              if [ -z "$FAILED_TESTS" ]; then
+                FAILED_TESTS="• $FAILED_COUNT test(s) failed but names could not be parsed"
+              fi
+              echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
+              echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              echo "tests_ran=true" >> $GITHUB_OUTPUT
+            else
+              echo "failed_tests=" >> $GITHUB_OUTPUT
+              if [ "$TOTAL_TESTS" -gt 0 ]; then
+                echo "tests_ran=true" >> $GITHUB_OUTPUT
+              else
+                echo "tests_ran=false" >> $GITHUB_OUTPUT
+              fi
+            fi
+          else
+            echo "⚠️  results.json file not found - tests may not have run"
+            echo "failed_tests=• Test results file not found (tests may not have started)" >> $GITHUB_OUTPUT
+            echo "failed_count=0" >> $GITHUB_OUTPUT
+            echo "passed_count=0" >> $GITHUB_OUTPUT
+            echo "total_tests=0" >> $GITHUB_OUTPUT
+            echo "tests_ran=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Notify Slack on Test Success
-        if: success()
+        if: steps.run-tests.outcome == 'success'
         uses: 8398a7/action-slack@v3
         with:
           status: custom
           custom_payload: |
             {
-              text: '✅ Postman Tests Completed (Informational)',
+              text: '✅ Playwright Tests Passed',
               attachments: [{
                 color: 'good',
-                text: `${process.env.AS_REPO} - ${process.env.AS_REF} by ${process.env.AS_AUTHOR}\nTests passed but are non-blocking during stabilization.`
+                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n✅ ${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
               }]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify Slack on Test Failure
-        if: failure()
+        if: steps.run-tests.outcome == 'failure' || failure()
         uses: 8398a7/action-slack@v3
         with:
           status: custom
           custom_payload: |
             {
-              text: '⚠️ Postman Tests Failed (Non-blocking)',
-              attachments: [{
-                color: 'warning',
-                text: `${process.env.AS_REPO} - ${process.env.AS_REF} by ${process.env.AS_AUTHOR}\nSome tests failed. This is informational only and does not block deployment.`
+              "text": "${{ steps.test-results.outputs.tests_ran == 'true' && '⚠️ Playwright Tests Failed (Non-blocking)' || '❌ Test Environment Not Ready' }}",
+              "attachments": [{
+                "color": "${{ steps.test-results.outputs.tests_ran == 'true' && 'warning' || 'danger' }}",
+                "text": "${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('❌ {0}/{1} tests failed\n✅ {2}/{1} tests passed\n\nFailed Tests:\n{3}\n\nTests are non-blocking during stabilization.', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || '❌ Tests did not run - environment health check failed or test setup error occurred.\n\nThe application may not be ready or there was an issue with test initialization.' }}\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
               }]
             }
         env:

@@ -3,10 +3,15 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
 import { CacheControls } from 'http-constants-ts'
+import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
 import { FileUpload, GenerateSignedUploadUrlArgs } from './files.types'
 
+/**
+ * @deprecated This service is being gradually migrated to use S3Service directly.
+ * Use S3Service for new features that require flexible bucket/subfolder support.
+ * Each feature should create its own controller endpoint for signed URLs with feature-specific logic.
+ */
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name)

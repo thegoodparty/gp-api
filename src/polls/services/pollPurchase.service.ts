@@ -6,7 +6,7 @@ import z from 'zod'
 
 const PRICE_PER_TEXT = 0.03
 
-const parseNum = z.coerce.number().int().min(1).parse
+const countSchema = z.coerce.number().int().min(1)
 
 @Injectable()
 export class PollPurchaseHandlerService
@@ -24,16 +24,18 @@ export class PollPurchaseHandlerService
       throw new BadRequestException('pollId is required')
     }
 
-    const num = parseNum(count)
-    if (!num || num <= 0) {
-      throw new BadRequestException('count must be a positive number')
+    const result = countSchema.safeParse(count)
+    if (!result.success) {
+      throw new BadRequestException(
+        'count must be a positive number: ' + result.error.message,
+      )
     }
   }
 
   async calculateAmount({
     count,
   }: PurchaseMetadata<PollPurchaseMetadata>): Promise<number> {
-    return parseNum(count) * PRICE_PER_TEXT * 100
+    return countSchema.parse(count) * PRICE_PER_TEXT * 100
   }
 
   async executePostPurchase(
@@ -48,7 +50,7 @@ export class PollPurchaseHandlerService
 
     await this.pollsService.expandPoll({
       pollId,
-      additionalRecipientCount: parseNum(count),
+      additionalRecipientCount: countSchema.parse(count),
     })
   }
 }
