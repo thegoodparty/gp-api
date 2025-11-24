@@ -189,13 +189,11 @@ jobs:
             echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
             
             if [ "$FAILED_COUNT" -gt 0 ]; then
-              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | .[]' 2>/dev/null | sed 's/^/• /' || echo "• Failed to parse test names")
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | map("• " + .) | join("\\n")' 2>/dev/null || echo "• Failed to parse test names")
               if [ -z "$FAILED_TESTS" ]; then
                 FAILED_TESTS="• $FAILED_COUNT test(s) failed but names could not be parsed"
               fi
-              echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
-              echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
+              echo "failed_tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
               echo "tests_ran=true" >> $GITHUB_OUTPUT
             else
               echo "failed_tests=" >> $GITHUB_OUTPUT
