@@ -12,6 +12,12 @@ const tevynPollCsvsBucketName = {
   master: 'tevyn-poll-csvs-master',
 }
 
+const zipToAreaCodeBucketName = {
+  develop: 'zip-to-area-code-mappings-develop',
+  qa: 'zip-to-area-code-mappings-qa',
+  master: 'zip-to-area-code-mappings-master',
+}
+
 const environment = {
   develop: 'dev',
   qa: 'qa',
@@ -42,14 +48,13 @@ export default $config({
   async run() {
     const { default: aws } = await import('@pulumi/aws')
     const { default: pulumi } = await import('@pulumi/pulumi')
-    const { lambda } = await import('./utils/lambda')
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
-            bastion: false,
-            nat: 'managed',
-            az: 2, // defaults to 2 availability zones and 2 NAT gateways
-          })
+          bastion: false,
+          nat: 'managed',
+          az: 2, // defaults to 2 availability zones and 2 NAT gateways
+        })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
     if (
@@ -122,7 +127,14 @@ export default $config({
     }
 
     // Each stage will get its own Cluster.
-    const cluster = new sst.aws.Cluster('fargate', { vpc })
+    const cluster = new sst.aws.Cluster('fargate', {
+      vpc,
+      transform: {
+        cluster: {
+          settings: [{ name: 'containerInsights', value: 'enabled' }],
+        },
+      },
+    })
 
     let dbUrl: string | undefined
     let dbName: string | undefined
@@ -251,6 +263,21 @@ export default $config({
       restrictPublicBuckets: true,
     })
 
+    const zipToAreaCodeBucket = new aws.s3.Bucket(
+      `zip-to-area-code-mappings-${$app.stage}`,
+      {
+        bucket: zipToAreaCodeBucketName[$app.stage],
+        forceDestroy: false,
+      },
+    )
+    new aws.s3.BucketPublicAccessBlock(`zip-to-area-code-mappings-pab-${$app.stage}`, {
+      bucket: zipToAreaCodeBucket.id,
+      blockPublicAcls: true,
+      blockPublicPolicy: true,
+      ignorePublicAcls: true,
+      restrictPublicBuckets: true,
+    })
+
     // Create shared VPC Endpoint for SQS (only in master stage)
     if ($app.stage === 'master') {
       // Create security group for SQS
@@ -283,58 +310,6 @@ export default $config({
         privateDnsEnabled: true,
       })
     }
-
-    const HANDLER_TIMEOUT = 30
-
-    const pollInsightsQueueDlq = new aws.sqs.Queue(
-      `poll-insights-queue-dlq-${$app.stage}`,
-      {
-        name: `poll-insights-queue-dlq-${$app.stage}.fifo`,
-        fifoQueue: true,
-        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-      },
-    )
-
-    const pollInsightsQueue = new aws.sqs.Queue(
-      `poll-insights-queue-${$app.stage}`,
-      {
-        name: `poll-insights-queue-${$app.stage}.fifo`,
-        fifoQueue: true,
-        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-        visibilityTimeoutSeconds: HANDLER_TIMEOUT + 5,
-        contentBasedDeduplication: true,
-        redrivePolicy: pulumi.interpolate`{
-          "deadLetterTargetArn": "${pollInsightsQueueDlq.arn}",
-          "maxReceiveCount": 3
-        }`,
-      },
-    )
-
-    const pollInsightsQueueHandler = lambda(aws, pulumi, {
-      name: `poll-insights-queue-handler-${$app.stage}`,
-      runtime: 'nodejs22.x',
-      timeout: HANDLER_TIMEOUT,
-      memorySize: 512,
-      filename: 'poll-response-analysis-queue-handler',
-      policy: [
-        {
-          actions: [
-            'sqs:ReceiveMessage',
-            'sqs:DeleteMessage',
-            'sqs:GetQueueAttributes',
-          ],
-          resources: [pollInsightsQueue.arn],
-        },
-      ],
-    })
-
-    new aws.lambda.EventSourceMapping(`poll-insights-queue-${$app.stage}`, {
-      eventSourceArn: pollInsightsQueue.arn,
-      functionName: pollInsightsQueueHandler.name,
-      enabled: true,
-      batchSize: 10,
-      functionResponseTypes: ['ReportBatchItemFailures'],
-    })
 
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
@@ -383,6 +358,7 @@ export default $config({
         SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
         SERVE_ANALYSIS_BUCKET_NAME: serveAnalysisBucketName[$app.stage],
         TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucketName[$app.stage],
+        ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucketName[$app.stage],
         ...secretsJson,
       },
       image: {

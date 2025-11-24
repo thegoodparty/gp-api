@@ -19,6 +19,7 @@ import {
 import { UsersService } from './services/users.service'
 import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { User } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
@@ -115,14 +116,18 @@ export class UsersController {
   async delete(@Param('id') id: string) {
     try {
       return await this.usersService.deleteUser(parseInt(id))
-    } catch (e: Error | any) {
-      if (e?.code !== 'P2025') {
+    } catch (error: unknown | PrismaClientKnownRequestError) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
         // P2025: Prisma error code for "Record to delete does not exist"
-        throw e
+        this.logger.warn(
+          `request to delete user that does not exist, w/ id: ${id}`,
+        )
+        return
       }
-      this.logger.warn(
-        `request to delete user that does not exist, w/ id: ${id}`,
-      )
+      throw error
     }
   }
 

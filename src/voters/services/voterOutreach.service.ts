@@ -1,34 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { Campaign, OutreachType, User } from '@prisma/client'
-import {
-  AudienceSlackBlock,
-  buildSlackBlocks,
-} from '../util/voterOutreach.util'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import sanitizeHtml from 'sanitize-html'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { EmailService } from 'src/email/email.service'
+import { EmailTemplateName } from 'src/email/email.types'
 import {
   IS_PROD,
   WEBAPP_API_PATH,
   WEBAPP_ROOT,
 } from 'src/shared/util/appEnvironment.util'
-import { VOTER_FILE_ROUTE } from '../voterFile/voterFile.controller'
+import { getUserFullName } from 'src/users/util/users.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import {
   SlackChannel,
   SlackMessageType,
 } from 'src/vendors/slack/slackService.types'
+import { Readable } from 'stream'
+import TurndownService from 'turndown'
+import { CampaignWith } from '../../campaigns/campaigns.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-import { getUserFullName } from 'src/users/util/users.util'
-import { EmailService } from 'src/email/email.service'
-import { EmailTemplateName } from 'src/email/email.types'
-import { VoterFileFilterService } from './voterFileFilter.service'
 import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types'
 import { PeerlyMediaService } from '../../vendors/peerly/services/peerlyMedia.service'
 import { PeerlyP2pSmsService } from '../../vendors/peerly/services/peerlyP2pSms.service'
 import { getPeerlyJobUrl } from '../../vendors/peerly/utils/peerlyJobUrl.util'
-import { CampaignWith } from '../../campaigns/campaigns.types'
-import { Readable } from 'stream'
-import TurndownService from 'turndown'
+import {
+  AudienceSlackBlock,
+  buildSlackBlocks,
+} from '../util/voterOutreach.util'
+import { VOTER_FILE_ROUTE } from '../voterFile/voterFile.constants'
+import { VoterFileFilterService } from './voterFileFilter.service'
 
 const turndownService = new TurndownService()
 

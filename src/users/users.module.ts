@@ -8,6 +8,7 @@ import { CrmUsersService } from './services/crmUsers.service'
 import { HttpModule } from '@nestjs/axios'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { StripeModule } from 'src/vendors/stripe/stripe.module'
 
 @Global()
 @Module({
@@ -21,6 +22,7 @@ import { SlackModule } from 'src/vendors/slack/slack.module'
     HttpModule,
     AnalyticsModule,
     SlackModule,
+    StripeModule,
   ],
 })
 export class UsersModule {}
