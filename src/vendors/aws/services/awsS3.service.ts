@@ -1,4 +1,3 @@
-import { Injectable } from '@nestjs/common'
 import {
   GetObjectCommand,
   NoSuchKey,
@@ -7,8 +6,9 @@ import {
   PutObjectCommandInput,
   S3Client,
 } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Upload } from '@aws-sdk/lib-storage'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { Injectable } from '@nestjs/common'
 import slugify from 'slugify'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { AwsService } from './aws.service'
@@ -19,6 +19,22 @@ export type UploadOptions = {
 
 const { AWS_REGION: region = 'us-west-2' } = process.env
 
+/**
+ * Legacy S3 service hardcoded to use ASSET_DOMAIN bucket.
+ *
+ * @deprecated This service is being gradually migrated to the new S3Service.
+ * Use S3Service for new features that require flexible bucket/subfolder support.
+ *
+ * Migration Reference - Current Consumers:
+ *
+ * 1. FilesService (src/files/files.service.ts)
+ *    - Uses: getSignedS3Url(), uploadFile()
+ *    - Methods: generateSignedUploadUrl(), uploadFile(), uploadFiles()
+ *    - Migration: Replace with S3Service.getSignedUrlForUpload() and S3Service.uploadFile()
+ *
+ * Note: This service always uses ASSET_DOMAIN as the bucket and has limited flexibility.
+ * The new S3Service supports multiple buckets, subfolders, and more configuration options.
+ */
 @Injectable()
 export class AwsS3Service extends AwsService {
   private readonly s3Client: S3Client
