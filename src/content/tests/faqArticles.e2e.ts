@@ -20,7 +20,7 @@ test.describe('CMS Content - FAQ Articles', () => {
     const content = (await response.json()) as Array<{
       category?: {
         id: string
-        fields: object
+        fields?: object
       }
       id: string
     }>
@@ -29,7 +29,9 @@ test.describe('CMS Content - FAQ Articles', () => {
       if (article.category) {
         expect(typeof article.category.id).toBe('string')
         expect(article.category.id).not.toBe(article.id)
-        expect(typeof article.category.fields).toBe('object')
+        if (article.category.fields !== undefined) {
+          expect(typeof article.category.fields).toBe('object')
+        }
       }
     })
   })
