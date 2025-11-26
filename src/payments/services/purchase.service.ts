@@ -42,12 +42,12 @@ export class PurchaseService {
     await handler.validatePurchase(dto.metadata)
     const amount = await handler.calculateAmount(dto.metadata)
 
-    const paymentMetadata: PaymentIntentPayload<PaymentType> = {
+    const paymentMetadata = {
       type: this.getPaymentType(dto.type),
       amount,
       ...dto.metadata,
       purchaseType: dto.type,
-    } as unknown as PaymentIntentPayload<PaymentType>
+    } as PaymentIntentPayload<PaymentType>
 
     const paymentIntent = await this.paymentsService.createPayment(
       user,
