@@ -33,7 +33,7 @@ test.describe('Viability', () => {
 
     const campaignId = candidateResponse.campaign.id
 
-    const response = await request.get(`/v1/viability/${campaignId}`, {
+    const response = await request.get(`/v1/path-to-victory/${campaignId}`, {
       headers: {
         Authorization: `Bearer ${authToken}`,
       },
@@ -44,10 +44,10 @@ test.describe('Viability', () => {
     const body = (await response.json()) as {
       success: boolean
       message: string
-      data: unknown
     }
     expect(body).toHaveProperty('success')
     expect(body).toHaveProperty('message')
-    expect(body).toHaveProperty('data')
+    expect(body.success).toBe(true)
+    expect(body.message).toContain('Path to victory calculation for campaign')
   })
 })
