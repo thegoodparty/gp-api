@@ -6,14 +6,12 @@ import {
 } from '@nestjs/common'
 import retry from 'async-retry'
 import { LlmService } from 'src/llm/services/llm.service'
-import { BiasAnalysisResponse } from '../types/pollBias.types'
-import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
 import {
-  cleanJsonContent,
-  isValidationError,
-  parseJson,
-  validateBiasAnalysisInput,
-} from '../utils/pollBiasResponse.util'
+  BiasAnalysisInputSchema,
+  BiasAnalysisResponse,
+} from '../types/pollBias.types'
+import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
+import { isValidationError } from '../utils/pollBiasResponse.util'
 import { convertSubstringsToIndices } from '../utils/pollBiasSpan.util'
 
 @Injectable()
@@ -42,8 +40,9 @@ export class PollBiasAnalysisService {
     return retry(
       async (bail): Promise<BiasAnalysisResponse> => {
         try {
-          const result = await this.llmService.chatCompletion({
+          const result = await this.llmService.jsonCompletion({
             messages,
+            schema: BiasAnalysisInputSchema,
             temperature: 0.2,
             maxTokens: 512,
             userId,
@@ -53,7 +52,22 @@ export class PollBiasAnalysisService {
             ],
           })
 
-          const parsed = this.parseAndValidateResponse(result.content, pollText)
+          const parsed = this.convertBiasSubstringsToIndices(
+            result.object as {
+              bias_spans: {
+                substring: string
+                reason: string
+                suggestion?: string
+              }[]
+              grammar_spans: {
+                substring: string
+                reason: string
+                suggestion?: string
+              }[]
+              rewritten_text: string
+            },
+            pollText,
+          )
 
           return parsed
         } catch (error) {
@@ -96,14 +110,22 @@ export class PollBiasAnalysisService {
    * Handles cases where the response may contain markdown code blocks or extra text.
    * Converts substring-based bias spans to start/end indices.
    */
-  private parseAndValidateResponse(
-    content: string,
+  private convertBiasSubstringsToIndices(
+    validated: {
+      bias_spans: {
+        substring: string
+        reason: string
+        suggestion?: string
+      }[]
+      grammar_spans: {
+        substring: string
+        reason: string
+        suggestion?: string
+      }[]
+      rewritten_text: string
+    },
     originalText: string,
   ): BiasAnalysisResponse {
-    const cleanedContent = cleanJsonContent(content)
-    const parsedJson = parseJson(cleanedContent, this.logger)
-    const validated = validateBiasAnalysisInput(parsedJson, this.logger)
-
     const biasSpans = convertSubstringsToIndices(
       validated.bias_spans,
       originalText,
