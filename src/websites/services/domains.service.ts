@@ -250,7 +250,6 @@ export class DomainsService
       phoneNumber: user.phone || GP_DOMAIN_CONTACT.phoneNumber,
       addressLine1:
         addressPlace?.formatted_address || GP_DOMAIN_CONTACT.addressLine1,
-      addressLine2: GP_DOMAIN_CONTACT.addressLine2,
       city:
         addressPlace?.address_components?.find((c) =>
           c.types.includes('locality'),
@@ -514,7 +513,6 @@ export class DomainsService
               email: contact.email,
               phoneNumber: contact.phoneNumber,
               addressLine1: contact.addressLine1,
-              addressLine2: contact.addressLine2,
               city: contact.city,
               state: contact.state,
               zipCode: contact.zipCode,
