@@ -1,6 +1,10 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { User } from '@prisma/client'
-import { PaymentIntentPayload, PaymentType } from 'src/payments/payments.types'
+import {
+  PaymentIntentPayload,
+  PaymentType,
+  PurchaseIntentPayloadEntry,
+} from 'src/payments/payments.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import Stripe from 'stripe'
 
@@ -21,7 +25,6 @@ const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 @Injectable()
 export class StripeService {
   private stripe = new Stripe(STRIPE_SECRET_KEY as string)
-  readonly isTestMode = !STRIPE_SECRET_KEY?.includes('live')
   private readonly logger = new Logger(StripeService.name)
 
   constructor(private readonly slack: SlackService) {}
@@ -42,8 +45,17 @@ export class StripeService {
 
     // Filter out undefined values from metadata before passing to Stripe
     const cleanedMetadata = Object.entries(restMetadata)
-      .filter(([_, value]) => value !== undefined)
-      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
+      .filter(
+        ([_, value]: [string, PurchaseIntentPayloadEntry]) =>
+          value !== undefined,
+      )
+      .reduce(
+        (acc, [key, value]: [string, PurchaseIntentPayloadEntry]) => ({
+          ...acc,
+          [key]: value,
+        }),
+        {},
+      )
 
     return await this.stripe.paymentIntents.create({
       customer: customerId,

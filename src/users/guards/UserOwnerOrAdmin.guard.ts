@@ -7,7 +7,10 @@ import { UserRole } from '@prisma/client'
 @Injectable()
 export class UserOwnerOrAdminGuard implements CanActivate {
   canActivate(context: ExecutionContext) {
-    const { user, params } = context.switchToHttp().getRequest()
+    const { user, params } = context.switchToHttp().getRequest<{
+      user: { id: number; roles: UserRole[] }
+      params: { id: string }
+    }>()
     return (
       user.id === parseInt(params.id) || user.roles.includes(UserRole.admin)
     )

@@ -167,8 +167,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       config: await this.getAxiosRequestConfig(),
     }
     try {
-      const response: AxiosResponse<PeerlyIdentityCreateResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyIdentityCreateResponseBody>
       const { data } = response
       const { Data: identity } = data
       this.logger.debug(
@@ -198,8 +199,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
     let result: PeerlyIdentity[] = []
     try {
-      const response: AxiosResponse<PeerlyGetIdentitiesResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyGetIdentitiesResponseBody>
       const { data } = response
       const { identities } = data
       this.logger.debug(
@@ -223,8 +225,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       config: (await this.getAxiosRequestConfig()) as AxiosRequestConfig,
     }
     try {
-      const response: AxiosResponse<PeerlyIdentityUseCaseResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyIdentityUseCaseResponseBody>
       const { data: useCases } = response
       this.logger.debug(
         `Successfully fetched use cases for identityId: ${peerlyIdentityId}: ${JSON.stringify(useCases)}`,
@@ -264,8 +267,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
     let result: PeerlyIdentityProfileResponseBody | null = null
     try {
-      const response: AxiosResponse<PeerlyIdentityProfileResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyIdentityProfileResponseBody>
       const { data } = response
       this.logger.debug(
         `Successfully submitted identity profile: ${JSON.stringify(data)}`,
@@ -296,8 +300,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
     let result: PeerlyIdentityProfileResponseBody | null = null
     try {
-      const response: AxiosResponse<PeerlyIdentityProfileResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyIdentityProfileResponseBody>
       const { data } = response
       this.logger.debug(
         `Successfully fetched identity profile for identityId: ${peerlyIdentityId}: ${JSON.stringify(data)}`,
@@ -389,8 +394,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       config: await this.getAxiosRequestConfig(),
     }
     try {
-      const response: AxiosResponse<Peerly10DLCBrandSubmitResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<Peerly10DLCBrandSubmitResponseBody>
       const { data } = response
       const { submission_key: submissionKey } = data
       this.logger.debug(
@@ -433,8 +439,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug(
         `Approving 10DLC brand with data: ${JSON.stringify(data)}`,
       )
-      const response: AxiosResponse<Approve10DLCBrandResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<Approve10DLCBrandResponseBody>
 
       const {
         data: { campaign_verify_token, ...identityBrand },
@@ -466,8 +473,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
     let result: PeerlyGetCvRequestResponseBody | null = null
     try {
-      const response: AxiosResponse<PeerlyGetCvRequestResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyGetCvRequestResponseBody>
       const { data } = response
       this.logger.debug(
         `Successfully fetched Campaign Verify status for identityId: ${peerlyIdentityId}: ${JSON.stringify(data)}`,
@@ -565,8 +573,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug(
         `Submitting CV request with data: ${JSON.stringify(submitCVData)}`,
       )
-      const response: AxiosResponse<PeerlySubmitCVResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlySubmitCVResponseBody>
       const { data } = response
       this.logger.debug(`Successfully submitted CV request: ${data}`)
       result = data
@@ -594,8 +603,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug(
         `Retrieving campaign verify status for identityId: ${peerlyIdentityId}`,
       )
-      const response: AxiosResponse<PeerlyRetrieveCampaignVerifyStatusResponseBody> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyRetrieveCampaignVerifyStatusResponseBody>
       const { data } = response
       const { verification_status } = data
       this.logger.debug(
@@ -626,8 +636,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       config: await this.getAxiosRequestConfig(),
     }
     try {
-      const response: AxiosResponse<PeerlyVerifyCVPinResponse> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyVerifyCVPinResponse>
       const { data } = response
       const { cv_verification_status } = data
       return cv_verification_status === CampaignVerificationStatus.VERIFIED
@@ -668,8 +679,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug(
         `Creating campaign verify token for identityId: ${peerlyIdentityId}`,
       )
-      const response: AxiosResponse<PeerlyCreateCVTokenResponse> =
-        await this.makeHttpRequest(requestConfig)
+      const response = (await this.makeHttpRequest(
+        requestConfig,
+      )) as AxiosResponse<PeerlyCreateCVTokenResponse>
       const { data } = response
       const { campaign_verify_token } = data
       return campaign_verify_token

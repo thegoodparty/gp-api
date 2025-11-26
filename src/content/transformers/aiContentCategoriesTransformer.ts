@@ -12,9 +12,16 @@ export const aiContentCategoriesTransformer: Transformer<
   AIContentTemplateRaw,
   AIContentCategories
 > = (aiContents: AIContentTemplateRaw[]): AIContentCategories[] => {
-  const aiContentCategoriesHash = {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const aiContentCategories: any = []
+  const aiContentCategoriesHash: Record<
+    string,
+    Array<{
+      key: string
+      name: string
+      taskOnly: boolean
+      id: string
+    }>
+  > = {}
+  const aiContentCategories: Array<{ title: string; order: number }> = []
 
   for (const aiContent of aiContents) {
     const { order, title } = aiContent.data.category.fields
@@ -39,10 +46,22 @@ export const aiContentCategoriesTransformer: Transformer<
   )
 }
 
-const combineAiContentAndCategories = (categories, categoriesHash) =>
+const combineAiContentAndCategories = (
+  categories: Array<{ title: string; order: number }>,
+  categoriesHash: Record<
+    string,
+    Array<{
+      key: string
+      name: string
+      taskOnly: boolean
+      id: string
+    }>
+  >,
+) =>
   categories
     .sort((a, b) => a.order - b.order)
-    .map(({ title }) => ({
+    .map(({ title, order }) => ({
       name: title,
+      order,
       templates: categoriesHash[title],
     }))

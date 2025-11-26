@@ -277,12 +277,12 @@ export type PeerlyIdentityUseCase = {
 export type PeerlyIdentityUseCaseResponseBody = PeerlyIdentityUseCase[]
 
 type HttpServiceMethod = {
-  <T = any, D = any>(
+  <T = Record<string, unknown>, D = Record<string, unknown>>(
     url: string,
     data?: D,
     config?: AxiosRequestConfig<D>,
   ): Observable<AxiosResponse<T, D>>
-  <T = any, D = any>(
+  <T = Record<string, unknown>, D = Record<string, unknown>>(
     url: string,
     config?: AxiosRequestConfig<D>,
   ): Observable<AxiosResponse<T, D>>
@@ -295,7 +295,7 @@ export interface PeerlyHttpRequestConfig {
   config?: AxiosRequestConfig
 }
 
-type HttpExceptionConstructor<T = {}> = new (
+type HttpExceptionConstructor<T = Record<string, never>> = new (
   message: string,
   options?: HttpExceptionOptions,
 ) => T

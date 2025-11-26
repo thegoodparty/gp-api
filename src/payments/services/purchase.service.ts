@@ -8,7 +8,7 @@ import {
   PurchaseType,
 } from '../purchase.types'
 import { PaymentsService } from './payments.service'
-import { PaymentType } from '../payments.types'
+import { PaymentIntentPayload, PaymentType } from '../payments.types'
 
 @Injectable()
 export class PurchaseService {
@@ -47,7 +47,7 @@ export class PurchaseService {
       amount,
       ...dto.metadata,
       purchaseType: dto.type,
-    } as any
+    } as PaymentIntentPayload<PaymentType>
 
     const paymentIntent = await this.paymentsService.createPayment(
       user,
@@ -80,11 +80,10 @@ export class PurchaseService {
       throw new Error('No post-purchase handler found for this purchase type')
     }
 
-    const result = await postPurchaseHandler(
+    return await postPurchaseHandler(
       dto.paymentIntentId,
-      paymentIntent.metadata as any,
+      paymentIntent.metadata,
     )
-    return result
   }
 
   private getPaymentType(purchaseType: PurchaseType): PaymentType {

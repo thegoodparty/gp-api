@@ -96,7 +96,9 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
           maxContentLength: MAX_FILE_SIZE,
         }),
       )
-      const { data } = response
+      const { data } = response as {
+        data: Record<string, string | number | boolean>
+      }
       const validatedData = this.validateCreateResponse(data)
 
       if (validatedData.status === MediaStatus.ERROR) {

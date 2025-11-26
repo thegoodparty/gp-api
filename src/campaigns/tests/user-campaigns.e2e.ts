@@ -34,7 +34,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as { status: string; slug: string }
     expect(body).toHaveProperty('status')
     expect(body).toHaveProperty('slug')
     expect(typeof body.status).toBe('string')
@@ -56,7 +56,12 @@ test.describe('Campaigns - User Campaign Operations', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaign = await response.json()
+    const campaign = (await response.json()) as {
+      id: number
+      slug: string
+      data: Record<string, string | number | boolean>
+      details: Record<string, string | number | boolean>
+    }
     expect(campaign).toHaveProperty('id')
     expect(campaign).toHaveProperty('slug')
     expect(campaign).toHaveProperty('data')
@@ -107,7 +112,10 @@ test.describe('Campaigns - User Campaign Operations', () => {
 
     expect(response.status()).toBe(200)
 
-    const campaign = await response.json()
+    const campaign = (await response.json()) as {
+      data: { name: string }
+      details: { website: string }
+    }
     expect(campaign.data.name).toBe(randomName)
     expect(campaign.details.website).toBe(randomWebsite)
   })
@@ -134,7 +142,10 @@ test.describe('Campaigns - User Campaign Operations', () => {
 
     expect(response.status()).toBe(400)
 
-    const body = await response.json()
+    const body = (await response.json()) as {
+      message: string
+      errors: Array<{ message: string }>
+    }
     expect(body.message).toBe('Validation failed')
     expect(body.errors[0].message).toBe('Expected string, received array')
   })
@@ -176,7 +187,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
 
     expect(response.status()).toBe(200)
 
-    const result = await response.json()
+    const result = (await response.json()) as boolean
     expect(result).toBe(true)
   })
 })
@@ -221,7 +232,7 @@ test.describe('Campaigns - User Without Campaign', () => {
 
     expect(response.status()).toBe(409)
 
-    const body = await response.json()
+    const body = (await response.json()) as { message: string }
     expect(body.message).toBe('User campaign already exists.')
   })
 })

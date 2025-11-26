@@ -53,7 +53,7 @@ export class VoterDatabaseService implements OnModuleDestroy {
     let isFirstChunk = true
     const transformHeaders = new Transform({
       objectMode: true,
-      transform(chunk, _encoding, callback) {
+      transform(chunk: Buffer, _encoding, callback) {
         let data: string = chunk.toString()
         if (isFirstChunk) {
           isFirstChunk = false
@@ -106,7 +106,7 @@ export class VoterDatabaseService implements OnModuleDestroy {
     // Define the mapping of old headers to new headers
     let isFirstChunk = true
     const transformHeaders = new Transform({
-      transform(chunk, _encoding, callback) {
+      transform(chunk: Buffer, _encoding, callback) {
         let data: string = chunk.toString()
         if (isFirstChunk) {
           isFirstChunk = false

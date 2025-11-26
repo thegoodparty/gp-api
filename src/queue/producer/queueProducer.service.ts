@@ -43,9 +43,9 @@ export class QueueProducerService {
 
     const message: Message = {
       id: uuid,
-      body,
-      deduplicationId: uuid, // Required for FIFO queues
-      groupId: `gp-queue-${group}`, // Required for FIFO queues
+      body: body as string,
+      deduplicationId: uuid,
+      groupId: `gp-queue-${group}`,
     }
 
     try {

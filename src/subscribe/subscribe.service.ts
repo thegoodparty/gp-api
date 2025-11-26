@@ -57,7 +57,11 @@ export class SubscribeService {
     }
 
     if (additionalFields) {
-      const fields = JSON.parse(additionalFields)
+      const fields = JSON.parse(additionalFields) as Array<{
+        name: string
+        value: string
+        objectTypeId: string
+      }>
       for (const field of fields) {
         crmFields.push(field)
       }

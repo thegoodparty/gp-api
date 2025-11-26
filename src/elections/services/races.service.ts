@@ -3,6 +3,10 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
+import {
+  ChatCompletionNamedToolChoice,
+  ChatCompletionTool,
+} from 'openai/resources/chat/completions'
 import { PositionLevel } from 'src/generated/graphql.types'
 import { AiService } from '../../ai/ai.service'
 import { AiChatMessage } from '../../campaigns/ai/chat/aiChat.types'
@@ -15,7 +19,7 @@ import {
   VILLAGE_PROMPT,
 } from '../constants/prompts.consts'
 import { RacesByZipSchema } from '../schemas/RacesByZip.schema'
-import { RaceNode } from '../types/ballotReady.types'
+import { RaceNode, RacesByIdNode } from '../types/ballotReady.types'
 import { GeoData } from '../types/elections.types'
 import { parseRaces } from '../util/parseRaces.util'
 import { BallotReadyService } from './ballotReady.service'
@@ -217,13 +221,14 @@ export class RacesService {
     zip?: string | null,
     findElectionDates = true,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = {}
+    const data: Record<
+      string,
+      string | number | boolean | GeoData | string[] | undefined
+    > = {}
 
     this.logger.debug(slug, 'getting race from ballotReady api...')
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let race: any
+    let race: RacesByIdNode['node'] | null
     try {
       race = await this.getRaceById(raceId)
     } catch (e) {
@@ -232,21 +237,21 @@ export class RacesService {
     }
     this.logger.debug(slug, 'got ballotReady Race')
 
-    let electionDate: string | undefined // the date of the election
+    let electionDate: string | undefined
     let termLength = 4
     let level = 'city'
     let positionId: string | undefined
-    let mtfcc: string | undefined
-    let geoId: string | undefined
-    let tier: string | undefined
+    let mtfcc: string | undefined | null
+    let geoId: string | undefined | null
+    let tier: string | number | undefined
 
     try {
-      electionDate = race?.election?.electionDay
-      termLength = race?.position?.electionFrequencies[0].frequency[0]
-      level = race?.position?.level.toLowerCase()
-      positionId = race?.position.id
-      mtfcc = race?.position.mtfcc
-      geoId = race?.position.geoId
+      electionDate = race?.election?.electionDay as string | undefined
+      termLength = race?.position?.electionFrequencies[0].frequency[0] as number
+      level = race?.position?.level.toLowerCase() as string
+      positionId = race?.position?.id
+      mtfcc = race?.position.mtfcc as string | undefined | null
+      geoId = race?.position.geoId as string | undefined | null
       tier = race?.position.tier
     } catch (e) {
       this.logger.error(slug, 'error getting election date', e)
@@ -291,17 +296,17 @@ export class RacesService {
       this.logger.debug(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const geoData: any = await this.resolveMtfcc(mtfcc, geoId)
+        const geoData = (await this.resolveMtfcc(mtfcc, geoId)) as GeoData
         this.logger.debug(slug, 'geoData', geoData)
         if (geoData?.city) {
-          city = geoData.city
+          city = geoData.city as string
           if (electionLevel !== 'city') {
             electionLevel = 'city'
           }
         }
         if (geoData?.county) {
           if (electionLevel !== 'county') {
-            county = geoData.county
+            county = geoData.county as string
             electionLevel = 'county'
           }
         }
@@ -313,22 +318,22 @@ export class RacesService {
         // TODO: electionLevel='local' could cause issues upstream
         // so we are leaving electionLevel as city for now.
         if (geoData?.township) {
-          city = geoData.township
+          city = geoData.township as string
           // electionLevel = 'local';
           electionLevel = 'city'
         }
         if (geoData?.town) {
-          city = geoData.town
+          city = geoData.town as string
           // electionLevel = 'local';
           electionLevel = 'city'
         }
         if (geoData?.village) {
-          city = geoData.village
+          city = geoData.village as string
           // electionLevel = 'local';
           electionLevel = 'city'
         }
         if (geoData?.borough) {
-          city = geoData.borough
+          city = geoData.borough as string
           // electionLevel = 'local';
           electionLevel = 'city'
         }
@@ -354,23 +359,27 @@ export class RacesService {
         )
 
         // If we couldn't get city/county with mtfcc/geo then use the AI.
-        locationResp = await this.extractLocationAi(
+        locationResp = (await this.extractLocationAi(
           officeName + ' - ' + electionState,
           level,
-        )
+        )) as {
+          level: string
+          county?: string
+          [key: string]: string | undefined
+        }
         this.logger.debug(slug, 'locationResp', locationResp)
       }
 
       if (locationResp?.level) {
         if (locationResp.level === 'county') {
-          county = locationResp.county
+          county = locationResp.county as string
         } else {
           if (
             locationResp.county &&
             locationResp.hasOwnProperty(locationResp.level)
           ) {
-            city = locationResp[locationResp.level]
-            county = locationResp.county
+            city = locationResp[locationResp.level] as string
+            county = locationResp.county as string
           }
         }
       }
@@ -408,7 +417,7 @@ export class RacesService {
           slug,
           officeName,
           zip,
-          race?.position?.level,
+          race?.position?.level as PositionLevel,
         )
       }
     }
@@ -418,12 +427,12 @@ export class RacesService {
     data.electionDate = electionDate
     data.electionTerm = termLength
     data.electionLevel = electionLevel
-    data.electionState = electionState
+    data.electionState = electionState as string | undefined
     data.electionCounty = county
     data.electionMunicipality = city
     data.subAreaName = subAreaName
     data.subAreaValue = subAreaValue
-    data.partisanType = partisanType
+    data.partisanType = partisanType as string | undefined
     data.priorElectionDates = priorElectionDates
     data.positionId = positionId
     data.tier = tier
@@ -507,7 +516,7 @@ export class RacesService {
     const messages: AiChatMessage[] = [
       {
         role: 'system',
-        content: systemPrompt,
+        content: systemPrompt as string,
       },
       {
         role: 'user',
@@ -516,16 +525,15 @@ export class RacesService {
       },
     ]
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toolChoice: any = {
+    const toolChoice = {
       type: 'function',
       function: { name: 'extractLocation' },
     }
 
     const completion = await this.ai.getChatToolCompletion({
       messages,
-      tool, // list of functions that could be called.
-      toolChoice, // force the function to be called on every generation if needed.
+      tool: tool as ChatCompletionTool,
+      toolChoice: toolChoice as ChatCompletionNamedToolChoice,
     })
 
     this.logger.debug(
@@ -533,10 +541,9 @@ export class RacesService {
     )
 
     const content = completion?.content
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let decodedContent: any = {}
+    let decodedContent: Record<string, string> = {}
     try {
-      decodedContent = JSON.parse(content)
+      decodedContent = JSON.parse(content) as Record<string, string>
       decodedContent.level = level
     } catch (e) {
       this.logger.debug('error at extract-location-ai helper', e)

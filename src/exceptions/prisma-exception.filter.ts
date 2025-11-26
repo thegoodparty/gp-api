@@ -19,11 +19,17 @@ const prismaErrorClasses = [
 export class PrismaExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(PrismaExceptionFilter.name)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  catch(exception: any, host: ArgumentsHost) {
+  catch(
+    exception: Prisma.PrismaClientKnownRequestError | Error,
+    host: ArgumentsHost,
+  ) {
     const ctx = host.switchToHttp()
-    const response = ctx.getResponse()
-    const request = ctx.getRequest()
+    const response: {
+      status: (code: number) => {
+        send: (body: Record<string, (() => string) | string | number>) => void
+      }
+    } = ctx.getResponse()
+    const request: { url: string; method: string } = ctx.getRequest()
 
     let statusCode: HttpStatus | null = null
     let message: string | null = null
@@ -66,16 +72,21 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       `Exception caught: ${message}`,
       exception.stack || 'No stack trace available',
       {
-        url: request.url,
-        method: request.method,
+        url: (request as { url: string }).url,
+        method: (request as { method: string }).method,
         statusCode,
       },
     )
 
-    response.status(statusCode).send({
+    const typedResponse = response as {
+      status: (code: number) => {
+        send: (body: Record<string, (() => string) | string | number>) => void
+      }
+    }
+    typedResponse.status(statusCode).send({
       statusCode,
       timestamp: new Date().toISOString,
-      path: request.url,
+      path: (request as { url: string }).url,
       error: message,
     })
   }

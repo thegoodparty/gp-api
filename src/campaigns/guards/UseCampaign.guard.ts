@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { Campaign } from '@prisma/client'
 import { Reflector } from '@nestjs/core'
 import { CampaignsService } from '../services/campaigns.service'
 import {
@@ -27,7 +28,11 @@ export class UseCampaignGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest()
+    const request = context.switchToHttp().getRequest<{
+      params: { slug: string }
+      campaign?: Campaign
+      user: { id: number }
+    }>()
 
     const { continueIfNotFound, include: campaignInclude } =
       this.reflector.getAllAndOverride<RequireCamapaignMetadata>(

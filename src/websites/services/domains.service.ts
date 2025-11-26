@@ -180,8 +180,11 @@ export class DomainsService
       )
     }
 
-    const result = await this.payments.getValidatedPaymentUser(paymentIntentId)
-    const user = result.user
+    const validatedPayment: {
+      paymentIntent: Record<string, unknown>
+      user: User
+    } = await this.payments.getValidatedPaymentUser(paymentIntentId)
+    const { paymentIntent: _paymentIntent, user } = validatedPayment
 
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
 
@@ -195,8 +198,8 @@ export class DomainsService
     const domain = await this.model.create({
       data: {
         websiteId: validWebsiteId,
-        name: domainName!,
-        price: this.validateDomainSearchResult(searchResult).price,
+        name: domainName as string,
+        price: this.validateDomainSearchResult(searchResult).price as number,
         paymentId: paymentIntentId,
         status: DomainStatus.pending,
       },
@@ -648,7 +651,7 @@ export class DomainsService
         if (
           errorMessage.includes('no such payment_intent') ||
           errorMessage.includes('not found') ||
-          errorCode === 'resource_missing'
+          (error as Error & { code?: string }).code === 'resource_missing'
         ) {
           // Payment doesn't exist - this might be acceptable in some cases
           // Return null to maintain backward compatibility for now
@@ -660,7 +663,7 @@ export class DomainsService
           errorMessage.includes('network') ||
           errorMessage.includes('timeout') ||
           errorMessage.includes('service') ||
-          errorCode === 'api_connection_error'
+          (error as Error & { code?: string }).code === 'api_connection_error'
         ) {
           throw new BadGatewayException(
             `Stripe service unavailable: ${error.message}`,
@@ -670,7 +673,7 @@ export class DomainsService
         // Invalid payment ID format
         if (
           errorMessage.includes('invalid') ||
-          errorCode === 'invalid_request_error'
+          (error as Error & { code?: string }).code === 'invalid_request_error'
         ) {
           throw new BadRequestException(
             `Invalid payment ID format: ${error.message}`,

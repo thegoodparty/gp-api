@@ -41,15 +41,17 @@ export class DeclareService {
       throw new BadGatewayException('Failed to fetch data from Hubspot API')
     }
 
-    const data = response.data?.results || []
+    const data = (response.data?.results || []) as Array<{
+      values: Array<{ value: string }>
+    }>
 
     const uniqueSignatures = new Set<string>()
 
     if (data?.length) {
       for (const submission of data) {
         if (submission.values.length > 0) {
-          let firstName = submission.values[0].value
-          let lastName = submission.values[1].value
+          let firstName: string = submission.values[0].value
+          let lastName: string = submission.values[1].value
           // format the names to look nice and prevent duplicates.
           if (firstName && firstName.length >= 2) {
             firstName = capitalizeString(firstName)

@@ -152,8 +152,9 @@ export class AreaCodeFromZipService {
     }
 
     try {
-      const parsed = JSON.parse(jsonContent)
-      const validationResult = AreaCodeResponseSchema.safeParse(parsed)
+      const validationResult = AreaCodeResponseSchema.safeParse(
+        JSON.parse(jsonContent),
+      )
 
       if (!validationResult.success) {
         this.logger.error(

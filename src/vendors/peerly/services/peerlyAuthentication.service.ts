@@ -7,6 +7,7 @@ import { isAxiosResponse } from '../../../shared/util/http.util'
 import { JwtService } from '@nestjs/jwt'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { AxiosResponse } from 'axios'
+import { PeerlyIdentity } from '@/vendors/peerly/peerly.types'
 
 const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
 
@@ -22,7 +23,7 @@ export interface PeerlyAuthenticatedUser {
   last_name: string
   email: string
   user_type: string
-  identities: any[]
+  identities: PeerlyIdentity[]
   first_name: string
   local_timezone: string
 }

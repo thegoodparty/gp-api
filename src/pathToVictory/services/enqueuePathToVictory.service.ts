@@ -5,7 +5,10 @@ import { QueueProducerService } from '../../queue/producer/queueProducer.service
 import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
-import { PathToVictoryQueueMessage } from '../types/pathToVictory.types'
+import {
+  PathToVictoryInput,
+  PathToVictoryQueueMessage,
+} from '../types/pathToVictory.types'
 import { MessageGroup, QueueType } from '../../queue/queue.types'
 
 @Injectable()
@@ -71,8 +74,11 @@ export class EnqueuePathToVictoryService {
           type: QueueType.PATH_TO_VICTORY,
           data: {
             campaignId: campaignId.toString(),
-            ...raceData,
-          },
+            ...(raceData as Record<
+              string,
+              string | number | boolean | string[]
+            >),
+          } as PathToVictoryInput,
         }
 
         // Update Campaign details
@@ -82,20 +88,11 @@ export class EnqueuePathToVictoryService {
             data: {
               details: {
                 ...details,
-                ...(raceData && {
-                  officeTermLength: raceData.electionTerm,
-                  electionDate: raceData.electionDate,
-                  level: raceData.electionLevel,
-                  state: raceData.electionState,
-                  county: raceData.electionCounty,
-                  city: raceData.electionMunicipality,
-                  district: raceData.subAreaValue,
-                  partisanType: raceData.partisanType,
-                  priorElectionDates: raceData.priorElectionDates,
-                  positionId: raceData.positionId,
-                  tier: raceData.tier,
-                }),
-              },
+                ...(raceData as Record<
+                  string,
+                  string | number | boolean | string[]
+                >),
+              } as PrismaJson.CampaignDetails,
             },
           })
         }
@@ -122,7 +119,7 @@ export class EnqueuePathToVictoryService {
       }
 
       this.logger.debug('queueing Message', queueMessage)
-      await this.queueService.sendMessage(queueMessage, MessageGroup.p2v)
+      await this.queueService.sendMessage(queueMessage!, MessageGroup.p2v)
       return { message: 'ok' }
     } catch (e) {
       this.logger.error('error at enqueue', e)
