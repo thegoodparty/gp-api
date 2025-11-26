@@ -367,14 +367,16 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
-      ...(stateCode && areaCodes && areaCodes.length > 0 ? {
-        jobAreas: [
-          {
-            didState: stateCode,
-            disNpaSubset: areaCodes,
-          },
-        ],
-      } : {}),
+      ...(stateCode && areaCodes && areaCodes.length > 0
+        ? {
+            jobAreas: [
+              {
+                didState: stateCode,
+                didNpaSubset: areaCodes,
+              },
+            ],
+          }
+        : {}),
     }
 
     this.logger.debug(
