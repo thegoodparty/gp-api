@@ -7,6 +7,7 @@ import {
   ChatCompletionTool,
   ChatCompletionToolChoiceOption,
 } from 'openai/resources/chat/completions'
+import { z } from 'zod'
 
 export interface LlmChatCompletionOptions {
   messages: ChatCompletionMessageParam[]
@@ -20,8 +21,12 @@ export interface LlmChatCompletionOptions {
 }
 
 export interface LlmToolCompletionOptions extends LlmChatCompletionOptions {
-  tools?: ChatCompletionTool[]
+  tools: ChatCompletionTool[]
   toolChoice?: ChatCompletionToolChoiceOption
+}
+
+export interface LlmJsonCompletionOptions<T> extends LlmChatCompletionOptions {
+  schema: z.ZodType<T>
 }
 
 export interface ToolCall {
@@ -36,7 +41,7 @@ export interface ToolCall {
 export interface LlmCompletionResult {
   content: string
   tokens: number
-  model?: string
+  model: string
   toolCalls?: ToolCall[]
 }
 
@@ -61,6 +66,7 @@ export class LlmService {
     this.defaultModels = AI_MODELS.split(',')
       .map((m) => m.trim())
       .filter((m) => m.length > 0)
+
     if (this.defaultModels.length === 0) {
       throw new Error('AI_MODELS must contain at least one model')
     }
@@ -92,60 +98,70 @@ export class LlmService {
 
     const models = this.prepareModelList(providedModels)
 
-    return retry(
-      async (bail) => {
-        let lastError: Error | undefined
-        for (let i = 0; i < models.length; i++) {
-          const currentModel = models[i]
-          try {
-            const result = await this.callChatCompletion({
-              model: currentModel,
-              messages,
-              temperature,
-              topP,
-              maxTokens,
-              timeout,
-              userId,
-            })
-
-            return {
-              ...result,
-              model: currentModel,
-            }
-          } catch (error) {
-            lastError =
-              error instanceof Error ? error : new Error(String(error))
-
-            if (this.isPermanentClientError(error)) {
-              this.logger.error(
-                `Permanent client error for model ${currentModel}, not retrying`,
-                lastError,
-              )
-              bail(lastError)
-            }
-
-            this.logger.warn(
-              `Model ${currentModel} failed, ${i < models.length - 1 ? 'trying fallback' : 'no more fallbacks'}`,
-              lastError,
-            )
-
-            if (i === models.length - 1) {
-              throw lastError
-            }
-          }
-        }
-        throw lastError || new Error('All models failed')
-      },
-      {
-        retries,
-        onRetry: (error, attempt) => {
-          this.logger.warn(
-            `Chat completion attempt ${attempt} failed, retrying...`,
-            error,
-          )
-        },
-      },
+    const { model, result } = await this.withModelFallback(
+      models,
+      retries,
+      'chat completion',
+      (currentModel) =>
+        this.callChatCompletion({
+          model: currentModel,
+          messages,
+          temperature,
+          topP,
+          maxTokens,
+          timeout,
+          userId,
+        }),
     )
+
+    return {
+      ...result,
+      model,
+    }
+  }
+
+  /**
+   * Creates a JSON-mode completion validated against a Zod schema.
+   */
+  async jsonCompletion<T>(
+    options: LlmJsonCompletionOptions<T>,
+  ): Promise<{ object: T; tokens: number; model: string }> {
+    const {
+      messages,
+      schema,
+      models: providedModels,
+      temperature = 0,
+      topP = 1,
+      maxTokens,
+      timeout = this.defaultTimeout,
+      userId,
+      retries = this.defaultRetries,
+    } = options
+
+    const models = this.prepareModelList(providedModels)
+
+    const { model, result } = await this.withModelFallback(
+      models,
+      retries,
+      'json completion',
+      (currentModel) =>
+        this.callJsonCompletion({
+          model: currentModel,
+          messages,
+          schema,
+          temperature,
+          topP,
+          maxTokens,
+          timeout,
+          userId,
+        }),
+    )
+
+    return {
+      object: result.object,
+      tokens: result.tokens,
+      model,
+    }
   }
 
   /**
@@ -168,48 +184,71 @@ export class LlmService {
       retries = this.defaultRetries,
     } = options
 
-    if (!tools || tools.length === 0) {
+    if (!tools.length) {
       throw new Error('Tools must be provided for tool completion')
     }
 
     const models = this.prepareModelList(providedModels)
 
+    const { model, result } = await this.withModelFallback(
+      models,
+      retries,
+      'tool completion',
+      (currentModel) =>
+        this.callToolCompletion({
+          model: currentModel,
+          messages,
+          tools,
+          toolChoice,
+          temperature,
+          topP,
+          maxTokens,
+          timeout,
+          userId,
+        }),
+    )
+
+    return {
+      ...result,
+      model,
+    }
+  }
+
+  /**
+   * Generic helper to run an operation with model fallbacks and retry logic.
+   */
+  private async withModelFallback<R>(
+    models: string[],
+    retries: number,
+    operationLabel: string,
+    fn: (model: string) => Promise<R>,
+  ): Promise<{ model: string; result: R }> {
     return retry(
       async (bail) => {
         let lastError: Error | undefined
+
         for (let i = 0; i < models.length; i++) {
           const currentModel = models[i]
-          try {
-            const result = await this.callToolCompletion({
-              model: currentModel,
-              messages,
-              tools,
-              toolChoice,
-              temperature,
-              topP,
-              maxTokens,
-              timeout,
-              userId,
-            })
 
-            return {
-              ...result,
-              model: currentModel,
-            }
+          try {
+            const result = await fn(currentModel)
+            return { model: currentModel, result }
           } catch (error) {
             lastError =
               error instanceof Error ? error : new Error(String(error))
 
             if (this.isPermanentClientError(error)) {
               this.logger.error(
-                `Permanent client error for model ${currentModel}, not retrying`,
+                `Permanent client error for ${operationLabel} with model ${currentModel}, not retrying`,
                 lastError,
               )
               bail(lastError)
             }
 
             this.logger.warn(
-              `Model ${currentModel} failed for tool completion, ${i < models.length - 1 ? 'trying fallback' : 'no more fallbacks'}`,
+              `Model ${currentModel} failed for ${operationLabel}, ${
+                i < models.length - 1 ? 'trying fallback' : 'no more fallbacks'
+              }`,
               lastError,
             )
 
@@ -218,13 +257,14 @@ export class LlmService {
             }
           }
         }
+
         throw lastError || new Error('All models failed')
       },
       {
         retries,
         onRetry: (error, attempt) => {
           this.logger.warn(
-            `Tool completion attempt ${attempt} failed, retrying...`,
+            `${operationLabel} attempt ${attempt} failed, retrying...`,
             error,
           )
         },
@@ -248,81 +288,24 @@ export class LlmService {
 
   /**
    * Prepares a list of models for fallback, using the provided models or default models.
-   * Utility function for building model fallback chains.
    */
-  prepareModelList(models?: string[]): string[] {
-    if (models && models.length > 0) {
-      return models
-    }
-    return this.defaultModels
+  private prepareModelList(models?: string[]): string[] {
+    return models && models.length > 0 ? models : this.defaultModels
   }
 
   /**
    * Prepares user identification for token caching.
    * TogetherAI API uses this to cache usage and avoid duplicate token charges.
-   * Utility function for building user identification objects.
    */
-  prepareUserIdentification(userId?: string): { user?: string } {
+  private prepareUserIdentification(userId?: string): { user?: string } {
     return userId ? { user: userId } : {}
   }
 
   /**
-   * Sanitizes message content by replacing problematic characters.
-   * Utility function for message preprocessing.
-   * Note: Does not replace backticks to preserve Markdown code blocks.
-   */
-  sanitizeMessageContent(content: string): string {
-    let sanitized = content
-    sanitized = sanitized.replace(/\–/g, '-')
-    return sanitized
-  }
-
-  /**
-   * Sanitizes an array of messages by cleaning their content.
-   * Utility function for message preprocessing.
-   * Handles both string content and multimodal array content.
-   */
-  sanitizeMessages(
-    messages: ChatCompletionMessageParam[],
-  ): ChatCompletionMessageParam[] {
-    return messages.map((message) => {
-      if (typeof message.content === 'string') {
-        return {
-          ...message,
-          content: this.sanitizeMessageContent(message.content),
-        }
-      }
-      if (Array.isArray(message.content)) {
-        return {
-          ...message,
-          content: message.content.map((part) => {
-            if (
-              part &&
-              typeof part === 'object' &&
-              'type' in part &&
-              part.type === 'text' &&
-              'text' in part &&
-              typeof part.text === 'string'
-            ) {
-              return {
-                ...part,
-                text: this.sanitizeMessageContent(part.text),
-              }
-            }
-            return part
-          }),
-        } as ChatCompletionMessageParam
-      }
-      return message
-    })
-  }
-
-  /**
    * Extracts content and tool calls from a chat completion response.
-   * Returns both content and tool calls separately for unambiguous handling.
-   * Utility function for response processing.
+   * Handles both string and array content.
    */
-  extractCompletionContent(completion: ChatCompletion): {
+  private extractCompletionContent(completion: ChatCompletion): {
     content: string
     toolCalls?: ToolCall[]
   } {
@@ -332,27 +315,54 @@ export class LlmService {
       return { content: '' }
     }
 
+    const normalizeContent = (c: unknown): string => {
+      if (typeof c === 'string') {
+        return c
+      }
+
+      if (Array.isArray(c)) {
+        return c
+          .map((part: { type?: string; text?: string }) => {
+            if (part.type === 'text' && typeof part.text === 'string') {
+              return part.text
+            }
+            return ''
+          })
+          .join('')
+      }
+
+      return ''
+    }
+
+    const content = normalizeContent((message as { content: unknown }).content)
+
     if (message.tool_calls && message.tool_calls.length > 0) {
-      const toolCalls: ToolCall[] = message.tool_calls.map((toolCall) => ({
-        id: toolCall.id,
-        type: toolCall.type,
-        function: {
-          name: toolCall.function?.name || '',
-          arguments: toolCall.function?.arguments || '',
-        },
-      }))
+      const toolCalls: ToolCall[] = message.tool_calls.map(
+        (toolCall: {
+          id: string
+          type: string
+          function: { name?: string; arguments?: string }
+        }) => ({
+          id: toolCall.id,
+          type: toolCall.type,
+          function: {
+            name: toolCall.function?.name || '',
+            arguments: toolCall.function?.arguments || '',
+          },
+        }),
+      )
+
       return {
-        content: message.content || '',
+        content,
         toolCalls,
       }
     }
 
-    return { content: message.content || '' }
+    return { content }
   }
 
   /**
    * Internal method to make a chat completion API call.
-   * Handles the actual TogetherAI API request with proper configuration.
    */
   private async callChatCompletion({
     model,
@@ -370,15 +380,14 @@ export class LlmService {
     maxTokens?: number
     timeout: number
     userId?: string
-  }): Promise<LlmCompletionResult> {
-    const sanitizedMessages = this.sanitizeMessages(messages)
+  }): Promise<Omit<LlmCompletionResult, 'model'>> {
     const userIdentification = this.prepareUserIdentification(userId)
 
     const requestParams: Parameters<
-      typeof this.client.chat.completions.create
+      (typeof this.client.chat.completions)['create']
     >[0] = {
       model,
-      messages: sanitizedMessages,
+      messages,
       temperature,
       top_p: topP,
       ...(maxTokens && { max_tokens: maxTokens }),
@@ -389,7 +398,7 @@ export class LlmService {
     this.logger.debug('Making TogetherAI API request', {
       model,
       baseURL: this.client.baseURL,
-      messageCount: sanitizedMessages.length,
+      messageCount: messages.length,
       hasUserId: !!userId,
     })
 
@@ -421,8 +430,90 @@ export class LlmService {
   }
 
   /**
+   * Internal method to make a JSON-mode completion API call.
+   */
+  private async callJsonCompletion<T>({
+    model,
+    messages,
+    schema,
+    temperature,
+    topP,
+    maxTokens,
+    timeout,
+    userId,
+  }: {
+    model: string
+    messages: ChatCompletionMessageParam[]
+    schema: z.ZodType<T>
+    temperature: number
+    topP: number
+    maxTokens?: number
+    timeout: number
+    userId?: string
+  }): Promise<{ object: T; tokens: number }> {
+    const userIdentification = this.prepareUserIdentification(userId)
+
+    const requestParams: Parameters<
+      (typeof this.client.chat.completions)['create']
+    >[0] = {
+      model,
+      messages,
+      temperature,
+      top_p: topP,
+      ...(maxTokens && { max_tokens: maxTokens }),
+      ...userIdentification,
+      stream: false,
+      response_format: { type: 'json_object' },
+    }
+
+    this.logger.debug('Making TogetherAI JSON-mode API request', {
+      model,
+      baseURL: this.client.baseURL,
+      messageCount: messages.length,
+      hasUserId: !!userId,
+    })
+
+    const completion = (await this.client.chat.completions.create(
+      requestParams,
+      {
+        timeout,
+      },
+    )) as ChatCompletion
+    const { content } = this.extractCompletionContent(completion)
+    const tokens = completion.usage?.total_tokens || 0
+
+    const cleanJson = (raw: string): string => {
+      let cleaned = raw.trim()
+      cleaned = cleaned
+        .replace(/^```(?:json)?/i, '')
+        .replace(/```$/, '')
+        .trim()
+      cleaned = cleaned.replace(/,\s*([}\]])/g, '$1')
+      return cleaned
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(cleanJson(content))
+    } catch (err) {
+      this.logger.error('Invalid JSON from model', {
+        model,
+        contentPreview: content.slice(0, 200),
+        error: err instanceof Error ? err.message : String(err),
+      })
+      throw new Error(`Model returned invalid JSON for ${model}`)
+    }
+
+    const object = schema.parse(parsed)
+
+    return {
+      object,
+      tokens,
+    }
+  }
+
+  /**
    * Internal method to make a tool completion API call.
-   * Handles the actual TogetherAI API request with tool/function calling.
    */
   private async callToolCompletion({
     model,
@@ -444,15 +535,14 @@ export class LlmService {
     maxTokens?: number
     timeout: number
     userId?: string
-  }): Promise<LlmCompletionResult> {
-    const sanitizedMessages = this.sanitizeMessages(messages)
+  }): Promise<Omit<LlmCompletionResult, 'model'>> {
     const userIdentification = this.prepareUserIdentification(userId)
 
     const requestParams: Parameters<
-      typeof this.client.chat.completions.create
+      (typeof this.client.chat.completions)['create']
     >[0] = {
       model,
-      messages: sanitizedMessages,
+      messages,
       tools,
       ...(toolChoice && { tool_choice: toolChoice }),
       temperature,
