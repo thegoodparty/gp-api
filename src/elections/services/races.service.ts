@@ -525,16 +525,15 @@ export class RacesService {
       },
     ]
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toolChoice: any = {
+    const toolChoice = {
       type: 'function',
       function: { name: 'extractLocation' },
     }
 
     const completion = await this.ai.getChatToolCompletion({
       messages,
-      tool: tool as unknown as ChatCompletionTool,
-      toolChoice: toolChoice as unknown as ChatCompletionNamedToolChoice,
+      tool: tool as ChatCompletionTool,
+      toolChoice: toolChoice as ChatCompletionNamedToolChoice,
     })
 
     this.logger.debug(
