@@ -78,7 +78,7 @@ export class EnqueuePathToVictoryService {
               string,
               string | number | boolean | string[]
             >),
-          } as unknown as PathToVictoryInput,
+          } as PathToVictoryInput,
         }
 
         // Update Campaign details
@@ -92,7 +92,7 @@ export class EnqueuePathToVictoryService {
                   string,
                   string | number | boolean | string[]
                 >),
-              } as unknown as PrismaJson.CampaignDetails,
+              } as PrismaJson.CampaignDetails,
             },
           })
         }
