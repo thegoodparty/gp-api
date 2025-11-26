@@ -13,4 +13,12 @@ jobs:
           cache: npm
       - run: npm install
       - run: npm run generate
-      - run: npx tsc --noEmit
+
+      - name: Type Check
+        run: npx tsc --noEmit
+
+      - name: Lint Check
+        run: npx eslint "{src,apps,libs,test}/**/*.ts" --max-warnings -1 --quiet
+
+      - name: Format Check
+        run: npx prettier --check "src/**/*.{ts,js,json}"
