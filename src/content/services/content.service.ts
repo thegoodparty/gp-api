@@ -10,6 +10,7 @@ import {
   AIChatPromptContents,
   BlogArticleContentRaw,
   findByTypeOptions,
+  GlossaryItemAugmented,
 } from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
@@ -68,13 +69,16 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     return this.transformContent(type, entries)
   }
 
-  async fetchGlossaryItems() {
+  async fetchGlossaryItems(): Promise<GlossaryItemAugmented[]> {
     const entries = await this.findMany({
       where: {
         type: ContentType.glossaryItem,
       },
     })
-    return this.transformContent(ContentType.glossaryItem, entries)
+    return this.transformContent(
+      ContentType.glossaryItem,
+      entries,
+    ) as GlossaryItemAugmented[]
   }
 
   async getAiContentPrompts() {
