@@ -24,7 +24,7 @@ import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.s
 import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
-import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
+import { sendTevynAPIPollMessage } from 'src/polls/utils/polls.utils'
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -49,6 +49,7 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { format } from 'date-fns'
 
 @Injectable()
 export class QueueConsumerService {
@@ -736,10 +737,13 @@ export class QueueConsumerService {
     this.logger.log('Created individual poll messages')
 
     // 3. Send CSV file to Slack for Tevyn
-    const blocks = buildTevynApiSlackBlocks({
+    await sendTevynAPIPollMessage(this.slackService.client, {
       message: poll.messageContent,
       pollId: poll.id,
-      csvFileUrl: csvUrl,
+      csv: {
+        fileContent: Buffer.from(csv),
+        filename: `${user.email}-${format(poll.scheduledDate, 'yyyy-MM-dd')}.csv`,
+      },
       imageUrl: poll.imageUrl || undefined,
       userInfo: {
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -748,7 +752,6 @@ export class QueueConsumerService {
       },
       isExpansion: params.isExpansion,
     })
-    await this.slackService.message({ blocks }, SlackChannel.botTevynApi)
     this.logger.log('Slack message sent')
 
     return true
