@@ -489,7 +489,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     campaignId: number
     inputValues?: AiContentInputValues | AiContentInputValues[]
     regenerate: boolean
-    oldVersion: { date: Date; text: string }
+    oldVersion?: { date: Date; text: string }
   }) {
     const { aiContent, key, campaignId, inputValues, oldVersion, regenerate } =
       inputs

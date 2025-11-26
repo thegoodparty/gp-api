@@ -62,7 +62,7 @@ export class ElectionsService {
       `Election API GET ${path} params: ${JSON.stringify(filteredParams)}`,
     )
     try {
-      const { data, status } = await lastValueFrom(
+      const { data, status } = (await lastValueFrom(
         this.httpService.get(fullUrl, {
           params: query,
           paramsSerializer: (params) =>
@@ -71,8 +71,8 @@ export class ElectionsService {
               .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
               .join('&'),
         }),
-      )
-      if (status >= 200 && status < 300) return data
+      )) as { data: Record<string, unknown>; status: number }
+      if (status >= 200 && status < 300) return data as Res
       this.logger.warn(`Election API GET ${path}} responded ${status}`)
       return null
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -110,7 +110,10 @@ export class ElectionsService {
       ? JSON.stringify(
           {
             status: error.response?.status,
-            data: error.response?.data,
+            data: error.response?.data as Record<
+              string,
+              string | number | boolean
+            >,
           },
           null,
           2,

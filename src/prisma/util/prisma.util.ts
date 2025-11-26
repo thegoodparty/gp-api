@@ -43,7 +43,11 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
     onModuleInit() {
       // Have to do these in onModuleInit, client is not available at constructor
       for (const method of PASSTHROUGH_MODEL_METHODS) {
-        this[method] = this.model[method].bind(this.model)
+        const thisWithMethod: Record<string, (...args: unknown[]) => unknown> =
+          this as unknown as Record<string, (...args: unknown[]) => unknown>
+        thisWithMethod[method] = this.model[method].bind(this.model) as (
+          ...args: unknown[]
+        ) => unknown
       }
     }
   }

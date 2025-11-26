@@ -73,7 +73,7 @@ export function FilesInterceptor(
       const req = ctx.switchToHttp().getRequest<
         FastifyRequest & {
           fileUploads?: FileUpload[]
-          body?: Record<string, any>
+          body?: Record<string, Prisma.JsonValue>
         }
       >()
 
@@ -83,7 +83,7 @@ export function FilesInterceptor(
       }
 
       req.fileUploads = []
-      req.body ??= {}
+      req.body ??= {} as Record<string, Prisma.JsonValue>
 
       const parts = req.parts({
         limits: { files: numFiles, fileSize: sizeLimit },

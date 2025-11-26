@@ -22,7 +22,7 @@ export interface PeerlyAuthenticatedUser {
   last_name: string
   email: string
   user_type: string
-  identities: any[]
+  identities: Record<string, unknown>[]
   first_name: string
   local_timezone: string
 }

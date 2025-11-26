@@ -48,8 +48,8 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     }
 
     // TODO: these aren't used (threadId is always created, just use const assignment)
-    let threadId
-    let messageId
+    let threadId: string | undefined
+    let messageId: string | undefined
 
     if (!threadId) {
       this.logger.log('creating thread')
@@ -60,14 +60,23 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     this.logger.log('candidateContext', candidateContext)
     this.logger.log('systemPrompt', systemPrompt)
 
-    const completion = await this.aiService.getAssistantCompletion({
+    const completion = (await this.aiService.getAssistantCompletion({
       systemPrompt,
       candidateContext,
       assistantId: LLAMA_AI_ASSISTANT,
       threadId,
       message: chatMessage,
-      messageId,
-    })
+      messageId: messageId!,
+    })) as
+      | {
+          content: string
+          threadId: string
+          id: string
+          role: string
+          createdAt: number
+          usage: number
+        }
+      | undefined
 
     this.logger.log('completion', completion)
 
@@ -115,7 +124,8 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         userId: campaign.user?.id,
       },
     })
-    const messages = aiChat.data.messages
+    const data = aiChat.data as { messages: AiChatMessage[] }
+    const messages = data.messages
 
     const { candidateJson, systemPrompt } =
       await this.contentService.getChatSystemPrompt()
@@ -125,7 +135,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       campaign,
     )
 
-    let messageId
+    let messageId: string | undefined
     if (regenerate) {
       // regenerate last chat response
       const aiMessage = messages[messages.length - 1]
@@ -142,19 +152,28 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       createdAt: new Date().valueOf(),
     }
 
-    const completion = await this.aiService.getAssistantCompletion({
+    const completion = (await this.aiService.getAssistantCompletion({
       systemPrompt,
       candidateContext,
       assistantId: LLAMA_AI_ASSISTANT,
       threadId,
       message: chatMessage,
-      messageId,
+      messageId: messageId!,
       existingMessages: messages,
-    })
+    })) as
+      | {
+          content: string
+          threadId: string
+          id: string
+          role: string
+          createdAt: number
+          usage: number
+        }
+      | undefined
 
     this.logger.log('completion', completion)
 
-    let chatResponse
+    let chatResponse: AiChatMessage | undefined
     if (completion && completion.content) {
       chatResponse = {
         role: 'assistant',
@@ -200,7 +219,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         userId: user.id,
       },
     })
-    const chatData = aiChat.data
+    const chatData = aiChat.data as { messages: AiChatMessage[] }
 
     await this.model.update({
       where: { id: aiChat.id },

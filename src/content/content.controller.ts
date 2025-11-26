@@ -48,7 +48,10 @@ export class ContentController {
   @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}/by-letter`)
   async getGlossaryItemsGroupedByAlpha() {
     return groupGlossaryItemsByAlpha(
-      await this.contentService.fetchGlossaryItems(),
+      (await this.contentService.fetchGlossaryItems()) as unknown as {
+        slug: string
+        title: string
+      }[],
     )
   }
 
@@ -56,7 +59,10 @@ export class ContentController {
   @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}/by-slug`)
   async getGlossaryItemsMappedBySlug() {
     return mapGlossaryItemsToSlug(
-      await this.contentService.fetchGlossaryItems(),
+      (await this.contentService.fetchGlossaryItems()) as unknown as {
+        slug: string
+        title: string
+      }[],
     )
   }
 
