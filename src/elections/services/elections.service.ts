@@ -71,8 +71,8 @@ export class ElectionsService {
               .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
               .join('&'),
         }),
-      )) as { data: Record<string, unknown>; status: number }
-      if (status >= 200 && status < 300) return data as Res
+      )) as { data: Res; status: number }
+      if (status >= 200 && status < 300) return data
       this.logger.warn(`Election API GET ${path}} responded ${status}`)
       return null
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
