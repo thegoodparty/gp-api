@@ -12,8 +12,8 @@ export const groupGlossaryItemsByAlpha = (
         itemAlphaGroups: Map<string, GlossaryItemAugmented[]>,
         item: GlossaryItemAugmented,
       ): Map<string, GlossaryItemAugmented[]> => {
-        const { title } = item as unknown as { title: string }
-        const firstLetter = title.charAt(0).toUpperCase()
+        const { title } = item
+        const firstLetter: string = title.charAt(0).toUpperCase() as string
         return itemAlphaGroups.set(firstLetter, [
           ...(itemAlphaGroups.get(firstLetter) || []),
           item,
