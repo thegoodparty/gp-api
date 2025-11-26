@@ -80,11 +80,10 @@ export class PurchaseService {
       throw new Error('No post-purchase handler found for this purchase type')
     }
 
-    const result = await postPurchaseHandler(
+    return await postPurchaseHandler(
       dto.paymentIntentId,
-      paymentIntent.metadata as unknown as Record<string, string | number>,
+      paymentIntent.metadata,
     )
-    return result
   }
 
   private getPaymentType(purchaseType: PurchaseType): PaymentType {
