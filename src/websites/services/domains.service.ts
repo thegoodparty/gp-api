@@ -29,7 +29,7 @@ import { QueueProducerService } from '../../queue/producer/queueProducer.service
 import { Timeout } from '@nestjs/schedule'
 import { MessageGroup, QueueType } from '../../queue/queue.types'
 import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
-import { BuyDomainResponse } from '@vercel/sdk/models/buydomainop'
+import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
 import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
 import { Records } from '@vercel/sdk/models/getrecordsop'
 import { GetProjectDomainResponseBody } from '@vercel/sdk/models/getprojectdomainop'
@@ -106,7 +106,7 @@ export class DomainsService
     return ENABLE_DOMAIN_SETUP === 'true'
   }
 
-  private validateDomainSearchResult(searchResult) {
+  private validateDomainSearchResult(searchResult: DomainSearchResult) {
     if (!searchResult.price) {
       throw new BadRequestException(
         `Could not get price for domain search result: ${searchResult}`,
@@ -141,24 +141,38 @@ export class DomainsService
     }
 
     const searchResult = await this.searchForDomain(domainName)
+    const validatedResult = this.validateDomainSearchResult(searchResult)
 
-    return this.validateDomainSearchResult(searchResult).price * 100
+    return validatedResult.price! * 100
   }
 
   async executePostPurchase(
     paymentIntentId: string,
     metadata: PurchaseMetadata<DomainPurchaseMetadata>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any> {
+  ): Promise<{
+    domain: Domain
+    registrationResult: {
+      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
+      projectResult: AddProjectDomainResponseBody | null
+      message: string
+    }
+    message: string
+  }> {
     return this.handleDomainPostPurchase(paymentIntentId, metadata)
   }
 
   async handleDomainPostPurchase(
     paymentIntentId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    metadata: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any> {
+    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+  ): Promise<{
+    domain: Domain
+    registrationResult: {
+      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
+      projectResult: AddProjectDomainResponseBody | null
+      message: string
+    }
+    message: string
+  }> {
     const { domainName, websiteId } = metadata
     if (!websiteId) {
       throw new BadRequestException(
@@ -166,8 +180,8 @@ export class DomainsService
       )
     }
 
-    const { paymentIntent: _paymentIntent, user } =
-      await this.payments.getValidatedPaymentUser(paymentIntentId)
+    const result = await this.payments.getValidatedPaymentUser(paymentIntentId)
+    const user = result.user
 
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
 
@@ -464,7 +478,10 @@ export class DomainsService
       throw new BadRequestException('Domain price not available')
     }
 
-    let vercelResult: GetDomainResponseBody | BuyDomainResponse | null = null,
+    let vercelResult:
+        | GetDomainResponseBody
+        | BuySingleDomainResponseBody
+        | null = null,
       existingDomain: GetDomainResponseBody | null = null,
       projectResult: AddProjectDomainResponseBody | null = null,
       forwardEmailDomain: ForwardEmailDomainResponse | null = null
@@ -550,7 +567,7 @@ export class DomainsService
         )
       } catch (e) {
         this.logger.error(
-          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} :`,
+          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} : ${e instanceof Error ? e.message : 'error unknown'}`,
         )
         // Not throwing an error here to allow for continued execution
       }
@@ -627,10 +644,13 @@ export class DomainsService
         const errorMessage = error.message.toLowerCase()
 
         // Stripe returns specific error types for different scenarios
+        const errorCode =
+          'code' in error ? (error as Record<string, string>).code : null
+
         if (
           errorMessage.includes('no such payment_intent') ||
           errorMessage.includes('not found') ||
-          (error as any).code === 'resource_missing'
+          errorCode === 'resource_missing'
         ) {
           // Payment doesn't exist - this might be acceptable in some cases
           // Return null to maintain backward compatibility for now
@@ -642,7 +662,7 @@ export class DomainsService
           errorMessage.includes('network') ||
           errorMessage.includes('timeout') ||
           errorMessage.includes('service') ||
-          (error as any).code === 'api_connection_error'
+          errorCode === 'api_connection_error'
         ) {
           throw new BadGatewayException(
             `Stripe service unavailable: ${error.message}`,
@@ -652,7 +672,7 @@ export class DomainsService
         // Invalid payment ID format
         if (
           errorMessage.includes('invalid') ||
-          (error as any).code === 'invalid_request_error'
+          errorCode === 'invalid_request_error'
         ) {
           throw new BadRequestException(
             `Invalid payment ID format: ${error.message}`,

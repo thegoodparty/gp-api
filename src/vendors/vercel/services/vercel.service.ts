@@ -7,6 +7,7 @@ import type {
 import { ForwardEmailDomainResponse } from '../../forwardEmail/forwardEmail.types'
 import { NotFound } from '@vercel/sdk/models/notfound'
 import { VercelError } from '@vercel/sdk/models/vercelerror'
+import { parsePhoneNumberWithError } from 'libphonenumber-js'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
 
@@ -116,6 +117,8 @@ export class VercelService {
    * @param domainName - The domain name to purchase (e.g. 'example.com')
    * @param contact - Contact information for domain registration
    * @param expectedPrice - The expected price for the domain
+   * @param autoRenew - Whether to auto-renew the domain (defaults to true)
+   * @param years - Number of years to purchase the domain for (defaults to 1)
    * @returns Operation result from Vercel
    */
   async purchaseDomain(
@@ -132,24 +135,48 @@ export class VercelService {
       zipCode: string
     },
     expectedPrice: number,
+    autoRenew: boolean = true,
+    years: number = 1,
   ) {
     try {
       this.logger.debug(`Purchasing domain ${domainName} through Vercel`)
 
-      const result = await this.client.domains.buyDomain({
+      let formattedPhone: string
+      try {
+        const phoneNumber = parsePhoneNumberWithError(contact.phoneNumber, 'US')
+        formattedPhone = phoneNumber.format('E.164')
+        this.logger.debug(`Formatted phone number: ${formattedPhone}`)
+      } catch (phoneError) {
+        this.logger.error(
+          `Error formatting phone number ${contact.phoneNumber}:`,
+          phoneError,
+        )
+        throw new Error(
+          `Invalid phone number format: ${contact.phoneNumber}. Must be a valid US phone number.`,
+        )
+      }
+
+      const result = await this.client.domainsRegistrar.buySingleDomain({
+        domain: domainName.trim(),
         teamId: VERCEL_TEAM_ID,
         requestBody: {
-          name: domainName,
+          autoRenew,
+          years,
           expectedPrice,
-          country: 'US',
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-          email: contact.email,
-          phone: contact.phoneNumber,
-          address1: contact.addressLine1,
-          city: contact.city,
-          state: contact.state,
-          postalCode: contact.zipCode,
+          contactInformation: {
+            firstName: contact.firstName.trim(),
+            lastName: contact.lastName.trim(),
+            email: contact.email.trim(),
+            phone: formattedPhone,
+            address1: contact.addressLine1.trim(),
+            ...(contact.addressLine2?.trim()
+              ? { address2: contact.addressLine2.trim() }
+              : {}),
+            city: contact.city.trim(),
+            state: contact.state.trim(),
+            zip: contact.zipCode.trim(),
+            country: 'US',
+          },
         },
       })
 

@@ -30,8 +30,7 @@ export class AreaCodeFromZipService {
   constructor(
     private readonly s3Service: S3Service,
     private readonly aiService: AiService,
-  ) {
-  }
+  ) {}
 
   /**
    * Gets area codes for a given zip code.
