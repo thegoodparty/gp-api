@@ -225,4 +225,3 @@ test.describe('Campaigns - User Without Campaign', () => {
     expect(body.message).toBe('User campaign already exists.')
   })
 })
-
