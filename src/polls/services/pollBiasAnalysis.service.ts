@@ -11,7 +11,6 @@ import {
   BiasAnalysisResponse,
 } from '../types/pollBias.types'
 import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
-import { isValidationError } from '../utils/pollBiasResponse.util'
 import { convertSubstringsToIndices } from '../utils/pollBiasSpan.util'
 
 @Injectable()
@@ -74,7 +73,7 @@ export class PollBiasAnalysisService {
           const errorMessage =
             error instanceof Error ? error.message : String(error)
 
-          if (isValidationError(error)) {
+          if (this.isValidationError(error)) {
             throw error
           }
 
@@ -145,5 +144,16 @@ export class PollBiasAnalysisService {
       grammar_spans: grammarSpans,
       rewritten_text: validated.rewritten_text,
     }
+  }
+
+  private isValidationError(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+
+    return (
+      errorMessage.includes('Failed to parse') ||
+      errorMessage.includes('Invalid response') ||
+      errorMessage.includes('Bias span') ||
+      errorMessage.includes('ZodError')
+    )
   }
 }
