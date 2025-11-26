@@ -169,7 +169,7 @@ export class AiContentService {
   }) {
     const { slug, key, regenerate } = message
 
-    let campaign = await this.campaignsService.findFirstOrThrow({
+    let campaign: Campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
       include: { pathToVictory: true, user: true },
     })
@@ -244,11 +244,11 @@ export class AiContentService {
         } catch (_e) {
           // dont warn because this is expected to fail sometimes.
         }
-        ;(aiContent as Record<string, Record<string, unknown>>)[key] = {
+        aiContent[key] = {
           name: camelToSentence(key),
           updatedAt: new Date().valueOf(),
           inputValues,
-          content: chatResponse,
+          content: chatResponse as string,
         }
 
         this.logger.log('saving campaign version', key)
