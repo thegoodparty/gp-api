@@ -60,6 +60,9 @@ type GetAssistantCompletionArgs = {
   topP?: number
 }
 
+/**
+ * @deprecated This service is deprecated. Use `LlmService` from `src/llm/services/llm.service` instead.
+ */
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name)
