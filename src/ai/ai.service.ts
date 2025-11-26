@@ -144,9 +144,7 @@ export class AiService {
 
     let completion: BaseMessage | undefined
     try {
-      completion = await modelWithFallback.invoke(
-        sanitizedMessages as unknown as BaseMessage[],
-      )
+      completion = await modelWithFallback.invoke(sanitizedMessages)
     } catch (error) {
       const err = error as Error & {
         response?: Record<string, string | number | boolean>
