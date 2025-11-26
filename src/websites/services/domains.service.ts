@@ -565,7 +565,7 @@ export class DomainsService
         )
       } catch (e) {
         this.logger.error(
-          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} : ${e instanceof Error ? e.message : 'error unknown'}`,
+          `Error setting up email forwarding for domain *@${domain.name} -> ${contact.email} : ${e instanceof Error ? e.message : 'error unknown while attempting to setup email forwarding'}`,
         )
         // Not throwing an error here to allow for continued execution
       }
