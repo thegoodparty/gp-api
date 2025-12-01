@@ -686,17 +686,17 @@ export class QueueConsumerService {
     if (!bucket) {
       throw new Error('TEVYN_POLL_CSVS_BUCKET environment variable is required')
     }
-    // It's important that this filename be deterministic. That way, in the event of a failure
-    // and retry, we can safely re-use a previously generated CSV.
-    const fileName = `${poll.id}-${params.messageId}.csv`
+    // It's important that this filename be deterministic based on the particular poll "run".
+    // That way, in the event of a failure and retry, we can safely re-use a previously generated CSV.
+    // We use the estimated completion date here because it gets set when the poll expanded, and then
+    // does not change.
+    const fileName = `${poll.id}-${poll.estimatedCompletionDate.toISOString()}.csv`
     const key = this.s3Service.buildKey(undefined, fileName)
 
     // 1. Get or create the CSV file of a random sample of contacts.
     // We do get-or-create here so that the logic remains retry-safe in the event of a failure.
     let csv = await this.s3Service.getFile(bucket, key)
 
-    // expires in 7 days
-    const expiresIn = 7 * 24 * 60 * 60
     if (!csv) {
       this.logger.log('No existing CSV found, generating new one')
       const sampleParams = await params.sampleParams(poll)
@@ -709,9 +709,7 @@ export class QueueConsumerService {
         contentType: 'text/csv',
       })
     }
-    const csvUrl = await this.s3Service.getSignedUrlForViewing(bucket, key, {
-      expiresIn,
-    })
+
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages
