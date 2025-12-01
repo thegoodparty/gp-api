@@ -667,7 +667,7 @@ export class QueueConsumerService {
   }) {
     const data = await this.getPollAndCampaign(params.pollId)
     if (!data) {
-      this.logger.log('Poll not found, ignoring event')
+      this.logger.log(`${params.pollId} Poll not found, ignoring event`)
       return
     }
     const { poll, campaign } = data
@@ -675,16 +675,18 @@ export class QueueConsumerService {
     const user = await this.usersService.findUnique({
       where: { id: campaign.userId },
     })
-    this.logger.log('Fetched sample and user')
+    this.logger.log(`${params.pollId} Fetched sample and user`)
 
     if (!user) {
-      this.logger.log('User not found, ignoring event')
+      this.logger.log(`${params.pollId} User not found, ignoring event`)
       return
     }
 
     const bucket = process.env.TEVYN_POLL_CSVS_BUCKET
     if (!bucket) {
-      throw new Error('TEVYN_POLL_CSVS_BUCKET environment variable is required')
+      throw new Error(
+        `${params.pollId} TEVYN_POLL_CSVS_BUCKET environment variable is required`,
+      )
     }
     // It's important that this filename be deterministic based on the particular poll "run".
     // That way, in the event of a failure and retry, we can safely re-use a previously generated CSV.
@@ -698,11 +700,19 @@ export class QueueConsumerService {
     let csv = await this.s3Service.getFile(bucket, key)
 
     if (!csv) {
-      this.logger.log('No existing CSV found, generating new one')
+      this.logger.log(
+        `${params.pollId} No existing CSV found, generating new one`,
+      )
       const sampleParams = await params.sampleParams(poll)
+      this.logger.log(
+        `${poll.id} Sampling contacts with params: ${JSON.stringify(sampleParams)}`,
+      )
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
         campaign,
+      )
+      this.logger.log(
+        `${params.pollId} Generated sample of ${sample.length} contacts`,
       )
       csv = buildCsvFromContacts(sample)
       await this.s3Service.uploadFile(bucket, csv, key, {
@@ -714,25 +724,28 @@ export class QueueConsumerService {
 
     // 2. Create individual poll messages
     const now = new Date()
-    await this.pollsService.client.$transaction(async (tx) => {
-      for (const person of people) {
-        const message: PollIndividualMessage = {
-          // It's important that this id be deterministic, so that we can safely re-upsert
-          // a previous CSV.
-          id: `${poll.id}-${person.id}`,
-          pollId: poll.id,
-          personId: person.id!,
-          sentAt: now,
+    await this.pollsService.client.$transaction(
+      async (tx) => {
+        for (const person of people) {
+          const message: PollIndividualMessage = {
+            // It's important that this id be deterministic, so that we can safely re-upsert
+            // a previous CSV.
+            id: `${poll.id}-${person.id}`,
+            pollId: poll.id,
+            personId: person.id!,
+            sentAt: now,
+          }
+          await tx.pollIndividualMessage.upsert({
+            where: { id: message.id },
+            create: message,
+            update: message,
+          })
         }
-        await tx.pollIndividualMessage.upsert({
-          where: { id: message.id },
-          create: message,
-          update: message,
-        })
-      }
-    })
+      },
+      { maxWait: 10000, timeout: 10000 },
+    )
 
-    this.logger.log('Created individual poll messages')
+    this.logger.log(`${params.pollId} Created individual poll messages`)
 
     // 3. Send CSV file to Slack for Tevyn
     await sendTevynAPIPollMessage(this.slackService.client, {
@@ -750,7 +763,7 @@ export class QueueConsumerService {
       },
       isExpansion: params.isExpansion,
     })
-    this.logger.log('Slack message sent')
+    this.logger.log(`${params.pollId} Slack message sent`)
 
     return true
   }
