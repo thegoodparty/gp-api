@@ -88,37 +88,13 @@ export class QueueConsumerService {
       const success = await this.processMessage(message)
       return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
-      const shouldRequeue = this.shouldRequeueError(error as Error)
-
-      if (shouldRequeue) {
-        this.logger.error('Message processing failed, will requeue:', error)
-        this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
-        return true // Indicate that we should requeue
-      } else {
-        this.logger.error(
-          `Message processing failed with non-retryable error, discarding message: ${JSON.stringify(message)}`,
-          error,
-        )
-
-        // Send error notification to Slack for non-retryable errors
-        try {
-          await this.slackService.errorMessage({
-            message: 'Queue message discarded due to non-retryable error',
-            error: {
-              error,
-              message,
-            },
-          })
-        } catch (slackError) {
-          this.logger.error('Failed to send Slack notification:', slackError)
-        }
-
-        return false // Don't requeue, delete the message
-      }
+      this.logger.error('Message processing failed, will requeue:', error)
+      this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
+      return true // Indicate that we should requeue
     }
   }
 
-  private shouldRequeueError(error: Error): boolean {
+  private legacyShouldRequeueError(error: Error): boolean {
     // Don't retry Prisma errors for missing records - these are permanent failures
     if (error instanceof PrismaClientKnownRequestError) {
       // P2025: Record not found
@@ -141,6 +117,40 @@ export class QueueConsumerService {
 
     // Retry network errors, timeouts, and other temporary failures
     return true
+  }
+
+  private withLegacyErrorSwallowing = async (
+    message: Message,
+    fn: () => Promise<boolean>,
+  ) => {
+    try {
+      return await fn()
+    } catch (error) {
+      const shouldRequeue = this.legacyShouldRequeueError(error as Error)
+      if (shouldRequeue) {
+        return false // Requeue the message
+      }
+
+      this.logger.error(
+        `Message processing failed with non-retryable error, discarding message: ${JSON.stringify(message)}`,
+        error,
+      )
+
+      // Send error notification to Slack for non-retryable errors
+      try {
+        await this.slackService.errorMessage({
+          message: 'Queue message discarded due to non-retryable error',
+          error: {
+            error,
+            message,
+          },
+        })
+      } catch (slackError) {
+        this.logger.error('Failed to send Slack notification:', slackError)
+      }
+
+      return true // Don't requeue, delete the message
+    }
   }
 
   // TODO: Each message type should be assigned it's own SQS queue allowing each
@@ -168,53 +178,61 @@ export class QueueConsumerService {
 
     switch (queueMessage.type) {
       case QueueType.GENERATE_AI_CONTENT:
-        this.logger.log('received generateAiContent message')
-        const generateAiContentMessage =
-          queueMessage.data as GenerateAiContentMessageData
-
-        try {
-          await this.aiContentService.handleGenerateAiContent(
-            generateAiContentMessage,
-          )
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          this.logger.log('received generateAiContent message')
+          const generateAiContentMessage =
+            queueMessage.data as GenerateAiContentMessageData
 
           try {
-            const { userId } = await this.campaignsService.findUniqueOrThrow({
-              where: { slug: generateAiContentMessage.slug },
-            })
-
-            this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
-              slug: generateAiContentMessage.slug,
-              key: generateAiContentMessage.key,
-              regenerate: generateAiContentMessage.regenerate,
-            })
-          } catch (analyticsError) {
-            this.logger.error(
-              'Failed to track analytics for AI content:',
-              analyticsError,
+            await this.aiContentService.handleGenerateAiContent(
+              generateAiContentMessage,
             )
+
+            try {
+              const { userId } = await this.campaignsService.findUniqueOrThrow({
+                where: { slug: generateAiContentMessage.slug },
+              })
+
+              this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+                slug: generateAiContentMessage.slug,
+                key: generateAiContentMessage.key,
+                regenerate: generateAiContentMessage.regenerate,
+              })
+            } catch (analyticsError) {
+              this.logger.error(
+                'Failed to track analytics for AI content:',
+                analyticsError,
+              )
+            }
+          } catch (error) {
+            this.logger.error(
+              `Error processing AI content generation for slug: ${generateAiContentMessage.slug}`,
+              error,
+            )
+            throw error
           }
-        } catch (error) {
-          this.logger.error(
-            `Error processing AI content generation for slug: ${generateAiContentMessage.slug}`,
-            error,
-          )
-          throw error
-        }
-        break
+          return true
+        })
       case QueueType.PATH_TO_VICTORY:
         this.logger.log('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
-        await this.handlePathToVictoryMessage(pathToVictoryMessage)
-        break
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          await this.handlePathToVictoryMessage(pathToVictoryMessage)
+          return true
+        })
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
         this.logger.log('received tcrComplianceStatusCheck message')
-        return await this.handleTcrComplianceCheckMessage(
-          queueMessage.data as TcrComplianceStatusCheckMessage,
+        return await this.withLegacyErrorSwallowing(message, () =>
+          this.handleTcrComplianceCheckMessage(
+            queueMessage.data as TcrComplianceStatusCheckMessage,
+          ),
         )
       case QueueType.DOMAIN_EMAIL_FORWARDING:
         this.logger.log('received domainEmailForwarding message')
-        return await this.handleDomainEmailForwardingMessage(
-          queueMessage.data as DomainEmailForwardingMessage,
+        return await this.withLegacyErrorSwallowing(message, () =>
+          this.handleDomainEmailForwardingMessage(
+            queueMessage.data as DomainEmailForwardingMessage,
+          ),
         )
       case QueueType.POLL_ANALYSIS_COMPLETE:
         this.logger.log('received pollAnalysisComplete message')
@@ -236,8 +254,6 @@ export class QueueConsumerService {
           message.MessageId!,
         )
     }
-    // Return true to delete the message from the queue
-    return true
   }
 
   private async getCvTokenStatus(
