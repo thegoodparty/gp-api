@@ -94,30 +94,61 @@ export class Compute extends pulumi.ComponentResource {
       { parent: this },
     );
 
-    // Create CloudWatch Log Group explicitly (use full name, no 32 char limit here)
     const logGroup = new aws.cloudwatch.LogGroup(`${shortName}-logs`, {
       name: `/ecs/${name}`,
       retentionInDays: 7,
     }, { parent: this });
 
-    // Convert the environment object into the format ECS expects
+    const taskRole = new aws.iam.Role(`${shortName}-task-role`, {
+      assumeRolePolicy: JSON.stringify({
+        Version: '2012-10-17',
+        Statement: [{
+          Action: 'sts:AssumeRole',
+          Effect: 'Allow',
+          Principal: { Service: 'ecs-tasks.amazonaws.com' },
+        }],
+      }),
+    }, { parent: this });
+
+    new aws.iam.RolePolicy(`${shortName}-task-policy`, {
+      role: taskRole.id,
+      policy: JSON.stringify({
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: ['sqs:*'],
+            Resource: '*',
+          },
+          {
+            Effect: 'Allow',
+            Action: ['s3:*', 's3-object-lambda:*'],
+            Resource: '*',
+          },
+          {
+            Effect: 'Allow',
+            Action: ['route53domains:Get*', 'route53domains:List*', 'route53domains:CheckDomainAvailability'],
+            Resource: '*',
+          },
+        ],
+      }),
+    }, { parent: this });
+
     const envVars = pulumi.output(args.environment).apply(env => 
         Object.entries(env).map(([name, value]) => ({ name, value }))
     );
 
-    // Define Fargate Service
     const service = new awsx.ecs.FargateService(
       `${shortName}-svc`,
       {
-        cluster: undefined, // Use default cluster
+        cluster: undefined,
         networkConfiguration: {
           subnets: args.publicSubnetIds,
           securityGroups: [taskSecurityGroup.id],
           assignPublicIp: true,
         },
-        
-        // Task Definition
         taskDefinitionArgs: {
+          taskRole: { roleArn: taskRole.arn },
           container: {
             name: 'gp-api',
             image: args.imageUri,
@@ -136,8 +167,6 @@ export class Compute extends pulumi.ComponentResource {
             },
           },
         },
-
-        // Attach to the Target Group created by the ALB
         loadBalancers: [
           {
             targetGroupArn: lb.defaultTargetGroup.arn,
@@ -145,7 +174,6 @@ export class Compute extends pulumi.ComponentResource {
             containerPort: 80,
           },
         ],
-
         desiredCount: args.isProduction ? 2 : 1,
       },
       { parent: this, dependsOn: [logGroup] },
