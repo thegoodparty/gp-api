@@ -1,0 +1,126 @@
+name: Reusable Deployment
+
+on:
+  workflow_call:
+    inputs:
+      ecr_repository:
+        required: true
+        type: string
+      service_name:
+        required: true
+        type: string
+      pulumi_stack_prefix:
+        required: false
+        type: string
+        default: 'gp-api'
+      # Infrastructure Config Inputs (Required for new stacks)
+      vpc_id:
+        required: true
+        type: string
+      public_subnets:
+        required: true
+        type: string # JSON string
+      security_group_id:
+        required: true
+        type: string
+      certificate_arn:
+        required: true
+        type: string
+      secret_arn:
+        required: true
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  determine-context:
+    runs-on: ubuntu-latest
+    outputs:
+      stack: ${{ steps.context.outputs.stack }}
+      is_preview: ${{ steps.context.outputs.is_preview }}
+    steps:
+      - name: Determine Environment Context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+             echo "stack=${{ inputs.pulumi_stack_prefix }}-pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+             echo "is_preview=true" >> $GITHUB_OUTPUT
+          else
+             SAFE_REF_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g')
+             echo "stack=${{ inputs.pulumi_stack_prefix }}-${SAFE_REF_NAME}" >> $GITHUB_OUTPUT
+             echo "is_preview=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        
+      - name: Build and push Docker image
+        run: |
+          docker build -t ${{ inputs.ecr_repository }}:${{ github.sha }} -f deploy/Dockerfile .
+          docker push ${{ inputs.ecr_repository }}:${{ github.sha }}
+
+  deploy-pulumi:
+    needs: [determine-context, build-docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v4
+        with:
+          pulumi-version: 'latest'
+          command: ''
+          
+      - name: Pulumi Up
+        working-directory: ./deploy/pulumi
+        env:
+          PULUMI_CONFIG_PASSPHRASE: '' 
+        run: |
+          # Select Stack
+          pulumi stack select ${{ needs.determine-context.outputs.stack }} --create
+          
+          # Configure Infrastructure (Essential for new stacks)
+          pulumi config set aws:region us-west-2
+          pulumi config set vpcId ${{ inputs.vpc_id }}
+          pulumi config set --path publicSubnetIds '${{ inputs.public_subnets }}'
+          pulumi config set securityGroupId ${{ inputs.security_group_id }}
+          pulumi config set certificateArn ${{ inputs.certificate_arn }}
+          
+          # Configure Secrets & App
+          pulumi config set imageUri ${{ inputs.ecr_repository }}:${{ github.sha }}
+          pulumi config set secretArn ${{ inputs.secret_arn }} --plaintext
+          
+          # Set Environment Flags
+          if [ "${{ needs.determine-context.outputs.is_preview }}" == "true" ]; then
+             pulumi config set isPreview true
+             pulumi config set isProduction false
+          else
+             pulumi config set isPreview false
+             if [ "${{ github.ref_name }}" == "master" ]; then
+                pulumi config set isProduction true
+             else
+                pulumi config set isProduction false
+             fi
+          fi
+          
+          # Run Update
+          pulumi up --yes --skip-preview

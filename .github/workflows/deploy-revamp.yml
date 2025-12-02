@@ -1,0 +1,36 @@
+name: Deploy (Revamp)
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+  # Enabled PR Triggers for Preview Environments
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      ecr_repository: 333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api
+      service_name: gp-api
+      pulumi_stack_prefix: gp-api
+
+      # Infrastructure Configuration (Using Dev Defaults for Previews)
+      vpc_id: vpc-0763fa52c32ebcf6a
+      # REPLACE with actual Public Subnets (e.g. from AWS console)
+      # Currently using placeholders as we don't have the real IDs yet.
+      # User MUST update this before pushing.
+      public_subnets: '["subnet-07984b965dabfdedc", "subnet-01c540e6428cdd8db"]'
+      security_group_id: sg-0e01f208be74c2a2b
+      certificate_arn: arn:aws:acm:us-west-2:333022194791:certificate/227d8028-477a-4d75-999f-60587a8a11e3
+      secret_arn: arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4
+
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
