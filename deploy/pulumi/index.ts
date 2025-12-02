@@ -72,7 +72,7 @@ if (isPreview) {
 const finalEnvVars = pulumi.all([secretData, databaseUrl, queue.queueName, queue.queueUrl]).apply(([data, dbUrl, qName, qUrl]) => ({
     ...data,
     DATABASE_URL: dbUrl,
-    NODE_ENV: isProduction ? 'production' : 'development',
+    NODE_ENV: 'production',
     SQS_QUEUE: qName,
     SQS_QUEUE_BASE_URL: qUrl.replace(`/${qName}`, ''),
     PORT: '80',
