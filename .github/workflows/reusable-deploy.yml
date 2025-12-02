@@ -121,6 +121,9 @@ jobs:
         env:
           PULUMI_CONFIG_PASSPHRASE: ''
         run: |
+          # Login to S3 Backend
+          pulumi login s3://gp-api-pulumi-state
+
           # Select Stack
           pulumi stack select ${{ needs.determine-context.outputs.stack }} --create
 

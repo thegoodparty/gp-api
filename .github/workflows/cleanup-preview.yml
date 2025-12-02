@@ -31,6 +31,9 @@ jobs:
         env:
           PULUMI_CONFIG_PASSPHRASE: ''
         run: |
+          # Login to S3 Backend
+          pulumi login s3://gp-api-pulumi-state
+          
           # Should match the naming convention in reusable-deploy.yml
           STACK_NAME="gp-api-pr-${{ github.event.number }}"
           echo "Destroying stack: $STACK_NAME"
