@@ -45,7 +45,7 @@ export class Database extends pulumi.ComponentResource {
       const cluster = new aws.rds.Cluster(`${name}-cluster`, {
           engine: aws.rds.EngineType.AuroraPostgresql,
           engineMode: "provisioned",
-          engineVersion: "15.4",
+          engineVersion: "16.4",
           databaseName: "gp_api",
           masterUsername: "postgres",
           masterPassword: passwordVersion.secretString.apply(s => s ?? "defaultpass"),
@@ -63,7 +63,6 @@ export class Database extends pulumi.ComponentResource {
           clusterIdentifier: cluster.id,
           instanceClass: "db.serverless",
           engine: aws.rds.EngineType.AuroraPostgresql,
-          engineVersion: cluster.engineVersion,
       }, { parent: this });
 
       this.url = pulumi.interpolate`postgresql://postgres:${passwordVersion.secretString}@${cluster.endpoint}:5432/gp_api`;
