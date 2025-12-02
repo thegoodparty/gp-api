@@ -5,8 +5,8 @@ export interface DatabaseArgs {
   vpcId: pulumi.Input<string>;
   subnetIds: pulumi.Input<string[]>;
   securityGroupId: pulumi.Input<string>;
+  ecsSecurityGroupId?: pulumi.Input<string>; // Security group of ECS tasks
   isPreview: boolean;
-  // For importing existing DB (prod/dev) or naming new ones
   clusterIdentifier?: string;
 }
 
@@ -38,6 +38,28 @@ export class Database extends pulumi.ComponentResource {
           subnetIds: args.subnetIds,
       }, { parent: this });
 
+      // Create security group for RDS that allows traffic from ECS tasks
+      const dbSecurityGroup = new aws.ec2.SecurityGroup(`${name}-db-sg`, {
+          vpcId: args.vpcId,
+          description: 'Security group for preview RDS',
+          ingress: [
+            {
+              protocol: 'tcp',
+              fromPort: 5432,
+              toPort: 5432,
+              cidrBlocks: ['10.0.0.0/8'], // Allow from VPC CIDR
+            },
+          ],
+          egress: [
+            {
+              protocol: '-1',
+              fromPort: 0,
+              toPort: 0,
+              cidrBlocks: ['0.0.0.0/0'],
+            },
+          ],
+      }, { parent: this });
+
       const cluster = new aws.rds.Cluster(`${name}-cluster`, {
           engine: aws.rds.EngineType.AuroraPostgresql,
           engineMode: "provisioned",
@@ -46,7 +68,7 @@ export class Database extends pulumi.ComponentResource {
           masterUsername: "postgres",
           masterPassword: passwordVersion.secretString.apply(s => s ?? "defaultpass"),
           dbSubnetGroupName: subnetGroup.name,
-          vpcSecurityGroupIds: [args.securityGroupId],
+          vpcSecurityGroupIds: [dbSecurityGroup.id],
           skipFinalSnapshot: true,
           serverlessv2ScalingConfiguration: {
               minCapacity: 0.5,
