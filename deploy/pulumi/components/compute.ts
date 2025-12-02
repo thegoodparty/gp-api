@@ -24,9 +24,32 @@ export class Compute extends pulumi.ComponentResource {
   ) {
     super('gp:compute:Compute', name, {}, opts);
 
-    // Create Application Load Balancer
     // Shorten name to stay under 32 char AWS limit
     const shortName = name.length > 20 ? name.substring(0, 20) : name;
+
+    // Create Security Group for ECS Tasks (allows traffic from ALB)
+    const taskSecurityGroup = new aws.ec2.SecurityGroup(`${shortName}-task-sg`, {
+      vpcId: args.vpcId,
+      description: 'Security group for ECS tasks',
+      ingress: [
+        {
+          protocol: 'tcp',
+          fromPort: 80,
+          toPort: 80,
+          securityGroups: [args.securityGroupId], // Allow from ALB SG
+        },
+      ],
+      egress: [
+        {
+          protocol: '-1',
+          fromPort: 0,
+          toPort: 0,
+          cidrBlocks: ['0.0.0.0/0'],
+        },
+      ],
+    }, { parent: this });
+
+    // Create Application Load Balancer
     const lb = new awsx.lb.ApplicationLoadBalancer(
       `${shortName}-alb`,
       {
@@ -71,11 +94,13 @@ export class Compute extends pulumi.ComponentResource {
       { parent: this },
     );
 
+    // Create CloudWatch Log Group explicitly (use full name, no 32 char limit here)
+    const logGroup = new aws.cloudwatch.LogGroup(`${shortName}-logs`, {
+      name: `/ecs/${name}`,
+      retentionInDays: 7,
+    }, { parent: this });
+
     // Convert the environment object into the format ECS expects
-    // We handle this inside the FargateService definition or transform it here.
-    // awsx.ecs.FargateService taskDefinitionArgs.container.environment expects NameKeyPair[]
-    // But Pulumi allows passing a generic map if we transform it.
-    
     const envVars = pulumi.output(args.environment).apply(env => 
         Object.entries(env).map(([name, value]) => ({ name, value }))
     );
@@ -84,25 +109,29 @@ export class Compute extends pulumi.ComponentResource {
     const service = new awsx.ecs.FargateService(
       `${shortName}-svc`,
       {
-        cluster: undefined, // Use default cluster or pass one if needed
-        assignPublicIp: true, // Required for Fargate in public subnets
+        cluster: undefined, // Use default cluster
+        networkConfiguration: {
+          subnets: args.publicSubnetIds,
+          securityGroups: [taskSecurityGroup.id],
+          assignPublicIp: true,
+        },
         
         // Task Definition
         taskDefinitionArgs: {
           container: {
             name: 'gp-api',
             image: args.imageUri,
-            cpu: args.isProduction ? 1024 : 256, // .25 vCPU for preview, 1 vCPU for prod
-            memory: args.isProduction ? 2048 : 512, // 512MB for preview, 2GB for prod
-            portMappings: [{ containerPort: 80 }],
+            cpu: args.isProduction ? 1024 : 512,
+            memory: args.isProduction ? 2048 : 1024,
+            essential: true,
+            portMappings: [{ containerPort: 80, hostPort: 80, protocol: 'tcp' }],
             environment: envVars,
             logConfiguration: {
               logDriver: 'awslogs',
               options: {
-                'awslogs-group': `/ecs/${name}`,
-                'awslogs-region': aws.config.region,
+                'awslogs-group': logGroup.name,
+                'awslogs-region': 'us-west-2',
                 'awslogs-stream-prefix': 'ecs',
-                'awslogs-create-group': 'true',
               },
             },
           },
@@ -119,7 +148,7 @@ export class Compute extends pulumi.ComponentResource {
 
         desiredCount: args.isProduction ? 2 : 1,
       },
-      { parent: this },
+      { parent: this, dependsOn: [logGroup] },
     );
 
     this.url = lb.loadBalancer.dnsName;
