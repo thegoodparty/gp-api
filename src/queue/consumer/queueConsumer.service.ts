@@ -742,7 +742,7 @@ export class QueueConsumerService {
           })
         }
       },
-      { maxWait: 10000, timeout: 10000 },
+      { timeout: 10000 },
     )
 
     this.logger.log(`${params.pollId} Created individual poll messages`)
