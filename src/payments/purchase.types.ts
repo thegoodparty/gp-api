@@ -18,16 +18,16 @@ export interface CompletePurchaseDto {
   paymentIntentId: string
 }
 
-export type PostPurchaseHandler<Metadata> = (
+export type PostPurchaseHandler<Metadata, Result = unknown> = (
   paymentIntentId: string,
   metadata: Metadata,
-) => Promise<unknown>
+) => Promise<Result>
 
-export interface PurchaseHandler<Metadata> {
+export interface PurchaseHandler<Metadata, Result = unknown> {
   validatePurchase(metadata: Metadata): Promise<void | Stripe.PaymentIntent>
   calculateAmount(metadata: Metadata): Promise<number>
   executePostPurchase?(
     paymentIntentId: string,
     metadata: Metadata,
-  ): Promise<unknown>
+  ): Promise<Result>
 }
