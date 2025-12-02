@@ -14,6 +14,11 @@ import Stripe from 'stripe'
 @Injectable()
 export class PurchaseService {
   private readonly logger = new Logger('PurchaseService')
+  // TODO: Refactor to remove the "handlers" anti-pattern here. It's absolutely
+  //  over-engineered, causes confusion and obfuscation in the code. It also
+  //  tightly couples the purchasing logic flows, with the logic flows of _what_
+  //  is being purchased and _how_ it is being purchased:
+  //  https://app.clickup.com/t/90132012119/ENG-4065
   private handlers: Map<PurchaseType, PurchaseHandler<unknown>> = new Map()
   private postPurchaseHandlers: Map<
     PurchaseType,
