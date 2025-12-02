@@ -26,7 +26,7 @@ export class Database extends pulumi.ComponentResource {
       
       // 1. Create Random Password
       const password = new aws.secretsmanager.Secret(`${name}-db-pass`, {
-          name: `gp-api-preview-db-${name}-${Date.now()}`,
+          name: `gp-api-preview-db-${name}`,
       }, { parent: this });
       
       const passwordVersion = new aws.secretsmanager.SecretVersion(`${name}-db-pass-ver`, {

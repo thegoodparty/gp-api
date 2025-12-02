@@ -1,12 +1,12 @@
 name: Cleanup Preview
 
+permissions:
+  contents: read
+  id-token: write
+
 on:
   pull_request:
     types: [closed]
-
-permissions:
-  id-token: write
-  contents: read
 
 jobs:
   destroy:

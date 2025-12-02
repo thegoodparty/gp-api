@@ -1,5 +1,9 @@
 name: Reusable Deployment
 
+permissions:
+  contents: read
+  id-token: write
+
 on:
   workflow_call:
     inputs:

@@ -78,6 +78,9 @@ Update the file after completing each sub-task, not just after completing an ent
     - [x] 2.3.2 Add `AWS_ROLE_ARN` and `PULUMI_ACCESS_TOKEN` to GitHub Secrets (User action).
   - [ ] 2.4 Verify CI/CD
     - [ ] 2.4.1 Push changes and verify the workflow successfully deploys to the shadow stack.
+  - [x] 2.5 Fix Security Issues
+    - [x] 2.5.1 Remove `Date.now()` from secret naming to ensure idempotent deployments.
+    - [x] 2.5.2 Add explicit `permissions` blocks to all workflows.
 
 - [ ] 3.0 Phase 3: Preview Environments Implementation
   - [x] 3.1 Implement Dedicated Database Logic
