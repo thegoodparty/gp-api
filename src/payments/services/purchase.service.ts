@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import {
   CompletePurchaseDto,
   CreatePurchaseIntentDto,
@@ -9,6 +9,7 @@ import {
 } from '../purchase.types'
 import { PaymentsService } from './payments.service'
 import { PaymentIntentPayload, PaymentType } from '../payments.types'
+import Stripe from 'stripe'
 
 @Injectable()
 export class PurchaseService {
@@ -35,16 +36,32 @@ export class PurchaseService {
     this.postPurchaseHandlers.set(type, handler)
   }
 
-  async createPurchaseIntent(
-    user: User,
-    dto: CreatePurchaseIntentDto<unknown>,
-  ): Promise<{ clientSecret: string; amount: number }> {
+  async createPurchaseIntent({
+    user,
+    dto,
+    campaign,
+  }: {
+    user: User
+    dto: CreatePurchaseIntentDto<unknown>
+    campaign?: Campaign
+  }): Promise<{
+    id: string
+    clientSecret: string
+    amount: number
+    status: Stripe.PaymentIntent.Status
+  }> {
     const handler = this.handlers.get(dto.type)
     if (!handler) {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
     }
 
-    await handler.validatePurchase(dto.metadata)
+    const existingPaymentIntent: void | Stripe.PaymentIntent =
+      await handler.validatePurchase({
+        // TODO: Remove this cast once `unknown` is removed from `PurchaseMetadata`
+        //  https://app.clickup.com/t/90132012119/ENG-6107
+        ...(dto.metadata as Record<string, unknown>),
+        ...(campaign?.id ? { campaignId: campaign?.id } : {}),
+      })
     const amount = await handler.calculateAmount(dto.metadata)
 
     const paymentMetadata = {
@@ -54,14 +71,15 @@ export class PurchaseService {
       purchaseType: dto.type,
     } as PaymentIntentPayload<PaymentType>
 
-    const paymentIntent = await this.paymentsService.createPayment(
-      user,
-      paymentMetadata,
-    )
+    const paymentIntent =
+      existingPaymentIntent ||
+      (await this.paymentsService.createPayment(user, paymentMetadata))
 
     return {
+      id: paymentIntent.id,
       clientSecret: paymentIntent.client_secret!,
       amount: paymentIntent.amount / 100,
+      status: paymentIntent.status,
     }
   }
 
