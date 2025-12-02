@@ -25,8 +25,10 @@ export class Compute extends pulumi.ComponentResource {
     super('gp:compute:Compute', name, {}, opts);
 
     // Create Application Load Balancer
+    // Shorten name to stay under 32 char AWS limit
+    const shortName = name.length > 20 ? name.substring(0, 20) : name;
     const lb = new awsx.lb.ApplicationLoadBalancer(
-      `${name}-alb`,
+      `${shortName}-alb`,
       {
         subnetIds: args.publicSubnetIds,
         securityGroups: [args.securityGroupId],
@@ -80,7 +82,7 @@ export class Compute extends pulumi.ComponentResource {
 
     // Define Fargate Service
     const service = new awsx.ecs.FargateService(
-      `${name}-service`,
+      `${shortName}-svc`,
       {
         cluster: undefined, // Use default cluster or pass one if needed
         assignPublicIp: true, // Required for Fargate in public subnets
