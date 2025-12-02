@@ -116,6 +116,10 @@ jobs:
           pulumi-version: 'latest'
           command: ''
 
+      - name: Install Pulumi SDK Dependencies
+        working-directory: ./deploy/pulumi
+        run: npm install
+
       - name: Pulumi Up
         working-directory: ./deploy/pulumi
         env:
