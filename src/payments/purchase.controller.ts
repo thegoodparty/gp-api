@@ -39,7 +39,7 @@ export class PurchaseController {
   @Post('create-intent')
   async createPurchaseIntent(
     @ReqUser() user: User,
-    @Body() dto: CreatePurchaseIntentDto,
+    @Body() dto: CreatePurchaseIntentDto<unknown>,
   ) {
     return this.purchaseService.createPurchaseIntent(user, dto)
   }
