@@ -3,6 +3,7 @@ import * as aws from '@pulumi/aws';
 import { Compute } from './components/compute';
 import { Database } from './components/database';
 import { Queue } from './components/queue';
+import { Monitoring } from './components/monitoring';
 
 const config = new pulumi.Config();
 const stackName = pulumi.getStack();
@@ -19,25 +20,32 @@ const secretArn = config.require('secretArn');
 const isPreview = config.getBoolean('isPreview') || false;
 const isProduction = config.getBoolean('isProduction') || false;
 
-// Determine Stage Name for Naming Conventions
 let stageName = 'dev';
+let prNumber: string | undefined;
+
 if (isPreview) {
-    // e.g., gp-api-pr-123 -> pr-123
     const parts = stackName.split('-');
     if (stackName.includes('pr-')) {
-        stageName = `pr-${parts[parts.length - 1]}`;
+        prNumber = parts[parts.length - 1];
+        stageName = `pr-${prNumber}`;
     }
 } else if (isProduction) {
     stageName = 'prod';
 } else {
-    // Default to 'dev' for non-prod, non-preview stacks (like develop-shadow)
     stageName = 'dev';
 }
 
-// 3. Queues
+const baseTags = {
+    Project: 'gp-api',
+    ManagedBy: 'pulumi',
+    Stack: stackName,
+};
+
 const queue = new Queue(`${stackName}-queue`, {
     isPreview,
+    prNumber,
     namePrefix: stageName,
+    tags: baseTags,
 });
 
 // Fetch and Parse Secret
@@ -61,6 +69,8 @@ if (isPreview) {
         subnetIds: publicSubnetIds,
         securityGroupId,
         isPreview: true,
+        prNumber,
+        tags: baseTags,
     });
     databaseUrl = db.url;
     dbDependency = db.instance;
@@ -79,7 +89,6 @@ const finalEnvVars = pulumi.all([secretData, databaseUrl, queue.queueName, queue
     HOST: '0.0.0.0',
 }));
 
-// 6. Compute (depends on DB instance for preview environments)
 const computeDeps = dbDependency ? { dependsOn: [dbDependency] } : undefined;
 const compute = new Compute(`${stackName}-compute`, {
     vpcId,
@@ -87,8 +96,18 @@ const compute = new Compute(`${stackName}-compute`, {
     securityGroupId,
     imageUri,
     isProduction,
+    isPreview,
+    prNumber,
     certificateArn,
     environment: finalEnvVars,
+    tags: baseTags,
 }, computeDeps);
+
+new Monitoring(`${stackName}-monitoring`, {
+    serviceName: compute.serviceName,
+    loadBalancerArnSuffix: compute.loadBalancerArnSuffix,
+    targetGroupArnSuffix: compute.targetGroupArnSuffix,
+    clusterName: compute.clusterArn.apply(arn => arn.split('/').pop() || ''),
+});
 
 export const serviceUrl = compute.url;

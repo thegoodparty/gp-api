@@ -3,7 +3,9 @@ import * as aws from '@pulumi/aws';
 
 export interface QueueArgs {
   isPreview: boolean;
-  namePrefix: string; // e.g. gp-api-dev or gp-api-pr-123
+  prNumber?: string;
+  namePrefix: string;
+  tags?: Record<string, string>;
 }
 
 export class Queue extends pulumi.ComponentResource {
@@ -37,17 +39,20 @@ export class Queue extends pulumi.ComponentResource {
     const dlqName = `${stageName}-DLQ.fifo`;
 
     if (args.isPreview) {
-        // Create Ephemeral Queues
+        const baseTags = args.tags || {};
+        const resourceTags = { ...baseTags, Environment: 'Preview', PR: args.prNumber || 'unknown' };
+
         const dlq = new aws.sqs.Queue(`${name}-dlq`, {
             name: dlqName,
             fifoQueue: true,
-            messageRetentionSeconds: 604800, // 7 days
+            messageRetentionSeconds: 604800,
+            tags: resourceTags,
         }, { parent: this });
 
         const queue = new aws.sqs.Queue(`${name}-queue`, {
             name: queueName,
             fifoQueue: true,
-            messageRetentionSeconds: 604800, // 7 days
+            messageRetentionSeconds: 604800,
             visibilityTimeoutSeconds: 300,
             deduplicationScope: 'messageGroup',
             fifoThroughputLimit: 'perMessageGroupId',
@@ -55,6 +60,7 @@ export class Queue extends pulumi.ComponentResource {
                 "deadLetterTargetArn": "${dlq.arn}",
                 "maxReceiveCount": 3
             }`,
+            tags: resourceTags,
         }, { parent: this });
 
         this.queueUrl = queue.url;

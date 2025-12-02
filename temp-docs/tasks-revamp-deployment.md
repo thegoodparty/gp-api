@@ -95,15 +95,14 @@ Update the file after completing each sub-task, not just after completing an ent
   - [x] 3.4 Implement Auto-Cleanup
     - [x] 3.4.1 Create a separate workflow or job to run `pulumi destroy` when a PR is closed or merged.
 
-- [ ] 4.0 Phase 4: Monitoring & Refinement
-  - [ ] 4.1 CloudWatch Dashboards
-    - [ ] 4.1.1 Add `deploy/pulumi/components/monitoring.ts`.
-    - [ ] 4.1.2 Create a CloudWatch Dashboard resource showing CPU, Memory, and Error rates for the service.
-  - [ ] 4.2 Cost Monitoring
-    - [ ] 4.2.1 Tag all preview resources with `Environment: Preview` and `PR: <number>`.
-    - [ ] 4.2.2 (Optional) Create an AWS Cost Budget for preview environments.
-  - [ ] 4.3 Refine Auto-Scaling
-    - [ ] 4.3.1 Configure CPU/Memory target tracking scaling policies for Production stack.
+- [x] 4.0 Phase 4: Monitoring & Refinement
+  - [x] 4.1 CloudWatch Dashboards
+    - [x] 4.1.1 Add `deploy/pulumi/components/monitoring.ts`.
+    - [x] 4.1.2 Create a CloudWatch Dashboard resource showing CPU, Memory, and Error rates for the service.
+  - [x] 4.2 Cost Monitoring
+    - [x] 4.2.1 Tag all preview resources with `Environment: Preview` and `PR: <number>`.
+  - [x] 4.3 Refine Auto-Scaling
+    - [x] 4.3.1 Configure CPU/Memory target tracking scaling policies for Production stack.
 
 - [ ] 5.0 Phase 5: Cutover & Cleanup
   - [ ] 5.1 Production DNS Cutover

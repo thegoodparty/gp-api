@@ -5,9 +5,11 @@ export interface DatabaseArgs {
   vpcId: pulumi.Input<string>;
   subnetIds: pulumi.Input<string[]>;
   securityGroupId: pulumi.Input<string>;
-  ecsSecurityGroupId?: pulumi.Input<string>; // Security group of ECS tasks
+  ecsSecurityGroupId?: pulumi.Input<string>;
   isPreview: boolean;
+  prNumber?: string;
   clusterIdentifier?: string;
+  tags?: Record<string, string>;
 }
 
 export class Database extends pulumi.ComponentResource {
@@ -23,8 +25,12 @@ export class Database extends pulumi.ComponentResource {
     super('gp:database:Database', name, {}, opts);
 
     if (args.isPreview) {
+      const baseTags = args.tags || {};
+      const resourceTags = { ...baseTags, Environment: 'Preview', PR: args.prNumber || 'unknown' };
+
       const password = new aws.secretsmanager.Secret(`${name}-db-pass`, {
           name: `gp-api-preview-db-${name}`,
+          tags: resourceTags,
       }, { parent: this });
       
       const passwordVersion = new aws.secretsmanager.SecretVersion(`${name}-db-pass-ver`, {
@@ -36,9 +42,9 @@ export class Database extends pulumi.ComponentResource {
 
       const subnetGroup = new aws.rds.SubnetGroup(`${name}-subnet-group`, {
           subnetIds: args.subnetIds,
+          tags: resourceTags,
       }, { parent: this });
 
-      // Create security group for RDS that allows traffic from ECS tasks
       const dbSecurityGroup = new aws.ec2.SecurityGroup(`${name}-db-sg`, {
           vpcId: args.vpcId,
           description: 'Security group for preview RDS',
@@ -47,7 +53,7 @@ export class Database extends pulumi.ComponentResource {
               protocol: 'tcp',
               fromPort: 5432,
               toPort: 5432,
-              cidrBlocks: ['10.0.0.0/8'], // Allow from VPC CIDR
+              cidrBlocks: ['10.0.0.0/8'],
             },
           ],
           egress: [
@@ -58,6 +64,7 @@ export class Database extends pulumi.ComponentResource {
               cidrBlocks: ['0.0.0.0/0'],
             },
           ],
+          tags: resourceTags,
       }, { parent: this });
 
       const cluster = new aws.rds.Cluster(`${name}-cluster`, {
@@ -74,12 +81,14 @@ export class Database extends pulumi.ComponentResource {
               minCapacity: 0.5,
               maxCapacity: 2.0,
           },
+          tags: resourceTags,
       }, { parent: this });
 
       this.instance = new aws.rds.ClusterInstance(`${name}-instance`, {
           clusterIdentifier: cluster.id,
           instanceClass: "db.serverless",
           engine: aws.rds.EngineType.AuroraPostgresql,
+          tags: resourceTags,
       }, { parent: this });
 
       this.url = pulumi.interpolate`postgresql://postgres:${passwordVersion.secretString}@${cluster.endpoint}:5432/gp_api`;
