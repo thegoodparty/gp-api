@@ -53,6 +53,7 @@ const secretData = secretVersion.secretString.apply(s => {
 
 // 4. Database Logic
 let databaseUrl: pulumi.Output<string>;
+let dbDependency: pulumi.Resource | undefined;
 
 if (isPreview) {
     const db = new Database(`${stackName}-db`, {
@@ -62,6 +63,7 @@ if (isPreview) {
         isPreview: true,
     });
     databaseUrl = db.url;
+    dbDependency = db.instance;
 } else {
     databaseUrl = secretData.apply(s => s.DATABASE_URL);
 }
@@ -72,11 +74,13 @@ const finalEnvVars = pulumi.all([secretData, databaseUrl, queue.queueName, queue
     DATABASE_URL: dbUrl,
     NODE_ENV: isProduction ? 'production' : 'development',
     SQS_QUEUE: qName,
-    // Construct base URL by removing the queue name from the full URL
     SQS_QUEUE_BASE_URL: qUrl.replace(`/${qName}`, ''),
+    PORT: '80',
+    HOST: '0.0.0.0',
 }));
 
-// 6. Compute
+// 6. Compute (depends on DB instance for preview environments)
+const computeDeps = dbDependency ? { dependsOn: [dbDependency] } : undefined;
 const compute = new Compute(`${stackName}-compute`, {
     vpcId,
     publicSubnetIds,
@@ -85,6 +89,6 @@ const compute = new Compute(`${stackName}-compute`, {
     isProduction,
     certificateArn,
     environment: finalEnvVars,
-});
+}, computeDeps);
 
 export const serviceUrl = compute.url;

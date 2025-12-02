@@ -13,6 +13,7 @@ export interface DatabaseArgs {
 export class Database extends pulumi.ComponentResource {
   public readonly url: pulumi.Output<string>;
   public readonly secretArn: pulumi.Output<string>;
+  public readonly instance?: aws.rds.ClusterInstance;
 
   constructor(
     name: string,
@@ -22,26 +23,21 @@ export class Database extends pulumi.ComponentResource {
     super('gp:database:Database', name, {}, opts);
 
     if (args.isPreview) {
-      // Create NEW Aurora Serverless v2 Cluster for Previews
-      
-      // 1. Create Random Password
       const password = new aws.secretsmanager.Secret(`${name}-db-pass`, {
           name: `gp-api-preview-db-${name}`,
       }, { parent: this });
       
       const passwordVersion = new aws.secretsmanager.SecretVersion(`${name}-db-pass-ver`, {
           secretId: password.id,
-          secretString: "superSecretPreviewPassword123!", // In real usage, generate random
+          secretString: "superSecretPreviewPassword123!",
       }, { parent: this });
 
       this.secretArn = password.arn;
 
-      // 2. Create Subnet Group
       const subnetGroup = new aws.rds.SubnetGroup(`${name}-subnet-group`, {
           subnetIds: args.subnetIds,
       }, { parent: this });
 
-      // 3. Create Cluster
       const cluster = new aws.rds.Cluster(`${name}-cluster`, {
           engine: aws.rds.EngineType.AuroraPostgresql,
           engineMode: "provisioned",
@@ -51,15 +47,14 @@ export class Database extends pulumi.ComponentResource {
           masterPassword: passwordVersion.secretString.apply(s => s ?? "defaultpass"),
           dbSubnetGroupName: subnetGroup.name,
           vpcSecurityGroupIds: [args.securityGroupId],
-          skipFinalSnapshot: true, // Important for ephemeral preview DBs
+          skipFinalSnapshot: true,
           serverlessv2ScalingConfiguration: {
               minCapacity: 0.5,
               maxCapacity: 2.0,
           },
       }, { parent: this });
 
-      // 4. Create Instance (Required for Serverless v2)
-      const instance = new aws.rds.ClusterInstance(`${name}-instance`, {
+      this.instance = new aws.rds.ClusterInstance(`${name}-instance`, {
           clusterIdentifier: cluster.id,
           instanceClass: "db.serverless",
           engine: aws.rds.EngineType.AuroraPostgresql,
