@@ -240,7 +240,7 @@ export class Compute extends pulumi.ComponentResource {
 
     this.url = lb.loadBalancer.dnsName;
     this.loadBalancerArnSuffix = lb.loadBalancer.arnSuffix;
-    this.targetGroupArnSuffix = lb.defaultTargetGroup.targetGroup.arnSuffix;
+    this.targetGroupArnSuffix = lb.defaultTargetGroup.arnSuffix;
     this.clusterArn = cluster.arn;
     this.serviceName = service.service.name;
   }
