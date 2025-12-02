@@ -35,6 +35,7 @@ import { Records } from '@vercel/sdk/models/getrecordsop'
 import { GetProjectDomainResponseBody } from '@vercel/sdk/models/getprojectdomainop'
 import { isAxiosError } from 'axios'
 import { VerifyProjectDomainResponseBody } from '@vercel/sdk/models/verifyprojectdomainop'
+import Stripe from 'stripe'
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 
@@ -115,11 +116,29 @@ export class DomainsService
     return searchResult
   }
 
-  async validatePurchase(metadata: DomainPurchaseMetadata): Promise<void> {
+  async validatePurchase(
+    metadata: DomainPurchaseMetadata,
+  ): Promise<void | Stripe.PaymentIntent> {
     const { domainName, websiteId } = metadata
 
     if (!domainName || !websiteId) {
       throw new BadRequestException('Domain name and website ID are required')
+    }
+
+    const domain = await this.model.findFirst({
+      where: {
+        name: domainName,
+        websiteId: this.convertWebsiteIdToNumber(websiteId),
+      },
+    })
+
+    if (domain && domain.paymentId) {
+      const paymentIntent = await this.payments.retrievePayment(
+        domain.paymentId,
+      )
+      if (paymentIntent.status === 'succeeded') {
+        return paymentIntent
+      }
     }
 
     const searchResult = await this.searchForDomain(domainName)
@@ -176,30 +195,35 @@ export class DomainsService
       )
     }
 
-    const validatedPayment: {
-      paymentIntent: Record<string, unknown>
-      user: User
-    } = await this.payments.getValidatedPaymentUser(paymentIntentId)
-    const { paymentIntent: _paymentIntent, user } = validatedPayment
+    const { user } =
+      await this.payments.getValidatedPaymentUser(paymentIntentId)
 
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
 
     const website = await this.client.website.findUniqueOrThrow({
       where: { id: validWebsiteId },
-      select: { content: true },
+      select: {
+        content: true,
+        domain: true,
+      },
     })
 
-    const searchResult = await this.searchForDomain(domainName!)
+    let domain: Domain | null = website.domain || null
 
-    const domain = await this.model.create({
-      data: {
+    if (!domain) {
+      const searchResult = await this.searchForDomain(domainName!)
+      const domainParams = {
         websiteId: validWebsiteId,
         name: domainName as string,
         price: this.validateDomainSearchResult(searchResult).price as number,
         paymentId: paymentIntentId,
         status: DomainStatus.pending,
-      },
-    })
+      }
+      this.logger.debug(
+        `Creating new domain record for website id ${validWebsiteId}: ${JSON.stringify(domainParams)}`,
+      )
+      domain = await this.model.create({ data: domainParams })
+    }
 
     const contactInfo = this.buildContactInfo(user, website.content)
 

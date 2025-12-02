@@ -1,3 +1,4 @@
+import Stripe from 'stripe'
 export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
   TEXT = 'TEXT',
@@ -23,7 +24,7 @@ export type PostPurchaseHandler<Metadata> = (
 ) => Promise<unknown>
 
 export interface PurchaseHandler<Metadata> {
-  validatePurchase(metadata: Metadata): Promise<void>
+  validatePurchase(metadata: Metadata): Promise<void | Stripe.PaymentIntent>
   calculateAmount(metadata: Metadata): Promise<number>
   executePostPurchase?(
     paymentIntentId: string,

@@ -24,6 +24,7 @@ export enum DomainOperationStatus {
   SUBMITTED = 'SUBMITTED',
   IN_PROGRESS = 'IN_PROGRESS',
   SUCCESSFUL = 'SUCCESSFUL',
+  INACTIVE = 'INACTIVE',
   ERROR = 'ERROR',
   NO_DOMAIN = 'NO_DOMAIN',
 }

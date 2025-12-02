@@ -1,10 +1,12 @@
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UsersService } from '../users/services/users.service'
 import { StripeService } from '../vendors/stripe/services/stripe.service'
 import { CompletePurchaseDto, CreatePurchaseIntentDto } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
+import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
+import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 
 @Controller('payments/purchase')
 export class PurchaseController {
@@ -37,11 +39,13 @@ export class PurchaseController {
   }
 
   @Post('create-intent')
+  @UseCampaign()
   async createPurchaseIntent(
     @ReqUser() user: User,
     @Body() dto: CreatePurchaseIntentDto<unknown>,
+    @ReqCampaign() campaign: Campaign,
   ) {
-    return this.purchaseService.createPurchaseIntent(user, dto)
+    return this.purchaseService.createPurchaseIntent({ user, dto, campaign })
   }
 
   @Post('complete')
