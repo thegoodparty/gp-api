@@ -56,20 +56,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
-          
+
+      - name: Fetch DATABASE_URL from Secrets Manager
+        id: get-db-url
+        run: |
+          # For PRs, use a placeholder since DB doesn't exist yet
+          # For dev/qa/prod, use the real DATABASE_URL from secrets
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          else
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ inputs.secret_arn }} --query SecretString --output text)
+            DATABASE_URL=$(echo $SECRET_JSON | jq -r '.DATABASE_URL')
+            echo "::add-mask::$DATABASE_URL"
+          fi
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_OUTPUT
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        
+
       - name: Build and push Docker image
+        env:
+          DATABASE_URL: ${{ steps.get-db-url.outputs.DATABASE_URL }}
         run: |
-          docker build -t ${{ inputs.ecr_repository }}:${{ github.sha }} -f deploy/Dockerfile .
+          docker build \
+            --build-arg DATABASE_URL="$DATABASE_URL" \
+            --build-arg STAGE=${{ github.ref_name }} \
+            --build-arg CACHEBUST=${{ github.sha }} \
+            -t ${{ inputs.ecr_repository }}:${{ github.sha }} \
+            -f deploy/Dockerfile \
+            .
           docker push ${{ inputs.ecr_repository }}:${{ github.sha }}
 
   deploy-pulumi:
@@ -77,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -89,26 +111,26 @@ jobs:
         with:
           pulumi-version: 'latest'
           command: ''
-          
+
       - name: Pulumi Up
         working-directory: ./deploy/pulumi
         env:
-          PULUMI_CONFIG_PASSPHRASE: '' 
+          PULUMI_CONFIG_PASSPHRASE: ''
         run: |
           # Select Stack
           pulumi stack select ${{ needs.determine-context.outputs.stack }} --create
-          
+
           # Configure Infrastructure (Essential for new stacks)
           pulumi config set aws:region us-west-2
           pulumi config set vpcId ${{ inputs.vpc_id }}
           pulumi config set --path publicSubnetIds '${{ inputs.public_subnets }}'
           pulumi config set securityGroupId ${{ inputs.security_group_id }}
           pulumi config set certificateArn ${{ inputs.certificate_arn }}
-          
+
           # Configure Secrets & App
           pulumi config set imageUri ${{ inputs.ecr_repository }}:${{ github.sha }}
           pulumi config set secretArn ${{ inputs.secret_arn }} --plaintext
-          
+
           # Set Environment Flags
           if [ "${{ needs.determine-context.outputs.is_preview }}" == "true" ]; then
              pulumi config set isPreview true
@@ -121,6 +143,6 @@ jobs:
                 pulumi config set isProduction false
              fi
           fi
-          
+
           # Run Update
           pulumi up --yes --skip-preview
