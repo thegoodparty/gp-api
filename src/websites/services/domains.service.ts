@@ -21,7 +21,7 @@ import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
-import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import { PurchaseHandler } from 'src/payments/purchase.types'
 import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
 import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
@@ -115,9 +115,7 @@ export class DomainsService
     return searchResult
   }
 
-  async validatePurchase(
-    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
-  ): Promise<void> {
+  async validatePurchase(metadata: DomainPurchaseMetadata): Promise<void> {
     const { domainName, websiteId } = metadata
 
     if (!domainName || !websiteId) {
@@ -131,9 +129,7 @@ export class DomainsService
     }
   }
 
-  async calculateAmount(
-    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
-  ): Promise<number> {
+  async calculateAmount(metadata: DomainPurchaseMetadata): Promise<number> {
     const { domainName } = metadata
 
     if (!domainName) {
@@ -148,7 +144,7 @@ export class DomainsService
 
   async executePostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+    metadata: DomainPurchaseMetadata,
   ): Promise<{
     domain: Domain
     registrationResult: {
@@ -163,7 +159,7 @@ export class DomainsService
 
   async handleDomainPostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata<DomainPurchaseMetadata>,
+    metadata: DomainPurchaseMetadata,
   ): Promise<{
     domain: Domain
     registrationResult: {

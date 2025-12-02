@@ -13,26 +13,31 @@ import { PaymentIntentPayload, PaymentType } from '../payments.types'
 @Injectable()
 export class PurchaseService {
   private readonly logger = new Logger('PurchaseService')
-  private handlers: Map<PurchaseType, PurchaseHandler> = new Map()
-  private postPurchaseHandlers: Map<PurchaseType, PostPurchaseHandler> =
-    new Map()
+  private handlers: Map<PurchaseType, PurchaseHandler<unknown>> = new Map()
+  private postPurchaseHandlers: Map<
+    PurchaseType,
+    PostPurchaseHandler<unknown>
+  > = new Map()
 
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  registerPurchaseHandler(type: PurchaseType, handler: PurchaseHandler): void {
+  registerPurchaseHandler(
+    type: PurchaseType,
+    handler: PurchaseHandler<unknown>,
+  ): void {
     this.handlers.set(type, handler)
   }
 
   registerPostPurchaseHandler(
     type: PurchaseType,
-    handler: PostPurchaseHandler,
+    handler: PostPurchaseHandler<unknown>,
   ): void {
     this.postPurchaseHandlers.set(type, handler)
   }
 
   async createPurchaseIntent(
     user: User,
-    dto: CreatePurchaseIntentDto,
+    dto: CreatePurchaseIntentDto<unknown>,
   ): Promise<{ clientSecret: string; amount: number }> {
     const handler = this.handlers.get(dto.type)
     if (!handler) {
@@ -45,7 +50,7 @@ export class PurchaseService {
     const paymentMetadata = {
       type: this.getPaymentType(dto.type),
       amount,
-      ...dto.metadata,
+      ...(dto.metadata as Record<string, unknown>),
       purchaseType: dto.type,
     } as PaymentIntentPayload<PaymentType>
 

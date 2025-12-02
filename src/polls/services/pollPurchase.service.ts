@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import { PurchaseHandler } from 'src/payments/purchase.types'
 import { PollPurchaseMetadata } from '../types/pollPurchase.types'
 import { PollsService } from './polls.service'
 import z from 'zod'
@@ -19,7 +19,7 @@ export class PollPurchaseHandlerService
   async validatePurchase({
     pollId,
     count,
-  }: PurchaseMetadata<PollPurchaseMetadata>): Promise<void> {
+  }: PollPurchaseMetadata): Promise<void> {
     if (!pollId) {
       throw new BadRequestException('pollId is required')
     }
@@ -32,15 +32,13 @@ export class PollPurchaseHandlerService
     }
   }
 
-  async calculateAmount({
-    count,
-  }: PurchaseMetadata<PollPurchaseMetadata>): Promise<number> {
+  async calculateAmount({ count }: PollPurchaseMetadata): Promise<number> {
     return countSchema.parse(count) * PRICE_PER_TEXT * 100
   }
 
   async executePostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata<PollPurchaseMetadata>,
+    metadata: PollPurchaseMetadata,
   ): Promise<void> {
     const { pollId, count } = metadata
 
