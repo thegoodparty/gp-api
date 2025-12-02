@@ -1,7 +1,15 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma.service'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { lowerFirst } from 'lodash'
+import { retryIf } from '@/shared/util/retry-if'
 
 export const MODELS = Prisma.ModelName
 
@@ -24,6 +32,20 @@ const PASSTHROUGH_MODEL_METHODS = [
 export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
   const lowerModelName = lowerFirst(modelName)
   /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+
+  type UniqueWhereArg = Parameters<
+    PrismaClient[Uncapitalize<T>]['findUnique']
+  >[0]['where']
+
+  type ExistingRecord = Awaited<
+    ReturnType<
+      Extract<
+        PrismaClient[Uncapitalize<T>],
+        { findUnique: unknown }
+      >['findUniqueOrThrow']
+    >
+  >
+
   @Injectable()
   class BasePrismaService implements OnModuleInit {
     @Inject()
@@ -49,6 +71,71 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
           ...args: unknown[]
         ) => unknown
       }
+    }
+
+    /**
+     * Performs an optimistic locking update on a Prisma model record using the `updatedAt` timestamp
+     * to detect concurrent updates.
+     *
+     * For more information about optimistic locking, check out this article:
+     * https://en.wikipedia.org/wiki/Optimistic_concurrency_control
+     *
+     * @example
+     * ```typescript
+     * // Update a user's balance atomically
+     * const updatedUser = await this.optimisticLockingUpdate(
+     *   { where: { id: userId } },
+     *   (existing) => ({
+     *     balance: existing.balance + amount,
+     *   })
+     * );
+     * ```
+     */
+    optimisticLockingUpdate(
+      params: { where: UniqueWhereArg },
+      modification: (
+        existing: ExistingRecord,
+      ) => Partial<ExistingRecord> | Promise<Partial<ExistingRecord>>,
+    ): Promise<ExistingRecord> {
+      return retryIf(
+        async (_, attempt) => {
+          // @ts-expect-error - it's extremely difficult to get perfectly inferred
+          // types for this line of code.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const existing = await this.model.findUnique({ where: params.where })
+
+          if (!existing) {
+            const msg = `[optimistic locking update] Existing ${modelName} record not found for where clause: ${JSON.stringify(params.where)}`
+            this.logger.log(msg)
+            throw new NotFoundException(msg)
+          }
+
+          const patch = await modification(existing)
+
+          // @ts-expect-error - it's extremely difficult to get perfectly inferred
+          // types for this line of code.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const result = await this.model.updateManyAndReturn({
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            where: { AND: [params.where, { updatedAt: existing.updatedAt }] },
+            data: patch,
+          })
+
+          if (result.length === 0) {
+            const msg = `[optimistic locking update] Record has been modified since it was fetched for where clause: ${JSON.stringify(params.where)} attempt ${attempt}`
+            this.logger.log(msg)
+            throw new ConflictException(msg)
+          }
+
+          return result[0]
+        },
+        {
+          shouldRetry: (error) => error instanceof ConflictException,
+          retries: 5,
+          factor: 1.5,
+          minTimeout: 100,
+        },
+      )
     }
   }
 

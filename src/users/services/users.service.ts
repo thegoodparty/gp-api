@@ -6,7 +6,6 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import retry from 'async-retry'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { WithOptional } from 'src/shared/types/utility.types'
 import { AnalyticsService } from '../../analytics/analytics.service'
@@ -189,50 +188,22 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     userId: number,
     newMetaData: PrismaJson.UserMetaData,
   ) {
-    return retry(
-      async (bail) => {
-        const user = await this.client.user.findUnique({
-          where: { id: userId },
-        })
-        if (!user) {
-          this.logger.warn(
-            `User with id ${userId} not found. Skipping metadata update`,
-          )
-          bail(new Error(`User with id ${userId} not found. Bailing retry.`))
-          return null
-        }
-
+    const updatedUser = await this.optimisticLockingUpdate(
+      { where: { id: userId } },
+      (user) => {
         this.logger.log(
           `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData ?? {})}`,
         )
-
-        const mergedMetaData = {
-          ...(user.metaData ?? {}),
-          ...(newMetaData ?? {}),
-        } as PrismaJson.UserMetaData
-
-        const updatedUsers = await this.client.user.updateManyAndReturn({
-          where: { id: userId, updatedAt: user.updatedAt },
-          data: {
-            metaData: mergedMetaData,
-          },
-        })
-        if (!updatedUsers || updatedUsers.length === 0) {
-          // Throwing triggers the retry
-          throw new ConflictException('Failed to update userMetaData')
+        return {
+          metaData: { ...(user.metaData ?? {}), ...(newMetaData ?? {}) },
         }
-        const updatedUser = updatedUsers[0]
-
-        this.logger.log(
-          `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData ?? {})}`,
-        )
-        return updatedUser
-      },
-      {
-        retries: 5,
-        minTimeout: 100,
       },
     )
+    this.logger.log(
+      `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData ?? {})}`,
+    )
+
+    return updatedUser
   }
 
   async deleteUser(id: number) {
