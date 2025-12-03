@@ -256,8 +256,10 @@ jobs:
       - name: Verify environment health
         run: |
           echo "Verifying ${API_BASE_URL}/v1/health is responding..."
+          # Using -k to skip SSL verification for preview environments
+          # (ALB DNS name doesn't match the SSL certificate domain)
           for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
             if [ "$STATUS" = "200" ]; then
               echo "✅ Health endpoint is responding"
               exit 0
