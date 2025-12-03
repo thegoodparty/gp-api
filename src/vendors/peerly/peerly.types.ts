@@ -1,6 +1,6 @@
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { HttpException, HttpExceptionOptions } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
+import { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { Observable } from 'rxjs'
 export type PeerlyIdentity = {
   identity_id: string
@@ -11,6 +11,11 @@ export type PeerlyIdentity = {
   vetting_expire_date?: string
   usecases?: string[]
 }
+export type PeerlyJobArea = {
+  didState?: string
+  didNpaSubset?: string[]
+}
+
 export type PeerlyIdentityCreateResponseBody = {
   Data: PeerlyIdentity
 }
@@ -83,6 +88,7 @@ export interface Peerly10DlcBrandData {
   postalCode?: string
   website: string
   email: string
+  jobAreas?: PeerlyJobArea[]
 }
 export type Peerly10DLCBrandSubmitResponseBody = {
   submission_key: string

@@ -1,12 +1,10 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { CampaignCreatedBy, ElectionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
-import { VotersService } from 'src/voters/services/voters.service'
-import { VoterCounts } from 'src/voters/voters.types'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
 import { EmailService } from '../../email/email.service'
@@ -15,19 +13,65 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { SlackService } from '../../vendors/slack/services/slack.service'
 import {
+  P2VCounts,
   P2VSource,
   PathToVictoryInput,
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 
+enum SpecialOfficePhrase {
+  AtLarge = 'At Large',
+  PresidentOfUS = 'President of the United States',
+  Senate = 'Senate',
+  Governor = 'Governor',
+  Mayor = 'Mayor',
+}
+
+const SPECIAL_OFFICE_PHRASES = Object.freeze(Object.values(SpecialOfficePhrase))
+
+const FEDERAL_SPECIAL_PHRASES = Object.freeze([
+  SpecialOfficePhrase.PresidentOfUS,
+  SpecialOfficePhrase.Senate,
+])
+
 @Injectable()
 export class PathToVictoryService extends createPrismaBase(
   MODELS.PathToVictory,
 ) {
+  private buildOfficeFingerprint(params: {
+    officeName: string
+    electionLevel: string
+    electionState: string
+    electionCounty: string
+    electionMunicipality: string
+    subAreaName?: string
+    subAreaValue?: string
+    positionId?: string
+  }): string {
+    const {
+      officeName,
+      electionLevel,
+      electionState,
+      electionCounty,
+      electionMunicipality,
+      subAreaName,
+      subAreaValue,
+      positionId,
+    } = params
+    return [
+      officeName,
+      electionLevel,
+      electionState,
+      electionCounty,
+      electionMunicipality,
+      subAreaName ?? '',
+      subAreaValue ?? '',
+      positionId ?? '',
+    ].join('|')
+  }
   constructor(
     private prisma: PrismaService,
-    private votersService: VotersService,
     private officeMatchService: OfficeMatchService,
     private slackService: SlackService,
     private emailService: EmailService,
@@ -61,17 +105,10 @@ export class PathToVictoryService extends createPrismaBase(
       electionLocation: '',
       district: '',
       counts: {
-        total: 0,
-        democrat: 0,
-        republican: 0,
-        independent: 0,
-        men: 0,
-        women: 0,
-        white: 0,
-        africanAmerican: 0,
-        asian: 0,
-        hispanic: 0,
-      } as VoterCounts,
+        projectedTurnout: 0,
+        winNumber: 0,
+        voterContactGoal: 0,
+      },
     }
 
     this.logger.debug(`Starting p2v for ${input.slug}`)
@@ -79,77 +116,77 @@ export class PathToVictoryService extends createPrismaBase(
     try {
       let searchColumns: string[] = ['']
 
-      if (!input.electionType || !input.electionLocation) {
-        if (
-          !input.officeName.includes('At Large') &&
-          !input.officeName.includes('President of the United States') &&
-          !input.officeName.includes('Senate') &&
-          !input.officeName.includes('Governor') &&
-          !input.officeName.includes('Mayor')
-        ) {
-          searchColumns = await this.officeMatchService.searchMiscDistricts(
-            input.slug,
-            input.officeName,
-            input.electionLevel,
-            input.electionState,
-          )
-        }
+      // Always recompute potential district columns based on the latest office info.
+      // Do not rely on any previously provided electionType/electionLocation values.
 
-        const locationColumns =
-          await this.officeMatchService.searchLocationDistricts(
-            input.slug,
-            input.electionLevel,
-            input.officeName,
-            input.subAreaName,
-            input.subAreaValue,
-          )
-
-        if (locationColumns.length > 0) {
-          this.logger.debug('locationColumns', locationColumns)
-          searchColumns = searchColumns.concat(locationColumns)
-        }
+      if (
+        !SPECIAL_OFFICE_PHRASES.some((phrase) =>
+          input.officeName.includes(phrase),
+        )
+      ) {
+        // Use unified, API-driven district type discovery
+        searchColumns = await this.officeMatchService.searchDistrictTypes(
+          input.slug,
+          input.officeName,
+          input.electionLevel as ElectionLevel,
+          input.electionState,
+          input.subAreaName,
+          input.subAreaValue,
+        )
       }
 
       let attempts = 1
+      if (!searchColumns || searchColumns.length === 0) {
+        this.logger.warn(
+          `No district type candidates returned for slug=${input.slug}, office="${input.officeName}"`,
+        )
+      } else {
+        this.logger.debug(
+          `District type candidates for slug=${input.slug}: ${JSON.stringify(searchColumns)}`,
+        )
+      }
       for (const searchColumn of searchColumns) {
-        let electionType = input.electionType
-        let electionLocation = input.electionLocation
+        // Always start fresh for each attempt; do not carry forward any previous district values.
+        let electionType = ''
+        let electionLocation = ''
 
-        if (
-          input.electionLevel === 'federal' &&
-          (input.officeName.includes('President of the United States') ||
-            input.officeName.includes('Senate'))
-        ) {
-          electionType = ''
-          electionLocation = ''
-        } else if (input.officeName.includes('Governor')) {
-          electionType = ''
-          electionLocation = ''
-        } else if (electionType && electionLocation) {
-          // if already specified, skip the search
-        } else {
-          await new Promise((resolve) => setTimeout(resolve, 7000))
-          const columnResponse = await this.officeMatchService.getSearchColumn(
-            input.slug,
-            searchColumn,
-            input.electionState,
-            this.getSearchString(input),
+        this.logger.debug(
+          `Attempt ${attempts}: resolving column "${searchColumn}"`,
+        )
+        const columnResponse = await this.officeMatchService.getSearchColumn(
+          input.slug,
+          searchColumn,
+          input.electionState,
+          this.getSearchString(input),
+          '',
+          input.electionDate,
+        )
+
+        if (!columnResponse) {
+          this.logger.debug(
+            `Attempt ${attempts}: no match from getSearchColumn for "${searchColumn}"`,
           )
-
-          if (!columnResponse) continue
-
-          electionType = columnResponse.column
-          electionLocation = columnResponse.value
+          continue
         }
 
-        if (!electionType || !electionLocation) continue
+        electionType = columnResponse.column
+        electionLocation = columnResponse.value
+
+        if (
+          (input.electionLevel as ElectionLevel) === ElectionLevel.federal &&
+          (FEDERAL_SPECIAL_PHRASES.some((p) => input.officeName.includes(p)) ||
+            input.officeName.includes(SpecialOfficePhrase.Governor)) &&
+          (!electionType || !electionLocation)
+        ) {
+          continue
+        }
 
         this.logger.debug(
           `Found Column! Election Type: ${electionType}. Location: ${electionLocation}`,
         )
 
         const state =
-          input.officeName === 'President of the United States'
+          input.officeName === SpecialOfficePhrase.PresidentOfUS
             ? 'US'
             : input.electionState
 
@@ -164,33 +201,22 @@ export class PathToVictoryService extends createPrismaBase(
           const { projectedTurnout, winNumber, voterContactGoal } =
             raceTargetDetails
 
+          // We only accept matches that we have a projected turnout for
+          if (projectedTurnout <= 0) continue
+
           pathToVictoryResponse.electionType = electionType
           pathToVictoryResponse.electionLocation = electionLocation
           pathToVictoryResponse.counts = {
-            projectedTurnout,
-            winNumber,
-            voterContactGoal,
+            projectedTurnout: projectedTurnout ?? 0,
+            winNumber: winNumber ?? 0,
+            voterContactGoal: voterContactGoal ?? 0,
           }
           break
-        } else {
-          const counts = await this.votersService.getVoterCounts(
-            input.electionTerm,
-            input.electionDate || new Date().toISOString().slice(0, 10),
-            state,
-            electionType,
-            electionLocation,
-            input.partisanType,
-            input.priorElectionDates,
-          )
-
-          if (counts?.total && counts.total > 0) {
-            pathToVictoryResponse.electionType = electionType
-            pathToVictoryResponse.electionLocation = electionLocation
-            pathToVictoryResponse.counts = counts
-            break
-          }
         }
 
+        this.logger.debug(
+          `Attempt ${attempts}: no projectedTurnout for type=${electionType}, location="${electionLocation}"`,
+        )
         if (++attempts > 10) break
       }
 
@@ -198,11 +224,13 @@ export class PathToVictoryService extends createPrismaBase(
         pathToVictoryResponse,
         ...input,
       }
-    } catch (e) {
-      this.logger.error('Error in handle-p2v', e)
+    } catch (error: unknown) {
+      const err: Error =
+        error instanceof Error ? error : new Error(String(error))
+      this.logger.error('Error in handle-p2v', err)
       await this.slackService.errorMessage({
         message: 'Error in handle-p2v',
-        error: e,
+        error: { message: err.message, stack: err.stack },
       })
       throw new Error('Error in handle-p2v')
     }
@@ -226,7 +254,7 @@ export class PathToVictoryService extends createPrismaBase(
   async analyzePathToVictoryResponse(p2vResponse: {
     campaign: Campaign & { pathToVictory: PathToVictory }
     pathToVictoryResponse: {
-      counts: VoterCounts
+      counts: P2VCounts
       electionType: string
       electionLocation: string
     }
@@ -241,6 +269,7 @@ export class PathToVictoryService extends createPrismaBase(
     subAreaValue?: string
     partisanType: string
     priorElectionDates: string[]
+    positionId?: string
   }): Promise<boolean> {
     const {
       campaign,
@@ -256,6 +285,7 @@ export class PathToVictoryService extends createPrismaBase(
       subAreaValue,
       partisanType,
       priorElectionDates,
+      positionId,
     } = p2vResponse
 
     const candidateSlackMessage = `
@@ -263,11 +293,6 @@ export class PathToVictoryService extends createPrismaBase(
     • Office: ${officeName}
     • Election Date: ${electionDate}
     • Prior Election Dates: ${priorElectionDates}
-    • L2 Election Date Columns: ${
-      pathToVictoryResponse?.counts?.foundColumns
-        ? JSON.stringify(pathToVictoryResponse?.counts?.foundColumns)
-        : ''
-    }
     • Election Term: ${electionTerm}
     • Election Level: ${electionLevel}
     • Election State: ${electionState}
@@ -279,22 +304,32 @@ export class PathToVictoryService extends createPrismaBase(
     `
 
     const pathToVictorySlackMessage = `
-    ￮ L2 Election Type: ${pathToVictoryResponse.electionType}
-    ￮ L2 Location: ${pathToVictoryResponse.electionLocation}
-    ￮ Total Voters: ${pathToVictoryResponse.counts.total}
-    ￮ Democrats: ${pathToVictoryResponse.counts.democrat}
-    ￮ Republicans: ${pathToVictoryResponse.counts.republican}
-    ￮ Independents: ${pathToVictoryResponse.counts.independent}
+    ￮ L2 DistrictType/ElectionType: ${pathToVictoryResponse.electionType}
+    ￮ L2 DistrictName/ElectionLocation: ${pathToVictoryResponse.electionLocation}
     `
 
-    if (
-      pathToVictoryResponse.counts.projectedTurnout &&
+    const officeContext = {
+      officeName,
+      electionLevel,
+      electionState,
+      electionCounty,
+      electionMunicipality,
+      subAreaName,
+      subAreaValue,
+      positionId,
+    }
+    const officeFingerprint = this.buildOfficeFingerprint(officeContext)
+
+    const hasTurnout =
+      !!pathToVictoryResponse.counts.projectedTurnout &&
       pathToVictoryResponse.counts.projectedTurnout > 0
-    ) {
+
+    let sendEmailFlag = false
+    let statusOverride: P2VStatus | undefined
+
+    if (hasTurnout) {
       const turnoutSlackMessage = `
-      ￮ Average Turnout %: ${pathToVictoryResponse.counts.averageTurnoutPercent}
       ￮ Projected Turnout: ${pathToVictoryResponse.counts.projectedTurnout}
-      ￮ Projected Turnout %: ${pathToVictoryResponse.counts.projectedTurnoutPercent}
       ￮ Win Number: ${pathToVictoryResponse.counts.winNumber}
       ￮ Voter Contact Goal: ${pathToVictoryResponse.counts.voterContactGoal}
       `
@@ -307,43 +342,11 @@ export class PathToVictoryService extends createPrismaBase(
         channel: SlackChannel.botPathToVictory,
       })
 
-      if (campaign.pathToVictory?.data?.p2vStatus === P2VStatus.complete) {
-        this.logger.debug(
-          'Path To Victory already completed for',
-          campaign.slug,
-        )
-        await this.completePathToVictory(
-          campaign.slug,
-          pathToVictoryResponse,
-          false,
-        )
-        return true
-      } else {
-        await this.completePathToVictory(campaign.slug, pathToVictoryResponse)
-        return true
-      }
-    } else if (
-      pathToVictoryResponse?.electionType &&
-      pathToVictoryResponse?.counts?.total &&
-      pathToVictoryResponse.counts.total > 0
-    ) {
-      const debugMessage = 'Was not able to get the turnout numbers.\n'
-      await this.slackService.formattedMessage({
-        message:
-          candidateSlackMessage + pathToVictorySlackMessage + debugMessage,
-        channel: SlackChannel.botPathToVictoryIssues,
-      })
-
-      if (campaign.pathToVictory?.data?.p2vStatus !== 'Complete') {
-        await this.completePathToVictory(
-          campaign.slug,
-          pathToVictoryResponse,
-          false,
-        )
-        return true
-      }
+      // Do not re-email if already completed previously
+      sendEmailFlag =
+        campaign.pathToVictory?.data?.p2vStatus !== P2VStatus.complete
     } else {
-      let debugMessage = 'No Path To Victory Found.\n'
+      let debugMessage = 'No Path To Victory Found with projected turnout.\n'
       if (pathToVictoryResponse) {
         debugMessage +=
           'pathToVictoryResponse: ' + JSON.stringify(pathToVictoryResponse)
@@ -352,24 +355,34 @@ export class PathToVictoryService extends createPrismaBase(
         message: candidateSlackMessage + debugMessage,
         channel: SlackChannel.botPathToVictoryIssues,
       })
+      statusOverride = P2VStatus.failed
+      await this.crmService.handleUpdateCampaign(
+        campaign,
+        'path_to_victory_status',
+        P2VStatus.failed,
+      )
     }
 
-    await this.crmService.handleUpdateCampaign(
-      campaign,
-      'path_to_victory_status',
-      'Waiting',
-    )
-    return false
+    await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
+      sendEmail: sendEmailFlag,
+      p2vStatusOverride: statusOverride,
+      officeFingerprint,
+    })
+    return hasTurnout
   }
 
   async completePathToVictory(
     slug: string,
     pathToVictoryResponse: {
-      counts: VoterCounts
+      counts: P2VCounts
       electionType: string
       electionLocation: string
     },
-    sendEmail = true,
+    options?: {
+      sendEmail?: boolean
+      p2vStatusOverride?: P2VStatus
+      officeFingerprint?: string
+    },
   ): Promise<void> {
     this.logger.debug('completing path to victory for', slug)
     this.logger.debug('pathToVictoryResponse', pathToVictoryResponse)
@@ -398,28 +411,69 @@ export class PathToVictoryService extends createPrismaBase(
         })
       }
 
-      let p2vStatus: P2VStatus = P2VStatus.waiting
-      if (
-        pathToVictoryResponse?.counts?.projectedTurnout &&
+      const p2vStatus: P2VStatus =
+        options?.p2vStatusOverride ??
+        (pathToVictoryResponse?.counts?.projectedTurnout &&
         pathToVictoryResponse.counts.projectedTurnout > 0
-      ) {
-        p2vStatus = P2VStatus.complete
+          ? P2VStatus.complete
+          : P2VStatus.waiting)
+
+      const p2vData = (p2v.data || {}) as PrismaJson.PathToVictoryData
+
+      // Detect office/district change using an office fingerprint stored on P2V.data
+      const previousOfficeFingerprint: string | null =
+        p2vData.officeContextFingerprint ?? null
+      const hasOfficeChanged =
+        !!options?.officeFingerprint &&
+        options.officeFingerprint !== previousOfficeFingerprint
+
+      if (hasOfficeChanged) {
+        this.logger.debug(
+          `Office changed; resetting prior P2V fields for ${slug}`,
+        )
       }
 
-      const p2vData = p2v.data || {}
+      // Build a base data object, optionally clearing stale fields if office changed
+      let baseData: Partial<PrismaJson.PathToVictoryData>
+      if (hasOfficeChanged) {
+        const {
+          projectedTurnout: _pt,
+          winNumber: _wn,
+          voterContactGoal: _vcg,
+          viability: _viability,
+          p2vAttempts: _attempts,
+          p2vCompleteDate: _p2vCompleteDate,
+          p2vStatus: _p2vStatus,
+          // electionType and electionLocation will be overwritten below
+          electionType: _oldElectionType,
+          electionLocation: _oldElectionLocation,
+          ...rest
+        } = p2vData
+        baseData = rest as Partial<PrismaJson.PathToVictoryData>
+      } else {
+        baseData = { ...p2vData }
+      }
       await this.prisma.pathToVictory.update({
         where: { id: p2v.id },
         data: {
           data: {
-            ...p2vData,
-            projectedTurnout: pathToVictoryResponse.counts.projectedTurnout,
-            winNumber: pathToVictoryResponse.counts.winNumber,
-            voterContactGoal: pathToVictoryResponse.counts.voterContactGoal,
+            ...baseData,
+            projectedTurnout: Number(
+              pathToVictoryResponse.counts?.projectedTurnout ?? 0,
+            ),
+            winNumber: Number(pathToVictoryResponse.counts?.winNumber ?? 0),
+            voterContactGoal: Number(
+              pathToVictoryResponse.counts?.voterContactGoal ?? 0,
+            ),
             electionType: pathToVictoryResponse.electionType,
             electionLocation: pathToVictoryResponse.electionLocation,
+            ...(hasOfficeChanged ? { p2vAttempts: 0 } : {}),
             p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
             p2vStatus,
             source: P2VSource.GpApi,
+            ...(options?.officeFingerprint
+              ? { officeContextFingerprint: options.officeFingerprint }
+              : {}),
           },
         },
       })
@@ -428,7 +482,8 @@ export class PathToVictoryService extends createPrismaBase(
         winNumber: pathToVictoryResponse.counts.winNumber,
       })
 
-      if (p2vStatus === 'Complete' && sendEmail && campaign.user?.email) {
+      const shouldSendEmail = options?.sendEmail ?? true
+      if (p2vStatus === 'Complete' && shouldSendEmail && campaign.user?.email) {
         const name = campaign.user
           ? await this.getUserName(campaign.user)
           : 'Friend'
@@ -457,11 +512,13 @@ export class PathToVictoryService extends createPrismaBase(
         'path_to_victory_status',
         p2vStatus,
       )
-    } catch (e) {
-      this.logger.error('error updating campaign', e)
+    } catch (error: unknown) {
+      const err: Error =
+        error instanceof Error ? error : new Error(String(error))
+      this.logger.error('error updating campaign', err)
       await this.slackService.errorMessage({
         message: 'error updating campaign with path to victory',
-        error: e,
+        error: { message: err.message, stack: err.stack },
       })
     }
   }

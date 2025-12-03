@@ -5,7 +5,6 @@ import {
   PathToVictory,
   Poll,
   PollIndividualMessage,
-  PollIssue,
   PollStatus,
   TcrComplianceStatus,
 } from '@prisma/client'
@@ -22,14 +21,10 @@ import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
-import { ViabilityService } from 'src/pathToVictory/services/viability.service'
-import {
-  PathToVictoryInput,
-  ViabilityScore,
-} from 'src/pathToVictory/types/pathToVictory.types'
+import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
-import { buildTevynApiSlackBlocks } from 'src/polls/utils/polls.utils'
+import { sendTevynAPIPollMessage } from 'src/polls/utils/polls.utils'
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -50,12 +45,11 @@ import {
   PollCreationEventSchema,
   PollExpansionEvent,
   PollExpansionEventSchema,
-  PollIssueAnalysisEvent,
-  PollIssueAnalysisEventSchema,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { format } from 'date-fns'
 
 @Injectable()
 export class QueueConsumerService {
@@ -65,7 +59,6 @@ export class QueueConsumerService {
     private readonly aiContentService: AiContentService,
     private readonly slackService: SlackService,
     private readonly pathToVictoryService: PathToVictoryService,
-    private readonly viabilityService: ViabilityService,
     private readonly analytics: AnalyticsService,
     private readonly campaignsService: CampaignsService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
@@ -223,11 +216,6 @@ export class QueueConsumerService {
         return await this.handleDomainEmailForwardingMessage(
           queueMessage.data as DomainEmailForwardingMessage,
         )
-      case QueueType.POLL_ISSUES_ANALYSIS:
-        this.logger.log('received pollIssueAnalysis message')
-        const pollIssueAnalysisEvent =
-          PollIssueAnalysisEventSchema.parse(queueMessage)
-        return await this.handlePollIssuesAnalysis(pollIssueAnalysisEvent)
       case QueueType.POLL_ANALYSIS_COMPLETE:
         this.logger.log('received pollAnalysisComplete message')
         const pollAnalysisCompleteEvent =
@@ -413,7 +401,20 @@ export class QueueConsumerService {
     let campaign: (Campaign & { pathToVictory: PathToVictory | null }) | null =
       null
 
+    const {
+      slug,
+      officeName,
+      electionLevel,
+      electionState,
+      subAreaName,
+      subAreaValue,
+      electionDate,
+    } = message
+
     try {
+      this.logger.debug(
+        `P2V start for slug=${slug}, office="${officeName}", level=${electionLevel}, state=${electionState}, subAreaName=${subAreaName}, subAreaValue=${subAreaValue}, electionDate=${electionDate}`,
+      )
       const p2vResponse: P2VResponse =
         await this.pathToVictoryService.handlePathToVictory({
           ...message,
@@ -447,55 +448,47 @@ export class QueueConsumerService {
           partisanType: (p2vResponse.partisanType as string) || '',
           priorElectionDates:
             (p2vResponse.priorElectionDates as string[]) || [],
+          positionId: p2vResponse.positionId as string | undefined,
         },
       )
     } catch (e) {
-      this.logger.error('error in consumer/handlePathToVictoryMessage', e)
+      this.logger.error(
+        `error in consumer/handlePathToVictoryMessage for slug=${message.slug}, office="${message.officeName}"`,
+        e,
+      )
+      // Extra structured context for visibility in logs
+      this.logger.error('P2V context', {
+        slug,
+        officeName,
+        electionLevel,
+        electionState,
+        subAreaName,
+        subAreaValue,
+        electionDate,
+      })
       await this.slackService.errorMessage({
         message: 'error in consumer/handlePathToVictoryMessage',
-        error: e,
+        error: {
+          error: e,
+          context: {
+            slug,
+            officeName,
+            electionLevel,
+            electionState,
+            subAreaName,
+            subAreaValue,
+            electionDate,
+          },
+        },
       })
     }
 
     if (p2vSuccess === false && campaign) {
+      this.logger.error(
+        `analyzePathToVictoryResponse returned false; slug=${campaign.slug}`,
+      )
       await this.handlePathToVictoryFailure(campaign)
       throw new Error('error in consumer/handlePathToVictoryMessage')
-    }
-
-    // Calculate viability score after a valid path to victory response
-    let viability: ViabilityScore | null = null
-    try {
-      viability = await this.viabilityService.calculateViabilityScore(
-        Number(message.campaignId),
-      )
-    } catch (e) {
-      this.logger.error('error calculating viability score', e)
-    }
-
-    if (viability) {
-      const pathToVictory = await this.pathToVictoryService.findUnique({
-        where: { campaignId: Number(message.campaignId) },
-      })
-
-      if (pathToVictory) {
-        const data = pathToVictory.data || {}
-        await this.pathToVictoryService.update({
-          where: { id: pathToVictory.id },
-          data: {
-            data: {
-              ...data,
-              viability,
-            },
-          },
-        })
-      }
-      this.logger.debug('viability', viability)
-      await this.slackService.message(
-        {
-          body: `Viability score calculated for ${campaign?.slug}: ${viability.score}`,
-        },
-        SlackChannel.botPathToVictory,
-      )
     }
 
     return true
@@ -545,42 +538,6 @@ export class QueueConsumerService {
     }
   }
 
-  private async handlePollIssuesAnalysis(event: PollIssueAnalysisEvent) {
-    this.logger.log(
-      `Handling poll issue analysis event for poll ${event.data.pollId}`,
-    )
-    if (event.data.rank === 1) {
-      this.logger.log(
-        'Detected first poll issue, deleting existing poll issues',
-      )
-      await this.pollIssuesService.model.deleteMany({
-        where: { pollId: event.data.pollId },
-      })
-      this.logger.log('Successfully deleted existing poll issues')
-    }
-
-    const issue: PollIssue = {
-      id: `${event.data.pollId}-${event.data.rank}`,
-      pollId: event.data.pollId,
-      title: event.data.theme,
-      summary: event.data.summary,
-      details: event.data.analysis,
-      mentionCount: event.data.responseCount,
-      representativeComments: event.data.quotes.map((quote) => ({
-        quote: quote.quote,
-      })),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
-    const result = await this.pollIssuesService.model.upsert({
-      where: { id: issue.id },
-      create: issue,
-      update: issue,
-    })
-    this.logger.log('Successfully upserted poll issue', result)
-    return true
-  }
-
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
     this.logger.log(
       `Handling poll analysis complete event for poll ${event.data.pollId}`,
@@ -615,29 +572,26 @@ export class QueueConsumerService {
         event.data.totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
-    if (event.data.issues) {
-      this.logger.log('Detected poll issues, clearing existing poll issues')
-      await this.pollIssuesService.model.deleteMany({
-        where: { pollId: event.data.pollId },
-      })
-      this.logger.log('Successfully deleted existing poll issues')
-      await this.pollIssuesService.client.pollIssue.createMany({
-        data: event.data.issues.map((issue) => ({
-          id: `${event.data.pollId}-${issue.rank}`,
-          pollId: event.data.pollId,
-          title: issue.theme,
-          summary: issue.summary,
-          details: issue.analysis,
-          mentionCount: issue.responseCount,
-          representativeComments: issue.quotes.map((quote) => ({
-            quote: quote.quote,
-          })),
-          createdAt: new Date(),
-          updatedAt: new Date(),
+    await this.pollIssuesService.model.deleteMany({
+      where: { pollId: event.data.pollId },
+    })
+    this.logger.log('Successfully deleted existing poll issues')
+    await this.pollIssuesService.client.pollIssue.createMany({
+      data: event.data.issues.map((issue) => ({
+        id: `${event.data.pollId}-${issue.rank}`,
+        pollId: event.data.pollId,
+        title: issue.theme,
+        summary: issue.summary,
+        details: issue.analysis,
+        mentionCount: issue.responseCount,
+        representativeComments: issue.quotes.map((quote) => ({
+          quote: quote.quote,
         })),
-      })
-      this.logger.log('Successfully created new poll issues')
-    }
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    })
+    this.logger.log('Successfully created new poll issues')
 
     await this.pollsService.markPollComplete({
       pollId: poll.id,
@@ -783,10 +737,13 @@ export class QueueConsumerService {
     this.logger.log('Created individual poll messages')
 
     // 3. Send CSV file to Slack for Tevyn
-    const blocks = buildTevynApiSlackBlocks({
+    await sendTevynAPIPollMessage(this.slackService.client, {
       message: poll.messageContent,
       pollId: poll.id,
-      csvFileUrl: csvUrl,
+      csv: {
+        fileContent: Buffer.from(csv),
+        filename: `${user.email}-${format(poll.scheduledDate, 'yyyy-MM-dd')}.csv`,
+      },
       imageUrl: poll.imageUrl || undefined,
       userInfo: {
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -795,7 +752,6 @@ export class QueueConsumerService {
       },
       isExpansion: params.isExpansion,
     })
-    await this.slackService.message({ blocks }, SlackChannel.botTevynApi)
     this.logger.log('Slack message sent')
 
     return true

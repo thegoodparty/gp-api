@@ -14,6 +14,7 @@ import {
   SlackMessageType,
   VanitySlackMethodArgs,
 } from '../slackService.types'
+import { WebClient } from '@slack/web-api'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
@@ -26,7 +27,16 @@ if (!SLACK_APP_ID) {
 @Injectable()
 export class SlackService {
   private readonly logger = new Logger(SlackService.name)
-  constructor(private readonly httpService: HttpService) {}
+
+  public client: WebClient
+
+  constructor(private readonly httpService: HttpService) {
+    const slackBotToken = process.env.SLACK_APP_BOT_TOKEN
+    if (!slackBotToken) {
+      throw new Error('Missing SLACK_APP_BOT_TOKEN environment variable')
+    }
+    this.client = new WebClient(slackBotToken)
+  }
 
   private getChannelConfig(channel: SlackChannel) {
     const channelConfig = SLACK_CHANNEL_IDS[channel]
