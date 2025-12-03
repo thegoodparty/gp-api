@@ -249,6 +249,9 @@ jobs:
           echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
           echo "CANDIDATE_ID=${{ secrets.DEV_CANDIDATE_ID }}" >> "$GITHUB_ENV"
           echo "CAMPAIGN_SLUG=${{ secrets.DEV_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "HAS_SLACK_WEBHOOK=true" >> "$GITHUB_ENV"
+          fi
 
       - name: Verify environment health
         run: |
@@ -321,7 +324,7 @@ jobs:
           fi
 
       - name: Notify Slack on Test Success
-        if: steps.run-tests.outcome == 'success' && secrets.SLACK_WEBHOOK_URL != ''
+        if: steps.run-tests.outcome == 'success' && env.HAS_SLACK_WEBHOOK == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -337,7 +340,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify Slack on Test Failure
-        if: (steps.run-tests.outcome == 'failure' || failure()) && secrets.SLACK_WEBHOOK_URL != ''
+        if: (steps.run-tests.outcome == 'failure' || failure()) && env.HAS_SLACK_WEBHOOK == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: custom
