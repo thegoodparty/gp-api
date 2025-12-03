@@ -1,3 +1,4 @@
+import { retryIf } from '@/shared/util/retry-if'
 import {
   ConflictException,
   Inject,
@@ -6,10 +7,9 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common'
-import { PrismaService } from '../prisma.service'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { lowerFirst } from 'lodash'
-import { retryIf } from '@/shared/util/retry-if'
+import { PrismaService } from '../prisma.service'
 
 export const MODELS = Prisma.ModelName
 
@@ -33,18 +33,14 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
   const lowerModelName = lowerFirst(modelName)
   /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 
-  type UniqueWhereArg = Parameters<
-    PrismaClient[Uncapitalize<T>]['findUnique']
-  >[0]['where']
+  type ModelDelegate = PrismaClient[Uncapitalize<T>]
+  type UniqueWhereArg = Parameters<ModelDelegate['findUnique']>[0]['where']
 
-  type ExistingRecord = Awaited<
-    ReturnType<
-      Extract<
-        PrismaClient[Uncapitalize<T>],
-        { findUnique: unknown }
-      >['findUniqueOrThrow']
-    >
-  >
+  type ExistingRecord = Awaited<ReturnType<ModelDelegate['findUniqueOrThrow']>>
+
+  type UpdateManyAndReturnArgs = Parameters<
+    ModelDelegate['updateManyAndReturn']
+  >[0]
 
   @Injectable()
   class BasePrismaService implements OnModuleInit {
@@ -97,12 +93,25 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
         existing: ExistingRecord,
       ) => Partial<ExistingRecord> | Promise<Partial<ExistingRecord>>,
     ): Promise<ExistingRecord> {
-      return retryIf(
-        async (_, attempt) => {
-          // @ts-expect-error - it's extremely difficult to get perfectly inferred
-          // types for this line of code.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const existing = await this.model.findUnique({ where: params.where })
+      return retryIf<ExistingRecord>(
+        async (_, attempt): Promise<ExistingRecord> => {
+          type FindUniqueResult = Awaited<
+            ReturnType<ModelDelegate['findUnique']>
+          >
+          type TypedModelDelegate = {
+            findUnique: (args: {
+              where: UniqueWhereArg
+            }) => Promise<FindUniqueResult>
+            updateManyAndReturn: (
+              args: UpdateManyAndReturnArgs,
+            ) => Promise<ExistingRecord[]>
+          }
+
+          const modelDelegate = this.model as unknown as TypedModelDelegate
+
+          const existing = await modelDelegate.findUnique({
+            where: params.where,
+          })
 
           if (!existing) {
             const msg = `[optimistic locking update] Existing ${modelName} record not found for where clause: ${JSON.stringify(params.where)}`
@@ -112,14 +121,19 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
 
           const patch = await modification(existing)
 
-          // @ts-expect-error - it's extremely difficult to get perfectly inferred
-          // types for this line of code.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const result = await this.model.updateManyAndReturn({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            where: { AND: [params.where, { updatedAt: existing.updatedAt }] },
-            data: patch,
-          })
+          const existingWithUpdatedAt = existing as ExistingRecord & {
+            updatedAt: Date
+          }
+
+          const result = await modelDelegate.updateManyAndReturn({
+            where: {
+              AND: [
+                params.where,
+                { updatedAt: existingWithUpdatedAt.updatedAt },
+              ],
+            } as UpdateManyAndReturnArgs['where'],
+            data: patch as UpdateManyAndReturnArgs['data'],
+          } as UpdateManyAndReturnArgs)
 
           if (result.length === 0) {
             const msg = `[optimistic locking update] Record has been modified since it was fetched for where clause: ${JSON.stringify(params.where)} attempt ${attempt}`
