@@ -35,3 +35,10 @@ jobs:
 
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
+      CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      DEV_CANDIDATE_ID: ${{ secrets.DEV_CANDIDATE_ID }}
+      DEV_CAMPAIGN_SLUG: ${{ secrets.DEV_CAMPAIGN_SLUG }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -37,6 +37,20 @@ on:
     secrets:
       AWS_ROLE_ARN:
         required: true
+      CANDIDATE_EMAIL:
+        required: false
+      CANDIDATE_PASSWORD:
+        required: false
+      ADMIN_EMAIL:
+        required: false
+      ADMIN_PASSWORD:
+        required: false
+      DEV_CANDIDATE_ID:
+        required: false
+      DEV_CAMPAIGN_SLUG:
+        required: false
+      SLACK_WEBHOOK_URL:
+        required: false
 
 jobs:
   determine-context:
@@ -202,3 +216,138 @@ jobs:
             > Stack: `${{ needs.determine-context.outputs.stack }}`
             > 
             > This environment will be automatically destroyed when the PR is closed.
+
+  tests:
+    needs: [determine-context, deploy-pulumi]
+    if: github.event_name == 'pull_request' && needs.deploy-pulumi.outputs.service_url != ''
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      API_BASE_URL: https://${{ needs.deploy-pulumi.outputs.service_url }}
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Set test credentials
+        run: |
+          echo "CANDIDATE_EMAIL=${{ secrets.CANDIDATE_EMAIL }}" >> "$GITHUB_ENV"
+          echo "CANDIDATE_PASSWORD=${{ secrets.CANDIDATE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> "$GITHUB_ENV"
+          echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "CANDIDATE_ID=${{ secrets.DEV_CANDIDATE_ID }}" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_SLUG=${{ secrets.DEV_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
+
+      - name: Verify environment health
+        run: |
+          echo "Verifying ${API_BASE_URL}/v1/health is responding..."
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health endpoint is responding"
+              exit 0
+            fi
+            echo "Attempt $i: Health endpoint returned $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "⚠️ Health endpoint not ready after 10 attempts"
+          exit 1
+
+      - name: Run Playwright tests
+        id: run-tests
+        run: npm run test:e2e
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-reports-pr-${{ github.event.number }}-${{ github.sha }}
+          path: |
+            e2e-tests/playwright-report
+            e2e-tests/test-results
+
+      - name: Parse test results
+        if: always()
+        id: test-results
+        shell: bash
+        run: |
+          if [ -f "e2e-tests/test-results/results.json" ]; then
+            echo "Found results.json, parsing test results..."
+            
+            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[]] | length' 2>/dev/null || echo "0")
+            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == false)] | length' 2>/dev/null || echo "0")
+            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == true)] | length' 2>/dev/null || echo "0")
+            
+            echo "Parsed: Total=$TOTAL_TESTS, Failed=$FAILED_COUNT, Passed=$PASSED_COUNT"
+            
+            echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+            echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
+            echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
+            
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | map("• " + .) | join("\\n")' 2>/dev/null || echo "• Failed to parse test names")
+              if [ -z "$FAILED_TESTS" ]; then
+                FAILED_TESTS="• $FAILED_COUNT test(s) failed but names could not be parsed"
+              fi
+              echo "failed_tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+              echo "tests_ran=true" >> $GITHUB_OUTPUT
+            else
+              echo "failed_tests=" >> $GITHUB_OUTPUT
+              if [ "$TOTAL_TESTS" -gt 0 ]; then
+                echo "tests_ran=true" >> $GITHUB_OUTPUT
+              else
+                echo "tests_ran=false" >> $GITHUB_OUTPUT
+              fi
+            fi
+          else
+            echo "⚠️  results.json file not found - tests may not have run"
+            echo "failed_tests=• Test results file not found (tests may not have started)" >> $GITHUB_OUTPUT
+            echo "failed_count=0" >> $GITHUB_OUTPUT
+            echo "passed_count=0" >> $GITHUB_OUTPUT
+            echo "total_tests=0" >> $GITHUB_OUTPUT
+            echo "tests_ran=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify Slack on Test Success
+        if: steps.run-tests.outcome == 'success' && secrets.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: '✅ Preview E2E Tests Passed',
+              attachments: [{
+                color: 'good',
+                text: `${{ github.repository }} - PR #${{ github.event.number }} by ${{ github.actor }}\nEnvironment: Preview (${{ needs.determine-context.outputs.stack }})\n✅ ${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/pull/${{ github.event.number }}|View PR>`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on Test Failure
+        if: (steps.run-tests.outcome == 'failure' || failure()) && secrets.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "${{ steps.test-results.outputs.tests_ran == 'true' && '⚠️ Preview E2E Tests Failed (Non-blocking)' || '❌ Preview Environment Not Ready' }}",
+              "attachments": [{
+                "color": "${{ steps.test-results.outputs.tests_ran == 'true' && 'warning' || 'danger' }}",
+                "text": "${{ github.repository }} - PR #${{ github.event.number }} by ${{ github.actor }}\nEnvironment: Preview (${{ needs.determine-context.outputs.stack }})\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('❌ {0}/{1} tests failed\n✅ {2}/{1} tests passed\n\nFailed Tests:\n{3}\n\nTests are non-blocking during stabilization.', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || '❌ Tests did not run - environment health check failed or test setup error occurred.' }}\n\n<https://github.com/${{ github.repository }}/pull/${{ github.event.number }}|View PR>"
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
