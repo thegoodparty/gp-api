@@ -37,7 +37,7 @@ const PollPurchaseMetadataSchema = z.union([
   }),
 ])
 
-const PRICE_PER_TEXT = 0.03
+const PRICE_PER_TEXT = 0.035
 
 @Injectable()
 export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
@@ -59,11 +59,12 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
   async calculateAmount(rawMetadata: unknown): Promise<number> {
     const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
 
-    if (metadata.type === 'expansion') {
-      return metadata.count * PRICE_PER_TEXT * 100
-    }
+    const dollars =
+      metadata.type === 'expansion'
+        ? metadata.count * PRICE_PER_TEXT
+        : metadata.audienceSize * PRICE_PER_TEXT
 
-    return metadata.audienceSize * PRICE_PER_TEXT * 100
+    return Math.round(dollars * 100)
   }
 
   async executePostPurchase(
