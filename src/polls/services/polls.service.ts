@@ -9,6 +9,7 @@ import { add } from 'date-fns'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
+import { Timeout } from '@nestjs/schedule'
 
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
@@ -43,6 +44,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
       },
       data: {
         status: 'COMPLETED',
+        isCompleted: true,
         confidence: params.confidence,
         responseCount: params.totalResponses,
         completedDate: new Date(),
@@ -110,5 +112,22 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     )
 
     return result[0]
+  }
+
+  @Timeout(0)
+  async backfillIsCompletedField() {
+    const polls = await this.client.poll.findMany({
+      where: { status: 'COMPLETED', isCompleted: false },
+    })
+
+    this.logger.log(`Backfilling isCompleted field for ${polls.length} polls`)
+    for (const poll of polls) {
+      await this.client.poll.update({
+        where: { id: poll.id },
+        data: { isCompleted: true },
+      })
+      this.logger.log(`Updated poll ${poll.id} to isCompleted: true`)
+    }
+    this.logger.log('Backfilling isCompleted field complete')
   }
 }
