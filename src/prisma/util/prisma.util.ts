@@ -110,8 +110,6 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
     ): Promise<ExistingRecord> {
       // By using the generic T, we know the specific model type at compile time.
       // We create a typed reference to the model delegate to avoid union type issues.
-      // The `as unknown as` pattern is necessary because TypeScript sees ModelDelegate as a union,
-      // but we know via generic T that it's the correct specific type.
       const modelDelegate = this.model as TypedModelDelegate
 
       return retryIf(
