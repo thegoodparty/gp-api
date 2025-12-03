@@ -13,6 +13,8 @@ export interface ComputeArgs {
   certificateArn: pulumi.Input<string>;
   environment: pulumi.Input<Record<string, pulumi.Input<string>>>;
   tags?: Record<string, string>;
+  hostedZoneId?: pulumi.Input<string>;
+  previewDomain?: string;
 }
 
 export class Compute extends pulumi.ComponentResource {
@@ -238,7 +240,25 @@ export class Compute extends pulumi.ComponentResource {
       }, { parent: this });
     }
 
-    this.url = lb.loadBalancer.dnsName;
+    if (args.isPreview && args.hostedZoneId && args.previewDomain && args.prNumber) {
+      const domainName = `pr-${args.prNumber}.${args.previewDomain}`;
+      
+      new aws.route53.Record(`${shortName}-dns`, {
+        zoneId: args.hostedZoneId,
+        name: domainName,
+        type: 'A',
+        aliases: [{
+          name: lb.loadBalancer.dnsName,
+          zoneId: lb.loadBalancer.zoneId,
+          evaluateTargetHealth: true,
+        }],
+      }, { parent: this });
+
+      this.url = pulumi.output(domainName);
+    } else {
+      this.url = lb.loadBalancer.dnsName;
+    }
+
     this.loadBalancerArnSuffix = lb.loadBalancer.arnSuffix;
     this.targetGroupArnSuffix = lb.defaultTargetGroup.arnSuffix;
     this.clusterArn = cluster.arn;

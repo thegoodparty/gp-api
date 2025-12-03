@@ -20,6 +20,11 @@ const secretArn = config.require('secretArn');
 const isPreview = config.getBoolean('isPreview') || false;
 const isProduction = config.getBoolean('isProduction') || false;
 
+// 3. Preview Environment Config (optional)
+const previewCertificateArn = config.get('previewCertificateArn');
+const previewHostedZoneId = config.get('previewHostedZoneId');
+const previewDomain = config.get('previewDomain') || 'preview.goodparty.org';
+
 let stageName = 'dev';
 let prNumber: string | undefined;
 
@@ -90,6 +95,8 @@ const finalEnvVars = pulumi.all([secretData, databaseUrl, queue.queueName, queue
 }));
 
 const computeDeps = dbDependency ? { dependsOn: [dbDependency] } : undefined;
+const effectiveCertArn = isPreview && previewCertificateArn ? previewCertificateArn : certificateArn;
+
 const compute = new Compute(`${stackName}-compute`, {
     vpcId,
     publicSubnetIds,
@@ -98,9 +105,11 @@ const compute = new Compute(`${stackName}-compute`, {
     isProduction,
     isPreview,
     prNumber,
-    certificateArn,
+    certificateArn: effectiveCertArn,
     environment: finalEnvVars,
     tags: baseTags,
+    hostedZoneId: previewHostedZoneId,
+    previewDomain,
 }, computeDeps);
 
 new Monitoring(`${stackName}-monitoring`, {

@@ -20,11 +20,20 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install Pulumi CLI
         uses: pulumi/actions@v4
         with:
           pulumi-version: 'latest'
           command: ''
+
+      - name: Install Pulumi SDK Dependencies
+        working-directory: ./deploy/pulumi
+        run: npm ci
 
       - name: Destroy Stack
         working-directory: ./deploy/pulumi

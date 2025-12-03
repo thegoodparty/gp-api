@@ -32,6 +32,9 @@ jobs:
       security_group_id: sg-0e01f208be74c2a2b
       certificate_arn: arn:aws:acm:us-west-2:333022194791:certificate/227d8028-477a-4d75-999f-60587a8a11e3
       secret_arn: arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4
+      preview_certificate_arn: arn:aws:acm:us-west-2:333022194791:certificate/b009d1a6-68ff-4d24-84f7-93683ca3f786
+      preview_hosted_zone_id: Z10392302OXMPNQLPO07K
+      preview_domain: preview.goodparty.org
 
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}

@@ -34,6 +34,18 @@ on:
       secret_arn:
         required: true
         type: string
+      preview_certificate_arn:
+        required: false
+        type: string
+        default: ''
+      preview_hosted_zone_id:
+        required: false
+        type: string
+        default: ''
+      preview_domain:
+        required: false
+        type: string
+        default: 'preview.goodparty.org'
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -169,6 +181,16 @@ jobs:
           if [ "${{ needs.determine-context.outputs.is_preview }}" == "true" ]; then
              pulumi config set isPreview true
              pulumi config set isProduction false
+             # Set preview-specific config for SSL and DNS
+             if [ -n "${{ inputs.preview_certificate_arn }}" ]; then
+               pulumi config set previewCertificateArn "${{ inputs.preview_certificate_arn }}"
+             fi
+             if [ -n "${{ inputs.preview_hosted_zone_id }}" ]; then
+               pulumi config set previewHostedZoneId "${{ inputs.preview_hosted_zone_id }}"
+             fi
+             if [ -n "${{ inputs.preview_domain }}" ]; then
+               pulumi config set previewDomain "${{ inputs.preview_domain }}"
+             fi
           else
              pulumi config set isPreview false
              if [ "${{ github.ref_name }}" == "master" ]; then
