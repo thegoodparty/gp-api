@@ -377,7 +377,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
             jobAreas: [
               {
                 didState: stateCode,
-                disNpaSubset: areaCodes,
+                didNpaSubset: areaCodes,
               },
             ],
           }
