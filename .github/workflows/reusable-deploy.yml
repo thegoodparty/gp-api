@@ -3,6 +3,7 @@ name: Reusable Deployment
 permissions:
   contents: read
   id-token: write
+  pull-requests: write
 
 on:
   workflow_call:
@@ -101,6 +102,8 @@ jobs:
   deploy-pulumi:
     needs: [determine-context, build-docker]
     runs-on: ubuntu-latest
+    outputs:
+      service_url: ${{ steps.pulumi-up.outputs.service_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -126,6 +129,7 @@ jobs:
         run: npm ci
 
       - name: Pulumi Up
+        id: pulumi-up
         working-directory: ./deploy/pulumi
         env:
           PULUMI_CONFIG_PASSPHRASE: ''
@@ -162,3 +166,39 @@ jobs:
 
           # Run Update
           pulumi up --yes --skip-preview
+
+          # Capture Service URL for PR comment
+          SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+  comment-on-pr:
+    needs: [determine-context, deploy-pulumi]
+    if: github.event_name == 'pull_request' && needs.deploy-pulumi.outputs.service_url != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '🚀 Preview Environment'
+
+      - name: Post PR comment
+        if: steps.find-comment.outputs.comment-id == ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ## 🚀 Preview Environment
+
+            Your preview environment is ready!
+
+            | Resource | URL |
+            |----------|-----|
+            | **API** | https://${{ needs.deploy-pulumi.outputs.service_url }} |
+            | **Health Check** | https://${{ needs.deploy-pulumi.outputs.service_url }}/v1/health |
+
+            > Stack: `${{ needs.determine-context.outputs.stack }}`
+            > 
+            > This environment will be automatically destroyed when the PR is closed.
