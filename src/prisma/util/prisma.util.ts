@@ -1,6 +1,5 @@
 import { retryIf } from '@/shared/util/retry-if'
 import {
-  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -34,14 +33,25 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
   const lowerModelName = lowerFirst(modelName)
   /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 
+  // Extract the specific model delegate type using the generic T
+  // This helps TypeScript understand we're working with a specific model, not a union
   type ModelDelegate = PrismaClient[Uncapitalize<T>]
+
   type UniqueWhereArg = Parameters<ModelDelegate['findUnique']>[0]['where']
 
   type ExistingRecord = Awaited<ReturnType<ModelDelegate['findUniqueOrThrow']>>
 
-  type UpdateManyAndReturnArgs = Parameters<
-    ModelDelegate['updateManyAndReturn']
-  >[0]
+  // Create a typed model delegate that includes the methods we need
+  // Using intersection type to combine the delegate with our method signatures
+  // This helps TypeScript understand the types without union issues
+  type TypedModelDelegate = ModelDelegate & {
+    findUnique: (args: {
+      where: UniqueWhereArg
+    }) => Promise<ExistingRecord | null>
+    updateManyAndReturn: (
+      args: Parameters<ModelDelegate['updateManyAndReturn']>[0],
+    ) => Promise<ExistingRecord[]>
+  }
 
   @Injectable()
   class BasePrismaService implements OnModuleInit {
@@ -89,44 +99,25 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
      * ```
      */
     optimisticLockingUpdate(
-      params: { where: UniqueWhereArg },
+      params: // This `extends` clause serves as a compile-time check to ensure that this helper
+      // cannot get used with models that do not have the `updatedAt` field.
+      ExistingRecord extends { updatedAt: Date }
+        ? { where: UniqueWhereArg }
+        : never,
       modification: (
         existing: ExistingRecord,
       ) => Partial<ExistingRecord> | Promise<Partial<ExistingRecord>>,
     ): Promise<ExistingRecord> {
-      return retryIf<ExistingRecord>(
-        async (_, attempt): Promise<ExistingRecord> => {
-          // WHY WE NEED A TYPED INTERFACE:
-          // Prisma's type system represents model delegates as union types (one per model).
-          // TypeScript cannot call methods on union types because each model has different method signatures.
-          // We create a minimal interface with just the methods we need, which TypeScript can work with.
-          //
-          // WHY THIS IS SAFE AT RUNTIME:
-          // 1. At runtime, `this.model` is guaranteed to be the correct delegate for model `T`
-          //    (it's created by Prisma based on the model name)
-          // 2. The generic `T` constrains which model we're working with at compile time
-          // 3. We're only using methods (`findUnique`, `updateManyAndReturn`) that exist on all Prisma model delegates
-          // 4. The interface we're casting to matches the actual runtime structure of the model delegate
-          // 5. This is a type system limitation workaround, not a runtime behavior change
-          type ModelWithMethods = {
-            findUnique: (args: {
-              where: UniqueWhereArg
-            }) => Promise<ExistingRecord | null>
-            updateManyAndReturn: (
-              args: UpdateManyAndReturnArgs,
-            ) => Promise<ExistingRecord[]>
-          }
-          // WHY `as unknown as` IS SAFE:
-          // The double assertion pattern (`as unknown as TargetType`) is necessary because:
-          // 1. TypeScript's type system is structural, but Prisma's union types are too complex for direct casting
-          // 2. `as unknown` first erases the type information, allowing us to bypass TypeScript's strict checks
-          // 3. `as ModelWithMethods` then tells TypeScript what we know to be true at runtime
-          //
-          const model = this.model as unknown as ModelWithMethods
+      // By using the generic T, we know the specific model type at compile time.
+      // We create a typed reference to the model delegate to avoid union type issues.
+      // The `as unknown as` pattern is necessary because TypeScript sees ModelDelegate as a union,
+      // but we know via generic T that it's the correct specific type.
+      const modelDelegate = this.model as unknown as TypedModelDelegate
 
-          // Type assertion is safe: findUnique returns the correct record type for model T.
-          // The union type prevents direct method calls, but we know the runtime type is correct.
-          const existing = await model.findUnique({
+      return retryIf(
+        async (_, attempt): Promise<ExistingRecord> => {
+          // Now TypeScript can call findUnique because we've narrowed to ExtendedModelDelegate
+          const existing = await modelDelegate.findUnique({
             where: params.where,
           })
 
@@ -136,45 +127,29 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
             throw new NotFoundException(msg)
           }
 
-          // Runtime validation: ensure the model has the required `updatedAt` timestamp column.
-          // This check validates at runtime what TypeScript cannot guarantee at compile time
-          // (since Prisma's types don't enforce the presence of `updatedAt` on all models).
-          if (
-            !('updatedAt' in existing) ||
-            !(existing.updatedAt instanceof Date)
-          ) {
-            const msg = `[optimistic locking update] Model ${modelName} does not have an 'updatedAt' timestamp column, which is required for optimistic locking`
-            this.logger.error(msg)
-            throw new BadRequestException(msg)
-          }
-
-          const patch = await modification(existing)
-
-          // Type assertion is safe: we've validated at runtime that `updatedAt` exists and is a Date.
-          // This assertion allows TypeScript to understand the type for the rest of the method.
-          const existingWithUpdatedAt = existing as ExistingRecord & {
+          // Type assertion is safe because the method signature enforces ExistingRecord extends { updatedAt: Date }
+          // We assert to ExistingRecord & { updatedAt: Date } to satisfy TypeScript's type checker
+          const existingRecord = existing as ExistingRecord & {
             updatedAt: Date
           }
 
-          // WHY THE TYPE ASSERTIONS:
-          // Prisma's `updateManyAndReturn` expects very specific types that TypeScript can't infer
-          // from the union type. We assert the types we know are correct:
-          // - `where`: We're using the same `UniqueWhereArg` type from findUnique, plus updatedAt
-          // - `data`: The patch comes from the modification function which returns Partial<ExistingRecord>
-          // - The whole args object: Prisma's union types require this final assertion
-          //
-          // WHY THIS IS SAFE:
-          // All these types are derived from the same `ModelDelegate` and `ExistingRecord` types,
-          // so they're guaranteed to be compatible at runtime.
-          const result = await model.updateManyAndReturn({
+          // Sanity check to ensure the updatedAt field exists
+          if (!(existingRecord.updatedAt instanceof Date)) {
+            const msg = `[optimistic locking update] Existing ${modelName} record has no updatedAt field. This is developer error.`
+            this.logger.error(msg)
+            throw new Error(msg)
+          }
+
+          const patch = await modification(existingRecord as ExistingRecord)
+
+          const updateArgs = {
             where: {
-              AND: [
-                params.where,
-                { updatedAt: existingWithUpdatedAt.updatedAt },
-              ],
-            } as UpdateManyAndReturnArgs['where'],
-            data: patch as UpdateManyAndReturnArgs['data'],
-          } as UpdateManyAndReturnArgs)
+              AND: [params.where, { updatedAt: existingRecord.updatedAt }],
+            },
+            data: patch,
+          } as Parameters<ModelDelegate['updateManyAndReturn']>[0]
+
+          const result = await modelDelegate.updateManyAndReturn(updateArgs)
 
           if (result.length === 0) {
             const msg = `[optimistic locking update] Record has been modified since it was fetched for where clause: ${JSON.stringify(params.where)} attempt ${attempt}`
@@ -182,7 +157,7 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
             throw new ConflictException(msg)
           }
 
-          return result[0]
+          return result[0] as ExistingRecord
         },
         {
           shouldRetry: (error) => error instanceof ConflictException,
