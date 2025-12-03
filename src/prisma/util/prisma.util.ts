@@ -77,8 +77,9 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
      * Performs an optimistic locking update on a Prisma model record using the `updatedAt` timestamp
      * to detect concurrent updates.
      *
-     * For more information about optimistic locking, check out this article:
-     * https://en.wikipedia.org/wiki/Optimistic_concurrency_control
+     * For more information about optimistic locking and its uses, check out these articles:
+     * - https://www.prisma.io/docs/orm/prisma-client/queries/transactions#optimistic-concurrency-control
+     * - https://en.wikipedia.org/wiki/Optimistic_concurrency_control
      *
      * @example
      * ```typescript
@@ -103,8 +104,10 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
     ): Promise<ExistingRecord> {
       return retryIf(
         async (_, attempt) => {
-          // @ts-expect-error - it's extremely difficult to get perfectly inferred
-          // types for this line of code.
+          // @ts-expect-error - it's extremely difficult to get actual inferred type-checking
+          // on this line of code, due to the complexity of the generics required for this helper
+          // to provide type-safety to callers. So, for now, we're disabling the type-checker for
+          // this line.
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const existing = await this.model.findUnique({ where: params.where })
 
@@ -123,8 +126,10 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
 
           const patch = await modification(existing)
 
-          // @ts-expect-error - it's extremely difficult to get perfectly inferred
-          // types for this line of code.
+          // @ts-expect-error - it's extremely difficult to get actual inferred type-checking
+          // on this line of code, due to the complexity of the generics required for this helper
+          // to provide type-safety to callers. So, for now, we're disabling the type-checker for
+          // this line.
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const result = await this.model.updateManyAndReturn({
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
