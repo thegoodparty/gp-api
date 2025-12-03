@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { Campaign, User } from '@prisma/client'
 import {
   CompletePurchaseDto,
   CreatePurchaseIntentDto,
@@ -8,55 +8,86 @@ import {
   PurchaseType,
 } from '../purchase.types'
 import { PaymentsService } from './payments.service'
-import { PaymentType } from '../payments.types'
+import { PaymentIntentPayload, PaymentType } from '../payments.types'
+import Stripe from 'stripe'
 
 @Injectable()
 export class PurchaseService {
   private readonly logger = new Logger('PurchaseService')
-  private handlers: Map<PurchaseType, PurchaseHandler> = new Map()
-  private postPurchaseHandlers: Map<PurchaseType, PostPurchaseHandler> =
-    new Map()
+  // TODO: Refactor to remove the "handlers" anti-pattern here along w/
+  //  implementors of the anti-pattern elsewhere.
+  //  It's absolutely over-engineered, causes confusion and obfuscation in the
+  //  code, and makes it very difficult to create type-safe annotations w/o
+  //  having to resort to `any` or `unknown` escape hatches.
+  //  It also tightly couples the purchasing logic flows, with the logic flows of
+  //  _what_ is being purchased and _how_ it is being purchased:
+  //  https://app.clickup.com/t/90132012119/ENG-4065
+  private handlers: Map<PurchaseType, PurchaseHandler<unknown>> = new Map()
+  private postPurchaseHandlers: Map<
+    PurchaseType,
+    PostPurchaseHandler<unknown>
+  > = new Map()
 
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  registerPurchaseHandler(type: PurchaseType, handler: PurchaseHandler): void {
+  registerPurchaseHandler(
+    type: PurchaseType,
+    handler: PurchaseHandler<unknown>,
+  ): void {
     this.handlers.set(type, handler)
   }
 
   registerPostPurchaseHandler(
     type: PurchaseType,
-    handler: PostPurchaseHandler,
+    handler: PostPurchaseHandler<unknown>,
   ): void {
     this.postPurchaseHandlers.set(type, handler)
   }
 
-  async createPurchaseIntent(
-    user: User,
-    dto: CreatePurchaseIntentDto,
-  ): Promise<{ clientSecret: string; amount: number }> {
+  async createPurchaseIntent({
+    user,
+    dto,
+    campaign,
+  }: {
+    user: User
+    dto: CreatePurchaseIntentDto<unknown>
+    campaign?: Campaign
+  }): Promise<{
+    id: string
+    clientSecret: string
+    amount: number
+    status: Stripe.PaymentIntent.Status
+  }> {
     const handler = this.handlers.get(dto.type)
     if (!handler) {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
     }
 
-    await handler.validatePurchase(dto.metadata)
+    const existingPaymentIntent: void | Stripe.PaymentIntent =
+      await handler.validatePurchase({
+        // TODO: Remove this cast once `unknown` is removed from `PurchaseMetadata`
+        //  https://app.clickup.com/t/90132012119/ENG-6107
+        ...(dto.metadata as Record<string, unknown>),
+        ...(campaign?.id ? { campaignId: campaign?.id } : {}),
+      })
     const amount = await handler.calculateAmount(dto.metadata)
 
     const paymentMetadata = {
       type: this.getPaymentType(dto.type),
       amount,
-      ...dto.metadata,
+      ...(dto.metadata as Record<string, unknown>),
       purchaseType: dto.type,
-    } as any
+    } as PaymentIntentPayload<PaymentType>
 
-    const paymentIntent = await this.paymentsService.createPayment(
-      user,
-      paymentMetadata,
-    )
+    const paymentIntent =
+      existingPaymentIntent ||
+      (await this.paymentsService.createPayment(user, paymentMetadata))
 
     return {
+      id: paymentIntent.id,
       clientSecret: paymentIntent.client_secret!,
       amount: paymentIntent.amount / 100,
+      status: paymentIntent.status,
     }
   }
 
@@ -80,11 +111,10 @@ export class PurchaseService {
       throw new Error('No post-purchase handler found for this purchase type')
     }
 
-    const result = await postPurchaseHandler(
+    return await postPurchaseHandler(
       dto.paymentIntentId,
-      paymentIntent.metadata as any,
+      paymentIntent.metadata,
     )
-    return result
   }
 
   private getPaymentType(purchaseType: PurchaseType): PaymentType {

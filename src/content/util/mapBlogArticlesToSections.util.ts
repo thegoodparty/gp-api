@@ -6,7 +6,8 @@ export const mapBlogArticlesToSections = (
 ) => {
   return Object.fromEntries(
     articles.reduce((acc, curr) => {
-      const currentSectionSlug = curr.section.fields.slug
+      const section = curr.section as { fields: { slug: string } }
+      const currentSectionSlug = section.fields.slug
       const existingSection = acc.get(currentSectionSlug) || []
       const sectionArticles = [...existingSection, curr].slice(0, limit)
 

@@ -64,11 +64,12 @@ export class AuthenticationService {
     return ''
   }
 
-  private SOCIAL_MEDIA_VALIDATORS_MAP: { [socialProvider in SocialProvider] } =
-    {
-      [SocialProvider.GOOGLE]: this.googleTokenValidator,
-      [SocialProvider.FACEBOOK]: this.facebookTokenValidator,
-    }
+  private SOCIAL_MEDIA_VALIDATORS_MAP: {
+    [socialProvider in SocialProvider]: SocialTokenValidator
+  } = {
+    [SocialProvider.GOOGLE]: this.googleTokenValidator,
+    [SocialProvider.FACEBOOK]: this.facebookTokenValidator,
+  }
 
   constructor(
     private usersService: UsersService,

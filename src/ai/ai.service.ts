@@ -1,4 +1,5 @@
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
+import { BaseMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
 import { Injectable, Logger } from '@nestjs/common'
 import { Prisma, User } from '@prisma/client'
@@ -59,6 +60,9 @@ type GetAssistantCompletionArgs = {
   topP?: number
 }
 
+/**
+ * @deprecated This service is deprecated. Use `LlmService` from `src/llm/services/llm.service` instead.
+ */
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name)
@@ -88,8 +92,8 @@ export class AiService {
       maxRetries: 0,
     }
 
-    let firstModel
-    let fallbackModel
+    let firstModel: ChatOpenAI | ChatTogetherAI | undefined
+    let fallbackModel: ChatOpenAI | ChatTogetherAI | undefined
 
     for (const model of models) {
       if (model.includes('gpt')) {
@@ -123,7 +127,7 @@ export class AiService {
       }
     }
 
-    const modelWithFallback = firstModel.withFallbacks([fallbackModel])
+    const modelWithFallback = firstModel!.withFallbacks([fallbackModel!])
 
     const sanitizedMessages = messages.map((message) => {
       let sanitizedContent = message.content
@@ -138,24 +142,26 @@ export class AiService {
       }
     })
 
-    let completion
+    let completion: BaseMessage | undefined
     try {
       completion = await modelWithFallback.invoke(sanitizedMessages)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      this.logger.error('Error in utils/ai/llmChatCompletion', error)
-      this.logger.error('error response', error?.response)
+    } catch (error) {
+      const err = error as Error & {
+        response?: Record<string, string | number | boolean>
+      }
+      this.logger.error('Error in utils/ai/llmChatCompletion', err)
+      this.logger.error('error response', err?.response)
 
       await this.slack.errorMessage({
         message: 'Error in AI completion (raw)',
-        error,
+        error: err,
       })
     }
 
     if (completion && completion?.content) {
-      let content = completion.content
+      let content = completion.content as string
       if (content.includes('```html')) {
-        content = content.match(/```html([\s\S]*?)```/)[1]
+        content = content.match(/```html([\s\S]*?)```/)![1]
       }
       content = content.replace('/n', '<br/><br/>')
 
@@ -278,26 +284,29 @@ export class AiService {
     }
   }
 
-  private parseToolResponse(response: string) {
-    {
-      const functionRegex = /<function=(\w+)>(.*?)<\/function>/
-      const match = response.match(functionRegex)
-
-      if (match) {
-        const [functionName, argsString] = match
-        try {
-          const args = JSON.parse(argsString)
-          return {
-            function: functionName,
-            arguments: args,
-          }
-        } catch (error) {
-          this.logger.error(`Error parsing function arguments: ${error}`)
-          return undefined
-        }
+  private parseToolResponse(response: string):
+    | {
+        function: string
+        arguments: string
       }
-      return undefined
+    | undefined {
+    const functionRegex = /<function=(\w+)>(.*?)<\/function>/
+    const match = response.match(functionRegex)
+
+    if (match) {
+      const [functionName, argsString] = match
+      try {
+        const args = JSON.parse(argsString) as string
+        return {
+          function: functionName,
+          arguments: args,
+        }
+      } catch (error) {
+        this.logger.error(`Error parsing function arguments: ${error}`)
+        return undefined
+      }
     }
+    return undefined
   }
 
   async getAssistantCompletion({

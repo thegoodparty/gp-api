@@ -10,6 +10,7 @@ import {
   AIChatPromptContents,
   BlogArticleContentRaw,
   findByTypeOptions,
+  GlossaryItemAugmented,
 } from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
@@ -68,13 +69,16 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     return this.transformContent(type, entries)
   }
 
-  async fetchGlossaryItems() {
+  async fetchGlossaryItems(): Promise<GlossaryItemAugmented[]> {
     const entries = await this.findMany({
       where: {
         type: ContentType.glossaryItem,
       },
     })
-    return this.transformContent(ContentType.glossaryItem, entries)
+    return this.transformContent(
+      ContentType.glossaryItem,
+      entries,
+    ) as GlossaryItemAugmented[]
   }
 
   async getAiContentPrompts() {
@@ -152,8 +156,10 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     entries: Content[],
   ) {
     const timerId = this.timers.start(`TransformContent type: ${type}`)
-    const transformer = CONTENT_TYPE_MAP[type]?.transformer
-    const result = transformer ? transformer(entries) : entries
+    const transformer = CONTENT_TYPE_MAP[type]?.transformer as
+      | ((entries: Content[]) => Content[])
+      | undefined
+    const result: Content[] = transformer ? transformer(entries) : entries
     this.timers.end(timerId)
     return result
   }
@@ -171,7 +177,9 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     await this.client.$transaction(
       async (tx) => {
         for (const entry of updateEntries) {
-          const contentTypeDef = CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]
+          const contentTypeDef = CONTENT_TYPE_MAP[
+            entry.sys.contentType.sys.id
+          ] as (typeof CONTENT_TYPE_MAP)[keyof typeof CONTENT_TYPE_MAP]
           const record = await tx.content.update({
             where: {
               id: entry.sys.id,
@@ -199,10 +207,12 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
         }
 
         for (const entry of createEntries) {
-          const contentTypeDef = CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]
+          const contentTypeDef = CONTENT_TYPE_MAP[
+            entry.sys.contentType.sys.id
+          ] as (typeof CONTENT_TYPE_MAP)[keyof typeof CONTENT_TYPE_MAP]
           const contentRecord = {
             id: entry.sys.id,
-            type: contentTypeDef.name,
+            type: contentTypeDef.name as ContentType,
             data: {
               ...entry.fields,
               updateDate: new Date(entry.sys.updatedAt)

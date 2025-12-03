@@ -126,7 +126,7 @@ export function buildSlackBlocks(
             elements: [
               {
                 type: SlackMessageType.TEXT,
-                text: lastThreadMessage,
+                text: lastThreadMessage as string,
               },
             ],
           },

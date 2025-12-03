@@ -88,37 +88,13 @@ export class QueueConsumerService {
       const success = await this.processMessage(message)
       return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
-      const shouldRequeue = this.shouldRequeueError(error as Error)
-
-      if (shouldRequeue) {
-        this.logger.error('Message processing failed, will requeue:', error)
-        this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
-        return true // Indicate that we should requeue
-      } else {
-        this.logger.error(
-          `Message processing failed with non-retryable error, discarding message: ${JSON.stringify(message)}`,
-          error,
-        )
-
-        // Send error notification to Slack for non-retryable errors
-        try {
-          await this.slackService.errorMessage({
-            message: 'Queue message discarded due to non-retryable error',
-            error: {
-              error,
-              message,
-            },
-          })
-        } catch (slackError) {
-          this.logger.error('Failed to send Slack notification:', slackError)
-        }
-
-        return false // Don't requeue, delete the message
-      }
+      this.logger.error('Message processing failed, will requeue:', error)
+      this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
+      return true // Indicate that we should requeue
     }
   }
 
-  private shouldRequeueError(error: Error): boolean {
+  private legacyShouldRequeueError(error: Error): boolean {
     // Don't retry Prisma errors for missing records - these are permanent failures
     if (error instanceof PrismaClientKnownRequestError) {
       // P2025: Record not found
@@ -141,6 +117,40 @@ export class QueueConsumerService {
 
     // Retry network errors, timeouts, and other temporary failures
     return true
+  }
+
+  private withLegacyErrorSwallowing = async (
+    message: Message,
+    fn: () => Promise<boolean>,
+  ) => {
+    try {
+      return await fn()
+    } catch (error) {
+      const shouldRequeue = this.legacyShouldRequeueError(error as Error)
+      if (shouldRequeue) {
+        return false // Requeue the message
+      }
+
+      this.logger.error(
+        `Message processing failed with non-retryable error, discarding message: ${JSON.stringify(message)}`,
+        error,
+      )
+
+      // Send error notification to Slack for non-retryable errors
+      try {
+        await this.slackService.errorMessage({
+          message: 'Queue message discarded due to non-retryable error',
+          error: {
+            error,
+            message,
+          },
+        })
+      } catch (slackError) {
+        this.logger.error('Failed to send Slack notification:', slackError)
+      }
+
+      return true // Don't requeue, delete the message
+    }
   }
 
   // TODO: Each message type should be assigned it's own SQS queue allowing each
@@ -168,53 +178,61 @@ export class QueueConsumerService {
 
     switch (queueMessage.type) {
       case QueueType.GENERATE_AI_CONTENT:
-        this.logger.log('received generateAiContent message')
-        const generateAiContentMessage =
-          queueMessage.data as GenerateAiContentMessageData
-
-        try {
-          await this.aiContentService.handleGenerateAiContent(
-            generateAiContentMessage,
-          )
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          this.logger.log('received generateAiContent message')
+          const generateAiContentMessage =
+            queueMessage.data as GenerateAiContentMessageData
 
           try {
-            const { userId } = await this.campaignsService.findUniqueOrThrow({
-              where: { slug: generateAiContentMessage.slug },
-            })
-
-            this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
-              slug: generateAiContentMessage.slug,
-              key: generateAiContentMessage.key,
-              regenerate: generateAiContentMessage.regenerate,
-            })
-          } catch (analyticsError) {
-            this.logger.error(
-              'Failed to track analytics for AI content:',
-              analyticsError,
+            await this.aiContentService.handleGenerateAiContent(
+              generateAiContentMessage,
             )
+
+            try {
+              const { userId } = await this.campaignsService.findUniqueOrThrow({
+                where: { slug: generateAiContentMessage.slug },
+              })
+
+              this.analytics.track(userId, EVENTS.AiContent.ContentGenerated, {
+                slug: generateAiContentMessage.slug,
+                key: generateAiContentMessage.key,
+                regenerate: generateAiContentMessage.regenerate,
+              })
+            } catch (analyticsError) {
+              this.logger.error(
+                'Failed to track analytics for AI content:',
+                analyticsError,
+              )
+            }
+          } catch (error) {
+            this.logger.error(
+              `Error processing AI content generation for slug: ${generateAiContentMessage.slug}`,
+              error,
+            )
+            throw error
           }
-        } catch (error) {
-          this.logger.error(
-            `Error processing AI content generation for slug: ${generateAiContentMessage.slug}`,
-            error,
-          )
-          throw error
-        }
-        break
+          return true
+        })
       case QueueType.PATH_TO_VICTORY:
         this.logger.log('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
-        await this.handlePathToVictoryMessage(pathToVictoryMessage)
-        break
+        return await this.withLegacyErrorSwallowing(message, async () => {
+          await this.handlePathToVictoryMessage(pathToVictoryMessage)
+          return true
+        })
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
         this.logger.log('received tcrComplianceStatusCheck message')
-        return await this.handleTcrComplianceCheckMessage(
-          queueMessage.data as TcrComplianceStatusCheckMessage,
+        return await this.withLegacyErrorSwallowing(message, () =>
+          this.handleTcrComplianceCheckMessage(
+            queueMessage.data as TcrComplianceStatusCheckMessage,
+          ),
         )
       case QueueType.DOMAIN_EMAIL_FORWARDING:
         this.logger.log('received domainEmailForwarding message')
-        return await this.handleDomainEmailForwardingMessage(
-          queueMessage.data as DomainEmailForwardingMessage,
+        return await this.withLegacyErrorSwallowing(message, () =>
+          this.handleDomainEmailForwardingMessage(
+            queueMessage.data as DomainEmailForwardingMessage,
+          ),
         )
       case QueueType.POLL_ANALYSIS_COMPLETE:
         this.logger.log('received pollAnalysisComplete message')
@@ -236,8 +254,6 @@ export class QueueConsumerService {
           message.MessageId!,
         )
     }
-    // Return true to delete the message from the queue
-    return true
   }
 
   private async getCvTokenStatus(
@@ -667,7 +683,7 @@ export class QueueConsumerService {
   }) {
     const data = await this.getPollAndCampaign(params.pollId)
     if (!data) {
-      this.logger.log('Poll not found, ignoring event')
+      this.logger.log(`${params.pollId} Poll not found, ignoring event`)
       return
     }
     const { poll, campaign } = data
@@ -675,66 +691,77 @@ export class QueueConsumerService {
     const user = await this.usersService.findUnique({
       where: { id: campaign.userId },
     })
-    this.logger.log('Fetched sample and user')
+    this.logger.log(`${params.pollId} Fetched sample and user`)
 
     if (!user) {
-      this.logger.log('User not found, ignoring event')
+      this.logger.log(`${params.pollId} User not found, ignoring event`)
       return
     }
 
     const bucket = process.env.TEVYN_POLL_CSVS_BUCKET
     if (!bucket) {
-      throw new Error('TEVYN_POLL_CSVS_BUCKET environment variable is required')
+      throw new Error(
+        `${params.pollId} TEVYN_POLL_CSVS_BUCKET environment variable is required`,
+      )
     }
-    // It's important that this filename be deterministic. That way, in the event of a failure
-    // and retry, we can safely re-use a previously generated CSV.
-    const fileName = `${poll.id}-${params.messageId}.csv`
+    // It's important that this filename be deterministic based on the particular poll "run".
+    // That way, in the event of a failure and retry, we can safely re-use a previously generated CSV.
+    // We use the estimated completion date here because it gets set when the poll expanded, and then
+    // does not change.
+    const fileName = `${poll.id}-${poll.estimatedCompletionDate.toISOString()}.csv`
     const key = this.s3Service.buildKey(undefined, fileName)
 
     // 1. Get or create the CSV file of a random sample of contacts.
     // We do get-or-create here so that the logic remains retry-safe in the event of a failure.
     let csv = await this.s3Service.getFile(bucket, key)
 
-    // expires in 7 days
-    const expiresIn = 7 * 24 * 60 * 60
     if (!csv) {
-      this.logger.log('No existing CSV found, generating new one')
+      this.logger.log(
+        `${params.pollId} No existing CSV found, generating new one`,
+      )
       const sampleParams = await params.sampleParams(poll)
+      this.logger.log(
+        `${poll.id} Sampling contacts with params: ${JSON.stringify(sampleParams)}`,
+      )
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
         campaign,
+      )
+      this.logger.log(
+        `${params.pollId} Generated sample of ${sample.length} contacts`,
       )
       csv = buildCsvFromContacts(sample)
       await this.s3Service.uploadFile(bucket, csv, key, {
         contentType: 'text/csv',
       })
     }
-    const csvUrl = await this.s3Service.getSignedUrlForViewing(bucket, key, {
-      expiresIn,
-    })
+
     const people = await parseCsv<{ id: string }>(csv)
 
     // 2. Create individual poll messages
     const now = new Date()
-    await this.pollsService.client.$transaction(async (tx) => {
-      for (const person of people) {
-        const message: PollIndividualMessage = {
-          // It's important that this id be deterministic, so that we can safely re-upsert
-          // a previous CSV.
-          id: `${poll.id}-${person.id}`,
-          pollId: poll.id,
-          personId: person.id!,
-          sentAt: now,
+    await this.pollsService.client.$transaction(
+      async (tx) => {
+        for (const person of people) {
+          const message: PollIndividualMessage = {
+            // It's important that this id be deterministic, so that we can safely re-upsert
+            // a previous CSV.
+            id: `${poll.id}-${person.id}`,
+            pollId: poll.id,
+            personId: person.id!,
+            sentAt: now,
+          }
+          await tx.pollIndividualMessage.upsert({
+            where: { id: message.id },
+            create: message,
+            update: message,
+          })
         }
-        await tx.pollIndividualMessage.upsert({
-          where: { id: message.id },
-          create: message,
-          update: message,
-        })
-      }
-    })
+      },
+      { timeout: 10000 },
+    )
 
-    this.logger.log('Created individual poll messages')
+    this.logger.log(`${params.pollId} Created individual poll messages`)
 
     // 3. Send CSV file to Slack for Tevyn
     await sendTevynAPIPollMessage(this.slackService.client, {
@@ -752,7 +779,7 @@ export class QueueConsumerService {
       },
       isExpansion: params.isExpansion,
     })
-    this.logger.log('Slack message sent')
+    this.logger.log(`${params.pollId} Slack message sent`)
 
     return true
   }

@@ -1,3 +1,4 @@
+import Stripe from 'stripe'
 export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
   TEXT = 'TEXT',
@@ -8,39 +9,25 @@ export interface BasePurchaseMetadata {
   campaignId?: number
 }
 
-export type PurchaseMetadata<
-  T extends BasePurchaseMetadata = BasePurchaseMetadata,
-> = T
-
-export interface CreatePurchaseIntentDto<
-  T extends BasePurchaseMetadata = BasePurchaseMetadata,
-> {
+export interface CreatePurchaseIntentDto<Metadata> {
   type: PurchaseType
-  metadata: PurchaseMetadata<T>
+  metadata: Metadata
 }
 
 export interface CompletePurchaseDto {
   paymentIntentId: string
 }
 
-export type PostPurchaseHandler<
-  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  TResult = unknown,
-> = (
+export type PostPurchaseHandler<Metadata> = (
   paymentIntentId: string,
-  metadata: PurchaseMetadata<TMetadata>,
-) => Promise<TResult>
+  metadata: Metadata,
+) => Promise<unknown>
 
-export interface PurchaseHandler<
-  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  TResult = unknown,
-> {
-  validatePurchase(metadata: PurchaseMetadata<TMetadata>): Promise<void>
-  calculateAmount(metadata: PurchaseMetadata<TMetadata>): Promise<number>
+export interface PurchaseHandler<Metadata> {
+  validatePurchase(metadata: Metadata): Promise<void | Stripe.PaymentIntent>
+  calculateAmount(metadata: Metadata): Promise<number>
   executePostPurchase?(
     paymentIntentId: string,
-    metadata: PurchaseMetadata<TMetadata>,
-  ): Promise<TResult>
+    metadata: Metadata,
+  ): Promise<unknown>
 }

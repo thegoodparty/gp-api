@@ -13,7 +13,7 @@ export const groupGlossaryItemsByAlpha = (
         item: GlossaryItemAugmented,
       ): Map<string, GlossaryItemAugmented[]> => {
         const { title } = item
-        const firstLetter = title.charAt(0).toUpperCase()
+        const firstLetter: string = title.charAt(0).toUpperCase() as string
         return itemAlphaGroups.set(firstLetter, [
           ...(itemAlphaGroups.get(firstLetter) || []),
           item,
