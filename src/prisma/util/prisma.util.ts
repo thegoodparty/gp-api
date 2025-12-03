@@ -92,7 +92,11 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
      * ```
      */
     optimisticLockingUpdate(
-      params: { where: UniqueWhereArg },
+      params: // This `extends` clause serves as a compile-time check to ensure that this helper
+      // cannot get used with models that do not have the `updatedAt` field.
+      ExistingRecord extends { updatedAt: Date }
+        ? { where: UniqueWhereArg }
+        : never,
       modification: (
         existing: ExistingRecord,
       ) => Partial<ExistingRecord> | Promise<Partial<ExistingRecord>>,
@@ -108,6 +112,13 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
             const msg = `[optimistic locking update] Existing ${modelName} record not found for where clause: ${JSON.stringify(params.where)}`
             this.logger.log(msg)
             throw new NotFoundException(msg)
+          }
+
+          // Sanity check to ensure the updatedAt field exists
+          if (!(existing.updatedAt instanceof Date)) {
+            const msg = `[optimistic locking update] Existing ${modelName} record has no updatedAt field. This is developer error.`
+            this.logger.error(msg)
+            throw new Error(msg)
           }
 
           const patch = await modification(existing)
