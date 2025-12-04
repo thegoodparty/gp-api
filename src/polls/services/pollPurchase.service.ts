@@ -19,9 +19,14 @@ const uuidV7Schema = z.string().refine(
   },
 )
 
+enum PollPurchaseType {
+  new = 'new',
+  expansion = 'expansion',
+}
+
 const PollPurchaseMetadataSchema = z.union([
   z.object({
-    type: z.literal('new'),
+    type: z.literal(PollPurchaseType.new),
     pollId: uuidV7Schema,
     // TODO SWAIN: confirm these size restrictions (ENG-6101)
     name: z.string().min(1).max(100),
@@ -31,13 +36,21 @@ const PollPurchaseMetadataSchema = z.union([
     scheduledDate: z.string().datetime(),
   }),
   z.object({
-    type: z.literal('expansion').optional().default('expansion'),
+    type: z
+      .literal(PollPurchaseType.expansion)
+      .optional()
+      .default(PollPurchaseType.expansion),
     pollId: uuidV7Schema,
     count: z.coerce.number().int().min(1),
   }),
 ])
 
-const PRICE_PER_TEXT = 0.03
+const PRICE_PER_TEXT_TENTH_CENTS = 35
+
+function calcAmountInCents(textCount: number): number {
+  const totalTenthCents = textCount * PRICE_PER_TEXT_TENTH_CENTS // integer
+  return Math.floor((totalTenthCents + 5) / 10)
+}
 
 @Injectable()
 export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
@@ -59,11 +72,9 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
   async calculateAmount(rawMetadata: unknown): Promise<number> {
     const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
 
-    if (metadata.type === 'expansion') {
-      return metadata.count * PRICE_PER_TEXT * 100
-    }
-
-    return metadata.audienceSize * PRICE_PER_TEXT * 100
+    return metadata.type === PollPurchaseType.expansion
+      ? calcAmountInCents(metadata.count)
+      : calcAmountInCents(metadata.audienceSize)
   }
 
   async executePostPurchase(
@@ -76,7 +87,7 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
       `Poll purchase completed: paymentIntentId=${paymentIntentId} metadata=${JSON.stringify(metadata)}`,
     )
 
-    if (metadata.type === 'expansion') {
+    if (metadata.type === PollPurchaseType.expansion) {
       await this.pollsService.expandPoll({
         pollId: metadata.pollId,
         additionalRecipientCount: metadata.count,
