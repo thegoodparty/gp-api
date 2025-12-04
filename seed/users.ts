@@ -6,11 +6,16 @@ const NUM_USERS = 20
 
 const ADMIN_STRIPE_CUSTOMER_ID = 'cus_RWKP2JnywRA590'
 
-const ADMIN_FIRST_NAME = 'Tyler'
-const ADMIN_LAST_NAME = 'Durden'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@test.local'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'testPassword123'
+const CANDIDATE_EMAIL = process.env.CANDIDATE_EMAIL || 'candidate@test.local'
+const CANDIDATE_PASSWORD = process.env.CANDIDATE_PASSWORD || 'testPassword123'
+
+const ADMIN_FIRST_NAME = 'Test'
+const ADMIN_LAST_NAME = 'Admin'
 export const ADMIN_USER = {
-  email: 'tyler@fightclub.org',
-  password: hashPasswordSync('no1TalksAboutFightClub'),
+  email: ADMIN_EMAIL,
+  password: hashPasswordSync(ADMIN_PASSWORD),
   hasPassword: true,
   firstName: ADMIN_FIRST_NAME,
   lastName: ADMIN_LAST_NAME,
@@ -29,8 +34,8 @@ const SALES_USER = {
 }
 
 const CANDIDATE_USER = {
-  email: 'candidate@fightclub.org',
-  password: hashPasswordSync('makeFightClubGreatAgain123'),
+  email: CANDIDATE_EMAIL,
+  password: hashPasswordSync(CANDIDATE_PASSWORD),
   hasPassword: true,
   roles: [UserRole.candidate],
 }

@@ -191,6 +191,19 @@ jobs:
              if [ -n "${{ inputs.preview_domain }}" ]; then
                pulumi config set previewDomain "${{ inputs.preview_domain }}"
              fi
+             # Set test credentials for seeding (only in preview)
+             if [ -n "${{ secrets.ADMIN_EMAIL }}" ]; then
+               pulumi config set adminEmail "${{ secrets.ADMIN_EMAIL }}"
+             fi
+             if [ -n "${{ secrets.ADMIN_PASSWORD }}" ]; then
+               pulumi config set adminPassword "${{ secrets.ADMIN_PASSWORD }}" --secret
+             fi
+             if [ -n "${{ secrets.CANDIDATE_EMAIL }}" ]; then
+               pulumi config set candidateEmail "${{ secrets.CANDIDATE_EMAIL }}"
+             fi
+             if [ -n "${{ secrets.CANDIDATE_PASSWORD }}" ]; then
+               pulumi config set candidatePassword "${{ secrets.CANDIDATE_PASSWORD }}" --secret
+             fi
           else
              pulumi config set isPreview false
              if [ "${{ github.ref_name }}" == "master" ]; then

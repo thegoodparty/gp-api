@@ -6,6 +6,12 @@ if [ -n "$DATABASE_URL" ] && [ "$DATABASE_URL" != "postgresql://placeholder:plac
   echo "Running Prisma migrations..."
   npx prisma migrate deploy --schema=prisma/schema
   echo "Migrations completed."
+
+  if [ "$IS_PREVIEW" = "true" ]; then
+    echo "Preview environment detected. Running seed..."
+    npx prisma db seed
+    echo "Seed completed."
+  fi
 else
   echo "DATABASE_URL not set or is placeholder, skipping migrations."
 fi

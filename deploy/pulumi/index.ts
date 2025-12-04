@@ -25,6 +25,12 @@ const previewCertificateArn = config.get('previewCertificateArn');
 const previewHostedZoneId = config.get('previewHostedZoneId');
 const previewDomain = config.get('previewDomain') || 'preview.goodparty.org';
 
+// 4. Test Credentials (for preview seeding)
+const adminEmail = config.get('adminEmail');
+const adminPassword = config.getSecret('adminPassword');
+const candidateEmail = config.get('candidateEmail');
+const candidatePassword = config.getSecret('candidatePassword');
+
 let stageName = 'dev';
 let prNumber: string | undefined;
 
@@ -83,16 +89,37 @@ if (isPreview) {
     databaseUrl = secretData.apply(s => s.DATABASE_URL);
 }
 
-// 5. Prepare Environment Variables
-const finalEnvVars = pulumi.all([secretData, databaseUrl, queue.queueName, queue.queueUrl]).apply(([data, dbUrl, qName, qUrl]) => ({
-    ...data,
-    DATABASE_URL: dbUrl,
-    NODE_ENV: 'production',
-    SQS_QUEUE: qName,
-    SQS_QUEUE_BASE_URL: qUrl.replace(`/${qName}`, ''),
-    PORT: '80',
-    HOST: '0.0.0.0',
-}));
+// 6. Prepare Environment Variables
+const finalEnvVars = pulumi.all([
+    secretData, 
+    databaseUrl, 
+    queue.queueName, 
+    queue.queueUrl,
+    adminEmail || '',
+    adminPassword || pulumi.output(''),
+    candidateEmail || '',
+    candidatePassword || pulumi.output(''),
+]).apply(([data, dbUrl, qName, qUrl, aEmail, aPass, cEmail, cPass]) => {
+    const baseEnv: Record<string, string> = {
+        ...data,
+        DATABASE_URL: dbUrl,
+        NODE_ENV: 'production',
+        IS_PREVIEW: isPreview ? 'true' : 'false',
+        SQS_QUEUE: qName,
+        SQS_QUEUE_BASE_URL: qUrl.replace(`/${qName}`, ''),
+        PORT: '80',
+        HOST: '0.0.0.0',
+    };
+
+    if (isPreview && aEmail && aPass && cEmail && cPass) {
+        baseEnv.ADMIN_EMAIL = aEmail;
+        baseEnv.ADMIN_PASSWORD = aPass;
+        baseEnv.CANDIDATE_EMAIL = cEmail;
+        baseEnv.CANDIDATE_PASSWORD = cPass;
+    }
+
+    return baseEnv;
+});
 
 const computeDeps = dbDependency ? { dependsOn: [dbDependency] } : undefined;
 const effectiveCertArn = isPreview && previewCertificateArn ? previewCertificateArn : certificateArn;
