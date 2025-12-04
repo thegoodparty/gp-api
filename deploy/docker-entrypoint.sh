@@ -9,7 +9,7 @@ if [ -n "$DATABASE_URL" ] && [ "$DATABASE_URL" != "postgresql://placeholder:plac
 
   if [ "$IS_PREVIEW" = "true" ]; then
     echo "Preview environment detected. Running seed..."
-    npx prisma db seed
+    node dist/seed/seed.js
     echo "Seed completed."
   fi
 else
