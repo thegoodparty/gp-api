@@ -33,18 +33,25 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
   const lowerModelName = lowerFirst(modelName)
   /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 
-  type UniqueWhereArg = Parameters<
-    PrismaClient[Uncapitalize<T>]['findUnique']
-  >[0]['where']
+  // Extract the specific model delegate type using the generic T
+  // This helps TypeScript understand we're working with a specific model, not a union
+  type ModelDelegate = PrismaClient[Uncapitalize<T>]
 
-  type ExistingRecord = Awaited<
-    ReturnType<
-      Extract<
-        PrismaClient[Uncapitalize<T>],
-        { findUnique: unknown }
-      >['findUniqueOrThrow']
-    >
-  >
+  type UniqueWhereArg = Parameters<ModelDelegate['findUnique']>[0]['where']
+
+  type ExistingRecord = Awaited<ReturnType<ModelDelegate['findUniqueOrThrow']>>
+
+  // Create a typed model delegate that includes the methods we need
+  // Using intersection type to combine the delegate with our method signatures
+  // This helps TypeScript understand the types without union issues
+  type TypedModelDelegate = ModelDelegate & {
+    findUnique: (args: {
+      where: UniqueWhereArg
+    }) => Promise<ExistingRecord | null>
+    updateManyAndReturn: (
+      args: Parameters<ModelDelegate['updateManyAndReturn']>[0],
+    ) => Promise<ExistingRecord[]>
+  }
 
   @Injectable()
   class BasePrismaService implements OnModuleInit {
@@ -102,14 +109,16 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
         existing: ExistingRecord,
       ) => Partial<ExistingRecord> | Promise<Partial<ExistingRecord>>,
     ): Promise<ExistingRecord> {
+      // By using the generic T, we know the specific model type at compile time.
+      // We create a typed reference to the model delegate to avoid union type issues.
+      const modelDelegate = this.model as TypedModelDelegate
+
       return retryIf(
-        async (_, attempt) => {
-          // @ts-expect-error - it's extremely difficult to get actual inferred type-checking
-          // on this line of code, due to the complexity of the generics required for this helper
-          // to provide type-safety to callers. So, for now, we're disabling the type-checker for
-          // this line.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const existing = await this.model.findUnique({ where: params.where })
+        async (_, attempt): Promise<ExistingRecord> => {
+          // Now TypeScript can call findUnique because we've narrowed to ExtendedModelDelegate
+          const existing = await modelDelegate.findUnique({
+            where: params.where,
+          })
 
           if (!existing) {
             const msg = `[optimistic locking update] Existing ${modelName} record not found for where clause: ${JSON.stringify(params.where)}`
@@ -118,24 +127,23 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
           }
 
           // Sanity check to ensure the updatedAt field exists
-          if (!(existing.updatedAt instanceof Date)) {
+          if (
+            !('updatedAt' in existing) ||
+            !(existing.updatedAt instanceof Date)
+          ) {
             const msg = `[optimistic locking update] Existing ${modelName} record has no updatedAt field. This is developer error.`
             this.logger.error(msg)
             throw new Error(msg)
           }
 
-          const patch = await modification(existing)
+          const patch = await modification(existing as ExistingRecord)
 
-          // @ts-expect-error - it's extremely difficult to get actual inferred type-checking
-          // on this line of code, due to the complexity of the generics required for this helper
-          // to provide type-safety to callers. So, for now, we're disabling the type-checker for
-          // this line.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const result = await this.model.updateManyAndReturn({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            where: { AND: [params.where, { updatedAt: existing.updatedAt }] },
+          const result = await modelDelegate.updateManyAndReturn({
+            where: {
+              AND: [params.where, { updatedAt: existing.updatedAt }],
+            },
             data: patch,
-          })
+          } as Parameters<ModelDelegate['updateManyAndReturn']>[0])
 
           if (result.length === 0) {
             const msg = `[optimistic locking update] Record has been modified since it was fetched for where clause: ${JSON.stringify(params.where)} attempt ${attempt}`
