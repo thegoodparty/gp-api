@@ -5,6 +5,7 @@ import z from 'zod'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import uuid from 'uuid'
 import { PaymentsService } from '@/payments/services/payments.service'
+import { PollStatus } from '@prisma/client'
 
 const uuidV7Schema = z.string().refine(
   (value) => {
@@ -110,7 +111,7 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
 
     await this.pollsService.create({
       id: metadata.pollId,
-      status: 'SCHEDULED',
+      status: PollStatus.SCHEDULED,
       name: metadata.name,
       electedOfficeId: electedOffice.id,
       messageContent: metadata.message,

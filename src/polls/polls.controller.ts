@@ -83,6 +83,8 @@ const toAPIIssue = (issue: PollIssue): APIPollIssue => ({
   })),
 })
 
+const INITIAL_POLL_NAME = 'Top Community Issues'
+
 @Controller('polls')
 @UsePipes(ZodValidationPipe)
 export class PollsController {
@@ -160,8 +162,8 @@ export class PollsController {
     const now = new Date()
     const poll = await this.pollsService.create({
       id: uuidv7(),
-      name: 'Top Community Issues',
-      status: 'IN_PROGRESS',
+      name: INITIAL_POLL_NAME,
+      status: PollStatus.IN_PROGRESS,
       scheduledDate: now,
       messageContent: message,
       imageUrl,
