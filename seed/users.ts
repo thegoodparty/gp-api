@@ -1,6 +1,6 @@
 import { PrismaClient, User, UserRole } from '@prisma/client'
 import { userFactory } from './factories/user.factory'
-import { hashPasswordSync } from 'src/users/util/passwords.util'
+import { hashPasswordSync } from '../src/users/util/passwords.util'
 
 const NUM_USERS = 20
 
