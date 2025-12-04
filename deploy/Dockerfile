@@ -44,9 +44,6 @@ RUN echo "Cache bust: $CACHEBUST" && npx prisma generate --schema=prisma/schema
 # Build the application (output in /dist)
 RUN echo "Cache bust: $CACHEBUST" && npm run build
 
-# Compile seed files separately (nest build only compiles src/)
-RUN echo "Cache bust: $CACHEBUST" && npx tsc --project tsconfig.seed.json
-
 # Stage 2: Create a minimal runtime image
 FROM public.ecr.aws/docker/library/node:22.12.0-alpine
 
@@ -75,6 +72,12 @@ COPY --from=builder /app/dist ./dist
 
 RUN echo "Cache bust: $CACHEBUST - copying prisma"
 COPY --from=builder /app/prisma ./prisma
+
+# Copy seed and src for tsx runtime seeding (preview environments only)
+RUN echo "Cache bust: $CACHEBUST - copying seed and src for preview seeding"
+COPY --from=builder /app/seed ./seed
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Expose the application port
 # EXPOSE 3000
