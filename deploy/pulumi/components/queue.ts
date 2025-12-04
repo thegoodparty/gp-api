@@ -40,7 +40,7 @@ export class Queue extends pulumi.ComponentResource {
 
     if (args.isPreview) {
         const baseTags = args.tags || {};
-        const resourceTags = { ...baseTags, Environment: 'Preview', PR: args.prNumber || 'unknown' };
+        const resourceTags = { ...baseTags, Environment: 'preview', PR: args.prNumber || 'unknown' };
 
         const dlq = new aws.sqs.Queue(`${name}-dlq`, {
             name: dlqName,

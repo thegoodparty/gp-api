@@ -35,7 +35,7 @@ export class Compute extends pulumi.ComponentResource {
 
     const baseTags = args.tags || {};
     const resourceTags = args.isPreview 
-      ? { ...baseTags, Environment: 'Preview', PR: args.prNumber || 'unknown' }
+      ? { ...baseTags, Environment: 'preview', PR: args.prNumber || 'unknown' }
       : { ...baseTags, Environment: args.isProduction ? 'Production' : 'Development' };
 
     const taskSecurityGroup = new aws.ec2.SecurityGroup(`${shortName}-task-sg`, {

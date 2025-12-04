@@ -26,7 +26,7 @@ export class Database extends pulumi.ComponentResource {
 
     if (args.isPreview) {
       const baseTags = args.tags || {};
-      const resourceTags = { ...baseTags, Environment: 'Preview', PR: args.prNumber || 'unknown' };
+      const resourceTags = { ...baseTags, Environment: 'preview', PR: args.prNumber || 'unknown' };
 
       const password = new aws.secretsmanager.Secret(`${name}-db-pass`, {
           name: `gp-api-preview-db-${name}`,
