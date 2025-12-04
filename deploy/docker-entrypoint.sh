@@ -9,8 +9,11 @@ if [ -n "$DATABASE_URL" ] && [ "$DATABASE_URL" != "postgresql://placeholder:plac
 
   if [ "$IS_PREVIEW" = "true" ]; then
     echo "Preview environment detected. Running seed..."
-    node dist/seed/seed.js
-    echo "Seed completed."
+    if node dist/seed/seed.js; then
+      echo "Seed completed successfully."
+    else
+      echo "WARNING: Seed failed with exit code $?. Continuing with app startup..."
+    fi
   fi
 else
   echo "DATABASE_URL not set or is placeholder, skipping migrations."
