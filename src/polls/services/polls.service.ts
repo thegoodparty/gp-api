@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PollConfidence, PollStatus, Prisma } from '@prisma/client'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { add } from 'date-fns'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
@@ -21,6 +21,14 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
 
   async delete(args: Prisma.PollDeleteArgs) {
     return this.model.delete(args)
+  }
+
+  async hasPolls(electedOfficeId: string): Promise<boolean> {
+    const poll = await this.model.findFirst({
+      where: { electedOfficeId },
+      take: 1,
+    })
+    return poll !== null
   }
 
   async markPollComplete(params: {
