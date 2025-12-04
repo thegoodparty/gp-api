@@ -124,11 +124,10 @@ export class PollsController {
   @Get('has-polls')
   @UseElectedOffice()
   async hasPolls(@ReqElectedOffice() electedOffice: ElectedOffice) {
-    const poll = await this.pollsService.findFirst({
-      where: { electedOfficeId: electedOffice.id },
-      take: 1,
-    })
-    return { hasPolls: poll !== null }
+    const userHasPolls: boolean = await this.pollsService.hasPolls(
+      electedOffice.id,
+    )
+    return { hasPolls: userHasPolls }
   }
 
   @Post('initial-poll')
@@ -173,10 +172,10 @@ export class PollsController {
       })
     }
 
-    const hasPolls = await this.pollsService.findFirst({
-      where: { electedOfficeId: electedOffice.id },
-    })
-    if (hasPolls) {
+    const userHasPolls: boolean = await this.pollsService.hasPolls(
+      electedOffice.id,
+    )
+    if (userHasPolls) {
       throw new ForbiddenException(
         'You already have a poll. You cannot create an initial poll.',
       )
