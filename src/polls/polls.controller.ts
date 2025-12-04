@@ -173,6 +173,15 @@ export class PollsController {
       })
     }
 
+    const hasPolls = await this.pollsService.findFirst({
+      where: { electedOfficeId: electedOffice.id },
+    })
+    if (hasPolls) {
+      throw new ForbiddenException(
+        'You already have a poll. You cannot create an initial poll.',
+      )
+    }
+
     const now = new Date()
     const poll = await this.pollsService.create({
       data: {
