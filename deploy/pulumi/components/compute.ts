@@ -14,7 +14,7 @@ export interface ComputeArgs {
   environment: pulumi.Input<Record<string, pulumi.Input<string>>>;
   tags?: Record<string, string>;
   hostedZoneId?: pulumi.Input<string>;
-  previewDomain?: string;
+  domain?: string;
 }
 
 export class Compute extends pulumi.ComponentResource {
@@ -240,8 +240,14 @@ export class Compute extends pulumi.ComponentResource {
       }, { parent: this });
     }
 
-    if (args.isPreview && args.hostedZoneId && args.previewDomain && args.prNumber) {
-      const domainName = `pr-${args.prNumber}.${args.previewDomain}`;
+    if (args.hostedZoneId && args.domain) {
+      let domainName: string;
+      
+      if (args.isPreview && args.prNumber) {
+        domainName = `pr-${args.prNumber}.${args.domain}`;
+      } else {
+        domainName = args.domain;
+      }
       
       new aws.route53.Record(`${shortName}-dns`, {
         zoneId: args.hostedZoneId,
@@ -254,7 +260,7 @@ export class Compute extends pulumi.ComponentResource {
         }],
       }, { parent: this });
 
-      this.url = pulumi.output(domainName);
+      this.url = pulumi.output(`https://${domainName}`);
     } else {
       this.url = lb.loadBalancer.dnsName;
     }

@@ -106,8 +106,8 @@ Update the file after completing each sub-task, not just after completing an ent
 
 - [ ] 5.0 Phase 5: Cutover & Cleanup
   - [ ] 5.1 Production DNS Cutover
-    - [ ] 5.1.1 Import the Production Route53 Hosted Zone.
-    - [ ] 5.1.2 Update the A-record to point to the new Pulumi-managed ALB.
+    - [x] 5.1.1 Add Route53 Hosted Zone config support to Pulumi (hostedZoneId + domain).
+    - [x] 5.1.2 Update compute.ts to create DNS A-records for all environments (prod/dev/qa/preview).
   - [ ] 5.2 Decommission SST
     - [ ] 5.2.1 Remove `sst.config.ts` and SST dependencies from `package.json`.
     - [ ] 5.2.2 Delete the old CloudFormation stacks (carefully, ensuring no shared resources are deleted).

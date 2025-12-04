@@ -19,18 +19,9 @@ const imageUri = config.require('imageUri');
 const secretArn = config.require('secretArn');
 const isPreview = config.getBoolean('isPreview') || false;
 const isProduction = config.getBoolean('isProduction') || false;
+const isQa = config.getBoolean('isQa') || false;
 
-// 3. Preview Environment Config (optional)
-const previewCertificateArn = config.get('previewCertificateArn');
-const previewHostedZoneId = config.get('previewHostedZoneId');
-const previewDomain = config.get('previewDomain') || 'preview.goodparty.org';
-
-// 4. Test Credentials (for preview seeding)
-const adminEmail = config.get('adminEmail');
-const adminPassword = config.getSecret('adminPassword');
-const candidateEmail = config.get('candidateEmail');
-const candidatePassword = config.getSecret('candidatePassword');
-
+// 3. Determine stage name
 let stageName = 'dev';
 let prNumber: string | undefined;
 
@@ -42,9 +33,32 @@ if (isPreview) {
     }
 } else if (isProduction) {
     stageName = 'prod';
+} else if (isQa) {
+    stageName = 'qa';
 } else {
     stageName = 'dev';
 }
+
+// 4. DNS Config
+const HOSTED_ZONE_ID = 'Z10392302OXMPNQLPO07K';
+const DOMAINS: Record<string, string> = {
+    prod: 'gp-api.goodparty.org',
+    dev: 'gp-api-dev.goodparty.org',
+    qa: 'gp-api-qa.goodparty.org',
+};
+const hostedZoneId = config.get('hostedZoneId') || HOSTED_ZONE_ID;
+const domain = config.get('domain') || DOMAINS[stageName];
+
+// 5. Preview Environment Config (optional)
+const previewCertificateArn = config.get('previewCertificateArn');
+const previewHostedZoneId = config.get('previewHostedZoneId');
+const previewDomain = config.get('previewDomain') || 'preview.goodparty.org';
+
+// 6. Test Credentials (for preview seeding)
+const adminEmail = config.get('adminEmail');
+const adminPassword = config.getSecret('adminPassword');
+const candidateEmail = config.get('candidateEmail');
+const candidatePassword = config.getSecret('candidatePassword');
 
 const baseTags = {
     Project: 'gp-api',
@@ -124,6 +138,9 @@ const finalEnvVars = pulumi.all([
 const computeDeps = dbDependency ? { dependsOn: [dbDependency] } : undefined;
 const effectiveCertArn = isPreview && previewCertificateArn ? previewCertificateArn : certificateArn;
 
+const effectiveHostedZoneId = isPreview ? previewHostedZoneId : hostedZoneId;
+const effectiveDomain = isPreview ? previewDomain : domain;
+
 const compute = new Compute(`${stackName}-compute`, {
     vpcId,
     publicSubnetIds,
@@ -135,8 +152,8 @@ const compute = new Compute(`${stackName}-compute`, {
     certificateArn: effectiveCertArn,
     environment: finalEnvVars,
     tags: baseTags,
-    hostedZoneId: previewHostedZoneId,
-    previewDomain,
+    hostedZoneId: effectiveHostedZoneId,
+    domain: effectiveDomain,
 }, computeDeps);
 
 new Monitoring(`${stackName}-monitoring`, {
