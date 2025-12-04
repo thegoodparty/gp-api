@@ -74,9 +74,14 @@ export default async function seedUsers(prisma: PrismaClient) {
     fakeUsers[i] = userFactory(FIXED_USERS[i])
   }
 
-  const users = await prisma.user.createManyAndReturn({ data: fakeUsers })
+  const users = await prisma.user.createManyAndReturn({
+    data: fakeUsers,
+    skipDuplicates: true,
+  })
 
-  console.log(`Created ${users.length} users`)
+  console.log(
+    `Created ${users.length} users (skipped ${fakeUsers.length - users.length} duplicates)`,
+  )
 
   // Filter out users to not create campaigns for them with seedCampaigns
   return users.filter((u) => u.email !== USER_W_NO_CAMPAIGN.email)

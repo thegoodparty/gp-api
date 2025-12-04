@@ -70,8 +70,9 @@ export default async function seedCampaigns(
 
   await prisma.campaignUpdateHistory.createMany({
     data: fakeUpdateHistory,
+    skipDuplicates: true,
   })
-  await prisma.pathToVictory.createMany({ data: fakeP2Vs })
+  await prisma.pathToVictory.createMany({ data: fakeP2Vs, skipDuplicates: true })
 
   console.log(`Created ${campaignIds.length} campaigns`)
 

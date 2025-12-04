@@ -101,14 +101,14 @@ const finalEnvVars = pulumi.all([
     candidatePassword || pulumi.output(''),
 ]).apply(([data, dbUrl, qName, qUrl, aEmail, aPass, cEmail, cPass]) => {
     const baseEnv: Record<string, string> = {
-        ...data,
-        DATABASE_URL: dbUrl,
-        NODE_ENV: 'production',
+    ...data,
+    DATABASE_URL: dbUrl,
+    NODE_ENV: 'production',
         IS_PREVIEW: isPreview ? 'true' : 'false',
-        SQS_QUEUE: qName,
-        SQS_QUEUE_BASE_URL: qUrl.replace(`/${qName}`, ''),
-        PORT: '80',
-        HOST: '0.0.0.0',
+    SQS_QUEUE: qName,
+    SQS_QUEUE_BASE_URL: qUrl.replace(`/${qName}`, ''),
+    PORT: '80',
+    HOST: '0.0.0.0',
     };
 
     if (isPreview && aEmail && aPass && cEmail && cPass) {

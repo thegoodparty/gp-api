@@ -29,7 +29,7 @@ if [ "$IS_PREVIEW" = "true" ]; then
   for i in $(seq 1 30); do
     if curl -s http://localhost:${PORT:-80}/v1/health > /dev/null 2>&1; then
       echo "App is healthy. Running content sync..."
-      if curl -s -X POST http://localhost:${PORT:-80}/v1/content/sync > /dev/null 2>&1; then
+      if curl -s http://localhost:${PORT:-80}/v1/content/sync > /dev/null 2>&1; then
         echo "Content sync completed."
       else
         echo "WARNING: Content sync failed. Continuing..."
