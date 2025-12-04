@@ -30,8 +30,7 @@ export class AreaCodeFromZipService {
   constructor(
     private readonly s3Service: S3Service,
     private readonly aiService: AiService,
-  ) {
-  }
+  ) {}
 
   /**
    * Gets area codes for a given zip code.
@@ -153,8 +152,9 @@ export class AreaCodeFromZipService {
     }
 
     try {
-      const parsed = JSON.parse(jsonContent)
-      const validationResult = AreaCodeResponseSchema.safeParse(parsed)
+      const validationResult = AreaCodeResponseSchema.safeParse(
+        JSON.parse(jsonContent),
+      )
 
       if (!validationResult.success) {
         this.logger.error(

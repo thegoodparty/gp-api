@@ -130,11 +130,14 @@ export class EcanvasserIntegrationService extends createPrismaBase(
   private groupInteractionsByRatings(
     interactions: EcanvasserInteraction[],
   ): Record<string, number> {
-    return interactions.reduce((acc, interaction) => {
-      const key = interaction.rating ? `${interaction.rating}` : 'unrated'
-      acc[key] = (acc[key] || 0) + 1
-      return acc
-    }, {})
+    return interactions.reduce(
+      (acc, interaction) => {
+        const key = interaction.rating ? `${interaction.rating}` : 'unrated'
+        acc[key] = (acc[key] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
   }
 
   async summary(campaignId: number) {

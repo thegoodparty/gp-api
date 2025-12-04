@@ -29,7 +29,9 @@ test.describe('Campaigns - Update History', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as Array<
+      Record<string, string | number | boolean>
+    >
     expect(Array.isArray(body)).toBe(true)
     expect(body.length).toBeGreaterThan(0)
   })
@@ -112,7 +114,7 @@ test.describe('Campaigns - Update History', () => {
         Authorization: `Bearer ${token}`,
       },
     })
-    const { slug } = await slugResponse.json()
+    const { slug } = (await slugResponse.json()) as { slug: string }
 
     const response = await request.get(
       `/v1/campaigns/mine/update-history?slug=${slug}`,
@@ -153,7 +155,7 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
         Authorization: `Bearer ${candidateLogin.token}`,
       },
     })
-    const { slug } = await slugResponse.json()
+    const { slug } = (await slugResponse.json()) as { slug: string }
 
     const { token: adminToken } = await loginUser(
       request,
@@ -172,7 +174,9 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as Array<
+      Record<string, string | number | boolean>
+    >
     expect(Array.isArray(body)).toBe(true)
     expect(body.length).toBeGreaterThan(0)
   })

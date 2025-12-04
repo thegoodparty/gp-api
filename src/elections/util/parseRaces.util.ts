@@ -1,7 +1,11 @@
 import { RaceNode, RacesByZipcode } from '../types/ballotReady.types'
 import { PositionLevel } from 'src/generated/graphql.types'
 
-const isPOTUSorVPOTUSNode = ({ position }) =>
+const isPOTUSorVPOTUSNode = ({
+  position,
+}: {
+  position?: { level?: PositionLevel; name?: string }
+}) =>
   position?.level === PositionLevel.FEDERAL &&
   position?.name?.toLowerCase().includes('president')
 
@@ -20,8 +24,14 @@ export function parseRaces(
   for (const edge of races.edges) {
     const { node } = edge || {}
     const { isPrimary } = node || {}
-    const { electionDay, name: electionName } = node?.election || {}
-    const { name, hasPrimary } = node?.position || {}
+    const { electionDay, name: electionName } = (node?.election || {}) as {
+      electionDay: string
+      name: string
+    }
+    const { name, hasPrimary } = (node?.position || {}) as {
+      name: string
+      hasPrimary: boolean
+    }
 
     const electionYear = new Date(electionDay).getFullYear()
 
@@ -35,8 +45,8 @@ export function parseRaces(
 
     if ((hasPrimary && isPrimary) || (node && isPOTUSorVPOTUSNode(node))) {
       primaryElectionDates[`${node.position.id}|${electionYear}`] = {
-        electionDay,
-        primaryElectionId: node?.election?.id,
+        electionDay: electionDay as string,
+        primaryElectionId: node?.election?.id as string,
       }
       continue
     }
@@ -49,13 +59,17 @@ export function parseRaces(
   for (const edge of races.edges) {
     const { node } = edge || {}
     const { isPrimary } = node || {}
-    const { hasPrimary, id, partisanType } = node?.position || {}
+    const { hasPrimary, id, partisanType } = (node?.position || {}) as {
+      hasPrimary: boolean
+      id: string
+      partisanType: string
+    }
 
     if (partisanType === 'partisan') {
       continue
     }
 
-    const { electionDay } = node?.election || {}
+    const { electionDay } = (node?.election || {}) as { electionDay: string }
     const electionYear = new Date(electionDay).getFullYear()
     const primaryElectionDate = primaryElectionDates[`${id}|${electionYear}`]
 

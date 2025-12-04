@@ -98,18 +98,18 @@ export class ScheduledMessagingService extends createPrismaBase(
             message: 'Error sending scheduled message',
             error: e,
           })
-          updatedScheduledMsg = await tx.scheduledMessage.update({
+          updatedScheduledMsg = (await tx.scheduledMessage.update({
             where: {
               id: m.id,
             },
             data: {
               error: errorMessage,
             },
-          })
+          })) as ScheduledMessage
           continue
         }
 
-        updatedScheduledMsg = await tx.scheduledMessage.update({
+        updatedScheduledMsg = (await tx.scheduledMessage.update({
           where: {
             id: m.id,
           },
@@ -117,7 +117,7 @@ export class ScheduledMessagingService extends createPrismaBase(
             sentAt: new Date(),
             processing: false,
           },
-        })
+        })) as ScheduledMessage
         updatedMessages.push(updatedScheduledMsg)
       }
     })

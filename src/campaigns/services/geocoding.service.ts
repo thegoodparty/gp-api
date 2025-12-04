@@ -107,8 +107,8 @@ export class GeocodingService {
       if (!location) {
         return null
       }
-      const geoHash = ngeohash.encode(location.lat, location.lng, 8)
-      return { lat: location.lat, lng: location.lng, geoHash: geoHash }
+      const geoHash = ngeohash.encode(location.lat, location.lng, 8) as string
+      return { lat: location.lat, lng: location.lng, geoHash }
     }
   }
 }

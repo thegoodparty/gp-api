@@ -1,3 +1,4 @@
+import { PurchaseType } from '@/payments/purchase.types'
 export enum WebhookEventType {
   CheckoutSessionCompleted = 'checkout.session.completed',
   CheckoutSessionExpired = 'checkout.session.expired',
@@ -30,6 +31,7 @@ export type PaymentIntentPayload<T extends PaymentType> = {
    */
   amount: number
   description?: string
+  purchaseType: PurchaseType
 } & (T extends PaymentType.DOMAIN_REGISTRATION
   ? {
       domainName: string
@@ -41,3 +43,5 @@ export type PaymentIntentPayload<T extends PaymentType> = {
         pollId: number
       }
     : never)
+
+export type PurchaseIntentPayloadEntry = PurchaseType | string | number

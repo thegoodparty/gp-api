@@ -214,7 +214,9 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
         this.httpService.post(`${this.baseUrl}/1to1/jobs`, body, config),
       )
 
-      const { data } = response
+      const { data } = response as {
+        data: Record<string, string | number | boolean>
+      }
       this.validateCreateJobResponse(data)
 
       let jobId: string | undefined
@@ -226,7 +228,9 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       }
 
       // Fallback to Location header if not in body
-      const { headers } = response
+      const { headers } = response as {
+        headers: { location?: string }
+      }
       if (!jobId && headers?.location) {
         jobId = headers.location.split('/').pop()
       }
@@ -234,7 +238,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       if (!jobId) {
         this.logger.error('Job created but no job ID found in response', {
           headers,
-          data,
+          data: data as Record<string, string | number | boolean>,
         })
         throw new BadGatewayException(
           'Job creation succeeded but job ID not found in response body or headers. Please verify API response format.',
@@ -274,8 +278,8 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       )
 
       // Validate and return the job details
-      const { data } = response
-      const jobDetails = data as PeerlyJob
+      const { data } = response as { data: PeerlyJob }
+      const jobDetails = data
       this.logger.debug(`Retrieved job details: ${JSON.stringify(jobDetails)}`)
       return jobDetails
     } catch (error) {

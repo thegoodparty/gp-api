@@ -36,7 +36,10 @@ export class JobsController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {
-      const job = await this.jobsService.findOne(id)
+      const job = (await this.jobsService.findOne(id)) as Record<
+        string,
+        string | number | boolean
+      > | null
       if (!job) {
         throw new NotFoundException(`Job with id ${id} not found`)
       }

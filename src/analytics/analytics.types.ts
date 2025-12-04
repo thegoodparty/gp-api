@@ -39,7 +39,7 @@ export interface TrackingProperties {
   voterContactGoal?: string | number
   winNumber?: string | number
   voterContactPercentage?: number | string
-  hubSpotUpdates?: Record<string, any>
-  aiContentTrackingFlags?: Record<string, any>
+  hubSpotUpdates?: Record<string, string | number | boolean>
+  aiContentTrackingFlags?: Record<string, string | number | boolean>
   contentQuestionsAnswered?: number
 }

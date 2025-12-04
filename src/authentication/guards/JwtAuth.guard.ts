@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { Reflector } from '@nestjs/core'
+import { FastifyReply } from 'fastify'
 import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
 import { User, UserRole } from '@prisma/client'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
@@ -22,7 +23,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   canActivate(context: ExecutionContext) {
     // Check if the route or class is marked as public
-    const isPublic = this.reflector.getAllAndOverride(IS_PUBLIC_KEY, [
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ])
@@ -49,7 +50,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     context: ExecutionContext,
   ): TUser {
     // Get the response object from the context
-    const response = context.switchToHttp().getResponse()
+    const response = context.switchToHttp().getResponse() as FastifyReply
 
     // If there's an error or the user object is missing
     if (err || !user) {

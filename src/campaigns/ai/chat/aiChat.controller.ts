@@ -86,14 +86,16 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.create(campaign, body)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (error) {
+      const e = error as Error & {
+        data?: { error?: string }
+      }
       this.logger.error('Error generating AI chat', e)
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
         error: e,
       })
-      if (e.data && e.data.error) {
+      if (e.data?.error) {
         this.logger.error('*** error*** :', e.data.error)
       }
 
@@ -122,14 +124,16 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.update(threadId, campaign, body)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (error) {
+      const e = error as Error & {
+        data?: { error?: string }
+      }
       this.logger.error('Error generating AI chat', e)
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
         error: e,
       })
-      if (e.data && e.data.error) {
+      if (e.data?.error) {
         this.logger.error('*** error*** :', e.data.error)
       }
 
@@ -160,15 +164,21 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.feedback(user, threadId, body)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (error) {
+      const e = error as Error
       this.logger.error('Error giving AI chat feedback', e)
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
         error: e,
       })
-      if (e.data && e.data.error) {
-        this.logger.log('*** error*** :', e.data.error)
+      if (
+        'data' in e &&
+        (e as Error & { data?: { error?: string } }).data?.error
+      ) {
+        this.logger.log(
+          '*** error*** :',
+          (e as Error & { data?: { error?: string } }).data!.error,
+        )
       }
       throw e
     }

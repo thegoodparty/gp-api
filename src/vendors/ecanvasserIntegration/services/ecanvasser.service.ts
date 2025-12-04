@@ -183,14 +183,22 @@ export class EcanvasserService {
     } = {},
   ): Promise<ApiResponse<T>> {
     try {
-      const { method = Methods.GET, data, params = {} } = options
+      const {
+        method = Methods.GET,
+        data,
+        params = {},
+      } = options as {
+        method?: Methods
+        data?: Record<string, string | number | boolean>
+        params?: Record<string, string | number | boolean>
+      }
       const queryParams = new URLSearchParams()
 
       if (params.limit) {
         queryParams.append('limit', params.limit.toString())
       }
       if (params.order) {
-        queryParams.append('order', params.order)
+        queryParams.append('order', String(params.order))
       }
       if (params.after_id) {
         queryParams.append('after_id', params.after_id.toString())
@@ -199,7 +207,7 @@ export class EcanvasserService {
         queryParams.append('before_id', params.before_id.toString())
       }
       if (params.start_date) {
-        queryParams.append('start_date', params.start_date)
+        queryParams.append('start_date', String(params.start_date))
       }
 
       const url = `${this.apiBaseUrl}${endpoint}${

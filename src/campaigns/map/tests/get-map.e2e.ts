@@ -6,7 +6,10 @@ test.describe('Campaigns Map - Get Map', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as Record<
+      string,
+      string | number | boolean
+    >[]
     expect(Array.isArray(body)).toBe(true)
     expect(body.length).toBeGreaterThanOrEqual(0)
   })
@@ -16,7 +19,10 @@ test.describe('Campaigns Map - Get Map', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as Record<
+      string,
+      string | number | boolean
+    >[]
     expect(Array.isArray(body)).toBe(true)
     expect(body.length).toBeGreaterThanOrEqual(0)
   })
@@ -26,7 +32,10 @@ test.describe('Campaigns Map - Get Map', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as Record<
+      string,
+      string | number | boolean
+    >[]
     expect(Array.isArray(body)).toBe(true)
     expect(body.length).toBeGreaterThanOrEqual(0)
   })
@@ -36,7 +45,10 @@ test.describe('Campaigns Map - Get Map', () => {
 
     expect(response.status()).toBe(200)
 
-    const body = await response.json()
+    const body = (await response.json()) as Record<
+      string,
+      string | number | boolean
+    >[]
     expect(Array.isArray(body)).toBe(true)
     expect(body.length).toBeGreaterThanOrEqual(0)
   })

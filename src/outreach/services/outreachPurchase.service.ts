@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { PurchaseHandler, PurchaseMetadata } from 'src/payments/purchase.types'
+import { PurchaseHandler } from 'src/payments/purchase.types'
 import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
 import { OutreachPurchaseMetadata } from '../types/outreach.types'
 
@@ -15,7 +15,7 @@ export class OutreachPurchaseHandlerService
   async validatePurchase({
     contactCount,
     pricePerContact,
-  }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<void> {
+  }: OutreachPurchaseMetadata): Promise<void> {
     if (!contactCount) {
       throw new BadRequestException('contactCount is required')
     }
@@ -30,7 +30,7 @@ export class OutreachPurchaseHandlerService
     pricePerContact,
     campaignId,
     outreachType,
-  }: PurchaseMetadata<OutreachPurchaseMetadata>): Promise<number> {
+  }: OutreachPurchaseMetadata): Promise<number> {
     if (!campaignId || outreachType !== 'p2p') {
       return contactCount * pricePerContact
     }
@@ -75,7 +75,7 @@ export class OutreachPurchaseHandlerService
 
   async executePostPurchase(
     paymentIntentId: string,
-    metadata: PurchaseMetadata<OutreachPurchaseMetadata>,
+    metadata: OutreachPurchaseMetadata,
   ): Promise<void> {
     const { campaignId, outreachType } = metadata
 

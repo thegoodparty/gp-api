@@ -62,7 +62,7 @@ export class AiContentService {
 
     // generating a new ai content here
     const cmsPrompts = await this.contentService.getAiContentPrompts()
-    const keyNoDigits = key.replace(/\d+$/, '') // we allow multiple keys like key1, key2
+    const keyNoDigits = key.replace(/\d+$/, '')
     let prompt = cmsPrompts[keyNoDigits] as string
 
     const campaignWithRelations = (await this.campaignsService.findFirst({
@@ -88,7 +88,7 @@ export class AiContentService {
       await this.slack.errorMessage({
         message: 'empty prompt replace',
         error: {
-          cmsPrompt: cmsPrompts[keyNoDigits],
+          cmsPrompt: cmsPrompts[keyNoDigits] as string | undefined,
           promptAfterReplace: prompt,
           campaign,
         },
@@ -98,7 +98,7 @@ export class AiContentService {
     await this.slack.aiMessage({
       message: 'prompt',
       error: {
-        cmsPrompt: cmsPrompts[keyNoDigits],
+        cmsPrompt: cmsPrompts[keyNoDigits] as string | undefined,
         promptAfterReplace: prompt,
       },
     })
@@ -169,7 +169,7 @@ export class AiContentService {
   }) {
     const { slug, key, regenerate } = message
 
-    let campaign = await this.campaignsService.findFirstOrThrow({
+    let campaign: Campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
       include: { pathToVictory: true, user: true },
     })
@@ -215,7 +215,7 @@ export class AiContentService {
         0.9,
       )
 
-      chatResponse = completion.content
+      chatResponse = completion.content as string
       const totalTokens = completion.tokens
 
       await this.slack.aiMessage({
@@ -230,24 +230,25 @@ export class AiContentService {
           include: { pathToVictory: true, user: true },
         })) || campaign
       aiContent = campaign.aiContent
-      let oldVersion
+      let oldVersion: { date: Date; text: string } | undefined
       if (chatResponse && chatResponse !== '') {
         try {
-          const oldVersionData = aiContent[key]
+          const oldVersionData = aiContent[key] as {
+            content: string
+            updatedAt?: number
+          }
           oldVersion = {
-            // todo: try to convert oldVersionData.updatedAt to a date object.
-            date: new Date().toString(),
+            date: new Date(),
             text: oldVersionData.content,
           }
         } catch (_e) {
           // dont warn because this is expected to fail sometimes.
-          // console.log('error getting old version', e);
         }
         aiContent[key] = {
-          name: camelToSentence(key), // todo: check if this overwrites a name they've chosen.
+          name: camelToSentence(key),
           updatedAt: new Date().valueOf(),
           inputValues,
-          content: chatResponse,
+          content: chatResponse as string,
         }
 
         this.logger.log('saving campaign version', key)
@@ -259,7 +260,7 @@ export class AiContentService {
           key,
           campaignId: campaign.id,
           inputValues,
-          oldVersion,
+          oldVersion: oldVersion!,
           regenerate: regenerate ? regenerate : false,
         })
 
@@ -285,16 +286,18 @@ export class AiContentService {
 
         await this.slack.aiMessage({
           message: `updated campaign with ai. chatResponse: key: ${key}`,
-          error: chatResponse,
+          error: chatResponse as string,
         })
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (error) {
+      const e = error as Error & {
+        data?: { error?: string }
+      }
       this.logger.error('error at consumer', e)
       this.logger.error('messages', messages)
       generateError = true
 
-      if (e.data) {
+      if (e.data?.error) {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer (with msg): ',
           error: e.data.error,
@@ -303,7 +306,7 @@ export class AiContentService {
           message: 'error at AI queue consumer (with msg): ',
           error: e.data.error,
         })
-        this.logger.error('error', e.data?.error)
+        this.logger.error('error', e.data.error)
       } else {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer. Queue Message: ',

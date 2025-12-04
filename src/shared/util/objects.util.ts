@@ -1,8 +1,8 @@
 /**
  * Flips an objects keys and values
  */
-export function flip(obj: Record<any, any>): Record<any, any> {
-  const ret = {}
+export function flip(obj: Record<string, string>): Record<string, string> {
+  const ret: Record<string, string> = {}
   Object.keys(obj).forEach((key) => {
     ret[obj[key]] = key
   })
@@ -15,15 +15,20 @@ export function flip(obj: Record<any, any>): Record<any, any> {
  * @param {string[]} keys Array of keys to pick
  * @returns {object}
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const pick = (obj: { [key: string]: any }, keys: string[]): object => {
+export const pick = (
+  obj: { [key: string]: string | number | boolean | null },
+  keys: string[],
+): object => {
   if (typeof obj !== 'object' || obj === null || !Array.isArray(keys)) {
     throw new Error('invalid args')
   }
 
   return keys
     .filter((key) => key in obj)
-    .reduce((obj2, key) => ((obj2[key] = obj[key]), obj2), {})
+    .reduce(
+      (obj2, key) => ((obj2[key] = obj[key]), obj2),
+      {} as Record<string, string | number | boolean | null>,
+    )
 }
 
 // Similar to the above 'pick' helper, but with pickKeys() the compiler won't allow non-existent keys

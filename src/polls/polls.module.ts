@@ -11,6 +11,8 @@ import { QueueProducerModule } from 'src/queue/producer/queueProducer.module'
 import { UsersModule } from 'src/users/users.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
+import { LlmModule } from 'src/llm/llm.module'
+import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 
 @Module({
   imports: [
@@ -20,10 +22,16 @@ import { AwsModule } from 'src/vendors/aws/aws.module'
     UsersModule,
     CampaignsModule,
     AwsModule,
+    LlmModule,
   ],
-  providers: [PollsService, PollIssuesService, PollPurchaseHandlerService],
+  providers: [
+    PollsService,
+    PollIssuesService,
+    PollPurchaseHandlerService,
+    PollBiasAnalysisService,
+  ],
   controllers: [PollsController],
-  exports: [PollsService, PollIssuesService],
+  exports: [PollsService, PollIssuesService, PollBiasAnalysisService],
 })
 export class PollsModule {
   constructor(

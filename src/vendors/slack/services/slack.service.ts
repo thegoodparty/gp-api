@@ -39,7 +39,9 @@ export class SlackService {
   }
 
   private getChannelConfig(channel: SlackChannel) {
-    const channelConfig = SLACK_CHANNEL_IDS[channel]
+    const channelConfig = SLACK_CHANNEL_IDS[channel] as
+      | { channelId: string; channelToken: string }
+      | undefined
     if (!channelConfig) {
       throw new InternalServerErrorException(
         `Unknown slack channel: ${channel}`,
@@ -50,10 +52,13 @@ export class SlackService {
   }
 
   async message(message: SlackMessage, channel: SlackChannel) {
-    const { channelId, channelToken } = this.getChannelConfig(channel)
+    const { channelId, channelToken } = this.getChannelConfig(channel) as {
+      channelId: string
+      channelToken: string
+    }
 
     try {
-      const { data } = await lastValueFrom(
+      const { data } = (await lastValueFrom(
         this.httpService.post(
           `https://hooks.slack.com/services/${SLACK_APP_ID}/${channelId}/${channelToken}`,
           message,
@@ -63,7 +68,7 @@ export class SlackService {
             },
           },
         ),
-      )
+      )) as { data: string }
       return data
     } catch (e: unknown) {
       this.logger.error(`Failed to send slack message!`, e)
@@ -73,18 +78,21 @@ export class SlackService {
   async errorMessage(
     { message, error }: VanitySlackMethodArgs,
     channel?: SlackChannel,
-  ) {
+  ): Promise<string | undefined> {
     return await this.formattedMessage({
       message,
-      error,
+      error: error as Error | string | Record<string, unknown>,
       channel: channel || SlackChannel.botDev,
     })
   }
 
-  async aiMessage({ message, error }: VanitySlackMethodArgs) {
+  async aiMessage({
+    message,
+    error,
+  }: VanitySlackMethodArgs): Promise<string | undefined> {
     return this.formattedMessage({
       message,
-      error,
+      error: error as Error | string | Record<string, unknown>,
       channel: SlackChannel.botAi,
     })
   }
