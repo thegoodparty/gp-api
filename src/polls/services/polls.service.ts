@@ -1,19 +1,38 @@
+import { add, addDays } from 'date-fns'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PollConfidence, PollStatus, Prisma } from '@prisma/client'
-import { add } from 'date-fns'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
 import { Timeout } from '@nestjs/schedule'
 
+type PollCreateInput = Omit<
+  Prisma.PollCreateInput,
+  'estimatedCompletionDate' | 'electedOffice' | 'issues' | 'individualMessages'
+> & {
+  electedOfficeId: string
+}
+
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
   constructor(private readonly queueProducer: QueueProducerService) {
     super()
   }
-  async create(args: Prisma.PollCreateArgs) {
-    return this.model.create(args)
+
+  async create(input: PollCreateInput) {
+    const poll = await this.client.poll.create({
+      data: {
+        ...input,
+        estimatedCompletionDate: addDays(input.scheduledDate, 7),
+      },
+    })
+    await this.queueProducer.sendMessage(
+      { type: QueueType.POLL_CREATION, data: { pollId: poll.id } },
+      pollMessageGroup(poll.id),
+    )
+
+    return poll
   }
 
   async update(args: Prisma.PollUpdateArgs) {
