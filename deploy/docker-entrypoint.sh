@@ -19,6 +19,31 @@ else
   echo "DATABASE_URL not set or is placeholder, skipping migrations."
 fi
 
-# Start the application
-exec node -r ./newrelic.js dist/src/main
+# For preview environments, start app in background, sync content, then wait
+if [ "$IS_PREVIEW" = "true" ]; then
+  echo "Starting application in background for content sync..."
+  node -r ./newrelic.js dist/src/main &
+  APP_PID=$!
+  
+  echo "Waiting for app to be healthy..."
+  for i in $(seq 1 30); do
+    if curl -s http://localhost:${PORT:-80}/v1/health > /dev/null 2>&1; then
+      echo "App is healthy. Running content sync..."
+      if curl -s -X POST http://localhost:${PORT:-80}/v1/content/sync > /dev/null 2>&1; then
+        echo "Content sync completed."
+      else
+        echo "WARNING: Content sync failed. Continuing..."
+      fi
+      break
+    fi
+    echo "Waiting for app... ($i/30)"
+    sleep 2
+  done
+  
+  echo "Waiting on application process..."
+  wait $APP_PID
+else
+  # For non-preview environments, start normally
+  exec node -r ./newrelic.js dist/src/main
+fi
 

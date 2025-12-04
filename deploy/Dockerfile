@@ -49,7 +49,8 @@ FROM public.ecr.aws/docker/library/node:22.12.0-alpine
 
 RUN apk add --no-cache \
   libc6-compat \
-  openssl
+  openssl \
+  curl
 
 WORKDIR /app
 
