@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -176,7 +177,7 @@ export class PollsController {
       electedOffice.id,
     )
     if (userHasPolls) {
-      throw new ForbiddenException(
+      throw new ConflictException(
         'You already have a poll. You cannot create an initial poll.',
       )
     }
