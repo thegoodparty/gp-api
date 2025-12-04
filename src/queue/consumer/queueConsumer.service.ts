@@ -667,7 +667,7 @@ export class QueueConsumerService {
           })
 
         return {
-          size: poll.targetAudienceSize,
+          size: poll.targetAudienceSize - alreadySent.length,
           excludeIds: alreadySent.map((p) => p.personId),
         }
       },
