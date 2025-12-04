@@ -121,6 +121,16 @@ export class PollsController {
     return { results, pagination: { nextCursor } }
   }
 
+  @Get('has-polls')
+  @UseElectedOffice()
+  async hasPolls(@ReqElectedOffice() electedOffice: ElectedOffice) {
+    const poll = await this.pollsService.findFirst({
+      where: { electedOfficeId: electedOffice.id },
+      take: 1,
+    })
+    return { hasPolls: poll !== null }
+  }
+
   @Post('initial-poll')
   async createInitialPoll(
     @ReqUser() user: User,
