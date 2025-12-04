@@ -416,7 +416,10 @@ export class ContactsService {
     }
   }
 
-  async getDistrictStats(campaign: CampaignWithPathToVictory) {
+  async getDistrictStats(
+    campaign: CampaignWithPathToVictory,
+    hasCellPhone = false,
+  ) {
     const {
       state,
       districtType,
@@ -436,6 +439,9 @@ export class ContactsService {
       : undefined
     if (typeof electionYear === 'number' && Number.isFinite(electionYear))
       params.set('electionYear', String(electionYear))
+    if (hasCellPhone) {
+      params.append('filters[]', 'cellPhoneFormatted')
+    }
     const token = usingStatewideFallback
       ? this.generateScopedS2SToken(state)
       : this.getValidS2SToken()

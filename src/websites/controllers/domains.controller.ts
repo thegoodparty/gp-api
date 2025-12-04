@@ -87,7 +87,7 @@ export class DomainsController {
         message = DomainOperationStatus.SUCCESSFUL
         break
       case DomainStatus.inactive:
-        message = DomainOperationStatus.ERROR
+        message = DomainOperationStatus.INACTIVE
         break
       default:
         message = DomainOperationStatus.ERROR

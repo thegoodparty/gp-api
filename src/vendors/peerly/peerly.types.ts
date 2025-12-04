@@ -13,7 +13,7 @@ export type PeerlyIdentity = {
 }
 export type PeerlyJobArea = {
   didState?: string
-  disNpaSubset?: string[]
+  didNpaSubset?: string[]
 }
 
 export type PeerlyIdentityCreateResponseBody = {

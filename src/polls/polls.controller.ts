@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -115,6 +116,15 @@ export class PollsController {
     return { results, pagination: { nextCursor } }
   }
 
+  @Get('has-polls')
+  @UseElectedOffice()
+  async hasPolls(@ReqElectedOffice() electedOffice: ElectedOffice) {
+    const userHasPolls: boolean = await this.pollsService.hasPolls(
+      electedOffice.id,
+    )
+    return { hasPolls: userHasPolls }
+  }
+
   @Post('initial-poll')
   async createInitialPoll(
     @ReqUser() user: User,
@@ -155,6 +165,15 @@ export class PollsController {
           swornInDate,
         },
       })
+    }
+
+    const userHasPolls: boolean = await this.pollsService.hasPolls(
+      electedOffice.id,
+    )
+    if (userHasPolls) {
+      throw new ConflictException(
+        'You already have a poll. You cannot create an initial poll.',
+      )
     }
 
     const now = new Date()
