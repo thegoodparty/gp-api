@@ -6,12 +6,15 @@ export interface ComputeArgs {
   vpcId: pulumi.Input<string>;
   publicSubnetIds: pulumi.Input<string[]>;
   securityGroupId: pulumi.Input<string>;
+  taskSecurityGroupId?: pulumi.Input<string>;
   imageUri: pulumi.Input<string>;
   isProduction: boolean;
   isPreview: boolean;
   prNumber?: string;
   certificateArn: pulumi.Input<string>;
   environment: pulumi.Input<Record<string, pulumi.Input<string>>>;
+  queueArn: pulumi.Input<string>;
+  s3BucketArns?: pulumi.Input<string[]>;
   tags?: Record<string, string>;
   hostedZoneId?: pulumi.Input<string>;
   domain?: string;
@@ -23,6 +26,7 @@ export class Compute extends pulumi.ComponentResource {
   public readonly targetGroupArnSuffix: pulumi.Output<string>;
   public readonly clusterArn: pulumi.Output<string>;
   public readonly serviceName: pulumi.Output<string>;
+  public readonly taskSecurityGroupId: pulumi.Output<string>;
 
   constructor(
     name: string,
@@ -38,27 +42,29 @@ export class Compute extends pulumi.ComponentResource {
       ? { ...baseTags, Environment: 'preview', PR: args.prNumber || 'unknown' }
       : { ...baseTags, Environment: args.isProduction ? 'Production' : 'Development' };
 
-    const taskSecurityGroup = new aws.ec2.SecurityGroup(`${shortName}-task-sg`, {
-      vpcId: args.vpcId,
-      description: 'Security group for ECS tasks',
-      ingress: [
-        {
-          protocol: 'tcp',
-          fromPort: 80,
-          toPort: 80,
-          securityGroups: [args.securityGroupId],
-        },
-      ],
-      egress: [
-        {
-          protocol: '-1',
-          fromPort: 0,
-          toPort: 0,
-          cidrBlocks: ['0.0.0.0/0'],
-        },
-      ],
-      tags: resourceTags,
-    }, { parent: this });
+    const taskSecurityGroup = args.taskSecurityGroupId 
+      ? aws.ec2.SecurityGroup.get(`${shortName}-task-sg`, args.taskSecurityGroupId, {}, { parent: this })
+      : new aws.ec2.SecurityGroup(`${shortName}-task-sg`, {
+          vpcId: args.vpcId,
+          description: 'Security group for ECS tasks',
+          ingress: [
+            {
+              protocol: 'tcp',
+              fromPort: 80,
+              toPort: 80,
+              securityGroups: [args.securityGroupId],
+            },
+          ],
+          egress: [
+            {
+              protocol: '-1',
+              fromPort: 0,
+              toPort: 0,
+              cidrBlocks: ['0.0.0.0/0'],
+            },
+          ],
+          tags: resourceTags,
+        }, { parent: this });
 
     const lb = new awsx.lb.ApplicationLoadBalancer(
       `${shortName}-alb`,
@@ -126,26 +132,43 @@ export class Compute extends pulumi.ComponentResource {
 
     new aws.iam.RolePolicy(`${shortName}-task-policy`, {
       role: taskRole.id,
-      policy: JSON.stringify({
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Action: ['sqs:*'],
-            Resource: '*',
-          },
-          {
-            Effect: 'Allow',
-            Action: ['s3:*', 's3-object-lambda:*'],
-            Resource: '*',
-          },
-          {
-            Effect: 'Allow',
-            Action: ['route53domains:Get*', 'route53domains:List*', 'route53domains:CheckDomainAvailability'],
-            Resource: '*',
-          },
-        ],
-      }),
+      policy: pulumi.all([args.queueArn, args.s3BucketArns || []]).apply(([queueArn, s3Arns]) => 
+        JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Action: [
+                'sqs:SendMessage',
+                'sqs:ReceiveMessage',
+                'sqs:DeleteMessage',
+                'sqs:GetQueueAttributes',
+                'sqs:GetQueueUrl'
+              ],
+              Resource: queueArn,
+            },
+            ...(s3Arns.length > 0 ? [{
+              Effect: 'Allow',
+              Action: [
+                's3:GetObject',
+                's3:PutObject',
+                's3:DeleteObject',
+                's3:ListBucket'
+              ],
+              Resource: s3Arns.flatMap((arn: string) => [arn, `${arn}/*`]),
+            }] : []),
+            {
+              Effect: 'Allow',
+              Action: [
+                'route53domains:Get*',
+                'route53domains:List*',
+                'route53domains:CheckDomainAvailability'
+              ],
+              Resource: '*',
+            },
+          ],
+        })
+      ),
     }, { parent: this });
 
     const envVars = pulumi.output(args.environment).apply(env => 
@@ -269,5 +292,6 @@ export class Compute extends pulumi.ComponentResource {
     this.targetGroupArnSuffix = lb.defaultTargetGroup.arnSuffix;
     this.clusterArn = cluster.arn;
     this.serviceName = service.service.name;
+    this.taskSecurityGroupId = taskSecurityGroup.id;
   }
 }

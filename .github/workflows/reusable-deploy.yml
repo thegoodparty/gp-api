@@ -25,6 +25,9 @@ on:
       public_subnets:
         required: true
         type: string # JSON string
+      private_subnets:
+        required: true
+        type: string # JSON string
       security_group_id:
         required: true
         type: string
@@ -170,6 +173,7 @@ jobs:
           pulumi config set aws:region us-west-2
           pulumi config set vpcId ${{ inputs.vpc_id }}
           pulumi config set --path publicSubnetIds '${{ inputs.public_subnets }}'
+          pulumi config set --path privateSubnetIds '${{ inputs.private_subnets }}'
           pulumi config set securityGroupId ${{ inputs.security_group_id }}
           pulumi config set certificateArn ${{ inputs.certificate_arn }}
 

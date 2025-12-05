@@ -11,6 +11,7 @@ const stackName = pulumi.getStack();
 // 1. Infrastructure Config
 const vpcId = config.require('vpcId');
 const publicSubnetIds = config.requireObject<string[]>('publicSubnetIds');
+const privateSubnetIds = config.requireObject<string[]>('privateSubnetIds');
 const securityGroupId = config.require('securityGroupId');
 const certificateArn = config.require('certificateArn');
 const imageUri = config.require('imageUri');
@@ -66,6 +67,33 @@ const baseTags = {
     Stack: stackName,
 };
 
+const shortName = stackName.length > 20 ? stackName.substring(0, 20) : stackName;
+const resourceTags = isPreview 
+    ? { ...baseTags, Environment: 'preview', PR: prNumber || 'unknown' }
+    : { ...baseTags, Environment: isProduction ? 'Production' : 'Development' };
+
+const taskSecurityGroup = new aws.ec2.SecurityGroup(`${shortName}-task-sg`, {
+    vpcId,
+    description: 'Security group for ECS tasks',
+    ingress: [
+        {
+            protocol: 'tcp',
+            fromPort: 80,
+            toPort: 80,
+            securityGroups: [securityGroupId],
+        },
+    ],
+    egress: [
+        {
+            protocol: '-1',
+            fromPort: 0,
+            toPort: 0,
+            cidrBlocks: ['0.0.0.0/0'],
+        },
+    ],
+    tags: resourceTags,
+});
+
 const queue = new Queue(`${stackName}-queue`, {
     isPreview,
     prNumber,
@@ -87,18 +115,21 @@ const secretData = secretVersion.secretString.apply(s => {
 // 4. Database Logic
 let databaseUrl: pulumi.Output<string>;
 let dbDependency: pulumi.Resource | undefined;
+let dbPassword: pulumi.Output<string> | undefined;
 
 if (isPreview) {
     const db = new Database(`${stackName}-db`, {
         vpcId,
-        subnetIds: publicSubnetIds,
+        subnetIds: privateSubnetIds,
         securityGroupId,
+        ecsSecurityGroupId: taskSecurityGroup.id,
         isPreview: true,
         prNumber,
         tags: baseTags,
     });
     databaseUrl = db.url;
     dbDependency = db.instance;
+    dbPassword = db.password;
 } else {
     databaseUrl = secretData.apply(s => s.DATABASE_URL);
 }
@@ -145,12 +176,14 @@ const compute = new Compute(`${stackName}-compute`, {
     vpcId,
     publicSubnetIds,
     securityGroupId,
+    taskSecurityGroupId: taskSecurityGroup.id,
     imageUri,
     isProduction,
     isPreview,
     prNumber,
     certificateArn: effectiveCertArn,
     environment: finalEnvVars,
+    queueArn: queue.queueArn,
     tags: baseTags,
     hostedZoneId: effectiveHostedZoneId,
     domain: effectiveDomain,
@@ -164,3 +197,4 @@ new Monitoring(`${stackName}-monitoring`, {
 });
 
 export const serviceUrl = compute.url;
+export const databasePassword = dbPassword;

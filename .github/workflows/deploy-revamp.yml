@@ -29,6 +29,9 @@ jobs:
       # Currently using placeholders as we don't have the real IDs yet.
       # User MUST update this before pushing.
       public_subnets: '["subnet-07984b965dabfdedc", "subnet-01c540e6428cdd8db"]'
+      # REPLACE with actual Private Subnets (for RDS databases)
+      # User MUST update this before pushing.
+      private_subnets: '["subnet-053357b931f0524d4", "subnet-0bb591861f72dcb7f"]'
       security_group_id: sg-0e01f208be74c2a2b
       certificate_arn: arn:aws:acm:us-west-2:333022194791:certificate/227d8028-477a-4d75-999f-60587a8a11e3
       secret_arn: arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4

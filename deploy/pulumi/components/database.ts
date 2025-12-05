@@ -1,11 +1,12 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as aws from '@pulumi/aws';
+import * as random from '@pulumi/random';
 
 export interface DatabaseArgs {
   vpcId: pulumi.Input<string>;
   subnetIds: pulumi.Input<string[]>;
   securityGroupId: pulumi.Input<string>;
-  ecsSecurityGroupId?: pulumi.Input<string>;
+  ecsSecurityGroupId: pulumi.Input<string>;
   isPreview: boolean;
   prNumber?: string;
   clusterIdentifier?: string;
@@ -15,6 +16,7 @@ export interface DatabaseArgs {
 export class Database extends pulumi.ComponentResource {
   public readonly url: pulumi.Output<string>;
   public readonly secretArn: pulumi.Output<string>;
+  public readonly password?: pulumi.Output<string>;
   public readonly instance?: aws.rds.ClusterInstance;
 
   constructor(
@@ -28,17 +30,23 @@ export class Database extends pulumi.ComponentResource {
       const baseTags = args.tags || {};
       const resourceTags = { ...baseTags, Environment: 'preview', PR: args.prNumber || 'unknown' };
 
-      const password = new aws.secretsmanager.Secret(`${name}-db-pass`, {
+      const randomPassword = new random.RandomPassword(`${name}-db-password`, {
+          length: 32,
+          special: true,
+          overrideSpecial: '!#$%&*()-_=+[]{}<>:?',
+      }, { parent: this });
+
+      const passwordSecret = new aws.secretsmanager.Secret(`${name}-db-pass`, {
           name: `gp-api-preview-db-${name}`,
           tags: resourceTags,
       }, { parent: this });
       
       const passwordVersion = new aws.secretsmanager.SecretVersion(`${name}-db-pass-ver`, {
-          secretId: password.id,
-          secretString: "superSecretPreviewPassword123!",
+          secretId: passwordSecret.id,
+          secretString: randomPassword.result,
       }, { parent: this });
 
-      this.secretArn = password.arn;
+      this.secretArn = passwordSecret.arn;
 
       const subnetGroup = new aws.rds.SubnetGroup(`${name}-subnet-group`, {
           subnetIds: args.subnetIds,
@@ -53,7 +61,7 @@ export class Database extends pulumi.ComponentResource {
               protocol: 'tcp',
               fromPort: 5432,
               toPort: 5432,
-              cidrBlocks: ['10.0.0.0/8'],
+              securityGroups: [args.ecsSecurityGroupId],
             },
           ],
           egress: [
@@ -92,6 +100,7 @@ export class Database extends pulumi.ComponentResource {
       }, { parent: this });
 
       this.url = pulumi.interpolate`postgresql://postgres:${passwordVersion.secretString}@${cluster.endpoint}:5432/gp_api`;
+      this.password = randomPassword.result;
 
     } else {
         // Production/Dev: We assume the DB exists.
