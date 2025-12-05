@@ -91,7 +91,7 @@ export class Compute extends pulumi.ComponentResource {
 
     const logGroup = new aws.cloudwatch.LogGroup(`${shortName}-logs`, {
       name: `/ecs/${name}`,
-      retentionInDays: 7,
+      retentionInDays: 60,
       tags: resourceTags,
     }, { parent: this });
 
