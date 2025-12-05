@@ -48,7 +48,7 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import { format } from 'date-fns'
+import { format, isBefore } from 'date-fns'
 import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
 
 @Injectable()
@@ -767,6 +767,9 @@ export class QueueConsumerService {
     await sendTevynAPIPollMessage(this.slackService.client, {
       message: poll.messageContent,
       pollId: poll.id,
+      scheduledDate: isBefore(poll.scheduledDate, new Date())
+        ? 'Now'
+        : format(poll.scheduledDate, 'PP') + ' at 11:00 AM ET',
       csv: {
         fileContent: Buffer.from(csv),
         filename: `${user.email}-${format(poll.scheduledDate, 'yyyy-MM-dd')}.csv`,

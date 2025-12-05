@@ -76,6 +76,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
   async expandPoll(params: {
     pollId: string
     additionalRecipientCount: number
+    scheduledDate: Date
   }) {
     const result = await this.optimisticLockingUpdate(
       { where: { id: params.pollId } },
@@ -86,7 +87,8 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
 
         return {
           isCompleted: false,
-          estimatedCompletionDate: add(new Date(), { weeks: 1 }),
+          scheduledDate: params.scheduledDate,
+          estimatedCompletionDate: add(params.scheduledDate, { weeks: 1 }),
           targetAudienceSize:
             poll.targetAudienceSize + params.additionalRecipientCount,
         }
