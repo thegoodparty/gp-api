@@ -176,7 +176,7 @@ const compute = new Compute(`${stackName}-compute`, {
     vpcId,
     publicSubnetIds,
     securityGroupId,
-    taskSecurityGroupId: taskSecurityGroup.id,
+    taskSecurityGroup: taskSecurityGroup,
     imageUri,
     isProduction,
     isPreview,

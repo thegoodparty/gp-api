@@ -6,7 +6,7 @@ export interface ComputeArgs {
   vpcId: pulumi.Input<string>;
   publicSubnetIds: pulumi.Input<string[]>;
   securityGroupId: pulumi.Input<string>;
-  taskSecurityGroupId?: pulumi.Input<string>;
+  taskSecurityGroup: aws.ec2.SecurityGroup;
   imageUri: pulumi.Input<string>;
   isProduction: boolean;
   isPreview: boolean;
@@ -41,30 +41,6 @@ export class Compute extends pulumi.ComponentResource {
     const resourceTags = args.isPreview 
       ? { ...baseTags, Environment: 'preview', PR: args.prNumber || 'unknown' }
       : { ...baseTags, Environment: args.isProduction ? 'Production' : 'Development' };
-
-    const taskSecurityGroup = args.taskSecurityGroupId 
-      ? aws.ec2.SecurityGroup.get(`${shortName}-task-sg`, args.taskSecurityGroupId, {}, { parent: this })
-      : new aws.ec2.SecurityGroup(`${shortName}-task-sg`, {
-          vpcId: args.vpcId,
-          description: 'Security group for ECS tasks',
-          ingress: [
-            {
-              protocol: 'tcp',
-              fromPort: 80,
-              toPort: 80,
-              securityGroups: [args.securityGroupId],
-            },
-          ],
-          egress: [
-            {
-              protocol: '-1',
-              fromPort: 0,
-              toPort: 0,
-              cidrBlocks: ['0.0.0.0/0'],
-            },
-          ],
-          tags: resourceTags,
-        }, { parent: this });
 
     const lb = new awsx.lb.ApplicationLoadBalancer(
       `${shortName}-alb`,
@@ -187,7 +163,7 @@ export class Compute extends pulumi.ComponentResource {
         propagateTags: 'SERVICE',
         networkConfiguration: {
           subnets: args.publicSubnetIds,
-          securityGroups: [taskSecurityGroup.id],
+          securityGroups: [args.taskSecurityGroup.id],
           assignPublicIp: true,
         },
         taskDefinitionArgs: {
@@ -292,6 +268,6 @@ export class Compute extends pulumi.ComponentResource {
     this.targetGroupArnSuffix = lb.defaultTargetGroup.arnSuffix;
     this.clusterArn = cluster.arn;
     this.serviceName = service.service.name;
-    this.taskSecurityGroupId = taskSecurityGroup.id;
+    this.taskSecurityGroupId = args.taskSecurityGroup.id;
   }
 }
