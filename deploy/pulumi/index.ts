@@ -3,7 +3,6 @@ import * as aws from '@pulumi/aws';
 import { Compute } from './components/compute';
 import { Database } from './components/database';
 import { Queue } from './components/queue';
-import { Monitoring } from './components/monitoring';
 
 const config = new pulumi.Config();
 const stackName = pulumi.getStack();
@@ -189,13 +188,6 @@ const compute = new Compute(`${stackName}-compute`, {
     hostedZoneId: effectiveHostedZoneId,
     domain: effectiveDomain,
 }, computeDeps);
-
-new Monitoring(`${stackName}-monitoring`, {
-    serviceName: compute.serviceName,
-    loadBalancerArnSuffix: compute.loadBalancerArnSuffix,
-    targetGroupArnSuffix: compute.targetGroupArnSuffix,
-    clusterName: compute.clusterArn.apply(arn => arn.split('/').pop() || ''),
-});
 
 export const serviceUrl = compute.url;
 export const databasePassword = dbPassword;
