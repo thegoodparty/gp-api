@@ -33,7 +33,7 @@ export class Database extends pulumi.ComponentResource {
       const randomPassword = new random.RandomPassword(`${name}-db-password`, {
           length: 32,
           special: true,
-          overrideSpecial: '!#$%&*()-_=+[]{}<>:?',
+          overrideSpecial: '!#$%&*()-_=+[]{}',
       }, { parent: this });
 
       const passwordSecret = new aws.secretsmanager.Secret(`${name}-db-pass`, {
@@ -99,7 +99,10 @@ export class Database extends pulumi.ComponentResource {
           tags: resourceTags,
       }, { parent: this });
 
-      this.url = pulumi.interpolate`postgresql://postgres:${passwordVersion.secretString}@${cluster.endpoint}:5432/gp_api`;
+      this.url = pulumi.all([passwordVersion.secretString, cluster.endpoint]).apply(
+        ([password, endpoint]) => 
+          `postgresql://postgres:${encodeURIComponent(password)}@${endpoint}:5432/gp_api`
+      );
       this.password = randomPassword.result;
 
     } else {
