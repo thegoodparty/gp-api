@@ -3,13 +3,13 @@ import { PurchaseHandler } from 'src/payments/purchase.types'
 import { PollsService } from './polls.service'
 import z from 'zod'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import uuid from 'uuid'
+import { version as uuidVersion } from 'uuid'
 import { PaymentsService } from '@/payments/services/payments.service'
 
 const uuidV7Schema = z.string().refine(
   (value) => {
     try {
-      return uuid.version(value) === 7
+      return uuidVersion(value) === 7
     } catch {
       return false
     }
