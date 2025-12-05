@@ -24,6 +24,7 @@ model Poll {
   scheduledDate           DateTime        @map("scheduled_date")
   estimatedCompletionDate DateTime
   completedDate           DateTime?       @map("completed_date")
+  isCompleted             Boolean         @default(false) @map("is_completed")
 
   electedOffice   ElectedOffice? @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
   electedOfficeId String?        @map("elected_office_id")
