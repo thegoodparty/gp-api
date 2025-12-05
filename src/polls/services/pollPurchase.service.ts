@@ -1,10 +1,12 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { PurchaseHandler } from 'src/payments/purchase.types'
-import { PollsService } from './polls.service'
-import z from 'zod'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import uuid from 'uuid'
 import { PaymentsService } from '@/payments/services/payments.service'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { PurchaseHandler } from 'src/payments/purchase.types'
+import uuid from 'uuid'
+import z from 'zod'
+import { PollsService } from './polls.service'
+
+const MAX_CONSTITUENTS_PER_RUN = 10000
 
 const uuidV7Schema = z.string().refine(
   (value) => {
@@ -32,7 +34,7 @@ const PollPurchaseMetadataSchema = z.union([
     name: z.string().min(1).max(100),
     message: z.string().min(1).max(1000),
     imageUrl: z.string().url().nullable().default(null),
-    audienceSize: z.coerce.number().int().min(1).max(10000),
+    audienceSize: z.coerce.number().int().min(1).max(MAX_CONSTITUENTS_PER_RUN),
     scheduledDate: z.string().datetime(),
   }),
   z.object({
