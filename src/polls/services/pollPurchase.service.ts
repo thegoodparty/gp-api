@@ -110,7 +110,6 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
 
     await this.pollsService.create({
       id: metadata.pollId,
-      status: 'SCHEDULED',
       name: metadata.name,
       electedOfficeId: electedOffice.id,
       messageContent: metadata.message,
