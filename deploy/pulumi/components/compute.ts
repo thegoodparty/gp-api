@@ -202,8 +202,8 @@ export class Compute extends pulumi.ComponentResource {
         parent: this, 
         dependsOn: [logGroup, cluster],
         customTimeouts: {
-          create: args.isPreview ? '30m' : '20m',
-          update: args.isPreview ? '30m' : '20m',
+          create: '30m',
+          update: '30m',
         }
       },
     );
