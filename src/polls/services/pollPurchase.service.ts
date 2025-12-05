@@ -43,7 +43,7 @@ const PollPurchaseMetadataSchema = z.union([
       .optional()
       .default(PollPurchaseType.expansion),
     pollId: uuidV7Schema,
-    count: z.coerce.number().int().min(1),
+    count: z.coerce.number().int().min(1).max(MAX_CONSTITUENTS_PER_RUN),
   }),
 ])
 
