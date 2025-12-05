@@ -11,7 +11,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Install dependencies  
-COPY package.json package-lock.json tsconfig.json tsconfig.build.json newrelic.js ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json tsconfig.seed.json newrelic.js ./
 
 # Copy application source files, prisma files, and seed data
 COPY src/ ./src
@@ -31,7 +31,12 @@ ENV DATABASE_URL=$DATABASE_URL
 
 # Note: the CodeBuild project must be configured to be on the VPC.
 # Force cache bust for these commands by echoing CACHEBUST
-RUN echo "Cache bust: $CACHEBUST" && npx prisma migrate deploy --schema=prisma/schema
+# Skip migrations if using placeholder DATABASE_URL (for preview environments)
+RUN if [ "$DATABASE_URL" != "postgresql://placeholder:placeholder@localhost:5432/placeholder" ]; then \
+      echo "Cache bust: $CACHEBUST" && npx prisma migrate deploy --schema=prisma/schema; \
+    else \
+      echo "Skipping migrations during build (will run on container startup)"; \
+    fi
 
 # Force cache bust for Prisma client generation
 RUN echo "Cache bust: $CACHEBUST" && npx prisma generate --schema=prisma/schema
@@ -44,7 +49,8 @@ FROM public.ecr.aws/docker/library/node:22.12.0-alpine
 
 RUN apk add --no-cache \
   libc6-compat \
-  openssl
+  openssl \
+  curl
 
 WORKDIR /app
 
@@ -68,8 +74,11 @@ COPY --from=builder /app/dist ./dist
 RUN echo "Cache bust: $CACHEBUST - copying prisma"
 COPY --from=builder /app/prisma ./prisma
 
-RUN echo "Cache bust: $CACHEBUST - copying seed"
+# Copy seed and src for tsx runtime seeding (preview environments only)
+RUN echo "Cache bust: $CACHEBUST - copying seed and src for preview seeding"
 COPY --from=builder /app/seed ./seed
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Expose the application port
 # EXPOSE 3000
@@ -80,5 +89,9 @@ ENV NODE_ENV=production
 # Copy New Relic configuration
 COPY --from=builder /app/newrelic.js ./
 
+# Copy entrypoint script
+COPY deploy/docker-entrypoint.sh ./
+RUN chmod +x ./docker-entrypoint.sh
+
 # Start the application
-CMD ["node", "-r", "./newrelic.js", "dist/src/main"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
