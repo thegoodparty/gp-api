@@ -99,9 +99,11 @@ export class Database extends pulumi.ComponentResource {
           tags: resourceTags,
       }, { parent: this });
 
-      this.url = pulumi.all([passwordVersion.secretString, cluster.endpoint]).apply(
-        ([password, endpoint]) => 
-          `postgresql://postgres:${encodeURIComponent(password)}@${endpoint}:5432/gp_api`
+      this.url = pulumi.all([randomPassword.result, cluster.endpoint]).apply(
+        ([password, endpoint]) => {
+          const encodedPassword = encodeURIComponent(password);
+          return `postgresql://postgres:${encodedPassword}@${endpoint}:5432/gp_api`;
+        }
       );
       this.password = randomPassword.result;
 
