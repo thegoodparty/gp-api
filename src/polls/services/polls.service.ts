@@ -1,11 +1,11 @@
 import { add, addDays } from 'date-fns'
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { PollConfidence, PollStatus, Prisma } from '@prisma/client'
+import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
-import { Timeout } from '@nestjs/schedule'
+import { APIPollStatus, derivePollStatus } from '../polls.types'
 
 type PollCreateInput = Omit<
   Prisma.PollCreateInput,
@@ -59,14 +59,11 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     return this.optimisticLockingUpdate(
       { where: { id: params.pollId } },
       (poll) => {
-        if (poll.status !== 'IN_PROGRESS' && poll.status !== 'EXPANDING') {
-          throw new BadRequestException(
-            'Poll is not in in-progress or expanding state',
-          )
+        if (derivePollStatus(poll) !== APIPollStatus.IN_PROGRESS) {
+          throw new BadRequestException('Poll is not in-progress')
         }
 
         return {
-          status: 'COMPLETED',
           isCompleted: true,
           confidence: params.confidence,
           responseCount: params.totalResponses,
@@ -83,12 +80,12 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     const result = await this.optimisticLockingUpdate(
       { where: { id: params.pollId } },
       (poll) => {
-        if (poll.status !== 'COMPLETED') {
+        if (derivePollStatus(poll) !== APIPollStatus.COMPLETED) {
           throw new BadRequestException('Poll is not completed')
         }
 
         return {
-          status: PollStatus.EXPANDING,
+          isCompleted: false,
           estimatedCompletionDate: add(new Date(), { weeks: 1 }),
           targetAudienceSize:
             poll.targetAudienceSize + params.additionalRecipientCount,
@@ -102,22 +99,5 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     )
 
     return result
-  }
-
-  @Timeout(0)
-  async backfillIsCompletedField() {
-    const polls = await this.client.poll.findMany({
-      where: { status: 'COMPLETED', isCompleted: false },
-    })
-
-    this.logger.log(`Backfilling isCompleted field for ${polls.length} polls`)
-    for (const poll of polls) {
-      await this.client.poll.update({
-        where: { id: poll.id },
-        data: { isCompleted: true },
-      })
-      this.logger.log(`Updated poll ${poll.id} to isCompleted: true`)
-    }
-    this.logger.log('Backfilling isCompleted field complete')
   }
 }
