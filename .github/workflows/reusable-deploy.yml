@@ -240,8 +240,8 @@ jobs:
 
             | Resource | URL |
             |----------|-----|
-            | **API** | https://${{ needs.deploy-pulumi.outputs.service_url }} |
-            | **Health Check** | https://${{ needs.deploy-pulumi.outputs.service_url }}/v1/health |
+            | **API** | ${{ needs.deploy-pulumi.outputs.service_url }} |
+            | **Health Check** | ${{ needs.deploy-pulumi.outputs.service_url }}/v1/health |
 
             > Stack: `${{ needs.determine-context.outputs.stack }}`
             > 
@@ -253,7 +253,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     env:
-      API_BASE_URL: https://${{ needs.deploy-pulumi.outputs.service_url }}
+      API_BASE_URL: ${{ needs.deploy-pulumi.outputs.service_url }}
       CI: true
     steps:
       - name: Checkout
