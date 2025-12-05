@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -17,7 +18,7 @@ import {
   PollStatus,
   User,
 } from '@prisma/client'
-import { add } from 'date-fns'
+import { v7 as uuidv7 } from 'uuid'
 import { orderBy } from 'lodash'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
@@ -25,10 +26,7 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import { QueueType } from 'src/queue/queue.types'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
-import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import z from 'zod'
 import { APIPoll, APIPollIssue } from './polls.types'
@@ -38,7 +36,6 @@ import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PollsService } from './services/polls.service'
 import { BiasAnalysisResponse } from './types/pollBias.types'
-import { pollMessageGroup } from './utils/polls.utils'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -94,10 +91,8 @@ export class PollsController {
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
     private readonly pollBiasAnalysisService: PollBiasAnalysisService,
-    private readonly users: UsersService,
     private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
-    private readonly queueProducerService: QueueProducerService,
     private readonly s3Service: S3Service,
   ) {}
   private readonly logger = new Logger(this.constructor.name)
@@ -119,6 +114,15 @@ export class PollsController {
     const nextCursor = polls.at(query.limit)?.id
     const results = polls.slice(0, query.limit).map(toAPIPoll)
     return { results, pagination: { nextCursor } }
+  }
+
+  @Get('has-polls')
+  @UseElectedOffice()
+  async hasPolls(@ReqElectedOffice() electedOffice: ElectedOffice) {
+    const userHasPolls: boolean = await this.pollsService.hasPolls(
+      electedOffice.id,
+    )
+    return { hasPolls: userHasPolls }
   }
 
   @Post('initial-poll')
@@ -163,27 +167,26 @@ export class PollsController {
       })
     }
 
+    const userHasPolls: boolean = await this.pollsService.hasPolls(
+      electedOffice.id,
+    )
+    if (userHasPolls) {
+      throw new ConflictException(
+        'You already have a poll. You cannot create an initial poll.',
+      )
+    }
+
     const now = new Date()
     const poll = await this.pollsService.create({
-      data: {
-        name: 'Top Community Issues',
-        status: 'IN_PROGRESS',
-        messageContent: message,
-        targetAudienceSize: 500,
-        scheduledDate: now,
-        estimatedCompletionDate: add(now, { weeks: 1 }),
-        imageUrl: imageUrl,
-        electedOfficeId: electedOffice.id,
-      },
+      id: uuidv7(),
+      name: 'Top Community Issues',
+      status: 'IN_PROGRESS',
+      scheduledDate: now,
+      messageContent: message,
+      imageUrl,
+      electedOfficeId: electedOffice.id,
+      targetAudienceSize: 500,
     })
-
-    await this.queueProducerService.sendMessage(
-      {
-        type: QueueType.POLL_CREATION,
-        data: { pollId: poll.id },
-      },
-      pollMessageGroup(poll.id),
-    )
 
     return toAPIPoll(poll)
   }
