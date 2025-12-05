@@ -81,7 +81,7 @@ export class Database extends pulumi.ComponentResource {
           engineVersion: "16.4",
           databaseName: "gp_api",
           masterUsername: "postgres",
-          masterPassword: passwordVersion.secretString.apply(s => s ?? "defaultpass"),
+          masterPassword: randomPassword.result,
           dbSubnetGroupName: subnetGroup.name,
           vpcSecurityGroupIds: [dbSecurityGroup.id],
           skipFinalSnapshot: true,
