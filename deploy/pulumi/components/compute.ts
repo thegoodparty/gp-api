@@ -270,7 +270,7 @@ export class Compute extends pulumi.ComponentResource {
 
       this.url = pulumi.output(`https://${domainName}`);
     } else {
-      this.url = lb.loadBalancer.dnsName;
+      this.url = pulumi.interpolate`https://${lb.loadBalancer.dnsName}`;
     }
 
     this.loadBalancerArnSuffix = lb.loadBalancer.arnSuffix;
