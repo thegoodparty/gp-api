@@ -161,6 +161,7 @@ export class Compute extends pulumi.ComponentResource {
         cluster: cluster.arn,
         tags: resourceTags,
         propagateTags: 'SERVICE',
+        healthCheckGracePeriodSeconds: args.isPreview ? 600 : 300,
         networkConfiguration: {
           subnets: args.publicSubnetIds,
           securityGroups: [args.taskSecurityGroup.id],

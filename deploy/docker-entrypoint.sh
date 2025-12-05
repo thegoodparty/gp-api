@@ -3,9 +3,29 @@ set -e
 
 # Run migrations on startup if DATABASE_URL is set and not a placeholder
 if [ -n "$DATABASE_URL" ] && [ "$DATABASE_URL" != "postgresql://placeholder:placeholder@localhost:5432/placeholder" ]; then
-  echo "Running Prisma migrations..."
-  npx prisma migrate deploy --schema=prisma/schema
-  echo "Migrations completed."
+  echo "Waiting for database to be ready..."
+  
+  # Retry logic for database connection (important for Aurora Serverless v2 which takes time to initialize)
+  MAX_RETRIES=30
+  RETRY_COUNT=0
+  
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    echo "Attempting database connection (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+    
+    if npx prisma migrate deploy --schema=prisma/schema 2>&1; then
+      echo "✅ Migrations completed successfully."
+      break
+    else
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        echo "⏳ Database not ready yet. Waiting 10 seconds before retry..."
+        sleep 10
+      else
+        echo "❌ ERROR: Failed to connect to database after $MAX_RETRIES attempts."
+        exit 1
+      fi
+    fi
+  done
 
   if [ "$IS_PREVIEW" = "true" ]; then
     echo "Preview environment detected. Running seed..."
