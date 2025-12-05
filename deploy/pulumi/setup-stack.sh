@@ -18,9 +18,14 @@ REGION=${AWS_REGION:-"us-west-2"}
 STATE_BUCKET="s3://gp-api-pulumi-state"
 
 echo "Using State Backend: $STATE_BUCKET"
-# Note: PULUMI_CONFIG_PASSPHRASE should be set in your shell or CI env for security.
-# We default to empty here for non-interactive usage if not set.
-export PULUMI_CONFIG_PASSPHRASE=${PULUMI_CONFIG_PASSPHRASE:-""}
+
+# Check for required PULUMI_CONFIG_PASSPHRASE
+if [ -z "$PULUMI_CONFIG_PASSPHRASE" ]; then
+  echo "ERROR: PULUMI_CONFIG_PASSPHRASE environment variable is required"
+  echo "Generate one with: openssl rand -base64 32"
+  exit 1
+fi
+
 pulumi login $STATE_BUCKET
 
 echo "Selecting/Creating Stack: $STACK_NAME"
@@ -29,11 +34,14 @@ pulumi stack select $STACK_NAME --create || true
 echo "Configuring Stack..."
 pulumi config set aws:region $REGION
 
-# Default Infrastructure Values (Modify these or pass as ENV vars)
-VPC_ID=${VPC_ID:-"vpc-0763fa52c32ebcf6a"}
-PUBLIC_SUBNETS=${PUBLIC_SUBNETS:-'["subnet-REPLACE-ME-1", "subnet-REPLACE-ME-2"]'}
-SECURITY_GROUP_ID=${SECURITY_GROUP_ID:-"sg-REPLACE-ME-ALB"}
-CERT_ARN=${CERT_ARN:-"arn:aws:acm:us-west-2:333022194791:certificate/REPLACE-ME"}
+# Infrastructure Values (MUST be set via ENV vars - no defaults for security)
+if [ -z "$VPC_ID" ] || [ -z "$PUBLIC_SUBNETS" ] || [ -z "$PRIVATE_SUBNETS" ] || \
+   [ -z "$SECURITY_GROUP_ID" ] || [ -z "$CERT_ARN" ]; then
+  echo "ERROR: Required infrastructure environment variables not set"
+  echo "Please set: VPC_ID, PUBLIC_SUBNETS, PRIVATE_SUBNETS, SECURITY_GROUP_ID, CERT_ARN"
+  exit 1
+fi
+
 IMAGE_URI=${IMAGE_URI:-"333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api:latest"}
 
 # Secret ARN for the specific environment
@@ -50,6 +58,7 @@ fi
 
 pulumi config set vpcId $VPC_ID
 pulumi config set --path publicSubnetIds "$PUBLIC_SUBNETS"
+pulumi config set --path privateSubnetIds "$PRIVATE_SUBNETS"
 pulumi config set securityGroupId $SECURITY_GROUP_ID
 pulumi config set certificateArn $CERT_ARN
 pulumi config set imageUri $IMAGE_URI

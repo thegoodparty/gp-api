@@ -22,25 +22,19 @@ jobs:
       ecr_repository: 333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api
       service_name: gp-api
       pulumi_stack_prefix: gp-api
-
-      # Infrastructure Configuration (Using Dev Defaults for Previews)
-      vpc_id: vpc-0763fa52c32ebcf6a
-      # REPLACE with actual Public Subnets (e.g. from AWS console)
-      # Currently using placeholders as we don't have the real IDs yet.
-      # User MUST update this before pushing.
-      public_subnets: '["subnet-07984b965dabfdedc", "subnet-01c540e6428cdd8db"]'
-      # REPLACE with actual Private Subnets (for RDS databases)
-      # User MUST update this before pushing.
-      private_subnets: '["subnet-053357b931f0524d4", "subnet-0bb591861f72dcb7f"]'
-      security_group_id: sg-0e01f208be74c2a2b
-      certificate_arn: arn:aws:acm:us-west-2:333022194791:certificate/227d8028-477a-4d75-999f-60587a8a11e3
-      secret_arn: arn:aws:secretsmanager:us-west-2:333022194791:secret:GP_API_DEV-ag7Mf4
-      preview_certificate_arn: arn:aws:acm:us-west-2:333022194791:certificate/b009d1a6-68ff-4d24-84f7-93683ca3f786
-      preview_hosted_zone_id: Z10392302OXMPNQLPO07K
       preview_domain: preview.goodparty.org
 
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+      VPC_ID: ${{ secrets.VPC_ID }}
+      PUBLIC_SUBNETS: ${{ secrets.PUBLIC_SUBNETS }}
+      PRIVATE_SUBNETS: ${{ secrets.PRIVATE_SUBNETS }}
+      SECURITY_GROUP_ID: ${{ secrets.SECURITY_GROUP_ID }}
+      CERTIFICATE_ARN: ${{ secrets.CERTIFICATE_ARN }}
+      SECRET_ARN: ${{ secrets.SECRET_ARN }}
+      PREVIEW_CERTIFICATE_ARN: ${{ secrets.PREVIEW_CERTIFICATE_ARN }}
+      PREVIEW_HOSTED_ZONE_ID: ${{ secrets.PREVIEW_HOSTED_ZONE_ID }}
       CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
       CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}

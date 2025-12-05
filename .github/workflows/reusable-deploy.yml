@@ -18,33 +18,6 @@ on:
         required: false
         type: string
         default: 'gp-api'
-      # Infrastructure Config Inputs (Required for new stacks)
-      vpc_id:
-        required: true
-        type: string
-      public_subnets:
-        required: true
-        type: string # JSON string
-      private_subnets:
-        required: true
-        type: string # JSON string
-      security_group_id:
-        required: true
-        type: string
-      certificate_arn:
-        required: true
-        type: string
-      secret_arn:
-        required: true
-        type: string
-      preview_certificate_arn:
-        required: false
-        type: string
-        default: ''
-      preview_hosted_zone_id:
-        required: false
-        type: string
-        default: ''
       preview_domain:
         required: false
         type: string
@@ -52,6 +25,24 @@ on:
     secrets:
       AWS_ROLE_ARN:
         required: true
+      PULUMI_CONFIG_PASSPHRASE:
+        required: true
+      VPC_ID:
+        required: true
+      PUBLIC_SUBNETS:
+        required: true
+      PRIVATE_SUBNETS:
+        required: true
+      SECURITY_GROUP_ID:
+        required: true
+      CERTIFICATE_ARN:
+        required: true
+      SECRET_ARN:
+        required: true
+      PREVIEW_CERTIFICATE_ARN:
+        required: false
+      PREVIEW_HOSTED_ZONE_ID:
+        required: false
       CANDIDATE_EMAIL:
         required: false
       CANDIDATE_PASSWORD:
@@ -105,7 +96,7 @@ jobs:
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
           else
-            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ inputs.secret_arn }} --query SecretString --output text)
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.SECRET_ARN }} --query SecretString --output text)
             DATABASE_URL=$(echo $SECRET_JSON | jq -r '.DATABASE_URL')
             echo "::add-mask::$DATABASE_URL"
           fi
@@ -161,7 +152,7 @@ jobs:
         id: pulumi-up
         working-directory: ./deploy/pulumi
         env:
-          PULUMI_CONFIG_PASSPHRASE: ''
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |
           # Login to S3 Backend
           pulumi login s3://gp-api-pulumi-state
@@ -171,26 +162,26 @@ jobs:
 
           # Configure Infrastructure (Essential for new stacks)
           pulumi config set aws:region us-west-2
-          pulumi config set vpcId ${{ inputs.vpc_id }}
-          pulumi config set --path publicSubnetIds '${{ inputs.public_subnets }}'
-          pulumi config set --path privateSubnetIds '${{ inputs.private_subnets }}'
-          pulumi config set securityGroupId ${{ inputs.security_group_id }}
-          pulumi config set certificateArn ${{ inputs.certificate_arn }}
+          pulumi config set vpcId ${{ secrets.VPC_ID }}
+          pulumi config set --path publicSubnetIds '${{ secrets.PUBLIC_SUBNETS }}'
+          pulumi config set --path privateSubnetIds '${{ secrets.PRIVATE_SUBNETS }}'
+          pulumi config set securityGroupId ${{ secrets.SECURITY_GROUP_ID }}
+          pulumi config set certificateArn ${{ secrets.CERTIFICATE_ARN }}
 
           # Configure Secrets & App
           pulumi config set imageUri ${{ inputs.ecr_repository }}:${{ github.sha }}
-          pulumi config set secretArn ${{ inputs.secret_arn }} --plaintext
+          pulumi config set secretArn ${{ secrets.SECRET_ARN }} --plaintext
 
           # Set Environment Flags
           if [ "${{ needs.determine-context.outputs.is_preview }}" == "true" ]; then
              pulumi config set isPreview true
              pulumi config set isProduction false
              # Set preview-specific config for SSL and DNS
-             if [ -n "${{ inputs.preview_certificate_arn }}" ]; then
-               pulumi config set previewCertificateArn "${{ inputs.preview_certificate_arn }}"
+             if [ -n "${{ secrets.PREVIEW_CERTIFICATE_ARN }}" ]; then
+               pulumi config set previewCertificateArn "${{ secrets.PREVIEW_CERTIFICATE_ARN }}"
              fi
-             if [ -n "${{ inputs.preview_hosted_zone_id }}" ]; then
-               pulumi config set previewHostedZoneId "${{ inputs.preview_hosted_zone_id }}"
+             if [ -n "${{ secrets.PREVIEW_HOSTED_ZONE_ID }}" ]; then
+               pulumi config set previewHostedZoneId "${{ secrets.PREVIEW_HOSTED_ZONE_ID }}"
              fi
              if [ -n "${{ inputs.preview_domain }}" ]; then
                pulumi config set previewDomain "${{ inputs.preview_domain }}"

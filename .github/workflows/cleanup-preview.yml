@@ -38,7 +38,7 @@ jobs:
       - name: Destroy Stack
         working-directory: ./deploy/pulumi
         env:
-          PULUMI_CONFIG_PASSPHRASE: ''
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |
           # Login to S3 Backend
           pulumi login s3://gp-api-pulumi-state
