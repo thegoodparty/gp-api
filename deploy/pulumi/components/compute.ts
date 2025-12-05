@@ -164,9 +164,9 @@ export class Compute extends pulumi.ComponentResource {
         propagateTags: 'SERVICE',
         healthCheckGracePeriodSeconds: args.isPreview ? 600 : 300,
         networkConfiguration: {
-          subnets: args.privateSubnetIds,
+          subnets: args.publicSubnetIds,
           securityGroups: [args.taskSecurityGroup.id],
-          assignPublicIp: false,
+          assignPublicIp: true,
         },
         taskDefinitionArgs: {
           taskRole: { roleArn: taskRole.arn },
