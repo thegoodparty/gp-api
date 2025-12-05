@@ -1,4 +1,4 @@
-name: Reusable Deployment
+name: Deployment Workflow
 
 permissions:
   contents: read

@@ -1,4 +1,4 @@
-name: Deploy (Revamp)
+name: Deploy
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy
-    uses: ./.github/workflows/reusable-deploy.yml
+    uses: ./.github/workflows/workflow-deploy.yml
     with:
       ecr_repository: 333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api
       service_name: gp-api
