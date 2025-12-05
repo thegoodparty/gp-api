@@ -175,6 +175,7 @@ const effectiveDomain = isPreview ? previewDomain : domain;
 const compute = new Compute(`${stackName}-compute`, {
     vpcId,
     publicSubnetIds,
+    privateSubnetIds,
     securityGroupId,
     taskSecurityGroup: taskSecurityGroup,
     imageUri,

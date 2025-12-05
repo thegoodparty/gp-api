@@ -5,6 +5,7 @@ import * as aws from '@pulumi/aws';
 export interface ComputeArgs {
   vpcId: pulumi.Input<string>;
   publicSubnetIds: pulumi.Input<string[]>;
+  privateSubnetIds: pulumi.Input<string[]>;
   securityGroupId: pulumi.Input<string>;
   taskSecurityGroup: aws.ec2.SecurityGroup;
   imageUri: pulumi.Input<string>;
@@ -163,9 +164,9 @@ export class Compute extends pulumi.ComponentResource {
         propagateTags: 'SERVICE',
         healthCheckGracePeriodSeconds: args.isPreview ? 600 : 300,
         networkConfiguration: {
-          subnets: args.publicSubnetIds,
+          subnets: args.privateSubnetIds,
           securityGroups: [args.taskSecurityGroup.id],
-          assignPublicIp: true,
+          assignPublicIp: false,
         },
         taskDefinitionArgs: {
           taskRole: { roleArn: taskRole.arn },
@@ -197,7 +198,14 @@ export class Compute extends pulumi.ComponentResource {
         ],
         desiredCount: args.isProduction ? 2 : 1,
       },
-      { parent: this, dependsOn: [logGroup, cluster] },
+      { 
+        parent: this, 
+        dependsOn: [logGroup, cluster],
+        customTimeouts: {
+          create: args.isPreview ? '30m' : '20m',
+          update: args.isPreview ? '30m' : '20m',
+        }
+      },
     );
 
     if (args.isProduction) {
