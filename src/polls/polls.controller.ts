@@ -115,7 +115,7 @@ export class PollsController {
   async createInitialPoll(
     @ReqUser() user: User,
     @Body()
-    { message, imageUrl, swornInDate }: CreatePollDto,
+    { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
   ) {
     // TEMPORARY FIX START
     // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
@@ -162,11 +162,10 @@ export class PollsController {
       )
     }
 
-    const now = new Date()
     const poll = await this.pollsService.create({
       id: uuidv7(),
       name: 'Top Community Issues',
-      scheduledDate: now,
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
       messageContent: message,
       imageUrl,
       electedOfficeId: electedOffice.id,

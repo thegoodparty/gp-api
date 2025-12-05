@@ -1,16 +1,16 @@
 import { Poll } from '@prisma/client'
+import { isAfter } from 'date-fns'
 
 export enum APIPollStatus {
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
-  // SCHEDULED coming in ENG-6136
+  SCHEDULED = 'scheduled',
 }
 
 // -- API Resources -- //
 export type APIPoll = {
   id: string
   name: string
-  // scheduled coming in ENG-6136
   status: APIPollStatus
   messageContent: string
   imageUrl?: string
@@ -37,6 +37,10 @@ export type APIPollIssue = {
 export const derivePollStatus = (poll: Poll): APIPollStatus => {
   if (poll.isCompleted) {
     return APIPollStatus.COMPLETED
+  }
+
+  if (isAfter(poll.scheduledDate, new Date())) {
+    return APIPollStatus.SCHEDULED
   }
 
   return APIPollStatus.IN_PROGRESS

@@ -42,6 +42,7 @@ const PollPurchaseMetadataSchema = z.union([
       .default(PollPurchaseType.expansion),
     pollId: uuidV7Schema,
     count: z.coerce.number().int().min(1),
+    scheduledDate: z.string().datetime().optional(),
   }),
 ])
 
@@ -91,6 +92,9 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
       await this.pollsService.expandPoll({
         pollId: metadata.pollId,
         additionalRecipientCount: metadata.count,
+        scheduledDate: metadata.scheduledDate
+          ? new Date(metadata.scheduledDate)
+          : new Date(),
       })
       return
     }

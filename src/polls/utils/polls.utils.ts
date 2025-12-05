@@ -8,6 +8,7 @@ export const sendTevynAPIPollMessage = async (
   {
     message,
     pollId,
+    scheduledDate,
     csv,
     imageUrl,
     userInfo,
@@ -15,6 +16,7 @@ export const sendTevynAPIPollMessage = async (
   }: {
     message: string
     pollId: string
+    scheduledDate: string
     csv: {
       fileContent: Buffer
       filename: string
@@ -155,6 +157,16 @@ export const sendTevynAPIPollMessage = async (
             ],
           },
         ],
+      },
+      {
+        type: 'divider',
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Scheduled Date:* ${scheduledDate}`,
+        },
       },
       {
         type: 'divider',
