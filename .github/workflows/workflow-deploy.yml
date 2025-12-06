@@ -189,6 +189,9 @@ jobs:
           # Select Stack
           pulumi stack select ${{ needs.determine-context.outputs.stack }} --create
 
+          # Cancel any existing locks (from interrupted runs)
+          pulumi cancel || true
+
           # Configure Infrastructure (Essential for new stacks)
           pulumi config set aws:region us-west-2
           pulumi config set vpcId ${{ secrets.VPC_ID }}
