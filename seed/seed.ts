@@ -11,10 +11,13 @@ import seedMtfcc from './mtfcc'
 import seedOffices from './offices'
 import { seedEcanvasserDemoAccount } from './util/seedEcanvasserDemoAccount.util'
 
+const IS_PREVIEW = process.env.IS_PREVIEW === 'true'
+
 const LIMIT_SEEDS =
-  process.env.NODE_ENV === 'production' ||
-  process.env.NODE_ENV === 'qa' ||
-  process.env.NODE_ENV === 'development'
+  !IS_PREVIEW &&
+  (process.env.NODE_ENV === 'production' ||
+    process.env.NODE_ENV === 'qa' ||
+    process.env.NODE_ENV === 'development')
 
 const prisma = new PrismaClient()
 
