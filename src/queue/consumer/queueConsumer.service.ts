@@ -5,7 +5,6 @@ import {
   PathToVictory,
   Poll,
   PollIndividualMessage,
-  PollStatus,
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
@@ -49,7 +48,8 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import { format } from 'date-fns'
+import { format, isBefore } from 'date-fns'
+import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
 
 @Injectable()
 export class QueueConsumerService {
@@ -565,8 +565,8 @@ export class QueueConsumerService {
     }
     const { poll, campaign } = data
 
-    if (!['IN_PROGRESS', 'EXPANDING'].includes(poll.status)) {
-      this.logger.log('Poll is not in-progress or expanding, ignoring event', {
+    if (derivePollStatus(poll) !== APIPollStatus.IN_PROGRESS) {
+      this.logger.log('Poll is not in-progress, ignoring event', {
         poll,
       })
       return
@@ -618,7 +618,7 @@ export class QueueConsumerService {
     const pollCount = await this.pollsService.model.count({
       where: {
         electedOfficeId: poll.electedOfficeId,
-        status: PollStatus.COMPLETED,
+        isCompleted: true,
       },
     })
 
@@ -767,6 +767,9 @@ export class QueueConsumerService {
     await sendTevynAPIPollMessage(this.slackService.client, {
       message: poll.messageContent,
       pollId: poll.id,
+      scheduledDate: isBefore(poll.scheduledDate, new Date())
+        ? 'Now'
+        : format(poll.scheduledDate, 'PP') + ' at 11:00 AM ET',
       csv: {
         fileContent: Buffer.from(csv),
         filename: `${user.email}-${format(poll.scheduledDate, 'yyyy-MM-dd')}.csv`,
