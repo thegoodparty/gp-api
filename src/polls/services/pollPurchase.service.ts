@@ -64,7 +64,6 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
   ) {}
 
   async validatePurchase(rawMetadata: unknown): Promise<void> {
-    console.log('validatePurchase', { rawMetadata })
     const result = PollPurchaseMetadataSchema.safeParse(rawMetadata)
     if (!result.success) {
       throw new BadRequestException(result.error.message)
@@ -72,8 +71,6 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
   }
 
   async calculateAmount(rawMetadata: unknown): Promise<number> {
-    console.log('calculateAmount', { rawMetadata })
-
     const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
 
     return metadata.pollPurchaseType === PollPurchaseType.expansion
@@ -85,7 +82,6 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
     paymentIntentId: string,
     rawMetadata: unknown,
   ): Promise<void> {
-    console.log('executePostPurchase', { paymentIntentId, rawMetadata })
     const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
 
     this.logger.log(
