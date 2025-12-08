@@ -68,8 +68,8 @@ jobs:
               SERVICE="gp-api-qa"
               ;;
             master)
-              CLUSTER="gp-prod-fargateCluster"
-              SERVICE="gp-api-prod"
+              CLUSTER="gp-master-fargateCluster"
+              SERVICE="gp-api-master"
               ;;
             *)
               echo "Unsupported branch"; exit 1
