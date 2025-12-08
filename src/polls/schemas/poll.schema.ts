@@ -6,5 +6,6 @@ export class CreatePollDto extends createZodDto(
     message: z.string().min(1, 'Message is required'),
     swornInDate: ZDateOnly,
     imageUrl: z.string().url().optional().nullable(),
+    scheduledDate: z.string().datetime().optional(),
   }),
 ) {}
