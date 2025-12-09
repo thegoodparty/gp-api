@@ -5,6 +5,7 @@ import { PurchaseHandler } from 'src/payments/purchase.types'
 import { version as uuidVersion } from 'uuid'
 import z from 'zod'
 import { PollsService } from './polls.service'
+import { MAX_POLL_MESSAGE_LENGTH } from '../schemas/poll.schema'
 
 const MAX_CONSTITUENTS_PER_RUN = 10000
 
@@ -30,9 +31,8 @@ const PollPurchaseMetadataSchema = z.union([
   z.object({
     pollPurchaseType: z.literal(PollPurchaseType.new),
     pollId: uuidV7Schema,
-    // TODO SWAIN: confirm these size restrictions (ENG-6101)
     name: z.string().min(1).max(100),
-    message: z.string().min(1).max(1000),
+    message: z.string().min(1).max(MAX_POLL_MESSAGE_LENGTH),
     imageUrl: z.string().url().nullable().default(null),
     audienceSize: z.coerce.number().int().min(1).max(MAX_CONSTITUENTS_PER_RUN),
     scheduledDate: z.string().datetime(),

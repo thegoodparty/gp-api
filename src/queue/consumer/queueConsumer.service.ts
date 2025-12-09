@@ -49,6 +49,7 @@ import {
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import { format, isBefore } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
 
 @Injectable()
@@ -769,7 +770,8 @@ export class QueueConsumerService {
       pollId: poll.id,
       scheduledDate: isBefore(poll.scheduledDate, new Date())
         ? 'Now'
-        : format(poll.scheduledDate, 'PP') + ' at 11:00 AM ET',
+        : formatInTimeZone(poll.scheduledDate, 'America/New_York', 'PP p') +
+          ' ET',
       csv: {
         fileContent: Buffer.from(csv),
         filename: `${user.email}-${format(poll.scheduledDate, 'yyyy-MM-dd')}.csv`,
