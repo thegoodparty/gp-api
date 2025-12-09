@@ -48,6 +48,13 @@ export class CampaignTcrComplianceController {
     return tcrCompliance
   }
 
+  /**
+   * Creates a new TCR Compliance record or resumes an incomplete Peerly registration flow.
+   *
+   * If a TcrCompliance record already exists for this campaign but the Peerly
+   * registration flow is incomplete (e.g., a previous submission failed mid-way),
+   * this endpoint will resume the flow from where it left off.
+   */
   @Post()
   @UseCampaign()
   async createTcrCompliance(
@@ -55,11 +62,20 @@ export class CampaignTcrComplianceController {
     @Body()
     tcrComplianceDto: CreateTcrComplianceDto,
   ) {
-    if (await this.tcrComplianceService.fetchByCampaignId(campaign.id)) {
+    const existingTcrCompliance =
+      await this.tcrComplianceService.fetchByCampaignId(campaign.id)
+
+    // If a completed TcrCompliance record exists (has peerlyIdentityId and is not in error state),
+    // don't allow re-creation. The user should proceed to the PIN step instead.
+    if (
+      existingTcrCompliance?.peerlyIdentityId &&
+      existingTcrCompliance?.status !== TcrComplianceStatus.error
+    ) {
       throw new ConflictException(
-        'TCR compliance already exists for this campaign',
+        'TCR compliance already exists for this campaign. Please proceed to the PIN verification step.',
       )
     }
+
     const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
       tcrComplianceDto
     const { ein, committeeName } = tcrComplianceCreatePayload
@@ -82,6 +98,7 @@ export class CampaignTcrComplianceController {
       )
     }
 
+    // The create method now handles both fresh creation and resumption
     return this.tcrComplianceService.create(
       user!,
       updatedCampaign,
