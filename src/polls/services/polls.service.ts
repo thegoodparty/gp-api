@@ -1,4 +1,4 @@
-import { add, addDays } from 'date-fns'
+import { addBusinessDays } from 'date-fns'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PollConfidence, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -14,6 +14,9 @@ type PollCreateInput = Omit<
   electedOfficeId: string
 }
 
+const estimatedCompletionDate = (scheduledDate: Date | string) =>
+  addBusinessDays(scheduledDate, 3)
+
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
   constructor(private readonly queueProducer: QueueProducerService) {
@@ -24,7 +27,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     const poll = await this.client.poll.create({
       data: {
         ...input,
-        estimatedCompletionDate: addDays(input.scheduledDate, 7),
+        estimatedCompletionDate: estimatedCompletionDate(input.scheduledDate),
       },
     })
     await this.queueProducer.sendMessage(
@@ -88,7 +91,9 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
         return {
           isCompleted: false,
           scheduledDate: params.scheduledDate,
-          estimatedCompletionDate: add(params.scheduledDate, { weeks: 1 }),
+          estimatedCompletionDate: estimatedCompletionDate(
+            params.scheduledDate,
+          ),
           targetAudienceSize:
             poll.targetAudienceSize + params.additionalRecipientCount,
         }
