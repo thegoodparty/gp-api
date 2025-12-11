@@ -694,6 +694,28 @@ export class ContactsService {
     if (segment.hasCellPhone) filters.push('cellPhoneFormatted')
     if (segment.hasLandline) filters.push('landlineFormatted')
 
+    const incomeLabelToFilter: Record<string, string> = {
+      '$1k - $15k': 'income1kTo15k',
+      '$15k - $25k': 'income15kTo25k',
+      '$25k - $35k': 'income25kTo35k',
+      '$35k - $50k': 'income35kTo50k',
+      '$50k - $75k': 'income50kTo75k',
+      '$75k - $100k': 'income75kTo100k',
+      '$100k - $125k': 'income100kTo125k',
+      '$125k - $150k': 'income125kTo150k',
+      '$150k - $175k': 'income150kTo175k',
+      '$175k - $200k': 'income175kTo200k',
+      '$200k - $250k': 'income200kTo250k',
+      '$250k +': 'income250kPlus',
+    }
+    if (segment.incomeRanges && Array.isArray(segment.incomeRanges)) {
+      for (const label of segment.incomeRanges) {
+        const filterKey = incomeLabelToFilter[label]
+        if (filterKey) filters.push(filterKey)
+      }
+    }
+    if (segment.incomeUnknown) filters.push('incomeUnknown')
+
     return filters
   }
 
@@ -846,20 +868,6 @@ export class ContactsService {
           })
           .filter(Boolean),
         is: seg.languageCodes.includes('other') ? 'null' : undefined,
-      }
-    }
-
-    // Estimated income ranges (vendor domain strings)
-    const income: string[] = []
-    let incomeIncludeNull = false
-    if (seg.incomeRanges && seg.incomeRanges.length) {
-      income.push(...seg.incomeRanges)
-    }
-    if (seg.incomeUnknown) incomeIncludeNull = true
-    if (income.length || incomeIncludeNull) {
-      filter.estimatedIncomeAmount = {
-        ...(income.length ? { in: income } : {}),
-        ...(incomeIncludeNull ? { is: 'null' } : {}),
       }
     }
 
