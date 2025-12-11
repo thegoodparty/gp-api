@@ -55,16 +55,9 @@ export class CampaignTcrComplianceController {
     @Body()
     tcrComplianceDto: CreateTcrComplianceDto,
   ) {
-    const existingTcrCompliance =
-      await this.tcrComplianceService.fetchByCampaignId(campaign.id)
-
-    // Block if registration is already complete (has peerlyIdentityId and not in error state)
-    if (
-      existingTcrCompliance?.peerlyIdentityId &&
-      existingTcrCompliance?.status !== TcrComplianceStatus.error
-    ) {
+    if (await this.tcrComplianceService.fetchByCampaignId(campaign.id)) {
       throw new ConflictException(
-        'TCR compliance already exists for this campaign. Please proceed to the PIN verification step.',
+        'TCR compliance already exists for this campaign',
       )
     }
 

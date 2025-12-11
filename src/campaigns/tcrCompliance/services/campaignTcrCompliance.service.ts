@@ -79,10 +79,12 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
   }
 
-  /**
-   * Creates or resumes a TCR Compliance record and executes the Peerly registration flow.
-   * Creates the record first, then progressively updates it as each Peerly step completes.
-   */
+  // TODO: Refactor this flow to persist the Peerly Identity ID and other
+  //  relevant data in the TCR Compliance record as we go, and then use that to
+  //  determine flow progress instead of calling Peerly for everything.
+  //  Once we do so, the UI and other consumers that are determining logic flows
+  //  based on existence of TcrCompliance records will need to be updated to
+  //  reflect this change.
   async create(
     user: User,
     campaign: Campaign,
@@ -93,7 +95,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     const { ballotLevel } = campaign.details as { ballotLevel?: string }
 
     this.logger.log(
-      `[TCR Compliance] Starting create/resume flow for ` +
+      `[TCR Compliance] Starting registration flow for ` +
         `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
         `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
     )
@@ -111,121 +113,47 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         'Campaign must have a domain to create TCR compliance',
       )
     }
-
-    let tcrCompliance = await this.fetchByCampaignId(campaign.id)
-
-    if (!tcrCompliance) {
-      this.logger.debug(
-        `[TCR Compliance] Step 1: Creating TcrCompliance record for campaignId=${campaign.id}`,
-      )
-      tcrCompliance = await this.model.create({
-        data: {
-          ...tcrComplianceCreatePayload,
-          postalAddress: campaign.formattedAddress!,
-          campaignId: campaign.id,
-        },
-      })
-      this.logger.debug(
-        `TcrCompliance record created with ID: ${tcrCompliance.id}`,
-      )
-    } else {
-      this.logger.debug(
-        `[TCR Compliance] Step 1: Existing TcrCompliance record found with ID: ${tcrCompliance.id}, resuming Peerly flow`,
-      )
-
-      if (tcrCompliance.ein !== ein) {
-        this.logger.warn(
-          `[TCR Compliance] EIN MISMATCH DETECTED for campaignId=${campaign.id}! ` +
-            `Stored EIN: ${tcrCompliance.ein}, New EIN: ${ein}. ` +
-            `This could create duplicate Peerly identities if peerlyIdentityId is not set.`,
-        )
-      }
-    }
-
-    let tcrComplianceIdentity: PeerlyIdentity | null = null
-    let peerlyIdentityProfileLink: string | null =
-      tcrCompliance.peerlyIdentityProfileLink
-    let peerly10DLCBrandSubmissionKey: string | null =
-      tcrCompliance.peerly10DLCBrandSubmissionKey
+    let tcrComplianceIdentity: PeerlyIdentity | null = null,
+      peerlyIdentityProfileLink: string | null = null,
+      peerly10DLCBrandSubmissionKey: string | null = null
 
     const tcrIdentityName = this.peerlyIdentityService.getTCRIdentityName(
-      getUserFullName(user!),
+      userFullName,
       ein,
     )
-    this.logger.debug(`tcrIdentityName => ${tcrIdentityName}`)
+    this.logger.debug(
+      `[TCR Compliance] Step 1: tcrIdentityName => ${tcrIdentityName}`,
+    )
 
-    if (!tcrCompliance.peerlyIdentityId) {
+    const identities = await this.peerlyIdentityService.getIdentities(campaign)
+    const existingIdentity = identities.find(
+      (identity) => identity.identity_name === tcrIdentityName,
+    )
+
+    if (existingIdentity) {
       this.logger.debug(
-        `[TCR Compliance] Step 2: Searching for Peerly identity: ${tcrIdentityName}`,
+        `[TCR Compliance] Step 1: Existing Identity found, skipping creation: ${JSON.stringify(existingIdentity)}`,
       )
-      const identities =
-        await this.peerlyIdentityService.getIdentities(campaign)
-
-      let existingIdentity = identities.find(
-        (identity) => identity.identity_name === tcrIdentityName,
-      )
-
-      // Also check for identity with stored EIN to prevent duplicates on EIN change
-      if (!existingIdentity && tcrCompliance.ein && tcrCompliance.ein !== ein) {
-        const storedEinIdentityName =
-          this.peerlyIdentityService.getTCRIdentityName(
-            getUserFullName(user!),
-            tcrCompliance.ein,
-          )
-        existingIdentity = identities.find(
-          (identity) => identity.identity_name === storedEinIdentityName,
-        )
-        if (existingIdentity) {
-          this.logger.warn(
-            `[TCR Compliance] Found existing identity with STORED EIN (${tcrCompliance.ein}) ` +
-              `instead of NEW EIN (${ein}). Using existing identity to prevent duplicate.`,
-          )
-        }
-      }
-
-      if (existingIdentity) {
-        this.logger.debug(
-          `[TCR Compliance] Step 2: Existing Identity found, skipping creation: ${JSON.stringify(existingIdentity)}`,
-        )
-      }
-
-      tcrComplianceIdentity =
-        existingIdentity ||
-        (await this.peerlyIdentityService.createIdentity(
-          tcrIdentityName,
-          campaign,
-        )) ||
-        null
-
-      if (tcrComplianceIdentity) {
-        tcrCompliance = await this.model.update({
-          where: { id: tcrCompliance.id },
-          data: { peerlyIdentityId: tcrComplianceIdentity.identity_id },
-        })
-        this.logger.debug(
-          `TcrCompliance updated with peerlyIdentityId: ${tcrComplianceIdentity.identity_id}`,
-        )
-      }
     } else {
       this.logger.debug(
-        `Using existing peerlyIdentityId: ${tcrCompliance.peerlyIdentityId}`,
+        `[TCR Compliance] Step 1: No existing identity found, creating new one`,
       )
-      tcrComplianceIdentity = {
-        identity_id: tcrCompliance.peerlyIdentityId,
-        identity_name: tcrIdentityName,
-      } as PeerlyIdentity
     }
 
-    if (!tcrComplianceIdentity) {
-      throw new BadRequestException('Failed to get or create Peerly identity')
-    }
+    tcrComplianceIdentity =
+      existingIdentity ||
+      (await this.peerlyIdentityService.createIdentity(
+        tcrIdentityName,
+        campaign,
+      )) ||
+      null
 
     let existingIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
       null
     try {
       existingIdentityProfileResponse =
         await this.peerlyIdentityService.getIdentityProfile(
-          tcrComplianceIdentity.identity_id,
+          tcrComplianceIdentity!.identity_id,
           campaign,
         )
     } catch (error) {
@@ -236,68 +164,46 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       }
     }
 
-    existingIdentityProfileResponse &&
-      this.logger.debug(`Existing Identity Profile found, skipping creation`)
+    if (existingIdentityProfileResponse) {
+      this.logger.debug(
+        `[TCR Compliance] Step 2: Existing Identity Profile found, skipping creation`,
+      )
+    } else {
+      this.logger.debug(`[TCR Compliance] Step 2: Submitting Identity Profile`)
+    }
 
     const peerlyIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
       existingIdentityProfileResponse ||
       (await this.peerlyIdentityService.submitIdentityProfile(
-        tcrComplianceIdentity.identity_id,
+        tcrComplianceIdentity!.identity_id,
         campaign,
       )) ||
       null
 
-    if (
-      peerlyIdentityProfileResponse?.link &&
-      !tcrCompliance.peerlyIdentityProfileLink
-    ) {
-      peerlyIdentityProfileLink = peerlyIdentityProfileResponse.link
-      tcrCompliance = await this.model.update({
-        where: { id: tcrCompliance.id },
-        data: { peerlyIdentityProfileLink },
-      })
-      this.logger.debug(
-        `TcrCompliance updated with peerlyIdentityProfileLink: ${peerlyIdentityProfileLink}`,
-      )
-    }
+    peerlyIdentityProfileLink = peerlyIdentityProfileResponse?.link || null
 
     const identityProfile: PeerlyIdentityProfile | null =
       peerlyIdentityProfileResponse?.profile
         ? peerlyIdentityProfileResponse?.profile
         : null
 
-    // Duck-typing `vertical` is the only way to determine if 10DLC brand was submitted
-    // See: https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759788426640679
-    if (
-      !identityProfile?.vertical &&
-      !tcrCompliance.peerly10DLCBrandSubmissionKey
-    ) {
-      identityProfile?.vertical &&
-        this.logger.debug(
-          `Existing 10DLC Brand derived from IdentityProfile, skipping creation`,
-        )
-
+    // Apparently, duck-typing whether `vertical` has been set or not, is the
+    //  _only_ way to determine whether or not the given Identity has a 10DLC
+    //  "brand" submitted for it or not. See Peerly Slack discussion here:
+    //  https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759788426640679
+    if (identityProfile?.vertical) {
+      this.logger.debug(
+        `[TCR Compliance] Step 3: Existing 10DLC Brand derived from IdentityProfile (vertical=${identityProfile.vertical}), skipping creation`,
+      )
+    } else {
+      this.logger.debug(`[TCR Compliance] Step 3: Submitting 10DLC Brand`)
       peerly10DLCBrandSubmissionKey =
         (await this.peerlyIdentityService.submit10DlcBrand(
-          tcrComplianceIdentity.identity_id,
+          tcrComplianceIdentity!.identity_id,
           tcrComplianceCreatePayload,
           campaign,
           domain,
         )) || null
-
-      if (peerly10DLCBrandSubmissionKey) {
-        tcrCompliance = await this.model.update({
-          where: { id: tcrCompliance.id },
-          data: { peerly10DLCBrandSubmissionKey },
-        })
-        this.logger.debug(
-          `TcrCompliance updated with peerly10DLCBrandSubmissionKey: ${peerly10DLCBrandSubmissionKey}`,
-        )
-      }
-    } else {
-      this.logger.debug(
-        `10DLC Brand already submitted, skipping (vertical: ${identityProfile?.vertical}, submissionKey: ${tcrCompliance.peerly10DLCBrandSubmissionKey})`,
-      )
     }
 
     let existingCampaignVerifyRequest: PeerlyGetCvRequestResponseBody | null =
@@ -305,7 +211,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     try {
       existingCampaignVerifyRequest =
         await this.peerlyIdentityService.getCampaignVerifyRequest(
-          tcrComplianceIdentity.identity_id,
+          tcrComplianceIdentity!.identity_id,
           campaign,
         )
     } catch (error) {
@@ -316,20 +222,19 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       }
     }
 
-    existingCampaignVerifyRequest?.verification_status &&
+    if (existingCampaignVerifyRequest?.verification_status) {
       this.logger.debug(
-        `Existing Campaign Verify Request found w/ status ${existingCampaignVerifyRequest?.verification_status}, skipping creation`,
+        `[TCR Compliance] Step 4: Existing Campaign Verify Request found w/ status ${existingCampaignVerifyRequest?.verification_status}, skipping creation`,
       )
-
-    if (!existingCampaignVerifyRequest?.verification_status) {
+    } else {
       this.logger.debug(
-        `[TCR Compliance] Step 5: Submitting Campaign Verify Request for campaignId=${campaign.id}`,
+        `[TCR Compliance] Step 4: Submitting Campaign Verify Request for campaignId=${campaign.id}`,
       )
       await this.peerlyIdentityService.submitCampaignVerifyRequest(
         {
           ein,
           filingUrl,
-          peerlyIdentityId: tcrComplianceIdentity.identity_id,
+          peerlyIdentityId: tcrComplianceIdentity!.identity_id,
           email,
         },
         user,
@@ -337,20 +242,33 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         domain!,
       )
       this.logger.log(
-        `[TCR Compliance] Step 5 SUCCESS: Campaign Verify Request submitted for campaignId=${campaign.id}`,
-      )
-    } else {
-      this.logger.debug(
-        `[TCR Compliance] Step 5: Skipping CV Request submission (existing status: ${existingCampaignVerifyRequest?.verification_status})`,
+        `[TCR Compliance] Step 4 SUCCESS: Campaign Verify Request submitted for campaignId=${campaign.id}`,
       )
     }
 
-    this.logger.log(
-      `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
-        `tcrComplianceId=${tcrCompliance.id}, peerlyIdentityId=${tcrCompliance.peerlyIdentityId}`,
+    const newTcrCompliance = {
+      ...tcrComplianceCreatePayload,
+      postalAddress: campaign.formattedAddress!,
+      campaignId: campaign.id,
+      peerlyIdentityId: tcrComplianceIdentity!.identity_id,
+      peerlyIdentityProfileLink,
+      peerly10DLCBrandSubmissionKey,
+    }
+
+    this.logger.debug(
+      `[TCR Compliance] Step 5: Creating TCR Compliance record: ${JSON.stringify(newTcrCompliance)}`,
     )
 
-    return tcrCompliance
+    const createdTcrCompliance = await this.model.create({
+      data: newTcrCompliance,
+    })
+
+    this.logger.log(
+      `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
+        `tcrComplianceId=${createdTcrCompliance.id}, peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
+    )
+
+    return createdTcrCompliance
   }
 
   async delete(id: string) {
