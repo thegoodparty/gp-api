@@ -534,12 +534,29 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
     }
     const peerlyLocale = getPeerlyLocaleFromBallotLevel(ballotLevel)
+
+    if (!peerlyLocale) {
+      this.logger.error(
+        `No Peerly locality mapping for ballotLevel: ${ballotLevel}`,
+      )
+      throw new BadRequestException(
+        `Unsupported ballot level for Campaign Verify: ${ballotLevel}`,
+      )
+    }
+
+    this.logger.debug(`Mapped ballotLevel '${ballotLevel}' to locality '${peerlyLocale}'`)
+
+    const verificationType =
+      peerlyLocale === PEERLY_LOCALITIES.federal
+        ? PEERLY_CV_VERIFICATION_TYPE.Federal
+        : PEERLY_CV_VERIFICATION_TYPE.StateLocal
+
     const submitCVData = {
       name: this.isTestEnvironment
         ? `TEST-${getUserFullName(user)}`
         : getUserFullName(user),
       general_campaign_email: email,
-      verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+      verification_type: verificationType,
       filing_url: ensureUrlHasProtocol(filingUrl),
       committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
       committee_ein: ein,

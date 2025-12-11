@@ -81,13 +81,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
   /**
    * Creates or resumes a TCR Compliance record and executes the Peerly registration flow.
-   *
-   * This method creates the TcrCompliance record FIRST (before any Peerly API calls),
-   * then progressively updates it as each Peerly step completes. This ensures that
-   * even if a Peerly API call fails mid-way, the record exists and can be resumed.
-   *
-   * If a TcrCompliance record already exists for this campaign, this method will
-   * resume the Peerly flow from where it left off.
+   * Creates the record first, then progressively updates it as each Peerly step completes.
    */
   async create(
     user: User,
@@ -95,6 +89,14 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     tcrComplianceCreatePayload: CreateTcrCompliancePayload,
   ) {
     const { ein, filingUrl, email } = tcrComplianceCreatePayload
+    const userFullName = getUserFullName(user!)
+    const { ballotLevel } = campaign.details as { ballotLevel?: string }
+
+    this.logger.log(
+      `[TCR Compliance] Starting create/resume flow for ` +
+        `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
+        `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
+    )
 
     const { domain } = await this.websitesService.findFirstOrThrow({
       where: {
@@ -110,19 +112,17 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
     }
 
-    // Check if a TcrCompliance record already exists for this campaign
     let tcrCompliance = await this.fetchByCampaignId(campaign.id)
 
-    // Step 1: Create TcrCompliance record FIRST if it doesn't exist
-    // This ensures we have a record even if subsequent Peerly calls fail
     if (!tcrCompliance) {
-      this.logger.debug('Creating TcrCompliance record before Peerly API calls')
+      this.logger.debug(
+        `[TCR Compliance] Step 1: Creating TcrCompliance record for campaignId=${campaign.id}`,
+      )
       tcrCompliance = await this.model.create({
         data: {
           ...tcrComplianceCreatePayload,
           postalAddress: campaign.formattedAddress!,
           campaignId: campaign.id,
-          // Peerly fields will be populated as each step completes
         },
       })
       this.logger.debug(
@@ -130,8 +130,16 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
     } else {
       this.logger.debug(
-        `Existing TcrCompliance record found with ID: ${tcrCompliance.id}, resuming Peerly flow`,
+        `[TCR Compliance] Step 1: Existing TcrCompliance record found with ID: ${tcrCompliance.id}, resuming Peerly flow`,
       )
+
+      if (tcrCompliance.ein !== ein) {
+        this.logger.warn(
+          `[TCR Compliance] EIN MISMATCH DETECTED for campaignId=${campaign.id}! ` +
+            `Stored EIN: ${tcrCompliance.ein}, New EIN: ${ein}. ` +
+            `This could create duplicate Peerly identities if peerlyIdentityId is not set.`,
+        )
+      }
     }
 
     let tcrComplianceIdentity: PeerlyIdentity | null = null
@@ -146,19 +154,40 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     )
     this.logger.debug(`tcrIdentityName => ${tcrIdentityName}`)
 
-    // Step 2: Get or create Peerly Identity
     if (!tcrCompliance.peerlyIdentityId) {
+      this.logger.debug(
+        `[TCR Compliance] Step 2: Searching for Peerly identity: ${tcrIdentityName}`,
+      )
       const identities =
         await this.peerlyIdentityService.getIdentities(campaign)
-      const existingIdentity = identities.find(
+
+      let existingIdentity = identities.find(
         (identity) => identity.identity_name === tcrIdentityName,
       )
 
-      existingIdentity &&
-        this.logger.debug(`Existing Identity found, skipping creation`)
-      this.logger.debug(
-        `existingIdentity => ${JSON.stringify(existingIdentity)}`,
-      )
+      // Also check for identity with stored EIN to prevent duplicates on EIN change
+      if (!existingIdentity && tcrCompliance.ein && tcrCompliance.ein !== ein) {
+        const storedEinIdentityName =
+          this.peerlyIdentityService.getTCRIdentityName(
+            getUserFullName(user!),
+            tcrCompliance.ein,
+          )
+        existingIdentity = identities.find(
+          (identity) => identity.identity_name === storedEinIdentityName,
+        )
+        if (existingIdentity) {
+          this.logger.warn(
+            `[TCR Compliance] Found existing identity with STORED EIN (${tcrCompliance.ein}) ` +
+              `instead of NEW EIN (${ein}). Using existing identity to prevent duplicate.`,
+          )
+        }
+      }
+
+      if (existingIdentity) {
+        this.logger.debug(
+          `[TCR Compliance] Step 2: Existing Identity found, skipping creation: ${JSON.stringify(existingIdentity)}`,
+        )
+      }
 
       tcrComplianceIdentity =
         existingIdentity ||
@@ -169,7 +198,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         null
 
       if (tcrComplianceIdentity) {
-        // Update TcrCompliance with Peerly Identity ID
         tcrCompliance = await this.model.update({
           where: { id: tcrCompliance.id },
           data: { peerlyIdentityId: tcrComplianceIdentity.identity_id },
@@ -182,7 +210,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       this.logger.debug(
         `Using existing peerlyIdentityId: ${tcrCompliance.peerlyIdentityId}`,
       )
-      // Create a minimal identity object for subsequent calls
       tcrComplianceIdentity = {
         identity_id: tcrCompliance.peerlyIdentityId,
         identity_name: tcrIdentityName,
@@ -193,7 +220,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       throw new BadRequestException('Failed to get or create Peerly identity')
     }
 
-    // Step 3: Get or submit Identity Profile
     let existingIdentityProfileResponse: PeerlyIdentityProfileResponseBody | null =
       null
     try {
@@ -226,7 +252,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       !tcrCompliance.peerlyIdentityProfileLink
     ) {
       peerlyIdentityProfileLink = peerlyIdentityProfileResponse.link
-      // Update TcrCompliance with Identity Profile Link
       tcrCompliance = await this.model.update({
         where: { id: tcrCompliance.id },
         data: { peerlyIdentityProfileLink },
@@ -241,10 +266,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         ? peerlyIdentityProfileResponse?.profile
         : null
 
-    // Step 4: Submit 10DLC Brand if not already submitted
-    // Duck-typing whether `vertical` has been set is the only way to determine
-    // if a 10DLC "brand" was submitted. See Peerly Slack discussion:
-    // https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759788426640679
+    // Duck-typing `vertical` is the only way to determine if 10DLC brand was submitted
+    // See: https://goodpartyorg.slack.com/archives/C09H3K02LLV/p1759788426640679
     if (
       !identityProfile?.vertical &&
       !tcrCompliance.peerly10DLCBrandSubmissionKey
@@ -263,7 +286,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         )) || null
 
       if (peerly10DLCBrandSubmissionKey) {
-        // Update TcrCompliance with 10DLC Brand Submission Key
         tcrCompliance = await this.model.update({
           where: { id: tcrCompliance.id },
           data: { peerly10DLCBrandSubmissionKey },
@@ -278,7 +300,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
     }
 
-    // Step 5: Submit Campaign Verify Request if not already submitted
     let existingCampaignVerifyRequest: PeerlyGetCvRequestResponseBody | null =
       null
     try {
@@ -301,6 +322,9 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       )
 
     if (!existingCampaignVerifyRequest?.verification_status) {
+      this.logger.debug(
+        `[TCR Compliance] Step 5: Submitting Campaign Verify Request for campaignId=${campaign.id}`,
+      )
       await this.peerlyIdentityService.submitCampaignVerifyRequest(
         {
           ein,
@@ -312,10 +336,20 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         campaign,
         domain!,
       )
-      this.logger.debug('Campaign Verify Request submitted successfully')
+      this.logger.log(
+        `[TCR Compliance] Step 5 SUCCESS: Campaign Verify Request submitted for campaignId=${campaign.id}`,
+      )
+    } else {
+      this.logger.debug(
+        `[TCR Compliance] Step 5: Skipping CV Request submission (existing status: ${existingCampaignVerifyRequest?.verification_status})`,
+      )
     }
 
-    // Return the final TcrCompliance record
+    this.logger.log(
+      `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
+        `tcrComplianceId=${tcrCompliance.id}, peerlyIdentityId=${tcrCompliance.peerlyIdentityId}`,
+    )
+
     return tcrCompliance
   }
 
