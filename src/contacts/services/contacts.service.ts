@@ -15,12 +15,14 @@ import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { INCOME_RANGE_MAP } from 'src/shared/constants/incomeRanges'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import {
   CampaignWithPathToVictory,
   DemographicFilter,
   ExtendedVoterFileFilter,
+  NumericRange,
 } from '../contacts.types'
 import {
   DownloadContactsDTO,
@@ -849,16 +851,35 @@ export class ContactsService {
       }
     }
 
-    // Estimated income ranges (vendor domain strings)
-    const income: string[] = []
-    let incomeIncludeNull = false
+    // Estimated income ranges - parse labels to numeric min/max
+    const incomeIncludeNull = seg.incomeUnknown === true
+    let incomeRangeFilter:
+      | { gte: number; lt?: number }
+      | { orRanges: NumericRange[] }
+      | null = null
+
     if (seg.incomeRanges && seg.incomeRanges.length) {
-      income.push(...seg.incomeRanges)
+      const parsedRanges: Array<{ min: number; max: number | null }> = []
+      for (const label of seg.incomeRanges) {
+        const parsed = this.parseIncomeRangeLabel(label)
+        if (!parsed) {
+          throw new BadRequestException(`Invalid income range label: ${label}`)
+        }
+        parsedRanges.push(parsed)
+      }
+
+      const coalescedRanges = this.coalesceContiguousRanges(parsedRanges)
+
+      if (coalescedRanges.length === 1) {
+        incomeRangeFilter = coalescedRanges[0]
+      } else if (coalescedRanges.length > 1) {
+        incomeRangeFilter = { orRanges: coalescedRanges }
+      }
     }
-    if (seg.incomeUnknown) incomeIncludeNull = true
-    if (income.length || incomeIncludeNull) {
-      filter.estimatedIncomeAmount = {
-        ...(income.length ? { in: income } : {}),
+
+    if (incomeRangeFilter || incomeIncludeNull) {
+      filter.estimatedIncomeAmountInt = {
+        ...(incomeRangeFilter || {}),
         ...(incomeIncludeNull ? { is: 'null' } : {}),
       }
     }
@@ -897,6 +918,24 @@ export class ContactsService {
         values.forEach((v) =>
           params.append(`filter[${apiField}][in][]`, String(v)),
         )
+      }
+      if (ops.gte !== undefined)
+        params.append(`filter[${apiField}][gte]`, String(ops.gte))
+      if (ops.lt !== undefined)
+        params.append(`filter[${apiField}][lt]`, String(ops.lt))
+      if (ops.orRanges !== undefined && Array.isArray(ops.orRanges)) {
+        ops.orRanges.forEach((range, idx) => {
+          if (range.gte !== undefined)
+            params.append(
+              `filter[${apiField}][orRanges][${idx}][gte]`,
+              String(range.gte),
+            )
+          if (range.lt !== undefined)
+            params.append(
+              `filter[${apiField}][orRanges][${idx}][lt]`,
+              String(range.lt),
+            )
+        })
       }
     })
   }
@@ -1084,6 +1123,52 @@ export class ContactsService {
       return 'African American'
     if (v.includes('other')) return 'Other'
     return 'Unknown'
+  }
+
+  private parseIncomeRangeLabel(
+    label: string,
+  ): { min: number; max: number | null } | null {
+    const range = INCOME_RANGE_MAP[label]
+    if (!range) return null
+    if (range.max !== null && range.min >= range.max) {
+      throw new Error(
+        `Invalid income range config: min (${range.min}) must be less than max (${range.max})`,
+      )
+    }
+    return range
+  }
+
+  private coalesceContiguousRanges(
+    ranges: Array<{ min: number; max: number | null }>,
+  ): NumericRange[] {
+    if (ranges.length === 0) return []
+
+    const sorted = [...ranges].sort((a, b) => a.min - b.min)
+
+    const result: NumericRange[] = []
+    let current = { gte: sorted[0].min, lt: sorted[0].max }
+
+    for (let i = 1; i < sorted.length; i++) {
+      const next = sorted[i]
+      if (current.lt !== null && current.lt === next.min) {
+        current.lt = next.max
+      } else {
+        result.push(
+          current.lt !== null
+            ? { gte: current.gte, lt: current.lt }
+            : { gte: current.gte },
+        )
+        current = { gte: next.min, lt: next.max }
+      }
+    }
+
+    result.push(
+      current.lt !== null
+        ? { gte: current.gte, lt: current.lt }
+        : { gte: current.gte },
+    )
+
+    return result
   }
 
   private async queryAlternativeDistrictName(

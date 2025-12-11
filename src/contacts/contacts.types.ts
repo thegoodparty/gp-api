@@ -4,11 +4,16 @@ export type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
 }
 
+export type NumericRange = { gte: number; lt?: number }
+
 export type DemographicOps = {
   eq?: string | boolean
   in?: Array<string | boolean>
   is?: 'null' | 'not_null'
-}
+} & (
+  | { gte?: number; lt?: number; orRanges?: never }
+  | { gte?: never; lt?: never; orRanges?: NumericRange[] }
+)
 
 export type DemographicFilter = Record<string, DemographicOps>
 
