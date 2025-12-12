@@ -112,6 +112,7 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.14.0",
+    "serialize-error": "^12.0.0",
     "slugify": "^1.6.6",
     "states-us": "^1.1.1",
     "stripe": "^17.5.0",
