@@ -263,6 +263,7 @@ export enum PEERLY_COMMITTEE_TYPE {
 
 export enum PEERLY_CV_VERIFICATION_TYPE {
   StateLocal = 'state_local',
+  Federal = 'federal',
 }
 
 export type PeerlyIdentityUseCase = {
