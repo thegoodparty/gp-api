@@ -374,13 +374,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
       ...(stateCode && areaCodes && areaCodes.length > 0
         ? {
-            jobAreas: [
-              {
-                didState: stateCode,
-                didNpaSubset: areaCodes,
-              },
-            ],
-          }
+          jobAreas: [
+            {
+              didState: stateCode,
+              didNpaSubset: areaCodes,
+            },
+          ],
+        }
         : {}),
     }
 
@@ -487,9 +487,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           `Peerly API returned 404 Not Found when fetching Campaign Verify status. This is likely due to an invalid identity ID or no CV submission: ${peerlyIdentityId}`,
           format(e),
         )
-        throw new NotFoundException(
-          'Campaign Verify status for given identity ID could not be found',
-        )
+        return null
       }
       await this.handleApiError({
         error: e,
@@ -571,11 +569,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       campaign_website: domain ? `https://${domain?.name}` : undefined,
       ...(peerlyLocale === PEERLY_LOCALITIES.local
         ? {
-            city_county:
-              ballotLevel === BallotReadyPositionLevel.COUNTY
-                ? county?.long_name
-                : city?.long_name,
-          }
+          city_county:
+            ballotLevel === BallotReadyPositionLevel.COUNTY
+              ? county?.long_name
+              : city?.long_name,
+        }
         : {}),
     }
 

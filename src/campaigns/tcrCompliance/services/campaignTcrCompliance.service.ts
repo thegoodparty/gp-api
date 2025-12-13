@@ -4,31 +4,30 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
+import { Interval } from '@nestjs/schedule'
 import {
   Campaign,
   TcrCompliance,
   TcrComplianceStatus,
   User,
 } from '@prisma/client'
-import { getUserFullName } from '../../../users/util/users.util'
-import { WebsitesService } from '../../../websites/services/websites.service'
-import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
-import {
-  PeerlyIdentityProfileResponseBody,
-  PeerlyIdentity,
-  PeerlyIdentityProfile,
-  PeerlyIdentityUseCase,
-  PeerlyGetCvRequestResponseBody,
-} from '../../../vendors/peerly/peerly.types'
-import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
-import { Interval } from '@nestjs/schedule'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../../../queue/queue.types'
+import { getUserFullName } from '../../../users/util/users.util'
+import {
+  PeerlyIdentity,
+  PeerlyIdentityProfile,
+  PeerlyIdentityProfileResponseBody,
+  PeerlyIdentityUseCase
+} from '../../../vendors/peerly/peerly.types'
+import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
+import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
+import { WebsitesService } from '../../../websites/services/websites.service'
+import { CreateTcrCompliancePayload } from '../campaignTcrCompliance.types'
 
 const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
@@ -96,8 +95,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     this.logger.log(
       `[TCR Compliance] Starting registration flow for ` +
-        `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
-        `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
+      `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
+      `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
     )
 
     const { domain } = await this.websitesService.findFirstOrThrow({
@@ -206,21 +205,10 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         )) || null
     }
 
-    let existingCampaignVerifyRequest: PeerlyGetCvRequestResponseBody | null =
-      null
-    try {
-      existingCampaignVerifyRequest =
-        await this.peerlyIdentityService.getCampaignVerifyRequest(
-          tcrComplianceIdentity!.identity_id,
-          campaign,
-        )
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        existingCampaignVerifyRequest = null
-      } else {
-        throw error
-      }
-    }
+    const existingCampaignVerifyRequest = await this.peerlyIdentityService.getCampaignVerifyRequest(
+      tcrComplianceIdentity!.identity_id,
+      campaign,
+    )
 
     if (existingCampaignVerifyRequest?.verification_status) {
       this.logger.debug(
@@ -265,7 +253,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     this.logger.log(
       `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
-        `tcrComplianceId=${createdTcrCompliance.id}, peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
+      `tcrComplianceId=${createdTcrCompliance.id}, peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
     )
 
     return createdTcrCompliance
