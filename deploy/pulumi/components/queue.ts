@@ -20,14 +20,6 @@ export class Queue extends pulumi.ComponentResource {
   ) {
     super('gp:queue:Queue', name, {}, opts);
 
-    // Naming convention matches existing SST: <stage>-Queue.fifo
-    // For Previews: pr-123-Queue.fifo
-    // For Dev: dev-Queue.fifo (mapped from develop branch)
-    // For Prod: prod-Queue.fifo (mapped from master)
-    const suffix = args.namePrefix.includes('prod') ? 'prod' : 
-                   args.namePrefix.includes('dev') ? 'dev' : 
-                   args.namePrefix.includes('qa') ? 'qa' : 
-                   args.namePrefix; // Fallback for PRs or other names
 
     // Actually, we should just use the namePrefix passed in, which should be the 'stage' name.
     // In index.ts, we need to determine what the "stage" name is.
