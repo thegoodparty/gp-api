@@ -15,7 +15,7 @@ fi
 
 # Default values (can be overridden by env vars)
 REGION=${AWS_REGION:-"us-west-2"}
-STATE_BUCKET="s3://gp-api-pulumi-state"
+STATE_BUCKET="s3://goodparty-iac-state"
 
 echo "Using State Backend: $STATE_BUCKET"
 

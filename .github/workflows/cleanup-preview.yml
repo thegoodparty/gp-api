@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -41,12 +41,12 @@ jobs:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |
           # Login to S3 Backend
-          pulumi login s3://gp-api-pulumi-state
-          
+          pulumi login s3://goodparty-iac-state
+
           # Should match the naming convention in reusable-deploy.yml
           STACK_NAME="gp-api-pr-${{ github.event.number }}"
           echo "Destroying stack: $STACK_NAME"
-          
+
           # Check if stack exists
           if pulumi stack select $STACK_NAME; then
             echo "Stack found. Destroying..."
@@ -55,4 +55,3 @@ jobs:
           else
             echo "Stack not found. Skipping."
           fi
-

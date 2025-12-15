@@ -20,7 +20,7 @@
 ### Notes
 
 - The migration involves a shift from SST to pure Pulumi with `awsx`.
-- State management will use a self-hosted S3 bucket (`gp-api-pulumi-state`).
+- State management will use a self-hosted S3 bucket (`goodparty-iac-state`).
 - Critical stateful resources (Prod Database, SQS) must be **imported**, not recreated, to prevent data loss.
 - Preview environments will use dedicated, ephemeral Aurora Serverless v2 clusters.
 - **Unit tests** for infrastructure components should be added where possible (e.g., `deploy/pulumi/components/compute.test.ts`).
@@ -39,8 +39,8 @@ Update the file after completing each sub-task, not just after completing an ent
 
 - [ ] 1.0 Phase 1: Foundation - Pulumi Setup & Shadow Stack
   - [x] 1.1 Bootstrap S3 State Backend
-    - [x] 1.1.1 Create S3 bucket `gp-api-pulumi-state` manually or via CLI if it doesn't exist.
-    - [x] 1.1.2 Configure Pulumi to use this bucket for state storage (`pulumi login s3://gp-api-pulumi-state`).
+    - [x] 1.1.1 Create S3 bucket `goodparty-iac-state` manually or via CLI if it doesn't exist.
+    - [x] 1.1.2 Configure Pulumi to use this bucket for state storage (`pulumi login s3://goodparty-iac-state`).
   - [x] 1.2 Initialize Pulumi Project
     - [x] 1.2.1 Create directory `deploy/pulumi`.
     - [x] 1.2.2 Initialize new Pulumi TypeScript project (created config files manually).
