@@ -22,7 +22,7 @@ import {
   PeerlyIdentity,
   PeerlyIdentityProfile,
   PeerlyIdentityProfileResponseBody,
-  PeerlyIdentityUseCase
+  PeerlyIdentityUseCase,
 } from '../../../vendors/peerly/peerly.types'
 import { PEERLY_USECASE } from '../../../vendors/peerly/services/peerly.const'
 import { PeerlyIdentityService } from '../../../vendors/peerly/services/peerlyIdentity.service'
@@ -95,8 +95,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     this.logger.log(
       `[TCR Compliance] Starting registration flow for ` +
-      `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
-      `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
+        `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
+        `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
     )
 
     const { domain } = await this.websitesService.findFirstOrThrow({
@@ -205,10 +205,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         )) || null
     }
 
-    const existingCampaignVerifyRequest = await this.peerlyIdentityService.getCampaignVerifyRequest(
-      tcrComplianceIdentity!.identity_id,
-      campaign,
-    )
+    const existingCampaignVerifyRequest =
+      await this.peerlyIdentityService.getCampaignVerifyRequest(
+        tcrComplianceIdentity!.identity_id,
+        campaign,
+      )
 
     if (existingCampaignVerifyRequest?.verification_status) {
       this.logger.debug(
@@ -253,7 +254,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     this.logger.log(
       `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
-      `tcrComplianceId=${createdTcrCompliance.id}, peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
+        `tcrComplianceId=${createdTcrCompliance.id}, peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
     )
 
     return createdTcrCompliance
