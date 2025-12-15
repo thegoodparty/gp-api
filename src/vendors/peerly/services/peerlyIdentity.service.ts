@@ -374,13 +374,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
       ...(stateCode && areaCodes && areaCodes.length > 0
         ? {
-          jobAreas: [
-            {
-              didState: stateCode,
-              didNpaSubset: areaCodes,
-            },
-          ],
-        }
+            jobAreas: [
+              {
+                didState: stateCode,
+                didNpaSubset: areaCodes,
+              },
+            ],
+          }
         : {}),
     }
 
@@ -444,7 +444,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )) as AxiosResponse<Approve10DLCBrandResponseBody>
 
       const {
-        data: { campaign_verify_token, ...identityBrand },
+        data: {
+          campaign_verify_token: _campaign_verify_token,
+          ...identityBrand
+        },
       } = response
       this.logger.debug(`Successfully approved 10DLC Brand: ${identityBrand}`)
 
@@ -482,12 +485,18 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
       result = data
     } catch (e) {
-      if (isAxiosError(e) && e.status === 404) {
-        this.logger.warn(
-          `Peerly API returned 404 Not Found when fetching Campaign Verify status. This is likely due to an invalid identity ID or no CV submission: ${peerlyIdentityId}`,
-          format(e),
-        )
-        return null
+      if (isAxiosError(e)) {
+        // Peerly returns 400 with nested status_code: 404 when CV doesn't exist
+        const is404 =
+          e.status === 404 ||
+          (e.status === 400 && e.response?.data?.status_code === 404)
+
+        if (is404) {
+          this.logger.debug(
+            `No Campaign Verify request found for identityId: ${peerlyIdentityId} (first-time registration)`,
+          )
+          return null
+        }
       }
       await this.handleApiError({
         error: e,
@@ -542,8 +551,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
     }
 
-    this.logger.debug(`Mapped ballotLevel '${ballotLevel}' to locality '${peerlyLocale}'`)
+    this.logger.debug(
+      `Mapped ballotLevel '${ballotLevel}' to locality '${peerlyLocale}'`,
+    )
 
+    // NOTE: Federal locality mapping exists but full federal support is not yet implemented.
+    // Missing: fec_committee_id field, proper committee_type codes for federal campaigns,
+    // and FEC URL validation. Federal campaigns will currently fail validation.
     const verificationType =
       peerlyLocale === PEERLY_LOCALITIES.federal
         ? PEERLY_CV_VERIFICATION_TYPE.Federal
@@ -569,11 +583,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       campaign_website: domain ? `https://${domain?.name}` : undefined,
       ...(peerlyLocale === PEERLY_LOCALITIES.local
         ? {
-          city_county:
-            ballotLevel === BallotReadyPositionLevel.COUNTY
-              ? county?.long_name
-              : city?.long_name,
-        }
+            city_county:
+              ballotLevel === BallotReadyPositionLevel.COUNTY
+                ? county?.long_name
+                : city?.long_name,
+          }
         : {}),
     }
 
