@@ -51,6 +51,7 @@ import {
 import { format, isBefore } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
+import { serializeError } from 'serialize-error'
 
 @Injectable()
 export class QueueConsumerService {
@@ -89,8 +90,13 @@ export class QueueConsumerService {
       const success = await this.processMessage(message)
       return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
-      this.logger.error('Message processing failed, will requeue:', error)
-      this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
+      this.logger.error(
+        JSON.stringify({
+          message,
+          error: serializeError(error),
+          msg: 'Message processing failed, will requeue',
+        }),
+      )
       return true // Indicate that we should requeue
     }
   }
