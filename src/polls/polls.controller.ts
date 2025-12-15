@@ -11,13 +11,7 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import {
-  ElectedOffice,
-  Poll,
-  PollIssue,
-  PollStatus,
-  User,
-} from '@prisma/client'
+import { ElectedOffice, Poll, PollIssue, User } from '@prisma/client'
 import { v7 as uuidv7 } from 'uuid'
 import { orderBy } from 'lodash'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
@@ -29,7 +23,7 @@ import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.s
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import z from 'zod'
-import { APIPoll, APIPollIssue } from './polls.types'
+import { APIPoll, APIPollIssue, derivePollStatus } from './polls.types'
 import { AnalyzePollBiasDto } from './schemas/analyzePollBias.schema'
 import { CreatePollDto } from './schemas/poll.schema'
 import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
@@ -51,18 +45,10 @@ class PollImageUploadUrlDto extends createZodDto(
   }),
 ) {}
 
-const API_STATUS_MAP: Record<PollStatus, APIPoll['status']> = {
-  [PollStatus.COMPLETED]: 'completed',
-  [PollStatus.IN_PROGRESS]: 'in_progress',
-  [PollStatus.EXPANDING]: 'expanding',
-  // As of Oct 22 2025, we don't support scheduled polls, so we just map them to in_progress
-  [PollStatus.SCHEDULED]: 'in_progress',
-}
-
 const toAPIPoll = (poll: Poll): APIPoll => ({
   id: poll.id,
   name: poll.name,
-  status: API_STATUS_MAP[poll.status],
+  status: derivePollStatus(poll),
   messageContent: poll.messageContent,
   imageUrl: poll.imageUrl ?? undefined,
   scheduledDate: poll.scheduledDate.toISOString(),
@@ -129,7 +115,7 @@ export class PollsController {
   async createInitialPoll(
     @ReqUser() user: User,
     @Body()
-    { message, imageUrl, swornInDate }: CreatePollDto,
+    { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
   ) {
     // TEMPORARY FIX START
     // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
@@ -176,12 +162,10 @@ export class PollsController {
       )
     }
 
-    const now = new Date()
     const poll = await this.pollsService.create({
       id: uuidv7(),
       name: 'Top Community Issues',
-      status: 'IN_PROGRESS',
-      scheduledDate: now,
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
       messageContent: message,
       imageUrl,
       electedOfficeId: electedOffice.id,

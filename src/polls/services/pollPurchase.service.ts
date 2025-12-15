@@ -1,15 +1,18 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { PurchaseHandler } from 'src/payments/purchase.types'
-import { PollsService } from './polls.service'
-import z from 'zod'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import uuid from 'uuid'
 import { PaymentsService } from '@/payments/services/payments.service'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { PurchaseHandler } from 'src/payments/purchase.types'
+import { version as uuidVersion } from 'uuid'
+import z from 'zod'
+import { PollsService } from './polls.service'
+import { MAX_POLL_MESSAGE_LENGTH } from '../schemas/poll.schema'
+
+const MAX_CONSTITUENTS_PER_RUN = 10000
 
 const uuidV7Schema = z.string().refine(
   (value) => {
     try {
-      return uuid.version(value) === 7
+      return uuidVersion(value) === 7
     } catch {
       return false
     }
@@ -26,22 +29,22 @@ enum PollPurchaseType {
 
 const PollPurchaseMetadataSchema = z.union([
   z.object({
-    type: z.literal(PollPurchaseType.new),
+    pollPurchaseType: z.literal(PollPurchaseType.new),
     pollId: uuidV7Schema,
-    // TODO SWAIN: confirm these size restrictions (ENG-6101)
     name: z.string().min(1).max(100),
-    message: z.string().min(1).max(1000),
+    message: z.string().min(1).max(MAX_POLL_MESSAGE_LENGTH),
     imageUrl: z.string().url().nullable().default(null),
-    audienceSize: z.coerce.number().int().min(1).max(10000),
+    audienceSize: z.coerce.number().int().min(1).max(MAX_CONSTITUENTS_PER_RUN),
     scheduledDate: z.string().datetime(),
   }),
   z.object({
-    type: z
+    pollPurchaseType: z
       .literal(PollPurchaseType.expansion)
       .optional()
       .default(PollPurchaseType.expansion),
     pollId: uuidV7Schema,
-    count: z.coerce.number().int().min(1),
+    count: z.coerce.number().int().min(1).max(MAX_CONSTITUENTS_PER_RUN),
+    scheduledDate: z.string().datetime().optional(),
   }),
 ])
 
@@ -72,7 +75,7 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
   async calculateAmount(rawMetadata: unknown): Promise<number> {
     const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
 
-    return metadata.type === PollPurchaseType.expansion
+    return metadata.pollPurchaseType === PollPurchaseType.expansion
       ? calcAmountInCents(metadata.count)
       : calcAmountInCents(metadata.audienceSize)
   }
@@ -87,10 +90,13 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
       `Poll purchase completed: paymentIntentId=${paymentIntentId} metadata=${JSON.stringify(metadata)}`,
     )
 
-    if (metadata.type === PollPurchaseType.expansion) {
+    if (metadata.pollPurchaseType === PollPurchaseType.expansion) {
       await this.pollsService.expandPoll({
         pollId: metadata.pollId,
         additionalRecipientCount: metadata.count,
+        scheduledDate: metadata.scheduledDate
+          ? new Date(metadata.scheduledDate)
+          : new Date(),
       })
       return
     }
@@ -110,7 +116,6 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
 
     await this.pollsService.create({
       id: metadata.pollId,
-      status: 'SCHEDULED',
       name: metadata.name,
       electedOfficeId: electedOffice.id,
       messageContent: metadata.message,

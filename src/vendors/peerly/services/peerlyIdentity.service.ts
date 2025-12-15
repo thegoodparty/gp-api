@@ -444,7 +444,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )) as AxiosResponse<Approve10DLCBrandResponseBody>
 
       const {
-        data: { campaign_verify_token, ...identityBrand },
+        data: {
+          campaign_verify_token: _campaign_verify_token,
+          ...identityBrand
+        },
       } = response
       this.logger.debug(`Successfully approved 10DLC Brand: ${identityBrand}`)
 
@@ -482,14 +485,18 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
       result = data
     } catch (e) {
-      if (isAxiosError(e) && e.status === 404) {
-        this.logger.warn(
-          `Peerly API returned 404 Not Found when fetching Campaign Verify status. This is likely due to an invalid identity ID or no CV submission: ${peerlyIdentityId}`,
-          format(e),
-        )
-        throw new NotFoundException(
-          'Campaign Verify status for given identity ID could not be found',
-        )
+      if (isAxiosError(e)) {
+        // Peerly returns 400 with nested status_code: 404 when CV doesn't exist
+        const is404 =
+          e.status === 404 ||
+          (e.status === 400 && e.response?.data?.status_code === 404)
+
+        if (is404) {
+          this.logger.debug(
+            `No Campaign Verify request found for identityId: ${peerlyIdentityId} (first-time registration)`,
+          )
+          return null
+        }
       }
       await this.handleApiError({
         error: e,
@@ -534,12 +541,34 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
     }
     const peerlyLocale = getPeerlyLocaleFromBallotLevel(ballotLevel)
+
+    if (!peerlyLocale) {
+      this.logger.error(
+        `No Peerly locality mapping for ballotLevel: ${ballotLevel}`,
+      )
+      throw new BadRequestException(
+        `Unsupported ballot level for Campaign Verify: ${ballotLevel}`,
+      )
+    }
+
+    this.logger.debug(
+      `Mapped ballotLevel '${ballotLevel}' to locality '${peerlyLocale}'`,
+    )
+
+    // NOTE: Federal locality mapping exists but full federal support is not yet implemented.
+    // Missing: fec_committee_id field, proper committee_type codes for federal campaigns,
+    // and FEC URL validation. Federal campaigns will currently fail validation.
+    const verificationType =
+      peerlyLocale === PEERLY_LOCALITIES.federal
+        ? PEERLY_CV_VERIFICATION_TYPE.Federal
+        : PEERLY_CV_VERIFICATION_TYPE.StateLocal
+
     const submitCVData = {
       name: this.isTestEnvironment
         ? `TEST-${getUserFullName(user)}`
         : getUserFullName(user),
       general_campaign_email: email,
-      verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+      verification_type: verificationType,
       filing_url: ensureUrlHasProtocol(filingUrl),
       committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
       committee_ein: ein,
