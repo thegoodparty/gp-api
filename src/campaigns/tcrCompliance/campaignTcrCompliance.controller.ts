@@ -60,6 +60,7 @@ export class CampaignTcrComplianceController {
         'TCR compliance already exists for this campaign',
       )
     }
+
     const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
       tcrComplianceDto
     const { ein, committeeName } = tcrComplianceCreatePayload
