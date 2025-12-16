@@ -621,13 +621,21 @@ VERIFICATION:
 
 **Default: Avoid JSON columns** - Use strongly-typed relational columns instead.
 
+**Why avoid JSON columns?**
+
+- **Type safety**: JSON columns bypass TypeScript's type system, leading to runtime errors
+- **Query performance**: Databases can't efficiently index or query nested JSON fields
+- **Data integrity**: No foreign key constraints or referential integrity
+- **Refactoring difficulty**: Changes require manual data migrations instead of automatic schema updates
+- **Maintenance burden**: Developers must maintain separate `.jsonTypes.d.ts` files that can drift from reality
+
 ### When NOT to use JSON columns:
 
 1. **Data has known structure**: If you know the fields ahead of time, use proper columns
    - ❌ Bad: `metadata Json` containing `{ title, description, author }`
    - ✅ Good: Individual columns `title String`, `description String?`, `author String?`
 
-2. **Data needs to be queried**: If you'll filter or search by these fields
+2. **Sub-fields need to be queried**: If you'll filter or search by nested fields within the JSON
    - ❌ Bad: `settings Json` that you query with `settings.path.to.value`
    - ✅ Good: Separate `Setting` model with proper relations
 
