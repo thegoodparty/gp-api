@@ -1,11 +1,8 @@
-name: Deploy
+name: Deploy Preview Environments
 
 on:
-  push:
-    branches:
-      - develop
-      - master
-  # Enabled PR Triggers for Preview Environments
+  # Only trigger for PR preview environments
+  # develop/qa/master still use CodeBuild (main.yml)
   pull_request:
     types: [opened, synchronize, reopened]
 
