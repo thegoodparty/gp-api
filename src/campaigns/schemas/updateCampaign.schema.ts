@@ -60,7 +60,7 @@ const CampaignDetailsSchema = z
     filingPeriodsStart: z.string().nullish(),
     filingPeriodsEnd: z.string().nullish(),
     officeTermLength: z.string(),
-    partisanType: z.string(),
+    partisanType: z.string().nullish().optional(),
     priorElectionDates: z.array(z.string()),
     positionId: z.string().nullish(),
     electionId: z.string().nullish(),
