@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "skipLibCheck": true,
+    "paths": {}
+  },
+  "include": [
+    "seed/**/*.ts",
+    "prisma/schema/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+
