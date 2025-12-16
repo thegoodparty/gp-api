@@ -8,8 +8,8 @@ import { campaignFactory } from './factories/campaign.factory'
 import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
 import { userFactory } from './factories/user.factory'
 import { pathToVictoryFactory } from './factories/pathToVictory.factory'
-import { buildSlug } from 'src/shared/util/slug.util'
-import { getUserFullName } from 'src/users/util/users.util'
+import { buildSlug } from '../src/shared/util/slug.util'
+import { getUserFullName } from '../src/users/util/users.util'
 import { Campaign } from '@prisma/client'
 import fixedCampaigns from './fixedCampaigns.json'
 import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
@@ -70,8 +70,9 @@ export default async function seedCampaigns(
 
   await prisma.campaignUpdateHistory.createMany({
     data: fakeUpdateHistory,
+    skipDuplicates: true,
   })
-  await prisma.pathToVictory.createMany({ data: fakeP2Vs })
+  await prisma.pathToVictory.createMany({ data: fakeP2Vs, skipDuplicates: true })
 
   console.log(`Created ${campaignIds.length} campaigns`)
 
