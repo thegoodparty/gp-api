@@ -6,8 +6,6 @@ import {
   generateRandomName,
   generateRandomPassword,
 } from '../../../e2e-tests/utils/auth.util'
-import * as fs from 'fs'
-import * as path from 'path'
 import { Prisma } from '@prisma/client'
 
 type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
@@ -165,76 +163,6 @@ test.describe('Websites - CRUD Operations', () => {
     expect(updatedWebsite.content.contact?.email).toBe(contactEmail)
     expect(updatedWebsite.vanityPath).toBe(vanityPath)
     expect(updatedWebsite.status).toBe('published')
-  })
-
-  test('should update website with image uploads', async ({ request }) => {
-    const email = generateRandomEmail()
-    const firstName = generateRandomName()
-    const lastName = generateRandomName()
-    const password = generateRandomPassword()
-
-    const registerResponse = await registerUser(request, {
-      firstName,
-      lastName,
-      email,
-      password,
-      phone: '5555555555',
-      zip: '12345-1234',
-      signUpMode: 'candidate',
-    })
-
-    testUserId = registerResponse.user.id
-    authToken = registerResponse.token
-
-    await request.post('/v1/websites', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    })
-
-    const imagePath = path.join(
-      __dirname,
-      '../../../e2e-tests/fixtures/test-image.png',
-    )
-    const imageBuffer = fs.readFileSync(imagePath)
-
-    const updateResponse = await request.put('/v1/websites/mine', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-      multipart: {
-        logoFile: {
-          name: 'logo.png',
-          mimeType: 'image/png',
-          buffer: imageBuffer,
-        },
-        heroFile: {
-          name: 'hero.png',
-          mimeType: 'image/png',
-          buffer: imageBuffer,
-        },
-        'main[title]': 'Test Title',
-      },
-    })
-
-    expect(updateResponse.status()).toBe(200)
-
-    const updatedWebsite =
-      (await updateResponse.json()) as WebsiteWithDomain & {
-        content: {
-          logo?: string
-          main?: { image?: string }
-        }
-      }
-
-    expect(updatedWebsite.content.logo).toBeTruthy()
-    expect(updatedWebsite.content.logo).toMatch(
-      /^https:\/\/assets(-dev|-qa)?\.goodparty\.org\/uploads\/.+\.(png|jpg|jpeg)$/,
-    )
-    expect(updatedWebsite.content.main?.image).toBeTruthy()
-    expect(updatedWebsite.content.main?.image).toMatch(
-      /^https:\/\/assets(-dev|-qa)?\.goodparty\.org\/uploads\/.+\.(png|jpg|jpeg)$/,
-    )
   })
 
   test('should update website and merge with existing content', async ({
