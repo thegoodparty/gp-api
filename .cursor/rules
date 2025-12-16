@@ -617,6 +617,62 @@ VERIFICATION:
 - Ensure they use `await` for service calls instead of `return`
 - Maintain HTTP specification compliance where 204 means "no content"
 
+## Rule 25: Avoid JSON column patterns
+
+**Default: Avoid JSON columns** - Use strongly-typed relational columns instead.
+
+### When NOT to use JSON columns:
+
+1. **Data has known structure**: If you know the fields ahead of time, use proper columns
+   - ❌ Bad: `metadata Json` containing `{ title, description, author }`
+   - ✅ Good: Individual columns `title String`, `description String?`, `author String?`
+
+2. **Data needs to be queried**: If you'll filter or search by these fields
+   - ❌ Bad: `settings Json` that you query with `settings.path.to.value`
+   - ✅ Good: Separate `Setting` model with proper relations
+
+3. **Data needs validation**: If the structure requires business rules
+   - ❌ Bad: `config Json` with unvalidated structure
+   - ✅ Good: DTO classes with class-validator decorators on typed fields
+
+4. **Relationships exist**: If the data relates to other models
+   - ❌ Bad: `tags Json` storing array of tag data
+   - ✅ Good: Proper many-to-many relation with `Tag` model
+
+### When JSON columns ARE acceptable:
+
+- **Truly dynamic/unpredictable data**: User-generated key-value pairs where keys are unknown
+- **Sparse optional data**: Many optional fields that are rarely populated (>20 optional fields)
+
+### Additional rules:
+
+- **NEVER create `.jsonTypes.d.ts` files**: If you're creating types for JSON columns, they should be proper columns instead
+- **Document why**: Add a comment explaining why JSON is necessary: `// Using Json for truly dynamic user-defined fields`
+- **Consider alternatives first**: Relations, separate tables, JSONB with partial indexes (PostgreSQL), or refactoring the feature
+
+### Example - Bad:
+
+```typescript
+model BlogArticle {
+id String @id
+meta Json // ❌ Contains title, description, tags, author
+}
+```
+
+Example - Good:
+
+````typescript
+model BlogArticle {
+  id          String   @id
+  title       String
+  description String?
+  author      String?
+  tags        Tag[]
+}
+```
+
+Before adding a JSON column, ask: "Can I model this with proper columns and relations?" If yes, use proper columns.
+
 ## General NestJS Patterns
 
 - Follow established patterns in the codebase
@@ -656,7 +712,7 @@ import {
   // ... other auth utils
 } from '../../../e2e-tests/utils/auth.util'
 import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
-```
+````
 
 2. **Test describe blocks**: Always use descriptive test.describe():
 
