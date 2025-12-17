@@ -24,7 +24,7 @@ import { PeerlyP2pJobService } from '../vendors/peerly/services/peerlyP2pJob.ser
 import { Readable } from 'stream'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import sanitizeHtml from 'sanitize-html'
+import { resolveScriptContent } from './util/resolveScriptContent.util'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -141,18 +141,11 @@ export class OutreachController {
           : ''
       }`
 
-      // Resolve script content from aiContent if the script is a key
-      // We store the resolved content in outreach.script for historical accuracy
-      // (if the AI content changes later, we still have what was actually sent)
       const { aiContent = {} } = campaign
-      const scriptKeyOrText = createOutreachDto.script!
-      const aiGeneratedScriptContent = aiContent[scriptKeyOrText]?.content
-      const resolvedScriptText = aiGeneratedScriptContent
-        ? sanitizeHtml(aiGeneratedScriptContent, {
-            allowedTags: [],
-            allowedAttributes: {},
-          })
-        : scriptKeyOrText
+      const resolvedScriptText = resolveScriptContent(
+        createOutreachDto.script!,
+        aiContent,
+      )
 
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
