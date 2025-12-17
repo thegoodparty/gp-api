@@ -628,11 +628,21 @@ export class ContactsService {
       throw new BadRequestException('Invalid state code in campaign data')
     }
 
-    return {
+    const resolved = {
       state,
       districtType: electionType,
       districtName: this.elections.cleanDistrictName(electionLocation),
     }
+
+    console.log(
+      JSON.stringify({
+        campaign,
+        resolved,
+        msg: 'Resolved district from campaign',
+      }),
+    )
+
+    return resolved
   }
 
   private async segmentToFilters(
