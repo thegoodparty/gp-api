@@ -24,6 +24,7 @@ import { PeerlyP2pJobService } from '../vendors/peerly/services/peerlyP2pJob.ser
 import { Readable } from 'stream'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import sanitizeHtml from 'sanitize-html'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -140,6 +141,19 @@ export class OutreachController {
           : ''
       }`
 
+      // Resolve script content from aiContent if the script is a key
+      // This matches the pattern used in voterOutreach.service.ts for Slack messages
+      // TODO: Refactor to store resolved content in outreach.script for historical accuracy
+      const { aiContent = {} } = campaign
+      const scriptKey = createOutreachDto.script!
+      const aiGeneratedScriptContent = aiContent[scriptKey]?.content
+      const resolvedScriptText = aiGeneratedScriptContent
+        ? sanitizeHtml(aiGeneratedScriptContent, {
+            allowedTags: [],
+            allowedAttributes: {},
+          })
+        : scriptKey
+
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         listId: createOutreachDto.phoneListId!,
@@ -149,7 +163,7 @@ export class OutreachController {
           mimeType: image.mimetype,
           title: createOutreachDto.title,
         },
-        scriptText: createOutreachDto.script!,
+        scriptText: resolvedScriptText,
         identityId: peerlyIdentityId!,
         name,
         didState: createOutreachDto.didState,
