@@ -142,17 +142,17 @@ export class OutreachController {
       }`
 
       // Resolve script content from aiContent if the script is a key
-      // This matches the pattern used in voterOutreach.service.ts for Slack messages
-      // TODO: Refactor to store resolved content in outreach.script for historical accuracy
+      // We store the resolved content in outreach.script for historical accuracy
+      // (if the AI content changes later, we still have what was actually sent)
       const { aiContent = {} } = campaign
-      const scriptKey = createOutreachDto.script!
-      const aiGeneratedScriptContent = aiContent[scriptKey]?.content
+      const scriptKeyOrText = createOutreachDto.script!
+      const aiGeneratedScriptContent = aiContent[scriptKeyOrText]?.content
       const resolvedScriptText = aiGeneratedScriptContent
         ? sanitizeHtml(aiGeneratedScriptContent, {
             allowedTags: [],
             allowedAttributes: {},
           })
-        : scriptKey
+        : scriptKeyOrText
 
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
@@ -172,6 +172,7 @@ export class OutreachController {
       return await this.outreachService.create(
         {
           ...createOutreachDto,
+          script: resolvedScriptText,
           projectId: jobId,
           status: OutreachStatus.in_progress,
         },

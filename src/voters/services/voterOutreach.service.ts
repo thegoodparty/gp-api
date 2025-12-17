@@ -157,6 +157,8 @@ export class VoterOutreachService {
         outreach.voterFileFilter!,
       )
 
+    // For new P2P records, outreach.script contains the resolved content directly (this allows us to keep a historical record of the script at time of submission even if ai_content changes for a particular key later).
+    // For legacy records, it may be a key in aiContent - try lookup first as fallback.
     const { content: aiGeneratedScriptContent } =
       aiContent[outreach.script!] || {}
 
