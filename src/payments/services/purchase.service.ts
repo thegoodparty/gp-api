@@ -60,7 +60,7 @@ export class PurchaseService {
   }> {
     this.logger.log(
       JSON.stringify({
-        user,
+        user: user.id,
         dto,
         campaign,
         msg: 'Attempting payment intent creation for user',

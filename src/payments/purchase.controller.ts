@@ -64,6 +64,9 @@ export class PurchaseController {
       this.logger.error(
         JSON.stringify({
           err: serializeError(error),
+          user: user.id,
+          campaign,
+          dto,
           msg: 'Error creating purchase intent',
         }),
       )
