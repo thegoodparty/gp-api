@@ -58,6 +58,14 @@ export class PurchaseService {
     amount: number
     status: Stripe.PaymentIntent.Status
   }> {
+    this.logger.log(
+      JSON.stringify({
+        user,
+        dto,
+        campaign,
+        msg: 'Attempting payment intent creation for user',
+      }),
+    )
     const handler = this.handlers.get(dto.type)
     if (!handler) {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
