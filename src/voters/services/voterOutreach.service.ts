@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Campaign, OutreachType, User } from '@prisma/client'
 import sanitizeHtml from 'sanitize-html'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -15,13 +15,9 @@ import {
   SlackChannel,
   SlackMessageType,
 } from 'src/vendors/slack/slackService.types'
-import { Readable } from 'stream'
 import TurndownService from 'turndown'
-import { CampaignWith } from '../../campaigns/campaigns.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { OutreachWithVoterFileFilter } from '../../outreach/types/outreach.types'
-import { PeerlyMediaService } from '../../vendors/peerly/services/peerlyMedia.service'
-import { PeerlyP2pSmsService } from '../../vendors/peerly/services/peerlyP2pSms.service'
 import { getPeerlyJobUrl } from '../../vendors/peerly/utils/peerlyJobUrl.util'
 import {
   AudienceSlackBlock,
@@ -63,42 +59,14 @@ export type Audience = {
   gender_female?: boolean | null
 }
 
-// P2P SMS interfaces
-interface CreateP2pCampaignParams {
-  campaign: CampaignWith<'pathToVictory'>
-  jobName: string
-  phoneListId: number
-  messageTemplates: Array<{
-    title: string
-    text: string
-    mediaStream?: {
-      stream: Readable
-      fileName: string
-      mimeType: string
-      fileSize?: number
-    }
-  }>
-  didState: string
-  identityId?: string
-}
-
-interface P2pCampaignResult {
-  jobId: string
-  phoneListId: number
-  mediaIds: string[]
-}
-
 @Injectable()
 export class VoterOutreachService {
-  private readonly logger = new Logger(VoterOutreachService.name)
   constructor(
     private readonly slack: SlackService,
     private readonly campaignsService: CampaignsService,
     private readonly crmCampaigns: CrmCampaignsService,
     private readonly email: EmailService,
     private readonly voterFileFilterService: VoterFileFilterService,
-    private readonly mediaService: PeerlyMediaService,
-    private readonly p2pSmsService: PeerlyP2pSmsService,
   ) {}
 
   private formatAudienceFiltersForSlack(
