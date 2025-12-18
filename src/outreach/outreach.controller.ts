@@ -24,6 +24,7 @@ import { PeerlyP2pJobService } from '../vendors/peerly/services/peerlyP2pJob.ser
 import { Readable } from 'stream'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { resolveScriptContent } from './util/resolveScriptContent.util'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -140,6 +141,12 @@ export class OutreachController {
           : ''
       }`
 
+      const { aiContent = {} } = campaign
+      const resolvedScriptText = resolveScriptContent(
+        createOutreachDto.script!,
+        aiContent,
+      )
+
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         listId: createOutreachDto.phoneListId!,
@@ -149,7 +156,7 @@ export class OutreachController {
           mimeType: image.mimetype,
           title: createOutreachDto.title,
         },
-        scriptText: createOutreachDto.script!,
+        scriptText: resolvedScriptText,
         identityId: peerlyIdentityId!,
         name,
         didState: createOutreachDto.didState,
@@ -158,6 +165,7 @@ export class OutreachController {
       return await this.outreachService.create(
         {
           ...createOutreachDto,
+          script: resolvedScriptText,
           projectId: jobId,
           status: OutreachStatus.in_progress,
         },
