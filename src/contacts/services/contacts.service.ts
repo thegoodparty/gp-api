@@ -21,6 +21,7 @@ import {
   CampaignWithPathToVictory,
   DemographicFilter,
   ExtendedVoterFileFilter,
+  StatsResponse,
 } from '../contacts.types'
 import {
   DownloadContactsDTO,
@@ -35,8 +36,6 @@ import {
 import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
-import type { PeopleStats } from '../stats.transformer'
-import { transformStatsResponse } from '../stats.transformer'
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
@@ -416,41 +415,32 @@ export class ContactsService {
     }
   }
 
-  async getDistrictStats(
-    campaign: CampaignWithPathToVictory,
-    hasCellPhone = false,
-  ) {
-    const {
-      state,
-      districtType,
-      districtName,
-      alternativeDistrictName,
-      usingStatewideFallback,
-    } = this.resolveLocationForRequest(campaign)
+  async getDistrictStats(campaign: CampaignWithPathToVictory) {
+    const { state, districtType, districtName } =
+      this.resolveLocationForRequest(campaign)
 
-    const params = new URLSearchParams({ state })
-    if (districtType && districtName) {
-      params.set('districtType', districtType)
-      params.set('districtName', districtName)
+    if (!state || !districtType || !districtName) {
+      const msg = 'Could not resolve state, district type, and district name'
+      this.logger.error(
+        JSON.stringify({ campaign, msg, state, districtType, districtName }),
+      )
+      throw new BadRequestException(msg)
     }
-    const details = campaign.details as { electionDate?: string } | undefined
-    const electionYear = details?.electionDate
-      ? Number(String(details.electionDate).slice(0, 4))
-      : undefined
-    if (typeof electionYear === 'number' && Number.isFinite(electionYear))
-      params.set('electionYear', String(electionYear))
-    if (hasCellPhone) {
-      params.append('filters[]', 'cellPhoneFormatted')
-    }
-    const token = usingStatewideFallback
-      ? this.generateScopedS2SToken(state)
-      : this.getValidS2SToken()
-    const data = await this.fetchStatsWithFallback(
-      params,
-      token,
-      alternativeDistrictName,
+
+    const token = this.getValidS2SToken()
+
+    const response = await lastValueFrom(
+      this.httpService.get<StatsResponse>(`${PEOPLE_API_URL}/v1/people/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          state,
+          districtType,
+          districtName,
+        },
+      }),
     )
-    return transformStatsResponse(data)
+
+    return response.data
   }
 
   private getValidS2SToken(): string {
@@ -1210,47 +1200,6 @@ export class ContactsService {
       throw new BadGatewayException(
         `Failed to fetch from people API (${endpoint})`,
       )
-    }
-  }
-
-  private async fetchStatsWithFallback(
-    params: URLSearchParams,
-    token: string,
-    alternativeDistrictName?: string,
-  ): Promise<PeopleStats> {
-    try {
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/stats?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        ),
-      )
-      if (response.data.totalVoters <= 0 && alternativeDistrictName) {
-        const alternativeResponse = await this.queryAlternativeDistrictName(
-          params,
-          token,
-          'stats',
-          alternativeDistrictName,
-        )
-        return alternativeResponse.data as PeopleStats
-      }
-      return response.data as PeopleStats
-    } catch (error) {
-      this.logger.error('Failed to fetch stats from people API', { error })
-      if (alternativeDistrictName) {
-        const alternativeResponse = await this.queryAlternativeDistrictName(
-          params,
-          token,
-          'stats',
-          alternativeDistrictName,
-        )
-        return alternativeResponse.data as PeopleStats
-      }
-      throw new BadGatewayException('Failed to fetch stats from people API')
     }
   }
 }
