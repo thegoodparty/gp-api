@@ -3,7 +3,7 @@ const defaultSegmentToFiltersMap = {
     filters: [],
   },
   texting: {
-    filters: ['cellPhoneFormatted'],
+    filters: ['hasCellPhone'],
   },
   doorKnocking: {
     filters: [],
@@ -12,10 +12,10 @@ const defaultSegmentToFiltersMap = {
     filters: [],
   },
   phoneBanking: {
-    filters: ['landlineFormatted'],
+    filters: ['hasLandline'],
   },
   digitalAds: {
-    filters: ['cellPhoneFormatted'],
+    filters: ['hasCellPhone'],
   },
 }
 

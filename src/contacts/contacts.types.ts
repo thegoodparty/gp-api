@@ -4,14 +4,6 @@ export type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
 }
 
-export type DemographicOps = {
-  eq?: string | boolean
-  in?: Array<string | boolean>
-  is?: 'null' | 'not_null'
-}
-
-export type DemographicFilter = Record<string, DemographicOps>
-
 export type ExtendedVoterFileFilter = VoterFileFilter & {
   registeredVoterTrue?: boolean | null
   registeredVoterFalse?: boolean | null
