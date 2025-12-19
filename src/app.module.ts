@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { APP_GUARD } from '@nestjs/core'
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ContentModule } from './content/content.module'
 import { JobsModule } from './jobs/jobs.module'
 import { HealthModule } from './health/health.module'
@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module'
 import { ElectionsModule } from './elections/elections.module'
 import { JwtAuthStrategy } from './authentication/auth-strategies/JwtAuth.strategy'
 import { JwtAuthGuard } from './authentication/guards/JwtAuth.guard'
+import { AdminAuditInterceptor } from './authentication/interceptors/AdminAudit.interceptor'
 import { AdminModule } from './admin/admin.module'
 import { QueueConsumerModule } from './queue/consumer/queueConsumer.module'
 import { TopIssuesModule } from './topIssues/topIssues.module'
@@ -76,6 +77,10 @@ import { FeaturesModule } from './features/features.module'
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AdminAuditInterceptor,
     },
     JwtAuthStrategy,
   ],
