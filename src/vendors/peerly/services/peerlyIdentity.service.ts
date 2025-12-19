@@ -521,21 +521,48 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   ): Promise<PeerlySubmitCVResponseBody | null> {
     const { details: campaignDetails, placeId } = campaign
     const { electionDate, ballotLevel } = campaignDetails
+
+    this.logger.debug(
+      `[CV Request] Starting for campaignId=${campaign.id}, ` +
+        `ballotLevel=${ballotLevel || 'NOT_SET'}, ` +
+        `electionDate=${electionDate || 'NOT_SET'}, ` +
+        `placeId=${placeId || 'NOT_SET'}`,
+    )
+
+    let addressComponents: ReturnType<typeof extractAddressComponents>
+    try {
+      addressComponents = extractAddressComponents(
+        await this.placesService.getAddressByPlaceId(placeId!),
+      )
+    } catch (error) {
+      this.logger.error(
+        `[CV Request] Failed to get address from Google Places for placeId=${placeId}: ${error}`,
+      )
+      throw new BadRequestException(
+        'Failed to retrieve address information for campaign',
+      )
+    }
+
     const {
       street: filing_address_line1,
       city,
       state,
       county,
       postalCode,
-    } = extractAddressComponents(
-      await this.placesService.getAddressByPlaceId(placeId!),
-    )
+    } = addressComponents
+
     if (!ballotLevel) {
+      this.logger.error(
+        `[CV Request] Missing ballotLevel for campaignId=${campaign.id}`,
+      )
       throw new BadRequestException(
         'Campaign must have ballotLevel to submit CV request',
       )
     }
     if (!electionDate) {
+      this.logger.error(
+        `[CV Request] Missing electionDate for campaignId=${campaign.id}`,
+      )
       throw new BadRequestException(
         'Campaign must have electionDate to submit CV request',
       )
