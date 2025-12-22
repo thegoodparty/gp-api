@@ -156,11 +156,10 @@ export const convertVoterFileFilterToFilters = (
   const genderValues: string[] = []
   if (segment.genderMale) genderValues.push('M')
   if (segment.genderFemale) genderValues.push('F')
+  if (segment.genderUnknown) genderValues.push('Unknown')
   if (genderValues.length > 0) {
     filters['gender'] =
       genderValues.length === 1 ? { eq: genderValues[0] } : { in: genderValues }
-  } else if (segment.genderUnknown) {
-    filters['gender'] = { is: 'null' }
   }
 
   const ageRanges: Array<{ min: number; max: number | null }> = []
