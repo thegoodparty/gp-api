@@ -7,7 +7,13 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { method as HttpMethod } from '@poppanator/http-constants'
-import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
+import {
+  Campaign,
+  Domain,
+  OfficeLevel,
+  TcrCompliance,
+  User,
+} from '@prisma/client'
 import { format } from '@redtea/format-axios-error'
 import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
@@ -514,13 +520,34 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       ein,
       peerlyIdentityId,
       filingUrl,
-    }: Pick<TcrCompliance, 'ein' | 'peerlyIdentityId' | 'filingUrl' | 'email'>,
+      officeLevel,
+      fecCommitteeId,
+      committeeType,
+    }: Pick<
+      TcrCompliance,
+      | 'ein'
+      | 'peerlyIdentityId'
+      | 'filingUrl'
+      | 'email'
+      | 'officeLevel'
+      | 'fecCommitteeId'
+      | 'committeeType'
+    >,
     user: User,
     campaign: Campaign,
     domain: Domain,
   ): Promise<PeerlySubmitCVResponseBody | null> {
     const { details: campaignDetails, placeId } = campaign
     const { electionDate, ballotLevel } = campaignDetails
+
+    if (!electionDate) {
+      this.logger.warn(
+        `[Campaign Verify] No electionDate found for campaignId=${campaign.id}. ` +
+          `Election date is required for federal (H, S, P) and state/local (CA) committee types. ` +
+          `Peerly submission may be rejected.`,
+      )
+    }
+
     const {
       street: filing_address_line1,
       city,
@@ -530,38 +557,68 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     } = extractAddressComponents(
       await this.placesService.getAddressByPlaceId(placeId!),
     )
-    if (!ballotLevel) {
-      throw new BadRequestException(
-        'Campaign must have ballotLevel to submit CV request',
+
+    // Use officeLevel first (always present), but fallback to ballotLevel mapping if needed
+    let peerlyLocale: string | undefined
+
+    if (officeLevel === OfficeLevel.federal) {
+      peerlyLocale = PEERLY_LOCALITIES.federal
+    } else if (officeLevel === OfficeLevel.state) {
+      peerlyLocale = PEERLY_LOCALITIES.state
+    } else if (officeLevel === OfficeLevel.local) {
+      peerlyLocale = PEERLY_LOCALITIES.local
+    } else if (ballotLevel) {
+      // Fallback to ballotLevel mapping for backwards compatibility
+      peerlyLocale = getPeerlyLocaleFromBallotLevel(ballotLevel)
+      this.logger.debug(
+        `Determined locality '${peerlyLocale}' from ballotLevel '${ballotLevel}' (fallback, officeLevel: '${officeLevel}')`,
       )
     }
-    if (!electionDate) {
-      throw new BadRequestException(
-        'Campaign must have electionDate to submit CV request',
-      )
-    }
-    const peerlyLocale = getPeerlyLocaleFromBallotLevel(ballotLevel)
 
     if (!peerlyLocale) {
       this.logger.error(
-        `No Peerly locality mapping for ballotLevel: ${ballotLevel}`,
+        `No Peerly locality mapping for officeLevel: ${officeLevel}, ballotLevel: ${ballotLevel}`,
       )
       throw new BadRequestException(
-        `Unsupported ballot level for Campaign Verify: ${ballotLevel}`,
+        `Unable to determine Peerly locality from officeLevel '${officeLevel}' or ballotLevel '${ballotLevel}'`,
       )
     }
 
-    this.logger.debug(
-      `Mapped ballotLevel '${ballotLevel}' to locality '${peerlyLocale}'`,
-    )
-
-    // NOTE: Federal locality mapping exists but full federal support is not yet implemented.
-    // Missing: fec_committee_id field, proper committee_type codes for federal campaigns,
-    // and FEC URL validation. Federal campaigns will currently fail validation.
     const verificationType =
       peerlyLocale === PEERLY_LOCALITIES.federal
         ? PEERLY_CV_VERIFICATION_TYPE.Federal
         : PEERLY_CV_VERIFICATION_TYPE.StateLocal
+
+    const isFederal = peerlyLocale === PEERLY_LOCALITIES.federal
+    const isLocal = peerlyLocale === PEERLY_LOCALITIES.local
+
+    // Warn if required federal fields are missing
+    if (isFederal) {
+      if (!fecCommitteeId) {
+        this.logger.warn(
+          `[Campaign Verify] Missing fec_committee_id for federal submission (campaignId=${campaign.id}). ` +
+            `This field is required by Peerly for federal verification.`,
+        )
+      }
+      if (!committeeType) {
+        this.logger.error(
+          `[Campaign Verify] Missing committee_type for federal submission (campaignId=${campaign.id}). ` +
+            `Expected H (House), S (Senate), or P (Presidential).`,
+        )
+        throw new BadRequestException(
+          `Committee type is required for federal candidates. Expected H (House), S (Senate), or P (Presidential).`,
+        )
+      }
+    }
+
+    const isMissingLocalLocation =
+      isLocal && !city?.long_name && !county?.long_name
+    if (isMissingLocalLocation) {
+      this.logger.warn(
+        `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
+          `This field is required by Peerly when locality is 'local'.`,
+      )
+    }
 
     const submitCVData = {
       name: this.isTestEnvironment
@@ -570,8 +627,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       general_campaign_email: email,
       verification_type: verificationType,
       filing_url: ensureUrlHasProtocol(filingUrl),
-      committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
+      // CommitteeType enum values (H, S, P, CA) match Peerly's expected values directly
+      committee_type: committeeType ?? PEERLY_COMMITTEE_TYPE.Candidate,
       committee_ein: ein,
+      // TODO(ENG-6400): using `electionDate!` is dangerous here.
       election_date: formatDate(new Date(electionDate!), DateFormats.isoDate),
       filing_address_line1,
       filing_city: city?.long_name,
@@ -581,7 +640,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       locality: peerlyLocale,
       state: state?.short_name,
       campaign_website: domain ? `https://${domain?.name}` : undefined,
-      ...(peerlyLocale === PEERLY_LOCALITIES.local
+      // Federal-specific fields
+      ...(isFederal && fecCommitteeId
+        ? {
+            fec_committee_id: fecCommitteeId,
+          }
+        : {}),
+      // Local-specific fields
+      ...(isLocal
         ? {
             city_county:
               ballotLevel === BallotReadyPositionLevel.COUNTY
