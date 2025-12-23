@@ -400,9 +400,13 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       return null
     }
 
+    const normalizedEmail = email.toLowerCase()
     const agents = await this.listAgents()
-    const agent = agents.find(a => a.display_email?.toLowerCase() === email.toLowerCase()
-      && a.status === 'active'
+    const agent = agents.find(
+      a =>
+        a.display_email &&
+        a.status === 'active' &&
+        a.display_email.toLowerCase() === normalizedEmail,
     )
     return agent?.id || null
   }
