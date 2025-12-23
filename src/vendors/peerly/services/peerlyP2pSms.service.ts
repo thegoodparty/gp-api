@@ -1,13 +1,14 @@
-import { BadGatewayException, Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
-import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../../shared/util/http.util'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { format } from '@redtea/format-axios-error'
-import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { AxiosResponse } from 'axios'
+import { lastValueFrom } from 'rxjs'
+import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
+import { isAxiosResponse } from '../../../shared/util/http.util'
+import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
+import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials.util'
+import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 
 interface Template {
   is_default: boolean
@@ -32,6 +33,7 @@ interface Template {
 }
 
 interface CreateJobParams {
+  crmCompanyId: string
   name: string
   templates: Template[]
   didState: string
@@ -49,6 +51,12 @@ interface PeerlyApiErrorResponse {
 interface PeerlyApiResponse {
   id?: string
   [key: string]: unknown
+}
+
+interface PeerlyAgent {
+  id: string
+  display_email: string
+  status?: string
 }
 
 export enum PeerlyJobStatus {
@@ -143,6 +151,7 @@ type PeerlyAxiosError = {
 export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   constructor(
     private readonly httpService: HttpService,
+    private readonly crmCampaigns: CrmCampaignsService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
   ) {
     super()
@@ -185,6 +194,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   }
 
   async createJob({
+    crmCompanyId,
     name,
     templates,
     didState,
@@ -192,12 +202,16 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
 
+    /// here we need to get the agent email from hubspot and call the getAgentIdByEmail method to get the agent id and then use it in the agent_ids array
+
+    const agentIds = crmCompanyId ? await this.crmCampaigns.getCrmCompanyOwnerName(crmCompanyId) : []
     const body = {
       account_id: this.accountNumber,
       name,
       templates,
       did_state: didState,
       can_use_mms: hasMms,
+      agent_ids: agentIds,
       // TODO: This doesn't appear to be used. But we _also_ aren't sending the
       //  `date` value to Peerly either. So how in the world are we setting send
       //  dates for messages? 🤔
@@ -331,5 +345,26 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     } catch (error) {
       this.handleApiError(error)
     }
+  }
+
+  async listAgents(): Promise<PeerlyAgent[]> {
+    try {
+      const config = await this.getBaseHttpHeaders()
+      const response = await lastValueFrom(
+        this.httpService.get(`${this.baseUrl}/1to1/agents`, config),
+      )
+      this.logger.debug(`Fetched ${response.data.length} Peerly agents`)
+      return response.data
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async getAgentIdByEmail(email: string): Promise<string | null> {
+    const agents = await this.listAgents()
+    const agent = agents.find(a => a.display_email?.toLowerCase() === email.toLowerCase()
+      && a.status === 'active'
+    )
+    return agent?.id || null
   }
 }
