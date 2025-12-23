@@ -36,6 +36,8 @@ interface CreateJobParams {
   templates: Template[]
   didState: string
   identityId?: string
+  startDate?: string
+  endDate?: string
 }
 
 interface PeerlyApiErrorResponse {
@@ -189,6 +191,8 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     templates,
     didState,
     identityId,
+    startDate,
+    endDate,
   }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
 
@@ -198,11 +202,10 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       templates,
       did_state: didState,
       can_use_mms: hasMms,
-      // TODO: This doesn't appear to be used. But we _also_ aren't sending the
-      //  `date` value to Peerly either. So how in the world are we setting send
-      //  dates for messages? 🤔
       schedule_id: this.scheduleId,
       ...(identityId && { identity_id: identityId }),
+      ...(startDate && { start_date: startDate }),
+      ...(endDate && { end_date: endDate }),
     }
 
     try {

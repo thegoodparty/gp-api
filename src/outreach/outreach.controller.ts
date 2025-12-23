@@ -147,6 +147,10 @@ export class OutreachController {
         aiContent,
       )
 
+      const scheduledDate = createOutreachDto.date
+        ? new Date(createOutreachDto.date)
+        : undefined
+
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         listId: createOutreachDto.phoneListId!,
@@ -160,6 +164,7 @@ export class OutreachController {
         identityId: peerlyIdentityId!,
         name,
         didState: createOutreachDto.didState,
+        scheduledDate,
       })
 
       return await this.outreachService.create(
