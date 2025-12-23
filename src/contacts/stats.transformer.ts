@@ -353,55 +353,28 @@ function normalizeIncome(
   categories: Record<string, { buckets: Bucket[] }>,
   total: number,
 ) {
-  if (categories.estimatedIncomeRange?.buckets) {
-    categories.estimatedIncomeRange.buckets = recomputePercents(
-      mapBuckets(
-        categories.estimatedIncomeRange.buckets,
-        (label) => label || 'Unknown',
-      ),
-      total,
-    )
-    return
+  if (!categories.income?.buckets) return
+
+  const labelMap: Record<string, string> = {
+    '1000-14999': '1k–15k',
+    '15000-24999': '15k–25k',
+    '25000-34999': '25k–35k',
+    '35000-49999': '35k–50k',
+    '50000-74999': '50k–75k',
+    '75000-99999': '75k–100k',
+    '100000-124999': '100k–125k',
+    '125000-149999': '125k–150k',
+    '150000-174999': '150k–175k',
+    '175000-199999': '175k–200k',
+    '200000-249999': '200k–250k',
+    '250000-1000000000': '250k+',
   }
-  if (!categories.estimatedIncomeAmount?.buckets) return
-  const ranges = [
-    { label: '1k–15k', min: 1000, max: 15000 },
-    { label: '15k–25k', min: 15000, max: 25000 },
-    { label: '25k–35k', min: 25000, max: 35000 },
-    { label: '35k–50k', min: 35000, max: 50000 },
-    { label: '50k–75k', min: 50000, max: 75000 },
-    { label: '75k–100k', min: 75000, max: 100000 },
-    { label: '100k–125k', min: 100000, max: 125000 },
-    { label: '125k–150k', min: 125000, max: 150000 },
-    { label: '150k–175k', min: 150000, max: 175000 },
-    { label: '175k–200k', min: 175000, max: 200000 },
-    { label: '200k–250k', min: 200000, max: 250000 },
-    { label: '250k+', min: 250000, max: Infinity },
-  ]
-  const sums = new Map<string, number>(ranges.map((r) => [r.label, 0]))
-  let unknown = 0
-  for (const b of categories.estimatedIncomeAmount.buckets) {
-    const v = (b.label || '').toLowerCase()
-    if (v === 'unknown' || v === 'other') {
-      unknown += b.count
-      continue
-    }
-    const num = parseInt(v.replace(/[^0-9]/g, ''), 10)
-    if (!Number.isFinite(num)) {
-      unknown += b.count
-      continue
-    }
-    const range = ranges.find((r) => num >= r.min && num < r.max)
-    if (!range) {
-      unknown += b.count
-    } else {
-      sums.set(range.label, (sums.get(range.label) || 0) + b.count)
-    }
-  }
-  const buckets: Bucket[] = [
-    ...ranges.map((r) => ({ label: r.label, count: sums.get(r.label) || 0 })),
-    { label: 'Unknown', count: unknown },
-  ]
+
+  const buckets = categories.income.buckets.map((b) => ({
+    label: labelMap[b.label] || b.label,
+    count: b.count,
+  }))
+
   categories.estimatedIncomeRange = {
     buckets: recomputePercents(buckets, total),
   }
@@ -422,6 +395,8 @@ function pruneDuplicateCategories(
     delete categories.educationOfPerson
   if (categories.estimatedIncomeRange && categories.estimatedIncomeAmount)
     delete categories.estimatedIncomeAmount
+  if (categories.estimatedIncomeRange && categories.income)
+    delete categories.income
 }
 
 function enforceAgePreference(
