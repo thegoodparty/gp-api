@@ -206,10 +206,14 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
     // Automatically assign PA as agent in Peerly
     // NOTE: This fetches agent list from Peerly on every job creation (see listAgents() for caching notes)
-    let agentIds: string[] = []
+    const agentIds: string[] = []
     try {
-      const owner = crmCompanyId ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId) : null
-      const agentId = owner?.email ? await this.getAgentIdByEmail(owner.email) : null
+      const owner = crmCompanyId
+        ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId)
+        : null
+      const agentId = owner?.email
+        ? await this.getAgentIdByEmail(owner.email)
+        : null
       if (agentId) {
         agentIds.push(agentId)
         this.logger.log(`Successfully assigned agent ${agentId} to job`)
@@ -403,7 +407,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     const normalizedEmail = email.toLowerCase()
     const agents = await this.listAgents()
     const agent = agents.find(
-      a =>
+      (a) =>
         a.display_email &&
         a.status === 'active' &&
         a.display_email.toLowerCase() === normalizedEmail,

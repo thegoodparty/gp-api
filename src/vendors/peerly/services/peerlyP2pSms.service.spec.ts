@@ -1,4 +1,7 @@
-import { PublicOwner, PublicOwnerTypeEnum } from '@hubspot/api-client/lib/codegen/crm/owners'
+import {
+  PublicOwner,
+  PublicOwnerTypeEnum,
+} from '@hubspot/api-client/lib/codegen/crm/owners'
 import { HttpService } from '@nestjs/axios'
 import { BadGatewayException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -8,11 +11,10 @@ import { CrmCampaignsService } from '../../../campaigns/services/crmCampaigns.se
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
 
-// Helper to create mock Axios config (we don't assert on this, just satisfies type requirement)
-const createMockAxiosConfig = () => ({} as any)
-
 // Helper to create mock PublicOwner
-const createMockOwner = (overrides: Partial<PublicOwner> = {}): PublicOwner => ({
+const createMockOwner = (
+  overrides: Partial<PublicOwner> = {},
+): PublicOwner => ({
   createdAt: new Date(),
   archived: false,
   id: 'owner-123',
@@ -29,7 +31,7 @@ const createMockOwner = (overrides: Partial<PublicOwner> = {}): PublicOwner => (
 describe('PeerlyP2pSmsService - Agent Assignment', () => {
   let service: PeerlyP2pSmsService
   let httpService: jest.Mocked<HttpService>
-  let peerlyAuth: jest.Mocked<PeerlyAuthenticationService>
+  let _peerlyAuth: jest.Mocked<PeerlyAuthenticationService>
   let crmCampaigns: jest.Mocked<CrmCampaignsService>
 
   const mockAgents = [
@@ -87,8 +89,12 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
 
     service = module.get<PeerlyP2pSmsService>(PeerlyP2pSmsService)
     httpService = module.get(HttpService) as jest.Mocked<HttpService>
-    peerlyAuth = module.get(PeerlyAuthenticationService) as jest.Mocked<PeerlyAuthenticationService>
-    crmCampaigns = module.get(CrmCampaignsService) as jest.Mocked<CrmCampaignsService>
+    _peerlyAuth = module.get(
+      PeerlyAuthenticationService,
+    ) as jest.Mocked<PeerlyAuthenticationService>
+    crmCampaigns = module.get(
+      CrmCampaignsService,
+    ) as jest.Mocked<CrmCampaignsService>
   })
 
   afterEach(() => {
@@ -97,15 +103,7 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
 
   describe('listAgents', () => {
     it('should return array of agents from Peerly API', async () => {
-      const mockResponse: AxiosResponse = {
-        data: mockAgents,
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: createMockAxiosConfig(),
-      }
-
-      httpService.get.mockReturnValue(of(mockResponse))
+      httpService.get.mockReturnValue(of({ data: mockAgents } as AxiosResponse))
 
       const result = await service.listAgents()
 
@@ -114,15 +112,7 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
     })
 
     it('should return empty array when no agents exist', async () => {
-      const mockResponse: AxiosResponse = {
-        data: [],
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: createMockAxiosConfig(),
-      }
-
-      httpService.get.mockReturnValue(of(mockResponse))
+      httpService.get.mockReturnValue(of({ data: [] } as AxiosResponse))
 
       const result = await service.listAgents()
 
@@ -140,14 +130,7 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
 
   describe('getAgentIdByEmail', () => {
     beforeEach(() => {
-      const mockResponse: AxiosResponse = {
-        data: mockAgents,
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: createMockAxiosConfig(),
-      }
-      httpService.get.mockReturnValue(of(mockResponse))
+      httpService.get.mockReturnValue(of({ data: mockAgents } as AxiosResponse))
     })
 
     it('should return agent ID when email matches active agent', async () => {
@@ -183,14 +166,9 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         },
       ]
 
-      const mockResponse: AxiosResponse = {
-        data: agentsWithoutEmail,
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: createMockAxiosConfig(),
-      }
-      httpService.get.mockReturnValue(of(mockResponse))
+      httpService.get.mockReturnValue(
+        of({ data: agentsWithoutEmail } as AxiosResponse),
+      )
 
       const result = await service.getAgentIdByEmail('test@example.com')
 
@@ -225,14 +203,9 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         },
       ]
 
-      const mockResponse: AxiosResponse = {
-        data: duplicateAgents,
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: createMockAxiosConfig(),
-      }
-      httpService.get.mockReturnValue(of(mockResponse))
+      httpService.get.mockReturnValue(
+        of({ data: duplicateAgents } as AxiosResponse),
+      )
 
       const result = await service.getAgentIdByEmail('duplicate@goodparty.org')
 
@@ -240,9 +213,7 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
     })
 
     it('should throw when listAgents fails', async () => {
-      httpService.get.mockReturnValue(
-        throwError(() => new Error('API error')),
-      )
+      httpService.get.mockReturnValue(throwError(() => new Error('API error')))
 
       await expect(
         service.getAgentIdByEmail('john@goodparty.org'),
@@ -264,30 +235,19 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
       identityId: 'identity-123',
     }
 
-    const mockJobResponse: AxiosResponse = {
-      data: {
-        id: 'job-123',
-        name: 'Test Job',
-        status: 'active',
-        templates: [],
-        agents: [],
-      },
-      status: 201,
-      statusText: 'Created',
-      headers: {},
-      config: createMockAxiosConfig(),
-    }
-
     beforeEach(() => {
-      const mockAgentsResponse: AxiosResponse = {
-        data: mockAgents,
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: createMockAxiosConfig(),
-      }
-      httpService.get.mockReturnValue(of(mockAgentsResponse))
-      httpService.post.mockReturnValue(of(mockJobResponse))
+      httpService.get.mockReturnValue(of({ data: mockAgents } as AxiosResponse))
+      httpService.post.mockReturnValue(
+        of({
+          data: {
+            id: 'job-123',
+            name: 'Test Job',
+            status: 'active',
+            templates: [],
+            agents: [],
+          },
+        } as AxiosResponse),
+      )
     })
 
     it('should include agent_ids when PA is found in Peerly', async () => {

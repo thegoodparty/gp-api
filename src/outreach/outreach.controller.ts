@@ -135,10 +135,11 @@ export class OutreachController {
         )
       }
 
-      const name = `${campaign.slug}${createOutreachDto.date
-        ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
-        : ''
-        }`
+      const name = `${campaign.slug}${
+        createOutreachDto.date
+          ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
+          : ''
+      }`
 
       const { aiContent = {} } = campaign
       const resolvedScriptText = resolveScriptContent(
@@ -198,8 +199,8 @@ export class OutreachController {
         ...outreach,
         ...(p2pJob
           ? {
-            p2pJob,
-          }
+              p2pJob,
+            }
           : {}),
       }
     })
