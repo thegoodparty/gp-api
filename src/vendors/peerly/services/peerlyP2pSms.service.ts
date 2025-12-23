@@ -205,10 +205,20 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     /// here we need to get the agent email from hubspot and call the getAgentIdByEmail method to get the agent id and then use it in the agent_ids array
 
     let agentIds: string[] = []
-    const owner = crmCompanyId ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId) : null
-    const agentId = owner?.email ? await this.getAgentIdByEmail(owner.email) : null
-    if (agentId) {
-      agentIds.push(agentId)
+    try {
+      const owner = crmCompanyId ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId) : null
+      const agentId = owner?.email ? await this.getAgentIdByEmail(owner.email) : null
+      if (agentId) {
+        agentIds.push(agentId)
+        this.logger.log(`Successfully assigned agent ${agentId} to job`)
+      } else if (owner?.email) {
+        this.logger.warn(`No Peerly agent found for PA email: ${owner.email}`)
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to assign PA as agent, creating job without agent assignment',
+        error,
+      )
     }
 
     const body = {

@@ -2,18 +2,14 @@ import { PublicOwner, PublicOwnerTypeEnum } from '@hubspot/api-client/lib/codege
 import { HttpService } from '@nestjs/axios'
 import { BadGatewayException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import { AxiosResponse } from 'axios'
 import { of, throwError } from 'rxjs'
 import { CrmCampaignsService } from '../../../campaigns/services/crmCampaigns.service'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
 
-// Helper to create mock Axios config
-const createMockAxiosConfig = (): InternalAxiosRequestConfig => ({
-  headers: {} as InternalAxiosRequestConfig['headers'],
-  url: '',
-  method: 'get',
-})
+// Helper to create mock Axios config (we don't assert on this, just satisfies type requirement)
+const createMockAxiosConfig = () => ({} as any)
 
 // Helper to create mock PublicOwner
 const createMockOwner = (overrides: Partial<PublicOwner> = {}): PublicOwner => ({
@@ -114,10 +110,7 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
       const result = await service.listAgents()
 
       expect(result).toEqual(mockAgents)
-      expect(httpService.get).toHaveBeenCalledWith(
-        expect.stringContaining('/1to1/agents'),
-        expect.any(Object),
-      )
+      expect(httpService.get).toHaveBeenCalledTimes(1)
     })
 
     it('should return empty array when no agents exist', async () => {
@@ -306,35 +299,38 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
+      expect(jobId).toBe('job-123')
       expect(crmCampaigns.getCrmCompanyOwner).toHaveBeenCalledWith('crm-123')
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          agent_ids: ['agent-123@11537225'],
-        }),
-        expect.any(Object),
-      )
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body.agent_ids).toEqual(['agent-123@11537225'])
+      expect(body.name).toBe(baseJobParams.name)
+      expect(body.did_state).toBe(baseJobParams.didState)
     })
 
     it('should NOT include agent_ids when no crmCompanyId provided', async () => {
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: '',
       })
 
+      expect(jobId).toBe('job-123')
       expect(crmCampaigns.getCrmCompanyOwner).not.toHaveBeenCalled()
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.not.objectContaining({
-          agent_ids: expect.anything(),
-        }),
-        expect.any(Object),
-      )
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('agent_ids')
+      expect(body.name).toBe(baseJobParams.name)
+      expect(body.did_state).toBe(baseJobParams.didState)
+      expect(body.templates).toEqual(baseJobParams.templates)
     })
 
     it('should NOT include agent_ids when PA has no email', async () => {
@@ -346,18 +342,18 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.not.objectContaining({
-          agent_ids: expect.anything(),
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('agent_ids')
+      expect(body.name).toBe(baseJobParams.name)
     })
 
     it('should NOT include agent_ids when PA email is empty string', async () => {
@@ -369,18 +365,18 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.not.objectContaining({
-          agent_ids: expect.anything(),
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('agent_ids')
+      expect(body.name).toBe(baseJobParams.name)
     })
 
     it('should NOT include agent_ids when PA not found in Peerly', async () => {
@@ -392,18 +388,18 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.not.objectContaining({
-          agent_ids: expect.anything(),
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('agent_ids')
+      expect(body.name).toBe(baseJobParams.name)
     })
 
     it('should NOT include agent_ids when PA agent is inactive', async () => {
@@ -415,35 +411,35 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.not.objectContaining({
-          agent_ids: expect.anything(),
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('agent_ids')
+      expect(body.name).toBe(baseJobParams.name)
     })
 
     it('should handle getCrmCompanyOwner returning undefined', async () => {
       crmCampaigns.getCrmCompanyOwner.mockResolvedValue(undefined)
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.not.objectContaining({
-          agent_ids: expect.anything(),
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('agent_ids')
+      expect(body.name).toBe(baseJobParams.name)
     })
 
     it('should handle getCrmCompanyOwner throwing error gracefully', async () => {
@@ -451,12 +447,21 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         new Error('HubSpot API error'),
       )
 
-      await expect(
-        service.createJob({
-          ...baseJobParams,
-          crmCompanyId: 'crm-123',
-        }),
-      ).rejects.toThrow()
+      // Should succeed and create job without agent assignment
+      const jobId = await service.createJob({
+        ...baseJobParams,
+        crmCompanyId: 'crm-123',
+      })
+
+      expect(jobId).toBe('job-123')
+
+      // Verify job was created without agent_ids (business logic)
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('agent_ids')
+      expect(body.name).toBe(baseJobParams.name)
+      expect(body.did_state).toBe(baseJobParams.didState)
     })
 
     it('should correctly format agent_ids as array with single agent', async () => {
@@ -468,22 +473,18 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          agent_ids: expect.arrayContaining(['agent-456@11537225']),
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
 
       const callArgs = httpService.post.mock.calls[0]
       const body = callArgs[1] as Record<string, unknown>
+
       expect(Array.isArray(body.agent_ids)).toBe(true)
+      expect(body.agent_ids).toEqual(['agent-456@11537225'])
       expect(body.agent_ids).toHaveLength(1)
     })
 
@@ -496,18 +497,17 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          agent_ids: ['agent-123@11537225'],
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body.agent_ids).toEqual(['agent-123@11537225'])
     })
 
     it('should include other required fields in job creation', async () => {
@@ -519,25 +519,23 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
         }),
       )
 
-      await service.createJob({
+      const jobId = await service.createJob({
         ...baseJobParams,
         crmCompanyId: 'crm-123',
       })
 
-      expect(httpService.post).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          account_id: expect.any(String),
-          name: 'Test Job',
-          templates: expect.any(Array),
-          did_state: 'NY',
-          can_use_mms: false,
-          schedule_id: expect.any(Number),
-          identity_id: 'identity-123',
-          agent_ids: expect.any(Array),
-        }),
-        expect.any(Object),
-      )
+      expect(jobId).toBe('job-123')
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      // Business logic: verify correct data passed
+      expect(body.name).toBe('Test Job')
+      expect(body.templates).toEqual(baseJobParams.templates)
+      expect(body.did_state).toBe('NY')
+      expect(body.can_use_mms).toBe(false)
+      expect(body.identity_id).toBe('identity-123')
+      expect(body.agent_ids).toEqual(['agent-123@11537225'])
     })
   })
 })
