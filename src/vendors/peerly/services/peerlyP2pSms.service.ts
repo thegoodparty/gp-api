@@ -204,14 +204,20 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
     /// here we need to get the agent email from hubspot and call the getAgentIdByEmail method to get the agent id and then use it in the agent_ids array
 
-    const agentIds = crmCompanyId ? await this.crmCampaigns.getCrmCompanyOwnerName(crmCompanyId) : []
+    let agentIds: string[] = []
+    const owner = crmCompanyId ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId) : null
+    const agentId = owner?.email ? await this.getAgentIdByEmail(owner.email) : null
+    if (agentId) {
+      agentIds.push(agentId)
+    }
+
     const body = {
       account_id: this.accountNumber,
       name,
       templates,
       did_state: didState,
       can_use_mms: hasMms,
-      agent_ids: agentIds,
+      ...(agentIds.length > 0 && { agent_ids: agentIds }),
       // TODO: This doesn't appear to be used. But we _also_ aren't sending the
       //  `date` value to Peerly either. So how in the world are we setting send
       //  dates for messages? 🤔
@@ -361,6 +367,10 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   }
 
   async getAgentIdByEmail(email: string): Promise<string | null> {
+    if (!email || !email.trim()) {
+      return null
+    }
+
     const agents = await this.listAgents()
     const agent = agents.find(a => a.display_email?.toLowerCase() === email.toLowerCase()
       && a.status === 'active'
