@@ -185,7 +185,7 @@
       }]
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(p-throttle|es-toolkit)/)"
+      "node_modules/(?!(p-throttle|es-toolkit|serialize-error)/)"
     ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"

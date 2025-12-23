@@ -204,6 +204,8 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
     /// here we need to get the agent email from hubspot and call the getAgentIdByEmail method to get the agent id and then use it in the agent_ids array
 
+    // Automatically assign PA as agent in Peerly
+    // NOTE: This fetches agent list from Peerly on every job creation (see listAgents() for caching notes)
     let agentIds: string[] = []
     try {
       const owner = crmCompanyId ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId) : null
@@ -219,6 +221,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
         'Failed to assign PA as agent, creating job without agent assignment',
         error,
       )
+      // Job creation continues without agent assignment - graceful degradation
     }
 
     const body = {
@@ -363,6 +366,22 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     }
   }
 
+  /**
+   * Fetches all agents from Peerly API
+   *
+   * NOTE: This currently fetches fresh data on every call (no caching).
+   * Agent list changes infrequently, so caching could improve performance.
+   *
+   * Consider adding in-memory cache (5-min TTL) if:
+   * - Job creation latency becomes > 1s
+   * - Volume exceeds 50+ jobs/day
+   * - Peerly API reliability issues occur
+   *
+   * Cache implementation suggestion:
+   * - Use class properties: agentsCache[], lastFetch timestamp, CACHE_TTL
+   * - Fallback to stale cache if API call fails
+   * - Clear cache on repeated assignment failures
+   */
   async listAgents(): Promise<PeerlyAgent[]> {
     try {
       const config = await this.getBaseHttpHeaders()
