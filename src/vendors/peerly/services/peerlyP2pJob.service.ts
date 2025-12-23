@@ -6,6 +6,7 @@ import {
   P2P_ERROR_MESSAGES,
   P2P_JOB_DEFAULTS,
 } from '../constants/p2pJob.constants'
+import { toDateOnlyString } from '../../../shared/util/date.util'
 
 interface CreateP2pJobParams {
   campaignId: number
@@ -21,6 +22,7 @@ interface CreateP2pJobParams {
   identityId: string
   name?: string
   didState?: string
+  scheduledDate?: Date
 }
 
 @Injectable()
@@ -40,6 +42,7 @@ export class PeerlyP2pJobService {
     identityId,
     name = P2P_JOB_DEFAULTS.CAMPAIGN_NAME,
     didState = P2P_JOB_DEFAULTS.DID_STATE,
+    scheduledDate,
   }: CreateP2pJobParams): Promise<string> {
     let mediaId: string | undefined
     let jobId: string | undefined
@@ -55,6 +58,10 @@ export class PeerlyP2pJobService {
         title: imageInfo.title,
       })
       this.logger.log(`Media created with ID: ${mediaId}`)
+
+      const dateOnly = scheduledDate
+        ? toDateOnlyString(scheduledDate)
+        : undefined
 
       this.logger.log('Creating P2P job')
       jobId = await this.peerlyP2pSmsService.createJob({
@@ -73,6 +80,7 @@ export class PeerlyP2pJobService {
         ],
         didState,
         identityId,
+        ...(dateOnly ? { startDate: dateOnly, endDate: dateOnly } : {}),
       })
       this.logger.log(`Job created with ID: ${jobId}`)
 
