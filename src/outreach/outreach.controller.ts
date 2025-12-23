@@ -1,3 +1,5 @@
+import { ReqFile } from '@/files/decorators/ReqFiles.decorator'
+import { FileUpload } from '@/files/files.types'
 import { PeerlyP2pJobService } from '@/vendors/peerly/services/peerlyP2pJob.service'
 import {
   BadRequestException,
@@ -20,6 +22,7 @@ import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { Readable } from 'stream'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { CreateOutreachSchema } from './schemas/createOutreachSchema'
 import { OutreachService } from './services/outreach.service'
 import { resolveScriptContent } from './util/resolveScriptContent.util'
 
