@@ -36,10 +36,12 @@ import { PeerlyModule } from './vendors/peerly/peerly.module'
 import { ContactsModule } from './contacts/contacts.module'
 import { PollsModule } from './polls/polls.module'
 import { FeaturesModule } from './features/features.module'
+import { BraintrustModule } from './vendors/braintrust/braintrust.module'
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    BraintrustModule,
     AnalyticsModule,
     UsersModule,
     FeaturesModule,
