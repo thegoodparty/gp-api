@@ -57,4 +57,5 @@ export const voterFilterBaseSchema = z.object({
   languageCodes: z.array(z.string()).optional(),
   voterStatus: z.array(z.string()).optional(),
   incomeRanges: z.array(z.string()).optional(),
+  incomeUnknown: z.boolean().optional(),
 })
