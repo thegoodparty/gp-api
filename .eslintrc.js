@@ -35,5 +35,23 @@ module.exports = {
         varsIgnorePattern: '^_',
       },
     ],
+    'no-restricted-imports': [
+      'error',
+      {
+        name: 'node:test',
+        message: 'Use vitest instead of node:test',
+      },
+    ],
   },
+  overrides: [
+    {
+      files: ['src/**/*.test.ts'],
+      rules: {
+        // This ESLint rule prevents normal usage of common testing utilities
+        // like `expect.objectContaining` in test files, so we disable it for
+        // test files.
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+      },
+    },
+  ],
 }

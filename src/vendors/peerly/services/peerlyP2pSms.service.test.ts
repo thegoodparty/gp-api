@@ -10,6 +10,7 @@ import { of, throwError } from 'rxjs'
 import { CrmCampaignsService } from '../../../campaigns/services/crmCampaigns.service'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
+import { beforeEach, describe, expect, it, vi, Mocked } from 'vitest'
 
 // Helper to create mock PublicOwner
 const createMockOwner = (
@@ -30,9 +31,9 @@ const createMockOwner = (
 
 describe('PeerlyP2pSmsService - Agent Assignment', () => {
   let service: PeerlyP2pSmsService
-  let httpService: jest.Mocked<HttpService>
-  let _peerlyAuth: jest.Mocked<PeerlyAuthenticationService>
-  let crmCampaigns: jest.Mocked<CrmCampaignsService>
+  let httpService: Mocked<HttpService>
+  let _peerlyAuth: Mocked<PeerlyAuthenticationService>
+  let crmCampaigns: Mocked<CrmCampaignsService>
 
   const mockAgents = [
     {
@@ -54,19 +55,19 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
 
   beforeEach(async () => {
     const mockHttpService = {
-      get: jest.fn(),
-      post: jest.fn(),
+      get: vi.fn(),
+      post: vi.fn(),
     }
 
     const mockPeerlyAuth = {
-      getAuthorizationHeader: jest.fn().mockResolvedValue({
+      getAuthorizationHeader: vi.fn().mockResolvedValue({
         Authorization: 'JWT mock-token',
       }),
-      getAuthenticatedUser: jest.fn(),
+      getAuthenticatedUser: vi.fn(),
     }
 
     const mockCrmCampaigns = {
-      getCrmCompanyOwner: jest.fn(),
+      getCrmCompanyOwner: vi.fn(),
     }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -88,17 +89,13 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
     }).compile()
 
     service = module.get<PeerlyP2pSmsService>(PeerlyP2pSmsService)
-    httpService = module.get(HttpService) as jest.Mocked<HttpService>
+    httpService = module.get(HttpService) as Mocked<HttpService>
     _peerlyAuth = module.get(
       PeerlyAuthenticationService,
-    ) as jest.Mocked<PeerlyAuthenticationService>
+    ) as Mocked<PeerlyAuthenticationService>
     crmCampaigns = module.get(
       CrmCampaignsService,
-    ) as jest.Mocked<CrmCampaignsService>
-  })
-
-  afterEach(() => {
-    jest.clearAllMocks()
+    ) as Mocked<CrmCampaignsService>
   })
 
   describe('listAgents', () => {
