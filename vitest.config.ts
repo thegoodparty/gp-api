@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import tsconfigPaths from 'vite-tsconfig-paths'
-import swc from 'rollup-plugin-swc'
+import swc from 'unplugin-swc'
 import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
 
@@ -9,7 +9,8 @@ export default defineConfig({
   // the required decorator metadata features that NestJS uses.
   esbuild: false,
   plugins: [
-    swc({
+    swc.vite(),
+    swc.rollup({
       jsc: {
         parser: { syntax: 'typescript', decorators: true },
         transform: { decoratorMetadata: true },
