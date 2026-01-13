@@ -88,7 +88,7 @@ export default $config({
       webAppRootUrl = `https://app-${$app.stage}.goodparty.org`
     }
 
-    let assetsBucket
+    let assetsBucket: sst.aws.Bucket
     if ($app.stage === 'master') {
       assetsBucket = sst.aws.Bucket.get('assetsBucket', 'assets.goodparty.org')
     } else {

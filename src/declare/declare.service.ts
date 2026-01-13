@@ -2,6 +2,7 @@ import { Injectable, Logger, BadGatewayException } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { Headers } from 'http-constants-ts'
+import { AxiosResponse } from 'axios'
 
 const capitalizeString = (s: string) =>
   s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().trim()
@@ -20,7 +21,7 @@ export class DeclareService {
       throw new Error('Please set HUBSPOT_TOKEN in your .env')
     }
 
-    let response
+    let response: AxiosResponse
     try {
       response = await lastValueFrom(
         this.httpService.get(

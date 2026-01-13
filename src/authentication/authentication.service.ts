@@ -20,6 +20,7 @@ import {
   SocialTokenValidator,
 } from './authentication.types'
 import { OAuth2Client, TokenInfo } from 'google-auth-library'
+import { User } from '@prisma/client'
 
 const googleOAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
@@ -61,7 +62,6 @@ export class AuthenticationService {
     throw new NotImplementedException(
       'Facebook token validation not implemented',
     )
-    return ''
   }
 
   private SOCIAL_MEDIA_VALIDATORS_MAP: {
@@ -152,7 +152,7 @@ export class AuthenticationService {
     token: string,
     password: string,
   ) {
-    let user
+    let user: User
     try {
       this.jwtService.verify(token)
       user = await this.usersService.findUserByResetToken(email, token)

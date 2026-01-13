@@ -194,7 +194,7 @@ export class AiContentService {
       { role: 'user', content: prompt } as AiChatMessage,
       ...chat,
     ]
-    let chatResponse
+    let chatResponse: string | undefined
     let generateError = false
 
     try {

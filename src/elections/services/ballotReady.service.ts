@@ -126,8 +126,8 @@ export class BallotReadyService {
     electionDate?: string | null,
     startCursor?: string | null,
   ): Promise<RacesByZipcode | null> {
-    let gt
-    let lt
+    let gt: string
+    let lt: string
     if (electionDate) {
       ;({ gt, lt } = getMonthBounds(electionDate))
     } else {

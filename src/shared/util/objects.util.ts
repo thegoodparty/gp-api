@@ -26,6 +26,7 @@ export const pick = (
   return keys
     .filter((key) => key in obj)
     .reduce(
+      // biome-ignore lint/suspicious/noAssignInExpressions: not fixing this right now
       (obj2, key) => ((obj2[key] = obj[key]), obj2),
       {} as Record<string, string | number | boolean | null>,
     )

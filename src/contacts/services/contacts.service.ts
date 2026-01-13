@@ -170,7 +170,9 @@ export class ContactsService {
     )
     this.appendDemographicFilter(params, demographicFilter)
     const listFilters = await this.segmentToFilters(segment, campaign)
-    listFilters.forEach((f) => params.append('filters[]', f))
+    listFilters.forEach((f) => {
+      params.append('filters[]', f)
+    })
     params.set('full', 'true')
     const token = usingStatewideFallback
       ? this.generateScopedS2SToken(state)
@@ -367,7 +369,9 @@ export class ContactsService {
     )
     this.appendDemographicFilter(params, demographicFilter)
     const listFilters = await this.segmentToFilters(segment, campaign)
-    listFilters.forEach((f) => params.append('filters[]', f))
+    listFilters.forEach((f) => {
+      params.append('filters[]', f)
+    })
     params.set('full', 'true')
     let token: string | undefined
     try {
@@ -894,9 +898,9 @@ export class ContactsService {
         params.append(`filter[${apiField}][is]`, String(ops.is))
       if (ops.in !== undefined) {
         const values = Array.isArray(ops.in) ? ops.in : [ops.in]
-        values.forEach((v) =>
-          params.append(`filter[${apiField}][in][]`, String(v)),
-        )
+        values.forEach((v) => {
+          params.append(`filter[${apiField}][in][]`, String(v))
+        })
       }
     })
   }

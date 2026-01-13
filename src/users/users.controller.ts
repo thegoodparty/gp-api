@@ -116,7 +116,7 @@ export class UsersController {
   async delete(@Param('id') id: string) {
     try {
       return await this.usersService.deleteUser(parseInt(id))
-    } catch (error: unknown | PrismaClientKnownRequestError) {
+    } catch (error: unknown) {
       if (
         error instanceof PrismaClientKnownRequestError &&
         error.code === 'P2025'

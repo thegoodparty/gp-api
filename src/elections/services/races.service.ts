@@ -476,7 +476,7 @@ export class RacesService {
         },
       },
     }
-    let systemPrompt
+    let systemPrompt: string
     if (level === 'county') {
       systemPrompt = COUNTY_PROMPT
     } else if (level === 'city') {

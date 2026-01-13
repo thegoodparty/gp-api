@@ -37,7 +37,9 @@ export class BlogArticleMetaService extends createPrismaBase(
       },
     })
     const dedupedArticleTags = articleTags.reduce((acc, curr) => {
-      curr.tags.forEach((tag) => acc.set(tag.slug, tag))
+      curr.tags.forEach((tag) => {
+        acc.set(tag.slug, tag)
+      })
       return acc
     }, new Map<string, PrismaJson.BlogArticleTag>())
     return [...dedupedArticleTags.values()].sort(
