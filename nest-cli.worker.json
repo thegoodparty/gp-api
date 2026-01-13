@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "entryFile": "worker/main",
+  "compilerOptions": {
+    "deleteOutDir": false,
+    "tsConfigPath": "tsconfig.json",
+    "webpack": false,
+    "assets": ["**/*.prisma"],
+    "watchAssets": true
+  }
+}

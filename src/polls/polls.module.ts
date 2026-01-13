@@ -13,6 +13,8 @@ import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { LlmModule } from 'src/llm/llm.module'
 import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
+import { InngestModule } from 'src/inngest/inngest.module'
+import { PollWebhooksController } from './controllers/pollWebhooks.controller'
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
     CampaignsModule,
     AwsModule,
     LlmModule,
+    InngestModule,
   ],
   providers: [
     PollsService,
@@ -30,7 +33,7 @@ import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
     PollPurchaseHandlerService,
     PollBiasAnalysisService,
   ],
-  controllers: [PollsController],
+  controllers: [PollsController, PollWebhooksController],
   exports: [PollsService, PollIssuesService, PollBiasAnalysisService],
 })
 export class PollsModule {

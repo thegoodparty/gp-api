@@ -37,6 +37,7 @@ import { ContactsModule } from './contacts/contacts.module'
 import { PollsModule } from './polls/polls.module'
 import { FeaturesModule } from './features/features.module'
 import { BraintrustModule } from './vendors/braintrust/braintrust.module'
+import { InngestModule } from './inngest/inngest.module'
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { BraintrustModule } from './vendors/braintrust/braintrust.module'
     ContactsModule,
     PollsModule,
     ElectedOfficeModule,
+    InngestModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.
@@ -79,6 +81,8 @@ import { BraintrustModule } from './vendors/braintrust/braintrust.module'
     // In the future, we might be able to support testing end-to-end background work
     // with a local mock queue, or https://www.localstack.cloud, or by migrating to a
     // more local-friendly background-work service like e.g. https://www.inngest.com.
+    //
+    // UPDATE: We're now migrating to Inngest! The InngestModule has been added above.
     .concat(process.env.NODE_ENV === 'test' ? [] : [QueueConsumerModule]),
   providers: [
     SessionsService,

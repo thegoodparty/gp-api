@@ -3,6 +3,7 @@ import * as aws from '@pulumi/aws';
 import { Compute } from './components/compute';
 import { Database } from './components/database';
 import { Queue } from './components/queue';
+import { InngestWorker } from './components/inngestWorker';
 
 const config = new pulumi.Config();
 const stackName = pulumi.getStack();
@@ -189,5 +190,26 @@ const compute = new Compute(`${stackName}-compute`, {
     domain: effectiveDomain,
 }, computeDeps);
 
+// Inngest Worker Service
+const inngestWorker = new InngestWorker(`${stackName}-inngest-worker`, {
+    vpcId,
+    publicSubnetIds,
+    privateSubnetIds,
+    taskSecurityGroup: taskSecurityGroup,
+    imageUri,
+    isProduction,
+    isPreview,
+    prNumber,
+    environment: finalEnvVars.apply(env => ({
+        ...env,
+        INNGEST_SIGNING_KEY: env.INNGEST_SIGNING_KEY || '',
+        WORKER_PORT: '3002',
+    })),
+    queueArn: queue.queueArn,
+    s3BucketArns: [], // Add S3 bucket ARNs if needed
+    tags: baseTags,
+}, computeDeps);
+
 export const serviceUrl = compute.url;
 export const databasePassword = dbPassword;
+export const workerServiceName = inngestWorker.serviceName;
