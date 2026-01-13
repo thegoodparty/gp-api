@@ -122,28 +122,26 @@ function createJsonOrConditionString(
     ? (paths as string[][])
     : [paths as string[]]
 
-  const orConditions = normalizedPaths
-    .map((path) => [
-      {
-        details: {
-          path: path,
-          string_contains: filterUpper,
-        },
+  const orConditions = normalizedPaths.flatMap((path) => [
+    {
+      details: {
+        path: path,
+        string_contains: filterUpper,
       },
-      {
-        details: {
-          path: path,
-          string_contains: filterLower,
-        },
+    },
+    {
+      details: {
+        path: path,
+        string_contains: filterLower,
       },
-      {
-        details: {
-          path: path,
-          string_contains: filter,
-        },
+    },
+    {
+      details: {
+        path: path,
+        string_contains: filter,
       },
-    ])
-    .flat()
+    },
+  ])
 
   return {
     OR: orConditions,

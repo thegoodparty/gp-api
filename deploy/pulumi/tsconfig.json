@@ -15,4 +15,3 @@
   "include": ["index.ts", "components/**/*.ts"],
   "exclude": ["node_modules"]
 }
-

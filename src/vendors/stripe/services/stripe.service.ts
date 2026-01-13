@@ -197,7 +197,7 @@ export class StripeService {
 
   async listActiveSubscriptionCustomerEmails(): Promise<string[]> {
     const emails = new Set<string>()
-    let startingAfter: string | undefined = undefined
+    let startingAfter: string | undefined
     try {
       do {
         const response: Stripe.ApiList<Stripe.Subscription> =

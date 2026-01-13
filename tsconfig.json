@@ -1,8 +1,5 @@
 {
-  "exclude": [
-    "node_modules",
-    "deploy"
-  ],
+  "exclude": ["node_modules", "deploy"],
   "compilerOptions": {
     "module": "NodeNext",
     "declaration": true,
@@ -15,12 +12,8 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "paths": {
-      "@/*": [
-        "src/*"
-      ],
-      "@e2e-tests/*": [
-        "e2e-tests/*"
-      ]
+      "@/*": ["src/*"],
+      "@e2e-tests/*": ["e2e-tests/*"]
     },
     "incremental": true,
     "skipLibCheck": true,
@@ -30,9 +23,7 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "lib": [
-      "esnext"
-    ],
+    "lib": ["esnext"],
     "resolveJsonModule": true,
     "esModuleInterop": true
   }

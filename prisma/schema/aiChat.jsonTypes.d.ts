@@ -3,8 +3,6 @@ import {
   AiChatMessage,
 } from 'src/campaigns/ai/chat/aiChat.types'
 
-export {}
-
 declare global {
   export namespace PrismaJson {
     export type AiChatData = {

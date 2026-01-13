@@ -14,8 +14,6 @@ import {
 import { HubSpot } from 'src/crm/crm.types'
 import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
 
-export {}
-
 declare global {
   export namespace PrismaJson {
     // Take care not to duplicate a field on both details and data

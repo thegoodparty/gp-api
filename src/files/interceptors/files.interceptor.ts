@@ -151,7 +151,7 @@ function setNestedProperty(
     return
   }
 
-  const keys = path.split(/[\[\]]/).filter((key) => key !== '')
+  const keys = path.split(/[[\]]/).filter((key) => key !== '')
 
   let current = obj
 

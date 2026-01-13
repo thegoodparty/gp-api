@@ -51,10 +51,10 @@ export default $config({
     const vpc =
       $app.stage === 'master'
         ? new sst.aws.Vpc('api', {
-          bastion: false,
-          nat: 'managed',
-          az: 2, // defaults to 2 availability zones and 2 NAT gateways
-        })
+            bastion: false,
+            nat: 'managed',
+            az: 2, // defaults to 2 availability zones and 2 NAT gateways
+          })
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
     if (
@@ -270,13 +270,16 @@ export default $config({
         forceDestroy: false,
       },
     )
-    new aws.s3.BucketPublicAccessBlock(`zip-to-area-code-mappings-pab-${$app.stage}`, {
-      bucket: zipToAreaCodeBucket.id,
-      blockPublicAcls: true,
-      blockPublicPolicy: true,
-      ignorePublicAcls: true,
-      restrictPublicBuckets: true,
-    })
+    new aws.s3.BucketPublicAccessBlock(
+      `zip-to-area-code-mappings-pab-${$app.stage}`,
+      {
+        bucket: zipToAreaCodeBucket.id,
+        blockPublicAcls: true,
+        blockPublicPolicy: true,
+        ignorePublicAcls: true,
+        restrictPublicBuckets: true,
+      },
+    )
 
     // Create shared VPC Endpoint for SQS (only in master stage)
     if ($app.stage === 'master') {

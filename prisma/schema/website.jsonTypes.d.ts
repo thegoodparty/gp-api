@@ -1,5 +1,3 @@
-export {}
-
 import { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
 
 declare global {

@@ -220,13 +220,14 @@ export class QueueConsumerService {
           }
           return true
         })
-      case QueueType.PATH_TO_VICTORY:
+      case QueueType.PATH_TO_VICTORY: {
         this.logger.log('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         return await this.withLegacyErrorSwallowing(message, async () => {
           await this.handlePathToVictoryMessage(pathToVictoryMessage)
           return true
         })
+      }
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
         this.logger.log('received tcrComplianceStatusCheck message')
         return await this.withLegacyErrorSwallowing(message, () =>
@@ -241,25 +242,28 @@ export class QueueConsumerService {
             queueMessage.data as DomainEmailForwardingMessage,
           ),
         )
-      case QueueType.POLL_ANALYSIS_COMPLETE:
+      case QueueType.POLL_ANALYSIS_COMPLETE: {
         this.logger.log('received pollAnalysisComplete message')
         const pollAnalysisCompleteEvent =
           PollAnalysisCompleteEventSchema.parse(queueMessage)
         return await this.handlePollAnalysisComplete(pollAnalysisCompleteEvent)
-      case QueueType.POLL_CREATION:
+      }
+      case QueueType.POLL_CREATION: {
         this.logger.log('received pollCreation message')
         const pollCreationEvent = PollCreationEventSchema.parse(queueMessage)
         return await this.handlePollCreation(
           pollCreationEvent,
           message.MessageId!,
         )
-      case QueueType.POLL_EXPANSION:
+      }
+      case QueueType.POLL_EXPANSION: {
         this.logger.log('received pollExpansion message')
         const pollExpansionEvent = PollExpansionEventSchema.parse(queueMessage)
         return await this.handlePollExpansion(
           pollExpansionEvent,
           message.MessageId!,
         )
+      }
     }
   }
 

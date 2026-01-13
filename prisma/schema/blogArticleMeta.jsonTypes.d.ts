@@ -1,7 +1,5 @@
 import { ContentMedia } from '../../src/content/content.types'
 import { FieldsType } from 'contentful'
-
-export {}
 declare global {
   export namespace PrismaJson {
     export type BlogArticleTag = {

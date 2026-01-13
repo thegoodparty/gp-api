@@ -131,10 +131,8 @@ export class AiService {
 
     const sanitizedMessages = messages.map((message) => {
       let sanitizedContent = message.content
-      sanitizedContent =
-        sanitizedContent.replace(/\–/g, '-') || sanitizedContent
-      sanitizedContent =
-        sanitizedContent.replace(/\`/g, "'") || sanitizedContent
+      sanitizedContent = sanitizedContent.replace(/–/g, '-') || sanitizedContent
+      sanitizedContent = sanitizedContent.replace(/`/g, "'") || sanitizedContent
 
       return {
         ...message,

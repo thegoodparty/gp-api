@@ -52,4 +52,4 @@ export const ensureUrlHasProtocol = (url: string) =>
 
 export const urlIncludesPath = (urlStr: string): boolean =>
   // optional protocol, but must have path (e.g. http://example.com/path not just http://example.com)
-  /^(https?:\/\/)?[^\/\s]+\/[^\/\s]+.*$/i.test(urlStr)
+  /^(https?:\/\/)?[^/\s]+\/[^/\s]+.*$/i.test(urlStr)

@@ -4,8 +4,6 @@ import {
   ViabilityScore,
 } from 'src/pathToVictory/types/pathToVictory.types'
 
-export {}
-
 declare global {
   export namespace PrismaJson {
     // New name for this will likely be "RaceTargetDetails" - which is currently reflected in elections.service functions
