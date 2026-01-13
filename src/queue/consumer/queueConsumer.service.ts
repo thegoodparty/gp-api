@@ -572,8 +572,8 @@ export class QueueConsumerService {
     }
     const { poll, campaign } = data
 
-    if (derivePollStatus(poll) !== APIPollStatus.IN_PROGRESS) {
-      this.logger.log('Poll is not in-progress, ignoring event', {
+    if (![APIPollStatus.SCHEDULED, APIPollStatus.IN_PROGRESS].includes(derivePollStatus(poll))) {
+      this.logger.log('Poll is not in expected state, ignoring event', {
         poll,
       })
       return
