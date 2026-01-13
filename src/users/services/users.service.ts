@@ -18,6 +18,11 @@ import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import Stripe from 'stripe'
+import { Interval } from '@nestjs/schedule'
+import { subHours } from 'date-fns'
+import throttle from 'p-throttle'
+import { chunk } from 'es-toolkit'
+import ms from 'ms'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
@@ -284,5 +289,36 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         updated_at = NOW()
       WHERE u.id = ${userId}
     `
+  }
+
+  /**
+   * Regularly automatically delete old test users that were
+   * created more than 3 hours ago.
+   */
+  @Interval(ms('6h'))
+  async deleteTestUsers() {
+    const testUsers = await this.model.findMany({
+      where: {
+        email: { endsWith: '@test.goodparty.org' },
+        createdAt: { lt: subHours(new Date(), 3) },
+      },
+    })
+
+    this.logger.log(`Found ${testUsers.length} test users to delete`)
+
+    const deleteUsers = throttle({ limit: 1, interval: 1000 })(
+      async (userIds: number[]) =>
+        this.model.deleteMany({ where: { id: { in: userIds } } }),
+    )
+
+    for (const users of chunk(testUsers, 10)) {
+      await deleteUsers(users.map((user) => user.id))
+      this.logger.log(
+        JSON.stringify({
+          ids: users.map((user) => user.id),
+          msg: 'Deleted users',
+        }),
+      )
+    }
   }
 }

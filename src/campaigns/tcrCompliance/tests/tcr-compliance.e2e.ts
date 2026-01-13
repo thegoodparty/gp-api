@@ -34,7 +34,6 @@ test.describe('Campaigns - TCR Compliance', () => {
       },
       data: {
         ...BASE_TCR_DATA,
-        matchingContactFields: ['email', 'phone'],
       },
     })
 
@@ -59,29 +58,10 @@ test.describe('Campaigns - TCR Compliance', () => {
       },
       data: {
         ...BASE_TCR_DATA,
-        matchingContactFields: ['email', 'phone'],
       },
     })
 
     expect([400, 409, 404]).toContain(response.status())
-  })
-
-  test('should reject TCR compliance with no matching contact fields', async ({
-    request,
-  }) => {
-    const { token } = await loginUser(request, adminEmail!, adminPassword!)
-
-    const response = await request.post('/v1/campaigns/tcr-compliance', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      data: {
-        ...BASE_TCR_DATA,
-        matchingContactFields: [],
-      },
-    })
-
-    expect(response.status()).toBe(400)
   })
 
   test('should check TCR compliance status', async ({ request }) => {
