@@ -15,6 +15,7 @@ import {
   VanitySlackMethodArgs,
 } from '../slackService.types'
 import { WebClient } from '@slack/web-api'
+import { serializeError } from 'serialize-error'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
@@ -71,7 +72,13 @@ export class SlackService {
       )) as { data: string }
       return data
     } catch (e: unknown) {
-      this.logger.error(`Failed to send slack message!`, e)
+      this.logger.error(
+        JSON.stringify({
+          msg: 'Failed to send slack message',
+          slackMessage: message,
+          err: serializeError(e),
+        }),
+      )
     }
   }
 

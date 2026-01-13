@@ -2,23 +2,21 @@ name: Pull Request Validation
 
 on: pull_request
 
+permissions:
+  contents: read
+
 jobs:
   main:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm install
+
+      - run: npm ci
       - run: npm run generate
-
-      - name: Type Check
-        run: npx tsc --noEmit
-
-      - name: Lint Check
-        run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
-
-      - name: Format Check
-        run: npx prettier --check "src/**/*.{ts,js,json}"
+      - run: npx tsc --noEmit
+      - run: npm run test

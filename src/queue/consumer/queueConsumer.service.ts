@@ -5,7 +5,6 @@ import {
   PathToVictory,
   Poll,
   PollIndividualMessage,
-  PollStatus,
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
@@ -49,7 +48,10 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import { format } from 'date-fns'
+import { format, isBefore } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
+import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
+import { serializeError } from 'serialize-error'
 
 @Injectable()
 export class QueueConsumerService {
@@ -88,8 +90,13 @@ export class QueueConsumerService {
       const success = await this.processMessage(message)
       return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
-      this.logger.error('Message processing failed, will requeue:', error)
-      this.logger.error(`Message to be requeued: ${JSON.stringify(message)}`)
+      this.logger.error(
+        JSON.stringify({
+          message,
+          error: serializeError(error),
+          msg: 'Message processing failed, will requeue',
+        }),
+      )
       return true // Indicate that we should requeue
     }
   }
@@ -565,8 +572,8 @@ export class QueueConsumerService {
     }
     const { poll, campaign } = data
 
-    if (!['IN_PROGRESS', 'EXPANDING'].includes(poll.status)) {
-      this.logger.log('Poll is not in-progress or expanding, ignoring event', {
+    if (derivePollStatus(poll) !== APIPollStatus.IN_PROGRESS) {
+      this.logger.log('Poll is not in-progress, ignoring event', {
         poll,
       })
       return
@@ -618,7 +625,7 @@ export class QueueConsumerService {
     const pollCount = await this.pollsService.model.count({
       where: {
         electedOfficeId: poll.electedOfficeId,
-        status: PollStatus.COMPLETED,
+        isCompleted: true,
       },
     })
 
@@ -767,6 +774,10 @@ export class QueueConsumerService {
     await sendTevynAPIPollMessage(this.slackService.client, {
       message: poll.messageContent,
       pollId: poll.id,
+      scheduledDate: isBefore(poll.scheduledDate, new Date())
+        ? 'Now'
+        : formatInTimeZone(poll.scheduledDate, 'America/New_York', 'PP p') +
+          ' ET',
       csv: {
         fileContent: Buffer.from(csv),
         filename: `${user.email}-${format(poll.scheduledDate, 'yyyy-MM-dd')}.csv`,

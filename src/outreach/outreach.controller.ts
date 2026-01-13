@@ -1,3 +1,6 @@
+import { ReqFile } from '@/files/decorators/ReqFiles.decorator'
+import { FileUpload } from '@/files/files.types'
+import { PeerlyP2pJobService } from '@/vendors/peerly/services/peerlyP2pJob.service'
 import {
   BadRequestException,
   Body,
@@ -9,21 +12,19 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { OutreachService } from './services/outreach.service'
-import { CreateOutreachSchema } from './schemas/createOutreachSchema'
-import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
-import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { ReqFile } from '../files/decorators/ReqFiles.decorator'
-import { FileUpload } from '../files/files.types'
-import { FilesService } from 'src/files/files.service'
-import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { PeerlyP2pJobService } from '../vendors/peerly/services/peerlyP2pJob.service'
-import { Readable } from 'stream'
+import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
+import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { FilesService } from 'src/files/files.service'
+import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
+import { Readable } from 'stream'
 import { CampaignTcrComplianceService } from '../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
+import { CreateOutreachSchema } from './schemas/createOutreachSchema'
+import { OutreachService } from './services/outreach.service'
+import { resolveScriptContent } from './util/resolveScriptContent.util'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
@@ -140,8 +141,15 @@ export class OutreachController {
           : ''
       }`
 
+      const { aiContent = {} } = campaign
+      const resolvedScriptText = resolveScriptContent(
+        createOutreachDto.script!,
+        aiContent,
+      )
+
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
+        crmCompanyId: campaign.data?.hubspotId,
         listId: createOutreachDto.phoneListId!,
         imageInfo: {
           fileStream: imageStream,
@@ -149,7 +157,7 @@ export class OutreachController {
           mimeType: image.mimetype,
           title: createOutreachDto.title,
         },
-        scriptText: createOutreachDto.script!,
+        scriptText: resolvedScriptText,
         identityId: peerlyIdentityId!,
         name,
         didState: createOutreachDto.didState,
@@ -158,6 +166,7 @@ export class OutreachController {
       return await this.outreachService.create(
         {
           ...createOutreachDto,
+          script: resolvedScriptText,
           projectId: jobId,
           status: OutreachStatus.in_progress,
         },

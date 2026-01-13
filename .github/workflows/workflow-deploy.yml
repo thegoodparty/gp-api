@@ -1,0 +1,420 @@
+name: Deployment Workflow
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+on:
+  workflow_call:
+    inputs:
+      ecr_repository:
+        required: true
+        type: string
+      service_name:
+        required: true
+        type: string
+      pulumi_stack_prefix:
+        required: false
+        type: string
+        default: 'gp-api'
+      preview_domain:
+        required: false
+        type: string
+        default: 'preview.goodparty.org'
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      PULUMI_CONFIG_PASSPHRASE:
+        required: true
+      VPC_ID:
+        required: true
+      PUBLIC_SUBNETS:
+        required: true
+      PRIVATE_SUBNETS:
+        required: true
+      SECURITY_GROUP_ID:
+        required: true
+      CERTIFICATE_ARN:
+        required: true
+      SECRET_ARN:
+        required: true
+      PREVIEW_CERTIFICATE_ARN:
+        required: false
+      PREVIEW_HOSTED_ZONE_ID:
+        required: false
+      CANDIDATE_EMAIL:
+        required: false
+      CANDIDATE_PASSWORD:
+        required: false
+      ADMIN_EMAIL:
+        required: false
+      ADMIN_PASSWORD:
+        required: false
+      DEV_CANDIDATE_ID:
+        required: false
+      DEV_CAMPAIGN_SLUG:
+        required: false
+      SLACK_WEBHOOK_URL:
+        required: false
+
+jobs:
+  validate:
+    name: Validate Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run generate
+
+      - name: Type Check
+        run: npx tsc --noEmit
+
+      - name: Lint Check
+        run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
+
+      - name: Format Check
+        run: npx prettier --check "src/**/*.{ts,js,json}"
+
+  determine-context:
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      stack: ${{ steps.context.outputs.stack }}
+      is_preview: ${{ steps.context.outputs.is_preview }}
+    steps:
+      - name: Determine Environment Context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+             echo "stack=${{ inputs.pulumi_stack_prefix }}-pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+             echo "is_preview=true" >> $GITHUB_OUTPUT
+          else
+             SAFE_REF_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g')
+             echo "stack=${{ inputs.pulumi_stack_prefix }}-${SAFE_REF_NAME}" >> $GITHUB_OUTPUT
+             echo "is_preview=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-docker:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Fetch DATABASE_URL from Secrets Manager
+        id: get-db-url
+        run: |
+          # For PRs, use a placeholder since DB doesn't exist yet
+          # For dev/qa/prod, use the real DATABASE_URL from secrets
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          else
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${{ secrets.SECRET_ARN }} --query SecretString --output text)
+            DATABASE_URL=$(echo $SECRET_JSON | jq -r '.DATABASE_URL')
+            echo "::add-mask::$DATABASE_URL"
+          fi
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          DATABASE_URL: ${{ steps.get-db-url.outputs.DATABASE_URL }}
+        run: |
+          docker build \
+            --build-arg DATABASE_URL="$DATABASE_URL" \
+            --build-arg STAGE=${{ github.ref_name }} \
+            --build-arg CACHEBUST=${{ github.sha }} \
+            -t ${{ inputs.ecr_repository }}:${{ github.sha }} \
+            -f deploy/Dockerfile \
+            .
+          docker push ${{ inputs.ecr_repository }}:${{ github.sha }}
+
+  deploy-pulumi:
+    needs: [determine-context, build-docker]
+    runs-on: ubuntu-latest
+    outputs:
+      service_url: ${{ steps.pulumi-up.outputs.service_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v4
+        with:
+          pulumi-version: 'latest'
+          command: ''
+
+      - name: Install Pulumi SDK Dependencies
+        working-directory: ./deploy/pulumi
+        run: npm ci
+
+      - name: Pulumi Up
+        id: pulumi-up
+        working-directory: ./deploy/pulumi
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+        run: |
+          # Login to S3 Backend
+          pulumi login s3://goodparty-iac-state
+
+          # Select Stack
+          pulumi stack select ${{ needs.determine-context.outputs.stack }} --create
+
+          # Cancel any existing locks (from interrupted runs)
+          pulumi cancel || true
+
+          # Configure Infrastructure (Essential for new stacks)
+          pulumi config set aws:region us-west-2
+          pulumi config set vpcId ${{ secrets.VPC_ID }}
+          pulumi config set --path publicSubnetIds '${{ secrets.PUBLIC_SUBNETS }}'
+          pulumi config set --path privateSubnetIds '${{ secrets.PRIVATE_SUBNETS }}'
+          pulumi config set securityGroupId ${{ secrets.SECURITY_GROUP_ID }}
+          pulumi config set certificateArn ${{ secrets.CERTIFICATE_ARN }}
+
+          # Configure Secrets & App
+          pulumi config set imageUri ${{ inputs.ecr_repository }}:${{ github.sha }}
+          pulumi config set secretArn ${{ secrets.SECRET_ARN }} --plaintext
+
+          # Set Environment Flags
+          if [ "${{ needs.determine-context.outputs.is_preview }}" == "true" ]; then
+             pulumi config set isPreview true
+             pulumi config set isProduction false
+             # Set preview-specific config for SSL and DNS
+             if [ -n "${{ secrets.PREVIEW_CERTIFICATE_ARN }}" ]; then
+               pulumi config set previewCertificateArn "${{ secrets.PREVIEW_CERTIFICATE_ARN }}"
+             fi
+             if [ -n "${{ secrets.PREVIEW_HOSTED_ZONE_ID }}" ]; then
+               pulumi config set previewHostedZoneId "${{ secrets.PREVIEW_HOSTED_ZONE_ID }}"
+             fi
+             if [ -n "${{ inputs.preview_domain }}" ]; then
+               pulumi config set previewDomain "${{ inputs.preview_domain }}"
+             fi
+             # Set test credentials for seeding (only in preview)
+             if [ -n "${{ secrets.ADMIN_EMAIL }}" ]; then
+               pulumi config set adminEmail "${{ secrets.ADMIN_EMAIL }}"
+             fi
+             if [ -n "${{ secrets.ADMIN_PASSWORD }}" ]; then
+               pulumi config set adminPassword "${{ secrets.ADMIN_PASSWORD }}" --secret
+             fi
+             if [ -n "${{ secrets.CANDIDATE_EMAIL }}" ]; then
+               pulumi config set candidateEmail "${{ secrets.CANDIDATE_EMAIL }}"
+             fi
+             if [ -n "${{ secrets.CANDIDATE_PASSWORD }}" ]; then
+               pulumi config set candidatePassword "${{ secrets.CANDIDATE_PASSWORD }}" --secret
+             fi
+          else
+             pulumi config set isPreview false
+             if [ "${{ github.ref_name }}" == "master" ]; then
+                pulumi config set isProduction true
+             else
+                pulumi config set isProduction false
+             fi
+          fi
+
+          # Run Update
+          pulumi up --yes --skip-preview
+
+          # Capture Service URL for PR comment
+          SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+  comment-on-pr:
+    needs: [determine-context, deploy-pulumi]
+    if: github.event_name == 'pull_request' && needs.deploy-pulumi.outputs.service_url != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '🚀 Preview Environment'
+
+      - name: Post PR comment
+        if: steps.find-comment.outputs.comment-id == ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ## 🚀 Preview Environment
+
+            Your preview environment is ready!
+
+            | Resource | URL |
+            |----------|-----|
+            | **API** | ${{ needs.deploy-pulumi.outputs.service_url }} |
+            | **Health Check** | ${{ needs.deploy-pulumi.outputs.service_url }}/v1/health |
+
+            > Stack: `${{ needs.determine-context.outputs.stack }}`
+            > 
+            > This environment will be automatically destroyed when the PR is closed.
+
+  tests:
+    needs: [determine-context, deploy-pulumi]
+    if: github.event_name == 'pull_request' && needs.deploy-pulumi.outputs.service_url != ''
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      API_BASE_URL: ${{ needs.deploy-pulumi.outputs.service_url }}
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Set test credentials
+        run: |
+          echo "CANDIDATE_EMAIL=${{ secrets.CANDIDATE_EMAIL }}" >> "$GITHUB_ENV"
+          echo "CANDIDATE_PASSWORD=${{ secrets.CANDIDATE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> "$GITHUB_ENV"
+          echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "CANDIDATE_ID=${{ secrets.DEV_CANDIDATE_ID }}" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_SLUG=${{ secrets.DEV_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "HAS_SLACK_WEBHOOK=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Verify environment health
+        run: |
+          echo "Verifying ${API_BASE_URL}/v1/health is responding..."
+          # Using -k to skip SSL verification for preview environments
+          # (ALB DNS name doesn't match the SSL certificate domain)
+          for i in {1..10}; do
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health endpoint is responding"
+              exit 0
+            fi
+            echo "Attempt $i: Health endpoint returned $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "⚠️ Health endpoint not ready after 10 attempts"
+          exit 1
+
+      - name: Run Playwright tests
+        id: run-tests
+        run: npm run test:e2e
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-reports-pr-${{ github.event.number }}-${{ github.sha }}
+          path: |
+            e2e-tests/playwright-report
+            e2e-tests/test-results
+
+      - name: Parse test results
+        if: always()
+        id: test-results
+        shell: bash
+        run: |
+          if [ -f "e2e-tests/test-results/results.json" ]; then
+            echo "Found results.json, parsing test results..."
+            
+            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[]] | length' 2>/dev/null || echo "0")
+            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == false)] | length' 2>/dev/null || echo "0")
+            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == true)] | length' 2>/dev/null || echo "0")
+            
+            echo "Parsed: Total=$TOTAL_TESTS, Failed=$FAILED_COUNT, Passed=$PASSED_COUNT"
+            
+            echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+            echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
+            echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
+            
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | map("• " + .) | join("\\n")' 2>/dev/null || echo "• Failed to parse test names")
+              if [ -z "$FAILED_TESTS" ]; then
+                FAILED_TESTS="• $FAILED_COUNT test(s) failed but names could not be parsed"
+              fi
+              echo "failed_tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+              echo "tests_ran=true" >> $GITHUB_OUTPUT
+            else
+              echo "failed_tests=" >> $GITHUB_OUTPUT
+              if [ "$TOTAL_TESTS" -gt 0 ]; then
+                echo "tests_ran=true" >> $GITHUB_OUTPUT
+              else
+                echo "tests_ran=false" >> $GITHUB_OUTPUT
+              fi
+            fi
+          else
+            echo "⚠️  results.json file not found - tests may not have run"
+            echo "failed_tests=• Test results file not found (tests may not have started)" >> $GITHUB_OUTPUT
+            echo "failed_count=0" >> $GITHUB_OUTPUT
+            echo "passed_count=0" >> $GITHUB_OUTPUT
+            echo "total_tests=0" >> $GITHUB_OUTPUT
+            echo "tests_ran=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify Slack on Test Success
+        if: steps.run-tests.outcome == 'success' && env.HAS_SLACK_WEBHOOK == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: '✅ Preview E2E Tests Passed',
+              attachments: [{
+                color: 'good',
+                text: `${{ github.repository }} - PR #${{ github.event.number }} by ${{ github.actor }}\nEnvironment: Preview (${{ needs.determine-context.outputs.stack }})\n✅ ${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/pull/${{ github.event.number }}|View PR>`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on Test Failure
+        if: (steps.run-tests.outcome == 'failure' || failure()) && env.HAS_SLACK_WEBHOOK == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "${{ steps.test-results.outputs.tests_ran == 'true' && '⚠️ Preview E2E Tests Failed (Non-blocking)' || '❌ Preview Environment Not Ready' }}",
+              "attachments": [{
+                "color": "${{ steps.test-results.outputs.tests_ran == 'true' && 'warning' || 'danger' }}",
+                "text": "${{ github.repository }} - PR #${{ github.event.number }} by ${{ github.actor }}\nEnvironment: Preview (${{ needs.determine-context.outputs.stack }})\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('❌ {0}/{1} tests failed\n✅ {2}/{1} tests passed\n\nFailed Tests:\n{3}\n\nTests are non-blocking during stabilization.', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || '❌ Tests did not run - environment health check failed or test setup error occurred.' }}\n\n<https://github.com/${{ github.repository }}/pull/${{ github.event.number }}|View PR>"
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -384,8 +384,13 @@ export class PathToVictoryService extends createPrismaBase(
       officeFingerprint?: string
     },
   ): Promise<void> {
-    this.logger.debug('completing path to victory for', slug)
-    this.logger.debug('pathToVictoryResponse', pathToVictoryResponse)
+    this.logger.debug(
+      JSON.stringify({
+        slug,
+        pathToVictoryResponse,
+        msg: 'completing path to victory',
+      }),
+    )
 
     try {
       const campaign = await this.prisma.campaign.findUnique({
