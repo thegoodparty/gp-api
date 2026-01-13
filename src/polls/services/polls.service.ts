@@ -62,7 +62,11 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     return this.optimisticLockingUpdate(
       { where: { id: params.pollId } },
       (poll) => {
-        if (![APIPollStatus.SCHEDULED, APIPollStatus.IN_PROGRESS].includes(derivePollStatus(poll))) {
+        if (
+          ![APIPollStatus.SCHEDULED, APIPollStatus.IN_PROGRESS].includes(
+            derivePollStatus(poll),
+          )
+        ) {
           throw new BadRequestException('Poll is not in-progress')
         }
 
