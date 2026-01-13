@@ -1,15 +1,15 @@
+import { OutreachType } from '@prisma/client'
 import { createZodDto } from 'nestjs-zod'
+import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
+import { parseJsonString } from 'src/shared/util/zod.util'
 import { z } from 'zod'
+import { ALLOWED_COLUMNS } from '../../constants/allowedColumns.const'
 import {
   CUSTOM_CHANNELS,
   CUSTOM_FILTERS,
   CUSTOM_PURPOSES,
   VoterFileType,
 } from '../voterFile.types'
-import { ALLOWED_COLUMNS } from '../../constants/allowedColumns.const'
-import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
-import { parseJsonString } from 'src/shared/util/zod.util'
-import { OutreachType } from '@prisma/client'
 
 const LOWER_CASE_TYPE_MAP = {
   doorknocking: VoterFileType.doorKnocking,

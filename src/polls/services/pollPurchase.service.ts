@@ -1,11 +1,11 @@
-import { PaymentsService } from '@/payments/services/payments.service'
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PurchaseHandler } from 'src/payments/purchase.types'
 import { version as uuidVersion } from 'uuid'
 import z from 'zod'
-import { PollsService } from './polls.service'
+import { PaymentsService } from '@/payments/services/payments.service'
 import { MAX_POLL_MESSAGE_LENGTH } from '../schemas/poll.schema'
+import { PollsService } from './polls.service'
 
 const MAX_CONSTITUENTS_PER_RUN = 10000
 

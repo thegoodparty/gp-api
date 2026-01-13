@@ -1,15 +1,15 @@
-import { test, expect } from '@playwright/test'
+import { faker } from '@faker-js/faker'
 import { HttpStatus } from '@nestjs/common'
+import { expect, test } from '@playwright/test'
 import {
-  registerUser,
+  cleanupTestUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
-  cleanupTestUser,
+  registerUser,
 } from '../../../e2e-tests/utils/auth.util'
-import { faker } from '@faker-js/faker'
-import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
+import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 
 type MetadataResponse = Record<string, unknown>
 

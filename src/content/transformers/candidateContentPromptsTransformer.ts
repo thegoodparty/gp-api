@@ -1,10 +1,10 @@
 import { Logger } from '@nestjs/common'
+import { camelCase } from 'es-toolkit/string'
 import {
-  Transformer,
   AIContentTemplateRaw,
   CandidateContentPrompts,
+  Transformer,
 } from '../content.types'
-import { camelCase } from 'es-toolkit/string'
 
 const logger = new Logger('CandidateContentPromptsTransformer')
 

@@ -1,9 +1,9 @@
 import { createZodDto } from 'nestjs-zod'
-import { z } from 'zod'
 import {
   BallotReadyPositionLevel,
   ElectionLevel,
 } from 'src/campaigns/campaigns.types'
+import { z } from 'zod'
 
 // AI'ed from the CampaignDetails type
 const CampaignDetailsSchema = z

@@ -10,19 +10,19 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
-import { CampaignsService } from '../campaigns/services/campaigns.service'
-import { SlackService } from '../vendors/slack/services/slack.service'
-import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
-import { Roles } from '../authentication/decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
+import { Roles } from '../authentication/decorators/Roles.decorator'
+import { CampaignsService } from '../campaigns/services/campaigns.service'
+import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
+import { SlackService } from '../vendors/slack/services/slack.service'
+import { HubSpot } from './crm.types'
 import {
   MassRefreshCompanySchema,
   RefreshCompanySchema,
   SyncCampaignSchema,
 } from './schemas/RefreshSync.schema'
-import { HubSpot } from './crm.types'
 
 @Controller('crm')
 @UsePipes(ZodValidationPipe)

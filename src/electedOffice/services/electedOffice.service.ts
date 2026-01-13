@@ -1,6 +1,6 @@
-import { Injectable, ConflictException } from '@nestjs/common'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { ConflictException, Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
 export class ElectedOfficeService extends createPrismaBase(

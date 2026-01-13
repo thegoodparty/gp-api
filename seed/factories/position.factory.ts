@@ -1,5 +1,5 @@
-import { Position } from '@prisma/client'
 import { faker } from '@faker-js/faker'
+import { Position } from '@prisma/client'
 import { generateFactory } from './generate'
 
 const uniquePositionNames = faker.helpers.uniqueArray(

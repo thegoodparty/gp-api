@@ -16,22 +16,22 @@ import {
   Res,
   UsePipes,
 } from '@nestjs/common'
-import { AiContentService } from './aiContent.service'
-import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
-import { ZodValidationPipe } from 'nestjs-zod'
 import { Campaign, User, UserRole } from '@prisma/client'
-import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { FastifyReply } from 'fastify'
-import { CampaignsService } from '../../services/campaigns.service'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { ContentService } from 'src/content/services/content.service'
+import { EVENTS } from '../../../vendors/segment/segment.types'
 import { ReqCampaign } from '../../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../decorators/UseCampaign.decorator'
+import { CampaignsService } from '../../services/campaigns.service'
+import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
+import { RenameAiContentSchema } from '../schemas/RenameAiContent.schema'
+import { AiContentService } from './aiContent.service'
 import { GetSystemPromptSchema } from './schemas/GetSystemPrompt.schema'
-import { ContentService } from 'src/content/services/content.service'
-import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
-import { Roles } from 'src/authentication/decorators/Roles.decorator'
-import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { AnalyticsService } from 'src/analytics/analytics.service'
-import { EVENTS } from '../../../vendors/segment/segment.types'
 
 @Controller('campaigns/ai')
 @UseCampaign()

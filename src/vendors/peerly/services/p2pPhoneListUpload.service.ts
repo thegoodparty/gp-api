@@ -1,21 +1,21 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { VoterDatabaseService } from '../../../voters/services/voterDatabase.service'
-import { PeerlyPhoneListService } from './peerlyPhoneList.service'
+import { Readable } from 'stream'
+import { CampaignWith } from '../../../campaigns/campaigns.types'
 import { CampaignTcrComplianceService } from '../../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
-import { VoterFileType } from '../../../voters/voterFile/voterFile.types'
 import {
   CHANNELS,
   CustomFilter,
   PURPOSES,
 } from '../../../shared/types/voter.types'
+import { VoterDatabaseService } from '../../../voters/services/voterDatabase.service'
 import { typeToQuery } from '../../../voters/voterFile/util/voterFile.util'
+import { VoterFileType } from '../../../voters/voterFile/voterFile.types'
+import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
 import {
   mapAudienceFieldsToCustomFilters,
   P2P_CSV_COLUMN_MAPPINGS,
 } from '../utils/audienceMapping.util'
-import { Readable } from 'stream'
-import { CampaignWith } from '../../../campaigns/campaigns.types'
+import { PeerlyPhoneListService } from './peerlyPhoneList.service'
 
 @Injectable()
 export class P2pPhoneListUploadService {

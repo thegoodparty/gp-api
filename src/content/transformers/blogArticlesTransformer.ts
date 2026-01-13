@@ -1,16 +1,16 @@
 import { documentToPlainTextString } from '@contentful/rich-text-plain-text-renderer'
-import { transformContentMedia } from '../util/transformContentMedia.util'
-import { transformBlogArticleRawTags } from '../util/transformBlogArticleRawTags.util'
-import { transformBlogArticleAuthor } from '../util/transformBlogArticleAuthor.util'
-import { transformBlogArticleSection } from '../util/transformBlogArticleSection.util'
-import { transformBlogArticleBanner } from '../util/transformBlogArticleBanner.util'
-import { transformBlogArticleRelatedArticles } from '../util/transformBlogArticleRelatedArticles.util'
-import { transformBlogArticleReferences } from '../util/transformBlogArticleReferences.util'
 import {
   BlogArticleAugmented,
   BlogArticleContentRaw,
   Transformer,
 } from '../content.types'
+import { transformBlogArticleAuthor } from '../util/transformBlogArticleAuthor.util'
+import { transformBlogArticleBanner } from '../util/transformBlogArticleBanner.util'
+import { transformBlogArticleRawTags } from '../util/transformBlogArticleRawTags.util'
+import { transformBlogArticleReferences } from '../util/transformBlogArticleReferences.util'
+import { transformBlogArticleRelatedArticles } from '../util/transformBlogArticleRelatedArticles.util'
+import { transformBlogArticleSection } from '../util/transformBlogArticleSection.util'
+import { transformContentMedia } from '../util/transformContentMedia.util'
 
 export const blogArticlesTransformer: Transformer<
   BlogArticleContentRaw,

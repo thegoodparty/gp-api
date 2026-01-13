@@ -1,4 +1,4 @@
-import { ImageRaw, ImageClean } from '../content.types'
+import { ImageClean, ImageRaw } from '../content.types'
 
 export function extractMediaFile(img: ImageRaw | null): ImageClean {
   if (!img?.fields?.file?.url) {

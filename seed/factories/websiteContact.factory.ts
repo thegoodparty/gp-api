@@ -1,5 +1,5 @@
-import { WebsiteContact } from '@prisma/client'
 import { faker } from '@faker-js/faker'
+import { WebsiteContact } from '@prisma/client'
 import { generateFactory } from './generate'
 
 export const websiteContactFactory = generateFactory<WebsiteContact>(() => {

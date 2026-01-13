@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('Campaigns Map - Get Map', () => {
   test('should return campaigns map with results', async ({ request }) => {

@@ -1,11 +1,11 @@
 import { Controller, Get, Query, UsePipes } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
-import { RacesByZipSchema } from './schemas/RacesByZip.schema'
 import {
   GetDistrictNamesDTO,
   GetDistrictTypesDTO,
 } from './schemas/districts.schema'
+import { RacesByZipSchema } from './schemas/RacesByZip.schema'
 import { ElectionsService } from './services/elections.service'
 import { RacesService } from './services/races.service'
 

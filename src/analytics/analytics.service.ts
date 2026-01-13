@@ -1,12 +1,12 @@
-import { SegmentService } from 'src/vendors/segment/segment.service'
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
-import Stripe from 'stripe'
+import { SegmentService } from 'src/vendors/segment/segment.service'
 import {
   EVENTS,
   SegmentIdentityTraits,
   SegmentTrackEventProperties,
   UserContext,
 } from 'src/vendors/segment/segment.types'
+import Stripe from 'stripe'
 import { UsersService } from '../users/services/users.service'
 
 @Injectable()

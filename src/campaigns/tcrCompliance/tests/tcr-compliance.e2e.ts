@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
 
 type TcrCompliance = { id: string }

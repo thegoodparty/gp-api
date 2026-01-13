@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common'
-import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
+import { User } from '@prisma/client'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { ContentService } from 'src/content/services/content.service'
-import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { User } from '@prisma/client'
+import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
+import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
-import { SlackChannel } from '../../../vendors/slack/slackService.types'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
 

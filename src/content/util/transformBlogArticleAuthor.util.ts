@@ -1,5 +1,5 @@
-import { transformContentMedia } from './transformContentMedia.util'
 import { BlogArticleAuthorRaw } from '../content.types'
+import { transformContentMedia } from './transformContentMedia.util'
 
 export const transformBlogArticleAuthor = (
   rawAuthor: BlogArticleAuthorRaw,

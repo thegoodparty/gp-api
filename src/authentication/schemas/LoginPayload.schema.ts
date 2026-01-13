@@ -1,6 +1,6 @@
-import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import { PasswordSchema, WriteEmailSchema } from 'src/shared/schemas'
+import { z } from 'zod'
 
 export const LoginPayloadSchema = z.object({
   email: WriteEmailSchema,

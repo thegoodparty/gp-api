@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common'
-import { ContentService } from './services/content.service'
-import { ContentController } from './content.controller'
 import { ContentfulModule } from '../vendors/contentful/contentful.module'
+import { ContentController } from './content.controller'
 import { BlogArticleMetaService } from './services/blogArticleMeta.service'
+import { ContentService } from './services/content.service'
 
 @Module({
   controllers: [ContentController],

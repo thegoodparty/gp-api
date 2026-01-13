@@ -1,6 +1,6 @@
-import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import { ZDateOnly } from 'src/shared/schemas/DateOnly.schema'
+import { z } from 'zod'
 
 export const ZDateOnlyOptional = ZDateOnly.optional()
 

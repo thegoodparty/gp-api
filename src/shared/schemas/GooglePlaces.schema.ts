@@ -1,5 +1,5 @@
-import { z } from 'zod'
 import { GOOGLE_ADDRESS_PLACE_VALUES } from 'src/shared/types/GooglePlaces.types'
+import { z } from 'zod'
 
 export const GoogleAddressComponentSchema = z.object({
   long_name: z.string(),

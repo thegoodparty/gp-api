@@ -1,5 +1,5 @@
-import { CampaignPlanVersion } from '@prisma/client'
 import { faker } from '@faker-js/faker'
+import { CampaignPlanVersion } from '@prisma/client'
 import { generateFactory } from './generate'
 
 export const campaignPlanVersionFactory = generateFactory<CampaignPlanVersion>(

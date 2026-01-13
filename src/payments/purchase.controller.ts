@@ -6,14 +6,14 @@ import {
   Post,
 } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
+import { serializeError } from 'serialize-error'
+import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
+import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UsersService } from '../users/services/users.service'
 import { StripeService } from '../vendors/stripe/services/stripe.service'
 import { CompletePurchaseDto, CreatePurchaseIntentDto } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
-import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
-import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
-import { serializeError } from 'serialize-error'
 
 @Controller('payments/purchase')
 export class PurchaseController {

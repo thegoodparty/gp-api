@@ -1,9 +1,9 @@
-import {
-  Transformer,
-  AIContentTemplateRaw,
-  AIContentCategories,
-} from '../content.types'
 import { camelCase } from 'es-toolkit/string'
+import {
+  AIContentCategories,
+  AIContentTemplateRaw,
+  Transformer,
+} from '../content.types'
 
 // AIContentCategories are grouped by the title found under each AIContentTemplateRaw's data.category.fields
 // MPX: Several AIContentTemplateRaw's are used to make each 'AIContentCategories' object

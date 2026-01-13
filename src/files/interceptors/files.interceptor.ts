@@ -5,12 +5,12 @@ import {
   Logger,
   NestInterceptor,
 } from '@nestjs/common'
-import { FastifyRequest } from 'fastify'
-import { FileUpload } from '../files.types'
-import { omit } from 'es-toolkit'
-import { PassThrough } from 'stream'
-import { Headers, MimeTypes } from 'http-constants-ts'
 import { Prisma } from '@prisma/client'
+import { omit } from 'es-toolkit'
+import { FastifyRequest } from 'fastify'
+import { Headers, MimeTypes } from 'http-constants-ts'
+import { PassThrough } from 'stream'
+import { FileUpload } from '../files.types'
 
 type FilesInterceptorOpts = {
   /**

@@ -1,5 +1,5 @@
-import { GlossaryItemAugmented } from '../content.types'
 import { mapToObject } from '../../shared/util/maps.util'
+import { GlossaryItemAugmented } from '../content.types'
 
 export const groupGlossaryItemsByAlpha = (
   items: GlossaryItemAugmented[],

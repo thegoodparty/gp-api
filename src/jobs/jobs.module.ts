@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common'
-import { JobsService } from './jobs.service'
-import { JobsController } from './jobs.controller'
 import { HttpModule } from '@nestjs/axios'
+import { Module } from '@nestjs/common'
+import { JobsController } from './jobs.controller'
+import { JobsService } from './jobs.service'
 
 @Module({
   controllers: [JobsController],

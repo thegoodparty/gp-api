@@ -1,5 +1,5 @@
 import slugify from 'slugify'
-import { BlogHomeRaw, BlogHomeAugmented, Transformer } from '../content.types'
+import { BlogHomeAugmented, BlogHomeRaw, Transformer } from '../content.types'
 
 export const blogHomeTransformer: Transformer<
   BlogHomeRaw,

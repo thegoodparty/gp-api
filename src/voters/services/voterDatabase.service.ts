@@ -6,9 +6,9 @@ import {
 } from '@nestjs/common'
 import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { Transform } from 'stream'
 import { HEADER_MAPPING } from '../constants/headerMapping.const'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { GetVoterFileSchema } from '../voterFile/schemas/GetVoterFile.schema'
 
 const VOTER_DATASTORE = process.env.VOTER_DATASTORE as string

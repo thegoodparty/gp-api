@@ -1,3 +1,5 @@
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts'
+import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   forwardRef,
@@ -6,17 +8,15 @@ import {
   Logger,
 } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
-import { UsersService } from './users.service'
-import { CampaignsService } from '../../campaigns/services/campaigns.service'
-import { getMidnightForDate } from '../../shared/util/date.util'
-import { HubspotService } from '../../crm/hubspot.service'
-import { CRMContactProperties } from '../../crm/crm.types'
-import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { SlackService } from '../../vendors/slack/services/slack.service'
-import { Headers, MimeTypes } from 'http-constants-ts'
 import { AxiosError, isAxiosError } from 'axios'
-import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts'
+import { Headers, MimeTypes } from 'http-constants-ts'
+import { lastValueFrom } from 'rxjs'
+import { CampaignsService } from '../../campaigns/services/campaigns.service'
+import { CRMContactProperties } from '../../crm/crm.types'
+import { HubspotService } from '../../crm/hubspot.service'
+import { getMidnightForDate } from '../../shared/util/date.util'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { UsersService } from './users.service'
 
 @Injectable()
 export class CrmUsersService {

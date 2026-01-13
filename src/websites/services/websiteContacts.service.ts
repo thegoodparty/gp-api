@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { createPrismaBase } from 'src/prisma/util/prisma.util'
-import { MODELS } from 'src/prisma/util/prisma.util'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ContactFormSchema } from '../schemas/ContactForm.schema'
 
 @Injectable()

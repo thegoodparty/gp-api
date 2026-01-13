@@ -1,5 +1,5 @@
-import { TopIssue } from '@prisma/client'
 import { faker } from '@faker-js/faker'
+import { TopIssue } from '@prisma/client'
 import { generateFactory } from './generate'
 
 const uniqueTopIssueNames = faker.helpers.uniqueArray(

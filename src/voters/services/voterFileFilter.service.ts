@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, VoterFileFilter } from '@prisma/client'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
 
 @Injectable()

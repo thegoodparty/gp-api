@@ -1,7 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common'
+import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { SubscribeService } from './subscribe.service'
 import { SubscribeEmailSchema } from './subscribeEmail.schema'
-import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 
 @PublicAccess()
 @Controller('subscribe')

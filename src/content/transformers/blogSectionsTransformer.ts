@@ -1,8 +1,8 @@
 import {
   BlogArticleContentRaw,
+  BlogSection,
   BlogSectionRaw,
   Transformer,
-  BlogSection,
   TYPE_BLOG_ARTICLE,
   TYPE_BLOG_SECTION,
 } from '../content.types'

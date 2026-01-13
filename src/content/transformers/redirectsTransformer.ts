@@ -1,4 +1,4 @@
-import { Transformer, RedirectsRaw, RedirectsAugmented } from '../content.types'
+import { RedirectsAugmented, RedirectsRaw, Transformer } from '../content.types'
 
 export const redirectsTransformer: Transformer<
   RedirectsRaw,

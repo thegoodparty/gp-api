@@ -1,17 +1,17 @@
 import './configrc'
+import cookie from '@fastify/cookie'
+import cors from '@fastify/cors'
+import helmet from '@fastify/helmet'
+import multipart from '@fastify/multipart'
+import fastifyStatic from '@fastify/static'
 import { NestFactory } from '@nestjs/core'
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import helmet from '@fastify/helmet'
-import cors from '@fastify/cors'
-import multipart from '@fastify/multipart'
-import { AppModule } from './app.module'
-import fastifyStatic from '@fastify/static'
 import { join } from 'path'
-import cookie from '@fastify/cookie'
+import { AppModule } from './app.module'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
 
 type BootstrapParams = {

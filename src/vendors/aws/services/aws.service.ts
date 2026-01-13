@@ -1,9 +1,9 @@
 import {
-  Logger,
   BadGatewayException,
   BadRequestException,
-  UnauthorizedException,
   ForbiddenException,
+  Logger,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { ServiceException } from '@smithy/smithy-client'
 

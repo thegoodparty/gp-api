@@ -1,5 +1,5 @@
-import { RaceNode, RacesByZipcode } from '../types/ballotReady.types'
 import { PositionLevel } from 'src/generated/graphql.types'
+import { RaceNode, RacesByZipcode } from '../types/ballotReady.types'
 
 const isPOTUSorVPOTUSNode = ({
   position,

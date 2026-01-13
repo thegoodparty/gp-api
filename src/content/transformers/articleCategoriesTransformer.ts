@@ -1,8 +1,8 @@
 import {
-  FaqArticleContentRaw,
   ArticleCategories,
-  Transformer,
   ArticleCategoryRaw,
+  FaqArticleContentRaw,
+  Transformer,
   TYPE_ARTICLE_CATEGORY,
   TYPE_FAQ_ARTICLE,
 } from '../content.types'

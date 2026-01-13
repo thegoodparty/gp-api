@@ -10,7 +10,10 @@ import {
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
+import { format, isBefore } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import parseCsv from 'neat-csv'
+import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -28,6 +31,7 @@ import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
+import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
@@ -48,10 +52,6 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import { format, isBefore } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
-import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
-import { serializeError } from 'serialize-error'
 
 @Injectable()
 export class QueueConsumerService {

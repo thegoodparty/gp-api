@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 import { CommunityIssuesController } from './controllers/communityIssues.controller'
-import { CommunityIssuesService } from './services/communityIssues.service'
 import { CommunityIssueStatusLogService } from './services/communityIssueStatusLog.service'
+import { CommunityIssuesService } from './services/communityIssues.service'
 
 @Module({
   controllers: [CommunityIssuesController],

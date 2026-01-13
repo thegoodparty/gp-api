@@ -4,10 +4,10 @@ import type {
   GetRecordsResponseBody,
   Records as VercelDNSRecord,
 } from '@vercel/sdk/models/getrecordsop'
-import { ForwardEmailDomainResponse } from '../../forwardEmail/forwardEmail.types'
 import { NotFound } from '@vercel/sdk/models/notfound'
 import { VercelError } from '@vercel/sdk/models/vercelerror'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
+import { ForwardEmailDomainResponse } from '../../forwardEmail/forwardEmail.types'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
 

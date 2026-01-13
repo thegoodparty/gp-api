@@ -1,27 +1,27 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
-import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
-import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
-import { EmailService } from 'src/email/email.service'
-import { getUserFullName } from 'src/users/util/users.util'
-import { EmailTemplateName } from 'src/email/email.types'
-import { UsersService } from 'src/users/services/users.service'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { AdminP2VService } from '../services/adminP2V.service'
+import { formatDate } from 'date-fns'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { AuthenticationService } from 'src/authentication/authentication.service'
 import {
   CampaignCreatedBy,
   CampaignWith,
   OnboardingStep,
 } from 'src/campaigns/campaigns.types'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
-import { formatDate } from 'date-fns'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { EmailService } from 'src/email/email.service'
+import { EmailTemplateName } from 'src/email/email.types'
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { DateFormats } from 'src/shared/util/date.util'
+import { UsersService } from 'src/users/services/users.service'
+import { getUserFullName } from 'src/users/util/users.util'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { AuthenticationService } from 'src/authentication/authentication.service'
-import { EVENTS } from 'src/vendors/segment/segment.types'
-import { AnalyticsService } from 'src/analytics/analytics.service'
+import { AdminP2VService } from '../services/adminP2V.service'
+import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
+import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 
 @Injectable()
 export class AdminCampaignsService {

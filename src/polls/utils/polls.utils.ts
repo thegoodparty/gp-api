@@ -1,5 +1,5 @@
-import { SLACK_CHANNEL_IDS } from '@/vendors/slack/slackService.config'
 import { WebClient } from '@slack/web-api'
+import { SLACK_CHANNEL_IDS } from '@/vendors/slack/slackService.config'
 
 export const pollMessageGroup = (pollId: string) => `polls-${pollId}`
 

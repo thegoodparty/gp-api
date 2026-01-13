@@ -1,11 +1,11 @@
-import { forwardRef, Module } from '@nestjs/common'
-import { EcanvasserIntegrationService } from './services/ecanvasserIntegration.service'
-import { EcanvasserIntegrationController } from './ecanvasserIntegration.controller'
-import { CampaignsModule } from '../../campaigns/campaigns.module'
 import { HttpModule } from '@nestjs/axios'
-import { SurveyService } from './services/survey.service'
-import { EcanvasserService } from './services/ecanvasser.service'
+import { forwardRef, Module } from '@nestjs/common'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { CampaignsModule } from '../../campaigns/campaigns.module'
+import { EcanvasserIntegrationController } from './ecanvasserIntegration.controller'
+import { EcanvasserService } from './services/ecanvasser.service'
+import { EcanvasserIntegrationService } from './services/ecanvasserIntegration.service'
+import { SurveyService } from './services/survey.service'
 
 @Module({
   imports: [forwardRef(() => CampaignsModule), HttpModule, SlackModule],

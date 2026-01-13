@@ -1,7 +1,7 @@
-import { PathToVictory } from '@prisma/client'
 import { faker } from '@faker-js/faker'
-import { generateFactory } from './generate'
+import { PathToVictory } from '@prisma/client'
 import { P2VStatus } from '../../src/elections/types/pathToVictory.types'
+import { generateFactory } from './generate'
 
 // some copy/pasted values from the DB
 const ELECTION_TYPES = [

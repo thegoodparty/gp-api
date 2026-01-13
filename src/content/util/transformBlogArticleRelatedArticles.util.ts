@@ -1,5 +1,5 @@
-import { transformContentMedia } from './transformContentMedia.util'
 import { BlogArticleRelatedArticleRaw } from '../content.types'
+import { transformContentMedia } from './transformContentMedia.util'
 
 export const transformBlogArticleRelatedArticles = (
   relatedArticles: BlogArticleRelatedArticleRaw[] = [],

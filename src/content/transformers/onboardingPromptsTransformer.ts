@@ -1,7 +1,7 @@
 import {
-  Transformer,
   OnboardingPromptsAugmented,
   OnboardingPromptsRaw,
+  Transformer,
 } from '../content.types'
 
 export const onboardingPromptsTransformer: Transformer<

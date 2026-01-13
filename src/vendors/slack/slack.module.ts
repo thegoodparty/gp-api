@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
+import { Module } from '@nestjs/common'
 import { SlackService } from './services/slack.service'
 
 @Module({

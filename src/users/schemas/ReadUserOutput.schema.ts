@@ -1,5 +1,3 @@
-import { CreateUserInputSchema } from './CreateUserInput.schema'
-import { z } from 'zod'
 import {
   EmailSchema,
   PhoneSchema,
@@ -7,6 +5,8 @@ import {
   ZipSchema,
 } from 'src/shared/schemas'
 import { makeOptional } from 'src/shared/util/zod.util'
+import { z } from 'zod'
+import { CreateUserInputSchema } from './CreateUserInput.schema'
 
 const WhyBrowsingSchema = z.enum(['considering', 'learning', 'test', 'else'])
 

@@ -1,25 +1,25 @@
+import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   BadRequestException,
   Injectable,
 } from '@nestjs/common'
-import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
-import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
 import FormData from 'form-data'
-import {
-  PhoneListDetailsResponseDto,
-  PhoneListStatusResponseDto,
-  UploadPhoneListResponseDto,
-} from '../schemas/peerlyPhoneList.schema'
+import { lastValueFrom } from 'rxjs'
+import { isAxiosResponse } from '../../../shared/util/http.util'
+import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import {
   P2P_DNC_SCRUBBING,
   P2P_DNC_SUPPRESS_INITIALS,
   P2P_PHONE_LIST_MAP,
 } from '../constants/p2pJob.constants'
+import {
+  PhoneListDetailsResponseDto,
+  PhoneListStatusResponseDto,
+  UploadPhoneListResponseDto,
+} from '../schemas/peerlyPhoneList.schema'
+import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB

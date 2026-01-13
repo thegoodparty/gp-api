@@ -1,9 +1,9 @@
+import { camelCase } from 'es-toolkit/string'
 import {
   AIContentTemplateRaw,
   ContentPromptsQuestions,
   Transformer,
 } from '../content.types'
-import { camelCase } from 'es-toolkit/string'
 
 export const contentPromptsQuestionsTransformer: Transformer<
   AIContentTemplateRaw,

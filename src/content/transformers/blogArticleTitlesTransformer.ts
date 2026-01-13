@@ -1,7 +1,7 @@
 import {
-  Transformer,
   BlogArticleContentRaw,
   BlogArticleTitle,
+  Transformer,
 } from '../content.types'
 
 export const blogArticleTitlesTransformer: Transformer<

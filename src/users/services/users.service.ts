@@ -5,24 +5,24 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common'
+import { Interval } from '@nestjs/schedule'
 import { Campaign, Prisma, User } from '@prisma/client'
+import { subHours } from 'date-fns'
+import { chunk } from 'es-toolkit'
+import ms from 'ms'
+import throttle from 'p-throttle'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { WithOptional } from 'src/shared/types/utility.types'
+import Stripe from 'stripe'
 import { AnalyticsService } from '../../analytics/analytics.service'
 import { trimMany } from '../../shared/util/strings.util'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import {
   CreateUserInputDto,
   SIGN_UP_MODE,
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
 import { CrmUsersService } from './crmUsers.service'
-import { StripeService } from '../../vendors/stripe/services/stripe.service'
-import Stripe from 'stripe'
-import { Interval } from '@nestjs/schedule'
-import { subHours } from 'date-fns'
-import throttle from 'p-throttle'
-import { chunk } from 'es-toolkit'
-import ms from 'ms'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 

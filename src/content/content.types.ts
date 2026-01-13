@@ -1,6 +1,6 @@
 import { Block, Inline } from '@contentful/rich-text-types'
-import { EntrySys, FieldsType } from 'contentful'
 import { BlogArticleMeta, Content, ContentType, Prisma } from '@prisma/client'
+import { EntrySys, FieldsType } from 'contentful'
 import { InferredContentTypes } from './CONTENT_TYPE_MAP.const'
 
 export const TYPE_FAQ_ARTICLE = 'faqArticle'

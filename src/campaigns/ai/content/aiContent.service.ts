@@ -1,16 +1,16 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
-import { CampaignsService } from '../../services/campaigns.service'
-import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
-import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { ContentService } from 'src/content/services/content.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
-import { AiChatMessage } from '../chat/aiChat.types'
-import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
-import { SlackChannel } from '../../../vendors/slack/slackService.types'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { MessageGroup, QueueType } from '../../../queue/queue.types'
+import { SlackChannel } from '../../../vendors/slack/slackService.types'
+import { CampaignsService } from '../../services/campaigns.service'
+import { AiChatMessage } from '../chat/aiChat.types'
+import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
+import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 
 @Injectable()
 export class AiContentService {

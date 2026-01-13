@@ -1,13 +1,13 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
-import { Timeout } from '@nestjs/schedule'
-import { lastValueFrom } from 'rxjs'
-import { format } from '@redtea/format-axios-error'
-import { isAxiosResponse } from '../../../shared/util/http.util'
 import { JwtService } from '@nestjs/jwt'
-import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
+import { Timeout } from '@nestjs/schedule'
+import { format } from '@redtea/format-axios-error'
 import { AxiosResponse } from 'axios'
+import { lastValueFrom } from 'rxjs'
 import { PeerlyIdentity } from '@/vendors/peerly/peerly.types'
+import { isAxiosResponse } from '../../../shared/util/http.util'
+import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 
 const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
 

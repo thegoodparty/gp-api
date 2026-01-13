@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { CampaignsService } from './campaigns.service'
 import * as ngeohash from 'ngeohash'
+import { CampaignsService } from './campaigns.service'
 
 const googleApiKey = process.env.GOOGLE_API_KEY
 

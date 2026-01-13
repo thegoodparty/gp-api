@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import {
-  registerUser,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
   loginUser,
+  registerUser,
 } from '../../../e2e-tests/utils/auth.util'
 import { CampaignWithPathToVictory } from '../campaigns.types'
 

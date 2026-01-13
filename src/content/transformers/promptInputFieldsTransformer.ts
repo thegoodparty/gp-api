@@ -1,7 +1,7 @@
 import {
-  Transformer,
   PromptInputFieldsAugmented,
   PromptInputFieldsRaw,
+  Transformer,
 } from '../content.types'
 
 export const promptInputFieldsTransformer: Transformer<

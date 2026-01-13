@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { getUserFullName } from 'src/users/util/users.util'
 
 type PositionWithTopIssue = Prisma.CampaignPositionGetPayload<{

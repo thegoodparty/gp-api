@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
-import { MapCampaign } from './campaignMap.types'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { buildMapFilters } from '../util/buildMapFilters'
+import { RacesService } from 'src/elections/services/races.service'
 import { CampaignsService } from '../services/campaigns.service'
 import { GeocodingService } from '../services/geocoding.service'
-import { RacesService } from 'src/elections/services/races.service'
+import { buildMapFilters } from '../util/buildMapFilters'
+import { MapCampaign } from './campaignMap.types'
 
 const DB_UPDATE_CHUNK_SIZE = 20
 

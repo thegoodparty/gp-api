@@ -1,6 +1,10 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
+import { AxiosResponse } from 'axios'
+import { cloneDeep } from 'es-toolkit'
 import { firstValueFrom } from 'rxjs'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import {
   EthnicityCounts,
   GenderCounts,
@@ -8,10 +12,6 @@ import {
   VoterCounts,
   VoterHistoryColumn,
 } from '../voters.types'
-import { Prisma } from '@prisma/client'
-import { AxiosResponse } from 'axios'
-import { cloneDeep } from 'es-toolkit'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 
 const API_BASE = 'https://api.l2datamapping.com/api/v2'
 const L2_DATA_KEY = process.env.L2_DATA_KEY

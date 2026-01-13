@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma } from '@prisma/client'
-import { CreateCommunityIssueSchema } from '../schemas/CreateCommunityIssue.schema'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { v4 as uuidv4 } from 'uuid'
+import { CreateCommunityIssueSchema } from '../schemas/CreateCommunityIssue.schema'
 
 @Injectable()
 export class CommunityIssuesService extends createPrismaBase(

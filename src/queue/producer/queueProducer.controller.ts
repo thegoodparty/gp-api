@@ -1,6 +1,6 @@
 import { BadGatewayException, Controller, Get, Logger } from '@nestjs/common'
-import { QueueProducerService } from './queueProducer.service'
 import { QueueMessage, QueueType } from '../queue.types'
+import { QueueProducerService } from './queueProducer.service'
 
 @Controller('queue')
 export class QueueProducerController {

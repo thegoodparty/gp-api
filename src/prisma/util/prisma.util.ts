@@ -6,10 +6,10 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common'
-import { PrismaService } from '../prisma.service'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { lowerFirst } from 'lodash'
 import { retryIf } from '@/shared/util/retry-if'
+import { PrismaService } from '../prisma.service'
 
 export const MODELS = Prisma.ModelName
 

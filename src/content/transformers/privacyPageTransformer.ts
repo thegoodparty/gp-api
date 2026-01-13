@@ -1,7 +1,7 @@
 import {
-  Transformer,
   PrivacyPageAugmented,
   PrivacyPageRaw,
+  Transformer,
 } from '../content.types'
 
 export const privacyPageTransformer: Transformer<

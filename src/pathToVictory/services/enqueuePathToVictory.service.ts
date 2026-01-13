@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { PrismaService } from '../../prisma/prisma.service'
-import { SlackService } from '../../vendors/slack/services/slack.service'
-import { QueueProducerService } from '../../queue/producer/queueProducer.service'
-import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
+import { PrismaService } from '../../prisma/prisma.service'
+import { QueueProducerService } from '../../queue/producer/queueProducer.service'
+import { MessageGroup, QueueType } from '../../queue/queue.types'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import {
   PathToVictoryInput,
   PathToVictoryQueueMessage,
 } from '../types/pathToVictory.types'
-import { MessageGroup, QueueType } from '../../queue/queue.types'
 
 @Injectable()
 export class EnqueuePathToVictoryService {

@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
-import { loginUser, LoginResponse } from '../../../e2e-tests/utils/auth.util'
+import { expect, test } from '@playwright/test'
+import { LoginResponse, loginUser } from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Authentication - Login', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL

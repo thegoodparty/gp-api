@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
-import { parse, differenceInWeeks } from 'date-fns'
+import { differenceInWeeks, parse } from 'date-fns'
 import { DateFormats } from '../../shared/util/date.util'
-import { STATIC_CAMPAIGN_TASKS } from './campaignTasks.consts'
 import { CampaignsService } from '../services/campaigns.service'
+import { STATIC_CAMPAIGN_TASKS } from './campaignTasks.consts'
 
 const MAX_WEEK_NUMBER = 9
 

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
-import { AwsS3Service } from './services/awsS3.service'
 import { AwsRoute53Service } from './services/awsRoute53.service'
+import { AwsS3Service } from './services/awsS3.service'
 import { S3Service } from './services/s3.service'
 
 @Module({

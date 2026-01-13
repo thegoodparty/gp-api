@@ -1,4 +1,4 @@
-import { Transformer, AIChatPrompt, AIChatPrompts } from '../content.types'
+import { AIChatPrompt, AIChatPrompts, Transformer } from '../content.types'
 
 export const aiChatPromptsTransformer: Transformer<
   AIChatPrompt,

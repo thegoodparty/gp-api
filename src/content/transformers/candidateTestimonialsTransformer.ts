@@ -1,10 +1,10 @@
+import { InternalServerErrorException } from '@nestjs/common'
 import {
   CandidateTestimonialAugmented,
   CandidateTestimonialRaw,
   Transformer,
 } from '../content.types'
 import { extractMediaFile } from '../util/extractMediaFile.util'
-import { InternalServerErrorException } from '@nestjs/common'
 
 export const candidateTestimonialsTransformer: Transformer<
   CandidateTestimonialRaw,

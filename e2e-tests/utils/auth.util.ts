@@ -1,6 +1,6 @@
-import { APIRequestContext } from '@playwright/test'
 import { faker } from '@faker-js/faker'
 import { HttpStatus } from '@nestjs/common'
+import { APIRequestContext } from '@playwright/test'
 
 export interface LoginResponse {
   token: string

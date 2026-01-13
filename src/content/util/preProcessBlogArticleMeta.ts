@@ -1,13 +1,13 @@
+import { isValid } from 'date-fns'
 import {
   BlogArticleContentRaw,
   BlogArticlePreprocessed,
 } from '../content.types'
 import { transformBlogArticleAuthor } from './transformBlogArticleAuthor.util'
 import { transformBlogArticleRawTags } from './transformBlogArticleRawTags.util'
-import { transformContentMedia } from './transformContentMedia.util'
-import { transformBlogArticleSection } from './transformBlogArticleSection.util'
 import { transformBlogArticleReferences } from './transformBlogArticleReferences.util'
-import { isValid } from 'date-fns'
+import { transformBlogArticleSection } from './transformBlogArticleSection.util'
+import { transformContentMedia } from './transformContentMedia.util'
 
 export const preProcessBlogArticleMeta = (
   rawBlogArticle: BlogArticleContentRaw,

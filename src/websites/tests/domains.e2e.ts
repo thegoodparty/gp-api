@@ -1,14 +1,14 @@
-import { test, expect } from '@playwright/test'
+import { faker } from '@faker-js/faker'
+import { expect, test } from '@playwright/test'
+import { Prisma } from '@prisma/client'
 import {
-  registerUser,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  registerUser,
 } from '../../../e2e-tests/utils/auth.util'
-import { faker } from '@faker-js/faker'
 import { DomainSearchResult } from '../domains.types'
-import { Prisma } from '@prisma/client'
 
 type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
   include: {

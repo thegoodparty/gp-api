@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
+import { User } from '@prisma/client'
+import { ZodValidationException } from 'nestjs-zod'
 import { Strategy } from 'passport-local'
 import { AuthenticationService } from '../authentication.service'
 import {
   LoginPayload,
   LoginPayloadSchema,
 } from '../schemas/LoginPayload.schema'
-import { User } from '@prisma/client'
-import { ZodValidationException } from 'nestjs-zod'
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {

@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
+import Stripe from 'stripe'
+import { PaymentIntentPayload, PaymentType } from '../payments.types'
 import {
   CompletePurchaseDto,
   CreatePurchaseIntentDto,
@@ -8,8 +10,6 @@ import {
   PurchaseType,
 } from '../purchase.types'
 import { PaymentsService } from './payments.service'
-import { PaymentIntentPayload, PaymentType } from '../payments.types'
-import Stripe from 'stripe'
 
 @Injectable()
 export class PurchaseService {

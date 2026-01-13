@@ -5,11 +5,11 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common'
+import { Domain } from '@prisma/client'
+import { format } from '@redtea/format-axios-error'
 import { AxiosResponse, isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
-import { format } from '@redtea/format-axios-error'
 import { isAxiosResponse } from '../../../shared/util/http.util'
-import { Domain } from '@prisma/client'
 import {
   ForwardEmailAliasResponse,
   ForwardEmailDomainResponse,

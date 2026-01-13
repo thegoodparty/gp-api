@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common'
+import { TopIssue } from '@prisma/client'
+import { AiService } from 'src/ai/ai.service'
+import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   CreateTopIssueDto,
   TopIssueOutputDto,
 } from './schemas/topIssues.schema'
-import { TopIssue } from '@prisma/client'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { AiService } from 'src/ai/ai.service'
-import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 
 @Injectable()
 export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {

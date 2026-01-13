@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common'
 import {
   createClient,
   DeletedEntry,
@@ -5,7 +6,6 @@ import {
   EntryCollection,
   EntrySkeletonType,
 } from 'contentful'
-import { Injectable } from '@nestjs/common'
 
 const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env as Record<
   string,

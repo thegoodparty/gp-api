@@ -12,9 +12,9 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { TopIssuesService } from './topIssues.service'
-import { CreateTopIssueDto } from './schemas/topIssues.schema'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { CreateTopIssueDto } from './schemas/topIssues.schema'
+import { TopIssuesService } from './topIssues.service'
 
 @Controller('top-issues')
 @UsePipes(ZodValidationPipe)

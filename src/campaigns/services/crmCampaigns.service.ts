@@ -1,27 +1,12 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
-import usStates from 'states-us'
-import { HubSpot } from '../../crm/crm.types'
+import { AssociationTypes } from '@hubspot/api-client'
+import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4/models/AssociationSpec'
 import {
   ApiException,
   SimplePublicObject,
   SimplePublicObjectBatchInput,
 } from '@hubspot/api-client/lib/codegen/crm/companies'
-import { HubspotService } from '../../crm/hubspot.service'
-import { CampaignsService } from './campaigns.service'
-import { SlackService } from '../../vendors/slack/services/slack.service'
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
-import { getUserFullName } from '../../users/util/users.util'
-import { formatDateForCRM } from '../../crm/util/cms.util'
-import { CrmUsersService } from '../../users/services/crmUsers.service'
-import { UsersService } from '../../users/services/users.service'
-import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4/models/AssociationSpec'
-import { AssociationTypes } from '@hubspot/api-client'
-import { AiChatService } from '../ai/chat/aiChat.service'
-import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
-import { pick } from '../../shared/util/objects.util'
-import { SlackChannel } from '../../vendors/slack/slackService.types'
-import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
 import {
   CRMCompanyProperties,
   CRMCompanyPropertiesSchema,
@@ -30,7 +15,22 @@ import {
   P2V_LOCKED_STATUS,
   P2VStatus,
 } from 'src/elections/types/pathToVictory.types'
+import usStates from 'states-us'
+import { HubSpot } from '../../crm/crm.types'
+import { HubspotService } from '../../crm/hubspot.service'
+import { formatDateForCRM } from '../../crm/util/cms.util'
+import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
+import { pick } from '../../shared/util/objects.util'
+import { CrmUsersService } from '../../users/services/crmUsers.service'
+import { UsersService } from '../../users/services/users.service'
+import { getUserFullName } from '../../users/util/users.util'
+import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
+import { AiChatService } from '../ai/chat/aiChat.service'
 import { CampaignCreatedBy, OnboardingStep } from '../campaigns.types'
+import { CampaignsService } from './campaigns.service'
 
 const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 

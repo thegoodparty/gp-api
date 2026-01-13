@@ -1,8 +1,8 @@
 import { WebsiteStatus } from '@prisma/client'
-import { VanityPathSchema } from './VanityPath.schema'
 import { createZodDto } from 'nestjs-zod'
-import { z } from 'zod'
 import { GooglePlacesApiResponseSchema } from 'src/shared/schemas'
+import { z } from 'zod'
+import { VanityPathSchema } from './VanityPath.schema'
 
 export class UpdateWebsiteSchema extends createZodDto(
   z.object({

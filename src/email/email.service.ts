@@ -1,17 +1,17 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
-import { EmailData, MailgunService } from './mailgun.service'
-import {
-  getBasicEmailContent,
-  getRecoverPasswordEmailContent,
-} from './util/content.util'
 import { User } from '@prisma/client'
+import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { getUserFullName } from '../users/util/users.util'
 import {
   EmailTemplateName,
   SendEmailInput,
   SendTemplateEmailInput,
 } from './email.types'
-import { getUserFullName } from '../users/util/users.util'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { EmailData, MailgunService } from './mailgun.service'
+import {
+  getBasicEmailContent,
+  getRecoverPasswordEmailContent,
+} from './util/content.util'
 import { isTestEmail } from './util/testEmailValidator.util'
 
 const SKIPPED_EMAIL_STATUS = { status: 'test-email-skipped', id: 'test-email' }

@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
-import { topIssueFactory } from './factories/topIssue.factory'
-import { positionFactory } from './factories/position.factory'
 import { campaignPositionFactory } from './factories/campaignPosition.factory'
+import { positionFactory } from './factories/position.factory'
+import { topIssueFactory } from './factories/topIssue.factory'
 
 export default async function seedTopIssues(
   prisma: PrismaClient,

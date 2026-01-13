@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common'
-import { UsersService } from '../../users/services/users.service'
 import { Experiment } from '@amplitude/experiment-node-server'
+import { Injectable, Logger } from '@nestjs/common'
 import { User } from '@prisma/client'
+import { UsersService } from '../../users/services/users.service'
 
 const AMPLITUDE_PROJECT_API_KEY = process.env.AMPLITUDE_PROJECT_API_KEY
 if (!AMPLITUDE_PROJECT_API_KEY) {

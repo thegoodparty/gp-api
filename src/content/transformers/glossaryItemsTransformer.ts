@@ -1,5 +1,5 @@
-import { GlossaryItemAugmented, GlossaryItemRaw } from '../content.types'
 import slugify from 'slugify'
+import { GlossaryItemAugmented, GlossaryItemRaw } from '../content.types'
 import { transformContentMedia } from '../util/transformContentMedia.util'
 
 export const glossaryItemsTransformer = (

@@ -7,10 +7,10 @@ import { BadGatewayException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { AxiosResponse } from 'axios'
 import { of, throwError } from 'rxjs'
+import { beforeEach, describe, expect, it, Mocked, vi } from 'vitest'
 import { CrmCampaignsService } from '../../../campaigns/services/crmCampaigns.service'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
-import { beforeEach, describe, expect, it, vi, Mocked } from 'vitest'
 
 // Helper to create mock PublicOwner
 const createMockOwner = (

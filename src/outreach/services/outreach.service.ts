@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { CreateOutreachSchema } from '../schemas/createOutreachSchema'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { CreateOutreachSchema } from '../schemas/createOutreachSchema'
 
 @Injectable()
 export class OutreachService extends createPrismaBase(MODELS.Outreach) {

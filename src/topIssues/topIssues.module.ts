@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common'
-import { TopIssuesController } from './topIssues.controller'
-import { TopIssuesService } from './topIssues.service'
+import { AiModule } from '../ai/ai.module'
 import { PositionsController } from './positions/positions.controller'
 import { PositionsService } from './positions/positions.service'
-import { AiModule } from '../ai/ai.module'
+import { TopIssuesController } from './topIssues.controller'
+import { TopIssuesService } from './topIssues.service'
 @Module({
   imports: [AiModule],
   controllers: [TopIssuesController, PositionsController],

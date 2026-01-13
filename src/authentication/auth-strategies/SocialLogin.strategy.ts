@@ -1,9 +1,9 @@
-import { Strategy } from 'passport-custom'
-import { AuthenticationService } from '../authentication.service'
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
-import { SocialAuthPayload, SocialProvider } from '../authentication.types'
 import { User } from '@prisma/client'
+import { Strategy } from 'passport-custom'
+import { AuthenticationService } from '../authentication.service'
+import { SocialAuthPayload, SocialProvider } from '../authentication.types'
 
 export const SOCIAL_LOGIN_STRATEGY_NAME = 'social'
 

@@ -1,5 +1,5 @@
-import axios, { AxiosResponse } from 'axios'
 import { HttpException } from '@nestjs/common'
+import axios, { AxiosResponse } from 'axios'
 
 export const isAxiosResponse = (error: unknown) =>
   axios.isAxiosError(error) && (error.response as AxiosResponse)

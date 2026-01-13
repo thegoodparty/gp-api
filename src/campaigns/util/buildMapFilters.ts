@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
-import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { capitalizeFirstLetter } from 'src/shared/util/strings.util'
 
 const WINNERS_ELECTION_YEAR = process.env.WINNERS_ELECTION_YEAR
 

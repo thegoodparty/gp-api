@@ -1,19 +1,19 @@
+import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   BadRequestException,
   Injectable,
 } from '@nestjs/common'
-import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
-import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../../shared/util/http.util'
 import { format } from '@redtea/format-axios-error'
-import { Readable } from 'stream'
 import FormData from 'form-data'
-import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
-import { MediaStatus } from '../peerly.types'
 import { MimeTypes } from 'http-constants-ts'
+import { lastValueFrom } from 'rxjs'
+import { Readable } from 'stream'
+import { isAxiosResponse } from '../../../shared/util/http.util'
+import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
+import { MediaStatus } from '../peerly.types'
+import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
+import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 
 const MAX_FILE_SIZE = 512000 // 500KB
 

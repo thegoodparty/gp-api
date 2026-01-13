@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
-import { VoterDatabaseService } from '../../voters/services/voterDatabase.service'
+import { Module } from '@nestjs/common'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { VoterDatabaseService } from '../../voters/services/voterDatabase.service'
 
 /**
  * Shared voter services module to break circular dependencies between voters and peerly modules.

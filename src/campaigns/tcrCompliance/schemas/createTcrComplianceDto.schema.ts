@@ -1,3 +1,4 @@
+import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import {
   EinSchema,
@@ -5,7 +6,6 @@ import {
   UrlOrDomainSchema,
   WriteEmailSchema,
 } from '../../../shared/schemas'
-import { createZodDto } from 'nestjs-zod'
 import { urlIncludesPath } from '../../../shared/util/strings.util'
 
 export class CreateTcrComplianceDto extends createZodDto(

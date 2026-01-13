@@ -3,14 +3,14 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
 import { Reflector } from '@nestjs/core'
-import { FastifyReply } from 'fastify'
-import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
+import { AuthGuard } from '@nestjs/passport'
 import { User, UserRole } from '@prisma/client'
+import { FastifyReply } from 'fastify'
+import { SessionsService } from '../../users/services/sessions.service'
+import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
 import { TokenException } from './token.exception'
-import { SessionsService } from '../../users/services/sessions.service'
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {

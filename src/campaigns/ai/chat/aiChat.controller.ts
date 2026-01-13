@@ -13,15 +13,15 @@ import {
 } from '@nestjs/common'
 import { User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { PromptReplaceCampaign } from 'src/ai/ai.service'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
-import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
-import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
-import { AiChatService } from './aiChat.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { PromptReplaceCampaign } from 'src/ai/ai.service'
+import { AiChatService } from './aiChat.service'
+import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
+import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
+import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 
 @Controller('campaigns/ai/chat')
 @UsePipes(ZodValidationPipe)

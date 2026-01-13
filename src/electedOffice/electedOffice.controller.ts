@@ -9,16 +9,15 @@ import {
   Put,
   UsePipes,
 } from '@nestjs/common'
-import { ElectedOfficeService } from './services/electedOffice.service'
+import { Prisma, User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
-import { Prisma } from '@prisma/client'
 import { toDateOnlyString } from 'src/shared/util/date.util'
 import {
   CreateElectedOfficeDto,
   UpdateElectedOfficeDto,
 } from './schemas/electedOffice.schema'
+import { ElectedOfficeService } from './services/electedOffice.service'
 
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)

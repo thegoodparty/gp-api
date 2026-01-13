@@ -7,10 +7,10 @@ import {
   Put,
   Query,
 } from '@nestjs/common'
-import { CampaignTasksService } from './campaignTasksService'
-import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
+import { ReqCampaign } from '../decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../decorators/UseCampaign.decorator'
+import { CampaignTasksService } from './campaignTasksService'
 
 @Controller('campaigns/tasks')
 @UseCampaign()

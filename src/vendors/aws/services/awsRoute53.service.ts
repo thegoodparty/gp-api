@@ -1,11 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common'
 import {
-  Route53DomainsClient,
   CheckDomainAvailabilityCommand,
   GetDomainSuggestionsCommand,
   ListPricesCommand,
+  Route53DomainsClient,
   Route53DomainsServiceException,
 } from '@aws-sdk/client-route-53-domains'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { AwsService } from './aws.service'
 
 const AWS_ROUTE_53_REGION = 'us-east-1'

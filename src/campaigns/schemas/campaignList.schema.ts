@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod'
 import { StateSchema } from 'src/shared/schemas'
-import { z } from 'zod'
 import { ElectionLevelSchema } from 'src/shared/schemas/ElectionLevel.schema'
+import { z } from 'zod'
 
 const STATUS_FILTERS = ['active', 'inactive'] as const
 

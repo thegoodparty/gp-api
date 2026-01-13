@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
+import { expect, test } from '@playwright/test'
 
 test.describe('CRM - Integrations', () => {
   test('should handle HubSpot webhook', async ({ request }) => {

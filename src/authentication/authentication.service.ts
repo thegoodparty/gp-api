@@ -8,19 +8,19 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
-import { UsersService } from '../users/services/users.service'
-import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
-import { LoginPayload } from './schemas/LoginPayload.schema'
-import { compare } from 'bcrypt'
+import { User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { compare } from 'bcrypt'
+import { OAuth2Client, TokenInfo } from 'google-auth-library'
 import { nanoid } from 'nanoid'
+import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
+import { UsersService } from '../users/services/users.service'
 import {
   SocialAuthPayload,
   SocialProvider,
   SocialTokenValidator,
 } from './authentication.types'
-import { OAuth2Client, TokenInfo } from 'google-auth-library'
-import { User } from '@prisma/client'
+import { LoginPayload } from './schemas/LoginPayload.schema'
 
 const googleOAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 

@@ -1,5 +1,5 @@
-import { BlogArticlesSectionAugmented, BlogSectionHero } from '../content.types'
 import { BlogArticleMeta } from '@prisma/client'
+import { BlogArticlesSectionAugmented, BlogSectionHero } from '../content.types'
 
 export const generateAllSectionsResponseData = (
   sections: BlogArticlesSectionAugmented[],

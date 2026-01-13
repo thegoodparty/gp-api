@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common'
 import { Client } from '@hubspot/api-client'
+import { Injectable } from '@nestjs/common'
 import {
   MockApi,
   MockBaseDiscovery,

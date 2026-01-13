@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common'
-import { DeclareService } from './declare.service'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
+import { DeclareService } from './declare.service'
 
 @Controller('declare')
 export class DeclareController {

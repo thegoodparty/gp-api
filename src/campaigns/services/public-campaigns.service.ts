@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
+import slugify from 'slugify'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { FindByRaceIdDto } from '../schemas/public/FindByRaceId.schema'
 import { FindByRaceIdResponse } from '../schemas/public/FindByRaceIdResponse.schema'
-import slugify from 'slugify'
 
 @Injectable()
 export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {

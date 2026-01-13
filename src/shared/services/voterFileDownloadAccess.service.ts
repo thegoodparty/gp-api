@@ -1,9 +1,9 @@
-import { CampaignWith } from '../../campaigns/campaigns.types'
 import { Logger } from '@nestjs/common'
-import { SlackService } from '../../vendors/slack/services/slack.service'
 import { User } from '@prisma/client'
-import { IS_PROD } from '../util/appEnvironment.util'
+import { CampaignWith } from '../../campaigns/campaigns.types'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
+import { IS_PROD } from '../util/appEnvironment.util'
 
 export class VoterFileDownloadAccessService {
   private readonly logger = new Logger(VoterFileDownloadAccessService.name)

@@ -1,5 +1,5 @@
-import { ElectedOffice } from '@prisma/client'
 import { faker } from '@faker-js/faker'
+import { ElectedOffice } from '@prisma/client'
 import { generateFactory } from './generate'
 
 export const electedOfficeFactory = generateFactory<ElectedOffice>(() => {

@@ -5,14 +5,14 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
 import { Reflector } from '@nestjs/core'
-import { CampaignsService } from '../services/campaigns.service'
+import { Campaign } from '@prisma/client'
+import { CampaignWith } from '../campaigns.types'
 import {
   REQUIRE_CAMPAIGN_META_KEY,
   RequireCamapaignMetadata,
 } from '../decorators/UseCampaign.decorator'
-import { CampaignWith } from '../campaigns.types'
+import { CampaignsService } from '../services/campaigns.service'
 
 @Injectable()
 /**

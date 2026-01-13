@@ -7,8 +7,8 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { User, UserRole } from '@prisma/client'
-import { ROLES_KEY } from '../decorators/Roles.decorator'
 import { FastifyRequest } from 'fastify'
+import { ROLES_KEY } from '../decorators/Roles.decorator'
 
 @Injectable()
 export class AdminAuditInterceptor implements NestInterceptor {

@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common'
-import { HubspotService } from './hubspot.service'
 import { HttpModule } from '@nestjs/axios'
-import { CrmController } from './crm.controller'
+import { Module } from '@nestjs/common'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { CrmController } from './crm.controller'
+import { HubspotService } from './hubspot.service'
 
 @Module({
   providers: [HubspotService],

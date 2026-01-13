@@ -1,5 +1,5 @@
-import { z } from 'zod'
 import { isURL } from 'validator'
+import { z } from 'zod'
 
 export const UrlOrDomainSchema = z
   .string()

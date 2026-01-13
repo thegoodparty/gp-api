@@ -1,5 +1,5 @@
-import { generateRandomString } from '../../shared/util/strings.util'
 import { genSalt, genSaltSync, hash, hashSync } from 'bcrypt'
+import { generateRandomString } from '../../shared/util/strings.util'
 
 export const MIN_PASS_LENGTH = 8
 export const MAX_PASS_LENGTH = 64

@@ -1,5 +1,5 @@
-import { WebsiteView } from '@prisma/client'
 import { faker } from '@faker-js/faker'
+import { WebsiteView } from '@prisma/client'
 import { generateFactory } from './generate'
 
 export const websiteViewFactory = generateFactory<WebsiteView>(() => {

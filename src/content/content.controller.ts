@@ -7,19 +7,19 @@ import {
   ParseIntPipe,
   Query,
 } from '@nestjs/common'
-import { ContentService } from './services/content.service'
 import { ContentType } from '@prisma/client'
+import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
+import { DerivedContentTypes } from './content.types'
+import { BlogArticleMetaService } from './services/blogArticleMeta.service'
+import { ContentService } from './services/content.service'
 import {
   groupGlossaryItemsByAlpha,
   mapGlossaryItemsToSlug,
 } from './util/glossaryItems.util'
-import { BlogArticleMetaService } from './services/blogArticleMeta.service'
-import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
-import { DerivedContentTypes } from './content.types'
 
 @Controller('content')
 @PublicAccess()

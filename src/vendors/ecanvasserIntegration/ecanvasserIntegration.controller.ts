@@ -10,20 +10,20 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common'
-import { EcanvasserIntegrationService } from './services/ecanvasserIntegration.service'
-import { SurveyService } from './services/survey.service'
-import { CreateEcanvasserSchema } from './schemas/createEcanvasser.schema'
-import { UpdateEcanvasserSchema } from './schemas/updateEcanvasser.schema'
+import { Campaign } from '@prisma/client'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
-import { CampaignOwnerOrAdminGuard } from 'src/campaigns/guards/CampaignOwnerOrAdmin.guard'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { Campaign } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { CampaignOwnerOrAdminGuard } from 'src/campaigns/guards/CampaignOwnerOrAdmin.guard'
+import { CreateEcanvasserSchema } from './schemas/createEcanvasser.schema'
 import { CreateSurveySchema } from './schemas/createSurvey.schema'
 import { CreateSurveyQuestionSchema } from './schemas/createSurveyQuestion.schema'
-import { UpdateSurveyQuestionSchema } from './schemas/updateSurveyQuestion.schema'
+import { UpdateEcanvasserSchema } from './schemas/updateEcanvasser.schema'
 import { UpdateSurveySchema } from './schemas/updateSurvey.schema'
+import { UpdateSurveyQuestionSchema } from './schemas/updateSurveyQuestion.schema'
+import { EcanvasserIntegrationService } from './services/ecanvasserIntegration.service'
+import { SurveyService } from './services/survey.service'
 
 @Controller('ecanvasser')
 export class EcanvasserIntegrationController {

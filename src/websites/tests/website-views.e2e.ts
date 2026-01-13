@@ -1,13 +1,13 @@
-import { test, expect } from '@playwright/test'
+import { faker } from '@faker-js/faker'
+import { expect, test } from '@playwright/test'
+import { WebsiteView } from '@prisma/client'
 import {
-  registerUser,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
+  registerUser,
 } from '../../../e2e-tests/utils/auth.util'
-import { faker } from '@faker-js/faker'
-import { WebsiteView } from '@prisma/client'
 
 test.describe('Websites - Views', () => {
   let testUserId: number | undefined

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PathToVictory } from '@prisma/client'
-import { PrismaService } from 'src/prisma/prisma.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { PrismaService } from 'src/prisma/prisma.service'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 
 @Injectable()

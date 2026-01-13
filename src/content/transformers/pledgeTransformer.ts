@@ -1,4 +1,4 @@
-import { Transformer, PledgeAugmented, PledgeRaw } from '../content.types'
+import { PledgeAugmented, PledgeRaw, Transformer } from '../content.types'
 
 export const pledgeTransformer: Transformer<PledgeRaw, PledgeAugmented> = (
   pledges: PledgeRaw[],

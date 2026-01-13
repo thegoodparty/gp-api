@@ -1,8 +1,8 @@
+import { faker } from '@faker-js/faker'
 import {
   CampaignUpdateHistory,
   CampaignUpdateHistoryType,
 } from '@prisma/client'
-import { faker } from '@faker-js/faker'
 import { generateFactory } from './generate'
 
 export const campaignUpdateHistoryFactory =

@@ -1,22 +1,22 @@
 import {
-  Controller,
-  UsePipes,
-  Logger,
-  Get,
-  Post,
-  Put,
-  Param,
-  ParseIntPipe,
-  Delete,
   Body,
-  UseGuards,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Logger,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  UseGuards,
+  UsePipes,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { CampaignOwnerOrAdminGuard } from '../guards/CampaignOwnerOrAdmin.guard'
 import { CampaignPositionsService } from './campaignPositions.service'
 import { CreateCampaignPositionSchema } from './schemas/CreateCampaignPosition.schema'
-import { CampaignOwnerOrAdminGuard } from '../guards/CampaignOwnerOrAdmin.guard'
 import { UpdateCampaignPositionSchema } from './schemas/UpdateCampaignPosition.schema'
 
 @Controller('campaigns/:id/positions')

@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
-import { z } from 'zod'
 import { isFQDN } from 'validator'
+import { z } from 'zod'
 
 export class SearchDomainSchema extends createZodDto(
   z.object({

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('CMS Content - FAQ Articles', () => {
   test('should fetch all FAQ articles', async ({ request }) => {

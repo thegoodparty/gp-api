@@ -1,3 +1,4 @@
+import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
 import {
   BadGatewayException,
   BadRequestException,
@@ -5,9 +6,21 @@ import {
   HttpStatus,
   Injectable,
 } from '@nestjs/common'
-import { AwsRoute53Service } from 'src/vendors/aws/services/awsRoute53.service'
+import { Timeout } from '@nestjs/schedule'
 import { Domain, DomainStatus, User } from '@prisma/client'
-import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
+import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
+import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
+import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
+import { GetProjectDomainResponseBody } from '@vercel/sdk/models/getprojectdomainop'
+import { Records } from '@vercel/sdk/models/getrecordsop'
+import { VerifyProjectDomainResponseBody } from '@vercel/sdk/models/verifyprojectdomainop'
+import { isAxiosError } from 'axios'
+import { PaymentStatus } from 'src/payments/payments.types'
+import { PurchaseHandler } from 'src/payments/purchase.types'
+import { PaymentsService } from 'src/payments/services/payments.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { AwsRoute53Service } from 'src/vendors/aws/services/awsRoute53.service'
+import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import {
   FORWARDEMAIL_MX1_VALUE,
   FORWARDEMAIL_MX2_VALUE,
@@ -15,27 +28,14 @@ import {
   VercelDnsRecordType,
   VercelService,
 } from 'src/vendors/vercel/services/vercel.service'
-import { PaymentsService } from 'src/payments/services/payments.service'
-import { PaymentStatus } from 'src/payments/payments.types'
-import { StripeService } from 'src/vendors/stripe/services/stripe.service'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 import { GP_DOMAIN_CONTACT } from 'src/vendors/vercel/vercel.const'
-import { PurchaseHandler } from 'src/payments/purchase.types'
-import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
-import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
-import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
-import { QueueProducerService } from '../../queue/producer/queueProducer.service'
-import { Timeout } from '@nestjs/schedule'
-import { MessageGroup, QueueType } from '../../queue/queue.types'
-import { AddProjectDomainResponseBody } from '@vercel/sdk/models/addprojectdomainop'
-import { BuySingleDomainResponseBody } from '@vercel/sdk/models/buysingledomainop'
-import { GetDomainResponseBody } from '@vercel/sdk/models/getdomainop'
-import { Records } from '@vercel/sdk/models/getrecordsop'
-import { GetProjectDomainResponseBody } from '@vercel/sdk/models/getprojectdomainop'
-import { isAxiosError } from 'axios'
-import { VerifyProjectDomainResponseBody } from '@vercel/sdk/models/verifyprojectdomainop'
 import Stripe from 'stripe'
+import { QueueProducerService } from '../../queue/producer/queueProducer.service'
+import { MessageGroup, QueueType } from '../../queue/queue.types'
+import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
+import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
+import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
+import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 
 const { ENABLE_DOMAIN_SETUP } = process.env
 

@@ -1,8 +1,8 @@
-import { defineConfig } from 'vitest/config'
-import tsconfigPaths from 'vite-tsconfig-paths'
-import swc from 'unplugin-swc'
 import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
+import swc from 'unplugin-swc'
+import tsconfigPaths from 'vite-tsconfig-paths'
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   // We have to disable esbuild and use swc because esbuild doesn't support

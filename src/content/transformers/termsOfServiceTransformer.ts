@@ -1,7 +1,7 @@
 import {
-  Transformer,
   TermsOfServiceAugmented,
   TermsOfServiceRaw,
+  Transformer,
 } from '../content.types'
 
 export const termsOfServiceTransformer: Transformer<

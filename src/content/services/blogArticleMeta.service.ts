@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { addDays } from 'date-fns'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
-import { addDays } from 'date-fns'
 import { mapBlogArticlesToSections } from '../util/mapBlogArticlesToSections.util'
 
 @Injectable()

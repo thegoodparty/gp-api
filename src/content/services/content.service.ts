@@ -1,7 +1,10 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { ContentfulService } from '../../vendors/contentful/contentful.service'
 import { Content, ContentType } from '@prisma/client'
+import { InputJsonObject } from '@prisma/client/runtime/client'
 import { Entry } from 'contentful'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { ProcessTimersService } from '../../shared/services/process-timers.service'
+import { ContentfulService } from '../../vendors/contentful/contentful.service'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
@@ -12,10 +15,7 @@ import {
   findByTypeOptions,
   GlossaryItemAugmented,
 } from '../content.types'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { ProcessTimersService } from '../../shared/services/process-timers.service'
 import { preProcessBlogArticleMeta } from '../util/preProcessBlogArticleMeta'
-import { InputJsonObject } from '@prisma/client/runtime/client'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {

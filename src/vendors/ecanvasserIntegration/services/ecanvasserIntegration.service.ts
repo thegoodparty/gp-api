@@ -5,15 +5,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { CreateEcanvasserSchema } from '../schemas/createEcanvasser.schema'
-import { UpdateEcanvasserSchema } from '../schemas/updateEcanvasser.schema'
-import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
 import slugify from 'slugify'
-import { EcanvasserSummary } from '../ecanvasserIntegration.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { CampaignsService } from '../../../campaigns/services/campaigns.service'
+import { EcanvasserSummary } from '../ecanvasserIntegration.types'
+import { CreateEcanvasserSchema } from '../schemas/createEcanvasser.schema'
+import { UpdateEcanvasserSchema } from '../schemas/updateEcanvasser.schema'
 import { EcanvasserService } from './ecanvasser.service'
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000

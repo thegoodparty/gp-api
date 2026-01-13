@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
-import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
+import { Interval } from '@nestjs/schedule'
 import { ScheduledMessage } from '@prisma/client'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { EmailService } from '../email/email.service'
 import { ScheduledMessageTypes } from '../email/email.types'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { Interval } from '@nestjs/schedule'
+import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
 
 const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
   .SCHEDULED_MESSAGING_INTERVAL_SECS

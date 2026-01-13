@@ -1,8 +1,8 @@
+import { OutreachType } from '@prisma/client'
 import {
   SlackMessageBlock,
   SlackMessageType,
 } from 'src/vendors/slack/slackService.types'
-import { OutreachType } from '@prisma/client'
 
 export type AudienceSlackBlock = {
   type: SlackMessageType.RICH_TEXT_SECTION

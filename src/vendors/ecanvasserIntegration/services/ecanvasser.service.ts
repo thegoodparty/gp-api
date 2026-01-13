@@ -2,6 +2,8 @@
 
 import { HttpService } from '@nestjs/axios'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { AxiosResponse } from 'axios'
+import { Methods } from 'http-constants-ts'
 import { lastValueFrom } from 'rxjs'
 import {
   ApiEcanvasserContact,
@@ -13,10 +15,8 @@ import {
   ApiResponse,
   PaginationParams,
 } from '../ecanvasserIntegration.types'
-import { Methods } from 'http-constants-ts'
 import { UpdateSurveySchema } from '../schemas/updateSurvey.schema'
 import { UpdateSurveyQuestionSchema } from '../schemas/updateSurveyQuestion.schema'
-import { AxiosResponse } from 'axios'
 
 const DEFAULT_PAGE_SIZE = 1000
 

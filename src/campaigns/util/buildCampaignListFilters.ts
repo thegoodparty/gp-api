@@ -1,6 +1,6 @@
+import { Prisma } from '@prisma/client'
 import { caseInsensitiveCompare } from 'src/prisma/util/json.util'
 import { CampaignListSchema } from '../schemas/campaignList.schema'
-import { Prisma } from '@prisma/client'
 
 export function buildCampaignListFilters({
   id,

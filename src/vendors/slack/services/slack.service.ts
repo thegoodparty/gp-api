@@ -4,8 +4,10 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
+import { WebClient } from '@slack/web-api'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom } from 'rxjs'
+import { serializeError } from 'serialize-error'
 import { SLACK_CHANNEL_IDS } from '../slackService.config'
 import {
   FormattedSlackMessageArgs,
@@ -14,8 +16,6 @@ import {
   SlackMessageType,
   VanitySlackMethodArgs,
 } from '../slackService.types'
-import { WebClient } from '@slack/web-api'
-import { serializeError } from 'serialize-error'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 

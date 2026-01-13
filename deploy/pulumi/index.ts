@@ -1,5 +1,5 @@
-import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
+import * as pulumi from '@pulumi/pulumi'
 import { Compute } from './components/compute'
 import { Database } from './components/database'
 import { Queue } from './components/queue'

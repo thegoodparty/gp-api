@@ -3,7 +3,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
-import { gql, GraphQLClient } from 'graphql-request'
+import { GraphQLClient, gql } from 'graphql-request'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
 import { truncateZip } from 'src/shared/util/zipcodes.util'

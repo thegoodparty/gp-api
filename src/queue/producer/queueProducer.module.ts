@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
-import { QueueProducerService } from './queueProducer.service'
 import { QueueProducerController } from './queueProducer.controller'
+import { QueueProducerService } from './queueProducer.service'
 
 @Module({
   controllers: [QueueProducerController],

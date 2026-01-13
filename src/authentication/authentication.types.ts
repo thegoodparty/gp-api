@@ -1,5 +1,5 @@
-import { ReadUserOutput } from '../users/schemas/ReadUserOutput.schema'
 import { Campaign } from '@prisma/client'
+import { ReadUserOutput } from '../users/schemas/ReadUserOutput.schema'
 
 export type LoginResult = {
   user: ReadUserOutput

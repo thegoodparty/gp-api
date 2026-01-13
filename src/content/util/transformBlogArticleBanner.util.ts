@@ -1,5 +1,5 @@
-import { transformContentMedia } from './transformContentMedia.util'
 import { BlogArticleBannerRaw } from '../content.types'
+import { transformContentMedia } from './transformContentMedia.util'
 
 export const transformBlogArticleBanner = (
   rawBanner: BlogArticleBannerRaw,

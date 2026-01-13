@@ -3,13 +3,13 @@ import { parseArgs } from 'util'
 
 // factory seeds
 import seedCampaigns from './campaigns'
-import seedTopIssues from './topIssues'
-import seedUsers, { ADMIN_USER, SERVE_USER } from './users'
-import seedWebsiteData from './websiteData'
 // csv file seeds
 import seedMtfcc from './mtfcc'
 import seedOffices from './offices'
+import seedTopIssues from './topIssues'
+import seedUsers, { ADMIN_USER, SERVE_USER } from './users'
 import { seedEcanvasserDemoAccount } from './util/seedEcanvasserDemoAccount.util'
+import seedWebsiteData from './websiteData'
 
 const IS_PREVIEW = process.env.IS_PREVIEW === 'true'
 

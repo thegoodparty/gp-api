@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import { createZodDto } from 'nestjs-zod'
 import {
   PasswordSchema,
@@ -7,6 +6,7 @@ import {
   WriteEmailSchema,
   ZipSchema,
 } from 'src/shared/schemas'
+import { z } from 'zod'
 
 export enum SIGN_UP_MODE {
   CANDIDATE = 'candidate',

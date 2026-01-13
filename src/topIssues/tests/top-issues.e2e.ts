@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test'
-import { HttpStatus } from '@nestjs/common'
-import { loginUser } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
+import { HttpStatus } from '@nestjs/common'
+import { expect, test } from '@playwright/test'
+import { loginUser } from '../../../e2e-tests/utils/auth.util'
 
 test.describe('TopIssues - CRUD Operations', () => {
   const adminEmail = process.env.ADMIN_EMAIL

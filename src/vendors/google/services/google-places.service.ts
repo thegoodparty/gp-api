@@ -1,7 +1,7 @@
-import { Injectable, BadGatewayException } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
-import { GooglePlacesApiResponse } from '../../../shared/types/GooglePlaces.types'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { firstValueFrom } from 'rxjs'
+import { GooglePlacesApiResponse } from '../../../shared/types/GooglePlaces.types'
 
 const googleApiKey = process.env.GOOGLE_API_KEY
 

@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common'
 import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
-import { Producer } from 'sqs-producer'
+import { Injectable, Logger } from '@nestjs/common'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
+import { Producer } from 'sqs-producer'
 import { queueConfig } from '../queue.config'
 import { MessageGroup, QueueMessage } from '../queue.types'
 

@@ -1,8 +1,8 @@
 import { PrismaClient } from '@prisma/client'
-import { electedOfficeFactory } from './factories/electedOffice.factory'
 import { BallotReadyPositionLevel } from '../src/campaigns/campaigns.types'
 import { P2VStatus } from '../src/elections/types/pathToVictory.types'
 import { P2VSource } from '../src/pathToVictory/types/pathToVictory.types'
+import { electedOfficeFactory } from './factories/electedOffice.factory'
 
 export default async function seedOffices(email: string, prisma: PrismaClient) {
   const user = await prisma.user.findUnique({

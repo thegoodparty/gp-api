@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test'
-import { loginUser } from '../../../../e2e-tests/utils/auth.util'
+import { expect, test } from '@playwright/test'
 import { CampaignUpdateHistory } from '@prisma/client'
+import { loginUser } from '../../../../e2e-tests/utils/auth.util'
 
 test.describe('Campaigns - Update History', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL

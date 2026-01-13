@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { SubscribeEmailSchema } from './subscribeEmail.schema'
 import { CrmUsersService } from '../users/services/crmUsers.service'
+import { SubscribeEmailSchema } from './subscribeEmail.schema'
 
 @Injectable()
 export class SubscribeService {

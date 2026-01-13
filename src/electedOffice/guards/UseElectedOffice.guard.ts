@@ -6,12 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { ElectedOfficeService } from '../services/electedOffice.service'
+import { ElectedOffice } from '@prisma/client'
 import {
   REQUIRE_ELECTED_OFFICE_META_KEY,
   RequireElectedOfficeMetadata,
 } from '../decorators/UseElectedOffice.decorator'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOfficeService } from '../services/electedOffice.service'
 
 @Injectable()
 export class UseElectedOfficeGuard implements CanActivate {

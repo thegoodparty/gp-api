@@ -1,14 +1,14 @@
-import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
+import { expect, test } from '@playwright/test'
 import {
-  registerUser,
+  cleanupTestUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
-  cleanupTestUser,
+  registerUser,
 } from '../../../e2e-tests/utils/auth.util'
-import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
+import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
 
 test.describe('Users - Get Current User', () => {
   test.afterEach(async ({ request }, testInfo) => {

@@ -1,7 +1,7 @@
-import { User, UserRole } from '@prisma/client'
 import { faker } from '@faker-js/faker'
-import { generateFactory } from './generate'
+import { User, UserRole } from '@prisma/client'
 import { generateRandomPassword } from '../../src/users/util/passwords.util'
+import { generateFactory } from './generate'
 
 // filter admin from seeded users
 const seedRoles = Object.values(UserRole).filter((r) => r !== UserRole.admin)

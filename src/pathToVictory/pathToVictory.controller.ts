@@ -1,15 +1,15 @@
 import {
+  BadGatewayException,
   Controller,
   Get,
-  Param,
-  Logger,
-  BadGatewayException,
   HttpException,
+  Logger,
+  Param,
   ParseIntPipe,
 } from '@nestjs/common'
-import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
-import { Roles } from '../authentication/decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'
+import { Roles } from '../authentication/decorators/Roles.decorator'
+import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 
 @Controller('path-to-victory')
 @Roles(UserRole.admin)

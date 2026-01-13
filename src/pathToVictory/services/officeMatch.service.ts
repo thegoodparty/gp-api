@@ -1,4 +1,3 @@
-import { ElectionLevel } from '@/campaigns/campaigns.types'
 import { Injectable, Logger } from '@nestjs/common'
 import { getYear } from 'date-fns'
 import {
@@ -9,6 +8,7 @@ import { AiChatMessage } from 'src/campaigns/ai/chat/aiChat.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { parseJsonString } from 'src/shared/util/zod.util'
 import { z } from 'zod'
+import { ElectionLevel } from '@/campaigns/campaigns.types'
 import { AiService } from '../../ai/ai.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackService } from '../../vendors/slack/services/slack.service'

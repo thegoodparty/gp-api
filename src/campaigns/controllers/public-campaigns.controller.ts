@@ -1,9 +1,9 @@
 import {
   Controller,
   Get,
-  Query,
   Logger,
   NotFoundException,
+  Query,
 } from '@nestjs/common'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { FindByRaceIdDto } from '../schemas/public/FindByRaceId.schema'

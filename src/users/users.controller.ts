@@ -16,23 +16,23 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { UsersService } from './services/users.service'
-import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { MimeTypes } from 'http-constants-ts'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
+import { FilesService } from 'src/files/files.service'
+import { FileUpload } from 'src/files/files.types'
+import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
+import { AuthenticationService } from '../authentication/authentication.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
-import { ZodValidationPipe } from 'nestjs-zod'
+import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
 import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
-import { FilesService } from 'src/files/files.service'
-import { FileUpload } from 'src/files/files.types'
-import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
-import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
-import { MimeTypes } from 'http-constants-ts'
 import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
-import { AuthenticationService } from '../authentication/authentication.service'
 import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
+import { UsersService } from './services/users.service'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)

@@ -1,14 +1,14 @@
 import {
+  BadGatewayException,
   Controller,
   Get,
-  Param,
-  NotFoundException,
   HttpException,
-  BadGatewayException,
   Logger,
+  NotFoundException,
+  Param,
 } from '@nestjs/common'
-import { JobsService } from './jobs.service'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
+import { JobsService } from './jobs.service'
 
 @Controller('jobs')
 @PublicAccess()
