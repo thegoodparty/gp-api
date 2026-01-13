@@ -114,7 +114,8 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
-## Swagger / API documentation
+
+
 
 - Visit http://localhost:3000/api to see swagger documentation
 - Visit http://localhost:3000/api-json to get the JSON openApi representation of swagger config
