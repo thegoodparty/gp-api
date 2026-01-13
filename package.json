@@ -29,7 +29,10 @@
     "test:e2e:ui": "playwright test --config=e2e-tests/playwright.config.ts --ui",
     "test:e2e:debug": "playwright test --config=e2e-tests/playwright.config.ts --debug",
     "test:e2e:report": "playwright show-report e2e-tests/playwright-report",
-    "install:clean": "rm -rf node_modules package-lock.json && npm install"
+    "install:clean": "rm -rf node_modules package-lock.json && npm install",
+    "worker:dev": "nest start --watch --entryFile worker",
+    "worker:build": "nest build --config nest-cli.worker.json",
+    "worker:start": "node -r ./newrelic.js dist/worker/main"
   },
   "prisma": {
     "seed": "tsx ./seed/seed.ts",
@@ -98,6 +101,7 @@
     "graphql": "^16.10.0",
     "graphql-request": "^7.1.2",
     "http-constants-ts": "^1.0.8",
+    "inngest": "^3.22.13",
     "jsonwebtoken": "^9.0.2",
     "libphonenumber-js": "^1.12.10",
     "mailgun.js": "^10.2.4",

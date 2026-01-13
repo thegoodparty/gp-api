@@ -11,6 +11,68 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+    networks:
+      - gp-network
+
+  # Inngest Dev Server for local development
+  inngest:
+    image: inngest/inngest:latest
+    container_name: goodparty-inngest
+    ports:
+      - "3001:3001"  # Inngest UI
+    environment:
+      - INNGEST_DEV=true
+    networks:
+      - gp-network
+    restart: unless-stopped
+
+  # API Service (runs in development mode)
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: goodparty-api
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/gpdb?schema=public
+  #     - INNGEST_DEV_SERVER_URL=http://inngest:3001
+  #     - NODE_ENV=development
+  #   volumes:
+  #     - ./src:/app/src
+  #     - ./prisma:/app/prisma
+  #   depends_on:
+  #     - postgres
+  #     - inngest
+  #   networks:
+  #     - gp-network
+  #   command: npm run start:dev
+
+  # Inngest Worker Service (separate process)
+  # inngest-worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: goodparty-inngest-worker
+  #   environment:
+  #     - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/gpdb?schema=public
+  #     - INNGEST_DEV_SERVER_URL=http://inngest:3001
+  #     - NODE_ENV=development
+  #     - WORKER_PORT=3002
+  #   volumes:
+  #     - ./src:/app/src
+  #     - ./prisma:/app/prisma
+  #   depends_on:
+  #     - postgres
+  #     - inngest
+  #   networks:
+  #     - gp-network
+  #   command: npm run worker:dev
+
 volumes:
   postgres_data:
     driver: local
+
+networks:
+  gp-network:
+    driver: bridge
