@@ -3,13 +3,6 @@
   "files": {
     "includes": ["**", "!!dist/**/*", "!!deploy/.sst", "!!**/playwright-report"]
   },
-  "assist": {
-    "actions": {
-      "source": {
-        "organizeImports": "off"
-      }
-    }
-  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",

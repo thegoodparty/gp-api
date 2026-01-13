@@ -1,3 +1,5 @@
+// biome-ignore-all assist/source/organizeImports: This needs to be organized by hand.
+// The wrong import order here can break the startup of the NestJS app.
 import { Module } from '@nestjs/common'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ContentModule } from './content/content.module'
