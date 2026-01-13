@@ -1,6 +1,7 @@
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { BaseMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
+
 import { Injectable, Logger } from '@nestjs/common'
 import { Prisma, User } from '@prisma/client'
 import { OpenAI } from 'openai'
@@ -92,8 +93,8 @@ export class AiService {
       maxRetries: 0,
     }
 
-    let firstModel: ChatOpenAI | ChatTogetherAI | undefined
-    let fallbackModel: ChatOpenAI | ChatTogetherAI | undefined
+    let firstModel: BaseChatModel | undefined
+    let fallbackModel: BaseChatModel | undefined
 
     for (const model of models) {
       if (model.includes('gpt')) {
@@ -112,16 +113,22 @@ export class AiService {
         }
       } else {
         if (!firstModel) {
-          firstModel = new ChatTogetherAI({
+          firstModel = new ChatOpenAI({
             apiKey: TOGETHER_AI_KEY,
             model,
             ...aiOptions,
+            configuration: {
+              baseURL: 'https://api.together.xyz/v1',
+            },
           })
         } else {
-          fallbackModel = new ChatTogetherAI({
+          fallbackModel = new ChatOpenAI({
             apiKey: TOGETHER_AI_KEY,
             model,
             ...aiOptions,
+            configuration: {
+              baseURL: 'https://api.together.xyz/v1',
+            },
           })
         }
       }

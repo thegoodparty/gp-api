@@ -52,27 +52,22 @@ export const bootstrap = async (
   const document = SwaggerModule.createDocument(app, swaggerConfig)
   SwaggerModule.setup('api', app, document)
 
-  // @ts-expect-error - Type augmentation issue with Fastify plugins
   await app.register(helmet)
 
-  // @ts-expect-error - Type augmentation issue with Fastify plugins
   await app.register(cors, {
     origin: process.env.CORS_ORIGIN || '*',
     credentials: true,
   })
 
-  // @ts-expect-error - Type augmentation issue with Fastify plugins
   await app.register(fastifyStatic, {
     root: join(__dirname, '..', 'public'),
     prefix: '/public/',
   })
 
-  // @ts-expect-error - Type augmentation issue with Fastify plugins
   await app.register(cookie, {
     secret: process.env.AUTH_SECRET,
   })
 
-  // @ts-expect-error - Type augmentation issue with Fastify plugins
   await app.register(multipart, {
     limits: {
       // global default limits, can be overidden at handler level

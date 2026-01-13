@@ -99,8 +99,8 @@ export class VercelService {
 
   async checkDomainPrice(domainName: string) {
     try {
-      const result = await this.client.domains.checkDomainPrice({
-        name: domainName,
+      const result = await this.client.domainsRegistrar.getDomainPrice({
+        domain: domainName,
         teamId: VERCEL_TEAM_ID,
       })
 
