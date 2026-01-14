@@ -1,19 +1,41 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as aws from '@pulumi/aws';
+import * as awsx from '@pulumi/awsx';
 import { Compute } from './components/compute';
 import { Database } from './components/database';
-import { Queue } from './components/queue';
+import { Vpc } from './components/vpc';
 
 const config = new pulumi.Config();
 const stackName = pulumi.getStack();
 
 // 1. Infrastructure Config
-const vpcId = config.require('vpcId');
-const publicSubnetIds = config.requireObject<string[]>('publicSubnetIds');
-const privateSubnetIds = config.requireObject<string[]>('privateSubnetIds');
+const vpcId = 'vpc-0763fa52c32ebcf6a';
+const publicSubnetIds = ['subnet-07984b965dabfdedc', 'subnet-01c540e6428cdd8db']
+const privateSubnetIds = ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f']
 const securityGroupId = config.require('securityGroupId');
 const certificateArn = config.require('certificateArn');
 const imageUri = config.require('imageUri');
+
+// ------- DIVERGE: BEGIN SWAIN --------
+type Environment = 'preview' | 'dev' | 'qa' | 'prod';
+const environment = config.get<Environment>('environment');
+if (!environment || !['preview', 'dev', 'qa', 'prod'].includes(environment)) {
+    throw new Error('Invalid environment');
+}
+
+if ( environment === 'prod') {
+    new Vpc('gp-api-vpc', { azs: 2 })
+}
+
+// TODO: provision assets bucket
+
+if (environment !== 'prod') {
+    // TODO: provision "Router"...wait, how is this working in master. THIS IS HELL
+}
+
+awsx.classic.
+
+// ------- DIVERGE: END SWAIN --------
 
 // 2. Secrets Config
 const secretArn = config.require('secretArn');
@@ -93,11 +115,25 @@ const taskSecurityGroup = new aws.ec2.SecurityGroup(`${shortName}-task-sg`, {
     tags: resourceTags,
 });
 
-const queue = new Queue(`${stackName}-queue`, {
-    isPreview,
-    prNumber,
-    namePrefix: stageName,
-    tags: baseTags,
+const dlq = new aws.sqs.Queue(`${name}-dlq`, {
+    name: `${stageName}-DLQ.fifo`,
+    fifoQueue: true,
+    messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+    tags: resourceTags,
+});
+
+const queue = new aws.sqs.Queue(`${name}-queue`, {
+    name: `${stageName}-Queue.fifo`,
+    fifoQueue: true,
+    messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+    visibilityTimeoutSeconds: 300, // 5 minutes
+    deduplicationScope: 'messageGroup',
+    fifoThroughputLimit: 'perMessageGroupId',
+    redrivePolicy: pulumi.interpolate`{
+        "deadLetterTargetArn": "${dlq.arn}",
+        "maxReceiveCount": 3
+    }`,
+    tags: resourceTags,
 });
 
 // Fetch and Parse Secret
@@ -137,8 +173,8 @@ if (isPreview) {
 const finalEnvVars = pulumi.all([
     secretData, 
     databaseUrl, 
-    queue.queueName, 
-    queue.queueUrl,
+    queue.name, 
+    queue.url,
     adminEmail || '',
     adminPassword || pulumi.output(''),
     candidateEmail || '',
@@ -183,7 +219,7 @@ const compute = new Compute(`${stackName}-compute`, {
     prNumber,
     certificateArn: effectiveCertArn,
     environment: finalEnvVars,
-    queueArn: queue.queueArn,
+    queueArn: queue.arn,
     tags: baseTags,
     hostedZoneId: effectiveHostedZoneId,
     domain: effectiveDomain,

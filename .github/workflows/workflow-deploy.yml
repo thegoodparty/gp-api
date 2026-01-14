@@ -17,11 +17,11 @@ on:
       pulumi_stack_prefix:
         required: false
         type: string
-        default: 'gp-api'
+        default: "gp-api"
       preview_domain:
         required: false
         type: string
-        default: 'preview.goodparty.org'
+        default: "preview.goodparty.org"
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -159,7 +159,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -170,8 +170,8 @@ jobs:
       - name: Install Pulumi CLI
         uses: pulumi/actions@v4
         with:
-          pulumi-version: 'latest'
-          command: ''
+          pulumi-version: "latest"
+          command: ""
 
       - name: Install Pulumi SDK Dependencies
         working-directory: ./deploy/pulumi
@@ -194,9 +194,6 @@ jobs:
 
           # Configure Infrastructure (Essential for new stacks)
           pulumi config set aws:region us-west-2
-          pulumi config set vpcId ${{ secrets.VPC_ID }}
-          pulumi config set --path publicSubnetIds '${{ secrets.PUBLIC_SUBNETS }}'
-          pulumi config set --path privateSubnetIds '${{ secrets.PRIVATE_SUBNETS }}'
           pulumi config set securityGroupId ${{ secrets.SECURITY_GROUP_ID }}
           pulumi config set certificateArn ${{ secrets.CERTIFICATE_ARN }}
 
@@ -257,8 +254,8 @@ jobs:
         id: find-comment
         with:
           issue-number: ${{ github.event.number }}
-          comment-author: 'github-actions[bot]'
-          body-includes: '🚀 Preview Environment'
+          comment-author: "github-actions[bot]"
+          body-includes: "🚀 Preview Environment"
 
       - name: Post PR comment
         if: steps.find-comment.outputs.comment-id == ''
