@@ -56,7 +56,6 @@ import { BraintrustModule } from './vendors/braintrust/braintrust.module'
     ElectionsModule,
     TopIssuesModule,
     AdminModule,
-    QueueConsumerModule,
     SharedModule,
     PaymentsModule,
     VotersModule,
@@ -73,7 +72,14 @@ import { BraintrustModule } from './vendors/braintrust/braintrust.module'
     ContactsModule,
     PollsModule,
     ElectedOfficeModule,
-  ],
+  ]
+    // Today, the QueueConsumerModule can't really work in the unit test environment,
+    // because it needs a real SQS queue to work.
+    //
+    // In the future, we might be able to support testing end-to-end background work
+    // with a local mock queue, or https://www.localstack.cloud, or by migrating to a
+    // more local-friendly background-work service like e.g. https://www.inngest.com.
+    .concat(process.env.NODE_ENV === 'test' ? [] : [QueueConsumerModule]),
   providers: [
     SessionsService,
     {
