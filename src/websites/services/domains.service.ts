@@ -303,7 +303,11 @@ export class DomainsService
     let searchedDomainPrice: number | undefined
     try {
       const vercelPrice = await this.vercel.checkDomainPrice(domainName)
-      searchedDomainPrice = vercelPrice.price
+      const vercelPurchasePrice = vercelPrice.purchasePrice
+      searchedDomainPrice =
+        vercelPurchasePrice === undefined
+          ? undefined
+          : Number(vercelPurchasePrice)
     } catch (error) {
       this.logger.warn(`Could not get Vercel price for ${domainName}:`, error)
     }
@@ -317,7 +321,11 @@ export class DomainsService
             const vercelPrice = await this.vercel.checkDomainPrice(
               suggestion.DomainName,
             )
-            price = vercelPrice.price
+            const vercelPurchasePrice = vercelPrice.purchasePrice
+            price =
+              vercelPurchasePrice === undefined
+                ? undefined
+                : Number(vercelPurchasePrice)
           }
         } catch (error) {
           this.logger.warn(
