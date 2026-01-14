@@ -116,7 +116,12 @@ export class VercelService {
         )
       }
 
-      return { price: result.purchasePrice }
+      const price =
+        typeof result.purchasePrice === 'string'
+          ? parseFloat(result.purchasePrice)
+          : result.purchasePrice
+
+      return { price }
     } catch (error) {
       this.logger.error(`Error checking price for domain ${domainName}:`, error)
       throw error
