@@ -313,6 +313,9 @@ export default $config({
 
     // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
     cluster.addService(`gp-api-${$app.stage}`, {
+      logging: {
+        retention: $app.stage === 'master' ? '2 months' : '1 month',
+      },
       loadBalancer: {
         domain: apiDomain,
         ports: [
