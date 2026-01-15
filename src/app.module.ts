@@ -36,10 +36,12 @@ import { PeerlyModule } from './vendors/peerly/peerly.module'
 import { ContactsModule } from './contacts/contacts.module'
 import { PollsModule } from './polls/polls.module'
 import { FeaturesModule } from './features/features.module'
+import { BraintrustModule } from './vendors/braintrust/braintrust.module'
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    BraintrustModule,
     AnalyticsModule,
     UsersModule,
     FeaturesModule,
@@ -54,7 +56,6 @@ import { FeaturesModule } from './features/features.module'
     ElectionsModule,
     TopIssuesModule,
     AdminModule,
-    QueueConsumerModule,
     SharedModule,
     PaymentsModule,
     VotersModule,
@@ -71,7 +72,14 @@ import { FeaturesModule } from './features/features.module'
     ContactsModule,
     PollsModule,
     ElectedOfficeModule,
-  ],
+  ]
+    // Today, the QueueConsumerModule can't really work in the unit test environment,
+    // because it needs a real SQS queue to work.
+    //
+    // In the future, we might be able to support testing end-to-end background work
+    // with a local mock queue, or https://www.localstack.cloud, or by migrating to a
+    // more local-friendly background-work service like e.g. https://www.inngest.com.
+    .concat(process.env.NODE_ENV === 'test' ? [] : [QueueConsumerModule]),
   providers: [
     SessionsService,
     {

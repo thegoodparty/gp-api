@@ -1,13 +1,14 @@
-import { BadGatewayException, Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
-import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../../shared/util/http.util'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { format } from '@redtea/format-axios-error'
-import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { AxiosResponse } from 'axios'
+import { lastValueFrom } from 'rxjs'
+import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
+import { isAxiosResponse } from '../../../shared/util/http.util'
+import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
+import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials.util'
+import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 
 interface Template {
   is_default: boolean
@@ -32,6 +33,7 @@ interface Template {
 }
 
 interface CreateJobParams {
+  crmCompanyId: string
   name: string
   templates: Template[]
   didState: string
@@ -51,6 +53,12 @@ interface PeerlyApiErrorResponse {
 interface PeerlyApiResponse {
   id?: string
   [key: string]: unknown
+}
+
+interface PeerlyAgent {
+  id: string
+  display_email: string
+  status?: string
 }
 
 export enum PeerlyJobStatus {
@@ -145,6 +153,7 @@ type PeerlyAxiosError = {
 export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   constructor(
     private readonly httpService: HttpService,
+    private readonly crmCampaigns: CrmCampaignsService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
   ) {
     super()
@@ -187,6 +196,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   }
 
   async createJob({
+    crmCompanyId,
     name,
     templates,
     didState,
@@ -196,12 +206,39 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
 
+    /// here we need to get the agent email from hubspot and call the getAgentIdByEmail method to get the agent id and then use it in the agent_ids array
+
+    // Automatically assign PA as agent in Peerly
+    // NOTE: This fetches agent list from Peerly on every job creation (see listAgents() for caching notes)
+    const agentIds: string[] = []
+    try {
+      const owner = crmCompanyId
+        ? await this.crmCampaigns.getCrmCompanyOwner(crmCompanyId)
+        : null
+      const agentId = owner?.email
+        ? await this.getAgentIdByEmail(owner.email)
+        : null
+      if (agentId) {
+        agentIds.push(agentId)
+        this.logger.log(`Successfully assigned agent ${agentId} to job`)
+      } else if (owner?.email) {
+        this.logger.warn(`No Peerly agent found for PA email: ${owner.email}`)
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to assign PA as agent, creating job without agent assignment',
+        error,
+      )
+      // Job creation continues without agent assignment - graceful degradation
+    }
+
     const body = {
       account_id: this.accountNumber,
       name,
       templates,
       did_state: didState,
       can_use_mms: hasMms,
+      ...(agentIds.length > 0 && { agent_ids: agentIds }),
       schedule_id: this.scheduleId,
       ...(identityId && { identity_id: identityId }),
       ...(startDate && { start_date: startDate }),
@@ -334,5 +371,50 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     } catch (error) {
       this.handleApiError(error)
     }
+  }
+
+  /**
+   * Fetches all agents from Peerly API
+   *
+   * NOTE: This currently fetches fresh data on every call (no caching).
+   * Agent list changes infrequently, so caching could improve performance.
+   *
+   * Consider adding in-memory cache (5-min TTL) if:
+   * - Job creation latency becomes > 1s
+   * - Volume exceeds 50+ jobs/day
+   * - Peerly API reliability issues occur
+   *
+   * Cache implementation suggestion:
+   * - Use class properties: agentsCache[], lastFetch timestamp, CACHE_TTL
+   * - Fallback to stale cache if API call fails
+   * - Clear cache on repeated assignment failures
+   */
+  async listAgents(): Promise<PeerlyAgent[]> {
+    try {
+      const config = await this.getBaseHttpHeaders()
+      const response = await lastValueFrom(
+        this.httpService.get(`${this.baseUrl}/1to1/agents`, config),
+      )
+      this.logger.debug(`Fetched ${response.data.length} Peerly agents`)
+      return response.data
+    } catch (error) {
+      this.handleApiError(error)
+    }
+  }
+
+  async getAgentIdByEmail(email: string): Promise<string | null> {
+    if (!email || !email.trim()) {
+      return null
+    }
+
+    const normalizedEmail = email.toLowerCase()
+    const agents = await this.listAgents()
+    const agent = agents.find(
+      (a) =>
+        a.display_email &&
+        a.status === 'active' &&
+        a.display_email.toLowerCase() === normalizedEmail,
+    )
+    return agent?.id || null
   }
 }

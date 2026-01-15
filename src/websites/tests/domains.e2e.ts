@@ -67,6 +67,59 @@ test.describe('Websites - Domains', () => {
     }
   })
 
+  test('should return valid pricing for available domains', async ({
+    request,
+  }) => {
+    const email = generateRandomEmail()
+    const firstName = generateRandomName()
+    const lastName = generateRandomName()
+    const password = generateRandomPassword()
+
+    const registerResponse = await registerUser(request, {
+      firstName,
+      lastName,
+      email,
+      password,
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
+
+    testUserId = registerResponse.user.id
+    authToken = registerResponse.token
+
+    // Use a unique domain name that's likely to be available
+    const domainName = `gptest-${Date.now()}-${faker.string.alphanumeric(6)}.com`
+
+    const response = await request.get(
+      `/v1/domains/search?domain=${domainName}`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      },
+    )
+
+    expect(response.status()).toBe(200)
+
+    const result = (await response.json()) as DomainSearchResult
+
+    // If domain is available, price should be a positive number (not $0)
+    if (result.availability === 'AVAILABLE') {
+      expect(result.price).toBeDefined()
+      expect(typeof result.price).toBe('number')
+      expect(result.price).toBeGreaterThan(0)
+    }
+
+    // Suggestions with prices should also have valid (non-zero) prices
+    result.suggestions.forEach((suggestion) => {
+      if (suggestion.price !== undefined) {
+        expect(typeof suggestion.price).toBe('number')
+        expect(suggestion.price).toBeGreaterThan(0)
+      }
+    })
+  })
+
   test('should return domain suggestions', async ({ request }) => {
     const email = generateRandomEmail()
     const firstName = generateRandomName()

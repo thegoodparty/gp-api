@@ -1,15 +1,16 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
-import { PeerlyMediaService } from './peerlyMedia.service'
-import { PeerlyJob, PeerlyP2pSmsService } from './peerlyP2pSms.service'
 import { Readable } from 'stream'
 import {
   P2P_ERROR_MESSAGES,
   P2P_JOB_DEFAULTS,
 } from '../constants/p2pJob.constants'
-import { DateFormats, formatDate } from '../../../shared/util/date.util'
+import { DateFormats, formatDate } from '@/shared/util/date.util'
+import { PeerlyMediaService } from './peerlyMedia.service'
+import { PeerlyJob, PeerlyP2pSmsService } from './peerlyP2pSms.service'
 
 interface CreateP2pJobParams {
   campaignId: number
+  crmCompanyId?: string
   listId: number
   imageInfo: {
     fileStream: Readable | Buffer
@@ -36,6 +37,7 @@ export class PeerlyP2pJobService {
 
   async createPeerlyP2pJob({
     campaignId,
+    crmCompanyId,
     listId,
     imageInfo,
     scriptText,
@@ -65,6 +67,7 @@ export class PeerlyP2pJobService {
 
       this.logger.log('Creating P2P job')
       jobId = await this.peerlyP2pSmsService.createJob({
+        crmCompanyId: crmCompanyId || '',
         name,
         templates: [
           {

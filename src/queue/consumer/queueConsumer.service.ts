@@ -572,8 +572,14 @@ export class QueueConsumerService {
     }
     const { poll, campaign } = data
 
-    if (derivePollStatus(poll) !== APIPollStatus.IN_PROGRESS) {
-      this.logger.log('Poll is not in-progress, ignoring event', {
+    // We want to allow completing scheduled polls for testing purposes. In E2E tests
+    // we create polls and want to simulate completing them quickly.
+    if (
+      ![APIPollStatus.SCHEDULED, APIPollStatus.IN_PROGRESS].includes(
+        derivePollStatus(poll),
+      )
+    ) {
+      this.logger.log('Poll is not in expected state, ignoring event', {
         poll,
       })
       return
