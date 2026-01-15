@@ -17,17 +17,14 @@ export class VoterFileDownloadAccessService {
 
     if (
       ballotLevel &&
-      ballotLevel !== 'FEDERAL' &&
-      ballotLevel !== 'STATE'
+      ballotLevel !== 'FEDERAL' && ballotLevel !== 'STATE'
     ) {
       // not required for local races
       // so we can fall back to the whole state.
       return true
     } else if (
       ballotLevel &&
-      (ballotLevel === 'FEDERAL' ||
-        ballotLevel === 'STATE') &&
-      campaign.canDownloadFederal
+      (ballotLevel === 'FEDERAL' || ballotLevel === 'STATE') && campaign.canDownloadFederal
     ) {
       // not required for federal/state races with canDownloadFederal flag
       return true
@@ -41,7 +38,6 @@ export class VoterFileDownloadAccessService {
       return false
     }
   }
-
 
   async downloadAccessAlert(
     campaign: CampaignWith<'pathToVictory'>,
