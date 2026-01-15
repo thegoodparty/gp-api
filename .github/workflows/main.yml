@@ -4,6 +4,11 @@ on:
   push:
     branches: ["develop", "qa", "master"]
 
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -44,10 +49,9 @@ jobs:
           esac
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v5
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::333022194791:role/github-actions-pulumi-deploy
           aws-region: us-west-2
 
       - name: Install Pulumi
