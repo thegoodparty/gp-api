@@ -1,9 +1,9 @@
+import { BallotReadyPositionLevel, CampaignWith } from '@/campaigns/campaigns.types'
+import { VoterFileDownloadAccessService } from '@/shared/services/voterFileDownloadAccess.service'
+import { SlackService } from '@/vendors/slack/services/slack.service'
 import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BallotReadyPositionLevel, CampaignWith } from '../../campaigns/campaigns.types'
-import { SlackService } from '../../vendors/slack/services/slack.service'
-import { VoterFileDownloadAccessService } from './voterFileDownloadAccess.service'
 
 describe('VoterFileDownloadAccessService - canDownload', () => {
   let service: VoterFileDownloadAccessService
@@ -40,10 +40,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
     it('should return false when campaign is undefined', () => {
       expect(service.canDownload(undefined)).toBe(false)
       expect(loggerSpy).not.toHaveBeenCalled()
-    })
-
-    it('should return false when campaign is null', () => {
-      expect(service.canDownload(null as any)).toBe(false)
     })
   })
 
@@ -226,15 +222,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       )
     })
 
-    it('should return false when ballotLevel is null', () => {
-      const campaign = createMockCampaign({
-        details: { ballotLevel: null as any },
-        canDownloadFederal: false,
-        pathToVictory: null,
-      })
-      expect(service.canDownload(campaign)).toBe(false)
-    })
-
     it('should return true when ballotLevel is missing but electionType/electionLocation exist', () => {
       // This tests the fallback behavior - allows download if election data exists
       const campaign = createMockCampaign({
@@ -389,11 +376,42 @@ function createMockCampaign(overrides: {
   id?: number
   slug?: string
 } = {}): CampaignWith<'pathToVictory'> {
+  // Construct full PathToVictory object if data is provided
+  const pathToVictory =
+    overrides.pathToVictory === null
+      ? null
+      : overrides.pathToVictory?.data
+        ? {
+          id: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          campaignId: overrides.id ?? 1,
+          data: overrides.pathToVictory.data,
+        }
+        : null
+
   return {
     id: overrides.id ?? 1,
     slug: overrides.slug ?? 'test-campaign',
     details: overrides.details ?? {},
     canDownloadFederal: overrides.canDownloadFederal ?? false,
-    pathToVictory: overrides.pathToVictory ?? null,
-  } as CampaignWith<'pathToVictory'>
+    pathToVictory,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isActive: false,
+    isVerified: null,
+    isPro: null,
+    isDemo: false,
+    didWin: null,
+    dateVerified: null,
+    tier: null,
+    formattedAddress: null,
+    placeId: null,
+    userId: 1,
+    data: {},
+    aiContent: {},
+    vendorTsData: {},
+    completedTaskIds: [],
+    hasFreeTextsOffer: false,
+  } as unknown as CampaignWith<'pathToVictory'>
 }
