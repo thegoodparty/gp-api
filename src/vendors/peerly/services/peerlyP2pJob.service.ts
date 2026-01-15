@@ -6,7 +6,7 @@ import {
   P2P_ERROR_MESSAGES,
   P2P_JOB_DEFAULTS,
 } from '../constants/p2pJob.constants'
-import { toDateOnlyString } from '../../../shared/util/date.util'
+import { DateFormats, formatDate } from '../../../shared/util/date.util'
 
 interface CreateP2pJobParams {
   campaignId: number
@@ -60,7 +60,7 @@ export class PeerlyP2pJobService {
       this.logger.log(`Media created with ID: ${mediaId}`)
 
       const dateOnly = scheduledDate
-        ? toDateOnlyString(scheduledDate)
+        ? formatDate(scheduledDate, DateFormats.isoDate)
         : undefined
 
       this.logger.log('Creating P2P job')
