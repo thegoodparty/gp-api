@@ -3,7 +3,7 @@ import * as pulumi from '@pulumi/pulumi'
 const config = new pulumi.Config()
 
 if (config.getBoolean('isPreview')) {
-  require('./preview')
+  module.exports = require('./preview')
 } else {
-  require('./main')
+  module.exports = require('./main')
 }
