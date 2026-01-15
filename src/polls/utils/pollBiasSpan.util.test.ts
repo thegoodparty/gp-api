@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
 import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { Span, SpanInput } from '../types/pollBias.types'
 import {
   convertSpanToIndices,
@@ -151,15 +151,6 @@ describe('pollBiasSpan.util', () => {
     it('handles trimmed substring', () => {
       const text = 'hello world'
       const substring = '  world  '
-
-      const result = findSubstringIndex(substring, text)
-
-      expect(result).toBe(6)
-    })
-
-    it('handles case-insensitive matching', () => {
-      const text = 'Hello World'
-      const substring = 'world'
 
       const result = findSubstringIndex(substring, text)
 

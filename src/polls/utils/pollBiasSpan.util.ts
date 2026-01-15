@@ -98,9 +98,7 @@ export function findSubstringIndex(
   if (index === -1) {
     const normalizedSubstring = normalizeWhitespace(trimmedSubstring)
     const normalizedText = normalizeWhitespace(originalText)
-    const normalizedSubstringLower = normalizedSubstring.toLowerCase()
-    const normalizedTextLower = normalizedText.toLowerCase()
-    let normalizedIndex = normalizedTextLower.indexOf(normalizedSubstringLower)
+    let normalizedIndex = normalizedText.indexOf(normalizedSubstring)
 
     if (normalizedIndex !== -1) {
       let result = findActualIndexAndLength(
@@ -110,8 +108,8 @@ export function findSubstringIndex(
       )
 
       while (result !== null && result.index < startFrom) {
-        normalizedIndex = normalizedTextLower.indexOf(
-          normalizedSubstringLower,
+        normalizedIndex = normalizedText.indexOf(
+          normalizedSubstring,
           normalizedIndex + 1,
         )
         if (normalizedIndex === -1) {
