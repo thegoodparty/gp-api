@@ -1,19 +1,19 @@
-import './configrc'
+import { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { User } from '@prisma/client'
 import {
   PostgreSqlContainer,
   StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql'
-import { NestFastifyApplication } from '@nestjs/platform-fastify'
 import axios, { AxiosInstance } from 'axios'
-import { beforeEach, beforeAll, afterAll } from 'vitest'
-import { bootstrap } from './app'
-import { PrismaService } from './prisma/prisma.service'
 import { randomBytes } from 'crypto'
-import { Client } from 'pg'
-import { readFileSync } from 'fs'
 import { sync as glob } from 'fast-glob'
+import { readFileSync } from 'fs'
 import jwt from 'jsonwebtoken'
-import { User } from '@prisma/client'
+import { Client } from 'pg'
+import { afterAll, beforeAll, beforeEach } from 'vitest'
+import { bootstrap } from './app'
+import './configrc'
+import { PrismaService } from './prisma/prisma.service'
 
 export type TestServiceContext = {
   /** A client targeting the test service. */
@@ -146,9 +146,7 @@ export const useTestService = (): TestServiceContext => {
       const tableList = tableNames
         .map(({ tablename }) => `"public"."${tablename}"`)
         .join(', ')
-      await prisma.$executeRawUnsafe(
-        `TRUNCATE TABLE ${tableList} CASCADE;`,
-      )
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tableList} CASCADE;`)
     }
 
     // Create a test user for the current test
