@@ -141,10 +141,13 @@ export const useTestService = (): TestServiceContext => {
     `
 
     // Empty every table before each test run to isolate individual tests
-    // within a suite.
-    for (const { tablename } of tableNames) {
+    // within a suite. Truncate all tables in a single statement for better performance.
+    if (tableNames.length > 0) {
+      const tableList = tableNames
+        .map(({ tablename }) => `"public"."${tablename}"`)
+        .join(', ')
       await prisma.$executeRawUnsafe(
-        `TRUNCATE TABLE "public"."${tablename}" CASCADE;`,
+        `TRUNCATE TABLE ${tableList} CASCADE;`,
       )
     }
 
