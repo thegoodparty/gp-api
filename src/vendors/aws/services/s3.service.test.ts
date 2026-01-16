@@ -12,6 +12,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { ServiceException } from '@smithy/smithy-client'
+import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { S3Service } from './s3.service'
 
@@ -69,6 +70,13 @@ describe('S3Service', () => {
     originalEnv = { ...process.env }
     process.env.AWS_REGION = 'us-west-2'
     service = new S3Service()
+
+    const mockLogger = createMockLogger()
+    Object.defineProperty(service, 'logger', {
+      get: () => mockLogger,
+      configurable: true,
+    })
+
     vi.clearAllMocks()
   })
 
