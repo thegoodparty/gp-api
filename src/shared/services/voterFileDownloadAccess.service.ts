@@ -12,13 +12,16 @@ export class VoterFileDownloadAccessService {
   canDownload(campaign?: CampaignWith<'pathToVictory'>) {
     if (!campaign) return false
 
-    const details = campaign.details as PrismaJson.CampaignDetails
-    const ballotLevel = details?.ballotLevel
+    // Prisma's Json type doesn't preserve structure, so we assert the known type
+    // This cast is necessary because details is typed as Json (union type) not CampaignDetails
+    const ballotLevel = (
+      campaign.details as PrismaJson.CampaignDetails | null
+    )?.ballotLevel
     const hasElectionData =
       campaign.pathToVictory?.data?.electionType &&
       campaign.pathToVictory?.data?.electionLocation
 
-    const canDownload =
+    const canDownload = Boolean(
       // Local races (CITY, TOWNSHIP, etc.) - not required, can fall back to whole state
       (ballotLevel && ballotLevel !== 'FEDERAL' && ballotLevel !== 'STATE') ||
       // FEDERAL/STATE races with canDownloadFederal flag
@@ -26,7 +29,8 @@ export class VoterFileDownloadAccessService {
         (ballotLevel === 'FEDERAL' || ballotLevel === 'STATE') &&
         campaign.canDownloadFederal) ||
       // FEDERAL/STATE races with election data from PathToVictory SQS job
-      hasElectionData
+      hasElectionData,
+    )
 
     if (!canDownload) {
       this.logger.log('Campaign is not eligible for download.', campaign.id)
