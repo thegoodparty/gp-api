@@ -432,6 +432,119 @@ describe('S3Service', () => {
     })
   })
 
+  describe('bucket support', () => {
+    const key = 'folder/file.txt'
+    const mockFileBody = Buffer.from('test content')
+
+    it('uploadFile works with different bucket names', async () => {
+      const buckets = ['bucket1', 'my-bucket', 'assets.example.com']
+      const mockResponse = { Key: key }
+
+      for (const bucket of buckets) {
+        mockUploadDone.mockResolvedValue(mockResponse)
+
+        const result = await service.uploadFile(bucket, mockFileBody, key)
+
+        expect(Upload).toHaveBeenCalledWith({
+          client: expect.any(S3Client),
+          params: {
+            Bucket: bucket,
+            Key: key,
+            Body: mockFileBody,
+            ContentType: undefined,
+            CacheControl: undefined,
+            Metadata: undefined,
+          },
+        })
+        expect(result).toBe(
+          `https://${bucket}.s3.us-west-2.amazonaws.com/${key}`,
+        )
+        vi.clearAllMocks()
+      }
+    })
+
+    it('getSignedUrlForUpload works with different bucket names', async () => {
+      const buckets = ['bucket1', 'my-bucket', 'assets.example.com']
+      const mockUrl = 'https://signed-url.com/upload'
+
+      for (const bucket of buckets) {
+        mockGetSignedUrl.mockResolvedValue(mockUrl)
+
+        await service.getSignedUrlForUpload(bucket, key)
+
+        expect(PutObjectCommand).toHaveBeenCalledWith({
+          Bucket: bucket,
+          Key: key,
+          ContentType: undefined,
+        })
+        vi.clearAllMocks()
+      }
+    })
+
+    it('getSignedUrlForViewing works with different bucket names', async () => {
+      const buckets = ['bucket1', 'my-bucket', 'assets.example.com']
+      const mockUrl = 'https://signed-url.com/view'
+
+      for (const bucket of buckets) {
+        mockGetSignedUrl.mockResolvedValue(mockUrl)
+
+        await service.getSignedUrlForViewing(bucket, key)
+
+        expect(GetObjectCommand).toHaveBeenCalledWith({
+          Bucket: bucket,
+          Key: key,
+        })
+        vi.clearAllMocks()
+      }
+    })
+
+    it('getFile works with different bucket names', async () => {
+      const buckets = ['bucket1', 'my-bucket', 'assets.example.com']
+      const mockContent = 'file content'
+      const mockResponse = {
+        Body: {
+          transformToString: vi.fn().mockResolvedValue(mockContent),
+        },
+      }
+
+      for (const bucket of buckets) {
+        mockSend.mockResolvedValue(mockResponse)
+
+        const result = await service.getFile(bucket, key)
+
+        expect(GetObjectCommand).toHaveBeenCalledWith({
+          Bucket: bucket,
+          Key: key,
+        })
+        expect(result).toBe(mockContent)
+        vi.clearAllMocks()
+      }
+    })
+
+    it('getFileUrl generates correct URLs for different bucket names', () => {
+      const buckets = ['bucket1', 'my-bucket', 'assets.example.com']
+
+      for (const bucket of buckets) {
+        const result = service.getFileUrl(bucket, key)
+
+        expect(result).toBe(
+          `https://${bucket}.s3.us-west-2.amazonaws.com/${key}`,
+        )
+      }
+    })
+
+    it('getFileUrl uses baseUrl correctly with different bucket names', () => {
+      const buckets = ['bucket1', 'my-bucket', 'assets.example.com']
+      const baseUrl = 'https://cdn.example.com'
+
+      for (const bucket of buckets) {
+        const result = service.getFileUrl(bucket, key, { baseUrl })
+
+        expect(result).toBe(`${baseUrl}/${key}`)
+      }
+    })
+  })
+
   describe('error handling from AwsService', () => {
     const bucket = 'test-bucket'
     const key = 'folder/file.txt'
