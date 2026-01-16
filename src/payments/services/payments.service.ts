@@ -7,7 +7,6 @@ import {
 import { Timeout } from '@nestjs/schedule'
 import { Prisma, User } from '@prisma/client'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
-import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/services/users.service'
 import { PaymentIntentPayload, PaymentType } from '../payments.types'
 
@@ -18,7 +17,6 @@ export class PaymentsService {
   constructor(
     private readonly stripe: StripeService,
     private readonly usersService: UsersService,
-    private readonly campaignsService: CampaignsService,
   ) {}
 
   async createPayment<T extends PaymentType>(
@@ -166,128 +164,6 @@ export class PaymentsService {
       success: results.success.length,
       failed: results.failed.length,
       skipped: results.skipped.length,
-      details: results,
-    }
-  }
-
-  async fixAutoScheduledCancellations(dryRun = true, limit = 50, offset = 0) {
-    const results: {
-      auto: string[]
-      manual: string[]
-      failed: { slug: string; error: string }[]
-      skipped: number
-      totalWithCancellations: number
-    } = {
-      auto: [],
-      manual: [],
-      failed: [],
-      skipped: 0,
-      totalWithCancellations: 0,
-    }
-
-    const allCampaigns = await this.campaignsService.findMany({
-      where: {
-        isPro: true,
-      },
-    })
-
-    const allCampaignsWithScheduledCancellations = allCampaigns.filter(
-      (campaign) => {
-        const details = campaign.details as PrismaJson.CampaignDetails
-        return (
-          details?.subscriptionCancelAt && details?.subscriptionCancelAt > 0
-        )
-      },
-    )
-
-    results.totalWithCancellations =
-      allCampaignsWithScheduledCancellations.length
-
-    const campaignsWithScheduledCancellations =
-      allCampaignsWithScheduledCancellations.slice(offset, offset + limit)
-    results.skipped = offset
-
-    this.logger.log(
-      `Found ${results.totalWithCancellations} total campaigns with scheduled cancellations`,
-    )
-    this.logger.log(
-      `Processing batch: ${offset + 1} to ${offset + campaignsWithScheduledCancellations.length} (limit: ${limit})`,
-    )
-
-    for (const campaign of campaignsWithScheduledCancellations) {
-      const { slug } = campaign
-      try {
-        const details = campaign.details as PrismaJson.CampaignDetails | null
-        const subscriptionId = details?.subscriptionId
-        if (!subscriptionId) {
-          continue
-        }
-
-        const subscription =
-          await this.stripe.retrieveSubscription(subscriptionId)
-        if (!subscription.cancel_at) {
-          continue
-        }
-
-        const wasUserInitiated =
-          subscription.cancellation_details?.comment != null ||
-          subscription.cancellation_details?.feedback != null
-        if (wasUserInitiated) {
-          results.manual.push(slug)
-          this.logger.log(
-            `Manual cancellation for ${slug} - Reason: ${subscription.cancellation_details?.reason} - Comment: ${subscription.cancellation_details?.comment}`,
-          )
-        } else {
-          if (!dryRun) {
-            await this.stripe.removeSubscriptionCancellation(subscriptionId)
-
-            await this.campaignsService.update({
-              where: { id: campaign.id },
-              data: {
-                details: {
-                  ...details,
-                  subscriptionCancelAt: null,
-                  subscriptionCanceledAt: null,
-                  endOfElectionSubscriptionCanceled: false,
-                },
-              },
-            })
-
-            this.logger.log(`✅ Fixed auto-scheduled cancellation for ${slug}`)
-          } else {
-            this.logger.log(
-              `Dry run: Would fix auto-scheduled cancellation for ${slug}`,
-            )
-          }
-          results.auto.push(slug)
-        }
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error'
-        results.failed.push({ slug, error: errorMessage })
-        this.logger.error(`Failed for ${slug}:`, error)
-      }
-    }
-
-    const processed =
-      results.auto.length + results.manual.length + results.failed.length
-    const remaining = results.totalWithCancellations - offset - processed
-
-    return {
-      message: dryRun
-        ? `DRY RUN: Would process ${results.auto.length} auto-scheduled cancellations (batch ${offset + 1}-${offset + processed} of ${results.totalWithCancellations})`
-        : `Processed ${results.auto.length} auto-scheduled cancellations (batch ${offset + 1}-${offset + processed} of ${results.totalWithCancellations})`,
-      dryRun,
-      batch: {
-        offset,
-        limit,
-        processed,
-        remaining: remaining > 0 ? remaining : 0,
-      },
-      totalWithCancellations: results.totalWithCancellations,
-      auto: results.auto.length,
-      manual: results.manual.length,
-      failed: results.failed.length,
       details: results,
     }
   }

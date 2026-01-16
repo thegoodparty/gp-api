@@ -113,26 +113,6 @@ export class StripeService {
     })
   }
 
-  async setSubscriptionCancelAt(subscriptionId: string, cancelAt: Date) {
-    try {
-      await this.stripe.subscriptions.update(subscriptionId, {
-        // Stripe API throws cryptic error if an int is not sent here
-        cancel_at: Math.floor(cancelAt.getTime() / 1000),
-      })
-    } catch (e) {
-      if (e instanceof Error) {
-        this.logger.error('Error setting subscription cancel at', e)
-        await this.slack.errorMessage({
-          message: 'Error setting subscription cancel at',
-          error: { subscriptionId, cancelAt, error: e },
-        })
-
-        throw new BadGatewayException('Error updating subscription', e.message)
-      }
-      throw e
-    }
-  }
-
   async parseWebhookEvent(rawBody: Buffer, stripeSignature: string) {
     return this.stripe.webhooks.constructEvent(
       rawBody,
@@ -246,26 +226,6 @@ export class StripeService {
         )
         throw new BadGatewayException(
           `Failed to retrieve subscription ${subscriptionId}`,
-          e.message,
-        )
-      }
-      throw e
-    }
-  }
-
-  async removeSubscriptionCancellation(subscriptionId: string) {
-    try {
-      return await this.stripe.subscriptions.update(subscriptionId, {
-        cancel_at_period_end: false,
-      })
-    } catch (e) {
-      if (e instanceof Error) {
-        this.logger.error(
-          `Failed to remove subscription cancellation ${subscriptionId}`,
-          e,
-        )
-        throw new BadGatewayException(
-          `Failed to remove subscription cancellation ${subscriptionId}`,
           e.message,
         )
       }
