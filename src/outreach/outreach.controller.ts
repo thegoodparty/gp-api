@@ -147,10 +147,6 @@ export class OutreachController {
         aiContent,
       )
 
-      const scheduledDate = createOutreachDto.date
-        ? new Date(createOutreachDto.date)
-        : undefined
-
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         crmCompanyId: campaign.data?.hubspotId,
@@ -165,7 +161,7 @@ export class OutreachController {
         identityId: peerlyIdentityId!,
         name,
         didState: createOutreachDto.didState,
-        scheduledDate,
+        scheduledDate: createOutreachDto.date,
       })
 
       return await this.outreachService.create(

@@ -4,7 +4,6 @@ import {
   P2P_ERROR_MESSAGES,
   P2P_JOB_DEFAULTS,
 } from '../constants/p2pJob.constants'
-import { DateFormats, formatDate } from '@/shared/util/date.util'
 import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyJob, PeerlyP2pSmsService } from './peerlyP2pSms.service'
 
@@ -23,7 +22,7 @@ interface CreateP2pJobParams {
   identityId: string
   name?: string
   didState?: string
-  scheduledDate?: Date
+  scheduledDate?: string
 }
 
 @Injectable()
@@ -61,9 +60,8 @@ export class PeerlyP2pJobService {
       })
       this.logger.log(`Media created with ID: ${mediaId}`)
 
-      const dateOnly = scheduledDate
-        ? formatDate(scheduledDate, DateFormats.isoDate)
-        : undefined
+      // extract date portion directly from ISO string to preserve the user's intended date
+      const dateOnly = scheduledDate?.slice(0, 10)
 
       this.logger.log('Creating P2P job')
       jobId = await this.peerlyP2pSmsService.createJob({
