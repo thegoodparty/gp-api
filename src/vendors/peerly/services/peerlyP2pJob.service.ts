@@ -81,7 +81,7 @@ export class PeerlyP2pJobService {
         ],
         didState,
         identityId,
-        ...(dateOnly ? { startDate: dateOnly, endDate: dateOnly } : {}),
+        scheduledDate: dateOnly,
       })
       this.logger.log(`Job created with ID: ${jobId}`)
 

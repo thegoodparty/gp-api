@@ -38,8 +38,7 @@ interface CreateJobParams {
   templates: Template[]
   didState: string
   identityId?: string
-  startDate?: string
-  endDate?: string
+  scheduledDate?: string
 }
 
 interface PeerlyApiErrorResponse {
@@ -201,8 +200,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     templates,
     didState,
     identityId,
-    startDate,
-    endDate,
+    scheduledDate,
   }: CreateJobParams): Promise<string> {
     const hasMms = templates.some((t) => !!t.media)
 
@@ -241,8 +239,10 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       ...(agentIds.length > 0 && { agent_ids: agentIds }),
       schedule_id: this.scheduleId,
       ...(identityId && { identity_id: identityId }),
-      ...(startDate && { start_date: startDate }),
-      ...(endDate && { end_date: endDate }),
+      ...(scheduledDate && {
+        start_date: scheduledDate,
+        end_date: scheduledDate,
+      }),
     }
 
     try {
