@@ -137,6 +137,7 @@
     "@playwright/test": "^1.56.1",
     "@testcontainers/postgresql": "^11.7.1",
     "@types/async-retry": "^1.4.9",
+    "aws-sdk-client-mock": "^4.1.0",
     "@types/bcrypt": "^5.0.2",
     "@types/lodash": "^4.17.13",
     "@types/node": "^20.3.1",
