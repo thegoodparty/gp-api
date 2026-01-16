@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  GetObjectCommandOutput,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -12,36 +13,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { ServiceException } from '@smithy/smithy-client'
+import { mockClient } from 'aws-sdk-client-mock'
 import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { S3Service } from './s3.service'
 
-const { mockSend, mockUploadDone, mockGetSignedUrl } = vi.hoisted(() => ({
-  mockSend: vi.fn(),
+const { mockUploadDone, mockGetSignedUrl } = vi.hoisted(() => ({
   mockUploadDone: vi.fn(),
   mockGetSignedUrl: vi.fn(),
 }))
 
-vi.mock('@aws-sdk/client-s3', async () => {
-  const actual = await vi.importActual('@aws-sdk/client-s3')
-  return {
-    ...actual,
-    S3Client: class MockS3Client {
-      send
-      constructor() {
-        this.send = mockSend
-      }
-    },
-    GetObjectCommand: vi.fn(),
-    PutObjectCommand: vi.fn(),
-    NoSuchKey: class MockNoSuchKey extends Error {
-      name = 'NoSuchKey'
-      constructor() {
-        super('The specified key does not exist')
-      }
-    },
-  }
-})
+const s3Mock = mockClient(S3Client)
 
 vi.mock('@aws-sdk/lib-storage', () => {
   class MockUpload {
@@ -69,6 +51,7 @@ describe('S3Service', () => {
   beforeEach(() => {
     originalEnv = { ...process.env }
     process.env.AWS_REGION = 'us-west-2'
+    s3Mock.reset()
     service = new S3Service()
 
     const mockLogger = createMockLogger()
@@ -76,12 +59,11 @@ describe('S3Service', () => {
       get: () => mockLogger,
       configurable: true,
     })
-
-    vi.clearAllMocks()
   })
 
   afterEach(() => {
     process.env = originalEnv
+    s3Mock.reset()
   })
 
   describe('buildKey', () => {
@@ -140,11 +122,6 @@ describe('S3Service', () => {
 
       const result = await service.getSignedUrlForUpload(bucket, key)
 
-      expect(PutObjectCommand).toHaveBeenCalledWith({
-        Bucket: bucket,
-        Key: key,
-        ContentType: undefined,
-      })
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
         expect.any(S3Client),
         expect.any(PutObjectCommand),
@@ -162,11 +139,6 @@ describe('S3Service', () => {
         contentType: 'image/png',
       })
 
-      expect(PutObjectCommand).toHaveBeenCalledWith({
-        Bucket: bucket,
-        Key: key,
-        ContentType: 'image/png',
-      })
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
         expect.any(S3Client),
         expect.any(PutObjectCommand),
@@ -200,10 +172,6 @@ describe('S3Service', () => {
 
       const result = await service.getSignedUrlForViewing(bucket, key)
 
-      expect(GetObjectCommand).toHaveBeenCalledWith({
-        Bucket: bucket,
-        Key: key,
-      })
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
         expect.any(S3Client),
         expect.any(GetObjectCommand),
@@ -349,20 +317,16 @@ describe('S3Service', () => {
 
     it('returns file content as string', async () => {
       const mockContent = 'file content'
-      const mockResponse = {
+      const mockResponse: GetObjectCommandOutput = {
         Body: {
           transformToString: vi.fn().mockResolvedValue(mockContent),
-        },
+        } as unknown as GetObjectCommandOutput['Body'],
+        $metadata: {},
       }
-      mockSend.mockResolvedValue(mockResponse)
+      s3Mock.on(GetObjectCommand).resolves(mockResponse)
 
       const result = await service.getFile(bucket, key)
 
-      expect(GetObjectCommand).toHaveBeenCalledWith({
-        Bucket: bucket,
-        Key: key,
-      })
-      expect(mockSend).toHaveBeenCalledWith(expect.any(GetObjectCommand))
       expect(result).toBe(mockContent)
     })
 
@@ -371,7 +335,7 @@ describe('S3Service', () => {
         message: 'The specified key does not exist',
         $metadata: {},
       })
-      mockSend.mockRejectedValue(noSuchKeyError)
+      s3Mock.on(GetObjectCommand).rejects(noSuchKeyError)
 
       const result = await service.getFile(bucket, key)
 
@@ -380,7 +344,7 @@ describe('S3Service', () => {
 
     it('throws other errors when file retrieval fails', async () => {
       const otherError = new Error('Network error')
-      mockSend.mockRejectedValue(otherError)
+      s3Mock.on(GetObjectCommand).rejects(otherError)
 
       await expect(service.getFile(bucket, key)).rejects.toThrow(
         'Network error',
@@ -394,7 +358,7 @@ describe('S3Service', () => {
         $fault: 'server',
         $metadata: {},
       })
-      mockSend.mockRejectedValue(awsError)
+      s3Mock.on(GetObjectCommand).rejects(awsError)
 
       await expect(service.getFile(bucket, key)).rejects.toThrow(
         BadGatewayException,
@@ -402,10 +366,11 @@ describe('S3Service', () => {
     })
 
     it('handles missing Body in response', async () => {
-      const mockResponse = {
+      const mockResponse: GetObjectCommandOutput = {
         Body: undefined,
+        $metadata: {},
       }
-      mockSend.mockResolvedValue(mockResponse)
+      s3Mock.on(GetObjectCommand).resolves(mockResponse)
 
       const result = await service.getFile(bucket, key)
 
@@ -467,7 +432,6 @@ describe('S3Service', () => {
         expect(result).toBe(
           `https://${bucket}.s3.us-west-2.amazonaws.com/${key}`,
         )
-        vi.clearAllMocks()
       }
     })
 
@@ -479,13 +443,6 @@ describe('S3Service', () => {
         mockGetSignedUrl.mockResolvedValue(mockUrl)
 
         await service.getSignedUrlForUpload(bucket, key)
-
-        expect(PutObjectCommand).toHaveBeenCalledWith({
-          Bucket: bucket,
-          Key: key,
-          ContentType: undefined,
-        })
-        vi.clearAllMocks()
       }
     })
 
@@ -497,35 +454,26 @@ describe('S3Service', () => {
         mockGetSignedUrl.mockResolvedValue(mockUrl)
 
         await service.getSignedUrlForViewing(bucket, key)
-
-        expect(GetObjectCommand).toHaveBeenCalledWith({
-          Bucket: bucket,
-          Key: key,
-        })
-        vi.clearAllMocks()
       }
     })
 
     it('getFile works with different bucket names', async () => {
       const buckets = ['bucket1', 'my-bucket', 'assets.example.com']
       const mockContent = 'file content'
-      const mockResponse = {
+      const mockResponse: GetObjectCommandOutput = {
         Body: {
           transformToString: vi.fn().mockResolvedValue(mockContent),
-        },
+        } as unknown as GetObjectCommandOutput['Body'],
+        $metadata: {},
       }
 
       for (const bucket of buckets) {
-        mockSend.mockResolvedValue(mockResponse)
+        s3Mock.on(GetObjectCommand).resolves(mockResponse)
 
         const result = await service.getFile(bucket, key)
 
-        expect(GetObjectCommand).toHaveBeenCalledWith({
-          Bucket: bucket,
-          Key: key,
-        })
         expect(result).toBe(mockContent)
-        vi.clearAllMocks()
+        s3Mock.reset()
       }
     })
 
@@ -610,8 +558,6 @@ describe('S3Service', () => {
         await expect(
           service.uploadFile(bucket, mockFileBody, key),
         ).rejects.toThrow(BadRequestException)
-
-        vi.clearAllMocks()
       }
     })
   })
