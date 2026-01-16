@@ -1,6 +1,7 @@
 import { BadGatewayException, BadRequestException } from '@nestjs/common'
 import { LlmService } from 'src/llm/services/llm.service'
 import { BraintrustService } from 'src/vendors/braintrust/braintrust.service'
+import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
 import { PollBiasAnalysisService } from './pollBiasAnalysis.service'
@@ -44,6 +45,12 @@ describe('PollBiasAnalysisService', () => {
       llmService as unknown as LlmService,
       braintrustService as unknown as BraintrustService,
     )
+
+    const mockLogger = createMockLogger()
+    Object.defineProperty(service, 'logger', {
+      get: () => mockLogger,
+      configurable: true,
+    })
 
     vi.mocked(createPollBiasAnalysisPrompt).mockReturnValue([
       { role: 'system', content: 'You are a helpful assistant.' },

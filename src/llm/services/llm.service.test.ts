@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
+import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { LlmService } from './llm.service'
 
 const mockCreate = vi.fn()
@@ -22,6 +23,16 @@ vi.mock('openai', () => {
 describe('LlmService', () => {
   let originalEnv: NodeJS.ProcessEnv
 
+  const createServiceWithMockLogger = (): LlmService => {
+    const service = new LlmService()
+    const mockLogger = createMockLogger()
+    Object.defineProperty(service, 'logger', {
+      get: () => mockLogger,
+      configurable: true,
+    })
+    return service
+  }
+
   beforeEach(() => {
     originalEnv = { ...process.env }
     process.env.TOGETHER_AI_KEY = 'test-api-key'
@@ -40,7 +51,7 @@ describe('LlmService', () => {
     let service: LlmService
 
     beforeEach(() => {
-      service = new LlmService()
+      service = createServiceWithMockLogger()
     })
 
     it('tries all models in sequence when each fails', async () => {
@@ -106,7 +117,7 @@ describe('LlmService', () => {
     let service: LlmService
 
     beforeEach(() => {
-      service = new LlmService()
+      service = createServiceWithMockLogger()
       vi.useFakeTimers()
     })
 
@@ -192,7 +203,7 @@ describe('LlmService', () => {
     let service: LlmService
 
     beforeEach(() => {
-      service = new LlmService()
+      service = createServiceWithMockLogger()
     })
 
     it('handles string content', async () => {
@@ -343,7 +354,7 @@ describe('LlmService', () => {
     })
 
     beforeEach(() => {
-      service = new LlmService()
+      service = createServiceWithMockLogger()
     })
 
     it('parses and validates valid JSON', async () => {
@@ -553,7 +564,7 @@ describe('LlmService', () => {
     let service: LlmService
 
     beforeEach(() => {
-      service = new LlmService()
+      service = createServiceWithMockLogger()
     })
 
     it('returns completion with tool calls', async () => {
@@ -688,7 +699,7 @@ describe('LlmService', () => {
     let service: LlmService
 
     beforeEach(() => {
-      service = new LlmService()
+      service = createServiceWithMockLogger()
     })
 
     it('identifies 4xx errors as permanent and does not retry', async () => {
@@ -772,7 +783,7 @@ describe('LlmService', () => {
     let service: LlmService
 
     beforeEach(() => {
-      service = new LlmService()
+      service = createServiceWithMockLogger()
     })
 
     it('includes userId in request when provided', async () => {
