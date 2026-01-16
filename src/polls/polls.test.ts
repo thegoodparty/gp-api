@@ -1,6 +1,7 @@
 import { useTestService } from '@/test-service'
 import { Poll } from '@prisma/client'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 
 const service = useTestService()
 
@@ -14,7 +15,7 @@ beforeEach(async () => {
 })
 
 describe('POST /polls/initial-poll', () => {
-  test.each([
+  it.each([
     { message: '', swornInDate: '2025-01-01' },
     { message: '', swornInDate: '2025-01-01' },
   ])('blocks bad input', async (payload) => {
@@ -25,7 +26,7 @@ describe('POST /polls/initial-poll', () => {
     })
   })
 
-  test('creates a poll', async () => {
+  it('creates a poll', async () => {
     const result = await service.client.post('/v1/polls/initial-poll', {
       message: 'This is a test message',
       swornInDate: '2025-01-01',
@@ -50,5 +51,45 @@ describe('POST /polls/initial-poll', () => {
       status: 200,
       data: result.data,
     })
+  })
+})
+
+describe('POST /polls/analyze-bias', () => {
+  let pollBiasAnalysisService: PollBiasAnalysisService
+
+  beforeEach(() => {
+    pollBiasAnalysisService = service.app.get(PollBiasAnalysisService)
+  })
+
+  it('returns bias analysis response', async () => {
+    const mockResponse = {
+      bias_spans: [
+        {
+          start: 0,
+          end: 5,
+          reason: 'bias',
+          suggestion: 'neutral term',
+        },
+      ],
+      grammar_spans: [],
+      rewritten_text: 'Neutral text',
+    }
+
+    const spy = vi
+      .spyOn(pollBiasAnalysisService, 'analyzePollText')
+      .mockResolvedValue(mockResponse)
+
+    const result = await service.client.post('/v1/polls/analyze-bias', {
+      pollText: 'Test poll text',
+    })
+
+    expect(result).toMatchObject({
+      status: 201,
+      data: mockResponse,
+    })
+    expect(spy).toHaveBeenCalledWith(
+      'Test poll text',
+      service.user.id.toString(),
+    )
   })
 })
