@@ -313,9 +313,6 @@ export class PaymentEventsService {
 
   async sendProCancellationSlackMessage(user: User, campaign: Campaign) {
     const { details = {} } = campaign || {}
-    if (details.endOfElectionSubscriptionCanceled) {
-      return // don't send Slack message if subscription was canceled at end of election
-    }
     const { office, otherOffice } = details
     const fullName = getUserFullName(user)
 
