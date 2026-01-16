@@ -1,6 +1,6 @@
+import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { LlmService } from './llm.service'
 
 const mockCreate = vi.fn()
@@ -43,7 +43,6 @@ describe('LlmService', () => {
 
   afterEach(() => {
     process.env = originalEnv
-    vi.clearAllMocks()
     vi.useRealTimers()
   })
 
