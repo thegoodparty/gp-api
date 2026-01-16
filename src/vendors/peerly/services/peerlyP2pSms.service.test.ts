@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { AxiosResponse } from 'axios'
 import { of, throwError } from 'rxjs'
 import { CrmCampaignsService } from '../../../campaigns/services/crmCampaigns.service'
+import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
 import { beforeEach, describe, expect, it, vi, Mocked } from 'vitest'
@@ -96,6 +97,12 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
     crmCampaigns = module.get(
       CrmCampaignsService,
     ) as Mocked<CrmCampaignsService>
+
+    const mockLogger = createMockLogger()
+    Object.defineProperty(service, 'logger', {
+      get: () => mockLogger,
+      configurable: true,
+    })
   })
 
   describe('listAgents', () => {
