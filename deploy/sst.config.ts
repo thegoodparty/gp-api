@@ -50,11 +50,15 @@ export default $config({
     const { default: pulumi } = await import('@pulumi/pulumi')
     const vpc =
       $app.stage === 'master'
-        ? new sst.aws.Vpc('api', {
-          bastion: false,
-          nat: 'managed',
-          az: 2, // defaults to 2 availability zones and 2 NAT gateways
-        })
+        ? new sst.aws.Vpc(
+            'api',
+            {
+              bastion: false,
+              nat: 'managed',
+              az: 2, // defaults to 2 availability zones and 2 NAT gateways
+            },
+            { retainOnDelete: true },
+          )
         : sst.aws.Vpc.get('api', 'vpc-0763fa52c32ebcf6a') // other stages will use same vpc.
 
     if (
@@ -90,30 +94,42 @@ export default $config({
 
     let assetsBucket
     if ($app.stage === 'master') {
-      assetsBucket = sst.aws.Bucket.get('assetsBucket', 'assets.goodparty.org')
+      assetsBucket = sst.aws.Bucket.get(
+        'assetsBucket',
+        'assets.goodparty.org',
+        { retainOnDelete: true },
+      )
     } else {
       // Each stage will get its own Bucket.
-      assetsBucket = new sst.aws.Bucket('assets', {
-        access: 'cloudfront',
-        // use a transformation to set the bucket name to the bucketDomain.
-        transform: {
-          bucket: {
-            bucket: bucketDomain,
+      assetsBucket = new sst.aws.Bucket(
+        'assets',
+        {
+          access: 'cloudfront',
+          // use a transformation to set the bucket name to the bucketDomain.
+          transform: {
+            bucket: {
+              bucket: bucketDomain,
+            },
           },
         },
-      })
+        { retainOnDelete: true },
+      )
     }
 
     if ($app.stage !== 'master') {
       // production bucket was setup manually. so no need to setup cloudfront.
-      new sst.aws.Router(`assets-${$app.stage}`, {
-        routes: {
-          '/*': {
-            bucket: assetsBucket,
+      new sst.aws.Router(
+        `assets-${$app.stage}`,
+        {
+          routes: {
+            '/*': {
+              bucket: assetsBucket,
+            },
           },
+          domain: bucketDomain,
         },
-        domain: bucketDomain,
-      })
+        { retainOnDelete: true },
+      )
     }
 
     // function to extract the username, password, and database name from the database url
@@ -127,14 +143,18 @@ export default $config({
     }
 
     // Each stage will get its own Cluster.
-    const cluster = new sst.aws.Cluster('fargate', {
-      vpc,
-      transform: {
-        cluster: {
-          settings: [{ name: 'containerInsights', value: 'enabled' }],
+    const cluster = new sst.aws.Cluster(
+      'fargate',
+      {
+        vpc,
+        transform: {
+          cluster: {
+            settings: [{ name: 'containerInsights', value: 'enabled' }],
+          },
         },
       },
-    })
+      { retainOnDelete: true },
+    )
 
     let dbUrl: string | undefined
     let dbName: string | undefined
@@ -225,27 +245,35 @@ export default $config({
     const sqsDlqName = `${$app.stage}-DLQ.fifo`
 
     // Create Dead Letter Queue
-    const dlq = new aws.sqs.Queue(`${$app.stage}-dlq`, {
-      name: sqsDlqName,
-      fifoQueue: true,
-      messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-    })
+    const dlq = new aws.sqs.Queue(
+      `${$app.stage}-dlq`,
+      {
+        name: sqsDlqName,
+        fifoQueue: true,
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+      },
+      { retainOnDelete: true },
+    )
 
     // Create Main Queue
-    new aws.sqs.Queue(`${$app.stage}-queue`, {
-      name: sqsQueueName,
-      fifoQueue: true,
-      visibilityTimeoutSeconds: 300, // 5 minutes
-      messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
-      delaySeconds: 0,
-      receiveWaitTimeSeconds: 0,
-      deduplicationScope: 'messageGroup',
-      fifoThroughputLimit: 'perMessageGroupId',
-      redrivePolicy: pulumi.interpolate`{
+    new aws.sqs.Queue(
+      `${$app.stage}-queue`,
+      {
+        name: sqsQueueName,
+        fifoQueue: true,
+        visibilityTimeoutSeconds: 300, // 5 minutes
+        messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
+        delaySeconds: 0,
+        receiveWaitTimeSeconds: 0,
+        deduplicationScope: 'messageGroup',
+        fifoThroughputLimit: 'perMessageGroupId',
+        redrivePolicy: pulumi.interpolate`{
         "deadLetterTargetArn": "${dlq.arn}",
         "maxReceiveCount": 3
       }`,
-    })
+      },
+      { retainOnDelete: true },
+    )
 
     const tevynPollCsvsBucket = new aws.s3.Bucket(
       `tevyn-poll-csvs-${$app.stage}`,
@@ -253,15 +281,20 @@ export default $config({
         bucket: tevynPollCsvsBucketName[$app.stage],
         forceDestroy: false,
       },
+      { retainOnDelete: true },
     )
 
-    new aws.s3.BucketPublicAccessBlock(`tevyn-poll-csvs-pab-${$app.stage}`, {
-      bucket: tevynPollCsvsBucket.id,
-      blockPublicAcls: true,
-      blockPublicPolicy: true,
-      ignorePublicAcls: true,
-      restrictPublicBuckets: true,
-    })
+    new aws.s3.BucketPublicAccessBlock(
+      `tevyn-poll-csvs-pab-${$app.stage}`,
+      {
+        bucket: tevynPollCsvsBucket.id,
+        blockPublicAcls: true,
+        blockPublicPolicy: true,
+        ignorePublicAcls: true,
+        restrictPublicBuckets: true,
+      },
+      { retainOnDelete: true },
+    )
 
     const zipToAreaCodeBucket = new aws.s3.Bucket(
       `zip-to-area-code-mappings-${$app.stage}`,
@@ -269,26 +302,191 @@ export default $config({
         bucket: zipToAreaCodeBucketName[$app.stage],
         forceDestroy: false,
       },
+      { retainOnDelete: true },
     )
-    new aws.s3.BucketPublicAccessBlock(`zip-to-area-code-mappings-pab-${$app.stage}`, {
-      bucket: zipToAreaCodeBucket.id,
-      blockPublicAcls: true,
-      blockPublicPolicy: true,
-      ignorePublicAcls: true,
-      restrictPublicBuckets: true,
-    })
+    new aws.s3.BucketPublicAccessBlock(
+      `zip-to-area-code-mappings-pab-${$app.stage}`,
+      {
+        bucket: zipToAreaCodeBucket.id,
+        blockPublicAcls: true,
+        blockPublicPolicy: true,
+        ignorePublicAcls: true,
+        restrictPublicBuckets: true,
+      },
+      { retainOnDelete: true },
+    )
 
     // Create shared VPC Endpoint for SQS (only in master stage)
     if ($app.stage === 'master') {
       // Create security group for SQS
-      const sqsSecurityGroup = new aws.ec2.SecurityGroup('sqs-sg', {
+      const sqsSecurityGroup = new aws.ec2.SecurityGroup(
+        'sqs-sg',
+        {
+          vpcId: 'vpc-0763fa52c32ebcf6a',
+          ingress: [
+            {
+              protocol: 'tcp',
+              fromPort: 443,
+              toPort: 443,
+              cidrBlocks: [vpcCidr],
+            },
+          ],
+          egress: [
+            {
+              protocol: '-1',
+              fromPort: 0,
+              toPort: 0,
+              cidrBlocks: ['0.0.0.0/0'],
+            },
+          ],
+        },
+        { retainOnDelete: true },
+      )
+
+      new aws.ec2.VpcEndpoint(
+        'sqs-endpoint',
+        {
+          vpcId: 'vpc-0763fa52c32ebcf6a',
+          serviceName: `com.amazonaws.us-west-2.sqs`,
+          vpcEndpointType: 'Interface',
+          subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+          securityGroupIds: [sqsSecurityGroup.id],
+          privateDnsEnabled: true,
+        },
+        { retainOnDelete: true },
+      )
+    }
+
+    // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
+    cluster.addService(
+      `gp-api-${$app.stage}`,
+      {
+        logging: {
+          retention: $app.stage === 'master' ? '2 months' : '1 month',
+        },
+        loadBalancer: {
+          domain: apiDomain,
+          ports: [
+            { listen: '80/http' },
+            { listen: '443/https', forward: '80/http' },
+          ],
+          health: {
+            '80/http': {
+              path: '/v1/health',
+              interval: '10 seconds',
+              timeout: '5 seconds',
+              healthyThreshold: 2,
+              unhealthyThreshold: 3,
+            },
+          },
+        },
+        // https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html#fargate-tasks-size
+        capacity: {
+          fargate: { weight: 1 },
+        },
+        memory: $app.stage === 'master' ? '4 GB' : '2 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
+        cpu: $app.stage === 'master' ? '1 vCPU' : '0.5 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
+        scaling: {
+          min: $app.stage === 'master' ? 2 : 1,
+          max: $app.stage === 'master' ? 16 : 4,
+          cpuUtilization: 50,
+          memoryUtilization: 50,
+        },
+        environment: {
+          // PORT: '3000',
+          PORT: '80',
+          HOST: '0.0.0.0',
+          LOG_LEVEL: 'debug',
+          CORS_ORIGIN:
+            $app.stage === 'master' ? 'goodparty.org' : 'dev.goodparty.org',
+          AWS_REGION: 'us-west-2',
+          ASSET_DOMAIN: bucketDomain,
+          WEBAPP_ROOT_URL: webAppRootUrl,
+          AI_MODELS:
+            'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,Qwen/Qwen3-235B-A22B-fp8-tput',
+          LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
+          SQS_QUEUE: sqsQueueName,
+          SQS_QUEUE_BASE_URL:
+            'https://sqs.us-west-2.amazonaws.com/333022194791',
+          SERVE_ANALYSIS_BUCKET_NAME: serveAnalysisBucketName[$app.stage],
+          TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucketName[$app.stage],
+          ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucketName[$app.stage],
+          ...secretsJson,
+        },
+        image: {
+          context: '../', // Set the context to the main app directory
+          dockerfile: './deploy/Dockerfile',
+          args: {
+            DOCKER_BUILDKIT: '1',
+            CACHEBUST: secretsJson?.CACHEBUST || Date.now().toString(),
+            DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
+            DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
+            DATABASE_URL: dbUrl, // so we can run migrations.
+            STAGE: $app.stage,
+          },
+        },
+        link: [assetsBucket],
+        transform: {
+          loadBalancer: {
+            idleTimeout: 120,
+          },
+          target: (targetArgs) => {
+            targetArgs.healthCheck = {
+              ...targetArgs.healthCheck,
+              path: '/v1/health',
+              interval: 10,
+              timeout: 5,
+              healthyThreshold: 2,
+              unhealthyThreshold: 3,
+              matcher: '200',
+            }
+          },
+        },
+        permissions: [
+          {
+            actions: ['route53domains:Get*', 'route53domains:List*'],
+            resources: ['*'],
+          },
+          {
+            actions: ['route53domains:CheckDomainAvailability'],
+            resources: ['*'],
+          },
+          {
+            actions: ['s3:*', 's3-object-lambda:*'],
+            resources: ['*'],
+          },
+          {
+            actions: ['sqs:*'],
+            resources: ['*'],
+          },
+        ],
+      },
+      { retainOnDelete: true },
+    )
+
+    // Create a Security Group for the RDS Cluster
+    const rdsSecurityGroup = new aws.ec2.SecurityGroup(
+      'rdsSecurityGroup',
+      {
+        name:
+          $app.stage === 'develop'
+            ? 'api-rds-security-group'
+            : `api-${$app.stage}-rds-security-group`,
+        description: 'Allow traffic to RDS',
         vpcId: 'vpc-0763fa52c32ebcf6a',
         ingress: [
           {
             protocol: 'tcp',
-            fromPort: 443,
-            toPort: 443,
+            fromPort: 5432,
+            toPort: 5432,
             cidrBlocks: [vpcCidr],
+          },
+          // Allow access from Codebuild's security group
+          {
+            protocol: 'tcp',
+            fromPort: 5432,
+            toPort: 5432,
+            securityGroups: ['sg-01de8d67b0f0ec787'], // Codebuild SG ID
           },
         ],
         egress: [
@@ -299,164 +497,25 @@ export default $config({
             cidrBlocks: ['0.0.0.0/0'],
           },
         ],
-      })
-
-      new aws.ec2.VpcEndpoint('sqs-endpoint', {
-        vpcId: 'vpc-0763fa52c32ebcf6a',
-        serviceName: `com.amazonaws.us-west-2.sqs`,
-        vpcEndpointType: 'Interface',
-        subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-        securityGroupIds: [sqsSecurityGroup.id],
-        privateDnsEnabled: true,
-      })
-    }
-
-    // todo: may need to add sqs queue policy to allow access from the vpc endpoint.
-    cluster.addService(`gp-api-${$app.stage}`, {
-      logging: {
-        retention: $app.stage === 'master' ? '2 months' : '1 month',
       },
-      loadBalancer: {
-        domain: apiDomain,
-        ports: [
-          { listen: '80/http' },
-          { listen: '443/https', forward: '80/http' },
-        ],
-        health: {
-          '80/http': {
-            path: '/v1/health',
-            interval: '10 seconds',
-            timeout: '5 seconds',
-            healthyThreshold: 2,
-            unhealthyThreshold: 3,
-          },
-        },
-      },
-      // https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html#fargate-tasks-size
-      capacity: {
-        fargate: { weight: 1 },
-      },
-      memory: $app.stage === 'master' ? '4 GB' : '2 GB', // ie: 1 GB, 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB
-      cpu: $app.stage === 'master' ? '1 vCPU' : '0.5 vCPU', // ie: 1 vCPU, 2 vCPU, 3 vCPU, 4 vCPU, 5 vCPU, 6 vCPU, 7 vCPU, 8 vCPU
-      scaling: {
-        min: $app.stage === 'master' ? 2 : 1,
-        max: $app.stage === 'master' ? 16 : 4,
-        cpuUtilization: 50,
-        memoryUtilization: 50,
-      },
-      environment: {
-        // PORT: '3000',
-        PORT: '80',
-        HOST: '0.0.0.0',
-        LOG_LEVEL: 'debug',
-        CORS_ORIGIN:
-          $app.stage === 'master' ? 'goodparty.org' : 'dev.goodparty.org',
-        AWS_REGION: 'us-west-2',
-        ASSET_DOMAIN: bucketDomain,
-        WEBAPP_ROOT_URL: webAppRootUrl,
-        AI_MODELS:
-          'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,Qwen/Qwen3-235B-A22B-fp8-tput',
-        LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
-        SQS_QUEUE: sqsQueueName,
-        SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
-        SERVE_ANALYSIS_BUCKET_NAME: serveAnalysisBucketName[$app.stage],
-        TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucketName[$app.stage],
-        ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucketName[$app.stage],
-        ...secretsJson,
-      },
-      image: {
-        context: '../', // Set the context to the main app directory
-        dockerfile: './deploy/Dockerfile',
-        args: {
-          DOCKER_BUILDKIT: '1',
-          CACHEBUST: secretsJson?.CACHEBUST || Date.now().toString(),
-          DOCKER_USERNAME: process.env.DOCKER_USERNAME || '',
-          DOCKER_PASSWORD: process.env.DOCKER_PASSWORD || '',
-          DATABASE_URL: dbUrl, // so we can run migrations.
-          STAGE: $app.stage,
-        },
-      },
-      link: [assetsBucket],
-      transform: {
-        loadBalancer: {
-          idleTimeout: 120,
-        },
-        target: (targetArgs) => {
-          targetArgs.healthCheck = {
-            ...targetArgs.healthCheck,
-            path: '/v1/health',
-            interval: 10,
-            timeout: 5,
-            healthyThreshold: 2,
-            unhealthyThreshold: 3,
-            matcher: '200',
-          }
-        },
-      },
-      permissions: [
-        {
-          actions: ['route53domains:Get*', 'route53domains:List*'],
-          resources: ['*'],
-        },
-        {
-          actions: ['route53domains:CheckDomainAvailability'],
-          resources: ['*'],
-        },
-        {
-          actions: ['s3:*', 's3-object-lambda:*'],
-          resources: ['*'],
-        },
-        {
-          actions: ['sqs:*'],
-          resources: ['*'],
-        },
-      ],
-    })
-
-    // Create a Security Group for the RDS Cluster
-    const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
-      name:
-        $app.stage === 'develop'
-          ? 'api-rds-security-group'
-          : `api-${$app.stage}-rds-security-group`,
-      description: 'Allow traffic to RDS',
-      vpcId: 'vpc-0763fa52c32ebcf6a',
-      ingress: [
-        {
-          protocol: 'tcp',
-          fromPort: 5432,
-          toPort: 5432,
-          cidrBlocks: [vpcCidr],
-        },
-        // Allow access from Codebuild's security group
-        {
-          protocol: 'tcp',
-          fromPort: 5432,
-          toPort: 5432,
-          securityGroups: ['sg-01de8d67b0f0ec787'], // Codebuild SG ID
-        },
-      ],
-      egress: [
-        {
-          protocol: '-1',
-          fromPort: 0,
-          toPort: 0,
-          cidrBlocks: ['0.0.0.0/0'],
-        },
-      ],
-    })
+      { retainOnDelete: true },
+    )
 
     // Create a Subnet Group for the RDS Cluster (using our private subnets)
-    const subnetGroup = new aws.rds.SubnetGroup('subnetGroup', {
-      name:
-        $app.stage === 'develop'
-          ? 'api-rds-subnet-group'
-          : `api-${$app.stage}-rds-subnet-group`,
-      subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-      tags: {
-        Name: `api-${$app.stage}-rds-subnet-group`,
+    const subnetGroup = new aws.rds.SubnetGroup(
+      'subnetGroup',
+      {
+        name:
+          $app.stage === 'develop'
+            ? 'api-rds-subnet-group'
+            : `api-${$app.stage}-rds-subnet-group`,
+        subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+        tags: {
+          Name: `api-${$app.stage}-rds-subnet-group`,
+        },
       },
-    })
+      { retainOnDelete: true },
+    )
 
     // Warning: Do not change the clusterIdentifier.
     // The clusterIdentifier is used as a unique identifier for your RDS cluster.
@@ -465,24 +524,28 @@ export default $config({
     // identity and cannot be modified in place.
     let rdsCluster: aws.rds.Cluster | undefined
     if ($app.stage === 'master') {
-      rdsCluster = new aws.rds.Cluster('rdsCluster', {
-        clusterIdentifier: 'gp-api-db-prod',
-        engine: aws.rds.EngineType.AuroraPostgresql,
-        engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.8',
-        databaseName: dbName,
-        masterUsername: dbUser,
-        masterPassword: dbPassword,
-        dbSubnetGroupName: subnetGroup.name,
-        vpcSecurityGroupIds: [rdsSecurityGroup.id],
-        storageEncrypted: true,
-        deletionProtection: true,
-        finalSnapshotIdentifier: `gp-api-db-${$app.stage}-final-snapshot`,
-        serverlessv2ScalingConfiguration: {
-          maxCapacity: 64,
-          minCapacity: $app.stage === 'master' ? 1.0 : 0.5,
+      rdsCluster = new aws.rds.Cluster(
+        'rdsCluster',
+        {
+          clusterIdentifier: 'gp-api-db-prod',
+          engine: aws.rds.EngineType.AuroraPostgresql,
+          engineMode: aws.rds.EngineMode.Provisioned,
+          engineVersion: '16.8',
+          databaseName: dbName,
+          masterUsername: dbUser,
+          masterPassword: dbPassword,
+          dbSubnetGroupName: subnetGroup.name,
+          vpcSecurityGroupIds: [rdsSecurityGroup.id],
+          storageEncrypted: true,
+          deletionProtection: true,
+          finalSnapshotIdentifier: `gp-api-db-${$app.stage}-final-snapshot`,
+          serverlessv2ScalingConfiguration: {
+            maxCapacity: 64,
+            minCapacity: $app.stage === 'master' ? 1.0 : 0.5,
+          },
         },
-      })
+        { retainOnDelete: true },
+      )
 
       const voterDbProdConfig = {
         clusterIdentifier: 'gp-voter-db',
@@ -505,185 +568,226 @@ export default $config({
       const voterCluster = new aws.rds.Cluster(
         'voterCluster',
         voterDbProdConfig,
+        { retainOnDelete: true },
       )
 
-      new aws.rds.ClusterInstance('voterInstance', {
-        clusterIdentifier: voterCluster.id,
-        instanceClass: 'db.serverless',
-        engine: aws.rds.EngineType.AuroraPostgresql,
-        engineVersion: voterCluster.engineVersion,
-      })
+      new aws.rds.ClusterInstance(
+        'voterInstance',
+        {
+          clusterIdentifier: voterCluster.id,
+          instanceClass: 'db.serverless',
+          engine: aws.rds.EngineType.AuroraPostgresql,
+          engineVersion: voterCluster.engineVersion,
+        },
+        { retainOnDelete: true },
+      )
 
       // Second voter cluster for database swap operation
-      const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
-        ...voterDbProdConfig,
-        clusterIdentifier: 'gp-voter-db-20250728',
-        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-20250728-final-snapshot`,
-      })
-
-      new aws.rds.ClusterInstance('voterInstanceLatest', {
-        clusterIdentifier: voterClusterLatest.id,
-        instanceClass: 'db.serverless',
-        engine: aws.rds.EngineType.AuroraPostgresql,
-        engineVersion: voterClusterLatest.engineVersion,
-      })
-    } else if ($app.stage === 'qa') {
-      rdsCluster = new aws.rds.Cluster('rdsCluster', {
-        clusterIdentifier: 'gp-api-db-qa',
-        engine: aws.rds.EngineType.AuroraPostgresql,
-        engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.8',
-        databaseName: dbName,
-        masterUsername: dbUser,
-        masterPassword: dbPassword,
-        dbSubnetGroupName: subnetGroup.name,
-        vpcSecurityGroupIds: [rdsSecurityGroup.id],
-        storageEncrypted: true,
-        deletionProtection: true,
-        finalSnapshotIdentifier: `gp-api-db-${$app.stage}-final-snapshot`,
-        serverlessv2ScalingConfiguration: {
-          maxCapacity: 64,
-          minCapacity: 0.5,
+      const voterClusterLatest = new aws.rds.Cluster(
+        'voterClusterLatest',
+        {
+          ...voterDbProdConfig,
+          clusterIdentifier: 'gp-voter-db-20250728',
+          finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-20250728-final-snapshot`,
         },
-      })
+        { retainOnDelete: true },
+      )
+
+      new aws.rds.ClusterInstance(
+        'voterInstanceLatest',
+        {
+          clusterIdentifier: voterClusterLatest.id,
+          instanceClass: 'db.serverless',
+          engine: aws.rds.EngineType.AuroraPostgresql,
+          engineVersion: voterClusterLatest.engineVersion,
+        },
+        { retainOnDelete: true },
+      )
+    } else if ($app.stage === 'qa') {
+      rdsCluster = new aws.rds.Cluster(
+        'rdsCluster',
+        {
+          clusterIdentifier: 'gp-api-db-qa',
+          engine: aws.rds.EngineType.AuroraPostgresql,
+          engineMode: aws.rds.EngineMode.Provisioned,
+          engineVersion: '16.8',
+          databaseName: dbName,
+          masterUsername: dbUser,
+          masterPassword: dbPassword,
+          dbSubnetGroupName: subnetGroup.name,
+          vpcSecurityGroupIds: [rdsSecurityGroup.id],
+          storageEncrypted: true,
+          deletionProtection: true,
+          finalSnapshotIdentifier: `gp-api-db-${$app.stage}-final-snapshot`,
+          serverlessv2ScalingConfiguration: {
+            maxCapacity: 64,
+            minCapacity: 0.5,
+          },
+        },
+        { retainOnDelete: true },
+      )
     } else if ($app.stage === 'develop') {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
 
-      const voterCluster = new aws.rds.Cluster('voterCluster', {
-        clusterIdentifier: `gp-voter-db-${$app.stage}`,
-        engine: aws.rds.EngineType.AuroraPostgresql,
-        engineMode: aws.rds.EngineMode.Provisioned,
-        engineVersion: '16.8',
-        databaseName: voterDbName,
-        masterUsername: voterDbUser,
-        masterPassword: voterDbPassword,
-        dbSubnetGroupName: subnetGroup.name,
-        vpcSecurityGroupIds: [rdsSecurityGroup.id],
-        storageEncrypted: true,
-        deletionProtection: true,
-        finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
-        serverlessv2ScalingConfiguration: {
-          maxCapacity: 128,
-          minCapacity: 0.5,
+      const voterCluster = new aws.rds.Cluster(
+        'voterCluster',
+        {
+          clusterIdentifier: `gp-voter-db-${$app.stage}`,
+          engine: aws.rds.EngineType.AuroraPostgresql,
+          engineMode: aws.rds.EngineMode.Provisioned,
+          engineVersion: '16.8',
+          databaseName: voterDbName,
+          masterUsername: voterDbUser,
+          masterPassword: voterDbPassword,
+          dbSubnetGroupName: subnetGroup.name,
+          vpcSecurityGroupIds: [rdsSecurityGroup.id],
+          storageEncrypted: true,
+          deletionProtection: true,
+          finalSnapshotIdentifier: `gp-voter-db-${$app.stage}-final-snapshot`,
+          serverlessv2ScalingConfiguration: {
+            maxCapacity: 128,
+            minCapacity: 0.5,
+          },
         },
-      })
+        { retainOnDelete: true },
+      )
 
-      new aws.rds.ClusterInstance('voterInstance', {
-        clusterIdentifier: voterCluster.id,
-        instanceClass: 'db.serverless',
-        engine: aws.rds.EngineType.AuroraPostgresql,
-        engineVersion: voterCluster.engineVersion,
-      })
+      new aws.rds.ClusterInstance(
+        'voterInstance',
+        {
+          clusterIdentifier: voterCluster.id,
+          instanceClass: 'db.serverless',
+          engine: aws.rds.EngineType.AuroraPostgresql,
+          engineVersion: voterCluster.engineVersion,
+        },
+        { retainOnDelete: true },
+      )
     } else {
       rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
     }
 
-    new aws.rds.ClusterInstance('rdsInstance', {
-      clusterIdentifier: rdsCluster.id,
-      instanceClass: 'db.serverless',
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineVersion: rdsCluster.engineVersion,
-    })
+    new aws.rds.ClusterInstance(
+      'rdsInstance',
+      {
+        clusterIdentifier: rdsCluster.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: rdsCluster.engineVersion,
+      },
+      { retainOnDelete: true },
+    )
 
     // Create an IAM Role for CodeBuild
-    const codeBuildRole = new aws.iam.Role('codebuild-service-role', {
-      assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: 'codebuild.amazonaws.com',
-      }),
-      managedPolicyArns: ['arn:aws:iam::aws:policy/AdministratorAccess'],
-    })
+    const codeBuildRole = new aws.iam.Role(
+      'codebuild-service-role',
+      {
+        assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+          Service: 'codebuild.amazonaws.com',
+        }),
+        managedPolicyArns: ['arn:aws:iam::aws:policy/AdministratorAccess'],
+      },
+      { retainOnDelete: true },
+    )
 
     // buildspec updated to use file with env vars.
-    new aws.codebuild.Project('gp-deploy-build', {
-      name: `gp-deploy-build-${$app.stage}`,
-      serviceRole: codeBuildRole.arn,
-      environment: {
-        computeType: 'BUILD_GENERAL1_LARGE',
-        image: 'aws/codebuild/standard:6.0',
-        type: 'LINUX_CONTAINER',
-        privilegedMode: true,
-        environmentVariables: [
-          {
-            name: 'STAGE',
-            value: $app.stage,
-            type: 'PLAINTEXT',
-          },
-          {
-            name: 'CLUSTER_NAME',
-            value: `gp-${$app.stage}-fargateCluster`,
-            type: 'PLAINTEXT',
-          },
-          {
-            name: 'SERVICE_NAME',
-            value: `gp-api-${$app.stage}`,
-            type: 'PLAINTEXT',
-          },
-          {
-            name: 'CACHEBUST',
-            value: secretsJson?.CACHEBUST || Date.now().toString(),
-            type: 'PLAINTEXT',
-          },
-        ],
+    new aws.codebuild.Project(
+      'gp-deploy-build',
+      {
+        name: `gp-deploy-build-${$app.stage}`,
+        serviceRole: codeBuildRole.arn,
+        environment: {
+          computeType: 'BUILD_GENERAL1_LARGE',
+          image: 'aws/codebuild/standard:6.0',
+          type: 'LINUX_CONTAINER',
+          privilegedMode: true,
+          environmentVariables: [
+            {
+              name: 'STAGE',
+              value: $app.stage,
+              type: 'PLAINTEXT',
+            },
+            {
+              name: 'CLUSTER_NAME',
+              value: `gp-${$app.stage}-fargateCluster`,
+              type: 'PLAINTEXT',
+            },
+            {
+              name: 'SERVICE_NAME',
+              value: `gp-api-${$app.stage}`,
+              type: 'PLAINTEXT',
+            },
+            {
+              name: 'CACHEBUST',
+              value: secretsJson?.CACHEBUST || Date.now().toString(),
+              type: 'PLAINTEXT',
+            },
+          ],
+        },
+        vpcConfig: {
+          vpcId: 'vpc-0763fa52c32ebcf6a',
+          subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+          securityGroupIds: ['sg-01de8d67b0f0ec787'],
+        },
+        source: {
+          type: 'GITHUB',
+          location: 'https://github.com/thegoodparty/gp-api.git',
+          buildspec: 'deploy/buildspec.yml',
+        },
+        artifacts: {
+          type: 'NO_ARTIFACTS',
+        },
       },
-      vpcConfig: {
-        vpcId: 'vpc-0763fa52c32ebcf6a',
-        subnets: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
-        securityGroupIds: ['sg-01de8d67b0f0ec787'],
-      },
-      source: {
-        type: 'GITHUB',
-        location: 'https://github.com/thegoodparty/gp-api.git',
-        buildspec: 'deploy/buildspec.yml',
-      },
-      artifacts: {
-        type: 'NO_ARTIFACTS',
-      },
-    })
+      { retainOnDelete: true },
+    )
 
     // Create an IAM Policy for Github actions
-    new aws.iam.Policy('github-actions-policy', {
-      description: 'Limited policy for Github Actions to trigger CodeBuild',
-      policy: pulumi.output({
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Action: [
-              'codebuild:StartBuild',
-              'codebuild:BatchGetBuilds',
-              'codebuild:ListBuildsForProject',
-            ],
-            Resource: 'arn:aws:codebuild:us-west-2:333022194791:project/*',
-          },
-          {
-            Effect: 'Allow',
-            Action: ['codebuild:ListProjects'],
-            Resource: '*',
-          },
-          {
-            Effect: 'Allow',
-            Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
-            Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/*`,
-          },
-          {
-            Effect: 'Allow',
-            Action: [
-              'ecs:DescribeServices',
-              'ecs:DescribeTasks',
-              'ecs:DescribeTaskDefinition',
-            ],
-            Resource: '*',
-          },
-          {
-            Effect: 'Allow',
-            Action: [
-              'elasticloadbalancing:DescribeTargetHealth',
-              'elasticloadbalancing:DescribeTargetGroups',
-            ],
-            Resource: '*',
-          },
-        ],
-      }),
-    })
+    new aws.iam.Policy(
+      'github-actions-policy',
+      {
+        description: 'Limited policy for Github Actions to trigger CodeBuild',
+        policy: pulumi.output({
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Action: [
+                'codebuild:StartBuild',
+                'codebuild:BatchGetBuilds',
+                'codebuild:ListBuildsForProject',
+              ],
+              Resource: 'arn:aws:codebuild:us-west-2:333022194791:project/*',
+            },
+            {
+              Effect: 'Allow',
+              Action: ['codebuild:ListProjects'],
+              Resource: '*',
+            },
+            {
+              Effect: 'Allow',
+              Action: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
+              Resource: pulumi.interpolate`arn:aws:logs:us-west-2:333022194791:log-group:/aws/codebuild/*`,
+            },
+            {
+              Effect: 'Allow',
+              Action: [
+                'ecs:DescribeServices',
+                'ecs:DescribeTasks',
+                'ecs:DescribeTaskDefinition',
+              ],
+              Resource: '*',
+            },
+            {
+              Effect: 'Allow',
+              Action: [
+                'elasticloadbalancing:DescribeTargetHealth',
+                'elasticloadbalancing:DescribeTargetGroups',
+              ],
+              Resource: '*',
+            },
+          ],
+        }),
+      },
+      { retainOnDelete: true },
+    )
   },
 })
