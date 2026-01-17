@@ -5,6 +5,8 @@ export interface ServiceConfig {
   environment: 'dev' | 'qa' | 'prod'
   stage: 'develop' | 'qa' | 'master'
 
+  imageUri: string
+
   vpcId: string
   securityGroupIds: string[]
   publicSubnetIds: string[]
@@ -27,6 +29,7 @@ export interface ServiceConfig {
 export async function createService({
   environment,
   stage,
+  imageUri,
   vpcId,
   securityGroupIds,
   publicSubnetIds,
@@ -282,8 +285,7 @@ export async function createService({
       pulumi.output(environmentVariables).apply((env) => [
         {
           name: serviceName,
-          // TODO: SWAIN: get this docker image from a docker build
-          image: `333022194791.dkr.ecr.us-west-2.amazonaws.com/sst-asset:${serviceName}`,
+          image: imageUri,
           cpu: parseInt(cpu),
           memory: parseInt(memory),
           essential: true,
@@ -344,6 +346,7 @@ export async function createService({
       enableExecuteCommand: true,
       // TODO: SWAIN: Set to false during import, can enable later for deployments
       // forceNewDeployment: true,
+      waitForSteadyState: true,
     },
     {
       import: `${clusterName}/${serviceName}`,

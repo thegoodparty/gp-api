@@ -11,6 +11,7 @@ export = async () => {
   const config = new pulumi.Config()
 
   const environment = config.require('environment') as 'dev' | 'qa' | 'prod'
+  const imageUri = config.require('imageUri')
 
   const vpcId = 'vpc-0763fa52c32ebcf6a'
   const vpcCidr = '10.0.0.0/16'
@@ -238,6 +239,7 @@ export = async () => {
   createService({
     environment,
     stage,
+    imageUri,
     vpcId,
     securityGroupIds: vpcSecurityGroupIds,
     publicSubnetIds: vpcSubnetIds.public,
