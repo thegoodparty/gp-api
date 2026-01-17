@@ -4,6 +4,7 @@ import { extractDbCredentials } from './utils'
 import { createService } from './main-components/service'
 import { createAssetsBucket } from './main-components/assets-bucket'
 import { createAssetsRouter } from './main-components/assets-router'
+import { createVpc } from './main-components/vpc'
 
 export = async () => {
   const stack = pulumi.getStack()
@@ -29,6 +30,11 @@ export = async () => {
 
   const select = <T>(values: Record<'dev' | 'qa' | 'prod', T>): T =>
     values[environment]
+
+  // Production deploy manages the VPC. The actual VPC details are hard-coded above as individual variables.
+  if (environment === 'prod') {
+    createVpc()
+  }
 
   // This is just a placeholder resource to confirm the deployment works.
   new aws.s3.Bucket('test-bucket', {
