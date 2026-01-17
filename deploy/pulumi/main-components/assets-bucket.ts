@@ -16,83 +16,61 @@ export async function createAssetsBucket({ environment }: AssetsBucketConfig) {
     prod: 'assets.goodparty.org',
   })
 
-  const bucket = new aws.s3.BucketV2(
-    'assetsBucket',
-    {
-      bucket: bucketName,
-      forceDestroy: false,
-    },
-    { import: bucketName },
-  )
+  const bucket = new aws.s3.BucketV2('assetsBucket', {
+    bucket: bucketName,
+    forceDestroy: false,
+  })
 
   if (environment !== 'prod') {
-    new aws.s3.BucketPublicAccessBlock(
-      'assetsBucketPublicAccessBlock',
-      {
-        bucket: bucket.id,
-        blockPublicAcls: false,
-        blockPublicPolicy: false,
-        ignorePublicAcls: false,
-        restrictPublicBuckets: false,
-      },
-      {
-        import: bucketName,
-      },
-    )
+    new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
+      bucket: bucket.id,
+      blockPublicAcls: false,
+      blockPublicPolicy: false,
+      ignorePublicAcls: false,
+      restrictPublicBuckets: false,
+    })
   }
 
-  new aws.s3.BucketPolicy(
-    'assetsBucketPolicy',
-    {
-      bucket: bucket.id,
-      policy: aws.iam.getPolicyDocumentOutput({
-        statements: [
-          {
-            principals: [
-              {
-                type: '*',
-                identifiers: ['*'],
-              },
-            ],
-            actions: ['s3:GetObject'],
-            resources: [pulumi.interpolate`${bucket.arn}/*`],
-          },
-        ],
-      }).json,
-    },
-    {
-      import: bucketName,
-    },
-  )
-
-  new aws.s3.BucketCorsConfigurationV2(
-    'assetsBucketCors',
-    {
-      bucket: bucket.id,
-      corsRules: [
+  new aws.s3.BucketPolicy('assetsBucketPolicy', {
+    bucket: bucket.id,
+    policy: aws.iam.getPolicyDocumentOutput({
+      statements: [
         {
-          allowedHeaders: ['*'],
-          allowedMethods: ['GET', 'POST', 'PUT'],
-          allowedOrigins: select({
-            dev: [
-              'http://localhost:4000',
-              'https://dev.goodparty.org',
-              'https://qa.goodparty.org',
-            ],
-            qa: [
-              'http://localhost:4000',
-              'https://gp-ui-git-qa-good-party.vercel.app',
-              'https://qa.goodparty.org',
-            ],
-            prod: ['https://goodparty.org'],
-          }),
+          principals: [
+            {
+              type: '*',
+              identifiers: ['*'],
+            },
+          ],
+          actions: ['s3:GetObject'],
+          resources: [pulumi.interpolate`${bucket.arn}/*`],
         },
       ],
-    },
-    {
-      import: bucketName,
-    },
-  )
+    }).json,
+  })
+
+  new aws.s3.BucketCorsConfigurationV2('assetsBucketCors', {
+    bucket: bucket.id,
+    corsRules: [
+      {
+        allowedHeaders: ['*'],
+        allowedMethods: ['GET', 'POST', 'PUT'],
+        allowedOrigins: select({
+          dev: [
+            'http://localhost:4000',
+            'https://dev.goodparty.org',
+            'https://qa.goodparty.org',
+          ],
+          qa: [
+            'http://localhost:4000',
+            'https://gp-ui-git-qa-good-party.vercel.app',
+            'https://qa.goodparty.org',
+          ],
+          prod: ['https://goodparty.org'],
+        }),
+      },
+    ],
+  })
 
   return {
     bucket,
