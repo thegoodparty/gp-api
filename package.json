@@ -22,6 +22,7 @@
     "seed": "npx prisma db seed",
     "seed:all": "npx prisma db seed -- --type all",
     "seed:csv": "npx prisma db seed -- --type csv",
+    "sync:cms": "tsx ./seed/contentfulSync.ts",
     "generate": "npx prisma generate",
     "codegen": "graphql-codegen",
     "test:e2e": "playwright test --config=e2e-tests/playwright.config.ts",
