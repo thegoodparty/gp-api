@@ -97,23 +97,19 @@ export = async () => {
   }
 
   const dlq = new aws.sqs.Queue(
-    `${stage}-dlq`,
+    'main-dlq',
     {
       name: `${stage}-DLQ.fifo`,
       fifoQueue: true,
       messageRetentionSeconds: 7 * 24 * 60 * 60, // 7 days
     },
     {
-      import: select({
-        dev: 'https://sqs.us-west-2.amazonaws.com/333022194791/develop-DLQ.fifo',
-        qa: 'https://sqs.us-west-2.amazonaws.com/333022194791/qa-DLQ.fifo',
-        prod: 'https://sqs.us-west-2.amazonaws.com/333022194791/master-DLQ.fifo',
-      }),
+      import: `https://sqs.us-west-2.amazonaws.com/333022194791/${stage}-DLQ.fifo`,
     },
   )
 
   const queue = new aws.sqs.Queue(
-    `${stage}-queue`,
+    'main-queue',
     {
       name: `${stage}-Queue.fifo`,
       fifoQueue: true,
@@ -129,35 +125,23 @@ export = async () => {
     }`,
     },
     {
-      import: select({
-        dev: 'https://sqs.us-west-2.amazonaws.com/333022194791/develop-Queue.fifo',
-        qa: 'https://sqs.us-west-2.amazonaws.com/333022194791/qa-Queue.fifo',
-        prod: 'https://sqs.us-west-2.amazonaws.com/333022194791/master-Queue.fifo',
-      }),
+      import: `https://sqs.us-west-2.amazonaws.com/333022194791/${stage}-Queue.fifo`,
     },
   )
 
   const tevynPollCsvsBucket = new aws.s3.Bucket(
-    `tevyn-poll-csvs-${stage}`,
+    'tevyn-poll-csvs-bucket',
     {
-      bucket: select({
-        dev: 'tevyn-poll-csvs-develop',
-        qa: 'tevyn-poll-csvs-qa',
-        prod: 'tevyn-poll-csvs-master',
-      }),
+      bucket: `tevyn-polls-csvs-${stage}`,
       forceDestroy: false,
     },
     {
-      import: select({
-        dev: 'tevyn-poll-csvs-develop',
-        qa: 'tevyn-poll-csvs-qa',
-        prod: 'tevyn-poll-csvs-master',
-      }),
+      import: `tevyn-polls-csvs-${stage}`,
     },
   )
 
   new aws.s3.BucketPublicAccessBlock(
-    `tevyn-poll-csvs-pab-${stage}`,
+    'tevyn-poll-csvs-pab',
     {
       bucket: tevynPollCsvsBucket.id,
       blockPublicAcls: true,
@@ -166,34 +150,22 @@ export = async () => {
       restrictPublicBuckets: true,
     },
     {
-      import: select({
-        dev: 'tevyn-poll-csvs-develop',
-        qa: 'tevyn-poll-csvs-qa',
-        prod: 'tevyn-poll-csvs-master',
-      }),
+      import: `tevyn-polls-csvs-${stage}`,
     },
   )
 
   const zipToAreaCodeBucket = new aws.s3.Bucket(
-    `zip-to-area-code-mappings-${stage}`,
+    'zip-to-area-code-bucket',
     {
-      bucket: select({
-        dev: 'zip-to-area-code-mappings-develop',
-        qa: 'zip-to-area-code-mappings-qa',
-        prod: 'zip-to-area-code-mappings-master',
-      }),
+      bucket: `zip-to-area-code-mappings-${stage}`,
       forceDestroy: false,
     },
     {
-      import: select({
-        dev: 'zip-to-area-code-mappings-develop',
-        qa: 'zip-to-area-code-mappings-qa',
-        prod: 'zip-to-area-code-mappings-master',
-      }),
+      import: `zip-to-area-code-mappings-${stage}`,
     },
   )
   new aws.s3.BucketPublicAccessBlock(
-    `zip-to-area-code-mappings-pab-${stage}`,
+    'zip-to-area-code-mappings-pab',
     {
       bucket: zipToAreaCodeBucket.id,
       blockPublicAcls: true,
@@ -202,11 +174,7 @@ export = async () => {
       restrictPublicBuckets: true,
     },
     {
-      import: select({
-        dev: 'zip-to-area-code-mappings-develop',
-        qa: 'zip-to-area-code-mappings-qa',
-        prod: 'zip-to-area-code-mappings-master',
-      }),
+      import: `zip-to-area-code-mappings-${stage}`,
     },
   )
 
