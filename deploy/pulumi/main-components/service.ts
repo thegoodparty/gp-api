@@ -14,6 +14,14 @@ export interface ServiceConfig {
   certificateArn: string
 
   environmentVariables: pulumi.Input<Record<string, pulumi.Input<string>>>
+
+  permissions: pulumi.Input<
+    {
+      Effect?: 'Allow' | 'Deny'
+      Actions: string[]
+      Resources: pulumi.Input<pulumi.Input<string>[]>
+    }[]
+  >
 }
 
 export function createService({
@@ -26,6 +34,7 @@ export function createService({
   domain,
   certificateArn,
   environmentVariables,
+  permissions,
 }: ServiceConfig) {
   const isProd = environment === 'prod'
   const serviceName = `gp-api-${stage}`
@@ -232,30 +241,6 @@ export function createService({
     },
   )
 
-  // Note: Execution role inline policies are already attached to the imported role.
-  // After import is complete and you've removed import IDs, you can uncomment this
-  // to manage the policy as code:
-  //
-  // new aws.iam.RolePolicy('executionRolePolicy', {
-  //   role: executionRole.name,
-  //   policy: JSON.stringify({
-  //     Version: '2012-10-17',
-  //     Statement: [
-  //       {
-  //         Sid: 'ReadSsmAndSecrets',
-  //         Effect: 'Allow',
-  //         Action: [
-  //           'ssm:GetParameters',
-  //           'ssm:GetParameter',
-  //           'ssm:GetParameterHistory',
-  //           'secretsmanager:GetSecretValue',
-  //         ],
-  //         Resource: '*',
-  //       },
-  //     ],
-  //   }),
-  // })
-
   const taskRole = new aws.iam.Role(
     'taskRole',
     {
@@ -272,6 +257,12 @@ export function createService({
           },
         ],
       }),
+      inlinePolicies: [
+        {
+          name: 'inline',
+          policy: pulumi.jsonStringify(permissions),
+        },
+      ],
     },
     {
       import: `gp-${stage}-gpapi${stage}TaskRole-uswest2`,

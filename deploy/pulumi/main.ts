@@ -300,6 +300,33 @@ export = async () => {
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       ...secret,
     },
+    permissions: [
+      {
+        Actions: ['route53domains:List*', 'route53domains:Get*'],
+        Resources: ['*'],
+      },
+      {
+        Actions: ['route53domains:CheckDomainAvailability'],
+        Resources: ['*'],
+      },
+      {
+        Actions: ['s3:*', 's3-object-lambda:*'],
+        Resources: ['*'],
+      },
+      {
+        Actions: ['sqs:*'],
+        Resources: ['*'],
+      },
+      {
+        Actions: [
+          'ssmmessages:OpenDataChannel',
+          'ssmmessages:OpenControlChannel',
+          'ssmmessages:CreateDataChannel',
+          'ssmmessages:CreateControlChannel',
+        ],
+        Resources: ['*'],
+      },
+    ],
   })
 
   const rdsSecurityGroup = new aws.ec2.SecurityGroup(
