@@ -85,7 +85,7 @@ export const createVpc = () => {
   )
 
   const publicRouteTable1 = new aws.ec2.RouteTable(
-    'apiPublicRouteTable1',
+    'apiPublicSubnet1RouteTable',
     {
       vpcId: vpc.id,
       routes: [
@@ -104,7 +104,7 @@ export const createVpc = () => {
   )
 
   const publicRouteTable2 = new aws.ec2.RouteTable(
-    'apiPublicRouteTable2',
+    'apiPublicSubnet2RouteTable',
     {
       vpcId: vpc.id,
       routes: [
@@ -123,7 +123,7 @@ export const createVpc = () => {
   )
 
   new aws.ec2.RouteTableAssociation(
-    'apiPublicRouteTableAssociation1',
+    'apiPublicSubnet1RouteTableAssociation',
     {
       subnetId: publicSubnet1.id,
       routeTableId: publicRouteTable1.id,
@@ -134,7 +134,7 @@ export const createVpc = () => {
   )
 
   new aws.ec2.RouteTableAssociation(
-    'apiPublicRouteTableAssociation2',
+    'apiPublicSubnet2RouteTableAssociation',
     {
       subnetId: publicSubnet2.id,
       routeTableId: publicRouteTable2.id,
@@ -145,7 +145,7 @@ export const createVpc = () => {
   )
 
   const eip1 = new aws.ec2.Eip(
-    'apiElasticIp1',
+    'apiPublicSubnet1Eip',
     {
       domain: 'vpc',
       tags: {
@@ -158,7 +158,7 @@ export const createVpc = () => {
   )
 
   const eip2 = new aws.ec2.Eip(
-    'apiElasticIp2',
+    'apiPublicSubnet2Eip',
     {
       domain: 'vpc',
       tags: {
@@ -171,7 +171,7 @@ export const createVpc = () => {
   )
 
   const natGateway1 = new aws.ec2.NatGateway(
-    'apiNatGateway1',
+    'apiPublicSubnet1NatGateway',
     {
       subnetId: publicSubnet1.id,
       allocationId: eip1.id,
@@ -185,7 +185,7 @@ export const createVpc = () => {
   )
 
   const natGateway2 = new aws.ec2.NatGateway(
-    'apiNatGateway2',
+    'apiPublicSubnet2NatGateway',
     {
       subnetId: publicSubnet2.id,
       allocationId: eip2.id,
@@ -227,7 +227,7 @@ export const createVpc = () => {
   )
 
   const privateRouteTable1 = new aws.ec2.RouteTable(
-    'apiPrivateRouteTable1',
+    'apiPrivateSubnet1RouteTable',
     {
       vpcId: vpc.id,
       routes: [
@@ -246,7 +246,7 @@ export const createVpc = () => {
   )
 
   const privateRouteTable2 = new aws.ec2.RouteTable(
-    'apiPrivateRouteTable2',
+    'apiPrivateSubnet2RouteTable',
     {
       vpcId: vpc.id,
       routes: [
@@ -265,7 +265,7 @@ export const createVpc = () => {
   )
 
   new aws.ec2.RouteTableAssociation(
-    'apiPrivateRouteTableAssociation1',
+    'apiPrivateSubnet1RouteTableAssociation',
     {
       subnetId: privateSubnet1.id,
       routeTableId: privateRouteTable1.id,
@@ -276,7 +276,7 @@ export const createVpc = () => {
   )
 
   new aws.ec2.RouteTableAssociation(
-    'apiPrivateRouteTableAssociation2',
+    'apiPrivateSubnet2RouteTableAssociation',
     {
       subnetId: privateSubnet2.id,
       routeTableId: privateRouteTable2.id,
