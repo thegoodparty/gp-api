@@ -141,13 +141,6 @@ export = async () => {
     ignorePublicAcls: true,
     restrictPublicBuckets: true,
   })
-  new aws.s3.BucketPublicAccessBlock(`zip-to-area-code-mappings-pab-${stage}`, {
-    bucket: zipToAreaCodeBucket.id,
-    blockPublicAcls: true,
-    blockPublicPolicy: true,
-    ignorePublicAcls: true,
-    restrictPublicBuckets: true,
-  })
 
   if (stage === 'master') {
     const sqsSecurityGroup = new aws.ec2.SecurityGroup('sqs-sg', {
