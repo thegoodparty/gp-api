@@ -18,13 +18,13 @@ export interface ServiceConfig {
   permissions: pulumi.Input<
     {
       Effect?: 'Allow' | 'Deny'
-      Actions: string[]
-      Resources: pulumi.Input<pulumi.Input<string>[]>
+      Action: string[]
+      Resource: pulumi.Input<pulumi.Input<string>[]>
     }[]
   >
 }
 
-export function createService({
+export async function createService({
   environment,
   stage,
   vpcId,
@@ -47,16 +47,9 @@ export function createService({
     'ecsCluster',
     {
       name: clusterName,
-      settings: [
-        {
-          name: 'containerInsights',
-          value: 'enabled',
-        },
-      ],
+      settings: [{ name: 'containerInsights', value: 'enabled' }],
     },
-    {
-      import: `gp-${stage}-fargateCluster`,
-    },
+    { import: `gp-${stage}-fargateCluster` },
   )
 
   const albSecurityGroup = new aws.ec2.SecurityGroup(
@@ -72,18 +65,11 @@ export function createService({
       vpcId,
       ingress: [
         {
-          protocol: 'tcp',
-          fromPort: 80,
-          toPort: 80,
+          protocol: '-1',
+          fromPort: 0,
+          toPort: 0,
           cidrBlocks: ['0.0.0.0/0'],
           description: 'HTTP',
-        },
-        {
-          protocol: 'tcp',
-          fromPort: 443,
-          toPort: 443,
-          cidrBlocks: ['0.0.0.0/0'],
-          description: 'HTTPS',
         },
       ],
       egress: [
@@ -154,22 +140,13 @@ export function createService({
     },
   )
 
-  const httpListener = new aws.lb.Listener(
+  new aws.lb.Listener(
     'httpListener',
     {
       loadBalancerArn: loadBalancer.arn,
       port: 80,
       protocol: 'HTTP',
-      defaultActions: [
-        {
-          type: 'redirect',
-          redirect: {
-            port: '443',
-            protocol: 'HTTPS',
-            statusCode: 'HTTP_301',
-          },
-        },
-      ],
+      defaultActions: [{ type: 'forward', targetGroupArn: targetGroup.arn }],
     },
     {
       import: select({
@@ -180,19 +157,14 @@ export function createService({
     },
   )
 
-  const httpsListener = new aws.lb.Listener(
+  new aws.lb.Listener(
     'httpsListener',
     {
       loadBalancerArn: loadBalancer.arn,
       port: 443,
       protocol: 'HTTPS',
       certificateArn,
-      defaultActions: [
-        {
-          type: 'forward',
-          targetGroupArn: targetGroup.arn,
-        },
-      ],
+      defaultActions: [{ type: 'forward', targetGroupArn: targetGroup.arn }],
     },
     {
       import: select({
@@ -235,6 +207,25 @@ export function createService({
       managedPolicyArns: [
         'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy',
       ],
+      inlinePolicies: [
+        {
+          name: 'inline',
+          policy: pulumi.jsonStringify({
+            Version: '2012-10-17',
+            Statement: [
+              {
+                Action: [
+                  'ssm:GetParameters',
+                  'ssm:GetParameterHistory',
+                  'ssm:GetParameter',
+                  'secretsmanager:GetSecretValue',
+                ],
+                Resource: '*',
+              },
+            ],
+          }),
+        },
+      ],
     },
     {
       import: `gp-${stage}-gpapi${stage}ExecutionRole-uswest2`,
@@ -260,7 +251,10 @@ export function createService({
       inlinePolicies: [
         {
           name: 'inline',
-          policy: pulumi.jsonStringify(permissions),
+          policy: pulumi.jsonStringify({
+            Version: '2012-10-17',
+            Statement: permissions,
+          }),
         },
       ],
     },
@@ -268,52 +262,6 @@ export function createService({
       import: `gp-${stage}-gpapi${stage}TaskRole-uswest2`,
     },
   )
-
-  // Note: Task role inline policies are already attached to the imported role.
-  // After import is complete and you've removed import IDs, you can uncomment this
-  // to manage the policy as code:
-  //
-  // new aws.iam.RolePolicy('taskRolePolicy', {
-  //   role: taskRole.name,
-  //   policy: JSON.stringify({
-  //     Version: '2012-10-17',
-  //     Statement: [
-  //       // SSM Messages for ECS Exec
-  //       {
-  //         Effect: 'Allow',
-  //         Action: [
-  //           'ssmmessages:CreateControlChannel',
-  //           'ssmmessages:CreateDataChannel',
-  //           'ssmmessages:OpenControlChannel',
-  //           'ssmmessages:OpenDataChannel',
-  //         ],
-  //         Resource: '*',
-  //       },
-  //       // Route53 Domains
-  //       {
-  //         Effect: 'Allow',
-  //         Action: [
-  //           'route53domains:Get*',
-  //           'route53domains:List*',
-  //           'route53domains:CheckDomainAvailability',
-  //         ],
-  //         Resource: '*',
-  //       },
-  //       // S3 - broad access as per SST config
-  //       {
-  //         Effect: 'Allow',
-  //         Action: ['s3:*', 's3-object-lambda:*'],
-  //         Resource: '*',
-  //       },
-  //       // SQS - broad access as per SST config
-  //       {
-  //         Effect: 'Allow',
-  //         Action: ['sqs:*'],
-  //         Resource: '*',
-  //       },
-  //     ],
-  //   }),
-  // })
 
   const cpu = isProd ? '1024' : '512'
   const memory = isProd ? '4096' : '2048'

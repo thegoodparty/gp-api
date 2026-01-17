@@ -1,8 +1,7 @@
 import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
-import * as awsx from '@pulumi/awsx'
 import { extractDbCredentials } from './utils'
-import { createService, ServiceConfig } from './main-components/service'
+import { createService } from './main-components/service'
 
 export = async () => {
   const stack = pulumi.getStack()
@@ -18,7 +17,6 @@ export = async () => {
     public: ['subnet-07984b965dabfdedc', 'subnet-01c540e6428cdd8db'],
     private: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
   }
-
   const vpcSecurityGroupIds = ['sg-01de8d67b0f0ec787']
 
   const stage = {
@@ -90,7 +88,6 @@ export = async () => {
     throw new Error('DATABASE_URL, VPC_CIDR keys must be set in the secret.')
   }
 
-  // Create Dead Letter Queue
   const dlq = new aws.sqs.Queue(
     `${stage}-dlq`,
     {
@@ -107,7 +104,6 @@ export = async () => {
     },
   )
 
-  // Create Main Queue
   const queue = new aws.sqs.Queue(
     `${stage}-queue`,
     {
@@ -302,29 +298,29 @@ export = async () => {
     },
     permissions: [
       {
-        Actions: ['route53domains:List*', 'route53domains:Get*'],
-        Resources: ['*'],
+        Action: ['route53domains:List*', 'route53domains:Get*'],
+        Resource: ['*'],
       },
       {
-        Actions: ['route53domains:CheckDomainAvailability'],
-        Resources: ['*'],
+        Action: ['route53domains:CheckDomainAvailability'],
+        Resource: ['*'],
       },
       {
-        Actions: ['s3:*', 's3-object-lambda:*'],
-        Resources: ['*'],
+        Action: ['s3:*', 's3-object-lambda:*'],
+        Resource: ['*'],
       },
       {
-        Actions: ['sqs:*'],
-        Resources: ['*'],
+        Action: ['sqs:*'],
+        Resource: ['*'],
       },
       {
-        Actions: [
+        Action: [
           'ssmmessages:OpenDataChannel',
           'ssmmessages:OpenControlChannel',
           'ssmmessages:CreateDataChannel',
           'ssmmessages:CreateControlChannel',
         ],
-        Resources: ['*'],
+        Resource: ['*'],
       },
     ],
   })
