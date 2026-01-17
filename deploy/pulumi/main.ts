@@ -2,6 +2,8 @@ import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
 import { extractDbCredentials } from './utils'
 import { createService } from './main-components/service'
+import { createAssetsBucket } from './main-components/assets-bucket'
+import { createAssetsRouter } from './main-components/assets-router'
 
 export = async () => {
   const stack = pulumi.getStack()
@@ -243,6 +245,20 @@ export = async () => {
         import: 'vpce-0e5410e7e5996e71c',
       },
     )
+  }
+
+  // Assets bucket - used for storing uploaded files, images, etc.
+  const assetsBucket = await createAssetsBucket({
+    environment,
+    stage,
+  })
+
+  if (environment !== 'prod') {
+    await createAssetsRouter({
+      environment: environment,
+      bucketRegionalDomainName: assetsBucket.bucketRegionalDomainName,
+      hostedZoneId,
+    })
   }
 
   createService({
