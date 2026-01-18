@@ -37,7 +37,7 @@ export async function createAssetsRouter({
 
   const distribution = new aws.cloudfront.Distribution('assetsDistribution', {
     enabled: true,
-    isIpv6Enabled: false,
+    isIpv6Enabled: true,
     comment: `Assets CDN for ${environment}`,
     aliases: [domain],
     priceClass: 'PriceClass_All',

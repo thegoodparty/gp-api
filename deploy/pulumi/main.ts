@@ -12,7 +12,6 @@ export = async () => {
   const environment = config.require('environment') as 'dev' | 'qa' | 'prod'
 
   const vpcId = 'vpc-0763fa52c32ebcf6a'
-  const vpcCidr = '10.0.0.0/16'
   const hostedZoneId = 'Z10392302OXMPNQLPO07K'
 
   const vpcSubnetIds = {
@@ -119,37 +118,6 @@ export = async () => {
     restrictPublicBuckets: true,
   })
 
-  if (stage === 'master') {
-    const sqsSecurityGroup = new aws.ec2.SecurityGroup('sqs-sg', {
-      vpcId,
-      ingress: [
-        {
-          protocol: 'tcp',
-          fromPort: 443,
-          toPort: 443,
-          cidrBlocks: [vpcCidr],
-        },
-      ],
-      egress: [
-        {
-          protocol: '-1',
-          fromPort: 0,
-          toPort: 0,
-          cidrBlocks: ['0.0.0.0/0'],
-        },
-      ],
-    })
-
-    new aws.ec2.VpcEndpoint('sqs-endpoint', {
-      vpcId,
-      serviceName: `com.amazonaws.us-west-2.sqs`,
-      vpcEndpointType: 'Interface',
-      subnetIds: vpcSubnetIds.private,
-      securityGroupIds: [sqsSecurityGroup.id],
-      privateDnsEnabled: true,
-    })
-  }
-
   // Assets bucket - used for storing uploaded files, images, etc.
   const assetsBucket = await createAssetsBucket({ environment })
 
@@ -173,6 +141,7 @@ export = async () => {
     vpcId,
     securityGroupIds: vpcSecurityGroupIds,
     publicSubnetIds: vpcSubnetIds.public,
+    privateSubnetIds: vpcSubnetIds.private,
     hostedZoneId,
     domain: select({
       dev: 'gp-api-dev.goodparty.org',
@@ -249,14 +218,7 @@ export = async () => {
         toPort: 5432,
         securityGroups: vpcSecurityGroupIds,
       },
-      {
-        protocol: 'tcp',
-        fromPort: 5432,
-        toPort: 5432,
-        cidrBlocks: [vpcCidr],
-      },
-    ].concat(
-      select({
+      ...select({
         // TODOSWAIN: investigate whether these are truly needed in dev
         dev: [
           {
@@ -277,7 +239,7 @@ export = async () => {
         qa: [],
         prod: [],
       }),
-    ),
+    ],
     egress: [
       {
         protocol: '-1',
@@ -317,6 +279,7 @@ export = async () => {
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
       deletionProtection: true,
+      backupRetentionPeriod: environment === 'prod' ? 14 : 7,
       finalSnapshotIdentifier: `gp-api-db-${stage}-final-snapshot`,
       serverlessv2ScalingConfiguration: {
         minCapacity: environment === 'prod' ? 1 : 0.5,
@@ -345,7 +308,7 @@ export = async () => {
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
       deletionProtection: true,
-      finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
+      backupRetentionPeriod: environment === 'prod' ? 14 : 7,
       serverlessv2ScalingConfiguration: {
         maxCapacity: 128,
         minCapacity: 0.5,

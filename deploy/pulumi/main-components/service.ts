@@ -8,6 +8,7 @@ export interface ServiceConfig {
   vpcId: string
   securityGroupIds: string[]
   publicSubnetIds: string[]
+  privateSubnetIds: string[]
 
   hostedZoneId: string
   domain: string
@@ -30,6 +31,7 @@ export async function createService({
   vpcId,
   securityGroupIds,
   publicSubnetIds,
+  privateSubnetIds,
   hostedZoneId,
   domain,
   certificateArn,
@@ -59,11 +61,18 @@ export async function createService({
     vpcId,
     ingress: [
       {
-        protocol: '-1',
-        fromPort: 0,
-        toPort: 0,
+        protocol: 'tcp',
+        fromPort: 80,
+        toPort: 80,
         cidrBlocks: ['0.0.0.0/0'],
         description: 'HTTP',
+      },
+      {
+        protocol: 'tcp',
+        fromPort: 443,
+        toPort: 443,
+        cidrBlocks: ['0.0.0.0/0'],
+        description: 'HTTPS',
       },
     ],
     egress: [
@@ -110,7 +119,16 @@ export async function createService({
     loadBalancerArn: loadBalancer.arn,
     port: 80,
     protocol: 'HTTP',
-    defaultActions: [{ type: 'forward', targetGroupArn: targetGroup.arn }],
+    defaultActions: [
+      {
+        type: 'redirect',
+        redirect: {
+          protocol: 'HTTPS',
+          port: '443',
+          statusCode: 'HTTP_301',
+        },
+      },
+    ],
   })
 
   new aws.lb.Listener('httpsListener', {
@@ -118,15 +136,14 @@ export async function createService({
     port: 443,
     protocol: 'HTTPS',
     certificateArn,
+    sslPolicy: 'ELBSecurityPolicy-TLS13-1-2-2021-06',
     defaultActions: [{ type: 'forward', targetGroupArn: targetGroup.arn }],
   })
-
-  const logGroupName = `/sst/cluster/gp-${stage}-fargateCluster/gp-api-${stage}/gp-api-${stage}`
 
   const logGroup = new aws.cloudwatch.LogGroup(
     'logGroup',
     {
-      name: logGroupName,
+      name: `/aws/ecs/gp-api-${serviceName}`,
       retentionInDays: isProd ? 60 : 30,
     },
     { retainOnDelete: true },
@@ -233,7 +250,7 @@ export async function createService({
           logConfiguration: {
             logDriver: 'awslogs',
             options: {
-              'awslogs-group': logGroupName,
+              'awslogs-group': logGroup.name,
               'awslogs-region': 'us-west-2',
               'awslogs-stream-prefix': '/service',
             },
@@ -256,9 +273,9 @@ export async function createService({
     desiredCount,
     capacityProviderStrategies: [{ capacityProvider: 'FARGATE', weight: 1 }],
     networkConfiguration: {
-      subnets: publicSubnetIds,
+      subnets: privateSubnetIds,
       securityGroups: securityGroupIds,
-      assignPublicIp: true,
+      assignPublicIp: false,
     },
     loadBalancers: [
       {
