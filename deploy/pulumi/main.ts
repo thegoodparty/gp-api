@@ -86,8 +86,8 @@ export = async () => {
     }
   }
 
-  if (!dbName || !dbUser || !dbPassword || !vpcCidr || !dbUrl) {
-    throw new Error('DATABASE_URL, VPC_CIDR keys must be set in the secret.')
+  if (!dbName || !dbUser || !dbPassword || !dbUrl) {
+    throw new Error('DATABASE_URL keys must be set in the secret.')
   }
 
   const dlq = new aws.sqs.Queue('main-dlq', {
