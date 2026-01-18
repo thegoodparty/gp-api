@@ -7,10 +7,9 @@ node_modules
 nestjs/node_modules
 
 # Pulumi
-deploy/pulumi/Pulumi.*.yaml
-!deploy/pulumi/Pulumi.yaml
-deploy/pulumi/bin/
-deploy/pulumi/node_modules/
+deploy/Pulumi.*.yaml
+!deploy/Pulumi.yaml
+deploy/bin/
 
 # Logs
 logs
