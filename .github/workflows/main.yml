@@ -54,6 +54,24 @@ jobs:
           role-to-assume: arn:aws:iam::333022194791:role/github-actions-pulumi-deploy
           aws-region: us-west-2
 
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        id: build-docker
+        env:
+          ECR_REPOSITORY: 333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api
+        run: |
+          IMAGE_URI="${ECR_REPOSITORY}:${{ github.sha }}"
+          docker build \
+            --build-arg CACHEBUST=${{ github.sha }} \
+            -t "${IMAGE_URI}" \
+            -f deploy/Dockerfile \
+            .
+          docker push "${IMAGE_URI}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
       - name: Install Pulumi
         uses: pulumi/actions@v6
         with:
@@ -63,46 +81,10 @@ jobs:
         working-directory: deploy/pulumi
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+          IMAGE_URI: ${{ steps.build-docker.outputs.image_uri }}
         run: |
           npm ci
           sh ./deploy.sh ${{ steps.set-env.outputs.target_env }}
-        # ignore failures for now, until this is proven to run successfully
-        continue-on-error: true
-
-      - name: Run CodeBuild
-        uses: aws-actions/aws-codebuild-run-build@v1
-        with:
-          project-name: gp-deploy-build-${{ github.ref_name }}
-
-      - name: Wait for ECS deployment
-        shell: bash
-        run: |
-          case "${{ github.ref_name }}" in
-            develop)
-              CLUSTER="gp-develop-fargateCluster"
-              SERVICE="gp-api-develop"
-              ;;
-            qa)
-              CLUSTER="gp-qa-fargateCluster"
-              SERVICE="gp-api-qa"
-              ;;
-            master)
-              CLUSTER="gp-master-fargateCluster"
-              SERVICE="gp-api-master"
-              ;;
-            *)
-              echo "Unsupported branch"; exit 1
-              ;;
-          esac
-
-          echo "Waiting for ECS service deployment to complete..."
-          aws ecs wait services-stable \
-            --cluster "$CLUSTER" \
-            --services "$SERVICE" \
-            --region us-west-2
-
-          echo "✅ ECS deployment complete"
-
       - name: Notify Slack on Success (Deploy)
         if: success()
         uses: 8398a7/action-slack@v3
