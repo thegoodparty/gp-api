@@ -161,7 +161,7 @@ export = async () => {
       vpcId,
       serviceName: `com.amazonaws.us-west-2.sqs`,
       vpcEndpointType: 'Interface',
-      subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+      subnetIds: vpcSubnetIds.private,
       securityGroupIds: [sqsSecurityGroup.id],
       privateDnsEnabled: true,
     })
@@ -269,12 +269,11 @@ export = async () => {
     description: 'Allow traffic to RDS',
     vpcId,
     ingress: [
-      // Allow access from Codebuild's security group
       {
         protocol: 'tcp',
         fromPort: 5432,
         toPort: 5432,
-        securityGroups: ['sg-01de8d67b0f0ec787'], // Codebuild SG ID
+        securityGroups: vpcSecurityGroupIds,
       },
       {
         protocol: 'tcp',
@@ -321,16 +320,20 @@ export = async () => {
       stage === 'develop'
         ? 'api-rds-subnet-group'
         : `api-${stage}-rds-subnet-group`,
-    subnetIds: ['subnet-053357b931f0524d4', 'subnet-0bb591861f72dcb7f'],
+    subnetIds: vpcSubnetIds.private,
     tags: {
       Name: `api-${stage}-rds-subnet-group`,
     },
   })
 
-  let rdsCluster: aws.rds.Cluster | undefined
-  if (stage === 'master') {
-    rdsCluster = new aws.rds.Cluster('rdsCluster', {
-      clusterIdentifier: 'gp-api-db-prod',
+  const rdsCluster = new aws.rds.Cluster(
+    'rdsCluster',
+    {
+      clusterIdentifier: select({
+        dev: 'gp-api-db',
+        qa: 'gp-api-db-qa',
+        prod: 'gp-api-db-prod',
+      }),
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineMode: aws.rds.EngineMode.Provisioned,
       engineVersion: '16.8',
@@ -343,11 +346,21 @@ export = async () => {
       deletionProtection: true,
       finalSnapshotIdentifier: `gp-api-db-${stage}-final-snapshot`,
       serverlessv2ScalingConfiguration: {
+        minCapacity: environment === 'prod' ? 1 : 0.5,
         maxCapacity: 64,
-        minCapacity: stage === 'master' ? 1.0 : 0.5,
       },
-    })
+    },
+    { import: environment === 'dev' ? 'gp-api-db' : undefined },
+  )
 
+  new aws.rds.ClusterInstance('rdsInstance', {
+    clusterIdentifier: rdsCluster.id,
+    instanceClass: 'db.serverless',
+    engine: aws.rds.EngineType.AuroraPostgresql,
+    engineVersion: rdsCluster.engineVersion,
+  })
+
+  if (stage === 'master') {
     const voterDbProdConfig = {
       clusterIdentifier: 'gp-voter-db',
       engine: aws.rds.EngineType.AuroraPostgresql,
@@ -388,28 +401,7 @@ export = async () => {
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineVersion: voterClusterLatest.engineVersion,
     })
-  } else if (stage === 'qa') {
-    rdsCluster = new aws.rds.Cluster('rdsCluster', {
-      clusterIdentifier: 'gp-api-db-qa',
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineMode: aws.rds.EngineMode.Provisioned,
-      engineVersion: '16.8',
-      databaseName: dbName,
-      masterUsername: dbUser,
-      masterPassword: dbPassword,
-      dbSubnetGroupName: subnetGroup.name,
-      vpcSecurityGroupIds: [rdsSecurityGroup.id],
-      storageEncrypted: true,
-      deletionProtection: true,
-      finalSnapshotIdentifier: `gp-api-db-${stage}-final-snapshot`,
-      serverlessv2ScalingConfiguration: {
-        maxCapacity: 64,
-        minCapacity: 0.5,
-      },
-    })
-  } else {
-    rdsCluster = aws.rds.Cluster.get('rdsCluster', 'gp-api-db')
-
+  } else if (stage === 'develop') {
     const voterCluster = new aws.rds.Cluster('voterCluster', {
       clusterIdentifier: `gp-voter-db-${stage}`,
       engine: aws.rds.EngineType.AuroraPostgresql,
@@ -436,11 +428,4 @@ export = async () => {
       engineVersion: voterCluster.engineVersion,
     })
   }
-
-  new aws.rds.ClusterInstance('rdsInstance', {
-    clusterIdentifier: rdsCluster.id,
-    instanceClass: 'db.serverless',
-    engine: aws.rds.EngineType.AuroraPostgresql,
-    engineVersion: rdsCluster.engineVersion,
-  })
 }
