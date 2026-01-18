@@ -49,11 +49,7 @@ export async function createAssetsRouter({
       },
     ],
     defaultCacheBehavior: {
-      // TODOSWAIN: remove these hard-coded ids
-      cachePolicyId: select({
-        dev: '658327ea-f89d-4fab-a63d-7e88639e58f6',
-        qa: '658327ea-f89d-4fab-a63d-7e88639e58f6',
-      }),
+      cachePolicyId: '658327ea-f89d-4fab-a63d-7e88639e58f6',
       targetOriginId: '/*',
       viewerProtocolPolicy: 'redirect-to-https',
       allowedMethods: ['GET', 'HEAD', 'OPTIONS'],

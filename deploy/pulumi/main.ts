@@ -7,7 +7,6 @@ import { createAssetsRouter } from './main-components/assets-router'
 import { createVpc } from './main-components/vpc'
 
 export = async () => {
-  const stack = pulumi.getStack()
   const config = new pulumi.Config()
 
   const environment = config.require('environment') as 'dev' | 'qa' | 'prod'
@@ -58,37 +57,21 @@ export = async () => {
   delete secret.AWS_S3_KEY
   delete secret.AWS_S3_SECRET
 
-  let dbUrl: string | undefined
-  let dbName: string | undefined
-  let dbUser: string | undefined
-  let dbPassword: string | undefined
-  let voterDbName: string | undefined
-  let voterDbUser: string | undefined
-  let voterDbPassword: string | undefined
-
-  for (const [key, value] of Object.entries(secret)) {
-    if (key === 'DATABASE_URL') {
-      const { username, password, database } = extractDbCredentials(
-        value as string,
-      )
-      dbUrl = value as string
-      dbName = database
-      dbUser = username
-      dbPassword = password
-    }
-    if (key === 'VOTER_DATASTORE') {
-      const { username, password, database } = extractDbCredentials(
-        value as string,
-      )
-      voterDbName = database
-      voterDbUser = username
-      voterDbPassword = password
-    }
+  if (!secret.DATABASE_URL) {
+    throw new Error('DATABASE_URL must be set in the secret.')
   }
 
-  if (!dbName || !dbUser || !dbPassword || !dbUrl) {
-    throw new Error('DATABASE_URL keys must be set in the secret.')
+  if (!secret.VOTER_DATASTORE) {
+    throw new Error('VOTER_DATASTORE must be set in the secret.')
   }
+
+  const {
+    username: dbUser,
+    password: dbPassword,
+    database: dbName,
+  } = extractDbCredentials(secret.DATABASE_URL)
+
+  const voterCredentials = extractDbCredentials(secret.VOTER_DATASTORE)
 
   const dlq = new aws.sqs.Queue('main-dlq', {
     name: `${stage}-DLQ.fifo`,
@@ -105,10 +88,10 @@ export = async () => {
     receiveWaitTimeSeconds: 0,
     deduplicationScope: 'messageGroup',
     fifoThroughputLimit: 'perMessageGroupId',
-    redrivePolicy: pulumi.interpolate`{
-      "deadLetterTargetArn": "${dlq.arn}",
-      "maxReceiveCount": 3
-    }`,
+    redrivePolicy: pulumi.jsonStringify({
+      deadLetterTargetArn: dlq.arn,
+      maxReceiveCount: 3,
+    }),
   })
 
   const tevynPollCsvsBucket = new aws.s3.Bucket('tevyn-poll-csvs-bucket', {
@@ -168,10 +151,7 @@ export = async () => {
   }
 
   // Assets bucket - used for storing uploaded files, images, etc.
-  const assetsBucket = await createAssetsBucket({
-    environment,
-    stage,
-  })
+  const assetsBucket = await createAssetsBucket({ environment })
 
   if (environment !== 'prod') {
     await createAssetsRouter({
@@ -180,6 +160,12 @@ export = async () => {
       hostedZoneId,
     })
   }
+
+  const productDomain = select({
+    dev: 'dev.goodparty.org',
+    qa: 'qa.goodparty.org',
+    prod: 'goodparty.org',
+  })
 
   createService({
     environment,
@@ -202,32 +188,20 @@ export = async () => {
       PORT: '80',
       HOST: '0.0.0.0',
       LOG_LEVEL: 'debug',
-      CORS_ORIGIN: select({
-        dev: 'dev.goodparty.org',
-        qa: 'qa.goodparty.org',
-        prod: 'goodparty.org',
-      }),
+      CORS_ORIGIN: productDomain,
       AWS_REGION: 'us-west-2',
       ASSET_DOMAIN: select({
         dev: 'https://assets-dev.goodparty.org',
         qa: 'https://assets-qa.goodparty.org',
         prod: 'https://assets.goodparty.org',
       }),
-      WEBAPP_ROOT_URL: select({
-        dev: 'https://dev.goodparty.org',
-        qa: 'https://qa.goodparty.org',
-        prod: 'https://goodparty.org',
-      }),
+      WEBAPP_ROOT_URL: `https://${productDomain}`,
       AI_MODELS:
         'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8,Qwen/Qwen3-235B-A22B-fp8-tput',
       LLAMA_AI_ASSISTANT: 'asst_GP_AI_1.0',
       SQS_QUEUE: queue.name,
       SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
-      SERVE_ANALYSIS_BUCKET_NAME: select({
-        dev: 'serve-analyze-data-dev',
-        qa: 'serve-analyze-data-qa',
-        prod: 'serve-analyze-data-prod',
-      }),
+      SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment}`,
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
       ...secret,
@@ -314,7 +288,6 @@ export = async () => {
     ],
   })
 
-  // Create a Subnet Group for the RDS Cluster (using our private subnets)
   const subnetGroup = new aws.rds.SubnetGroup('subnetGroup', {
     name:
       stage === 'develop'
@@ -360,15 +333,14 @@ export = async () => {
     engineVersion: rdsCluster.engineVersion,
   })
 
-  if (stage === 'master') {
-    const voterDbProdConfig = {
-      clusterIdentifier: 'gp-voter-db',
+  if (environment === 'dev' || environment === 'prod') {
+    const voterDbBaseConfig = {
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineMode: aws.rds.EngineMode.Provisioned,
       engineVersion: '16.8',
-      databaseName: voterDbName,
-      masterUsername: voterDbUser,
-      masterPassword: voterDbPassword,
+      databaseName: voterCredentials.database,
+      masterUsername: voterCredentials.username,
+      masterPassword: voterCredentials.password,
       dbSubnetGroupName: subnetGroup.name,
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
@@ -379,46 +351,12 @@ export = async () => {
         minCapacity: 0.5,
       },
     }
-    const voterCluster = new aws.rds.Cluster('voterCluster', voterDbProdConfig)
 
-    new aws.rds.ClusterInstance('voterInstance', {
-      clusterIdentifier: voterCluster.id,
-      instanceClass: 'db.serverless',
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineVersion: voterCluster.engineVersion,
-    })
-
-    // Second voter cluster for database swap operation
-    const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
-      ...voterDbProdConfig,
-      clusterIdentifier: 'gp-voter-db-20250728',
-      finalSnapshotIdentifier: `gp-voter-db-${stage}-20250728-final-snapshot`,
-    })
-
-    new aws.rds.ClusterInstance('voterInstanceLatest', {
-      clusterIdentifier: voterClusterLatest.id,
-      instanceClass: 'db.serverless',
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineVersion: voterClusterLatest.engineVersion,
-    })
-  } else if (stage === 'develop') {
     const voterCluster = new aws.rds.Cluster('voterCluster', {
-      clusterIdentifier: `gp-voter-db-${stage}`,
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineMode: aws.rds.EngineMode.Provisioned,
-      engineVersion: '16.8',
-      databaseName: voterDbName,
-      masterUsername: voterDbUser,
-      masterPassword: voterDbPassword,
-      dbSubnetGroupName: subnetGroup.name,
-      vpcSecurityGroupIds: [rdsSecurityGroup.id],
-      storageEncrypted: true,
-      deletionProtection: true,
+      ...voterDbBaseConfig,
+      clusterIdentifier:
+        stage === 'master' ? 'gp-voter-db' : `gp-voter-db-${stage}`,
       finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
-      serverlessv2ScalingConfiguration: {
-        maxCapacity: 128,
-        minCapacity: 0.5,
-      },
     })
 
     new aws.rds.ClusterInstance('voterInstance', {
@@ -427,5 +365,20 @@ export = async () => {
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineVersion: voterCluster.engineVersion,
     })
+
+    if (environment === 'prod') {
+      const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
+        ...voterDbBaseConfig,
+        clusterIdentifier: 'gp-voter-db-20250728',
+        finalSnapshotIdentifier: `gp-voter-db-${stage}-20250728-final-snapshot`,
+      })
+
+      new aws.rds.ClusterInstance('voterInstanceLatest', {
+        clusterIdentifier: voterClusterLatest.id,
+        instanceClass: 'db.serverless',
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineVersion: voterClusterLatest.engineVersion,
+      })
+    }
   }
 }

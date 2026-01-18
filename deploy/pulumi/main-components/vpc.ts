@@ -3,10 +3,13 @@ import { Output } from '@pulumi/pulumi'
 
 const AZs = ['us-west-2a', 'us-west-2b']
 
-const subnet = (params: {
+const createSubnet = (params: {
   vpcId: Output<string>
-  internetGatewayId: Output<string>
   name: string
+  gateway: Pick<
+    aws.types.input.ec2.RouteTableRoute,
+    'gatewayId' | 'natGatewayId'
+  >
   availabilityZone: string
   cidrBlock: string
   public: boolean
@@ -25,8 +28,8 @@ const subnet = (params: {
     vpcId: params.vpcId,
     routes: [
       {
+        ...params.gateway,
         cidrBlock: '0.0.0.0/0',
-        gatewayId: params.internetGatewayId,
       },
     ],
     tags: {
@@ -39,24 +42,7 @@ const subnet = (params: {
     routeTableId: routeTable.id,
   })
 
-  if (params.public) {
-    const eip = new aws.ec2.Eip(`${params.name}Eip`, {
-      domain: 'vpc',
-      tags: {
-        Name: `gp-master-${params.name}ElasticIp`,
-      },
-    })
-
-    new aws.ec2.NatGateway(`${params.name}NatGateway`, {
-      subnetId: subnet.id,
-      allocationId: eip.id,
-      tags: {
-        Name: `gp-master-${params.name}NatGateway`,
-      },
-    })
-  }
-
-  return { id: subnet.id, public: params.public }
+  return { id: subnet.id }
 }
 
 export const createVpc = () => {
@@ -98,21 +84,44 @@ export const createVpc = () => {
   })
 
   for (const [idx, azName] of AZs.entries()) {
-    subnet({
+    const publicSubnet = createSubnet({
       name: `apiPublicSubnet${idx + 1}`,
       availabilityZone: azName,
       cidrBlock: `10.0.${idx * 4}.0/22`,
       vpcId: vpc.id,
-      internetGatewayId: internetGateway.id,
       public: true,
+      gateway: {
+        gatewayId: internetGateway.id,
+      },
     })
-    subnet({
+
+    const eip = new aws.ec2.Eip(`apiPublicSubnet${idx + 1}Eip`, {
+      domain: 'vpc',
+      tags: {
+        Name: `gp-master-apiPublicSubnet${idx + 1}ElasticIp`,
+      },
+    })
+
+    const natGateway = new aws.ec2.NatGateway(
+      `apiPublicSubnet${idx + 1}NatGateway`,
+      {
+        subnetId: publicSubnet.id,
+        allocationId: eip.id,
+        tags: {
+          Name: `gp-master-apiPublicSubnet${idx + 1}NatGateway`,
+        },
+      },
+    )
+
+    createSubnet({
       name: `apiPrivateSubnet${idx + 1}`,
       availabilityZone: azName,
       cidrBlock: `10.0.${(idx + 1) * 4}.0/22`,
       vpcId: vpc.id,
-      internetGatewayId: internetGateway.id,
       public: false,
+      gateway: {
+        natGatewayId: natGateway.id,
+      },
     })
   }
 }

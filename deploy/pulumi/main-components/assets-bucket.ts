@@ -3,7 +3,6 @@ import * as aws from '@pulumi/aws'
 
 export interface AssetsBucketConfig {
   environment: 'dev' | 'qa' | 'prod'
-  stage: 'develop' | 'qa' | 'master'
 }
 
 export async function createAssetsBucket({ environment }: AssetsBucketConfig) {
