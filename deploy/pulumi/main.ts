@@ -36,12 +36,6 @@ export = async () => {
     createVpc()
   }
 
-  // This is just a placeholder resource to confirm the deployment works.
-  new aws.s3.Bucket('test-bucket', {
-    bucket: `${stack}-pulumi-test-bucket`,
-    tags: { Stack: stack },
-  })
-
   const { secretString: secretJson } =
     await aws.secretsmanager.getSecretVersion({
       secretId: select({
