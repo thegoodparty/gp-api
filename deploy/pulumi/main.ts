@@ -132,11 +132,11 @@ export = async () => {
   const tevynPollCsvsBucket = new aws.s3.Bucket(
     'tevyn-poll-csvs-bucket',
     {
-      bucket: `tevyn-polls-csvs-${stage}`,
+      bucket: `tevyn-poll-csvs-${stage}`,
       forceDestroy: false,
     },
     {
-      import: `tevyn-polls-csvs-${stage}`,
+      import: `tevyn-poll-csvs-${stage}`,
     },
   )
 
@@ -150,7 +150,7 @@ export = async () => {
       restrictPublicBuckets: true,
     },
     {
-      import: `tevyn-polls-csvs-${stage}`,
+      import: `tevyn-poll-csvs-${stage}`,
     },
   )
 
