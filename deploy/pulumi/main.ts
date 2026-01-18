@@ -273,9 +273,9 @@ export = async () => {
       }),
       AWS_REGION: 'us-west-2',
       ASSET_DOMAIN: select({
-        dev: 'https://assets-dev.goodparty.org',
-        qa: 'https://assets-qa.goodparty.org',
-        prod: 'https://assets.goodparty.org',
+        dev: 'assets-dev.goodparty.org',
+        qa: 'assets-qa.goodparty.org',
+        prod: 'assets.goodparty.org',
       }),
       WEBAPP_ROOT_URL: select({
         dev: 'https://dev.goodparty.org',
