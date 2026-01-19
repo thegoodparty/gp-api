@@ -75,9 +75,7 @@ export = async () => {
 
   for (const [key, value] of Object.entries(secret)) {
     if (key === 'DATABASE_URL') {
-      const { username, password, database } = extractDbCredentials(
-        value as string,
-      )
+      const { username, password, database } = extractDbCredentials(value)
       dbUrl = value as string
       dbName = database
       dbUser = username
@@ -286,7 +284,14 @@ export = async () => {
       }),
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
-      ...secret,
+      // TODO: after pulumi migration, get these out of environment variables and into
+      // standard ECS secret management.
+      ...Object.fromEntries(
+        Object.entries(secret).map(([key, value]) => [
+          key,
+          pulumi.secret(value),
+        ]),
+      ),
     },
     permissions: [
       {
@@ -414,7 +419,7 @@ export = async () => {
         engineVersion: '16.8',
         databaseName: dbName,
         masterUsername: dbUser,
-        masterPassword: dbPassword,
+        masterPassword: pulumi.secret(dbPassword),
         dbSubnetGroupName: subnetGroup.name,
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
@@ -437,7 +442,7 @@ export = async () => {
       engineVersion: '16.8',
       databaseName: voterDbName,
       masterUsername: voterDbUser,
-      masterPassword: voterDbPassword,
+      masterPassword: pulumi.secret(voterDbPassword!),
       dbSubnetGroupName: subnetGroup.name,
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
@@ -502,7 +507,7 @@ export = async () => {
         engineVersion: '16.8',
         databaseName: dbName,
         masterUsername: dbUser,
-        masterPassword: dbPassword,
+        masterPassword: pulumi.secret(dbPassword),
         dbSubnetGroupName: subnetGroup.name,
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
@@ -527,7 +532,7 @@ export = async () => {
         engineVersion: '16.8',
         databaseName: voterDbName,
         masterUsername: voterDbUser,
-        masterPassword: voterDbPassword,
+        masterPassword: pulumi.secret(voterDbPassword!),
         dbSubnetGroupName: subnetGroup.name,
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
