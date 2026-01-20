@@ -168,7 +168,8 @@ export const convertVoterFileFilterToFilters = (
   if (segment.age35_50) ageRanges.push({ min: 35, max: 50 })
   if (segment.age50Plus) ageRanges.push({ min: 50, max: null })
 
-  if (ageRanges.length > 0 && !segment.ageUnknown) {
+  const shouldIncludeNull = segment.ageUnknown
+  if (ageRanges.length > 0) {
     if (ageRanges.length === 1) {
       const range = ageRanges[0]
       if (range.max === null) {
@@ -215,6 +216,18 @@ export const convertVoterFileFilterToFilters = (
     }
   } else if (segment.ageUnknown) {
     filters['ageInt'] = { is: 'null' }
+  }
+
+  if (shouldIncludeNull && ageRanges.length > 0) {
+    const currentFilter = filters['ageInt'] as {
+      gte?: number
+      lte?: number
+      in?: number[]
+    }
+    filters['ageInt'] = {
+      ...currentFilter,
+      _includeNull: true,
+    } as typeof currentFilter & { _includeNull: true }
   }
 
   const maritalValues: string[] = []

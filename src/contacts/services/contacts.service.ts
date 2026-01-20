@@ -311,7 +311,7 @@ export class ContactsService {
           token,
           'download',
           alternativeDistrictName,
-          { responseType: 'stream' },
+          { responseType: 'stream', body },
         )
         return new Promise<void>((resolve, reject) => {
           alternativeResponse.data.pipe(res.raw)
@@ -762,16 +762,13 @@ export class ContactsService {
     token: string,
     endpoint: 'people' | 'search' | 'download' | 'stats',
     alternativeDistrictName?: string,
-    options?: { responseType?: 'stream' },
+    options?: { responseType?: 'stream'; body?: Record<string, unknown> },
   ) {
     if (!alternativeDistrictName) {
       throw new BadGatewayException(
         `Failed to fetch from people API (${endpoint})`,
       )
     }
-
-    const newParams = new URLSearchParams(params)
-    newParams.set('districtName', alternativeDistrictName)
 
     const endpointMap = {
       people: '/v1/people',
@@ -781,6 +778,30 @@ export class ContactsService {
     }
 
     try {
+      if (endpoint === 'download' && options?.body) {
+        const body = {
+          ...options.body,
+          districtName: alternativeDistrictName,
+        }
+        return await lastValueFrom(
+          this.httpService.post(
+            `${PEOPLE_API_URL}${endpointMap[endpoint]}`,
+            body,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              ...(options?.responseType && {
+                responseType: options.responseType,
+              }),
+            },
+          ),
+        )
+      }
+
+      const newParams = new URLSearchParams(params)
+      newParams.set('districtName', alternativeDistrictName)
+
       return await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}${endpointMap[endpoint]}?${newParams.toString()}`,
