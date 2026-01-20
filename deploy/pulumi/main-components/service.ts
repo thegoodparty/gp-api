@@ -19,7 +19,7 @@ export interface ServiceConfig {
 
   permissions: pulumi.Input<
     {
-      Effect?: 'Allow' | 'Deny'
+      Effect: 'Allow' | 'Deny'
       Action: string[]
       Resource: pulumi.Input<pulumi.Input<string>[]>
     }[]
@@ -217,6 +217,7 @@ export async function createService({
             Version: '2012-10-17',
             Statement: [
               {
+                Effect: 'Allow',
                 Action: [
                   'ssm:GetParameters',
                   'ssm:GetParameterHistory',
