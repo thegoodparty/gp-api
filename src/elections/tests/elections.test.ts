@@ -2,43 +2,48 @@
 // Test if it queries the people-api correctly ( > 0 totalResults)
 
 import { BallotReadyRaceFixtures } from '@/shared/testing/ballotreadyRaceFixtures'
-import { useTestService } from '@/test-service'
-import { expect, test } from 'vitest'
+import { SlackService } from '@/vendors/slack/services/slack.service'
+import { HttpService } from '@nestjs/axios'
+import axios from 'axios'
+import { describe, expect, it, vi } from 'vitest'
+import { ElectionsService } from '../services/elections.service'
 
-const svc = useTestService()
+vi.stubEnv('ELECTION_API_URL', 'https://election-api-dev.goodparty.org')
+vi.stubEnv('SLACK_APP_ID', 'test')
 
-test('ballotready to L2 matches are high confidence and allow querying of the people-api', async () => {
-  // create campaign once for the test user
-  const campaign = await svc.prisma.campaign.create({
-    data: { userId: svc.user.id, slug: 'test-campaign' },
-  })
+describe('ballotready to L2 matches are high confidence and allow querying of the people-api', () => {
+  it('all fixtures resolve to a matched district', async () => {
+    vi.resetModules()
+    const { ElectionsService } = await import(
+      '../services/elections.service.js'
+    )
 
-  const failures: Array<{
-    state: string
-    positionId: string
-    electionDate: string
-    status: number
-  }> = []
+    const http = new HttpService(
+      axios.create({
+        timeout: 30_000,
+      }),
+    )
 
-  for (const fx of BallotReadyRaceFixtures) {
-    await svc.prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { details: fx },
-    })
-
-    const res = await svc.client.put('/v1/campaigns/mine/race-target-details')
-    if (res.status !== 200) {
-      failures.push({
-        state: fx.state,
-        positionId: fx.positionId,
-        electionDate: fx.electionDate,
-        status: res.status,
-      })
-      continue
+    const slackMock = {
+      formattedMessage: vi.fn().mockResolvedValue(undefined),
     }
 
-    // assert shape/value (example)
-  }
+    const svc: ElectionsService = new ElectionsService(
+      http,
+      slackMock as unknown as SlackService,
+    )
 
-  expect(failures).toEqual([])
-}, 120_000)
+    for (const fx of BallotReadyRaceFixtures) {
+      const res = await svc.getBallotReadyMatchedRaceTargetDetails(
+        fx.positionId,
+        fx.electionDate,
+        true,
+      )
+
+      expect(res.district?.id).toBeTruthy()
+      expect(res.projectedTurnout).toBeGreaterThan(0)
+
+      fuzzball.partial_ratio()
+    }
+  }, 120_000)
+})

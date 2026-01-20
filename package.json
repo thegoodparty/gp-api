@@ -94,6 +94,7 @@
     "es-toolkit": "^1.30.1",
     "fast-glob": "^3.3.3",
     "fastify": "^5.2.1",
+    "fuzzball": "^2.2.3",
     "google-auth-library": "^9.15.0",
     "googleapis": "^144.0.0",
     "graphql": "^16.10.0",
