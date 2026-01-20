@@ -97,15 +97,31 @@ export class VercelService {
     }
   }
 
-  async checkDomainPrice(domainName: string) {
+  /**
+   * Check the price for a domain
+   * @see https://vercel.com/docs/domains/registrar-api
+   */
+  async checkDomainPrice(domainName: string): Promise<{ price: number }> {
     try {
-      const result = await this.client.domains.checkDomainPrice({
-        name: domainName,
+      const result = await this.client.domainsRegistrar.getDomainPrice({
+        domain: domainName,
         teamId: VERCEL_TEAM_ID,
       })
 
       this.logger.debug(`Price check for ${domainName}:`, result)
-      return result
+
+      if (result.purchasePrice === null || result.purchasePrice === undefined) {
+        throw new Error(
+          `Domain ${domainName} is not available for purchase or price unavailable`,
+        )
+      }
+
+      const price =
+        typeof result.purchasePrice === 'string'
+          ? parseFloat(result.purchasePrice)
+          : result.purchasePrice
+
+      return { price }
     } catch (error) {
       this.logger.error(`Error checking price for domain ${domainName}:`, error)
       throw error

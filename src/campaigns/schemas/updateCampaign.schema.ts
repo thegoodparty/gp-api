@@ -5,6 +5,15 @@ import {
   ElectionLevel,
 } from 'src/campaigns/campaigns.types'
 
+// TODO(ENG-6410): This schema uses .passthrough() which allows ANY fields to be sent through,
+// even if not defined here. This is a security/data integrity concern because:
+// 1. Subscription fields (subscriptionId, subscriptionCancelAt, etc.) can be directly
+//    modified via this API, potentially causing desync with Stripe.
+// 2. These fields should ONLY be modified by Stripe webhook handlers.
+// 3. To fix: Add .transform() to strip subscription fields, or remove .passthrough()
+//    and explicitly define all allowed fields.
+// See: ENG-4918, ENG-6495 for related subscription sync bugs.
+
 // AI'ed from the CampaignDetails type
 const CampaignDetailsSchema = z
   .object({
@@ -53,6 +62,8 @@ const CampaignDetailsSchema = z
     funFact: z.string(),
     campaignCommittee: z.string(),
     statementName: z.string(),
+    // TODO(ENG-6410): These subscription fields should be BLOCKED from direct updates, not just validated.
+    // They should only be modified via Stripe webhook handlers (paymentEventsService.ts).
     subscriptionId: z.string().nullish(),
     endOfElectionSubscriptionCanceled: z.boolean(),
     subscriptionCanceledAt: z.number(),
