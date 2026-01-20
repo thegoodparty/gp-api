@@ -11,6 +11,7 @@ export = async () => {
   const config = new pulumi.Config()
 
   const environment = config.require('environment') as 'dev' | 'qa' | 'prod'
+  const imageUri = config.require('imageUri')
 
   const vpcId = 'vpc-0763fa52c32ebcf6a'
   const vpcCidr = '10.0.0.0/16'
@@ -74,9 +75,7 @@ export = async () => {
 
   for (const [key, value] of Object.entries(secret)) {
     if (key === 'DATABASE_URL') {
-      const { username, password, database } = extractDbCredentials(
-        value as string,
-      )
+      const { username, password, database } = extractDbCredentials(value)
       dbUrl = value as string
       dbName = database
       dbUser = username
@@ -238,6 +237,7 @@ export = async () => {
   createService({
     environment,
     stage,
+    imageUri,
     vpcId,
     securityGroupIds: vpcSecurityGroupIds,
     publicSubnetIds: vpcSubnetIds.public,
@@ -284,7 +284,14 @@ export = async () => {
       }),
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
-      ...secret,
+      // TODO: after pulumi migration, get these out of environment variables and into
+      // standard ECS secret management.
+      ...Object.fromEntries(
+        Object.entries(secret).map(([key, value]) => [
+          key,
+          pulumi.secret(value),
+        ]),
+      ),
     },
     permissions: [
       {
@@ -412,7 +419,7 @@ export = async () => {
         engineVersion: '16.8',
         databaseName: dbName,
         masterUsername: dbUser,
-        masterPassword: dbPassword,
+        masterPassword: pulumi.secret(dbPassword),
         dbSubnetGroupName: subnetGroup.name,
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
@@ -435,7 +442,7 @@ export = async () => {
       engineVersion: '16.8',
       databaseName: voterDbName,
       masterUsername: voterDbUser,
-      masterPassword: voterDbPassword,
+      masterPassword: pulumi.secret(voterDbPassword!),
       dbSubnetGroupName: subnetGroup.name,
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
@@ -500,7 +507,7 @@ export = async () => {
         engineVersion: '16.8',
         databaseName: dbName,
         masterUsername: dbUser,
-        masterPassword: dbPassword,
+        masterPassword: pulumi.secret(dbPassword),
         dbSubnetGroupName: subnetGroup.name,
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,
@@ -525,7 +532,7 @@ export = async () => {
         engineVersion: '16.8',
         databaseName: voterDbName,
         masterUsername: voterDbUser,
-        masterPassword: voterDbPassword,
+        masterPassword: pulumi.secret(voterDbPassword!),
         dbSubnetGroupName: subnetGroup.name,
         vpcSecurityGroupIds: [rdsSecurityGroup.id],
         storageEncrypted: true,

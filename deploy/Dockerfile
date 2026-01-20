@@ -24,21 +24,7 @@ RUN npm ci --legacy-peer-deps
 ARG CACHEBUST
 ENV CACHEBUST=${CACHEBUST:-1}
 
-# Set the docker build args into environment variables on runner.
-ARG STAGE
-ARG DATABASE_URL
-ENV DATABASE_URL=$DATABASE_URL
-
-# Note: the CodeBuild project must be configured to be on the VPC.
-# Force cache bust for these commands by echoing CACHEBUST
-# Skip migrations if using placeholder DATABASE_URL (for preview environments)
-RUN if [ "$DATABASE_URL" != "postgresql://placeholder:placeholder@localhost:5432/placeholder" ]; then \
-      echo "Cache bust: $CACHEBUST" && npx prisma migrate deploy --schema=prisma/schema; \
-    else \
-      echo "Skipping migrations during build (will run on container startup)"; \
-    fi
-
-# Force cache bust for Prisma client generation
+# Generate Prisma client (migrations run on container startup via docker-entrypoint.sh)
 RUN echo "Cache bust: $CACHEBUST" && npx prisma generate --schema=prisma/schema
 
 # Build the application (output in /dist)
