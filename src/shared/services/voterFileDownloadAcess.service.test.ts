@@ -1,4 +1,7 @@
-import { BallotReadyPositionLevel, CampaignWith } from '@/campaigns/campaigns.types'
+import {
+  BallotReadyPositionLevel,
+  CampaignWith,
+} from '@/campaigns/campaigns.types'
 import { VoterFileDownloadAccessService } from '@/shared/services/voterFileDownloadAccess.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { Logger } from '@nestjs/common'
@@ -367,27 +370,29 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
 })
 
 // Helper to create mock campaign
-function createMockCampaign(overrides: {
-  details?: { ballotLevel?: string | BallotReadyPositionLevel }
-  canDownloadFederal?: boolean
-  pathToVictory?: {
-    data?: { electionType?: string; electionLocation?: string }
-  } | null
-  id?: number
-  slug?: string
-} = {}): CampaignWith<'pathToVictory'> {
+function createMockCampaign(
+  overrides: {
+    details?: { ballotLevel?: string | BallotReadyPositionLevel }
+    canDownloadFederal?: boolean
+    pathToVictory?: {
+      data?: { electionType?: string; electionLocation?: string }
+    } | null
+    id?: number
+    slug?: string
+  } = {},
+): CampaignWith<'pathToVictory'> {
   // Construct full PathToVictory object if data is provided
   const pathToVictory =
     overrides.pathToVictory === null
       ? null
       : overrides.pathToVictory?.data
         ? {
-          id: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          campaignId: overrides.id ?? 1,
-          data: overrides.pathToVictory.data,
-        }
+            id: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            campaignId: overrides.id ?? 1,
+            data: overrides.pathToVictory.data,
+          }
         : null
 
   return {
