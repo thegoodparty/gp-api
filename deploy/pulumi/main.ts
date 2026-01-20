@@ -295,22 +295,27 @@ export = async () => {
     },
     permissions: [
       {
+        Effect: 'Allow',
         Action: ['route53domains:List*', 'route53domains:Get*'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: ['route53domains:CheckDomainAvailability'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: ['s3:*', 's3-object-lambda:*'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: ['sqs:*'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: [
           'ssmmessages:OpenDataChannel',
           'ssmmessages:OpenControlChannel',
