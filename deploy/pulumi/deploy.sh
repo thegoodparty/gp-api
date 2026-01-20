@@ -13,14 +13,24 @@ if [ "$environment" != "dev" ] && [ "$environment" != "qa" ] && [ "$environment"
   exit 1
 fi
 
-pulumi login s3://goodparty-iac-state
+if [ -z "$IMAGE_URI" ]; then
+  echo "Must specify an IMAGE_URI environment variable"
+  exit 1
+fi
+
+AWS_REGION=us-west-2 pulumi login s3://goodparty-iac-state
 pulumi stack select "organization/gp-api/gp-api-$environment" --create
 pulumi config set aws:region us-west-2
 pulumi config set environment "$environment"
+pulumi config set imageUri "$IMAGE_URI"
+
+# Set default tags
+pulumi config set --path aws:defaultTags.tags.Environment "$environment"
+pulumi config set --path aws:defaultTags.tags.Project "gp-api"
 
 # if there is a value for CI, just do it
 if [ -n "$CI" ]; then
   pulumi up --yes --skip-preview
 else
-  pulumi up
+  pulumi preview --diff
 fi
