@@ -340,6 +340,7 @@ export async function createService({
           containerPort: 80,
         },
       ],
+      healthCheckGracePeriodSeconds: 120,
       deploymentCircuitBreaker: {
         enable: true,
         rollback: true,
