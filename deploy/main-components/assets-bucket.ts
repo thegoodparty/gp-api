@@ -5,7 +5,9 @@ export interface AssetsBucketConfig {
   environment: 'dev' | 'qa' | 'prod'
 }
 
-export async function createAssetsBucket({ environment }: AssetsBucketConfig) {
+export function createAssetsBucket({ environment }: AssetsBucketConfig): {
+  bucketRegionalDomainName: pulumi.Output<string>
+} {
   const select = <T>(values: Record<'dev' | 'qa' | 'prod', T>): T =>
     values[environment]
 
@@ -72,7 +74,6 @@ export async function createAssetsBucket({ environment }: AssetsBucketConfig) {
   })
 
   return {
-    bucketName,
     bucketRegionalDomainName: bucket.bucketRegionalDomainName,
   }
 }
