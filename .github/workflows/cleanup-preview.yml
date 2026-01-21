@@ -23,20 +23,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Pulumi CLI
         uses: pulumi/actions@v4
         with:
-          pulumi-version: 'latest'
-          command: ''
+          pulumi-version: "latest"
 
-      - name: Install Pulumi SDK Dependencies
-        working-directory: ./deploy/pulumi
-        run: npm ci
+      - run: npm ci
 
       - name: Destroy Stack
-        working-directory: ./deploy/pulumi
+        working-directory: ./deploy
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |

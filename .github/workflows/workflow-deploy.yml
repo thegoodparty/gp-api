@@ -173,13 +173,11 @@ jobs:
           pulumi-version: "latest"
           command: ""
 
-      - name: Install Pulumi SDK Dependencies
-        working-directory: ./deploy/pulumi
-        run: npm ci
+      - run: npm ci
 
       - name: Pulumi Up
         id: pulumi-up
-        working-directory: ./deploy/pulumi
+        working-directory: ./deploy
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |

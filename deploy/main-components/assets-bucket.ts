@@ -72,10 +72,7 @@ export async function createAssetsBucket({ environment }: AssetsBucketConfig) {
   })
 
   return {
-    bucket,
     bucketName,
-    bucketArn: bucket.arn,
-    bucketDomainName: bucket.bucketDomainName,
     bucketRegionalDomainName: bucket.bucketRegionalDomainName,
   }
 }
