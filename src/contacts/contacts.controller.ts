@@ -41,14 +41,8 @@ export class ContactsController {
   }
 
   @Get('stats')
-  getContactsStats(
-    @ReqCampaign() campaign: CampaignWithPathToVictory,
-    @Query('hasCellPhone') hasCellPhone?: string,
-  ) {
-    return this.contactsService.getDistrictStats(
-      campaign,
-      hasCellPhone === 'true',
-    )
+  getContactsStats(@ReqCampaign() campaign: CampaignWithPathToVictory) {
+    return this.contactsService.getDistrictStats(campaign)
   }
 
   @Get('search')
