@@ -8,7 +8,6 @@ import {
   Logger,
   Patch,
   Post,
-  Query,
   RawBodyRequest,
   Req,
 } from '@nestjs/common'
@@ -71,20 +70,5 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   async fixMissingCustomerIds() {
     return this.paymentsService.fixMissingCustomerIds()
-  }
-
-  @Patch('fix-auto-scheduled-cancellations')
-  @Roles(UserRole.admin)
-  @HttpCode(HttpStatus.OK)
-  async fixAutoScheduledCancellations(
-    @Query('dryRun') dryRun?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    return this.paymentsService.fixAutoScheduledCancellations(
-      dryRun !== 'false',
-      limit ? parseInt(limit) : 50,
-      offset ? parseInt(offset) : 0,
-    )
   }
 }

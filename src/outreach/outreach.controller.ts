@@ -161,6 +161,7 @@ export class OutreachController {
         identityId: peerlyIdentityId!,
         name,
         didState: createOutreachDto.didState,
+        scheduledDate: createOutreachDto.date,
       })
 
       return await this.outreachService.create(
