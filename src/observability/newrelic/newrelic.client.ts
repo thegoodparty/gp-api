@@ -1,0 +1,91 @@
+/**
+ * Minimal New Relic wrapper so application code can safely emit events/attributes
+ * without exploding when the agent is disabled (e.g. missing env vars, test env).
+ *
+ * Important: Do NOT include PII (emails, request bodies, auth headers) in attributes.
+ */
+import * as newrelic from 'newrelic'
+import {
+  CustomEventAttributesByType,
+  CustomEventType,
+  NewRelicEventAttributeValue,
+} from './newrelic.events'
+
+type NewRelicApi = Pick<
+  typeof newrelic,
+  'recordCustomEvent' | 'addCustomAttribute' | 'addCustomAttributes'
+>
+
+type NewRelicAttributes = Record<string, NewRelicEventAttributeValue>
+
+function isNewRelicEnabled(): boolean {
+  return Boolean(
+    process.env.NEW_RELIC_APP_NAME && process.env.NEW_RELIC_LICENSE_KEY,
+  )
+}
+
+function getApi(): NewRelicApi | null {
+  // If the env vars aren’t present, our `newrelic.js` config will no-op in prod.
+  // Treat as disabled in dev/test to avoid emitting.
+  if (!isNewRelicEnabled()) return null
+  return newrelic
+}
+
+function toNewRelicAttributes(
+  attributes: Record<string, unknown>,
+): NewRelicAttributes {
+  const out: NewRelicAttributes = {}
+  for (const [k, v] of Object.entries(attributes)) {
+    if (
+      typeof v === 'string' ||
+      typeof v === 'number' ||
+      typeof v === 'boolean'
+    ) {
+      out[k] = v
+    }
+  }
+  return out
+}
+
+export function recordCustomEvent<T extends CustomEventType>(
+  eventType: T,
+  attributes: CustomEventAttributesByType[T],
+) {
+  const api = getApi()
+  if (!api) return
+  try {
+    // Runtime safety: ensure only primitive attribute values reach the agent.
+    api.recordCustomEvent(
+      eventType,
+      toNewRelicAttributes(attributes as Record<string, unknown>),
+    )
+  } catch {
+    // swallow
+  }
+}
+
+export function addCustomAttribute(key: string, value: unknown) {
+  const api = getApi()
+  if (!api) return
+  try {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      api.addCustomAttribute(key, value)
+    }
+  } catch {
+    // swallow
+  }
+}
+
+export function addCustomAttributes(attributes: Record<string, unknown>) {
+  const api = getApi()
+  if (!api) return
+  try {
+    api.addCustomAttributes(toNewRelicAttributes(attributes))
+  } catch {
+    // swallow
+  }
+}

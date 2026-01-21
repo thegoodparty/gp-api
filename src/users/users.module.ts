@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common'
+import { forwardRef, Global, Module } from '@nestjs/common'
 import { UsersService } from './services/users.service'
 import { UsersController } from './users.controller'
 import { FilesModule } from 'src/files/files.module'
@@ -20,7 +20,7 @@ import { StripeModule } from 'src/vendors/stripe/stripe.module'
     AuthenticationModule,
     CrmModule,
     HttpModule,
-    AnalyticsModule,
+    forwardRef(() => AnalyticsModule),
     SlackModule,
     StripeModule,
   ],

@@ -20,6 +20,9 @@
       ],
       "@e2e-tests/*": [
         "e2e-tests/*"
+      ],
+      "newrelic": [
+        "node_modules/newrelic"
       ]
     },
     "incremental": true,
