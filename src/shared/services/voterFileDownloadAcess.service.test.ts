@@ -372,7 +372,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
 // Helper to create mock campaign
 function createMockCampaign(
   overrides: {
-    details?: { ballotLevel?: string | BallotReadyPositionLevel }
+    details?: { ballotLevel?: BallotReadyPositionLevel }
     canDownloadFederal?: boolean
     pathToVictory?: {
       data?: { electionType?: string; electionLocation?: string }
@@ -387,12 +387,12 @@ function createMockCampaign(
       ? null
       : overrides.pathToVictory?.data
         ? {
-            id: 1,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            campaignId: overrides.id ?? 1,
-            data: overrides.pathToVictory.data,
-          }
+          id: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          campaignId: overrides.id ?? 1,
+          data: overrides.pathToVictory.data,
+        }
         : null
 
   return {
@@ -418,5 +418,5 @@ function createMockCampaign(
     vendorTsData: {},
     completedTaskIds: [],
     hasFreeTextsOffer: false,
-  } as unknown as CampaignWith<'pathToVictory'>
+  }
 }
