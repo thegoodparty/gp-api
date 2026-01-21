@@ -25,8 +25,6 @@ function isNewRelicEnabled(): boolean {
 }
 
 function getApi(): NewRelicApi | null {
-  // If the env vars aren’t present, our `newrelic.js` config will no-op in prod.
-  // Treat as disabled in dev/test to avoid emitting.
   if (!isNewRelicEnabled()) return null
   return newrelic
 }
@@ -54,7 +52,6 @@ export function recordCustomEvent<T extends CustomEventType>(
   const api = getApi()
   if (!api) return
   try {
-    // Runtime safety: ensure only primitive attribute values reach the agent.
     api.recordCustomEvent(
       eventType,
       toNewRelicAttributes(attributes as Record<string, unknown>),

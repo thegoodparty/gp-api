@@ -65,4 +65,3 @@ export function deriveRootCause(params: {
 
   return params.statusCode >= 500 ? 'internal_unknown' : 'internal_unknown'
 }
-s
