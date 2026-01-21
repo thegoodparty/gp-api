@@ -1,6 +1,6 @@
-import { Injectable, ConflictException } from '@nestjs/common'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { ConflictException, Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 @Injectable()
 export class ElectedOfficeService extends createPrismaBase(
@@ -30,7 +30,8 @@ export class ElectedOfficeService extends createPrismaBase(
   async create(args: Prisma.ElectedOfficeCreateArgs) {
     const data = args.data as Prisma.ElectedOfficeCreateInput
 
-    if (data.isActive && data.user?.connect?.id) {
+    // if isActive is not false, then we need to validate that the user does not already have an active elected office
+    if (data.isActive !== false && data.user?.connect?.id) {
       await this.validateActiveElectedOffice(data.user.connect.id)
     }
 
