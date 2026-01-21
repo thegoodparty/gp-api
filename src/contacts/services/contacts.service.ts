@@ -197,9 +197,7 @@ export class ContactsService {
         usingStatewideFallback,
       } = this.resolveLocationForRequest(campaign)
 
-      const personState = String(
-        person.Residence_Addresses_State || '',
-      ).toUpperCase()
+      const personState = String(person.state || '').toUpperCase()
       const stateMatches = personState === state.toUpperCase()
 
       if (usingStatewideFallback) {
