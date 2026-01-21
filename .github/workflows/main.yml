@@ -18,6 +18,9 @@ jobs:
   main:
     name: Build & Deploy
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
+      cancel-in-progress: false
     outputs:
       environment: ${{ steps.context.outputs.environment }}
       service_url: ${{ steps.pulumi.outputs.service_url }}
@@ -80,13 +83,12 @@ jobs:
 
       - name: Run Pulumi Deploy
         id: pulumi
-        working-directory: deploy
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
           GITHUB_PR_NUMBER: ${{ github.event.number }}
         run: |
-          ./deploy.sh ${{ steps.context.outputs.environment }}
-          SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
+          npm run infra deploy ${{ steps.context.outputs.environment }}
+          cd deploy && SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
           echo "service_url=${SERVICE_URL}" >> "$GITHUB_OUTPUT"
 
       # PR comment for preview environments
@@ -235,3 +237,116 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  plans:
+    name: Infrastructure Plans
+    needs: main
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Pulumi
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: "^3"
+
+      - name: Run Pulumi Preview for all environments
+        run: |
+          for env in dev qa prod; do
+            echo "::group::Preview for $env"
+
+            # Map environment to stage name
+            case "$env" in
+              dev) stage="develop" ;;
+              qa) stage="qa" ;;
+              prod) stage="master" ;;
+            esac
+
+            # Fetch the currently deployed image URI to avoid showing task definition diffs for code-only changes
+            CLUSTER="gp-${stage}-fargateCluster"
+            SERVICE="gp-api-${stage}"
+            TASK_DEF_ARN=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
+            export IMAGE_URI=$(aws ecs describe-task-definition --task-definition "$TASK_DEF_ARN" --query 'taskDefinition.containerDefinitions[0].image' --output text)
+
+            set +e
+            PREVIEW_OUTPUT=$(npm run infra diff $env 2>&1)
+            set -e
+
+            echo "$PREVIEW_OUTPUT"
+
+            if echo "$PREVIEW_OUTPUT" | grep -q "no changes"; then
+              echo "NO_CHANGES_${env}=true" >> $GITHUB_ENV
+            else
+              echo "NO_CHANGES_${env}=false" >> $GITHUB_ENV
+              echo "$PREVIEW_OUTPUT" > "/tmp/preview-$env.txt"
+            fi
+            echo "::endgroup::"
+          done
+
+      - name: Build PR comment
+        id: build-comment
+        run: |
+          COMMENT="## Infrastructure Plans\n\n"
+          HAS_CHANGES=false
+
+          for env in dev qa prod; do
+            NO_CHANGES_VAR="NO_CHANGES_${env}"
+            if [ "${!NO_CHANGES_VAR}" = "true" ]; then
+              COMMENT="${COMMENT}### ${env}\n\nNo changes\n\n"
+            else
+              HAS_CHANGES=true
+              COMMENT="${COMMENT}### ${env}\n\n<details>\n<summary>View changes</summary>\n\n\`\`\`\n"
+              if [ -f "/tmp/preview-$env.txt" ]; then
+                # Truncate if too long (GitHub has comment size limits)
+                PREVIEW_CONTENT=$(head -c 30000 "/tmp/preview-$env.txt")
+                COMMENT="${COMMENT}${PREVIEW_CONTENT}"
+              fi
+              COMMENT="${COMMENT}\n\`\`\`\n\n</details>\n\n"
+            fi
+          done
+
+          # Write to file to preserve newlines
+          echo -e "$COMMENT" > /tmp/pr-comment.md
+          echo "has_changes=$HAS_CHANGES" >> $GITHUB_OUTPUT
+
+      - name: Find existing plans comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "Infrastructure Plans"
+
+      - name: Post or update PR comment
+        if: steps.build-comment.outputs.has_changes == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          edit-mode: replace
+          body-path: /tmp/pr-comment.md
+
+      - name: Delete existing comment if no changes
+        if: steps.build-comment.outputs.has_changes == 'false' && steps.find-comment.outputs.comment-id != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.deleteComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ steps.find-comment.outputs.comment-id }}
+            })

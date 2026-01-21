@@ -8,6 +8,10 @@ on:
   pull_request:
     types: [closed]
 
+concurrency:
+  group: deploy-pr-${{ github.event.number }}
+  cancel-in-progress: false
+
 jobs:
   destroy:
     runs-on: ubuntu-latest
