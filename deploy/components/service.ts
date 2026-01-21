@@ -2,8 +2,8 @@ import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
 
 export interface ServiceConfig {
-  environment: 'dev' | 'qa' | 'prod'
-  stage: 'develop' | 'qa' | 'master'
+  environment: 'preview' | 'dev' | 'qa' | 'prod'
+  stage: string
 
   imageUri: string
 
@@ -26,7 +26,7 @@ export interface ServiceConfig {
   >
 }
 
-export async function createService({
+export function createService({
   environment,
   stage,
   imageUri,
@@ -42,7 +42,7 @@ export async function createService({
   const isProd = environment === 'prod'
   const serviceName = `gp-api-${stage}`
 
-  const select = <T>(values: Record<'dev' | 'qa' | 'prod', T>): T =>
+  const select = <T>(values: Record<'preview' | 'dev' | 'qa' | 'prod', T>): T =>
     values[environment]
 
   const clusterName = `gp-${stage}-fargateCluster`
@@ -53,6 +53,7 @@ export async function createService({
 
   const albSecurityGroup = new aws.ec2.SecurityGroup('albSecurityGroup', {
     name: select({
+      preview: `gp-api-preview-${stage}-sg`,
       dev: 'gp-api-developLoadBalancerSecurityGroup-5ba8676',
       qa: 'gp-api-qaLoadBalancerSecurityGroup-623a91f',
       prod: 'gp-api-masterLoadBalancerSecurityGroup-c8b2676',
@@ -81,6 +82,7 @@ export async function createService({
 
   const loadBalancer = new aws.lb.LoadBalancer('loadBalancer', {
     name: select({
+      preview: `gpapi-${stage}`,
       dev: 'develop-gpapidevelopLoad',
       qa: 'g-qa-gpapiqaLoadBalancer',
       prod: 'master-gpapimasterLoadBa',
@@ -252,7 +254,7 @@ export async function createService({
 
   const desiredCount = isProd ? 2 : 1
 
-  const service = new aws.ecs.Service('ecsService', {
+  new aws.ecs.Service('ecsService', {
     name: serviceName,
     cluster: cluster.arn,
     taskDefinition: taskDefinition.arn,
@@ -305,14 +307,6 @@ export async function createService({
   })
 
   return {
-    cluster,
-    loadBalancer,
-    targetGroup,
-    service,
-    taskDefinition,
-    taskRole,
-    executionRole,
-    logGroup,
     url: pulumi.interpolate`https://${domain}`,
   }
 }
