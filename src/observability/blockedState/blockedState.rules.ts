@@ -29,7 +29,6 @@ export function shouldRecordBlockedState(
   if (statusCode >= 500) return true
   if (statusCode < 400 || statusCode >= 500) return false
 
-  // v2: rely on stable error codes rather than message matching.
   if (typeof errorCode === 'string' && allowlistCodeSet.has(errorCode))
     return true
 
@@ -66,3 +65,4 @@ export function deriveRootCause(params: {
 
   return params.statusCode >= 500 ? 'internal_unknown' : 'internal_unknown'
 }
+s
