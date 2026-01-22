@@ -239,7 +239,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   plans:
-    name: Infrastructure Plans
+    name: Infrastructure Diff
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -269,7 +269,7 @@ jobs:
           declare -A STAGES=([dev]=develop [qa]=qa [prod]=master)
           HAS_CHANGES=false
 
-          echo "## Infrastructure Plans" > /tmp/pr-comment.md
+          echo "## Infrastructure Diff" > /tmp/pr-comment.md
           echo "" >> /tmp/pr-comment.md
           echo "This PR makes infrastructure changes in at least one environment." >> /tmp/pr-comment.md
 
@@ -300,13 +300,13 @@ jobs:
 
           echo "has_changes=$HAS_CHANGES" >> $GITHUB_OUTPUT
 
-      - name: Find existing plans comment
+      - name: Find existing diff comment
         uses: peter-evans/find-comment@v3
         id: find-comment
         with:
           issue-number: ${{ github.event.number }}
           comment-author: "github-actions[bot]"
-          body-includes: "Infrastructure Plans"
+          body-includes: "Infrastructure Diff"
 
       - name: Post or update PR comment
         if: steps.preview.outputs.has_changes == 'true'
