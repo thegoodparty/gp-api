@@ -250,7 +250,7 @@ export = async () => {
     engineVersion: '16.8',
     databaseName: dbName,
     masterUsername: dbUser,
-    masterPassword: dbPassword,
+    masterPassword: pulumi.secret(dbPassword),
     dbSubnetGroupName: subnetGroup.name,
     vpcSecurityGroupIds: [rdsSecurityGroup.id],
     storageEncrypted: true,
@@ -276,7 +276,7 @@ export = async () => {
       engineVersion: '16.8',
       databaseName: voterCredentials.database,
       masterUsername: voterCredentials.username,
-      masterPassword: voterCredentials.password,
+      masterPassword: pulumi.secret(voterCredentials.password),
       dbSubnetGroupName: subnetGroup.name,
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
@@ -353,10 +353,10 @@ export = async () => {
       CORS_ORIGIN: productDomain,
       AWS_REGION: 'us-west-2',
       ASSET_DOMAIN: select({
-        preview: 'https://assets-dev.goodparty.org',
-        dev: 'https://assets-dev.goodparty.org',
-        qa: 'https://assets-qa.goodparty.org',
-        prod: 'https://assets.goodparty.org',
+        preview: 'assets-dev.goodparty.org',
+        dev: 'assets-dev.goodparty.org',
+        qa: 'assets-qa.goodparty.org',
+        prod: 'assets.goodparty.org',
       }),
       WEBAPP_ROOT_URL: `https://${productDomain}`,
       AI_MODELS:
@@ -367,7 +367,12 @@ export = async () => {
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment}`,
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
-      ...secret,
+      ...Object.fromEntries(
+        Object.entries(secret).map(([key, value]) => [
+          key,
+          pulumi.secret(value),
+        ]),
+      ),
       ...(environment === 'preview'
         ? {
             IS_PREVIEW: 'true',
