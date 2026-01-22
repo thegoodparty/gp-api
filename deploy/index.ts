@@ -16,6 +16,9 @@ export = async () => {
     | 'prod'
   const imageUri = config.require('imageUri')
 
+  const prNumber =
+    environment === 'preview' ? config.require('prNumber') : undefined
+
   const vpcId = 'vpc-0763fa52c32ebcf6a'
   const vpcCidr = '10.0.0.0/16'
   const hostedZoneId = 'Z10392302OXMPNQLPO07K'
@@ -27,7 +30,7 @@ export = async () => {
   const vpcSecurityGroupIds = ['sg-01de8d67b0f0ec787']
 
   const stage = {
-    preview: `pr-${config.require('prNumber')}`,
+    preview: `pr-${prNumber}`,
     dev: 'develop',
     qa: 'qa',
     prod: 'master',
