@@ -2,41 +2,42 @@
 set -e
 
 # Run migrations on startup if DATABASE_URL is set and not a placeholder
-if [ -n "$DATABASE_URL" ] && [ "$DATABASE_URL" != "postgresql://placeholder:placeholder@localhost:5432/placeholder" ]; then
-  echo "Waiting for database to be ready..."
-  
-  # Retry logic for database connection (important for Aurora Serverless v2 which takes time to initialize)
-  MAX_RETRIES=30
-  RETRY_COUNT=0
-  
-  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    echo "Attempting database connection (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
-    
-    if npx prisma migrate deploy --schema=prisma/schema 2>&1; then
-      echo "✅ Migrations completed successfully."
-      break
-    else
-      RETRY_COUNT=$((RETRY_COUNT + 1))
-      if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-        echo "⏳ Database not ready yet. Waiting 10 seconds before retry..."
-        sleep 10
-      else
-        echo "❌ ERROR: Failed to connect to database after $MAX_RETRIES attempts."
-        exit 1
-      fi
-    fi
-  done
+if [ -z "$DATABASE_URL" ]; then
+  echo "DATABASE_URL is not set, can't run migrations"
+  exit 1
+fi
 
-  if [ "$IS_PREVIEW" = "true" ]; then
-    echo "Preview environment detected. Running seed..."
-    if npx tsx seed/seed.ts; then
-      echo "Seed completed successfully."
+echo "Waiting for database to be ready..."
+
+# Retry logic for database connection (important for Aurora Serverless v2 which takes time to wake up)
+MAX_RETRIES=30
+RETRY_COUNT=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  echo "Attempting database connection (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+
+  if npx prisma migrate deploy --schema=prisma/schema 2>&1; then
+    echo "✅ Migrations completed successfully."
+    break
+  else
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+      echo "⏳ Database not ready yet. Retrying in 10s..."
+      sleep 10
     else
-      echo "WARNING: Seed failed with exit code $?. Continuing with app startup..."
+      echo "❌ ERROR: Failed to connect to database after $MAX_RETRIES attempts."
+      exit 1
     fi
   fi
-else
-  echo "DATABASE_URL not set or is placeholder, skipping migrations."
+done
+
+if [ "$IS_PREVIEW" = "true" ]; then
+  echo "Preview environment detected. Running seed..."
+  if npx tsx seed/seed.ts; then
+    echo "Seed completed successfully."
+  else
+    echo "WARNING: Seed failed with exit code $?. Continuing with app startup..."
+  fi
 fi
 
 # For preview environments, start app in background, sync content, then wait
