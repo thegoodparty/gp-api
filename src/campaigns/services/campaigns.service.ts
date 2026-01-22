@@ -8,15 +8,15 @@ import {
 import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { EVENTS } from 'src/vendors/segment/segment.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
@@ -300,16 +300,18 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   ) {
     const existingCampaign = await this.model.findUnique({
       where: { id: campaignId },
-      select: { isPro: true, hasFreeTextsOffer: true },
+      select: { isPro: true, hasFreeTextsOffer: true, freeTextsOfferRedeemedAt: true },
     })
 
     const isBecomingProFirstTime = !existingCampaign?.isPro && isPro
+    const hasNeverRedeemedFreeTexts = !existingCampaign?.freeTextsOfferRedeemedAt
+    const shouldGrantOffer = isBecomingProFirstTime && hasNeverRedeemedFreeTexts
 
     const campaign = await this.model.update({
       where: { id: campaignId },
       data: {
         isPro,
-        ...(isBecomingProFirstTime && { hasFreeTextsOffer: true }),
+        ...(shouldGrantOffer && { hasFreeTextsOffer: true }),
       },
     })
     // Must be in serial so as to not overwrite campaign details w/ concurrent queries
@@ -342,7 +344,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
             id: campaignId,
             hasFreeTextsOffer: true,
           },
-          data: { hasFreeTextsOffer: false },
+          data: { hasFreeTextsOffer: false, freeTextsOfferRedeemedAt: new Date() },
         })
 
         if (updatedCampaign.count === 0) {
@@ -391,7 +393,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const isVerified =
       campaign.isVerified ||
       data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
-        CandidateVerification.yes
+      CandidateVerification.yes
 
     if (campaign.isActive) {
       return {
