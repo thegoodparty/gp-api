@@ -377,7 +377,7 @@ export = async () => {
       ...(environment === 'preview'
         ? {
             IS_PREVIEW: 'true',
-            DATABASE_URL: pulumi.interpolate`postgresql://postgres:${dbPassword}@${rdsCluster.endpoint}:5432/${dbName}`,
+            DATABASE_URL: pulumi.interpolate`postgresql://${dbUser}:${dbPassword}@${rdsCluster.endpoint}:5432/${dbName}`,
             ADMIN_EMAIL: process.env.ADMIN_EMAIL,
             ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
             CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
