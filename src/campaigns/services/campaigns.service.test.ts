@@ -37,9 +37,13 @@ describe('CampaignsService - redeemFreeTexts', () => {
   }
 
   // Type helper for transaction client - we only mock the methods we need
-  type TransactionClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0]
+  type TransactionClient = Parameters<
+    Parameters<PrismaClient['$transaction']>[0]
+  >[0]
   type MockTransactionClient = {
-    campaign: Partial<Pick<TransactionClient['campaign'], 'updateMany' | 'findUnique'>>
+    campaign: Partial<
+      Pick<TransactionClient['campaign'], 'updateMany' | 'findUnique'>
+    >
   }
 
   beforeEach(async () => {
@@ -172,7 +176,7 @@ describe('CampaignsService - redeemFreeTexts', () => {
       mockPrismaClient.$transaction = vi.fn(
         async (
           callback: Parameters<PrismaClient['$transaction']>[0],
-          options?: Parameters<PrismaClient['$transaction']>[1],
+          _options?: Parameters<PrismaClient['$transaction']>[1],
         ) => {
           const mockTx: MockTransactionClient = {
             campaign: {
@@ -273,15 +277,17 @@ describe('CampaignsService - redeemFreeTexts', () => {
     it('should throw BadRequestException when campaign does not have offer (hasFreeTextsOffer: false)', async () => {
       const campaignId = 123
 
-      mockPrismaClient.$transaction = vi.fn(async (callback: any) => {
-        const mockTx = {
-          campaign: {
-            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-            findUnique: vi.fn(),
-          },
-        }
-        return await callback(mockTx)
-      }) as MockedFunction<PrismaClient['$transaction']>
+      mockPrismaClient.$transaction = vi.fn(
+        async (callback: Parameters<PrismaClient['$transaction']>[0]) => {
+          const mockTx: MockTransactionClient = {
+            campaign: {
+              updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+              findUnique: vi.fn(),
+            },
+          }
+          return await callback(mockTx as TransactionClient)
+        },
+      ) as MockedFunction<PrismaClient['$transaction']>
 
       await expect(service.redeemFreeTexts(campaignId)).rejects.toThrow(
         BadRequestException,
@@ -297,15 +303,17 @@ describe('CampaignsService - redeemFreeTexts', () => {
     it('should throw BadRequestException when campaign does not exist', async () => {
       const campaignId = 999
 
-      mockPrismaClient.$transaction = vi.fn(async (callback: any) => {
-        const mockTx = {
-          campaign: {
-            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-            findUnique: vi.fn(),
-          },
-        }
-        return await callback(mockTx)
-      }) as MockedFunction<PrismaClient['$transaction']>
+      mockPrismaClient.$transaction = vi.fn(
+        async (callback: Parameters<PrismaClient['$transaction']>[0]) => {
+          const mockTx: MockTransactionClient = {
+            campaign: {
+              updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+              findUnique: vi.fn(),
+            },
+          }
+          return await callback(mockTx as TransactionClient)
+        },
+      ) as MockedFunction<PrismaClient['$transaction']>
 
       await expect(service.redeemFreeTexts(campaignId)).rejects.toThrow(
         BadRequestException,
