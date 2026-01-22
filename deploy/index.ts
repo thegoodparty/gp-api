@@ -262,7 +262,7 @@ export = async () => {
     },
   })
 
-  new aws.rds.ClusterInstance('rdsInstance', {
+  const rdsInstance = new aws.rds.ClusterInstance('rdsInstance', {
     clusterIdentifier: rdsCluster.id,
     instanceClass: 'db.serverless',
     engine: aws.rds.EngineType.AuroraPostgresql,
@@ -326,6 +326,7 @@ export = async () => {
   })
 
   const service = createService({
+    dependsOn: [rdsInstance],
     environment,
     stage,
     imageUri,

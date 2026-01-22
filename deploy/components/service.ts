@@ -24,6 +24,7 @@ export interface ServiceConfig {
       Resource: pulumi.Input<pulumi.Input<string>[]>
     }[]
   >
+  dependsOn: pulumi.ResourceOptions['dependsOn']
 }
 
 export function createService({
@@ -38,6 +39,7 @@ export function createService({
   certificateArn,
   environmentVariables,
   permissions,
+  dependsOn,
 }: ServiceConfig) {
   const isProd = environment === 'prod'
   const serviceName = `gp-api-${stage}`
@@ -254,32 +256,36 @@ export function createService({
 
   const desiredCount = isProd ? 2 : 1
 
-  new aws.ecs.Service('ecsService', {
-    name: serviceName,
-    cluster: cluster.arn,
-    taskDefinition: taskDefinition.arn,
-    desiredCount,
-    capacityProviderStrategies: [{ capacityProvider: 'FARGATE', weight: 1 }],
-    networkConfiguration: {
-      subnets: publicSubnetIds,
-      securityGroups: securityGroupIds,
-      assignPublicIp: true,
-    },
-    loadBalancers: [
-      {
-        targetGroupArn: targetGroup.arn,
-        containerName: serviceName,
-        containerPort: 80,
+  new aws.ecs.Service(
+    'ecsService',
+    {
+      name: serviceName,
+      cluster: cluster.arn,
+      taskDefinition: taskDefinition.arn,
+      desiredCount,
+      capacityProviderStrategies: [{ capacityProvider: 'FARGATE', weight: 1 }],
+      networkConfiguration: {
+        subnets: publicSubnetIds,
+        securityGroups: securityGroupIds,
+        assignPublicIp: true,
       },
-    ],
-    healthCheckGracePeriodSeconds: 120,
-    deploymentCircuitBreaker: {
-      enable: true,
-      rollback: true,
+      loadBalancers: [
+        {
+          targetGroupArn: targetGroup.arn,
+          containerName: serviceName,
+          containerPort: 80,
+        },
+      ],
+      healthCheckGracePeriodSeconds: 120,
+      deploymentCircuitBreaker: {
+        enable: true,
+        rollback: true,
+      },
+      enableExecuteCommand: true,
+      waitForSteadyState: true,
     },
-    enableExecuteCommand: true,
-    waitForSteadyState: true,
-  })
+    { dependsOn },
+  )
 
   new aws.route53.Record('dnsARecord', {
     zoneId: hostedZoneId,
