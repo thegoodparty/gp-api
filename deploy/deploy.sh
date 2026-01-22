@@ -8,9 +8,19 @@ if [ -z "$environment" ]; then
   echo "Must provide an environment"
   exit 1
 fi
-if [ "$environment" != "dev" ] && [ "$environment" != "qa" ] && [ "$environment" != "prod" ]; then
+if [ "$environment" != "preview" ] && [ "$environment" != "dev" ] && [ "$environment" != "qa" ] && [ "$environment" != "prod" ]; then
   echo "Invalid environment: $environment"
   exit 1
+fi
+
+if [ "$environment" = "preview" ]; then
+  if [ -z "$GITHUB_PR_NUMBER" ]; then
+    echo "Must specify a GITHUB_PR_NUMBER environment variable for preview environment"
+    exit 1
+  fi
+  stack="organization/gp-api/gp-api-pr-$GITHUB_PR_NUMBER"
+else
+  stack="organization/gp-api/gp-api-$environment"
 fi
 
 if [ -z "$IMAGE_URI" ]; then
@@ -19,10 +29,13 @@ if [ -z "$IMAGE_URI" ]; then
 fi
 
 AWS_REGION=us-west-2 pulumi login s3://goodparty-iac-state
-pulumi stack select "organization/gp-api/gp-api-$environment" --create
+pulumi stack select "$stack" --create
 pulumi config set aws:region us-west-2
 pulumi config set environment "$environment"
 pulumi config set imageUri "$IMAGE_URI"
+if [ "$environment" = "preview" ]; then
+  pulumi config set prNumber "$GITHUB_PR_NUMBER"
+fi
 
 # Set default tags
 pulumi config set --path aws:defaultTags.tags.Environment "$environment"

@@ -135,6 +135,10 @@
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.9",
     "@playwright/test": "^1.56.1",
+    "@pulumi/aws": "~6.67.0",
+    "@pulumi/awsx": "~2.18.0",
+    "@pulumi/pulumi": "~3.140.0",
+    "@pulumi/random": "~4.16.0",
     "@testcontainers/postgresql": "^11.7.1",
     "@types/async-retry": "^1.4.9",
     "aws-sdk-client-mock": "^4.1.0",
@@ -161,7 +165,6 @@
     "supertest": "^7.0.0",
     "testcontainers": "^11.7.1",
     "tsconfig-paths": "^4.2.0",
-    "tsx": "^4.20.6",
     "typescript": "^5.6.3"
   }
 }
