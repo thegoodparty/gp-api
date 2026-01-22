@@ -289,8 +289,8 @@ jobs:
             if [ "$CHANGES" -gt 0 ]; then
               HAS_CHANGES=true
               jq -r '"**\(.changeSummary | to_entries | map("\(.value) \(.key)") | join(", "))**"' /tmp/preview-$env.json >> /tmp/pr-comment.md
-              echo '```' >> /tmp/pr-comment.md
-              jq -r '.steps[] | select(.op != "same") | "\(.op): \(.urn | split("::") | .[-1])"' /tmp/preview-$env.json | head -100 >> /tmp/pr-comment.md
+              echo '```diff' >> /tmp/pr-comment.md
+              echo "$(npm run --silent infra diff $env 2>&1)" >> /tmp/pr-comment.md
               echo '```' >> /tmp/pr-comment.md
             else
               echo "✅ No changes" >> /tmp/pr-comment.md
