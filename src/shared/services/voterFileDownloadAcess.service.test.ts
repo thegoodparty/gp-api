@@ -418,5 +418,6 @@ function createMockCampaign(
     vendorTsData: {},
     completedTaskIds: [],
     hasFreeTextsOffer: false,
+    freeTextsOfferRedeemedAt: null,
   }
 }

@@ -1,13 +1,16 @@
+import { ElectionsService } from '@/elections/services/elections.service'
+import { PrismaService } from '@/prisma/prisma.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { UsersService } from '@/users/services/users.service'
+import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
+import { SegmentService } from '@/vendors/segment/segment.service'
+import { EVENTS } from '@/vendors/segment/segment.types'
+import { SlackService } from '@/vendors/slack/services/slack.service'
+import { StripeService } from '@/vendors/stripe/services/stripe.service'
 import { BadRequestException } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { ElectionsService } from 'src/elections/services/elections.service'
-import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
-import { UsersService } from 'src/users/services/users.service'
-import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
-import { EVENTS } from 'src/vendors/segment/segment.types'
-import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CampaignsService } from './campaigns.service'
@@ -26,45 +29,108 @@ describe('CampaignsService - redeemFreeTexts', () => {
     track: MockedFunction<AnalyticsService['track']>
   }
 
-  beforeEach(() => {
-    // Mock Prisma client
+  beforeEach(async () => {
+    // Mock Prisma client methods
+    const mockUpdateMany = vi.fn()
+    const mockFindUnique = vi.fn()
+    const mockTransaction = vi.fn()
+
+    // Store references for test assertions
     mockPrismaClient = {
-      $transaction: vi.fn() as MockedFunction<PrismaClient['$transaction']>,
+      $transaction: mockTransaction as MockedFunction<
+        PrismaClient['$transaction']
+      >,
       campaign: {
-        updateMany: vi.fn(),
-        findUnique: vi.fn(),
+        updateMany: mockUpdateMany as MockedFunction<
+          PrismaClient['campaign']['updateMany']
+        >,
+        findUnique: mockFindUnique as MockedFunction<
+          PrismaClient['campaign']['findUnique']
+        >,
       },
     }
 
-    // Mock Analytics
-    mockAnalytics = {
+    // Mock Analytics - create a proper mock object
+    // Ensure it has all public methods that might be called
+    const mockAnalyticsInstance = {
       track: vi.fn(),
+      identify: vi.fn(),
+      trackProPayment: vi.fn(),
+    }
+    mockAnalytics = {
+      track: mockAnalyticsInstance.track,
     }
 
-    // Mock all service dependencies
-    const mockUsersService = {} as UsersService
-    const mockCrmCampaignsService = {} as CrmCampaignsService
-    const mockCampaignPlanVersionsService = {} as CampaignPlanVersionsService
-    const mockStripeService = {} as StripeService
-    const mockGooglePlacesService = {} as GooglePlacesService
-    const mockElectionsService = {} as ElectionsService
-    const mockSlackService = {} as SlackService
+    // Create mock PrismaService
+    const mockPrismaService = {
+      $transaction: mockTransaction,
+      campaign: {
+        updateMany: mockUpdateMany,
+        findUnique: mockFindUnique,
+      },
+    }
 
-    // Create service instance directly with mocked dependencies
-    service = new CampaignsService(
-      mockUsersService,
-      mockCrmCampaignsService,
-      mockAnalytics as AnalyticsService,
-      mockCampaignPlanVersionsService,
-      mockStripeService,
-      mockGooglePlacesService,
-      mockElectionsService,
-      mockSlackService,
-    )
+    // Use Test.createTestingModule following NestJS best practices
+    // CRITICAL: Provide SegmentService BEFORE AnalyticsService
+    // Even with useValue, NestJS validates AnalyticsService class and checks its dependencies
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        // Provide PrismaService first (needed by base class via @Inject())
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
+        // Provide dependencies in constructor parameter order
+        {
+          provide: UsersService,
+          useValue: {},
+        },
+        {
+          provide: CrmCampaignsService,
+          useValue: {},
+        },
+        // CRITICAL: Provide SegmentService BEFORE AnalyticsService
+        // NestJS validates AnalyticsService class and needs SegmentService to exist
+        {
+          provide: SegmentService,
+          useValue: {},
+        },
+        // Provide AnalyticsService with useValue - NestJS will use mock since SegmentService exists
+        {
+          provide: AnalyticsService,
+          useValue: mockAnalyticsInstance,
+        },
+        {
+          provide: CampaignPlanVersionsService,
+          useValue: {},
+        },
+        {
+          provide: StripeService,
+          useValue: {},
+        },
+        {
+          provide: GooglePlacesService,
+          useValue: {},
+        },
+        {
+          provide: ElectionsService,
+          useValue: {},
+        },
+        {
+          provide: SlackService,
+          useValue: {},
+        },
+        // Provide CampaignsService LAST - all dependencies are now available
+        CampaignsService,
+      ],
+    }).compile()
 
-    // Override the client property with our mock
-    Object.defineProperty(service, 'client', {
-      get: () => mockPrismaClient as unknown as PrismaClient,
+    service = module.get<CampaignsService>(CampaignsService)
+
+    // Override the client property with our mock Prisma client
+    // The base class uses this._prisma for the client getter
+    Object.defineProperty(service, '_prisma', {
+      get: () => mockPrismaClient,
       configurable: true,
     })
 
