@@ -387,12 +387,12 @@ function createMockCampaign(
       ? null
       : overrides.pathToVictory?.data
         ? {
-          id: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          campaignId: overrides.id ?? 1,
-          data: overrides.pathToVictory.data,
-        }
+            id: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            campaignId: overrides.id ?? 1,
+            data: overrides.pathToVictory.data,
+          }
         : null
 
   return {

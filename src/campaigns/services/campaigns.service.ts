@@ -300,11 +300,16 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   ) {
     const existingCampaign = await this.model.findUnique({
       where: { id: campaignId },
-      select: { isPro: true, hasFreeTextsOffer: true, freeTextsOfferRedeemedAt: true },
+      select: {
+        isPro: true,
+        hasFreeTextsOffer: true,
+        freeTextsOfferRedeemedAt: true,
+      },
     })
 
     const isBecomingProFirstTime = !existingCampaign?.isPro && isPro
-    const hasNeverRedeemedFreeTexts = !existingCampaign?.freeTextsOfferRedeemedAt
+    const hasNeverRedeemedFreeTexts =
+      !existingCampaign?.freeTextsOfferRedeemedAt
     const shouldGrantOffer = isBecomingProFirstTime && hasNeverRedeemedFreeTexts
 
     const campaign = await this.model.update({
@@ -344,7 +349,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
             id: campaignId,
             hasFreeTextsOffer: true,
           },
-          data: { hasFreeTextsOffer: false, freeTextsOfferRedeemedAt: new Date() },
+          data: {
+            hasFreeTextsOffer: false,
+            freeTextsOfferRedeemedAt: new Date(),
+          },
         })
 
         if (updatedCampaign.count === 0) {
@@ -393,7 +401,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const isVerified =
       campaign.isVerified ||
       data?.hubSpotUpdates?.verified_candidates?.toUpperCase() ===
-      CandidateVerification.yes
+        CandidateVerification.yes
 
     if (campaign.isActive) {
       return {
