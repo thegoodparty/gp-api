@@ -152,10 +152,10 @@ export = async () => {
   }
 
   // Assets bucket - used for storing uploaded files, images, etc.
-  const assetsBucket = await createAssetsBucket({ environment })
+  const assetsBucket = createAssetsBucket({ environment })
 
   if (environment !== 'prod') {
-    await createAssetsRouter({
+    createAssetsRouter({
       environment: environment,
       bucketRegionalDomainName: assetsBucket.bucketRegionalDomainName,
       hostedZoneId,

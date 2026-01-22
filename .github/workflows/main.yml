@@ -78,13 +78,11 @@ jobs:
           pulumi-version: "^3"
 
       - name: Run Pulumi Deploy
-        working-directory: deploy/pulumi
+        working-directory: deploy
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
           IMAGE_URI: ${{ steps.build-docker.outputs.image_uri }}
-        run: |
-          npm ci
-          sh ./deploy.sh ${{ steps.set-env.outputs.target_env }}
+        run: sh ./deploy.sh ${{ steps.set-env.outputs.target_env }}
       - name: Notify Slack on Success (Deploy)
         if: success()
         uses: 8398a7/action-slack@v3

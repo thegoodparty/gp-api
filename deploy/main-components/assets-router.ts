@@ -7,7 +7,7 @@ export interface AssetsRouterConfig {
   hostedZoneId: string
 }
 
-export async function createAssetsRouter({
+export function createAssetsRouter({
   environment,
   bucketRegionalDomainName,
   hostedZoneId,
@@ -94,11 +94,4 @@ export async function createAssetsRouter({
       },
     ],
   })
-
-  return {
-    distribution,
-    distributionDomainName: distribution.domainName,
-    distributionId: distribution.id,
-    url: pulumi.interpolate`https://${domain}`,
-  }
 }
