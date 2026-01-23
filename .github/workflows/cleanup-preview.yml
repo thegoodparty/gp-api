@@ -6,7 +6,6 @@ permissions:
   pull-requests: read
 
 on:
-  pull_request:
   workflow_dispatch:
   schedule:
     # Run every 3 hours
