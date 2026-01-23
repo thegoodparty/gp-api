@@ -193,7 +193,7 @@ export function typeToQuery(
       "Residence_Addresses_State", 
       "Residence_Addresses_Zip"`
 
-      whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
+      whereClause += `${whereClause ? ' AND ' : ''}"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
     }
 
     if (type === 'directMail') {
