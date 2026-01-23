@@ -8,7 +8,7 @@ export class CanDownloadVoterFileGuard implements CanActivate {
     private campaignsService: CampaignsService,
     private voterFileDownloadAccess: VoterFileDownloadAccessService,
   ) {}
-  async canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const { user } = context.switchToHttp().getRequest<{
       user: { id: number }
     }>()
@@ -17,6 +17,7 @@ export class CanDownloadVoterFileGuard implements CanActivate {
       pathToVictory: true,
     })
 
-    return this.voterFileDownloadAccess.canDownload(campaign)
+    const result = this.voterFileDownloadAccess.canDownload(campaign)
+    return Boolean(result)
   }
 }

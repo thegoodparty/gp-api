@@ -16,6 +16,9 @@ export = async () => {
     | 'prod'
   const imageUri = config.require('imageUri')
 
+  const prNumber =
+    environment === 'preview' ? config.require('prNumber') : undefined
+
   const vpcId = 'vpc-0763fa52c32ebcf6a'
   const vpcCidr = '10.0.0.0/16'
   const hostedZoneId = 'Z10392302OXMPNQLPO07K'
@@ -27,7 +30,7 @@ export = async () => {
   const vpcSecurityGroupIds = ['sg-01de8d67b0f0ec787']
 
   const stage = {
-    preview: `pr-${config.require('prNumber')}`,
+    preview: `pr-${prNumber}`,
     dev: 'develop',
     qa: 'qa',
     prod: 'master',
@@ -126,6 +129,37 @@ export = async () => {
     restrictPublicBuckets: true,
   })
 
+  if (environment === 'prod') {
+    const sqsSecurityGroup = new aws.ec2.SecurityGroup('sqs-sg', {
+      vpcId,
+      ingress: [
+        {
+          protocol: 'tcp',
+          fromPort: 443,
+          toPort: 443,
+          cidrBlocks: [vpcCidr],
+        },
+      ],
+      egress: [
+        {
+          protocol: '-1',
+          fromPort: 0,
+          toPort: 0,
+          cidrBlocks: ['0.0.0.0/0'],
+        },
+      ],
+    })
+
+    new aws.ec2.VpcEndpoint('sqs-endpoint', {
+      vpcId,
+      serviceName: `com.amazonaws.us-west-2.sqs`,
+      vpcEndpointType: 'Interface',
+      subnetIds: vpcSubnetIds.private,
+      securityGroupIds: [sqsSecurityGroup.id],
+      privateDnsEnabled: true,
+    })
+  }
+
   // Assets bucket - used for storing uploaded files, images, etc.
   if (environment !== 'preview') {
     const assetsBucket = createAssetsBucket({ environment })
@@ -153,7 +187,14 @@ export = async () => {
         toPort: 5432,
         securityGroups: vpcSecurityGroupIds,
       },
-      ...select({
+      {
+        protocol: 'tcp',
+        fromPort: 5432,
+        toPort: 5432,
+        cidrBlocks: [vpcCidr],
+      },
+    ].concat(
+      select({
         preview: [],
         // TODOSWAIN: investigate whether these are truly needed in dev
         dev: [
@@ -175,7 +216,7 @@ export = async () => {
         qa: [],
         prod: [],
       }),
-    ],
+    ),
     egress: [
       {
         protocol: '-1',
@@ -197,36 +238,37 @@ export = async () => {
     },
   })
 
-  const rdsCluster = new aws.rds.Cluster(
-    'rdsCluster',
-    {
-      clusterIdentifier: select({
-        preview: `gp-api-${stage}`,
-        dev: 'gp-api-db',
-        qa: 'gp-api-db-qa',
-        prod: 'gp-api-db-prod',
-      }),
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineMode: aws.rds.EngineMode.Provisioned,
-      engineVersion: '16.8',
-      databaseName: dbName,
-      masterUsername: dbUser,
-      masterPassword: dbPassword,
-      dbSubnetGroupName: subnetGroup.name,
-      vpcSecurityGroupIds: [rdsSecurityGroup.id],
-      storageEncrypted: true,
-      deletionProtection: true,
-      backupRetentionPeriod: select({ preview: 1, dev: 7, qa: 7, prod: 14 }),
-      finalSnapshotIdentifier: `gp-api-db-${stage}-final-snapshot`,
-      serverlessv2ScalingConfiguration: {
-        minCapacity: environment === 'prod' ? 1 : 0.5,
-        maxCapacity: 64,
-      },
+  const rdsCluster = new aws.rds.Cluster('rdsCluster', {
+    clusterIdentifier: select({
+      preview: `gp-api-${stage}`,
+      dev: 'gp-api-db',
+      qa: 'gp-api-db-qa',
+      prod: 'gp-api-db-prod',
+    }),
+    engine: aws.rds.EngineType.AuroraPostgresql,
+    engineMode: aws.rds.EngineMode.Provisioned,
+    engineVersion: '16.8',
+    databaseName: dbName,
+    masterUsername: dbUser,
+    masterPassword: pulumi.secret(dbPassword),
+    dbSubnetGroupName: subnetGroup.name,
+    vpcSecurityGroupIds: [rdsSecurityGroup.id],
+    storageEncrypted: true,
+    serverlessv2ScalingConfiguration: {
+      minCapacity: environment === 'prod' ? 1 : 0.5,
+      maxCapacity: 64,
     },
-    { import: environment === 'dev' ? 'gp-api-db' : undefined },
-  )
+    // Disable these protections for preview environments -- these
+    // configs help them tear down more quickly.
+    deletionProtection: environment !== 'preview',
+    skipFinalSnapshot: environment === 'preview',
+    finalSnapshotIdentifier:
+      environment === 'preview'
+        ? undefined
+        : `gp-api-db-${stage}-final-snapshot`,
+  })
 
-  new aws.rds.ClusterInstance('rdsInstance', {
+  const rdsInstance = new aws.rds.ClusterInstance('rdsInstance', {
     clusterIdentifier: rdsCluster.id,
     instanceClass: 'db.serverless',
     engine: aws.rds.EngineType.AuroraPostgresql,
@@ -234,18 +276,18 @@ export = async () => {
   })
 
   if (environment === 'dev' || environment === 'prod') {
-    const voterDbBaseConfig: aws.rds.ClusterArgs = {
+    const voterDbBaseConfig = {
       engine: aws.rds.EngineType.AuroraPostgresql,
       engineMode: aws.rds.EngineMode.Provisioned,
       engineVersion: '16.8',
       databaseName: voterCredentials.database,
       masterUsername: voterCredentials.username,
-      masterPassword: voterCredentials.password,
+      masterPassword: pulumi.secret(voterCredentials.password),
       dbSubnetGroupName: subnetGroup.name,
       vpcSecurityGroupIds: [rdsSecurityGroup.id],
       storageEncrypted: true,
       deletionProtection: true,
-      backupRetentionPeriod: select({ preview: 1, dev: 7, qa: 7, prod: 14 }),
+      finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
       serverlessv2ScalingConfiguration: {
         maxCapacity: 128,
         minCapacity: 0.5,
@@ -290,13 +332,13 @@ export = async () => {
   })
 
   const service = createService({
+    dependsOn: [rdsInstance],
     environment,
     stage,
     imageUri,
     vpcId,
     securityGroupIds: vpcSecurityGroupIds,
     publicSubnetIds: vpcSubnetIds.public,
-    privateSubnetIds: vpcSubnetIds.private,
     hostedZoneId,
     domain: select({
       preview: `${stage}.preview.goodparty.org`,
@@ -306,7 +348,7 @@ export = async () => {
     }),
     certificateArn: select({
       preview:
-        'arn:aws:acm:us-west-2:333022194791:certificate/227d8028-477a-4d75-999f-60587a8a11e3',
+        'arn:aws:acm:us-west-2:333022194791:certificate/b009d1a6-68ff-4d24-84f7-93683ca3f786',
       dev: 'arn:aws:acm:us-west-2:333022194791:certificate/227d8028-477a-4d75-999f-60587a8a11e3',
       qa: 'arn:aws:acm:us-west-2:333022194791:certificate/29de1de7-6ab0-4f62-baf1-235c2a92cfe2',
       prod: 'arn:aws:acm:us-west-2:333022194791:certificate/e1969507-2514-4585-a225-917883d8ffef',
@@ -318,10 +360,10 @@ export = async () => {
       CORS_ORIGIN: productDomain,
       AWS_REGION: 'us-west-2',
       ASSET_DOMAIN: select({
-        preview: 'https://assets-dev.goodparty.org',
-        dev: 'https://assets-dev.goodparty.org',
-        qa: 'https://assets-qa.goodparty.org',
-        prod: 'https://assets.goodparty.org',
+        preview: 'assets-dev.goodparty.org',
+        dev: 'assets-dev.goodparty.org',
+        qa: 'assets-qa.goodparty.org',
+        prod: 'assets.goodparty.org',
       }),
       WEBAPP_ROOT_URL: `https://${productDomain}`,
       AI_MODELS:
@@ -332,11 +374,16 @@ export = async () => {
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment}`,
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
-      ...secret,
+      ...Object.fromEntries(
+        Object.entries(secret).map(([key, value]) => [
+          key,
+          pulumi.secret(value),
+        ]),
+      ),
       ...(environment === 'preview'
         ? {
             IS_PREVIEW: 'true',
-            DATABASE_URL: pulumi.interpolate`postgresql://postgres:${dbPassword}@${rdsCluster.endpoint}:5432/${dbName}`,
+            DATABASE_URL: pulumi.interpolate`postgresql://${dbUser}:${dbPassword}@${rdsCluster.endpoint}:5432/${dbName}`,
             ADMIN_EMAIL: process.env.ADMIN_EMAIL,
             ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
             CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
@@ -346,22 +393,27 @@ export = async () => {
     },
     permissions: [
       {
+        Effect: 'Allow',
         Action: ['route53domains:List*', 'route53domains:Get*'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: ['route53domains:CheckDomainAvailability'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: ['s3:*', 's3-object-lambda:*'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: ['sqs:*'],
         Resource: ['*'],
       },
       {
+        Effect: 'Allow',
         Action: [
           'ssmmessages:OpenDataChannel',
           'ssmmessages:OpenControlChannel',

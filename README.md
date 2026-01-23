@@ -44,7 +44,7 @@ $ npm install
 
 [Install Docker](https://docs.docker.com/get-started/get-docker/)
 
-``` bash
+```bash
 $ docker compose up -d
 
 # to stop docker
@@ -54,6 +54,7 @@ $ docker compose stop
 ```
 
 ### Install Postgres locally (Not docker)
+
 - Create a Postgres database for the project to connect to. There are many ways to do this, below is an example using Homebrew on macOS:
 
   ```sh
@@ -95,11 +96,9 @@ $ npm run migrate:reset
 - This also generates the Prisma Client and Typescript types.
 - This should also run seeds to populate your local DB with dummy data.
 
-
 ### Database Stop & Cleanup
 
-  Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
-
+Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
 
 ## Compile and run the project
 
@@ -135,7 +134,13 @@ You can run the tests in the Postman desktop app or you can run them using the P
 
 ## Deployment
 
-Check out the README in the [deploy](./deploy) directory for more information on how the project is deployed.
+This project's deployment is managed via [Pulumi](https://www.pulumi.com/) within the [deploy](./deploy) directory.
+
+There is an in-tree CLI for interacting with the Pulumi stack: `npm run infra`.
+
+For example, to validate deployment changes, you can run `npm run infra diff <dev|qa|prod>` -- this will output a summary of changes that will be applied to the specified environment.
+
+> Note: You'll need to be authenticated via the AWS CLI locally before running `infra` commands.
 
 ## Resources
 
