@@ -37,6 +37,7 @@ model Campaign {
   ecanvasser            Ecanvasser?
   completedTaskIds      String[]                @default([]) @map("completed_task_ids")
   hasFreeTextsOffer     Boolean                 @default(false) @map("has_free_texts_offer")
+  freeTextsOfferRedeemedAt DateTime?            @map("free_texts_offer_redeemed_at")
   ScheduledMessage      ScheduledMessage[]
   tcrCompliance         TcrCompliance?
   voterFileFilters      VoterFileFilter[]

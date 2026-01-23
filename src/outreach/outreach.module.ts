@@ -25,5 +25,12 @@ export class OutreachModule {
       PurchaseType.TEXT,
       this.outreachPurchaseHandler,
     )
+
+    this.purchaseService.registerPostPurchaseHandler(
+      PurchaseType.TEXT,
+      this.outreachPurchaseHandler.executePostPurchase.bind(
+        this.outreachPurchaseHandler,
+      ),
+    )
   }
 }
