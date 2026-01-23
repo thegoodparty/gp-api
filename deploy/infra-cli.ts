@@ -64,6 +64,7 @@ const setupStack = async (env: string) => {
     console.warn(
       'IMAGE_URI environment variable is not set, building image locally',
     )
+    run('npm run generate', { cwd: `${__dirname}/..` })
     run('npm run build', { cwd: `${__dirname}/..` })
 
     run(
