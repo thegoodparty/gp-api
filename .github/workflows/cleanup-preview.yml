@@ -93,6 +93,8 @@ jobs:
           if pulumi stack select "$STACK_NAME"; then
             echo "Stack found. Destroying..."
             pulumi destroy --yes --skip-preview
+            # This log group is created by ECS automatically and needs to be deleted manually
+            aws logs delete-log-group --log-group-name "/aws/ecs/containerinsights/gp-pr-${STACK_NAME#gp-api-pr-}-fargateCluster/performance" || true
             pulumi stack rm --yes
             echo "Stack $STACK_NAME destroyed successfully"
           else
