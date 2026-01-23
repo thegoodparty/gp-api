@@ -26,10 +26,10 @@ export function shouldRecordBlockedState(
 ): boolean {
   const { statusCode, errorCode } = input
 
-  if (statusCode >= 500) return true
-  if (statusCode < 400 || statusCode >= 500) return false
-
-  if (typeof errorCode === 'string' && allowlistCodeSet.has(errorCode))
+  if (
+    statusCode >= 500 ||
+    (typeof errorCode === 'string' && allowlistCodeSet.has(errorCode))
+  )
     return true
 
   return false

@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   CallHandler,
+  ExecutionContext,
   InternalServerErrorException,
 } from '@nestjs/common'
+import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host'
 import { of, throwError } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CustomEventType } from '../newrelic/newrelic.events'
@@ -20,20 +22,17 @@ function makeContext(params: {
   userId?: number
   method?: string
   url?: string
-}) {
+}): ExecutionContext {
   const req = {
     user: params.userId ? { id: params.userId } : undefined,
     method: params.method ?? 'GET',
     url: params.url ?? '/v1/somewhere',
   }
 
-  return {
-    switchToHttp: () => ({
-      getRequest: () => req,
-    }),
-    getHandler: () => ({ name: 'handler' }),
-    getClass: () => ({ name: 'Controller' }),
-  } as unknown as Parameters<BlockedStateInterceptor['intercept']>[0]
+  class Controller {}
+  function handler() {}
+
+  return new ExecutionContextHost([req, {}, {}], Controller, handler)
 }
 
 describe('BlockedStateInterceptor', () => {
