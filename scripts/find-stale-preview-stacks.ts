@@ -14,6 +14,7 @@ const getPreviewPulumiStacks = () => {
   const output = execSync('pulumi stack ls --json', {
     encoding: 'utf-8',
     stdio: 'pipe',
+    cwd: `${__dirname}/../deploy`,
   })
   const stacks = JSON.parse(output) as PulumiStack[]
   return stacks
