@@ -54,8 +54,17 @@ export function typeToQuery(
   let l2ColumnName = campaign.pathToVictory?.data.electionType
   const l2ColumnValue = campaign.pathToVictory?.data.electionLocation
 
+  logger.debug(
+    `Building query: state=${state}, electionType=${l2ColumnName}, electionLocation=${l2ColumnValue}`,
+  )
+
+  // For statewide offices (electionType === 'State'), we skip the district filter.
+  // The voter tables are already state-specific (e.g., VoterCO), so querying that
+  // table already targets voters in that state and we don't need to filter by district
+  const isStatewideOffice = l2ColumnName === 'State'
+
   // TODO: if these two are not present, should we throw an error?
-  if (l2ColumnName && l2ColumnValue) {
+  if (l2ColumnName && l2ColumnValue && !isStatewideOffice) {
     // value is like "IN##CLARK##CLARK CNTY COMM DIST 1" we need just CLARK CNTY COMM DIST 1
     const cleanValue = extractLocation(l2ColumnValue, fixColumns)
     if (fixColumns) {
@@ -68,6 +77,8 @@ export function typeToQuery(
       OR "${l2ColumnName}" = '${cleanValue} (EST.)' 
       OR "${l2ColumnName}" = '${cleanValue.replace(/^0/, '')}') `
     }
+  } else if (isStatewideOffice) {
+    logger.debug('Statewide office - skipping district filter')
   }
 
   let columns: string
