@@ -254,12 +254,18 @@ export = async () => {
     dbSubnetGroupName: subnetGroup.name,
     vpcSecurityGroupIds: [rdsSecurityGroup.id],
     storageEncrypted: true,
-    deletionProtection: true,
-    finalSnapshotIdentifier: `gp-api-db-${stage}-final-snapshot`,
     serverlessv2ScalingConfiguration: {
       minCapacity: environment === 'prod' ? 1 : 0.5,
       maxCapacity: 64,
     },
+    // Disable these protections for preview environments -- these
+    // configs help them tear down more quickly.
+    deletionProtection: environment !== 'preview',
+    skipFinalSnapshot: environment === 'preview',
+    finalSnapshotIdentifier:
+      environment === 'preview'
+        ? undefined
+        : `gp-api-db-${stage}-final-snapshot`,
   })
 
   const rdsInstance = new aws.rds.ClusterInstance('rdsInstance', {

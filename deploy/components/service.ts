@@ -130,14 +130,10 @@ export function createService({
 
   const logGroupName = `/sst/cluster/gp-${stage}-fargateCluster/gp-api-${stage}/gp-api-${stage}`
 
-  const logGroup = new aws.cloudwatch.LogGroup(
-    'logGroup',
-    {
-      name: logGroupName,
-      retentionInDays: isProd ? 60 : 30,
-    },
-    { retainOnDelete: true },
-  )
+  const logGroup = new aws.cloudwatch.LogGroup('logGroup', {
+    name: logGroupName,
+    retentionInDays: isProd ? 60 : 30,
+  })
 
   const executionRole = new aws.iam.Role('executionRole', {
     name: `gp-${stage}-gpapi${stage}ExecutionRole-uswest2`,
