@@ -1,6 +1,19 @@
 #!/bin/sh
 set -e
 
+if [ -z "$DB_HOST" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
+  echo "One or more required DB environment variables are not set"
+  exit 1
+fi
+
+if [ -z "$VOTER_DB_HOST" ] || [ -z "$VOTER_DB_PASSWORD" ] || [ -z "$VOTER_DB_USER" ] || [ -z "$VOTER_DB_NAME" ]; then
+  echo "One or more required VOTER_DB environment variables are not set"
+  exit 1
+fi
+
+export DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME"
+export VOTER_DATASTORE="postgresql://$VOTER_DB_USER:$VOTER_DB_PASSWORD@$VOTER_DB_HOST:5432/$VOTER_DB_NAME"
+
 # Run migrations on startup if DATABASE_URL is set and not a placeholder
 if [ -n "$DATABASE_URL" ] && [ "$DATABASE_URL" != "postgresql://placeholder:placeholder@localhost:5432/placeholder" ]; then
   echo "Waiting for database to be ready..."
