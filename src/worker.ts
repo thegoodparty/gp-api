@@ -17,12 +17,14 @@ async function bootstrap() {
     },
   )
 
+  app.setGlobalPrefix('v1')
+
   const port = process.env.WORKER_PORT || 3001
   const host = process.env.HOST || '0.0.0.0'
 
   await app.listen(port, host)
   logger.log(`Inngest worker running on ${host}:${port}`)
-  logger.log(`Inngest endpoint: http://${host}:${port}/api/inngest`)
+  logger.log(`Inngest endpoint: http://${host}:${port}/v1/inngest`)
 }
 
 bootstrap()

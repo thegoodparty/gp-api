@@ -15,7 +15,7 @@ services:
   inngest:
     image: inngest/inngest:latest
     container_name: goodparty-inngest
-    command: inngest dev -u http://host.docker.internal:3000/api/inngest --no-discovery
+    command: inngest dev -u http://host.docker.internal:3000/v1/inngest --no-discovery
     ports:
       - "8288:8288"
     restart: unless-stopped

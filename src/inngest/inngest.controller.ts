@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Req, Res, Put } from '@nestjs/common'
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { serve } from 'inngest/fastify'
+import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { inngest } from './inngest.client'
 import { PollAnalysisHandlerService } from './services/pollAnalysisHandler.service'
 import { PollCreationHandlerService } from './services/pollCreationHandler.service'
@@ -9,7 +10,8 @@ type InngestFastifyRequest = FastifyRequest<{
   Querystring: Record<string, string | undefined>
 }>
 
-@Controller('api/inngest')
+@Controller('inngest')
+@PublicAccess()
 export class InngestController {
   private handler: ReturnType<typeof serve>
 
