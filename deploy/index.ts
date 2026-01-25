@@ -276,52 +276,48 @@ export = async () => {
   })
 
   if (environment === 'dev' || environment === 'prod') {
-    const voterDbBaseConfig = {
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineMode: aws.rds.EngineMode.Provisioned,
-      engineVersion: '16.8',
-      databaseName: voterCredentials.database,
-      masterUsername: voterCredentials.username,
-      masterPassword: pulumi.secret(voterCredentials.password),
-      dbSubnetGroupName: subnetGroup.name,
-      vpcSecurityGroupIds: [rdsSecurityGroup.id],
-      storageEncrypted: true,
-      deletionProtection: true,
-      finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
-      serverlessv2ScalingConfiguration: {
-        maxCapacity: 128,
-        minCapacity: 0.5,
+    const voterCluster = new aws.rds.Cluster(
+      'voterCluster',
+      {
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.8',
+        databaseName: voterCredentials.database,
+        masterUsername: voterCredentials.username,
+        masterPassword: pulumi.secret(voterCredentials.password),
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 128,
+          minCapacity: 0.5,
+        },
+        clusterIdentifier:
+          environment === 'prod'
+            ? 'gp-voter-db-20250728'
+            : `gp-voter-db-${stage}`,
+        finalSnapshotIdentifier:
+          environment === 'prod'
+            ? `gp-voter-db-${stage}-20250728-final-snapshot`
+            : `gp-voter-db-${stage}-final-snapshot`,
       },
-    }
+      { import: environment === 'prod' ? 'gp-voter-db-20250728' : undefined },
+    )
 
-    const voterCluster = new aws.rds.Cluster('voterCluster', {
-      ...voterDbBaseConfig,
-      clusterIdentifier:
-        environment === 'prod' ? 'gp-voter-db' : `gp-voter-db-${stage}`,
-      finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
-    })
-
-    new aws.rds.ClusterInstance('voterInstance', {
-      clusterIdentifier: voterCluster.id,
-      instanceClass: 'db.serverless',
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineVersion: voterCluster.engineVersion,
-    })
-
-    if (environment === 'prod') {
-      const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
-        ...voterDbBaseConfig,
-        clusterIdentifier: 'gp-voter-db-20250728',
-        finalSnapshotIdentifier: `gp-voter-db-${stage}-20250728-final-snapshot`,
-      })
-
-      new aws.rds.ClusterInstance('voterInstanceLatest', {
-        clusterIdentifier: voterClusterLatest.id,
+    new aws.rds.ClusterInstance(
+      'voterInstance',
+      {
+        clusterIdentifier: voterCluster.id,
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
-        engineVersion: voterClusterLatest.engineVersion,
-      })
-    }
+        engineVersion: voterCluster.engineVersion,
+      },
+      {
+        import:
+          environment === 'prod' ? 'tf-20250730174208900800000001' : undefined,
+      },
+    )
   }
 
   const productDomain = select({
