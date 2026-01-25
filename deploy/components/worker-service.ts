@@ -105,8 +105,8 @@ export function createWorkerService({
     ],
   })
 
-  const cpu = isProd ? '512' : '256'
-  const memory = isProd ? '1024' : '512'
+  const cpu = isProd ? '512' : '512'
+  const memory = isProd ? '2048' : '2048'
 
   const taskDefinition = new aws.ecs.TaskDefinition('workerTaskDefinition', {
     family: `gp-worker-${stage}`,
