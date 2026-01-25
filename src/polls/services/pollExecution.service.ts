@@ -36,13 +36,13 @@ export class PollExecutionService {
   private readonly logger = new Logger(PollExecutionService.name)
 
   constructor(
-    private readonly pollsService: PollsService,
-    private readonly campaignsService: CampaignsService,
-    private readonly electedOfficeService: ElectedOfficeService,
-    private readonly contactsService: ContactsService,
-    private readonly s3Service: S3Service,
-    private readonly slackService: SlackService,
-    private readonly usersService: UsersService,
+    readonly pollsService: PollsService,
+    readonly campaignsService: CampaignsService,
+    readonly electedOfficeService: ElectedOfficeService,
+    readonly contactsService: ContactsService,
+    readonly s3Service: S3Service,
+    readonly slackService: SlackService,
+    readonly usersService: UsersService,
   ) {}
 
   async triggerPollExecution(
@@ -174,7 +174,7 @@ export class PollExecutionService {
     })
   }
 
-  private async getPollAndCampaign(
+  async getPollAndCampaign(
     pollId: string,
   ): Promise<PollWithCampaign | undefined> {
     const poll = await this.pollsService.findUnique({
@@ -211,7 +211,7 @@ export class PollExecutionService {
     return { poll, office, campaign }
   }
 
-  private csvEscape(value: string | number | null | undefined): string {
+  csvEscape(value: string | number | null | undefined): string {
     if (value === null || value === undefined) return ''
     const str = String(value)
     const mustQuote = /[",\n]/.test(str)
@@ -219,7 +219,7 @@ export class PollExecutionService {
     return mustQuote ? `"${escaped}"` : escaped
   }
 
-  private buildCsvFromContacts(people: PersonOutput[]): string {
+  buildCsvFromContacts(people: PersonOutput[]): string {
     const headers: (keyof PersonOutput)[] = [
       'id',
       'firstName',
