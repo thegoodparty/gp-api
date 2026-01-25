@@ -73,9 +73,6 @@ export class InngestFunctionsService {
             this.logger.log(
               `${pollId} No existing CSV found, generating new one`,
             )
-            this.logger.log(
-              `${poll.id} Sampling contacts with params: ${JSON.stringify(sampleParams)}`,
-            )
             const sample =
               await this.pollExecutionService.contactsService.sampleContacts(
                 { size: poll.targetAudienceSize },
