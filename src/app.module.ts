@@ -37,6 +37,7 @@ import { ContactsModule } from './contacts/contacts.module'
 import { PollsModule } from './polls/polls.module'
 import { FeaturesModule } from './features/features.module'
 import { BraintrustModule } from './vendors/braintrust/braintrust.module'
+import { InngestModule } from './inngest/inngest.module'
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { BraintrustModule } from './vendors/braintrust/braintrust.module'
     ContactsModule,
     PollsModule,
     ElectedOfficeModule,
+    InngestModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.

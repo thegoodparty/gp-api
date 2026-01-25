@@ -40,7 +40,7 @@ export function createService({
   environmentVariables,
   permissions,
   dependsOn,
-}: ServiceConfig) {
+}: ServiceConfig): { url: pulumi.Output<string>; clusterArn: pulumi.Output<string> } {
   const isProd = environment === 'prod'
   const serviceName = `gp-api-${stage}`
 
@@ -310,5 +310,6 @@ export function createService({
 
   return {
     url: pulumi.interpolate`https://${domain}`,
+    clusterArn: cluster.arn,
   }
 }

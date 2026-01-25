@@ -1,7 +1,9 @@
 import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
+import * as random from '@pulumi/random'
 import { extractDbCredentials } from './utils'
 import { createService } from './components/service'
+import { createWorkerService } from './components/worker-service'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
 import { createVpc } from './components/vpc'
@@ -402,6 +404,82 @@ export = async () => {
         Action: ['route53domains:CheckDomainAvailability'],
         Resource: ['*'],
       },
+      {
+        Effect: 'Allow',
+        Action: ['s3:*', 's3-object-lambda:*'],
+        Resource: ['*'],
+      },
+      {
+        Effect: 'Allow',
+        Action: ['sqs:*'],
+        Resource: ['*'],
+      },
+      {
+        Effect: 'Allow',
+        Action: [
+          'ssmmessages:OpenDataChannel',
+          'ssmmessages:OpenControlChannel',
+          'ssmmessages:CreateDataChannel',
+          'ssmmessages:CreateControlChannel',
+        ],
+        Resource: ['*'],
+      },
+    ],
+  })
+
+  const inngestEventKey = new random.RandomPassword('inngestEventKey', {
+    length: 32,
+    special: false,
+  })
+
+  const inngestSigningKey = new random.RandomPassword('inngestSigningKey', {
+    length: 64,
+    special: false,
+  })
+
+  const inngestServerUrl = select({
+    preview: `https://${stage}.preview.goodparty.org`,
+    dev: 'https://gp-api-dev.goodparty.org',
+    qa: 'https://gp-api-qa.goodparty.org',
+    prod: 'https://gp-api.goodparty.org',
+  })
+
+  createWorkerService({
+    dependsOn: [rdsInstance],
+    environment,
+    stage,
+    imageUri,
+    vpcId,
+    securityGroupIds: vpcSecurityGroupIds,
+    publicSubnetIds: vpcSubnetIds.public,
+    clusterArn: service.clusterArn,
+    environmentVariables: {
+      WORKER_PORT: '3001',
+      HOST: '0.0.0.0',
+      LOG_LEVEL: 'debug',
+      AWS_REGION: 'us-west-2',
+      INNGEST_DEV: '0',
+      INNGEST_EVENT_KEY: inngestEventKey.result,
+      INNGEST_SIGNING_KEY: inngestSigningKey.result,
+      INNGEST_BASE_URL: inngestServerUrl,
+      SQS_QUEUE: queue.name,
+      SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
+      TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
+      ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
+      ...Object.fromEntries(
+        Object.entries(secret).map(([key, value]) => [
+          key,
+          pulumi.secret(value),
+        ]),
+      ),
+      ...(environment === 'preview'
+        ? {
+            IS_PREVIEW: 'true',
+            DATABASE_URL: pulumi.interpolate`postgresql://${dbUser}:${dbPassword}@${rdsCluster.endpoint}:5432/${dbName}`,
+          }
+        : {}),
+    },
+    permissions: [
       {
         Effect: 'Allow',
         Action: ['s3:*', 's3-object-lambda:*'],
