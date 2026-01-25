@@ -11,6 +11,17 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+
+  inngest:
+    image: inngest/inngest:latest
+    container_name: goodparty-inngest
+    command: inngest dev -u http://host.docker.internal:3000/v1/inngest --no-discovery
+    ports:
+      - "8288:8288"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local

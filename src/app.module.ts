@@ -16,6 +16,7 @@ import { OrganizationsModule } from '@/organizations/organizations.module'
 import { ErrorLoggerModule } from '@/errorLogger/errorLogger.module'
 import { FeaturesModule } from '@/features/features.module'
 import { HealthModule } from '@/health/health.module'
+import { InngestModule } from '@/inngest/inngest.module'
 import { BlockedStateInterceptor } from '@/observability/blockedState/blockedState.interceptor'
 import { OutreachModule } from '@/outreach/outreach.module'
 import { PaymentsModule } from '@/payments/payments.module'
@@ -77,6 +78,7 @@ import { loggerModule } from './observability/logging/logger-module'
     MeetingsModule,
     ElectedOfficeModule,
     OrganizationsModule,
+    InngestModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.
