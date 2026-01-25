@@ -37,11 +37,13 @@ import { ContactsModule } from './contacts/contacts.module'
 import { PollsModule } from './polls/polls.module'
 import { FeaturesModule } from './features/features.module'
 import { BraintrustModule } from './vendors/braintrust/braintrust.module'
+import { InngestClientModule } from './inngest/inngestClient.module'
 import { InngestModule } from './inngest/inngest.module'
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    InngestClientModule,
     BraintrustModule,
     AnalyticsModule,
     UsersModule,

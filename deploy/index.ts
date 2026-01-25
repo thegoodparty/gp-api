@@ -427,23 +427,6 @@ export = async () => {
     ],
   })
 
-  const inngestEventKey = new random.RandomPassword('inngestEventKey', {
-    length: 32,
-    special: false,
-  })
-
-  const inngestSigningKey = new random.RandomPassword('inngestSigningKey', {
-    length: 64,
-    special: false,
-  })
-
-  const inngestServerUrl = select({
-    preview: `https://${stage}.preview.goodparty.org`,
-    dev: 'https://gp-api-dev.goodparty.org',
-    qa: 'https://gp-api-qa.goodparty.org',
-    prod: 'https://gp-api.goodparty.org',
-  })
-
   createWorkerService({
     dependsOn: [rdsInstance],
     environment,
@@ -459,9 +442,6 @@ export = async () => {
       LOG_LEVEL: 'debug',
       AWS_REGION: 'us-west-2',
       INNGEST_DEV: '0',
-      INNGEST_EVENT_KEY: inngestEventKey.result,
-      INNGEST_SIGNING_KEY: inngestSigningKey.result,
-      INNGEST_BASE_URL: inngestServerUrl,
       SQS_QUEUE: queue.name,
       SQS_QUEUE_BASE_URL: 'https://sqs.us-west-2.amazonaws.com/333022194791',
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,

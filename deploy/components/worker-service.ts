@@ -129,6 +129,18 @@ export function createWorkerService({
           memory: parseInt(memory),
           essential: true,
           command: ['node', '-r', './newrelic.js', 'dist/src/worker'],
+          secrets: [
+            {
+              name: 'INNGEST_EVENT_KEY',
+              valueFrom:
+                'arn:aws:ssm:us-west-2:333022194791:parameter/swain-inngest-poc-event-key',
+            },
+            {
+              name: 'INNGEST_SIGNING_KEY',
+              valueFrom:
+                'arn:aws:ssm:us-west-2:333022194791:parameter/swain-inngest-poc-signing-key',
+            },
+          ],
           environment: Object.entries(env).map(([name, value]) => ({
             name,
             value,

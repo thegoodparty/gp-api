@@ -6,7 +6,6 @@ import { ElectedOfficeModule } from 'src/electedOffice/electedOffice.module'
 import { PollsModule } from 'src/polls/polls.module'
 import { AwsModule } from 'src/vendors/aws/aws.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
-import { InngestService } from './services/inngest.service'
 import { PollAnalysisHandlerService } from './services/pollAnalysisHandler.service'
 import { PollCreationHandlerService } from './services/pollCreationHandler.service'
 import { InngestController } from './inngest.controller'
@@ -22,15 +21,7 @@ import { InngestController } from './inngest.controller'
     SlackModule,
   ],
   controllers: [InngestController],
-  providers: [
-    InngestService,
-    PollAnalysisHandlerService,
-    PollCreationHandlerService,
-  ],
-  exports: [
-    InngestService,
-    PollAnalysisHandlerService,
-    PollCreationHandlerService,
-  ],
+  providers: [PollAnalysisHandlerService, PollCreationHandlerService],
+  exports: [PollAnalysisHandlerService, PollCreationHandlerService],
 })
 export class InngestModule {}
