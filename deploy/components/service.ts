@@ -15,6 +15,7 @@ export interface ServiceConfig {
   domain: string
   certificateArn: string
 
+  secrets: pulumi.Input<Record<string, pulumi.Input<string>>>
   environmentVariables: pulumi.Input<Record<string, pulumi.Input<string>>>
 
   permissions: pulumi.Input<
@@ -37,6 +38,7 @@ export function createService({
   hostedZoneId,
   domain,
   certificateArn,
+  secrets,
   environmentVariables,
   permissions,
   dependsOn,
@@ -215,13 +217,17 @@ export function createService({
       operatingSystemFamily: 'LINUX',
     },
     containerDefinitions: pulumi.jsonStringify(
-      pulumi.output(environmentVariables).apply((env) => [
+      pulumi.all([environmentVariables, secrets]).apply(([env, sec]) => [
         {
           name: serviceName,
           image: imageUri,
           cpu: parseInt(cpu),
           memory: parseInt(memory),
           essential: true,
+          secrets: Object.entries(sec).map(([name, valueFrom]) => ({
+            name,
+            valueFrom,
+          })),
           portMappings: [
             {
               containerPort: 80,
