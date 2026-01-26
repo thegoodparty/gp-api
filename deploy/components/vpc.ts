@@ -42,7 +42,7 @@ const createSubnet = (params: {
     routeTableId: routeTable.id,
   })
 
-  return { id: subnet.id }
+  return { id: subnet.id, routeTableId: routeTable.id }
 }
 
 export const createVpc = () => {
@@ -113,7 +113,7 @@ export const createVpc = () => {
       },
     )
 
-    createSubnet({
+    const privateSubnet = createSubnet({
       name: `apiPrivateSubnet${idx + 1}`,
       availabilityZone: azName,
       cidrBlock: `10.0.${idx * 8 + 4}.0/22`,
@@ -122,6 +122,11 @@ export const createVpc = () => {
       gateway: {
         natGatewayId: natGateway.id,
       },
+    })
+    new aws.ec2.Route(`databricksPrivatePeeringRoute${idx + 1}`, {
+      routeTableId: privateSubnet.routeTableId,
+      destinationCidrBlock: '172.16.0.0/16',
+      vpcPeeringConnectionId: 'pcx-013299c506ffd3395',
     })
   }
 }
