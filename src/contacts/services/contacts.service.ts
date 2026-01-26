@@ -179,7 +179,8 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
   ): Promise<PersonOutput> {
     try {
-      const { state } = this.resolveLocationForRequest(campaign)
+      const { state, districtType, districtName, usingStatewideFallback } =
+        this.resolveLocationForRequest(campaign)
 
       const response = await lastValueFrom(
         this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
@@ -195,6 +196,21 @@ export class ContactsService {
       const person = response.data as PersonOutput &
         Record<string, string | number | boolean | null | undefined>
 
+      const personState = String(person.state || '').toUpperCase()
+      const stateMatches = personState === state.toUpperCase()
+
+      if (usingStatewideFallback) {
+        if (!stateMatches) throw new NotFoundException('Person not found')
+        return person
+      }
+
+      if (!districtType || !districtName) {
+        throw new BadRequestException(
+          'Campaign path to victory data is missing required election information',
+        )
+      }
+
+      if (!stateMatches) throw new NotFoundException('Person not found')
       return person
     } catch (error) {
       if (error instanceof HttpException) {

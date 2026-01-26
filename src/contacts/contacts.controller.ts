@@ -4,6 +4,7 @@ import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { GetPersonParamsDTO } from './schemas/getPerson.schema'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
@@ -55,9 +56,9 @@ export class ContactsController {
 
   @Get(':id')
   getContact(
-    @Param('id') id: string,
+    @Param() params: GetPersonParamsDTO,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
-    return this.contactsService.findPerson(id, campaign)
+    return this.contactsService.findPerson(params.id, campaign)
   }
 }
