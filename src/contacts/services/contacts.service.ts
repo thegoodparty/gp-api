@@ -177,29 +177,24 @@ export class ContactsService {
   async findPerson(
     id: string,
     campaign: CampaignWithPathToVictory,
-    usState: string,
   ): Promise<PersonOutput> {
     try {
+      const { state, districtType, districtName, usingStatewideFallback } =
+        this.resolveLocationForRequest(campaign)
+
       const response = await lastValueFrom(
         this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
           headers: {
             Authorization: `Bearer ${this.getValidS2SToken()}`,
           },
           params: {
-            state: usState,
+            state,
           },
         }),
       )
+
       const person = response.data as PersonOutput &
         Record<string, string | number | boolean | null | undefined>
-
-      const {
-        state,
-        districtType,
-        districtName,
-        alternativeDistrictName,
-        usingStatewideFallback,
-      } = this.resolveLocationForRequest(campaign)
 
       const personState = String(person.state || '').toUpperCase()
       const stateMatches = personState === state.toUpperCase()
@@ -215,20 +210,7 @@ export class ContactsService {
         )
       }
 
-      const rawDistrictValue = person[districtType]
-      const districtValue =
-        typeof rawDistrictValue === 'string' ? rawDistrictValue : ''
-      const cleanedPersonDistrict =
-        this.elections.cleanDistrictName(districtValue)
-      const personMatches =
-        cleanedPersonDistrict === districtName ||
-        cleanedPersonDistrict === `${districtName} (EST.)` ||
-        (alternativeDistrictName
-          ? cleanedPersonDistrict === alternativeDistrictName
-          : false)
-
-      if (!stateMatches || !personMatches)
-        throw new NotFoundException('Person not found')
+      if (!stateMatches) throw new NotFoundException('Person not found')
       return person
     } catch (error) {
       if (error instanceof HttpException) {
