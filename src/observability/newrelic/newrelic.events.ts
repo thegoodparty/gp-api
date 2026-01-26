@@ -1,4 +1,4 @@
-import { BlockedStateRootCause } from '../blockedState/blockedState.types'
+import { BlockedStateRootCause } from '@/observability/blockedState/blockedState.types'
 
 export enum CustomEventType {
   BlockedState = 'BlockedState',

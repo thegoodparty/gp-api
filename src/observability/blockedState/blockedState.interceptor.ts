@@ -11,8 +11,8 @@ import { Observable, catchError, throwError } from 'rxjs'
 import {
   addCustomAttributes,
   recordCustomEvent,
-} from '../newrelic/newrelic.client'
-import { CustomEventType } from '../newrelic/newrelic.events'
+} from '@/observability/newrelic/newrelic.client'
+import { CustomEventType } from '@/observability/newrelic/newrelic.events'
 import { deriveRootCause, shouldRecordBlockedState } from './blockedState.rules'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
