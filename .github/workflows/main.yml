@@ -39,7 +39,7 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
       - run: npx prettier --check "src/**/*.{ts,js,json}"
-      - run: npm run test
+      - run: npm run test -- --coverage
 
       # Determine deployment context
       - name: Determine deployment context
