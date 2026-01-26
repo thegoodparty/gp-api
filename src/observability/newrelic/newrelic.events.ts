@@ -25,7 +25,7 @@ export type BlockedStateEventAttributes = {
 
   // Classification
   rootCause: BlockedStateRootCause
-  isBackground: boolean
+  isBackground: boolean // For blocked states that happen outside the context of an HTTP request, like in queues
 
   // Optional domain context
   campaignId?: number

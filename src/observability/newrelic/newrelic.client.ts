@@ -74,7 +74,13 @@ export function addCustomAttribute(key: string, value: unknown) {
   }
 }
 
-export function addCustomAttributes(attributes: Record<string, unknown>) {
+type NewRelicCustomAttributes = Record<string, unknown> & {
+  userId?: number
+  endpoint?: string
+  method?: string
+}
+
+export function addCustomAttributes(attributes: NewRelicCustomAttributes) {
   const api = getApi()
   if (!api) return
   try {
