@@ -8,6 +8,10 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from './schemas/listContacts.schema'
+import {
+  GetPersonParamsDTO,
+  GetPersonQueryDTO,
+} from './schemas/getPerson.schema'
 import { SearchContactsDTO } from './schemas/searchContacts.schema'
 import { ContactsService } from './services/contacts.service'
 
@@ -55,9 +59,10 @@ export class ContactsController {
 
   @Get(':id')
   getContact(
-    @Param('id') id: string,
+    @Param() params: GetPersonParamsDTO,
+    @Query() query: GetPersonQueryDTO,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
-    return this.contactsService.findPerson(id, campaign)
+    return this.contactsService.findPerson(params.id, campaign, query.state)
   }
 }

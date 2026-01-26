@@ -177,12 +177,16 @@ export class ContactsService {
   async findPerson(
     id: string,
     campaign: CampaignWithPathToVictory,
+    usState: string,
   ): Promise<PersonOutput> {
     try {
       const response = await lastValueFrom(
         this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
           headers: {
             Authorization: `Bearer ${this.getValidS2SToken()}`,
+          },
+          params: {
+            state: usState,
           },
         }),
       )
