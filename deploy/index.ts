@@ -1,6 +1,5 @@
 import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
-import { extractDbCredentials } from './utils'
 import { createService } from './components/service'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
@@ -44,17 +43,24 @@ export = async () => {
     createVpc()
   }
 
-  const { secretString: secretJson } =
-    await aws.secretsmanager.getSecretVersion({
-      secretId: select({
-        preview: 'GP_API_DEV',
-        dev: 'GP_API_DEV',
-        qa: 'GP_API_QA',
-        prod: 'GP_API_PROD',
-      }),
-    })
+  const secretName = select({
+    preview: 'GP_API_DEV',
+    dev: 'GP_API_DEV',
+    qa: 'GP_API_QA',
+    prod: 'GP_API_PROD',
+  })
 
-  const secret: Record<string, string> = JSON.parse(secretJson)
+  const secretVersion = await aws.secretsmanager.getSecretVersion({
+    secretId: secretName,
+  })
+
+  const secretInfo = await aws.secretsmanager.getSecret({
+    name: secretName,
+  })
+
+  const secret: Record<string, string> = JSON.parse(
+    secretVersion.secretString || '{}',
+  ) as Record<string, string>
   // DO NOT REMOVE THESE. These are here so that we don't use the AWS credentials
   // that were (at some point) hardcoded in the secret. Instead, we want to make sure
   // our instances use their NATIVE IAM roles, so that we can easily manage their
@@ -66,22 +72,34 @@ export = async () => {
   delete secret.AWS_SECRET_ACCESS_KEY
   delete secret.AWS_S3_KEY
   delete secret.AWS_S3_SECRET
+  // DO NOT REMOVE THESE. These are here so that the secret values don't take precedence
+  // over the environment variables set below.
+  // Once this change has deployed to prod, we can remove these entries from the secret entirely.
+  delete secret.LOG_LEVEL
+  delete secret.CORS_ORIGIN
+  delete secret.AWS_REGION
+  delete secret.ASSET_DOMAIN
+  delete secret.WEBAPP_ROOT_URL
+  delete secret.AI_MODELS
+  delete secret.LLAMA_AI_ASSISTANT
+  delete secret.SQS_QUEUE
+  delete secret.SQS_QUEUE_BASE_URL
+  delete secret.SERVE_ANALYSIS_BUCKET_NAME
+  delete secret.TEVYN_POLL_CSVS_BUCKET
+  delete secret.ZIP_TO_AREA_CODE_BUCKET
+  // DO NOT REMOVE THESE. These are here so that the secret values don't take precedence
+  // over the connection strings constructed at runtime in docker-entrypoint.sh.
+  // In AWS ECS, secrets take precedence over environment variables.
+  delete secret.DATABASE_URL
+  delete secret.VOTER_DATASTORE
 
-  if (!secret.DATABASE_URL) {
-    throw new Error('DATABASE_URL must be set in the secret.')
+  if (!secret.DB_PASSWORD) {
+    throw new Error('DB_PASSWORD must be set in the secret.')
   }
 
-  if (!secret.VOTER_DATASTORE) {
-    throw new Error('VOTER_DATASTORE must be set in the secret.')
+  if (!secret.VOTER_DB_PASSWORD) {
+    throw new Error('VOTER_DB_PASSWORD must be set in the secret.')
   }
-
-  const {
-    username: dbUser,
-    password: dbPassword,
-    database: dbName,
-  } = extractDbCredentials(secret.DATABASE_URL)
-
-  const voterCredentials = extractDbCredentials(secret.VOTER_DATASTORE)
 
   const dlq = new aws.sqs.Queue('main-dlq', {
     name: `${stage}-DLQ.fifo`,
@@ -248,9 +266,9 @@ export = async () => {
     engine: aws.rds.EngineType.AuroraPostgresql,
     engineMode: aws.rds.EngineMode.Provisioned,
     engineVersion: '16.8',
-    databaseName: dbName,
-    masterUsername: dbUser,
-    masterPassword: pulumi.secret(dbPassword),
+    databaseName: 'gpdb',
+    masterUsername: 'gpuser',
+    masterPassword: pulumi.secret(secret.DB_PASSWORD),
     dbSubnetGroupName: subnetGroup.name,
     vpcSecurityGroupIds: [rdsSecurityGroup.id],
     storageEncrypted: true,
@@ -275,53 +293,68 @@ export = async () => {
     engineVersion: rdsCluster.engineVersion,
   })
 
-  if (environment === 'dev' || environment === 'prod') {
-    const voterDbBaseConfig = {
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineMode: aws.rds.EngineMode.Provisioned,
-      engineVersion: '16.8',
-      databaseName: voterCredentials.database,
-      masterUsername: voterCredentials.username,
-      masterPassword: pulumi.secret(voterCredentials.password),
-      dbSubnetGroupName: subnetGroup.name,
-      vpcSecurityGroupIds: [rdsSecurityGroup.id],
-      storageEncrypted: true,
-      deletionProtection: true,
-      finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
-      serverlessv2ScalingConfiguration: {
-        maxCapacity: 128,
-        minCapacity: 0.5,
-      },
-    }
+  let voterCluster: aws.rds.Cluster | aws.rds.GetClusterResult
 
-    const voterCluster = new aws.rds.Cluster('voterCluster', {
-      ...voterDbBaseConfig,
-      clusterIdentifier:
-        environment === 'prod' ? 'gp-voter-db' : `gp-voter-db-${stage}`,
-      finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
-    })
+  switch (environment) {
+    case 'dev':
+    case 'prod':
+      const voterDbBaseConfig = {
+        engine: aws.rds.EngineType.AuroraPostgresql,
+        engineMode: aws.rds.EngineMode.Provisioned,
+        engineVersion: '16.8',
+        databaseName: 'voters',
+        masterUsername: 'postgres',
+        masterPassword: pulumi.secret(secret.VOTER_DB_PASSWORD),
+        dbSubnetGroupName: subnetGroup.name,
+        vpcSecurityGroupIds: [rdsSecurityGroup.id],
+        storageEncrypted: true,
+        deletionProtection: true,
+        finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
+        serverlessv2ScalingConfiguration: {
+          maxCapacity: 128,
+          minCapacity: 0.5,
+        },
+      }
 
-    new aws.rds.ClusterInstance('voterInstance', {
-      clusterIdentifier: voterCluster.id,
-      instanceClass: 'db.serverless',
-      engine: aws.rds.EngineType.AuroraPostgresql,
-      engineVersion: voterCluster.engineVersion,
-    })
-
-    if (environment === 'prod') {
-      const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
+      voterCluster = new aws.rds.Cluster('voterCluster', {
         ...voterDbBaseConfig,
-        clusterIdentifier: 'gp-voter-db-20250728',
-        finalSnapshotIdentifier: `gp-voter-db-${stage}-20250728-final-snapshot`,
+        clusterIdentifier:
+          environment === 'prod' ? 'gp-voter-db' : `gp-voter-db-${stage}`,
+        finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
       })
 
-      new aws.rds.ClusterInstance('voterInstanceLatest', {
-        clusterIdentifier: voterClusterLatest.id,
+      new aws.rds.ClusterInstance('voterInstance', {
+        clusterIdentifier: voterCluster.id,
         instanceClass: 'db.serverless',
         engine: aws.rds.EngineType.AuroraPostgresql,
-        engineVersion: voterClusterLatest.engineVersion,
+        engineVersion: voterCluster.engineVersion,
       })
-    }
+
+      if (environment === 'prod') {
+        const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
+          ...voterDbBaseConfig,
+          clusterIdentifier: 'gp-voter-db-20250728',
+          finalSnapshotIdentifier: `gp-voter-db-${stage}-20250728-final-snapshot`,
+        })
+
+        new aws.rds.ClusterInstance('voterInstanceLatest', {
+          clusterIdentifier: voterClusterLatest.id,
+          instanceClass: 'db.serverless',
+          engine: aws.rds.EngineType.AuroraPostgresql,
+          engineVersion: voterClusterLatest.engineVersion,
+        })
+      }
+      break
+    case 'preview':
+      voterCluster = await aws.rds.getCluster({
+        clusterIdentifier: 'gp-voter-db-develop',
+      })
+      break
+    case 'qa':
+      voterCluster = await aws.rds.getCluster({
+        clusterIdentifier: 'gp-voter-db-20250728',
+      })
+      break
   }
 
   const productDomain = select({
@@ -353,6 +386,12 @@ export = async () => {
       qa: 'arn:aws:acm:us-west-2:333022194791:certificate/29de1de7-6ab0-4f62-baf1-235c2a92cfe2',
       prod: 'arn:aws:acm:us-west-2:333022194791:certificate/e1969507-2514-4585-a225-917883d8ffef',
     }),
+    secrets: Object.fromEntries(
+      Object.keys(secret).map((key) => [
+        key,
+        pulumi.interpolate`${secretInfo.arn}:${key}::`,
+      ]),
+    ),
     environmentVariables: {
       PORT: '80',
       HOST: '0.0.0.0',
@@ -374,16 +413,15 @@ export = async () => {
       SERVE_ANALYSIS_BUCKET_NAME: `serve-analyze-data-${environment}`,
       TEVYN_POLL_CSVS_BUCKET: tevynPollCsvsBucket.bucket,
       ZIP_TO_AREA_CODE_BUCKET: zipToAreaCodeBucket.bucket,
-      ...Object.fromEntries(
-        Object.entries(secret).map(([key, value]) => [
-          key,
-          pulumi.secret(value),
-        ]),
-      ),
+      DB_HOST: rdsCluster.endpoint,
+      DB_USER: rdsCluster.masterUsername,
+      DB_NAME: rdsCluster.databaseName,
+      VOTER_DB_HOST: voterCluster.endpoint,
+      VOTER_DB_USER: voterCluster.masterUsername,
+      VOTER_DB_NAME: voterCluster.databaseName,
       ...(environment === 'preview'
         ? {
             IS_PREVIEW: 'true',
-            DATABASE_URL: pulumi.interpolate`postgresql://${dbUser}:${dbPassword}@${rdsCluster.endpoint}:5432/${dbName}`,
             ADMIN_EMAIL: process.env.ADMIN_EMAIL,
             ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
             CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
