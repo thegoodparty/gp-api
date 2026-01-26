@@ -49,10 +49,7 @@ export function recordCustomEvent<T extends CustomEventType>(
   const api = getApi()
   if (!api) return
   try {
-    api.recordCustomEvent(
-      eventType,
-      toNewRelicAttributes(attributes as Record<string, unknown>),
-    )
+    api.recordCustomEvent(eventType, toNewRelicAttributes(attributes))
   } catch (error) {
     logger.error(JSON.stringify(error))
   }

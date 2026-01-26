@@ -17,9 +17,7 @@ export const BLOCKED_STATE_ALLOWLIST_ERROR_CODES = Object.freeze([
   'BILLING_DOMAIN_PAYMENT_ID_MISSING',
 ] satisfies readonly BlockedStateErrorCode[])
 
-const allowlistCodeSet = new Set<string>(
-  BLOCKED_STATE_ALLOWLIST_ERROR_CODES as readonly string[],
-)
+const allowlistCodeSet = new Set<string>(BLOCKED_STATE_ALLOWLIST_ERROR_CODES)
 
 export function shouldRecordBlockedState(
   input: BlockedStateDecisionInput,
