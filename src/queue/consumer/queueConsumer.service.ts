@@ -1,3 +1,4 @@
+import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
 import { Message } from '@aws-sdk/client-sqs'
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import {
@@ -10,7 +11,10 @@ import {
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
+import { format, isBefore } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import parseCsv from 'neat-csv'
+import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { AiContentService } from 'src/campaigns/ai/content/aiContent.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -19,6 +23,8 @@ import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
+import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
+import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
@@ -48,10 +54,6 @@ import {
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import { format, isBefore } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
-import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
-import { serializeError } from 'serialize-error'
 
 @Injectable()
 export class QueueConsumerService {
@@ -546,6 +548,18 @@ export class QueueConsumerService {
             p2vStatus: P2VStatus.failed,
           },
         },
+      })
+
+      recordCustomEvent(CustomEventType.BlockedState, {
+        service: 'gp-api',
+        environment: process.env.NODE_ENV,
+        userId: campaign.userId,
+        campaignId: campaign.id,
+        slug: campaign.slug,
+        feature: 'path_to_victory',
+        rootCause: 'p2v_failed',
+        isBackground: true,
+        p2vAttempts,
       })
     } else {
       // otherwise, increment the p2vAttempts

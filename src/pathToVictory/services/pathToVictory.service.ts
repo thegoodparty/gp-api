@@ -3,6 +3,8 @@ import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignCreatedBy, ElectionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
+import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -356,6 +358,19 @@ export class PathToVictoryService extends createPrismaBase(
         channel: SlackChannel.botPathToVictoryIssues,
       })
       statusOverride = P2VStatus.failed
+
+      recordCustomEvent(CustomEventType.BlockedState, {
+        service: 'gp-api',
+        environment: process.env.NODE_ENV,
+        userId: campaign.userId,
+        campaignId: campaign.id,
+        slug: campaign.slug,
+        feature: 'path_to_victory',
+        rootCause: 'p2v_failed',
+        isBackground: true,
+        reason: 'no_projected_turnout',
+      })
+
       await this.crmService.handleUpdateCampaign(
         campaign,
         'path_to_victory_status',

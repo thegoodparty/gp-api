@@ -1,13 +1,13 @@
-import { Campaign, CampaignTier } from '@prisma/client'
 import { faker } from '@faker-js/faker'
-import { STATE_CODES } from '../../src/shared/constants/states'
-import { LEVELS } from '../../src/shared/constants/governmentLevels'
-import { generateFactory } from './generate'
+import { Campaign, CampaignTier } from '@prisma/client'
 import { GenerationStatus } from '../../src/campaigns/ai/content/aiContent.types'
 import {
   CampaignLaunchStatus,
   OnboardingStep,
 } from '../../src/campaigns/campaigns.types'
+import { LEVELS } from '../../src/shared/constants/governmentLevels'
+import { STATE_CODES } from '../../src/shared/constants/states'
+import { generateFactory } from './generate'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.between({
@@ -69,6 +69,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     completedTaskIds: [],
     canDownloadFederal: faker.datatype.boolean(0.3),
     hasFreeTextsOffer: faker.datatype.boolean(0.2),
+    freeTextsOfferRedeemedAt: null,
   }
 
   // NOTE: putting this in the object literal above gives a TS error on the generationStatus key

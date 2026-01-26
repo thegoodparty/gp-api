@@ -3,14 +3,19 @@ name: Cleanup Preview
 permissions:
   contents: read
   id-token: write
+  pull-requests: read
 
 on:
-  pull_request:
-    types: [closed]
+  workflow_dispatch:
+  schedule:
+    # Run every 3 hours
+    - cron: "0 */3 * * *"
 
 jobs:
-  destroy:
+  discover-stale-stacks:
     runs-on: ubuntu-latest
+    outputs:
+      stacks: ${{ steps.find-stale.outputs.stacks }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,35 +28,73 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
+          cache: npm
 
       - name: Install Pulumi CLI
-        uses: pulumi/actions@v4
+        uses: pulumi/actions@v6
         with:
-          pulumi-version: 'latest'
-          command: ''
+          pulumi-version: "^3"
 
-      - name: Install Pulumi SDK Dependencies
-        working-directory: ./deploy/pulumi
-        run: npm ci
+      - run: npm ci
+
+      - name: Find stale PR stacks
+        id: find-stale
+        working-directory: deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          pulumi login s3://goodparty-iac-state
+          npx tsx ../scripts/find-stale-preview-stacks.ts /tmp/stale-stacks.json
+          echo "stacks=$(cat /tmp/stale-stacks.json)" >> $GITHUB_OUTPUT
+
+  destroy:
+    needs: discover-stale-stacks
+    if: needs.discover-stale-stacks.outputs.stacks != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        stack: ${{ fromJson(needs.discover-stale-stacks.outputs.stacks) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: "^3"
+
+      - run: npm ci
 
       - name: Destroy Stack
-        working-directory: ./deploy/pulumi
+        working-directory: ./deploy
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
         run: |
           # Login to S3 Backend
           pulumi login s3://goodparty-iac-state
 
-          # Should match the naming convention in reusable-deploy.yml
-          STACK_NAME="gp-api-pr-${{ github.event.number }}"
+          STACK_NAME="${{ matrix.stack }}"
           echo "Destroying stack: $STACK_NAME"
 
-          # Check if stack exists
-          if pulumi stack select $STACK_NAME; then
+          if pulumi stack select "$STACK_NAME"; then
             echo "Stack found. Destroying..."
             pulumi destroy --yes --skip-preview
             pulumi stack rm --yes
+            echo "Stack $STACK_NAME destroyed successfully"
           else
-            echo "Stack not found. Skipping."
+            echo "Stack $STACK_NAME not found. Skipping."
           fi
