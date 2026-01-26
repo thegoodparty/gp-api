@@ -1,110 +1,126 @@
-name: Deploy and Test
+name: CI
 
 on:
+  pull_request:
   push:
-    branches: ["develop", "qa", "master"]
+    branches: [develop, qa, master]
 
 permissions:
   id-token: write
   contents: read
   pull-requests: write
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    outputs:
-      target_env: ${{ steps.set-env.outputs.target_env }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+env:
+  AWS_REGION: us-west-2
+  IMAGE_URI: 333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api:${{ github.sha }}
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+jobs:
+  main:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
+      cancel-in-progress: false
+    outputs:
+      environment: ${{ steps.context.outputs.environment }}
+      service_url: ${{ steps.pulumi.outputs.service_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
+
+      # Validation
       - run: npm run generate
       - run: npx tsc --noEmit
+      - run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
+      - run: npx prettier --check "src/**/*.{ts,js,json}"
+      - run: npm run test
 
-      - name: Map branch to environment
-        id: set-env
-        shell: bash
+      # Determine deployment context
+      - name: Determine deployment context
+        id: context
         run: |
-          BRANCH="${GITHUB_REF_NAME}"
-          case "$BRANCH" in
-            develop)
-              echo "target_env=dev" >> "$GITHUB_OUTPUT"
-              ;;
-            qa)
-              echo "target_env=qa" >> "$GITHUB_OUTPUT"
-              ;;
-            master)
-              echo "target_env=prod" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "Unsupported branch: $BRANCH"; exit 1
-              ;;
-          esac
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "environment=preview" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.ref_name }}" in
+              develop) echo "environment=dev" >> "$GITHUB_OUTPUT" ;;
+              qa) echo "environment=qa" >> "$GITHUB_OUTPUT" ;;
+              master) echo "environment=prod" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
 
+      # Docker build and push
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: arn:aws:iam::333022194791:role/github-actions-pulumi-deploy
-          aws-region: us-west-2
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        id: docker
+        run: |
+          docker build \
+            --build-arg CACHEBUST=${{ github.sha }} \
+            -t "${IMAGE_URI}" \
+            -f deploy/Dockerfile \
+            .
+          docker push "${IMAGE_URI}"
+
+      # Pulumi deployment
       - name: Install Pulumi
         uses: pulumi/actions@v6
         with:
           pulumi-version: "^3"
 
       - name: Run Pulumi Deploy
-        working-directory: deploy/pulumi
+        id: pulumi
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+          GITHUB_PR_NUMBER: ${{ github.event.number }}
         run: |
-          npm ci
-          sh ./deploy.sh ${{ steps.set-env.outputs.target_env }}
-        # ignore failures for now, until this is proven to run successfully
-        continue-on-error: true
+          npm run infra deploy ${{ steps.context.outputs.environment }}
+          cd deploy && SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
+          echo "service_url=${SERVICE_URL}" >> "$GITHUB_OUTPUT"
 
-      - name: Run CodeBuild
-        uses: aws-actions/aws-codebuild-run-build@v1
+      # PR comment for preview environments
+      - name: Find existing PR comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/find-comment@v3
+        id: find-comment
         with:
-          project-name: gp-deploy-build-${{ github.ref_name }}
+          issue-number: ${{ github.event.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "Preview Environment"
 
-      - name: Wait for ECS deployment
-        shell: bash
-        run: |
-          case "${{ github.ref_name }}" in
-            develop)
-              CLUSTER="gp-develop-fargateCluster"
-              SERVICE="gp-api-develop"
-              ;;
-            qa)
-              CLUSTER="gp-qa-fargateCluster"
-              SERVICE="gp-api-qa"
-              ;;
-            master)
-              CLUSTER="gp-master-fargateCluster"
-              SERVICE="gp-api-master"
-              ;;
-            *)
-              echo "Unsupported branch"; exit 1
-              ;;
-          esac
+      - name: Post PR comment
+        if: github.event_name == 'pull_request' && steps.find-comment.outputs.comment-id == '' && steps.pulumi.outputs.service_url != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ## Preview Environment
 
-          echo "Waiting for ECS service deployment to complete..."
-          aws ecs wait services-stable \
-            --cluster "$CLUSTER" \
-            --services "$SERVICE" \
-            --region us-west-2
+            Your preview environment is ready!
 
-          echo "✅ ECS deployment complete"
+            | Resource | URL |
+            |----------|-----|
+            | **API** | ${{ steps.pulumi.outputs.service_url }} |
+            | **Health Check** | ${{ steps.pulumi.outputs.service_url }}/v1/health |
 
-      - name: Notify Slack on Success (Deploy)
-        if: success()
+            > This environment will be automatically destroyed when the PR is closed.
+
+      # Slack notifications
+      - name: Notify Slack on Deploy Success
+        if: success() && github.event_name == 'push'
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -112,7 +128,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Notify Slack on Failure (Deploy)
+      - name: Notify Slack on Deploy Failure
         if: failure()
         uses: 8398a7/action-slack@v3
         with:
@@ -122,80 +138,41 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   tests:
-    needs: deploy
+    name: E2E Tests
+    needs: main
     if: github.ref_name != 'master'
     runs-on: ubuntu-latest
     continue-on-error: true
-    env:
-      TARGET_ENV: ${{ needs.deploy.outputs.target_env }}
-      CI: true
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Set API base URL and test credentials
-        shell: bash
-        run: |
-          case "$TARGET_ENV" in
-            dev)
-              echo "API_BASE_URL=https://gp-api-dev.goodparty.org" >> "$GITHUB_ENV"
-              echo "CANDIDATE_EMAIL=${{ secrets.CANDIDATE_EMAIL }}" >> "$GITHUB_ENV"
-              echo "CANDIDATE_PASSWORD=${{ secrets.CANDIDATE_PASSWORD }}" >> "$GITHUB_ENV"
-              echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> "$GITHUB_ENV"
-              echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
-              echo "CANDIDATE_ID=${{ secrets.DEV_CANDIDATE_ID }}" >> "$GITHUB_ENV"
-              echo "CAMPAIGN_SLUG=${{ secrets.DEV_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
-              ;;
-            qa)
-              echo "API_BASE_URL=https://gp-api-qa.goodparty.org" >> "$GITHUB_ENV"
-              echo "CANDIDATE_EMAIL=${{ secrets.CANDIDATE_EMAIL }}" >> "$GITHUB_ENV"
-              echo "CANDIDATE_PASSWORD=${{ secrets.CANDIDATE_PASSWORD }}" >> "$GITHUB_ENV"
-              echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> "$GITHUB_ENV"
-              echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}" >> "$GITHUB_ENV"
-              echo "CANDIDATE_ID=${{ secrets.QA_CANDIDATE_ID }}" >> "$GITHUB_ENV"
-              echo "CAMPAIGN_SLUG=${{ secrets.QA_CAMPAIGN_SLUG }}" >> "$GITHUB_ENV"
-              ;;
-            prod)
-              HEALTH_URL="https://gp-api.goodparty.org/v1/health"
-              ;;
-            *)
-              echo "Unknown environment: $TARGET_ENV"; exit 1
-              ;;
-          esac
-
-      - name: Verify environment health
-        shell: bash
-        run: |
-          echo "Verifying ${API_BASE_URL}/v1/health is responding..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${API_BASE_URL}/v1/health") || true
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ Health endpoint is responding"
-          else
-            echo "⚠️ Health endpoint returned $STATUS (expected 200)"
-            exit 1
-          fi
-
       - name: Run Playwright tests
         id: run-tests
+        env:
+          API_BASE_URL: ${{ needs.main.outputs.service_url }}
+          CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
+          CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CANDIDATE_ID: ${{ needs.main.outputs.environment == 'qa' && secrets.QA_CANDIDATE_ID || secrets.DEV_CANDIDATE_ID }}
+          CAMPAIGN_SLUG: ${{ needs.main.outputs.environment == 'qa' && secrets.QA_CAMPAIGN_SLUG || secrets.DEV_CAMPAIGN_SLUG }}
         run: npm run test:e2e
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-reports-${{ env.TARGET_ENV }}-${{ github.sha }}
+          name: playwright-reports-${{ needs.main.outputs.environment }}-${{ github.sha }}
           path: |
             e2e-tests/playwright-report
             e2e-tests/test-results
@@ -203,39 +180,26 @@ jobs:
       - name: Parse test results
         if: always()
         id: test-results
-        shell: bash
         run: |
           if [ -f "e2e-tests/test-results/results.json" ]; then
-            echo "Found results.json, parsing test results..."
-            
             TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[]] | length' 2>/dev/null || echo "0")
             FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == false)] | length' 2>/dev/null || echo "0")
             PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == true)] | length' 2>/dev/null || echo "0")
-            
-            echo "Parsed: Total=$TOTAL_TESTS, Failed=$FAILED_COUNT, Passed=$PASSED_COUNT"
-            
+
             echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
             echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
             echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
-            
+
             if [ "$FAILED_COUNT" -gt 0 ]; then
               FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | map("• " + .) | join("\\n")' 2>/dev/null || echo "• Failed to parse test names")
-              if [ -z "$FAILED_TESTS" ]; then
-                FAILED_TESTS="• $FAILED_COUNT test(s) failed but names could not be parsed"
-              fi
               echo "failed_tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
               echo "tests_ran=true" >> $GITHUB_OUTPUT
             else
               echo "failed_tests=" >> $GITHUB_OUTPUT
-              if [ "$TOTAL_TESTS" -gt 0 ]; then
-                echo "tests_ran=true" >> $GITHUB_OUTPUT
-              else
-                echo "tests_ran=false" >> $GITHUB_OUTPUT
-              fi
+              echo "tests_ran=$( [ "$TOTAL_TESTS" -gt 0 ] && echo true || echo false )" >> $GITHUB_OUTPUT
             fi
           else
-            echo "⚠️  results.json file not found - tests may not have run"
-            echo "failed_tests=• Test results file not found (tests may not have started)" >> $GITHUB_OUTPUT
+            echo "failed_tests=• Test results file not found" >> $GITHUB_OUTPUT
             echo "failed_count=0" >> $GITHUB_OUTPUT
             echo "passed_count=0" >> $GITHUB_OUTPUT
             echo "total_tests=0" >> $GITHUB_OUTPUT
@@ -249,10 +213,10 @@ jobs:
           status: custom
           custom_payload: |
             {
-              text: '✅ Playwright Tests Passed',
+              text: 'E2E Tests Passed',
               attachments: [{
                 color: 'good',
-                text: `${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n✅ ${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>`
+                text: `${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.main.outputs.environment }}\n${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>`
               }]
             }
         env:
@@ -265,11 +229,104 @@ jobs:
           status: custom
           custom_payload: |
             {
-              "text": "${{ steps.test-results.outputs.tests_ran == 'true' && '⚠️ Playwright Tests Failed (Non-blocking)' || '❌ Test Environment Not Ready' }}",
+              "text": "${{ steps.test-results.outputs.tests_ran == 'true' && 'E2E Tests Failed (Non-blocking)' || 'Test Environment Not Ready' }}",
               "attachments": [{
                 "color": "${{ steps.test-results.outputs.tests_ran == 'true' && 'warning' || 'danger' }}",
-                "text": "${{ github.repository }} - ${{ github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ env.TARGET_ENV }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('❌ {0}/{1} tests failed\n✅ {2}/{1} tests passed\n\nFailed Tests:\n{3}\n\nTests are non-blocking during stabilization.', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || '❌ Tests did not run - environment health check failed or test setup error occurred.\n\nThe application may not be ready or there was an issue with test initialization.' }}\n\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+                "text": "${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.main.outputs.environment }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('{0}/{1} tests failed\n{2}/{1} tests passed\n\nFailed Tests:\n{3}', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || 'Tests did not run - environment health check failed or test setup error occurred.' }}\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>"
               }]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  plans:
+    name: Infrastructure Diff
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Pulumi
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: "^3"
+
+      - name: Run Pulumi Preview and build comment
+        id: preview
+        run: |
+          declare -A STAGES=([dev]=develop [qa]=qa [prod]=master)
+          HAS_CHANGES=false
+
+          echo "## Infrastructure Diff" > /tmp/pr-comment.md
+          echo "" >> /tmp/pr-comment.md
+          echo "This PR makes infrastructure changes in at least one environment." >> /tmp/pr-comment.md
+
+          for env in dev qa prod; do
+            stage="${STAGES[$env]}"
+
+            # Use currently deployed image to avoid diffs from code-only changes
+            TASK_DEF=$(aws ecs describe-services --cluster "gp-${stage}-fargateCluster" --services "gp-api-${stage}" --query 'services[0].taskDefinition' --output text)
+            export IMAGE_URI=$(aws ecs describe-task-definition --task-definition "$TASK_DEF" --query 'taskDefinition.containerDefinitions[0].image' --output text)
+
+            npm run --silent infra diff $env -- --json > /tmp/preview-$env.json 2>&1 || true
+
+            # Count changes
+            CHANGES=$(jq '[.changeSummary.create, .changeSummary.update, .changeSummary.delete, .changeSummary.replace | values] | add // 0' /tmp/preview-$env.json)
+
+            echo "### \`$env\`" >> /tmp/pr-comment.md
+            if [ "$CHANGES" -gt 0 ]; then
+              HAS_CHANGES=true
+              jq -r '"**\(.changeSummary | to_entries | map("\(.value) \(.key)") | join(", "))**"' /tmp/preview-$env.json >> /tmp/pr-comment.md
+              echo '<details><summary>Show diff</summary>' >> /tmp/pr-comment.md
+              echo '' >> /tmp/pr-comment.md
+              echo '```diff' >> /tmp/pr-comment.md
+              echo "$(npm run --silent infra diff $env 2>&1)" >> /tmp/pr-comment.md
+              echo '```' >> /tmp/pr-comment.md
+              echo '</details>' >> /tmp/pr-comment.md
+            else
+              echo "✅ No changes" >> /tmp/pr-comment.md
+            fi
+            echo "" >> /tmp/pr-comment.md
+          done
+
+          echo "has_changes=$HAS_CHANGES" >> $GITHUB_OUTPUT
+
+      - name: Find existing diff comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "Infrastructure Diff"
+
+      - name: Post or update PR comment
+        if: steps.preview.outputs.has_changes == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          edit-mode: replace
+          body-path: /tmp/pr-comment.md
+
+      - name: Delete existing comment if no changes
+        if: steps.preview.outputs.has_changes == 'false' && steps.find-comment.outputs.comment-id != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.deleteComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ steps.find-comment.outputs.comment-id }}
+            })
