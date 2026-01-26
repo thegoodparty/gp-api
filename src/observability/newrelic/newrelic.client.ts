@@ -1,15 +1,12 @@
-/**
- * Minimal New Relic wrapper so application code can safely emit events/attributes
- * without exploding when the agent is disabled (e.g. missing env vars, test env).
- *
- * Important: Do NOT include PII (emails, request bodies, auth headers) in attributes.
- */
+import { Logger } from '@nestjs/common'
 import * as newrelic from 'newrelic'
 import {
   CustomEventAttributesByType,
   CustomEventType,
   NewRelicEventAttributeValue,
 } from './newrelic.events'
+
+const logger = new Logger('NewRelic Client')
 
 type NewRelicApi = Pick<
   typeof newrelic,
@@ -56,8 +53,8 @@ export function recordCustomEvent<T extends CustomEventType>(
       eventType,
       toNewRelicAttributes(attributes as Record<string, unknown>),
     )
-  } catch {
-    // swallow
+  } catch (error) {
+    logger.error(JSON.stringify(error))
   }
 }
 
@@ -72,8 +69,8 @@ export function addCustomAttribute(key: string, value: unknown) {
     ) {
       api.addCustomAttribute(key, value)
     }
-  } catch {
-    // swallow
+  } catch (error) {
+    logger.error(JSON.stringify(error))
   }
 }
 
@@ -82,7 +79,7 @@ export function addCustomAttributes(attributes: Record<string, unknown>) {
   if (!api) return
   try {
     api.addCustomAttributes(toNewRelicAttributes(attributes))
-  } catch {
-    // swallow
+  } catch (error) {
+    logger.error(JSON.stringify(error))
   }
 }
