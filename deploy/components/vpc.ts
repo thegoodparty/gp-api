@@ -13,6 +13,7 @@ const createSubnet = (params: {
   availabilityZone: string
   cidrBlock: string
   public: boolean
+  extraRoutes?: aws.types.input.ec2.RouteTableRoute[]
 }) => {
   const subnet = new aws.ec2.Subnet(params.name, {
     vpcId: params.vpcId,
@@ -31,6 +32,7 @@ const createSubnet = (params: {
         ...params.gateway,
         cidrBlock: '0.0.0.0/0',
       },
+      ...(params.extraRoutes ?? []),
     ],
     tags: {
       Name: `gp-master-${params.name}RouteTable`,
@@ -42,7 +44,7 @@ const createSubnet = (params: {
     routeTableId: routeTable.id,
   })
 
-  return { id: subnet.id, routeTableId: routeTable.id }
+  return { id: subnet.id }
 }
 
 export const createVpc = () => {
@@ -113,7 +115,7 @@ export const createVpc = () => {
       },
     )
 
-    const privateSubnet = createSubnet({
+    createSubnet({
       name: `apiPrivateSubnet${idx + 1}`,
       availabilityZone: azName,
       cidrBlock: `10.0.${idx * 8 + 4}.0/22`,
@@ -122,11 +124,12 @@ export const createVpc = () => {
       gateway: {
         natGatewayId: natGateway.id,
       },
-    })
-    new aws.ec2.Route(`databricksPrivatePeeringRoute${idx + 1}`, {
-      routeTableId: privateSubnet.routeTableId,
-      destinationCidrBlock: '172.16.0.0/16',
-      vpcPeeringConnectionId: 'pcx-013299c506ffd3395',
+      extraRoutes: [
+        {
+          cidrBlock: '172.16.0.0/16',
+          vpcPeeringConnectionId: 'pcx-013299c506ffd3395',
+        },
+      ],
     })
   }
 }
