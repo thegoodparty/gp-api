@@ -1,8 +1,5 @@
 {
-  "exclude": [
-    "node_modules",
-    "deploy"
-  ],
+  "exclude": ["node_modules"],
   "compilerOptions": {
     "module": "NodeNext",
     "declaration": true,
@@ -20,7 +17,10 @@
       ],
       "@e2e-tests/*": [
         "e2e-tests/*"
-      ]
+      ],
+      "newrelic": [
+        "node_modules/newrelic"
+      ],
     },
     "incremental": true,
     "skipLibCheck": true,
@@ -30,9 +30,7 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "lib": [
-      "esnext"
-    ],
+    "lib": ["esnext"],
     "resolveJsonModule": true,
     "esModuleInterop": true
   }

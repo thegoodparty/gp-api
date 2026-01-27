@@ -1,6 +1,6 @@
 import { ElectionLevel } from '@/campaigns/campaigns.types'
 import { Injectable, Logger } from '@nestjs/common'
-import { getYear } from 'date-fns'
+import { getYear, parseISO } from 'date-fns'
 import {
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
@@ -241,7 +241,7 @@ export class OfficeMatchService {
     })
     const details = campaign?.details as { electionDate?: string } | undefined
     const electionYear = details?.electionDate
-      ? getYear(details?.electionDate)
+      ? getYear(parseISO(details.electionDate))
       : undefined
     if (!electionYear) {
       await this.slack.message(
@@ -729,7 +729,7 @@ export class OfficeMatchService {
 
       this.logger.debug(`searching for ${search}`)
 
-      const electionYear = getYear(electionDate)
+      const electionYear = getYear(parseISO(electionDate))
       if (!electionYear) {
         await this.slack.message(
           {
