@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
+import { sortBy } from 'es-toolkit'
 
 export interface ServiceConfig {
   environment: 'preview' | 'dev' | 'qa' | 'prod'
@@ -224,10 +225,12 @@ export function createService({
           cpu: parseInt(cpu),
           memory: parseInt(memory),
           essential: true,
-          secrets: Object.entries(sec).map(([name, valueFrom]) => ({
-            name,
-            valueFrom,
-          })),
+          secrets: sortBy(Object.entries(sec), [([name]) => name]).map(
+            ([name, valueFrom]) => ({
+              name,
+              valueFrom,
+            }),
+          ),
           portMappings: [
             {
               containerPort: 80,
@@ -235,10 +238,12 @@ export function createService({
               protocol: 'tcp',
             },
           ],
-          environment: Object.entries(env).map(([name, value]) => ({
-            name,
-            value,
-          })),
+          environment: sortBy(Object.entries(env), [([name]) => name]).map(
+            ([name, value]) => ({
+              name,
+              value,
+            }),
+          ),
           logConfiguration: {
             logDriver: 'awslogs',
             options: {
