@@ -34,6 +34,9 @@ import {
   type FilterObject,
 } from '../utils/voterFileFilter.utils'
 
+const P2V_ELECTION_INFO_MISSING_MESSAGE =
+  'Campaign path to victory data is missing required election information'
+
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
 
 if (!PEOPLE_API_URL) {
@@ -205,9 +208,10 @@ export class ContactsService {
       }
 
       if (!districtType || !districtName) {
-        throw new BadRequestException(
-          'Campaign path to victory data is missing required election information',
-        )
+        throw new BadRequestException({
+          message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+          errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
+        })
       }
 
       if (!stateMatches) throw new NotFoundException('Person not found')
@@ -393,11 +397,17 @@ export class ContactsService {
 
   private getCampaignState(campaign: CampaignWithPathToVictory): string {
     if (!campaign.details) {
-      throw new BadRequestException('Campaign details are missing')
+      throw new BadRequestException({
+        message: 'Campaign details are missing',
+        errorCode: 'DATA_INTEGRITY_CAMPAIGN_DETAILS_MISSING',
+      })
     }
     const { state } = campaign.details as { state?: string }
     if (!state || state.length !== 2) {
-      throw new BadRequestException('Invalid state code in campaign data')
+      throw new BadRequestException({
+        message: 'Invalid state code in campaign data',
+        errorCode: 'DATA_INTEGRITY_CAMPAIGN_STATE_INVALID',
+      })
     }
     return state.toUpperCase()
   }
@@ -448,9 +458,10 @@ export class ContactsService {
       return { state, usingStatewideFallback: true }
     }
 
-    throw new BadRequestException(
-      'Campaign path to victory data is missing required election information',
-    )
+    throw new BadRequestException({
+      message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+      errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
+    })
   }
 
   private isStatewideSelection(
@@ -495,19 +506,26 @@ export class ContactsService {
     const electionLocation = pathToVictoryData?.electionLocation
 
     if (!electionType || !electionLocation) {
-      throw new BadRequestException(
-        'Campaign path to victory data is missing required election information',
-      )
+      throw new BadRequestException({
+        message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+        errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
+      })
     }
 
     if (!campaign.details) {
-      throw new BadRequestException('Campaign details are missing')
+      throw new BadRequestException({
+        message: 'Campaign details are missing',
+        errorCode: 'DATA_INTEGRITY_CAMPAIGN_DETAILS_MISSING',
+      })
     }
 
     const { state } = campaign.details as { state?: string }
 
     if (!state || state.length !== 2) {
-      throw new BadRequestException('Invalid state code in campaign data')
+      throw new BadRequestException({
+        message: 'Invalid state code in campaign data',
+        errorCode: 'DATA_INTEGRITY_CAMPAIGN_STATE_INVALID',
+      })
     }
 
     return {

@@ -13,6 +13,7 @@ const createSubnet = (params: {
   availabilityZone: string
   cidrBlock: string
   public: boolean
+  extraRoutes?: aws.types.input.ec2.RouteTableRoute[]
 }) => {
   const subnet = new aws.ec2.Subnet(params.name, {
     vpcId: params.vpcId,
@@ -31,6 +32,7 @@ const createSubnet = (params: {
         ...params.gateway,
         cidrBlock: '0.0.0.0/0',
       },
+      ...(params.extraRoutes ?? []),
     ],
     tags: {
       Name: `gp-master-${params.name}RouteTable`,
@@ -122,6 +124,12 @@ export const createVpc = () => {
       gateway: {
         natGatewayId: natGateway.id,
       },
+      extraRoutes: [
+        {
+          cidrBlock: '172.16.0.0/16',
+          vpcPeeringConnectionId: 'pcx-013299c506ffd3395',
+        },
+      ],
     })
   }
 }
