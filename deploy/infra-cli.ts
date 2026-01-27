@@ -146,6 +146,22 @@ yargs(hideBin(process.argv))
       }
     },
   )
+  .command(
+    'refresh <environment>',
+    'Refresh the Pulumi stack',
+    (yargs) =>
+      yargs.positional('environment', {
+        describe: 'Target environment',
+        choices: ENVIRONMENTS,
+        demandOption: true,
+      }),
+    async (argv) => {
+      // We don't need an image URI to refresh, so we'll just use a placeholder
+      process.env.IMAGE_URI = 'placeholder'
+      await setupStack(argv.environment)
+      run('pulumi refresh --diff')
+    },
+  )
   .demandCommand(1, 'You must specify a command')
   .strict()
   .help()
