@@ -343,6 +343,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const { details: campaignDetails, placeId } = campaign
     const { phone, websiteDomain, ein } = tcrCompliancePayload
     const { street, city, state, postalCode } = extractAddressComponents(
+      // TODO(ENG-6400): using `placeId!` is dangerous here.
       await this.placesService.getAddressByPlaceId(placeId!),
     )
     const { campaignCommittee } = campaignDetails
@@ -555,6 +556,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       county,
       postalCode,
     } = extractAddressComponents(
+      // TODO(ENG-6400): using `placeId!` is dangerous here.
       await this.placesService.getAddressByPlaceId(placeId!),
     )
 
