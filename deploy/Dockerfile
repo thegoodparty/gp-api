@@ -1,37 +1,4 @@
-# Use the public.ecr.aws BuildKit image
-FROM public.ecr.aws/vend/moby/buildkit:buildx-stable-1 AS buildkit
-
-# Stage 1: Install dependencies and build application
-FROM public.ecr.aws/docker/library/node:22.12.0-alpine AS builder
-
-RUN apk add --no-cache \
-  libc6-compat \
-  openssl
-
-WORKDIR /app
-
-# Install dependencies  
-COPY package.json package-lock.json tsconfig.json tsconfig.build.json tsconfig.seed.json newrelic.js ./
-
-# Copy application source files, prisma files, and seed data
-COPY src/ ./src
-COPY prisma/ ./prisma
-COPY seed/ ./seed
-
-RUN npm ci --legacy-peer-deps
-
-# Optionally bust the cache to force a rebuild of the following steps
-ARG CACHEBUST
-ENV CACHEBUST=${CACHEBUST:-1}
-
-# Generate Prisma client (migrations run on container startup via docker-entrypoint.sh)
-RUN echo "Cache bust: $CACHEBUST" && npx prisma generate --schema=prisma/schema
-
-# Build the application (output in /dist)
-RUN echo "Cache bust: $CACHEBUST" && npm run build
-
-# Stage 2: Create a minimal runtime image
-FROM public.ecr.aws/docker/library/node:22.12.0-alpine
+FROM node:22-alpine3.23
 
 RUN apk add --no-cache \
   libc6-compat \
@@ -40,44 +7,23 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-ARG CACHEBUST
-ENV CACHEBUST=${CACHEBUST:-1}
-
-# Copy package files for production dependencies
-RUN echo "Cache bust: $CACHEBUST - copying package.json and package-lock.json"
 COPY package.json package-lock.json ./
-RUN echo "Package files copied at: $(date)"
-# Install only production dependencies
-RUN echo "Cache bust: $CACHEBUST" && npm ci --omit=dev --legacy-peer-deps
+RUN npm ci --omit=dev --legacy-peer-deps
 
-# Copy only necessary files to the runtime image
-RUN echo "Cache bust: $CACHEBUST - copying .prisma"
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-
-RUN echo "Cache bust: $CACHEBUST - copying dist"
-COPY --from=builder /app/dist ./dist
-
-RUN echo "Cache bust: $CACHEBUST - copying prisma"
-COPY --from=builder /app/prisma ./prisma
+COPY node_modules/.prisma ./node_modules/.prisma
+COPY dist ./dist
+COPY prisma ./prisma
 
 # Copy seed and src for tsx runtime seeding (preview environments only)
-RUN echo "Cache bust: $CACHEBUST - copying seed and src for preview seeding"
-COPY --from=builder /app/seed ./seed
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY seed ./seed
+COPY src ./src
+COPY tsconfig.json ./
 
-# Expose the application port
-# EXPOSE 3000
-
-# Set the NODE_ENV to production
 ENV NODE_ENV=production
 
-# Copy New Relic configuration
-COPY --from=builder /app/newrelic.js ./
-
-# Copy entrypoint script
+# Copy New Relic configuration and entrypoint
+COPY newrelic.js ./
 COPY deploy/docker-entrypoint.sh ./
 RUN chmod +x ./docker-entrypoint.sh
 
-# Start the application
 ENTRYPOINT ["./docker-entrypoint.sh"]
