@@ -4,6 +4,14 @@ export type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
 }
 
+export type DemographicOps = {
+  eq?: string | boolean
+  in?: Array<string | boolean>
+  is?: 'null' | 'not_null'
+}
+
+export type DemographicFilter = Record<string, DemographicOps>
+
 export type ExtendedVoterFileFilter = VoterFileFilter & {
   registeredVoterTrue?: boolean | null
   registeredVoterFalse?: boolean | null
@@ -44,28 +52,4 @@ export type ExtendedVoterFileFilter = VoterFileFilter & {
   audienceUnknown?: boolean | null
   registeredVoterUnknown?: boolean | null
   incomeUnknown?: boolean | null
-}
-
-export type DistrictStatsBucket = {
-  label: string
-  count: number
-  percent: number
-}
-
-export type DistrictStatSummary = {
-  buckets: DistrictStatsBucket[]
-}
-
-export type StatsResponse = {
-  districtId: string
-  computedAt: string
-  totalConstituents: number
-  totalConstituentsWithCellPhone: number
-  buckets: {
-    age: DistrictStatSummary
-    homeowner: DistrictStatSummary
-    education: DistrictStatSummary
-    presenceOfChildren: DistrictStatSummary
-    estimatedIncomeRange: DistrictStatSummary
-  }
 }
