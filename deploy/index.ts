@@ -211,8 +211,14 @@ export = async () => {
         toPort: 5432,
         cidrBlocks: [vpcCidr],
       },
-    ].concat(
-      select({
+      {
+        protocol: 'tcp',
+        fromPort: 5432,
+        toPort: 5432,
+        description: 'databricks via vpc peering',
+        cidrBlocks: ['172.16.0.0/16'],
+      },
+      ...select({
         preview: [],
         // TODOSWAIN: investigate whether these are truly needed in dev
         dev: [
@@ -223,18 +229,11 @@ export = async () => {
             description: 'internal gp-bastion',
             securityGroups: ['sg-05a21af11aacbe60b'],
           },
-          {
-            protocol: 'tcp',
-            fromPort: 5432,
-            toPort: 5432,
-            description: 'databricks via vpc peering',
-            cidrBlocks: ['172.16.0.0/16'],
-          },
         ],
         qa: [],
         prod: [],
       }),
-    ),
+    ],
     egress: [
       {
         protocol: '-1',

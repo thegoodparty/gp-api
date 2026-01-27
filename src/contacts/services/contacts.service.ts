@@ -7,7 +7,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { VoterFileFilter } from '@prisma/client'
 import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
@@ -17,26 +16,23 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
-import {
-  CampaignWithPathToVictory,
-  DemographicFilter,
-  ExtendedVoterFileFilter,
-} from '../contacts.types'
+import { CampaignWithPathToVictory, StatsResponse } from '../contacts.types'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
 import {
   PeopleListResponse,
-  PersonInput,
   PersonListItem,
   PersonOutput,
 } from '../schemas/person.schema'
 import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
-import type { PeopleStats } from '../stats.transformer'
-import { transformStatsResponse } from '../stats.transformer'
+import {
+  convertVoterFileFilterToFilters,
+  type FilterObject,
+} from '../utils/voterFileFilter.utils'
 
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
@@ -49,86 +45,6 @@ if (!PEOPLE_API_URL) {
 if (!PEOPLE_API_S2S_SECRET) {
   throw new Error('Please set PEOPLE_API_S2S_SECRET in your .env')
 }
-
-// This list was collected by examining the language values in the people-db in production
-// on Oct 27 2025.
-const OTHER_LANGUAGES = [
-  'Bantu',
-  'Afrikaans',
-  'Turkmeni',
-  'Swazi',
-  'Sotho',
-  'Malagasy',
-  'Kirghiz',
-  'Tajik',
-  'Xhosa',
-  'Samoan',
-  'Moldavian',
-  'Malay',
-  'Tswana',
-  'Macedonian',
-  'Bengali',
-  'Somali',
-  'Uzbeki',
-  'Tongan',
-  'Kazakh',
-  'Azeri',
-  'Mongolian',
-  'Zulu',
-  'Icelandic',
-  'Georgian',
-  'Nepali',
-  'Basque',
-  'Indonesian',
-  'Estonian',
-  'Dzongha',
-  'Slovakian',
-  'Pashto',
-  'Sinhalese',
-  'Swahili',
-  'Tibetan',
-  'Ashanti',
-  'Oromo',
-  'Burmese',
-  'Lithuanian',
-  'Latvian',
-  'Laotian',
-  'Albanian',
-  'Finnish',
-  'Slovenian',
-  'Czech',
-  'Ga',
-  'Khmer',
-  'Norwegian',
-  'Dutch',
-  'Danish',
-  'Bulgarian',
-  'Turkish',
-  'Thai',
-  'Serbo-Croatian',
-  'Swedish',
-  'Armenian',
-  'Urdu',
-  'Romanian',
-  'Tagalog',
-  'Amharic',
-  'Hungarian',
-  'Greek',
-  'French',
-  'Farsi',
-  'Japanese',
-  'German',
-  'Russian',
-  'Polish',
-  'Hebrew',
-  'Korean',
-  'Italian',
-  'Arabic',
-  'Hindi',
-  'Portuguese',
-  'Vietnamese',
-  'Chinese',
-]
 
 @Injectable()
 export class ContactsService {
@@ -156,36 +72,29 @@ export class ContactsService {
       usingStatewideFallback,
     } = this.resolveLocationForRequest(campaign)
 
-    const params = new URLSearchParams({
+    const filters = await this.segmentToFilters(segment, campaign)
+
+    const body = {
       state,
-      resultsPerPage: resultsPerPage.toString(),
-      page: page.toString(),
-    })
-    if (districtType && districtName) {
-      params.set('districtType', districtType)
-      params.set('districtName', districtName)
+      districtType,
+      districtName,
+      resultsPerPage,
+      page,
+      filters,
+      full: true,
     }
 
-    // Build demographic filter from full segment when custom segment id is used
-    const demographicFilter = await this.buildDemographicFilterFromSegmentId(
-      segment,
-      campaign,
-    )
-    this.appendDemographicFilter(params, demographicFilter)
-    const listFilters = await this.segmentToFilters(segment, campaign)
-    listFilters.forEach((f) => params.append('filters[]', f))
-    params.set('full', 'true')
     const token = usingStatewideFallback
       ? this.generateScopedS2SToken(state)
       : this.getValidS2SToken()
-    const data = await this.fetchPeopleWithFallback(
+    const data = await this.fetchPeopleWithFallbackPost(
       'people',
-      params,
+      body,
       token,
       alternativeDistrictName,
       campaign.id,
     )
-    return this.transformListResponse(data)
+    return data
   }
 
   async searchContacts(
@@ -232,7 +141,7 @@ export class ContactsService {
       alternativeDistrictName,
       campaign.id,
     )
-    return this.transformListResponse(data)
+    return data
   }
 
   async sampleContacts(
@@ -261,7 +170,7 @@ export class ContactsService {
         }),
       )
       const people = this.normalizePeopleResponse(response.data)
-      return people.map((p) => this.transformPerson(p))
+      return people
     } catch (error) {
       this.logger.error('Failed to sample contacts from people API', error)
       throw new BadGatewayException('Failed to sample contacts from people API')
@@ -273,32 +182,29 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
   ): Promise<PersonOutput> {
     try {
+      const { state, districtType, districtName, usingStatewideFallback } =
+        this.resolveLocationForRequest(campaign)
+
       const response = await lastValueFrom(
         this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
           headers: {
             Authorization: `Bearer ${this.getValidS2SToken()}`,
           },
+          params: {
+            state,
+          },
         }),
       )
-      const person = response.data as PersonInput &
+
+      const person = response.data as PersonOutput &
         Record<string, string | number | boolean | null | undefined>
 
-      const {
-        state,
-        districtType,
-        districtName,
-        alternativeDistrictName,
-        usingStatewideFallback,
-      } = this.resolveLocationForRequest(campaign)
-
-      const personState = String(
-        person.Residence_Addresses_State || '',
-      ).toUpperCase()
+      const personState = String(person.state || '').toUpperCase()
       const stateMatches = personState === state.toUpperCase()
 
       if (usingStatewideFallback) {
         if (!stateMatches) throw new NotFoundException('Person not found')
-        return this.transformPerson(person)
+        return person
       }
 
       if (!districtType || !districtName) {
@@ -308,21 +214,8 @@ export class ContactsService {
         })
       }
 
-      const rawDistrictValue = person[districtType]
-      const districtValue =
-        typeof rawDistrictValue === 'string' ? rawDistrictValue : ''
-      const cleanedPersonDistrict =
-        this.elections.cleanDistrictName(districtValue)
-      const personMatches =
-        cleanedPersonDistrict === districtName ||
-        cleanedPersonDistrict === `${districtName} (EST.)` ||
-        (alternativeDistrictName
-          ? cleanedPersonDistrict === alternativeDistrictName
-          : false)
-
-      if (!stateMatches || !personMatches)
-        throw new NotFoundException('Person not found')
-      return this.transformPerson(person)
+      if (!stateMatches) throw new NotFoundException('Person not found')
+      return person
     } catch (error) {
       if (error instanceof HttpException) {
         throw error
@@ -364,30 +257,28 @@ export class ContactsService {
       params.set('districtName', districtName)
     }
 
-    // Build demographic filter from full segment when custom segment id is used
-    const demographicFilter = await this.buildDemographicFilterFromSegmentId(
-      segment,
-      campaign,
-    )
-    this.appendDemographicFilter(params, demographicFilter)
-    const listFilters = await this.segmentToFilters(segment, campaign)
-    listFilters.forEach((f) => params.append('filters[]', f))
-    params.set('full', 'true')
+    const filters = await this.segmentToFilters(segment, campaign)
+
+    const body: Record<string, unknown> = {
+      state,
+      districtType,
+      districtName,
+      filters,
+      full: true,
+    }
+
     let token: string | undefined
     try {
       token = usingStatewideFallback
         ? this.generateScopedS2SToken(state)
         : this.getValidS2SToken()
       const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/download?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            responseType: 'stream',
+        this.httpService.post(`${PEOPLE_API_URL}/v1/people/download`, body, {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-        ),
+          responseType: 'stream',
+        }),
       )
 
       return new Promise<void>((resolve, reject) => {
@@ -405,7 +296,7 @@ export class ContactsService {
           token,
           'download',
           alternativeDistrictName,
-          { responseType: 'stream' },
+          { responseType: 'stream', body },
         )
         return new Promise<void>((resolve, reject) => {
           alternativeResponse.data.pipe(res.raw)
@@ -420,41 +311,32 @@ export class ContactsService {
     }
   }
 
-  async getDistrictStats(
-    campaign: CampaignWithPathToVictory,
-    hasCellPhone = false,
-  ) {
-    const {
-      state,
-      districtType,
-      districtName,
-      alternativeDistrictName,
-      usingStatewideFallback,
-    } = this.resolveLocationForRequest(campaign)
+  async getDistrictStats(campaign: CampaignWithPathToVictory) {
+    const { state, districtType, districtName } =
+      this.resolveLocationForRequest(campaign)
 
-    const params = new URLSearchParams({ state })
-    if (districtType && districtName) {
-      params.set('districtType', districtType)
-      params.set('districtName', districtName)
+    if (!state || !districtType || !districtName) {
+      const msg = 'Could not resolve state, district type, and district name'
+      this.logger.error(
+        JSON.stringify({ campaign, msg, state, districtType, districtName }),
+      )
+      throw new BadRequestException(msg)
     }
-    const details = campaign.details as { electionDate?: string } | undefined
-    const electionYear = details?.electionDate
-      ? Number(String(details.electionDate).slice(0, 4))
-      : undefined
-    if (typeof electionYear === 'number' && Number.isFinite(electionYear))
-      params.set('electionYear', String(electionYear))
-    if (hasCellPhone) {
-      params.append('filters[]', 'cellPhoneFormatted')
-    }
-    const token = usingStatewideFallback
-      ? this.generateScopedS2SToken(state)
-      : this.getValidS2SToken()
-    const data = await this.fetchStatsWithFallback(
-      params,
-      token,
-      alternativeDistrictName,
+
+    const token = this.getValidS2SToken()
+
+    const response = await lastValueFrom(
+      this.httpService.get<StatsResponse>(`${PEOPLE_API_URL}/v1/people/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          state,
+          districtType,
+          districtName,
+        },
+      }),
     )
-    return transformStatsResponse(data)
+
+    return response.data
   }
 
   private getValidS2SToken(): string {
@@ -656,274 +538,28 @@ export class ContactsService {
   private async segmentToFilters(
     segment: string | undefined,
     campaign: CampaignWithPathToVictory,
-  ): Promise<string[]> {
+  ): Promise<FilterObject> {
     const resolvedSegment = segment || 'all'
     const segmentToFiltersMap =
       defaultSegmentToFiltersMap[
         resolvedSegment as keyof typeof defaultSegmentToFiltersMap
       ]
 
-    return segmentToFiltersMap
-      ? segmentToFiltersMap.filters
-      : await this.getCustomSegmentFilters(resolvedSegment, campaign)
-  }
+    if (segmentToFiltersMap) {
+      const filters: Record<string, boolean> = {}
+      for (const filterName of segmentToFiltersMap.filters) {
+        filters[filterName] = true
+      }
+      return filters
+    }
 
-  private async getCustomSegmentFilters(
-    segment: string,
-    campaign: CampaignWithPathToVictory,
-  ): Promise<string[]> {
     const customSegment =
       await this.voterFileFilterService.findByIdAndCampaignId(
-        parseInt(segment),
+        parseInt(resolvedSegment),
         campaign.id,
       )
 
-    return customSegment
-      ? this.convertVoterFileFilterToFilters(customSegment)
-      : []
-  }
-
-  private convertVoterFileFilterToFilters(
-    segment: ExtendedVoterFileFilter,
-  ): string[] {
-    const filters: string[] = []
-
-    if (segment.genderMale) filters.push('genderMale')
-    if (segment.genderFemale) filters.push('genderFemale')
-    if (segment.genderUnknown) filters.push('genderUnknown')
-
-    if (segment.age18_25) filters.push('age18_25')
-    if (segment.age25_35) filters.push('age25_35')
-    if (segment.age35_50) filters.push('age35_50')
-    if (segment.age50Plus) filters.push('age50Plus')
-
-    if (segment.partyDemocrat) filters.push('partyDemocrat')
-    if (segment.partyIndependent) filters.push('partyIndependent')
-    if (segment.partyRepublican) filters.push('partyRepublican')
-
-    if (segment.audienceFirstTimeVoters) filters.push('audienceFirstTimeVoters')
-    if (segment.audienceLikelyVoters) filters.push('audienceLikelyVoters')
-    if (segment.audienceSuperVoters) filters.push('audienceSuperVoters')
-    if (segment.audienceUnreliableVoters)
-      filters.push('audienceUnreliableVoters')
-    if (segment.audienceUnlikelyVoters) filters.push('audienceUnlikelyVoters')
-    if (segment.audienceUnknown) filters.push('audienceUnknown')
-
-    if (segment.hasCellPhone) filters.push('cellPhoneFormatted')
-    if (segment.hasLandline) filters.push('landlineFormatted')
-
-    return filters
-  }
-
-  private async buildDemographicFilterFromSegmentId(
-    segment: string | undefined,
-    campaign: CampaignWithPathToVictory,
-  ): Promise<DemographicFilter> {
-    // If segment is a known default, no demographic filter additions are applied
-    if (!segment || this.isDefaultSegment(segment)) return {}
-
-    const id = parseInt(segment)
-    if (!Number.isFinite(id)) return {}
-
-    const fullSegment = await this.voterFileFilterService.findByIdAndCampaignId(
-      id,
-      campaign.id,
-    )
-    if (!fullSegment) return {}
-
-    return this.translateSegmentToDemographicFilter(fullSegment)
-  }
-
-  private isDefaultSegment(segment: string): boolean {
-    return Boolean(
-      defaultSegmentToFiltersMap[
-        segment as keyof typeof defaultSegmentToFiltersMap
-      ],
-    )
-  }
-
-  private translateSegmentToDemographicFilter(
-    s: VoterFileFilter,
-  ): DemographicFilter {
-    const seg = s as ExtendedVoterFileFilter
-    const filter: DemographicFilter = {}
-
-    // Voter status
-    if (seg.voterStatus && seg.voterStatus.length)
-      filter.voterStatus = { in: seg.voterStatus }
-
-    // Marital status booleans → vendor domain strings; Unknown means null
-    const marital: string[] = []
-    let maritalIncludeNull = false
-    if (seg.likelyMarried) marital.push('Inferred Married')
-    if (seg.likelySingle) marital.push('Inferred Single')
-    if (seg.married) marital.push('Married')
-    if (seg.single) marital.push('Single')
-    if (seg.maritalUnknown) maritalIncludeNull = true
-    if (marital.length || maritalIncludeNull) {
-      filter.maritalStatus = {
-        ...(marital.length ? { in: marital } : {}),
-        ...(maritalIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Presence of children; Unknown means null
-    const children: string[] = []
-    let childrenIncludeNull = false
-    if (seg.hasChildrenYes) children.push('Y')
-    if (seg.hasChildrenNo) children.push('N')
-    if (seg.hasChildrenUnknown) childrenIncludeNull = true
-    if (children.length || childrenIncludeNull) {
-      filter.presenceOfChildren = {
-        ...(children.length ? { in: children } : {}),
-        ...(childrenIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Veteran status; Unknown means null
-    const veteran: string[] = []
-    let veteranIncludeNull = false
-    if (seg.veteranYes) veteran.push('Yes')
-    if (seg.veteranUnknown) veteranIncludeNull = true
-    if (veteran.length || veteranIncludeNull) {
-      filter.veteranStatus = {
-        ...(veteran.length ? { in: veteran } : {}),
-        ...(veteranIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Homeowner probability model; Unknown means null
-    const homeowner: string[] = []
-    let homeownerIncludeNull = false
-    if (seg.homeownerYes) homeowner.push('Home Owner')
-    if (seg.homeownerLikely) homeowner.push('Probable Home Owner')
-    if (seg.homeownerNo) homeowner.push('Renter')
-    if (seg.homeownerUnknown) homeownerIncludeNull = true
-    if (homeowner.length || homeownerIncludeNull) {
-      filter.homeownerProbabilityModel = {
-        ...(homeowner.length ? { in: homeowner } : {}),
-        ...(homeownerIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Business owner in household; Unknown means null
-    const biz: string[] = []
-    let bizIncludeNull = false
-    if (seg.businessOwnerYes) biz.push('Yes')
-    if (seg.businessOwnerUnknown) bizIncludeNull = true
-    if (biz.length || bizIncludeNull) {
-      filter.businessOwner = {
-        ...(biz.length ? { in: biz } : {}),
-        ...(bizIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Education levels; Unknown means null
-    const edu: string[] = []
-    let eduIncludeNull = false
-    if (seg.educationNone) edu.push('Did not complete high school likely')
-    if (seg.educationHighSchoolDiploma) {
-      edu.push('Completed high school likely')
-    }
-    if (seg.educationTechnicalSchool) {
-      edu.push('Attended vocational/technical school likely')
-    }
-    if (seg.educationSomeCollege) {
-      edu.push('Attended but did not complete college likely')
-    }
-    if (seg.educationCollegeDegree) {
-      edu.push('Completed college likely')
-    }
-    if (seg.educationGraduateDegree) {
-      edu.push('Completed graduate school likely')
-    }
-    if (seg.educationUnknown) eduIncludeNull = true
-    if (edu.length || eduIncludeNull) {
-      filter.educationOfPerson = {
-        ...(edu.length ? { in: edu } : {}),
-        ...(eduIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Language codes
-    if (seg.languageCodes.length) {
-      filter.languageCode = {
-        in: seg.languageCodes
-          .flatMap((code) => {
-            if (code === 'es') {
-              return 'Spanish'
-            }
-            if (code === 'en') {
-              return 'English'
-            }
-            if (code === 'other') {
-              return OTHER_LANGUAGES
-            }
-            // Ignore any other values for now.
-            return ''
-          })
-          .filter(Boolean),
-        is: seg.languageCodes.includes('other') ? 'null' : undefined,
-      }
-    }
-
-    // Estimated income ranges (vendor domain strings)
-    const income: string[] = []
-    let incomeIncludeNull = false
-    if (seg.incomeRanges && seg.incomeRanges.length) {
-      income.push(...seg.incomeRanges)
-    }
-    if (seg.incomeUnknown) incomeIncludeNull = true
-    if (income.length || incomeIncludeNull) {
-      filter.estimatedIncomeAmount = {
-        ...(income.length ? { in: income } : {}),
-        ...(incomeIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    // Ethnic groups broad categories; Unknown means null
-    const eth: string[] = []
-    let ethIncludeNull = false
-    if (seg.ethnicityAsian) eth.push('East and South Asian')
-    if (seg.ethnicityEuropean) eth.push('European')
-    if (seg.ethnicityHispanic) eth.push('Hispanic and Portuguese')
-    if (seg.ethnicityAfricanAmerican) eth.push('Likely African-American')
-    if (seg.ethnicityOther) eth.push('Other')
-    if (seg.ethnicityUnknown) ethIncludeNull = true
-    if (eth.length || ethIncludeNull) {
-      filter.ethnicGroupsEthnicGroup1Desc = {
-        ...(eth.length ? { in: eth } : {}),
-        ...(ethIncludeNull ? { is: 'null' } : {}),
-      }
-    }
-
-    return filter
-  }
-
-  private appendDemographicFilter(
-    params: URLSearchParams,
-    demographicFilter: DemographicFilter,
-  ): void {
-    Object.entries(demographicFilter).forEach(([apiField, ops]) => {
-      if (!ops || typeof ops !== 'object') return
-      if (ops.eq !== undefined)
-        params.append(`filter[${apiField}][eq]`, String(ops.eq))
-      if (ops.is === 'null' || ops.is === 'not_null')
-        params.append(`filter[${apiField}][is]`, String(ops.is))
-      if (ops.in !== undefined) {
-        const values = Array.isArray(ops.in) ? ops.in : [ops.in]
-        values.forEach((v) =>
-          params.append(`filter[${apiField}][in][]`, String(v)),
-        )
-      }
-    })
-  }
-
-  private transformListResponse(data: PeopleListResponse) {
-    return {
-      pagination: data.pagination,
-      people: data.people.map((p: PersonListItem) => this.transformPerson(p)),
-    }
+    return customSegment ? convertVoterFileFilterToFilters(customSegment) : {}
   }
 
   private normalizePeopleResponse(
@@ -942,183 +578,18 @@ export class ContactsService {
     return []
   }
 
-  private transformPerson(p: PersonInput): PersonOutput {
-    const firstName = p.FirstName || ''
-    const lastName = p.LastName || ''
-    const gender =
-      p.Gender === 'M' ? 'Male' : p.Gender === 'F' ? 'Female' : 'Unknown'
-    const age =
-      typeof p.Age_Int === 'number' && Number.isFinite(p.Age_Int)
-        ? p.Age_Int
-        : p.Age && Number.isFinite(parseInt(p.Age, 10))
-          ? parseInt(p.Age, 10)
-          : 'Unknown'
-    const politicalParty = p.Parties_Description || 'Unknown'
-    const registeredVoter =
-      p.Registered_Voter === true
-        ? 'Yes'
-        : p.Registered_Voter === false
-          ? 'No'
-          : 'Unknown'
-    const activeVoter = 'Unknown'
-    const voterStatus = p.Voter_Status || 'Unknown'
-    const zipPlus4 = p.Residence_Addresses_ZipPlus4
-      ? `-${p.Residence_Addresses_ZipPlus4}`
-      : ''
-    const addressParts = [
-      p.Residence_Addresses_AddressLine,
-      [p.Residence_Addresses_City, p.Residence_Addresses_State]
-        .filter((v) => Boolean(v))
-        .join(', '),
-      [p.Residence_Addresses_Zip, zipPlus4].filter((v) => Boolean(v)).join(''),
-    ].filter((v) => Boolean(v))
-    const address = addressParts.length ? addressParts.join(', ') : 'Unknown'
-    const cellPhone = p.VoterTelephones_CellPhoneFormatted || 'Unknown'
-    const landline = p.VoterTelephones_LandlineFormatted || 'Unknown'
-    const maritalStatus = this.mapMaritalStatus(p.Marital_Status)
-    const hasChildrenUnder18 = this.mapPresenceOfChildren(
-      p.Presence_Of_Children,
-    )
-    const veteranStatus = p.Veteran_Status === 'Yes' ? 'Yes' : 'Unknown'
-    const homeowner = this.mapHomeowner(p.Homeowner_Probability_Model)
-    const businessOwner =
-      p.Business_Owner && p.Business_Owner.toLowerCase().includes('owner')
-        ? 'Yes'
-        : 'Unknown'
-    const levelOfEducation = this.mapEducation(p.Education_Of_Person)
-    const ethnicityGroup = this.mapEthnicity(p.EthnicGroups_EthnicGroup1Desc)
-    const language = p.Language_Code ? p.Language_Code : 'Unknown'
-    const estimatedIncomeRange = p.Estimated_Income_Amount || 'Unknown'
-    const lat = p.Residence_Addresses_Latitude || null
-    const lng = p.Residence_Addresses_Longitude || null
-    return {
-      id: p.id,
-      firstName,
-      lastName,
-      gender,
-      age,
-      politicalParty,
-      registeredVoter,
-      activeVoter,
-      voterStatus,
-      address,
-      cellPhone,
-      landline,
-      maritalStatus,
-      hasChildrenUnder18,
-      veteranStatus,
-      homeowner,
-      businessOwner,
-      levelOfEducation,
-      ethnicityGroup,
-      language,
-      estimatedIncomeRange,
-      lat,
-      lng,
-    }
-  }
-
-  private mapMaritalStatus(
-    value: string | null | undefined,
-  ): 'Likely Married' | 'Likely Single' | 'Married' | 'Single' | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v.includes('inferred married')) return 'Likely Married'
-    if (v.includes('inferred single')) return 'Likely Single'
-    if (v === 'married') return 'Married'
-    if (v === 'single') return 'Single'
-    return 'Unknown'
-  }
-
-  private mapPresenceOfChildren(
-    value: string | null | undefined,
-  ): 'Yes' | 'No' | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v === 'y' || v === 'yes') return 'Yes'
-    if (v === 'n' || v === 'no') return 'No'
-    return 'Unknown'
-  }
-
-  private mapHomeowner(
-    value: string | null | undefined,
-  ): 'Yes' | 'Likely' | 'No' | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v.includes('home owner') || v.includes('yes homeowner')) return 'Yes'
-    if (v.includes('probable homeowner')) return 'Likely'
-    if (v.includes('renter')) return 'No'
-    return 'Unknown'
-  }
-
-  private mapEducation(
-    value: string | null | undefined,
-  ):
-    | 'None'
-    | 'High School Diploma'
-    | 'Technical School'
-    | 'Some College'
-    | 'College Degree'
-    | 'Graduate Degree'
-    | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (v.includes('did not complete high school')) return 'None'
-    if (v.includes('completed high school')) return 'High School Diploma'
-    if (v.includes('vocational') || v.includes('technical school'))
-      return 'Technical School'
-    if (v.includes('did not complete college')) return 'Some College'
-    if (v.includes('completed college')) return 'College Degree'
-    if (v.includes('completed grad school') || v.includes('graduate'))
-      return 'Graduate Degree'
-    return 'Unknown'
-  }
-
-  private mapEthnicity(
-    value: string | null | undefined,
-  ):
-    | 'Asian'
-    | 'European'
-    | 'Hispanic'
-    | 'African American'
-    | 'Other'
-    | 'Unknown' {
-    if (!value) return 'Unknown'
-    const v = value.toLowerCase()
-    if (
-      v.includes('east & south asian') ||
-      v.includes('east and south asian') ||
-      v.includes('asian')
-    )
-      return 'Asian'
-    if (v.includes('european')) return 'European'
-    if (
-      v.includes('hispanic & portuguese') ||
-      v.includes('hispanic and portuguese') ||
-      v.includes('hispanic')
-    )
-      return 'Hispanic'
-    if (v.includes('likely african american') || v.includes('african american'))
-      return 'African American'
-    if (v.includes('other')) return 'Other'
-    return 'Unknown'
-  }
-
   private async queryAlternativeDistrictName(
     params: URLSearchParams,
     token: string,
     endpoint: 'people' | 'search' | 'download' | 'stats',
     alternativeDistrictName?: string,
-    options?: { responseType?: 'stream' },
+    options?: { responseType?: 'stream'; body?: Record<string, unknown> },
   ) {
     if (!alternativeDistrictName) {
       throw new BadGatewayException(
         `Failed to fetch from people API (${endpoint})`,
       )
     }
-
-    const newParams = new URLSearchParams(params)
-    newParams.set('districtName', alternativeDistrictName)
 
     const endpointMap = {
       people: '/v1/people',
@@ -1128,6 +599,30 @@ export class ContactsService {
     }
 
     try {
+      if (endpoint === 'download' && options?.body) {
+        const body = {
+          ...options.body,
+          districtName: alternativeDistrictName,
+        }
+        return await lastValueFrom(
+          this.httpService.post(
+            `${PEOPLE_API_URL}${endpointMap[endpoint]}`,
+            body,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              ...(options?.responseType && {
+                responseType: options.responseType,
+              }),
+            },
+          ),
+        )
+      }
+
+      const newParams = new URLSearchParams(params)
+      newParams.set('districtName', alternativeDistrictName)
+
       return await lastValueFrom(
         this.httpService.get(
           `${PEOPLE_API_URL}${endpointMap[endpoint]}?${newParams.toString()}`,
@@ -1161,6 +656,69 @@ export class ContactsService {
         campaignId,
         { pathToVictory: { electionLocation: alternativeDistrictName } },
         false,
+      )
+    }
+  }
+
+  private async fetchPeopleWithFallbackPost(
+    endpoint: 'people' | 'search',
+    body: Record<string, unknown>,
+    token: string,
+    alternativeDistrictName?: string,
+    campaignId?: number,
+  ): Promise<PeopleListResponse> {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(
+          `${PEOPLE_API_URL}/v1/people${
+            endpoint === 'people' ? '' : '/search'
+          }`,
+          body,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      )
+      if (
+        response.data.pagination?.totalResults <= 0 &&
+        alternativeDistrictName
+      ) {
+        const alternativeBody = {
+          ...body,
+          districtName: alternativeDistrictName,
+        }
+        const alternativeResponse = await lastValueFrom(
+          this.httpService.post(
+            `${PEOPLE_API_URL}/v1/people${
+              endpoint === 'people' ? '' : '/search'
+            }`,
+            alternativeBody,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          ),
+        )
+        const altData = alternativeResponse.data as PeopleListResponse
+        if (campaignId && alternativeDistrictName) {
+          await this.updateCampaignDistrictNameIfSuccessful(
+            campaignId,
+            alternativeDistrictName,
+            altData.pagination.totalResults > 0,
+          )
+        }
+        return altData
+      }
+      return response.data as PeopleListResponse
+    } catch (error) {
+      this.logger.error(`Failed to fetch from people API (${endpoint})`, {
+        error,
+      })
+      throw new BadGatewayException(
+        `Failed to fetch from people API (${endpoint})`,
       )
     }
   }
@@ -1228,47 +786,6 @@ export class ContactsService {
       throw new BadGatewayException(
         `Failed to fetch from people API (${endpoint})`,
       )
-    }
-  }
-
-  private async fetchStatsWithFallback(
-    params: URLSearchParams,
-    token: string,
-    alternativeDistrictName?: string,
-  ): Promise<PeopleStats> {
-    try {
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people/stats?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        ),
-      )
-      if (response.data.totalVoters <= 0 && alternativeDistrictName) {
-        const alternativeResponse = await this.queryAlternativeDistrictName(
-          params,
-          token,
-          'stats',
-          alternativeDistrictName,
-        )
-        return alternativeResponse.data as PeopleStats
-      }
-      return response.data as PeopleStats
-    } catch (error) {
-      this.logger.error('Failed to fetch stats from people API', { error })
-      if (alternativeDistrictName) {
-        const alternativeResponse = await this.queryAlternativeDistrictName(
-          params,
-          token,
-          'stats',
-          alternativeDistrictName,
-        )
-        return alternativeResponse.data as PeopleStats
-      }
-      throw new BadGatewayException('Failed to fetch stats from people API')
     }
   }
 }

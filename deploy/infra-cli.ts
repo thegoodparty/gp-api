@@ -64,12 +64,15 @@ const setupStack = async (env: string) => {
     console.warn(
       'IMAGE_URI environment variable is not set, building image locally',
     )
+    run('npm run generate', { cwd: `${__dirname}/..` })
+    run('npm run build', { cwd: `${__dirname}/..` })
+
     run(
       `aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin ${ECR_REGISTRY}`,
     )
     imageUri = `${ECR_REGISTRY}/gp-api:${userInfo().username}-${Date.now()}`
     run(
-      `docker build --platform linux/amd64 --build-arg CACHEBUST=${process.env.GITHUB_SHA} -t "${imageUri}" -f ./Dockerfile .. --push`,
+      `docker build --platform linux/amd64 -t "${imageUri}" -f ./Dockerfile .. --push`,
     )
     console.log('✅  Built and pushed image to ECR')
   }

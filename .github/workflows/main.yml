@@ -39,7 +39,9 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
       - run: npx prettier --check "src/**/*.{ts,js,json}"
-      - run: npm run test
+      - run: npm run test -- --coverage
+
+      - run: npm run build
 
       # Determine deployment context
       - name: Determine deployment context
@@ -66,13 +68,8 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
-        id: docker
         run: |
-          docker build \
-            --build-arg CACHEBUST=${{ github.sha }} \
-            -t "${IMAGE_URI}" \
-            -f deploy/Dockerfile \
-            .
+          docker build -t "${IMAGE_URI}" -f deploy/Dockerfile .
           docker push "${IMAGE_URI}"
 
       # Pulumi deployment
