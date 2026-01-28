@@ -157,6 +157,7 @@ jobs:
         run: npm run test -- --coverage
 
       - name: Calculate overall coverage
+        id: coverage-calc
         if: always()
         run: |
           if [ -f "coverage/coverage-summary.json" ]; then
