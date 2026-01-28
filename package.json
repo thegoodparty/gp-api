@@ -157,6 +157,7 @@
     "@types/zipcodes": "^8.0.5",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^4.0.15",
     "@vitest/ui": "^4.0.15",
     "aws-sdk-client-mock": "^4.1.0",
     "eslint": "^8.0.0",
