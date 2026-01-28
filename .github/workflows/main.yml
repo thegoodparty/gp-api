@@ -156,9 +156,21 @@ jobs:
       - name: Run tests with Coverage
         run: npm run test -- --coverage
 
+      - name: Calculate overall coverage
+        if: always()
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            OVERALL=$(jq -r '(.total.lines.pct + .total.statements.pct + .total.functions.pct + .total.branches.pct) / 4' coverage/coverage-summary.json)
+            echo "## 📊 Overall Test Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**${OVERALL}%** (average of lines, statements, functions, and branches)" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Publish coverage to PR + summary
         if: always()
         uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          threshold-icons: "{0: '🔴', 80: '🟠', 90: '🟢'}"
 
   tests:
     name: E2E Tests
