@@ -161,9 +161,14 @@ jobs:
         run: |
           if [ -f "coverage/coverage-summary.json" ]; then
             OVERALL=$(jq -r '(.total.lines.pct + .total.statements.pct + .total.functions.pct + .total.branches.pct) / 4' coverage/coverage-summary.json)
+            OVERALL_ROUNDED=$(printf "%.2f" "$OVERALL")
+            echo "overall_pct=$OVERALL_ROUNDED" >> $GITHUB_OUTPUT
+            echo "📊 Overall Coverage: ${OVERALL_ROUNDED}%"
             echo "## 📊 Overall Test Coverage" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**${OVERALL}%** (average of lines, statements, functions, and branches)" >> $GITHUB_STEP_SUMMARY
+            echo "**${OVERALL_ROUNDED}%** (average of lines, statements, functions, and branches)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "overall_pct=0" >> $GITHUB_OUTPUT
           fi
 
       - name: Publish coverage to PR + summary
@@ -171,6 +176,17 @@ jobs:
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           threshold-icons: "{0: '🔴', 80: '🟠', 90: '🟢'}"
+
+      - name: Add overall coverage to PR comment
+        if: always() && github.event_name == 'pull_request' && steps.coverage-calc.outputs.overall_pct != '0'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ## 📊 Overall Test Coverage
+
+            **${{ steps.coverage-calc.outputs.overall_pct }}%** (average of lines, statements, functions, and branches)
+          comment-id: ${{ steps.coverage-calc.outputs.comment-id }}
 
   tests:
     name: E2E Tests
