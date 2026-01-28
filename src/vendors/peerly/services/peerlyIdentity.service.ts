@@ -7,13 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common'
 import { method as HttpMethod } from '@poppanator/http-constants'
-import {
-  Campaign,
-  Domain,
-  OfficeLevel,
-  TcrCompliance,
-  User,
-} from '@prisma/client'
+import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
 import { format } from '@redtea/format-axios-error'
 import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
