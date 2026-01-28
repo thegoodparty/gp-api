@@ -85,7 +85,6 @@ export class ContactsService {
       page,
       filters,
       search,
-      full: true,
     }
 
     const token = usingStatewideFallback
@@ -143,7 +142,6 @@ export class ContactsService {
       districtName: locationData.districtName,
       size: String(dto.size ?? 500),
       hasCellPhone: 'true',
-      full: 'true',
       excludeIds: (dto.excludeIds ?? []) as string[],
     }
 
@@ -251,7 +249,6 @@ export class ContactsService {
       districtType,
       districtName,
       filters,
-      full: true,
     }
 
     let token: string | undefined
