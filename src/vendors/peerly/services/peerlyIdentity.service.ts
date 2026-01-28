@@ -52,8 +52,8 @@ import {
   PeerlySubmitCVResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { getPeerlyLocaleFromBallotLevel } from '../utils/getPeerlyLocaleFromBallotLevel.util'
 import {
+  getPeerlyLocaleFromOfficeLevel,
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
   PEERLY_USECASE,
@@ -558,31 +558,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       await this.placesService.getAddressByPlaceId(placeId!),
     )
 
-    // Use officeLevel first (always present), but fallback to ballotLevel mapping if needed
-    let peerlyLocale: string | undefined
-
-    if (officeLevel === OfficeLevel.federal) {
-      peerlyLocale = PEERLY_LOCALITIES.federal
-    } else if (officeLevel === OfficeLevel.state) {
-      peerlyLocale = PEERLY_LOCALITIES.state
-    } else if (officeLevel === OfficeLevel.local) {
-      peerlyLocale = PEERLY_LOCALITIES.local
-    } else if (ballotLevel) {
-      // Fallback to ballotLevel mapping for backwards compatibility
-      peerlyLocale = getPeerlyLocaleFromBallotLevel(ballotLevel)
-      this.logger.debug(
-        `Determined locality '${peerlyLocale}' from ballotLevel '${ballotLevel}' (fallback, officeLevel: '${officeLevel}')`,
-      )
-    }
-
-    if (!peerlyLocale) {
-      this.logger.error(
-        `No Peerly locality mapping for officeLevel: ${officeLevel}, ballotLevel: ${ballotLevel}`,
-      )
-      throw new BadRequestException(
-        `Unable to determine Peerly locality from officeLevel '${officeLevel}' or ballotLevel '${ballotLevel}'`,
-      )
-    }
+    // Map officeLevel to Peerly locality
+    const peerlyLocale = getPeerlyLocaleFromOfficeLevel(officeLevel)
 
     const verificationType =
       peerlyLocale === PEERLY_LOCALITIES.federal
@@ -592,12 +569,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const isFederal = peerlyLocale === PEERLY_LOCALITIES.federal
     const isLocal = peerlyLocale === PEERLY_LOCALITIES.local
 
-    // Warn if required federal fields are missing
+    // Validate required federal fields
     if (isFederal) {
       if (!fecCommitteeId) {
-        this.logger.warn(
+        this.logger.error(
           `[Campaign Verify] Missing fec_committee_id for federal submission (campaignId=${campaign.id}). ` +
             `This field is required by Peerly for federal verification.`,
+        )
+        throw new BadRequestException(
+          `FEC Committee ID is required for federal candidates.`,
         )
       }
       if (!committeeType) {
@@ -640,7 +620,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       state: state?.short_name,
       campaign_website: domain ? `https://${domain?.name}` : undefined,
       // Federal-specific fields
-      ...(isFederal && fecCommitteeId
+      ...(isFederal
         ? {
             fec_committee_id: fecCommitteeId,
           }

@@ -282,37 +282,6 @@ describe('PeerlyIdentityService', () => {
           city_county: 'Sangamon',
         },
       },
-      // Fallback to ballotLevel when officeLevel is missing
-      {
-        name: 'falls back to ballotLevel FEDERAL when officeLevel is undefined',
-        input: {
-          officeLevel: null,
-          committeeType: PEERLY_COMMITTEE_TYPE.House,
-          fecCommitteeId: 'C00123456',
-          ballotLevel: BallotReadyPositionLevel.FEDERAL,
-        },
-        expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
-          committee_type: PEERLY_COMMITTEE_TYPE.House,
-          fec_committee_id: 'C00123456',
-          has_city_county: false,
-        },
-      },
-      {
-        name: 'falls back to ballotLevel STATE when officeLevel is undefined',
-        input: {
-          officeLevel: null,
-          committeeType: null,
-          fecCommitteeId: null,
-          ballotLevel: BallotReadyPositionLevel.STATE,
-        },
-        expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-          committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
-          fec_committee_id: undefined,
-          has_city_county: false,
-        },
-      },
     ]
 
     testCases.forEach(({ name, input, expected }) => {
@@ -362,34 +331,6 @@ describe('PeerlyIdentityService', () => {
       })
     })
 
-    it('throws BadRequestException when officeLevel and ballotLevel are both missing', async () => {
-      const campaign = createMockCampaign({
-        details: {
-          electionDate: '2024-11-05',
-          ballotLevel: undefined,
-        },
-      })
-
-      const tcrComplianceInput = {
-        email: 'candidate@example.com',
-        ein: '12-3456789',
-        peerlyIdentityId: 'peerly-123',
-        filingUrl: 'https://fec.gov/filing/123',
-        officeLevel: null,
-        fecCommitteeId: null,
-        committeeType: null,
-      }
-
-      await expect(
-        service.submitCampaignVerifyRequest(
-          tcrComplianceInput,
-          baseUser,
-          campaign,
-          baseDomain,
-        ),
-      ).rejects.toThrow(BadRequestException)
-    })
-
     it('throws BadRequestException when federal candidate is missing committeeType', async () => {
       const campaign = createMockCampaign({
         details: {
@@ -406,6 +347,34 @@ describe('PeerlyIdentityService', () => {
         officeLevel: OfficeLevel.federal,
         fecCommitteeId: 'C00123456',
         committeeType: null,
+      }
+
+      await expect(
+        service.submitCampaignVerifyRequest(
+          tcrComplianceInput,
+          baseUser,
+          campaign,
+          baseDomain,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('throws BadRequestException when federal candidate is missing fecCommitteeId', async () => {
+      const campaign = createMockCampaign({
+        details: {
+          electionDate: '2024-11-05',
+          ballotLevel: BallotReadyPositionLevel.FEDERAL,
+        },
+      })
+
+      const tcrComplianceInput = {
+        email: 'candidate@example.com',
+        ein: '12-3456789',
+        peerlyIdentityId: 'peerly-123',
+        filingUrl: 'https://fec.gov/filing/123',
+        officeLevel: OfficeLevel.federal,
+        fecCommitteeId: null,
+        committeeType: PEERLY_COMMITTEE_TYPE.House,
       }
 
       await expect(

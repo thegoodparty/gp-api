@@ -30,7 +30,7 @@ model TcrCompliance {
   filingUrl             String                     @map("filing_url")
   phone                 String
   email                 String
-  officeLevel           OfficeLevel?
+  officeLevel           OfficeLevel                @map("office_level")
   fecCommitteeId        String?                    @map("fec_committee_id")
   committeeType         CommitteeType?             @default(CA) @map("committee_type")
   status                TcrComplianceStatus?       @default(submitted)
