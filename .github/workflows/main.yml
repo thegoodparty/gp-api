@@ -137,6 +137,29 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tests with Coverage
+        run: npm run test -- --coverage
+
+      - name: Publish coverage to PR + summary
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+
   tests:
     name: E2E Tests
     needs: main
