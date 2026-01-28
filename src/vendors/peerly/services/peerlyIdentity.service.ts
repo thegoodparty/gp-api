@@ -542,10 +542,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const { electionDate, ballotLevel } = campaignDetails
 
     if (!electionDate) {
-      this.logger.warn(
-        `[Campaign Verify] No electionDate found for campaignId=${campaign.id}. ` +
-          `Election date is required for federal (H, S, P) and state/local (CA) committee types. ` +
-          `Peerly submission may be rejected.`,
+      throw new BadRequestException(
+        'Campaign must have electionDate to submit CV request',
       )
     }
 
@@ -632,8 +630,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       // CommitteeType enum values (H, S, P, CA) match Peerly's expected values directly
       committee_type: committeeType ?? PEERLY_COMMITTEE_TYPE.Candidate,
       committee_ein: ein,
-      // TODO(ENG-6400): using `electionDate!` is dangerous here.
-      election_date: formatDate(new Date(electionDate!), DateFormats.isoDate),
+      election_date: formatDate(new Date(electionDate), DateFormats.isoDate),
       filing_address_line1,
       filing_city: city?.long_name,
       filing_state: state?.short_name,
