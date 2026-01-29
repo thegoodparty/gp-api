@@ -12,6 +12,8 @@ const BASE_TCR_DATA = {
   filingUrl: 'https://sos.tn.co/filing',
   email: 'tyler@fightclub.org',
   phone: '288-555-0153',
+  officeLevel: 'local',
+  committeeType: 'CANDIDATE',
 }
 
 test.describe('Campaigns - TCR Compliance', () => {
