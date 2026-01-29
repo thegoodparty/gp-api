@@ -47,6 +47,7 @@ import {
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
 import {
+  getPeerlyCommitteeType,
   getPeerlyLocaleFromOfficeLevel,
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
@@ -574,15 +575,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           `FEC Committee ID is required for federal candidates.`,
         )
       }
-      if (!committeeType) {
-        this.logger.error(
-          `[Campaign Verify] Missing committee_type for federal submission (campaignId=${campaign.id}). ` +
-            `Expected H (House), S (Senate), or P (Presidential).`,
-        )
-        throw new BadRequestException(
-          `Committee type is required for federal candidates. Expected H (House), S (Senate), or P (Presidential).`,
-        )
-      }
     }
 
     const isMissingLocalLocation =
@@ -601,8 +593,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       general_campaign_email: email,
       verification_type: verificationType,
       filing_url: ensureUrlHasProtocol(filingUrl),
-      // CommitteeType enum values (H, S, P, CA) match Peerly's expected values directly
-      committee_type: committeeType ?? PEERLY_COMMITTEE_TYPE.Candidate,
+      // Map Prisma enum to Peerly API values
+      committee_type: getPeerlyCommitteeType(committeeType),
       committee_ein: ein,
       election_date: formatDate(new Date(electionDate), DateFormats.isoDate),
       filing_address_line1,

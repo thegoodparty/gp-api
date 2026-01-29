@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import {
   Campaign,
+  CommitteeType,
   Domain,
   DomainStatus,
   OfficeLevel,
@@ -16,10 +17,7 @@ import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { UsersService } from '../../../users/services/users.service'
 import { GooglePlacesService } from '../../google/services/google-places.service'
 import { SlackService } from '../../slack/services/slack.service'
-import {
-  PEERLY_COMMITTEE_TYPE,
-  PEERLY_CV_VERIFICATION_TYPE,
-} from '../peerly.types'
+import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 
@@ -192,13 +190,13 @@ describe('PeerlyIdentityService', () => {
         name: 'federal House candidate',
         input: {
           officeLevel: OfficeLevel.federal,
-          committeeType: PEERLY_COMMITTEE_TYPE.House,
+          committeeType: CommitteeType.HOUSE,
           fecCommitteeId: 'C00123456',
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
           verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
-          committee_type: PEERLY_COMMITTEE_TYPE.House,
+          committee_type: 'H', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
         },
@@ -207,13 +205,13 @@ describe('PeerlyIdentityService', () => {
         name: 'federal Senate candidate',
         input: {
           officeLevel: OfficeLevel.federal,
-          committeeType: PEERLY_COMMITTEE_TYPE.Senate,
+          committeeType: CommitteeType.SENATE,
           fecCommitteeId: 'C00123456',
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
           verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
-          committee_type: PEERLY_COMMITTEE_TYPE.Senate,
+          committee_type: 'S', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
         },
@@ -222,13 +220,13 @@ describe('PeerlyIdentityService', () => {
         name: 'federal Presidential candidate',
         input: {
           officeLevel: OfficeLevel.federal,
-          committeeType: PEERLY_COMMITTEE_TYPE.Presidential,
+          committeeType: CommitteeType.PRESIDENTIAL,
           fecCommitteeId: 'C00123456',
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
           verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
-          committee_type: PEERLY_COMMITTEE_TYPE.Presidential,
+          committee_type: 'P', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
         },
@@ -238,13 +236,13 @@ describe('PeerlyIdentityService', () => {
         name: 'state candidate',
         input: {
           officeLevel: OfficeLevel.state,
-          committeeType: null,
+          committeeType: CommitteeType.CANDIDATE,
           fecCommitteeId: null,
           ballotLevel: BallotReadyPositionLevel.STATE,
         },
         expected: {
           verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-          committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
+          committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: false,
         },
@@ -254,13 +252,13 @@ describe('PeerlyIdentityService', () => {
         name: 'local CITY-level candidate',
         input: {
           officeLevel: OfficeLevel.local,
-          committeeType: null,
+          committeeType: CommitteeType.CANDIDATE,
           fecCommitteeId: null,
           ballotLevel: BallotReadyPositionLevel.CITY,
         },
         expected: {
           verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-          committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
+          committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: true,
           city_county: 'Springfield',
@@ -270,13 +268,13 @@ describe('PeerlyIdentityService', () => {
         name: 'local COUNTY-level candidate',
         input: {
           officeLevel: OfficeLevel.local,
-          committeeType: null,
+          committeeType: CommitteeType.CANDIDATE,
           fecCommitteeId: null,
           ballotLevel: BallotReadyPositionLevel.COUNTY,
         },
         expected: {
           verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
-          committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
+          committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: true,
           city_county: 'Sangamon',
@@ -331,34 +329,6 @@ describe('PeerlyIdentityService', () => {
       })
     })
 
-    it('throws BadRequestException when federal candidate is missing committeeType', async () => {
-      const campaign = createMockCampaign({
-        details: {
-          electionDate: '2024-11-05',
-          ballotLevel: BallotReadyPositionLevel.FEDERAL,
-        },
-      })
-
-      const tcrComplianceInput = {
-        email: 'candidate@example.com',
-        ein: '12-3456789',
-        peerlyIdentityId: 'peerly-123',
-        filingUrl: 'https://fec.gov/filing/123',
-        officeLevel: OfficeLevel.federal,
-        fecCommitteeId: 'C00123456',
-        committeeType: null,
-      }
-
-      await expect(
-        service.submitCampaignVerifyRequest(
-          tcrComplianceInput,
-          baseUser,
-          campaign,
-          baseDomain,
-        ),
-      ).rejects.toThrow(BadRequestException)
-    })
-
     it('throws BadRequestException when federal candidate is missing fecCommitteeId', async () => {
       const campaign = createMockCampaign({
         details: {
@@ -374,7 +344,7 @@ describe('PeerlyIdentityService', () => {
         filingUrl: 'https://fec.gov/filing/123',
         officeLevel: OfficeLevel.federal,
         fecCommitteeId: null,
-        committeeType: PEERLY_COMMITTEE_TYPE.House,
+        committeeType: CommitteeType.HOUSE,
       }
 
       await expect(

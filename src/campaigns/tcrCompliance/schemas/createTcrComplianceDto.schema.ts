@@ -52,18 +52,18 @@ export class CreateTcrComplianceDto extends createZodDto(
         }
 
         // Committee Type is required for federal and must be H (House), S (Senate), or P (Presidential).
-        const federalCommitteeTypes: CommitteeType[] = [
-          CommitteeType.H,
-          CommitteeType.S,
-          CommitteeType.P,
-        ]
+        const federalCommitteeTypes = new Set<CommitteeType>([
+          CommitteeType.HOUSE,
+          CommitteeType.SENATE,
+          CommitteeType.PRESIDENTIAL,
+        ])
         if (!data.committeeType) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Committee Type is required for federal office level',
             path: ['committeeType'],
           })
-        } else if (!federalCommitteeTypes.includes(data.committeeType)) {
+        } else if (!federalCommitteeTypes.has(data.committeeType)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
@@ -93,7 +93,10 @@ export class CreateTcrComplianceDto extends createZodDto(
           })
         }
         // Non-federal must use CA (Candidate) committee type if provided.
-        if (data.committeeType && data.committeeType !== CommitteeType.CA) {
+        if (
+          data.committeeType &&
+          data.committeeType !== CommitteeType.CANDIDATE
+        ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
@@ -111,12 +114,15 @@ export class CreateTcrComplianceDto extends createZodDto(
         return { ...data, committeeType: data.committeeType }
       }
 
-      // Non-federal without committeeType: default to CA
+      // Non-federal without committeeType: default to CANDIDATE
       if (data.officeLevel !== OfficeLevel.federal) {
         logger.warn(
-          `committeeType not provided for non-federal officeLevel "${data.officeLevel}", defaulting to CA`,
+          `committeeType not provided for non-federal officeLevel "${data.officeLevel}", defaulting to CANDIDATE`,
         )
-        return { ...data, committeeType: CommitteeType.CA }
+        return {
+          ...data,
+          committeeType: CommitteeType.CANDIDATE,
+        }
       }
 
       // Federal without committeeType - superRefine should have caught this
