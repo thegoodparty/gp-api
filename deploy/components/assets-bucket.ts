@@ -6,6 +6,7 @@ export interface AssetsBucketConfig {
 }
 
 export function createAssetsBucket({ environment }: AssetsBucketConfig): {
+  bucket: aws.s3.BucketV2
   bucketRegionalDomainName: pulumi.Output<string>
 } {
   const select = <T>(values: Record<'dev' | 'qa' | 'prod', T>): T =>
@@ -22,33 +23,51 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
     forceDestroy: false,
   })
 
-  if (environment !== 'prod') {
-    new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
+  // Enable public access blocks for ALL environments to prevent direct S3 access
+  // Access should only be allowed through CloudFront OAC
+  new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
+    bucket: bucket.id,
+    blockPublicAcls: true,
+    blockPublicPolicy: true,
+    ignorePublicAcls: true,
+    restrictPublicBuckets: true,
+  })
+
+  // NOTE: Bucket policy allowing CloudFront OAC access is created in assets-router.ts
+  // for dev/qa environments. For prod, the CloudFront distribution ARN needs to be
+  // provided separately (see PROD_CLOUDFRONT_DISTRIBUTION_ARN below).
+
+  // For prod environment, we need to create the CloudFront-only bucket policy here
+  // since it doesn't go through assets-router.ts
+  if (environment === 'prod') {
+    const prodCloudfrontDistributionArn =
+      'arn:aws:cloudfront::333022194791:distribution/E2LRA7IV6F5YST'
+
+    new aws.s3.BucketPolicy('assetsBucketPolicy', {
       bucket: bucket.id,
-      blockPublicAcls: false,
-      blockPublicPolicy: false,
-      ignorePublicAcls: false,
-      restrictPublicBuckets: false,
+      policy: aws.iam.getPolicyDocumentOutput({
+        statements: [
+          {
+            principals: [
+              {
+                type: 'Service',
+                identifiers: ['cloudfront.amazonaws.com'],
+              },
+            ],
+            actions: ['s3:GetObject'],
+            resources: [pulumi.interpolate`${bucket.arn}/*`],
+            conditions: [
+              {
+                test: 'StringEquals',
+                variable: 'AWS:SourceArn',
+                values: [prodCloudfrontDistributionArn],
+              },
+            ],
+          },
+        ],
+      }).json,
     })
   }
-
-  new aws.s3.BucketPolicy('assetsBucketPolicy', {
-    bucket: bucket.id,
-    policy: aws.iam.getPolicyDocumentOutput({
-      statements: [
-        {
-          principals: [
-            {
-              type: '*',
-              identifiers: ['*'],
-            },
-          ],
-          actions: ['s3:GetObject'],
-          resources: [pulumi.interpolate`${bucket.arn}/*`],
-        },
-      ],
-    }).json,
-  })
 
   new aws.s3.BucketCorsConfigurationV2('assetsBucketCors', {
     bucket: bucket.id,
@@ -74,6 +93,7 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
   })
 
   return {
+    bucket,
     bucketRegionalDomainName: bucket.bucketRegionalDomainName,
   }
 }
