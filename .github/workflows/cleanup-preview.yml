@@ -17,7 +17,7 @@ jobs:
     outputs:
       stacks: ${{ steps.find-stale.outputs.stacks }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -26,7 +26,7 @@ jobs:
           aws-region: us-west-2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -58,7 +58,7 @@ jobs:
       matrix:
         stack: ${{ fromJson(needs.discover-stale-stacks.outputs.stacks) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -67,7 +67,7 @@ jobs:
           aws-region: us-west-2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
