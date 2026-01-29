@@ -4,6 +4,7 @@ import { createService } from './components/service'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
 import { createVpc } from './components/vpc'
+import { createNewRelicLogForwarder } from './components/newrelic-log-forwarder'
 
 export = async () => {
   const config = new pulumi.Config()
@@ -430,6 +431,17 @@ export = async () => {
       },
     ],
   })
+
+  if (environment !== 'preview') {
+    createNewRelicLogForwarder({
+      environment,
+      secretArn: secretInfo.arn,
+      secretKey: 'NEW_RELIC_LICENSE_KEY',
+      logGroupName: service.logGroupName,
+      logGroupArn: service.logGroupArn,
+      serviceName: secret.NEW_RELIC_APP_NAME,
+    })
+  }
 
   return {
     serviceUrl: service.url,
