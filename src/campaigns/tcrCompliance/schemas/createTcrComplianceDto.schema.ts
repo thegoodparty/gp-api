@@ -51,7 +51,7 @@ export class CreateTcrComplianceDto extends createZodDto(
           })
         }
 
-        // Committee Type is required for federal and must be H (House), S (Senate), or P (Presidential).
+        // Committee Type is required for federal and must be HOUSE, SENATE, or PRESIDENTIAL.
         const federalCommitteeTypes = new Set<CommitteeType>([
           CommitteeType.HOUSE,
           CommitteeType.SENATE,
@@ -67,7 +67,7 @@ export class CreateTcrComplianceDto extends createZodDto(
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'Committee Type must be H (House), S (Senate), or P (Presidential) for federal office level',
+              'Committee Type must be HOUSE, SENATE, or PRESIDENTIAL for federal office level',
             path: ['committeeType'],
           })
         }
@@ -92,7 +92,7 @@ export class CreateTcrComplianceDto extends createZodDto(
             path: ['fecCommitteeId'],
           })
         }
-        // Non-federal must use CA (Candidate) committee type if provided.
+        // Non-federal must use CANDIDATE committee type if provided.
         if (
           data.committeeType &&
           data.committeeType !== CommitteeType.CANDIDATE
@@ -100,7 +100,7 @@ export class CreateTcrComplianceDto extends createZodDto(
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'Committee Type must be CA (Candidate) for non-federal office level',
+              'Committee Type must be CANDIDATE for non-federal office level',
             path: ['committeeType'],
           })
         }
