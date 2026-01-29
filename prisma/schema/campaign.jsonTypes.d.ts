@@ -67,6 +67,7 @@ declare global {
       electionId?: string | null
       tier?: string
       einNumber?: string | null
+      einSupportingDocument?: string | null
       wonGeneral?: boolean
     }
     // TODO: Reconcile these w/ CampaignDetails once front-end catches up.
