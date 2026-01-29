@@ -1,5 +1,6 @@
-import { OfficeLevel } from '@prisma/client'
+import { CommitteeType, OfficeLevel } from '@prisma/client'
 import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
+import { PEERLY_COMMITTEE_TYPE } from '../peerly.types'
 
 export const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 export const PEERLY_USECASE = 'POLITICAL'
@@ -20,6 +21,21 @@ export const getPeerlyLocaleFromOfficeLevel = (
       return PEERLY_LOCALITIES.state
     case OfficeLevel.local:
       return PEERLY_LOCALITIES.local
+  }
+}
+
+export const getPeerlyCommitteeType = (
+  committeeType: CommitteeType,
+): PEERLY_COMMITTEE_TYPE => {
+  switch (committeeType) {
+    case CommitteeType.HOUSE:
+      return PEERLY_COMMITTEE_TYPE.House
+    case CommitteeType.SENATE:
+      return PEERLY_COMMITTEE_TYPE.Senate
+    case CommitteeType.PRESIDENTIAL:
+      return PEERLY_COMMITTEE_TYPE.Presidential
+    case CommitteeType.CANDIDATE:
+      return PEERLY_COMMITTEE_TYPE.Candidate
   }
 }
 

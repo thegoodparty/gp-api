@@ -15,10 +15,10 @@ enum OfficeLevel {
 // Committee types that map to Peerly's committee_type field.
 // See: https://api-docs.peerly.com/reference/submit-campaign-verify-request
 enum CommitteeType {
-  H  // House (federal)
-  S  // Senate (federal)
-  P  // Presidential (federal)
-  CA // Candidate (state/local)
+  HOUSE        @map("house")
+  SENATE       @map("senate")
+  PRESIDENTIAL @map("presidential")
+  CANDIDATE    @map("candidate")
 }
 
 model TcrCompliance {
@@ -32,7 +32,7 @@ model TcrCompliance {
   email                 String
   officeLevel           OfficeLevel                @map("office_level")
   fecCommitteeId        String?                    @map("fec_committee_id")
-  committeeType         CommitteeType?             @default(CA) @map("committee_type")
+  committeeType         CommitteeType              @default(CANDIDATE) @map("committee_type")
   status                TcrComplianceStatus?       @default(submitted)
   tdlcNumber            String?                    @map("tdlc_number")
   createdAt             DateTime                   @default(now()) @map("created_at")
