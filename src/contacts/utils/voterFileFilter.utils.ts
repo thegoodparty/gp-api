@@ -104,21 +104,8 @@ export const convertVoterFileFilterToFilters = (
         filters['voterStatus'] =
           value.length === 1 ? { eq: value[0] } : { in: value }
       } else if (key === 'incomeRanges') {
-        if (!segment.incomeUnknown) {
-          const numericValues = value
-            .map((v) => {
-              const num = Number(v)
-              return Number.isFinite(num) ? num : null
-            })
-            .filter((v): v is number => v !== null)
-
-          if (numericValues.length > 0) {
-            filters['estimatedIncomeAmountInt'] =
-              numericValues.length === 1
-                ? { eq: numericValues[0] }
-                : { in: numericValues }
-          }
-        }
+        // Income ranges are handled separately after the loop
+        // to allow combining with incomeUnknown using _includeNull
       } else {
         filters[key] = value.length === 1 ? { eq: value[0] } : { in: value }
       }
@@ -316,8 +303,83 @@ export const convertVoterFileFilterToFilters = (
         : { in: homeownerValues }
   }
 
-  if (segment.incomeUnknown && !filters['estimatedIncomeAmountInt']) {
+  // Handle income ranges similar to age ranges
+  const incomeRangeMapping: Record<string, { min: number; max: number | null }> =
+    {
+      'Under $25k': { min: 0, max: 25000 },
+      '$25k - $35k': { min: 25000, max: 35000 },
+      '$35k - $50k': { min: 35000, max: 50000 },
+      '$50k - $75k': { min: 50000, max: 75000 },
+      '$75k - $100k': { min: 75000, max: 100000 },
+      '$100k - $125k': { min: 100000, max: 125000 },
+      '$125k - $150k': { min: 125000, max: 150000 },
+      '$150k - $200k': { min: 150000, max: 200000 },
+      '$200k+': { min: 200000, max: null },
+    }
+
+  const incomeRanges: Array<{ min: number; max: number | null }> = []
+  if (segment.incomeRanges && Array.isArray(segment.incomeRanges)) {
+    for (const rangeStr of segment.incomeRanges) {
+      const range = incomeRangeMapping[rangeStr]
+      if (range) {
+        incomeRanges.push(range)
+      }
+    }
+  }
+
+  const shouldIncludeNullIncome = segment.incomeUnknown
+  if (incomeRanges.length > 0) {
+    if (incomeRanges.length === 1) {
+      const range = incomeRanges[0]
+      if (range.max === null) {
+        filters['estimatedIncomeAmountInt'] = { gte: range.min }
+      } else {
+        filters['estimatedIncomeAmountInt'] = { gte: range.min, lte: range.max }
+      }
+    } else {
+      const sortedRanges = incomeRanges.sort((a, b) => a.min - b.min)
+      const hasUnbounded = sortedRanges.some((r) => r.max === null)
+      const minIncome = sortedRanges[0].min
+      const maxIncome = hasUnbounded
+        ? null
+        : Math.max(...sortedRanges.map((r) => r.max ?? 0))
+
+      const isContiguous = sortedRanges.every((range, index) => {
+        if (index === 0) return true
+        const prevRange = sortedRanges[index - 1]
+        return prevRange.max !== null && range.min === prevRange.max
+      })
+
+      if (isContiguous && !hasUnbounded) {
+        filters['estimatedIncomeAmountInt'] = {
+          gte: minIncome,
+          lte: maxIncome ?? 10000000,
+        }
+      } else if (isContiguous && hasUnbounded) {
+        filters['estimatedIncomeAmountInt'] = { gte: minIncome }
+      } else {
+        // For non-contiguous ranges, create individual range conditions
+        // This will be handled by the People API as an OR of range conditions
+        filters['estimatedIncomeAmountInt'] = {
+          gte: minIncome,
+          lte: hasUnbounded ? 10000000 : (maxIncome ?? 10000000),
+        }
+      }
+    }
+  } else if (segment.incomeUnknown) {
     filters['estimatedIncomeAmountInt'] = { is: 'null' }
+  }
+
+  if (shouldIncludeNullIncome && incomeRanges.length > 0) {
+    const currentFilter = filters['estimatedIncomeAmountInt'] as {
+      gte?: number
+      lte?: number
+      in?: number[]
+    }
+    filters['estimatedIncomeAmountInt'] = {
+      ...currentFilter,
+      _includeNull: true,
+    } as typeof currentFilter & { _includeNull: true }
   }
 
   if (segment.hasCellPhone) {
