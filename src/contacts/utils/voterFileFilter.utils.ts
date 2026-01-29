@@ -1,7 +1,11 @@
 import { ExtendedVoterFileFilter } from '../contacts.types'
 
-export type FilterObject = Record<
-  string,
+type RangeCondition = {
+  gte?: number
+  lte?: number
+}
+
+type FilterValue =
   | boolean
   | {
       in?: string[] | number[]
@@ -9,8 +13,61 @@ export type FilterObject = Record<
       gte?: number
       lte?: number
       is?: 'not_null' | 'null'
+      _includeNull?: boolean
+      _or?: RangeCondition[]
     }
->
+
+export type FilterObject = Record<string, FilterValue>
+
+type NumericRange = { min: number; max: number | null }
+
+const processNumericRanges = (
+  ranges: NumericRange[],
+  defaultMax: number,
+): FilterValue => {
+  if (ranges.length === 1) {
+    const range = ranges[0]
+    if (range.max === null) {
+      return { gte: range.min }
+    }
+    return { gte: range.min, lte: range.max }
+  }
+
+  const sortedRanges = [...ranges].sort((a, b) => a.min - b.min)
+  const hasUnbounded = sortedRanges.some((r) => r.max === null)
+  const minValue = sortedRanges[0].min
+
+  const isContiguous = sortedRanges.every((range, index) => {
+    if (index === 0) return true
+    const prevRange = sortedRanges[index - 1]
+    return (
+      prevRange.max !== null &&
+      (range.min === prevRange.max || range.min === prevRange.max + 1)
+    )
+  })
+
+  if (isContiguous) {
+    if (hasUnbounded) {
+      return { gte: minValue }
+    }
+    const maxValue = Math.max(...sortedRanges.map((r) => r.max ?? 0))
+    return { gte: minValue, lte: maxValue }
+  }
+
+  const orConditions: RangeCondition[] = sortedRanges.map((range) => {
+    if (range.max === null) {
+      return { gte: range.min }
+    }
+    return { gte: range.min, lte: range.max }
+  })
+
+  return { _or: orConditions }
+}
+
+const addIncludeNull = (filter: FilterValue): FilterValue => {
+  if (typeof filter === 'boolean') return filter
+  return { ...filter, _includeNull: true }
+}
 
 export const convertVoterFileFilterToFilters = (
   segment: ExtendedVoterFileFilter,
@@ -303,21 +360,19 @@ export const convertVoterFileFilterToFilters = (
         : { in: homeownerValues }
   }
 
-  // Handle income ranges similar to age ranges
-  const incomeRangeMapping: Record<string, { min: number; max: number | null }> =
-    {
-      'Under $25k': { min: 0, max: 25000 },
-      '$25k - $35k': { min: 25000, max: 35000 },
-      '$35k - $50k': { min: 35000, max: 50000 },
-      '$50k - $75k': { min: 50000, max: 75000 },
-      '$75k - $100k': { min: 75000, max: 100000 },
-      '$100k - $125k': { min: 100000, max: 125000 },
-      '$125k - $150k': { min: 125000, max: 150000 },
-      '$150k - $200k': { min: 150000, max: 200000 },
-      '$200k+': { min: 200000, max: null },
-    }
+  const incomeRangeMapping: Record<string, NumericRange> = {
+    'Under $25k': { min: 0, max: 24999 },
+    '$25k - $35k': { min: 25000, max: 34999 },
+    '$35k - $50k': { min: 35000, max: 49999 },
+    '$50k - $75k': { min: 50000, max: 74999 },
+    '$75k - $100k': { min: 75000, max: 99999 },
+    '$100k - $125k': { min: 100000, max: 124999 },
+    '$125k - $150k': { min: 125000, max: 149999 },
+    '$150k - $200k': { min: 150000, max: 199999 },
+    '$200k+': { min: 200000, max: null },
+  }
 
-  const incomeRanges: Array<{ min: number; max: number | null }> = []
+  const incomeRanges: NumericRange[] = []
   if (segment.incomeRanges && Array.isArray(segment.incomeRanges)) {
     for (const rangeStr of segment.incomeRanges) {
       const range = incomeRangeMapping[rangeStr]
@@ -327,59 +382,13 @@ export const convertVoterFileFilterToFilters = (
     }
   }
 
-  const shouldIncludeNullIncome = segment.incomeUnknown
   if (incomeRanges.length > 0) {
-    if (incomeRanges.length === 1) {
-      const range = incomeRanges[0]
-      if (range.max === null) {
-        filters['estimatedIncomeAmountInt'] = { gte: range.min }
-      } else {
-        filters['estimatedIncomeAmountInt'] = { gte: range.min, lte: range.max }
-      }
-    } else {
-      const sortedRanges = incomeRanges.sort((a, b) => a.min - b.min)
-      const hasUnbounded = sortedRanges.some((r) => r.max === null)
-      const minIncome = sortedRanges[0].min
-      const maxIncome = hasUnbounded
-        ? null
-        : Math.max(...sortedRanges.map((r) => r.max ?? 0))
-
-      const isContiguous = sortedRanges.every((range, index) => {
-        if (index === 0) return true
-        const prevRange = sortedRanges[index - 1]
-        return prevRange.max !== null && range.min === prevRange.max
-      })
-
-      if (isContiguous && !hasUnbounded) {
-        filters['estimatedIncomeAmountInt'] = {
-          gte: minIncome,
-          lte: maxIncome ?? 10000000,
-        }
-      } else if (isContiguous && hasUnbounded) {
-        filters['estimatedIncomeAmountInt'] = { gte: minIncome }
-      } else {
-        // For non-contiguous ranges, create individual range conditions
-        // This will be handled by the People API as an OR of range conditions
-        filters['estimatedIncomeAmountInt'] = {
-          gte: minIncome,
-          lte: hasUnbounded ? 10000000 : (maxIncome ?? 10000000),
-        }
-      }
-    }
+    const incomeFilter = processNumericRanges(incomeRanges, 10000000)
+    filters['estimatedIncomeAmountInt'] = segment.incomeUnknown
+      ? addIncludeNull(incomeFilter)
+      : incomeFilter
   } else if (segment.incomeUnknown) {
     filters['estimatedIncomeAmountInt'] = { is: 'null' }
-  }
-
-  if (shouldIncludeNullIncome && incomeRanges.length > 0) {
-    const currentFilter = filters['estimatedIncomeAmountInt'] as {
-      gte?: number
-      lte?: number
-      in?: number[]
-    }
-    filters['estimatedIncomeAmountInt'] = {
-      ...currentFilter,
-      _includeNull: true,
-    } as typeof currentFilter & { _includeNull: true }
   }
 
   if (segment.hasCellPhone) {
