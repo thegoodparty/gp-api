@@ -3,6 +3,7 @@ import * as aws from '@pulumi/aws'
 import { createService } from './components/service'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
+import { createBastionResources } from './components/bastion'
 import { createVpc } from './components/vpc'
 
 export = async () => {
@@ -39,9 +40,14 @@ export = async () => {
     values[environment]
 
   // Production deploy manages the VPC. The actual VPC details are hard-coded above as individual variables.
-  if (environment === 'prod') {
-    createVpc()
-  }
+  // Bastion resources are created in prod and used across environments.
+  const bastionResources =
+    environment === 'prod'
+      ? (() => {
+          createVpc()
+          return createBastionResources({ vpcId })
+        })()
+      : null
 
   const secretName = select({
     preview: 'GP_API_DEV',
@@ -218,21 +224,33 @@ export = async () => {
         description: 'databricks via vpc peering',
         cidrBlocks: ['172.16.0.0/16'],
       },
-      ...select({
-        preview: [],
-        // TODOSWAIN: investigate whether these are truly needed in dev
-        dev: [
-          {
-            protocol: 'tcp',
-            fromPort: 5432,
-            toPort: 5432,
-            description: 'internal gp-bastion',
-            securityGroups: ['sg-05a21af11aacbe60b'],
-          },
-        ],
-        qa: [],
-        prod: [],
-      }),
+      // Allow bastion to connect to RDS
+      ...(bastionResources
+        ? [
+            {
+              protocol: 'tcp',
+              fromPort: 5432,
+              toPort: 5432,
+              description: 'gp-bastion (IaC-managed)',
+              securityGroups: [bastionResources.securityGroup.id],
+            },
+          ]
+        : select({
+            preview: [],
+            // TODO: Once bastion EC2 is migrated to use the new IaC-managed SG,
+            // update this to reference the prod bastion SG via StackReference
+            dev: [
+              {
+                protocol: 'tcp',
+                fromPort: 5432,
+                toPort: 5432,
+                description: 'gp-bastion (legacy SG - migrate to IaC)',
+                securityGroups: ['sg-05a21af11aacbe60b'],
+              },
+            ],
+            qa: [],
+            prod: [],
+          })),
     ],
     egress: [
       {
