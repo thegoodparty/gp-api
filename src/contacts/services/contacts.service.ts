@@ -1,16 +1,13 @@
-import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   BadRequestException,
-  HttpException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { isAxiosError } from 'axios'
+import axios, { AxiosInstance, isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
-import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -50,12 +47,23 @@ export class ContactsService {
   private readonly logger = new Logger(ContactsService.name)
   private cachedToken: string | null = null
 
+  private readonly client: AxiosInstance
+
   constructor(
-    private readonly httpService: HttpService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
     private readonly campaigns: CampaignsService,
-  ) {}
+  ) {
+    this.client = axios.create({ baseURL: PEOPLE_API_URL })
+
+    this.client.interceptors.request.use((config) => {
+      if (!this.cachedToken || !this.isTokenValid(this.cachedToken)) {
+        this.cachedToken = this.generateS2SToken()
+      }
+      config.headers.Authorization = `Bearer ${this.cachedToken}`
+      return config
+    })
+  }
 
   async findContacts(
     { resultsPerPage, page, search, segment }: ListContactsDTO,
@@ -82,28 +90,16 @@ export class ContactsService {
       search,
     }
 
-    const token = this.getValidS2SToken()
-
     try {
-      const response = await lastValueFrom(
-        this.httpService.post(`${PEOPLE_API_URL}/v1/people`, body, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      )
+      const response = await this.client.post('/v1/people', body)
       if (
         response.data.pagination?.totalResults <= 0 &&
         alternativeDistrictName
       ) {
-        const alternativeResponse = await lastValueFrom(
-          this.httpService.post(
-            `${PEOPLE_API_URL}/v1/people`,
-            {
-              ...body,
-              districtName: alternativeDistrictName,
-            },
-            { headers: { Authorization: `Bearer ${token}` } },
-          ),
-        )
+        const alternativeResponse = await this.client.post('/v1/people', {
+          ...body,
+          districtName: alternativeDistrictName,
+        })
         const altData = alternativeResponse.data as PeopleListResponse
         if (alternativeDistrictName) {
           await this.updateCampaignDistrictNameIfSuccessful(
@@ -139,16 +135,8 @@ export class ContactsService {
     }
 
     try {
-      const token = this.getValidS2SToken()
-      const response = await lastValueFrom(
-        this.httpService.post(`${PEOPLE_API_URL}/v1/people/sample`, body, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-      )
-      const people = this.normalizePeopleResponse(response.data)
-      return people
+      const response = await this.client.post('/v1/people/sample', body)
+      return this.normalizePeopleResponse(response.data)
     } catch (error) {
       this.logger.error('Failed to sample contacts from people API', error)
       throw new BadGatewayException('Failed to sample contacts from people API')
@@ -162,23 +150,12 @@ export class ContactsService {
     try {
       const { state } = this.resolveLocationForRequest(campaign)
 
-      const response = await lastValueFrom(
-        this.httpService.get<PersonOutput>(
-          `${PEOPLE_API_URL}/v1/people/${id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${this.getValidS2SToken()}`,
-            },
-            params: { state },
-          },
-        ),
-      )
+      const response = await this.client.get<PersonOutput>(`/v1/people/${id}`, {
+        params: { state },
+      })
 
       return response.data
     } catch (error) {
-      if (error instanceof HttpException) {
-        throw error
-      }
       this.logger.error(
         'Failed to fetch person from people API',
         JSON.stringify(error),
@@ -220,17 +197,10 @@ export class ContactsService {
       filters,
     }
 
-    let token: string | undefined
     try {
-      token = this.getValidS2SToken()
-      const response = await lastValueFrom(
-        this.httpService.post(`${PEOPLE_API_URL}/v1/people/download`, body, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          responseType: 'stream',
-        }),
-      )
+      const response = await this.client.post('/v1/people/download', body, {
+        responseType: 'stream',
+      })
 
       return new Promise<void>((resolve, reject) => {
         response.data.pipe(res.raw)
@@ -241,24 +211,17 @@ export class ContactsService {
       this.logger.error('Failed to download contacts from people API', {
         error,
       })
-      if (token) {
-        const alternativeResponse = await this.queryAlternativeDistrictName(
-          params,
-          token,
-          'download',
-          alternativeDistrictName,
-          { responseType: 'stream', body },
-        )
-        return new Promise<void>((resolve, reject) => {
-          alternativeResponse.data.pipe(res.raw)
-          alternativeResponse.data.on('end', resolve)
-          alternativeResponse.data.on('error', reject)
-        })
-      }
-
-      throw new BadGatewayException(
-        'Failed to download contacts from people API',
+      const alternativeResponse = await this.queryAlternativeDistrictName(
+        params,
+        'download',
+        alternativeDistrictName,
+        { responseType: 'stream', body },
       )
+      return new Promise<void>((resolve, reject) => {
+        alternativeResponse.data.pipe(res.raw)
+        alternativeResponse.data.on('end', resolve)
+        alternativeResponse.data.on('error', reject)
+      })
     }
   }
 
@@ -274,28 +237,15 @@ export class ContactsService {
       throw new BadRequestException(msg)
     }
 
-    const token = this.getValidS2SToken()
-
-    const response = await lastValueFrom(
-      this.httpService.get<StatsResponse>(`${PEOPLE_API_URL}/v1/people/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: {
-          state,
-          districtType,
-          districtName,
-        },
-      }),
-    )
+    const response = await this.client.get<StatsResponse>('/v1/people/stats', {
+      params: {
+        state,
+        districtType,
+        districtName,
+      },
+    })
 
     return response.data
-  }
-
-  private getValidS2SToken(): string {
-    if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
-      return this.cachedToken
-    }
-
-    return this.generateAndCacheS2SToken()
   }
 
   private isTokenValid(token: string): boolean {
@@ -314,18 +264,14 @@ export class ContactsService {
     }
   }
 
-  private generateAndCacheS2SToken(): string {
+  private generateS2SToken(): string {
     const now = Math.floor(Date.now() / 1000)
-
     const payload = {
       iss: 'gp-api',
       iat: now,
       exp: now + 300,
     }
-
-    this.cachedToken = jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
-
-    return this.cachedToken
+    return jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
   }
 
   private canUseStatewideFallback(
@@ -515,7 +461,6 @@ export class ContactsService {
 
   private async queryAlternativeDistrictName(
     params: URLSearchParams,
-    token: string,
     endpoint: 'people' | 'search' | 'download' | 'stats',
     alternativeDistrictName?: string,
     options?: { responseType?: 'stream'; body?: Record<string, unknown> },
@@ -539,37 +484,23 @@ export class ContactsService {
           ...options.body,
           districtName: alternativeDistrictName,
         }
-        return await lastValueFrom(
-          this.httpService.post(
-            `${PEOPLE_API_URL}${endpointMap[endpoint]}`,
-            body,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              ...(options?.responseType && {
-                responseType: options.responseType,
-              }),
-            },
-          ),
-        )
+        return await this.client.post(endpointMap[endpoint], body, {
+          ...(options?.responseType && {
+            responseType: options.responseType,
+          }),
+        })
       }
 
       const newParams = new URLSearchParams(params)
       newParams.set('districtName', alternativeDistrictName)
 
-      return await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}${endpointMap[endpoint]}?${newParams.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            ...(options?.responseType && {
-              responseType: options.responseType,
-            }),
-          },
-        ),
+      return await this.client.get(
+        `${endpointMap[endpoint]}?${newParams.toString()}`,
+        {
+          ...(options?.responseType && {
+            responseType: options.responseType,
+          }),
+        },
       )
     } catch (error) {
       this.logger.error(`Failed to query ${endpoint} from people API`, {
