@@ -13,7 +13,7 @@ const BASE_TCR_DATA = {
   email: 'tyler@fightclub.org',
   phone: '288-555-0153',
   officeLevel: 'local',
-  committeeType: 'CA',
+  committeeType: 'CANDIDATE',
 }
 
 test.describe('Campaigns - TCR Compliance', () => {
