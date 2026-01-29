@@ -27,7 +27,6 @@ import {
   PersonOutput,
 } from '../schemas/person.schema'
 import type { SampleContacts } from '../schemas/sampleContacts.schema'
-import { SearchContactsDTO } from '../schemas/searchContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import {
   convertVoterFileFilterToFilters,
@@ -59,10 +58,14 @@ export class ContactsService {
   ) {}
 
   async findContacts(
-    dto: ListContactsDTO,
+    { resultsPerPage, page, search, segment }: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    const { resultsPerPage, page, segment } = dto
+    if (search && !campaign.isPro) {
+      throw new BadRequestException(
+        'Search is only available for pro campaigns',
+      )
+    }
 
     const {
       state,
@@ -81,67 +84,50 @@ export class ContactsService {
       resultsPerPage,
       page,
       filters,
-      full: true,
+      search,
     }
 
     const token = usingStatewideFallback
       ? this.generateScopedS2SToken(state)
       : this.getValidS2SToken()
-    const data = await this.fetchPeopleWithFallbackPost(
-      'people',
-      body,
-      token,
-      alternativeDistrictName,
-      campaign.id,
-    )
-    return data
-  }
 
-  async searchContacts(
-    dto: SearchContactsDTO,
-    campaign: CampaignWithPathToVictory,
-  ) {
-    const { resultsPerPage, page, name, phone, firstName, lastName } = dto
-
-    if (!campaign.isPro) {
-      throw new BadRequestException(
-        'Search contacts is only available for pro campaigns',
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(`${PEOPLE_API_URL}/v1/people`, body, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       )
+      if (
+        response.data.pagination?.totalResults <= 0 &&
+        alternativeDistrictName
+      ) {
+        const alternativeResponse = await lastValueFrom(
+          this.httpService.post(
+            `${PEOPLE_API_URL}/v1/people`,
+            {
+              ...body,
+              districtName: alternativeDistrictName,
+            },
+            { headers: { Authorization: `Bearer ${token}` } },
+          ),
+        )
+        const altData = alternativeResponse.data as PeopleListResponse
+        if (alternativeDistrictName) {
+          await this.updateCampaignDistrictNameIfSuccessful(
+            campaign.id,
+            alternativeDistrictName,
+            altData.pagination.totalResults > 0,
+          )
+        }
+        return altData
+      }
+      return response.data as PeopleListResponse
+    } catch (error) {
+      this.logger.error(`Failed to fetch from people API`, {
+        error,
+      })
+      throw new BadGatewayException(`Failed to fetch from people API`)
     }
-
-    const {
-      state,
-      districtType,
-      districtName,
-      alternativeDistrictName,
-      usingStatewideFallback,
-    } = this.resolveLocationForRequest(campaign)
-
-    const params = new URLSearchParams({
-      state,
-      resultsPerPage: resultsPerPage.toString(),
-      page: page.toString(),
-    })
-    if (districtType && districtName) {
-      params.set('districtType', districtType)
-      params.set('districtName', districtName)
-    }
-    if (name) params.set('name', name)
-    if (firstName) params.set('firstName', firstName)
-    if (lastName) params.set('lastName', lastName)
-    if (phone) params.set('phone', phone)
-    params.set('full', 'true')
-    const token = usingStatewideFallback
-      ? this.generateScopedS2SToken(state)
-      : this.getValidS2SToken()
-    const data = await this.fetchPeopleWithFallback(
-      'search',
-      params,
-      token,
-      alternativeDistrictName,
-      campaign.id,
-    )
-    return data
   }
 
   async sampleContacts(
@@ -156,7 +142,6 @@ export class ContactsService {
       districtName: locationData.districtName,
       size: String(dto.size ?? 500),
       hasCellPhone: 'true',
-      full: 'true',
       excludeIds: (dto.excludeIds ?? []) as string[],
     }
 
@@ -264,7 +249,6 @@ export class ContactsService {
       districtType,
       districtName,
       filters,
-      full: true,
     }
 
     let token: string | undefined
@@ -656,135 +640,6 @@ export class ContactsService {
         campaignId,
         { pathToVictory: { electionLocation: alternativeDistrictName } },
         false,
-      )
-    }
-  }
-
-  private async fetchPeopleWithFallbackPost(
-    endpoint: 'people' | 'search',
-    body: Record<string, unknown>,
-    token: string,
-    alternativeDistrictName?: string,
-    campaignId?: number,
-  ): Promise<PeopleListResponse> {
-    try {
-      const response = await lastValueFrom(
-        this.httpService.post(
-          `${PEOPLE_API_URL}/v1/people${
-            endpoint === 'people' ? '' : '/search'
-          }`,
-          body,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        ),
-      )
-      if (
-        response.data.pagination?.totalResults <= 0 &&
-        alternativeDistrictName
-      ) {
-        const alternativeBody = {
-          ...body,
-          districtName: alternativeDistrictName,
-        }
-        const alternativeResponse = await lastValueFrom(
-          this.httpService.post(
-            `${PEOPLE_API_URL}/v1/people${
-              endpoint === 'people' ? '' : '/search'
-            }`,
-            alternativeBody,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          ),
-        )
-        const altData = alternativeResponse.data as PeopleListResponse
-        if (campaignId && alternativeDistrictName) {
-          await this.updateCampaignDistrictNameIfSuccessful(
-            campaignId,
-            alternativeDistrictName,
-            altData.pagination.totalResults > 0,
-          )
-        }
-        return altData
-      }
-      return response.data as PeopleListResponse
-    } catch (error) {
-      this.logger.error(`Failed to fetch from people API (${endpoint})`, {
-        error,
-      })
-      throw new BadGatewayException(
-        `Failed to fetch from people API (${endpoint})`,
-      )
-    }
-  }
-
-  private async fetchPeopleWithFallback(
-    endpoint: 'people' | 'search',
-    params: URLSearchParams,
-    token: string,
-    alternativeDistrictName?: string,
-    campaignId?: number,
-  ): Promise<PeopleListResponse> {
-    try {
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${PEOPLE_API_URL}/v1/people${
-            endpoint === 'people' ? '' : '/search'
-          }?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        ),
-      )
-      if (
-        response.data.pagination?.totalResults <= 0 &&
-        alternativeDistrictName
-      ) {
-        const alternativeResponse = await this.queryAlternativeDistrictName(
-          params,
-          token,
-          endpoint,
-          alternativeDistrictName,
-        )
-        const altData = alternativeResponse.data as PeopleListResponse
-        if (campaignId && alternativeDistrictName) {
-          await this.updateCampaignDistrictNameIfSuccessful(
-            campaignId,
-            alternativeDistrictName,
-            (altData.pagination?.totalResults || 0) > 0,
-          )
-        }
-        return altData
-      }
-      return response.data as PeopleListResponse
-    } catch (error) {
-      this.logger.error(`Failed to fetch  from people API`, { endpoint, error })
-      if (alternativeDistrictName) {
-        const alternativeResponse = await this.queryAlternativeDistrictName(
-          params,
-          token,
-          endpoint,
-          alternativeDistrictName,
-        )
-        const altData = alternativeResponse.data as PeopleListResponse
-        if (campaignId && alternativeDistrictName) {
-          await this.updateCampaignDistrictNameIfSuccessful(
-            campaignId,
-            alternativeDistrictName,
-            (altData.pagination?.totalResults || 0) > 0,
-          )
-        }
-        return altData
-      }
-      throw new BadGatewayException(
-        `Failed to fetch from people API (${endpoint})`,
       )
     }
   }

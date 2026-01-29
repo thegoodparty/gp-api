@@ -29,6 +29,12 @@ export interface ServiceConfig {
   dependsOn: pulumi.ResourceOptions['dependsOn']
 }
 
+type ServiceOutput = {
+  url: pulumi.Output<string>
+  logGroupName: pulumi.Output<string>
+  logGroupArn: pulumi.Output<string>
+}
+
 export function createService({
   environment,
   stage,
@@ -43,7 +49,7 @@ export function createService({
   environmentVariables,
   permissions,
   dependsOn,
-}: ServiceConfig) {
+}: ServiceConfig): ServiceOutput {
   const isProd = environment === 'prod'
   const serviceName = `gp-api-${stage}`
 
@@ -68,11 +74,18 @@ export function createService({
     vpcId,
     ingress: [
       {
-        protocol: '-1',
-        fromPort: 0,
-        toPort: 0,
+        protocol: 'tcp',
+        fromPort: 80,
+        toPort: 80,
         cidrBlocks: ['0.0.0.0/0'],
         description: 'HTTP',
+      },
+      {
+        protocol: 'tcp',
+        fromPort: 443,
+        toPort: 443,
+        cidrBlocks: ['0.0.0.0/0'],
+        description: 'HTTPS',
       },
     ],
     egress: [
@@ -106,6 +119,7 @@ export function createService({
     protocol: 'HTTP',
     targetType: 'ip',
     vpcId,
+    deregistrationDelay: 120,
     healthCheck: {
       path: '/v1/health',
       interval: 10,
@@ -128,13 +142,12 @@ export function createService({
     port: 443,
     protocol: 'HTTPS',
     certificateArn,
+    sslPolicy: 'ELBSecurityPolicy-TLS13-1-2-2021-06',
     defaultActions: [{ type: 'forward', targetGroupArn: targetGroup.arn }],
   })
 
-  const logGroupName = `/sst/cluster/gp-${stage}-fargateCluster/gp-api-${stage}/gp-api-${stage}`
-
   const logGroup = new aws.cloudwatch.LogGroup('logGroup', {
-    name: logGroupName,
+    name: `/sst/cluster/gp-${stage}-fargateCluster/gp-api-${stage}/gp-api-${stage}`,
     retentionInDays: isProd ? 60 : 30,
   })
 
@@ -247,7 +260,7 @@ export function createService({
           logConfiguration: {
             logDriver: 'awslogs',
             options: {
-              'awslogs-group': logGroupName,
+              'awslogs-group': logGroup.name,
               'awslogs-region': 'us-west-2',
               'awslogs-stream-prefix': '/service',
             },
@@ -261,15 +274,13 @@ export function createService({
     ),
   })
 
-  const desiredCount = isProd ? 2 : 1
-
   new aws.ecs.Service(
     'ecsService',
     {
       name: serviceName,
       cluster: cluster.arn,
       taskDefinition: taskDefinition.arn,
-      desiredCount,
+      desiredCount: isProd ? 2 : 1,
       capacityProviderStrategies: [{ capacityProvider: 'FARGATE', weight: 1 }],
       networkConfiguration: {
         subnets: publicSubnetIds,
@@ -321,5 +332,7 @@ export function createService({
 
   return {
     url: pulumi.interpolate`https://${domain}`,
+    logGroupName: logGroup.name,
+    logGroupArn: logGroup.arn,
   }
 }
