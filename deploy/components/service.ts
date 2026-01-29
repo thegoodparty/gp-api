@@ -29,6 +29,12 @@ export interface ServiceConfig {
   dependsOn: pulumi.ResourceOptions['dependsOn']
 }
 
+type ServiceOutput = {
+  url: pulumi.Output<string>
+  logGroupName: pulumi.Output<string>
+  logGroupArn: pulumi.Output<string>
+}
+
 export function createService({
   environment,
   stage,
@@ -43,7 +49,7 @@ export function createService({
   environmentVariables,
   permissions,
   dependsOn,
-}: ServiceConfig) {
+}: ServiceConfig): ServiceOutput {
   const isProd = environment === 'prod'
   const serviceName = `gp-api-${stage}`
 
@@ -326,5 +332,7 @@ export function createService({
 
   return {
     url: pulumi.interpolate`https://${domain}`,
+    logGroupName: logGroup.name,
+    logGroupArn: logGroup.arn,
   }
 }

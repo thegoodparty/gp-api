@@ -31,7 +31,7 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
     application_logging: {
       enabled: true,
       forwarding: {
-        enabled: true,
+        enabled: false,
       },
       metrics: {
         enabled: true,
