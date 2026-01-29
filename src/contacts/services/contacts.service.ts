@@ -67,13 +67,8 @@ export class ContactsService {
       )
     }
 
-    const {
-      state,
-      districtType,
-      districtName,
-      alternativeDistrictName,
-      usingStatewideFallback,
-    } = this.resolveLocationForRequest(campaign)
+    const { state, districtType, districtName, alternativeDistrictName } =
+      this.resolveLocationForRequest(campaign)
 
     const filters = await this.segmentToFilters(segment, campaign)
 
@@ -87,9 +82,7 @@ export class ContactsService {
       search,
     }
 
-    const token = usingStatewideFallback
-      ? this.generateScopedS2SToken(state)
-      : this.getValidS2SToken()
+    const token = this.getValidS2SToken()
 
     try {
       const response = await lastValueFrom(
@@ -167,40 +160,21 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
   ): Promise<PersonOutput> {
     try {
-      const { state, districtType, districtName, usingStatewideFallback } =
-        this.resolveLocationForRequest(campaign)
+      const { state } = this.resolveLocationForRequest(campaign)
 
       const response = await lastValueFrom(
-        this.httpService.get(`${PEOPLE_API_URL}/v1/people/${id}`, {
-          headers: {
-            Authorization: `Bearer ${this.getValidS2SToken()}`,
+        this.httpService.get<PersonOutput>(
+          `${PEOPLE_API_URL}/v1/people/${id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${this.getValidS2SToken()}`,
+            },
+            params: { state },
           },
-          params: {
-            state,
-          },
-        }),
+        ),
       )
 
-      const person = response.data as PersonOutput &
-        Record<string, string | number | boolean | null | undefined>
-
-      const personState = String(person.state || '').toUpperCase()
-      const stateMatches = personState === state.toUpperCase()
-
-      if (usingStatewideFallback) {
-        if (!stateMatches) throw new NotFoundException('Person not found')
-        return person
-      }
-
-      if (!districtType || !districtName) {
-        throw new BadRequestException({
-          message: P2V_ELECTION_INFO_MISSING_MESSAGE,
-          errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
-        })
-      }
-
-      if (!stateMatches) throw new NotFoundException('Person not found')
-      return person
+      return response.data
     } catch (error) {
       if (error instanceof HttpException) {
         throw error
@@ -228,13 +202,8 @@ export class ContactsService {
     }
     const segment = dto.segment as string | undefined
 
-    const {
-      state,
-      districtType,
-      districtName,
-      alternativeDistrictName,
-      usingStatewideFallback,
-    } = this.resolveLocationForRequest(campaign)
+    const { state, districtType, districtName, alternativeDistrictName } =
+      this.resolveLocationForRequest(campaign)
 
     const params = new URLSearchParams({ state })
     if (districtType && districtName) {
@@ -253,9 +222,7 @@ export class ContactsService {
 
     let token: string | undefined
     try {
-      token = usingStatewideFallback
-        ? this.generateScopedS2SToken(state)
-        : this.getValidS2SToken()
+      token = this.getValidS2SToken()
       const response = await lastValueFrom(
         this.httpService.post(`${PEOPLE_API_URL}/v1/people/download`, body, {
           headers: {
@@ -401,7 +368,6 @@ export class ContactsService {
     districtType?: string
     districtName?: string
     alternativeDistrictName?: string
-    usingStatewideFallback: boolean
   } {
     const state = this.getCampaignState(campaign)
 
@@ -426,7 +392,7 @@ export class ContactsService {
             'Statewide or federal contacts require admin approval',
           )
         }
-        return { state, usingStatewideFallback: true }
+        return { state }
       }
 
       return {
@@ -434,12 +400,11 @@ export class ContactsService {
         districtType: electionType,
         districtName: cleanedName,
         alternativeDistrictName: alternativeCleanedName,
-        usingStatewideFallback: false,
       }
     }
 
     if (this.canUseStatewideFallback(campaign)) {
-      return { state, usingStatewideFallback: true }
+      return { state }
     }
 
     throw new BadRequestException({
@@ -461,20 +426,6 @@ export class ContactsService {
       typeof stateLong === 'string' &&
       districtName.toLowerCase() === stateLong.toLowerCase()
     return type === 'state' ? matchesCode || matchesLong : false
-  }
-
-  private generateScopedS2SToken(state: string): string {
-    const now = Math.floor(Date.now() / 1000)
-    const payload = {
-      iss: 'gp-api',
-      aud: 'people-api',
-      sub: 'contacts',
-      iat: now,
-      exp: now + 300,
-      allowStatewide: true,
-      state,
-    }
-    return jwt.sign(payload, PEOPLE_API_S2S_SECRET!)
   }
 
   private extractLocationFromCampaign(campaign: CampaignWithPathToVictory): {
