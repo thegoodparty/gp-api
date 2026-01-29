@@ -41,6 +41,39 @@ jobs:
       - run: npx prettier --check "src/**/*.{ts,js,json}"
       - run: npm run test
 
+      - name: Calculate overall coverage
+        id: coverage-calc
+        if: always()
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            OVERALL=$(jq -r '(.total.lines.pct + .total.statements.pct + .total.functions.pct + .total.branches.pct) / 4' coverage/coverage-summary.json)
+            OVERALL_ROUNDED=$(printf "%.2f" "$OVERALL")
+            echo "overall_pct=$OVERALL_ROUNDED" >> $GITHUB_OUTPUT
+            echo "📊 Overall Coverage: ${OVERALL_ROUNDED}%"
+            echo "## 📊 Overall Test Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**${OVERALL_ROUNDED}%** (average of lines, statements, functions, and branches)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "overall_pct=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish coverage to PR + summary
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          threshold-icons: "{0: '🔴', 80: '🟠', 90: '🟢'}"
+
+      - name: Add overall coverage to PR comment
+        if: always() && github.event_name == 'pull_request' && steps.coverage-calc.outputs.overall_pct != '0'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ## 📊 Overall Test Coverage
+
+            **${{ steps.coverage-calc.outputs.overall_pct }}%** (average of lines, statements, functions, and branches)
+          comment-id: ${{ steps.coverage-calc.outputs.comment-id }}
+
       # Determine deployment context
       - name: Determine deployment context
         id: context
@@ -136,58 +169,6 @@ jobs:
           fields: repo,commit,author,action,eventName,ref,workflow,took
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  coverage:
-    name: Test Coverage
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      - name: Run tests with Coverage
-        run: npm run test -- --coverage
-
-      - name: Calculate overall coverage
-        id: coverage-calc
-        if: always()
-        run: |
-          if [ -f "coverage/coverage-summary.json" ]; then
-            OVERALL=$(jq -r '(.total.lines.pct + .total.statements.pct + .total.functions.pct + .total.branches.pct) / 4' coverage/coverage-summary.json)
-            OVERALL_ROUNDED=$(printf "%.2f" "$OVERALL")
-            echo "overall_pct=$OVERALL_ROUNDED" >> $GITHUB_OUTPUT
-            echo "📊 Overall Coverage: ${OVERALL_ROUNDED}%"
-            echo "## 📊 Overall Test Coverage" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**${OVERALL_ROUNDED}%** (average of lines, statements, functions, and branches)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "overall_pct=0" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Publish coverage to PR + summary
-        if: always()
-        uses: davelosert/vitest-coverage-report-action@v2
-        with:
-          threshold-icons: "{0: '🔴', 80: '🟠', 90: '🟢'}"
-
-      - name: Add overall coverage to PR comment
-        if: always() && github.event_name == 'pull_request' && steps.coverage-calc.outputs.overall_pct != '0'
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.number }}
-          body: |
-            ## 📊 Overall Test Coverage
-
-            **${{ steps.coverage-calc.outputs.overall_pct }}%** (average of lines, statements, functions, and branches)
-          comment-id: ${{ steps.coverage-calc.outputs.comment-id }}
 
   tests:
     name: E2E Tests
