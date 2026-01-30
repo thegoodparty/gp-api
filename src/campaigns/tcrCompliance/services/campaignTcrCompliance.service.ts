@@ -89,7 +89,15 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     campaign: Campaign,
     tcrComplianceCreatePayload: CreateTcrCompliancePayload,
   ) {
-    const { ein, filingUrl, email } = tcrComplianceCreatePayload
+    const {
+      ein,
+      filingUrl,
+      email,
+      officeLevel,
+      fecCommitteeId,
+      committeeType,
+    } = tcrComplianceCreatePayload
+
     const userFullName = getUserFullName(user!)
     const { ballotLevel } = campaign.details as { ballotLevel?: string }
 
@@ -219,12 +227,16 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       this.logger.debug(
         `[TCR Compliance] Step 4: Submitting Campaign Verify Request for campaignId=${campaign.id}`,
       )
+
       await this.peerlyIdentityService.submitCampaignVerifyRequest(
         {
           ein,
           filingUrl,
           peerlyIdentityId: tcrComplianceIdentity!.identity_id,
           email,
+          officeLevel,
+          fecCommitteeId: fecCommitteeId ?? null,
+          committeeType: committeeType,
         },
         user,
         campaign,

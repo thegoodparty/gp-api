@@ -58,14 +58,6 @@ export class PurchaseService {
     amount: number
     status: Stripe.PaymentIntent.Status
   }> {
-    this.logger.log(
-      JSON.stringify({
-        user: user.id,
-        dto,
-        campaign,
-        msg: 'Attempting payment intent creation for user',
-      }),
-    )
     const handler = this.handlers.get(dto.type)
     if (!handler) {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
@@ -79,6 +71,40 @@ export class PurchaseService {
         ...(campaign?.id ? { campaignId: campaign?.id } : {}),
       })
     const amount = await handler.calculateAmount(dto.metadata)
+
+    // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
+    // Stripe rejects PaymentIntents with $0 so we our own response
+    // and immediately execute post-purchase handlers (e.g., redeem free texts offer)
+    if (amount === 0) {
+      const freePaymentId = `free_${Date.now()}_${user.id}`
+
+      this.logger.log(
+        `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe`,
+      )
+
+      // Execute post-purchase handler immediately for free purchases
+      const postPurchaseHandler = this.postPurchaseHandlers.get(dto.type)
+      if (postPurchaseHandler) {
+        try {
+          await postPurchaseHandler(freePaymentId, {
+            ...(dto.metadata as Record<string, unknown>),
+            purchaseType: dto.type,
+          })
+        } catch (error) {
+          this.logger.error(
+            `Failed to execute post-purchase handler for free purchase ${freePaymentId}`,
+            error,
+          )
+        }
+      }
+
+      return {
+        id: freePaymentId,
+        clientSecret: '',
+        amount: 0,
+        status: 'succeeded' as Stripe.PaymentIntent.Status,
+      }
+    }
 
     const paymentMetadata = {
       type: this.getPaymentType(dto.type),

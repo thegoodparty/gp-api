@@ -20,6 +20,10 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'json'],
+    },
     include: ['src/**/*.test.ts'],
     env: dotenv.parse(readFileSync(`${__dirname}/.env.test`)),
     clearMocks: true,

@@ -32,7 +32,6 @@ import {
   HandleApiErrorParams,
   Peerly10DlcBrandData,
   Peerly10DLCBrandSubmitResponseBody,
-  PEERLY_COMMITTEE_TYPE,
   PEERLY_CV_VERIFICATION_TYPE,
   PeerlyCreateCVTokenResponse,
   PeerlyGetCvRequestResponseBody,
@@ -46,8 +45,9 @@ import {
   PeerlySubmitCVResponseBody,
   PeerlyVerifyCVPinResponse,
 } from '../peerly.types'
-import { getPeerlyLocaleFromBallotLevel } from '../utils/getPeerlyLocaleFromBallotLevel.util'
 import {
+  getPeerlyCommitteeType,
+  getPeerlyLocaleFromOfficeLevel,
   PEERLY_ENTITY_TYPE,
   PEERLY_LOCALITIES,
   PEERLY_USECASE,
@@ -337,6 +337,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const { details: campaignDetails, placeId } = campaign
     const { phone, websiteDomain, ein } = tcrCompliancePayload
     const { street, city, state, postalCode } = extractAddressComponents(
+      // TODO(ENG-6400): using `placeId!` is dangerous here.
       await this.placesService.getAddressByPlaceId(placeId!),
     )
     const { campaignCommittee } = campaignDetails
@@ -514,13 +515,32 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       ein,
       peerlyIdentityId,
       filingUrl,
-    }: Pick<TcrCompliance, 'ein' | 'peerlyIdentityId' | 'filingUrl' | 'email'>,
+      officeLevel,
+      fecCommitteeId,
+      committeeType,
+    }: Pick<
+      TcrCompliance,
+      | 'ein'
+      | 'peerlyIdentityId'
+      | 'filingUrl'
+      | 'email'
+      | 'officeLevel'
+      | 'fecCommitteeId'
+      | 'committeeType'
+    >,
     user: User,
     campaign: Campaign,
     domain: Domain,
   ): Promise<PeerlySubmitCVResponseBody | null> {
     const { details: campaignDetails, placeId } = campaign
     const { electionDate, ballotLevel } = campaignDetails
+
+    if (!electionDate) {
+      throw new BadRequestException(
+        'Campaign must have electionDate to submit CV request',
+      )
+    }
+
     const {
       street: filing_address_line1,
       city,
@@ -528,40 +548,42 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       county,
       postalCode,
     } = extractAddressComponents(
+      // TODO(ENG-6400): using `placeId!` is dangerous here.
       await this.placesService.getAddressByPlaceId(placeId!),
     )
-    if (!ballotLevel) {
-      throw new BadRequestException(
-        'Campaign must have ballotLevel to submit CV request',
-      )
-    }
-    if (!electionDate) {
-      throw new BadRequestException(
-        'Campaign must have electionDate to submit CV request',
-      )
-    }
-    const peerlyLocale = getPeerlyLocaleFromBallotLevel(ballotLevel)
 
-    if (!peerlyLocale) {
-      this.logger.error(
-        `No Peerly locality mapping for ballotLevel: ${ballotLevel}`,
-      )
-      throw new BadRequestException(
-        `Unsupported ballot level for Campaign Verify: ${ballotLevel}`,
-      )
-    }
+    // Map officeLevel to Peerly locality
+    const peerlyLocale = getPeerlyLocaleFromOfficeLevel(officeLevel)
 
-    this.logger.debug(
-      `Mapped ballotLevel '${ballotLevel}' to locality '${peerlyLocale}'`,
-    )
-
-    // NOTE: Federal locality mapping exists but full federal support is not yet implemented.
-    // Missing: fec_committee_id field, proper committee_type codes for federal campaigns,
-    // and FEC URL validation. Federal campaigns will currently fail validation.
     const verificationType =
       peerlyLocale === PEERLY_LOCALITIES.federal
         ? PEERLY_CV_VERIFICATION_TYPE.Federal
         : PEERLY_CV_VERIFICATION_TYPE.StateLocal
+
+    const isFederal = peerlyLocale === PEERLY_LOCALITIES.federal
+    const isLocal = peerlyLocale === PEERLY_LOCALITIES.local
+
+    // Validate required federal fields
+    if (isFederal) {
+      if (!fecCommitteeId) {
+        this.logger.error(
+          `[Campaign Verify] Missing fec_committee_id for federal submission (campaignId=${campaign.id}). ` +
+            `This field is required by Peerly for federal verification.`,
+        )
+        throw new BadRequestException(
+          `FEC Committee ID is required for federal candidates.`,
+        )
+      }
+    }
+
+    const isMissingLocalLocation =
+      isLocal && !city?.long_name && !county?.long_name
+    if (isMissingLocalLocation) {
+      this.logger.warn(
+        `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
+          `This field is required by Peerly when locality is 'local'.`,
+      )
+    }
 
     const submitCVData = {
       name: this.isTestEnvironment
@@ -570,9 +592,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       general_campaign_email: email,
       verification_type: verificationType,
       filing_url: ensureUrlHasProtocol(filingUrl),
-      committee_type: PEERLY_COMMITTEE_TYPE.Candidate,
+      // Map Prisma enum to Peerly API values
+      committee_type: getPeerlyCommitteeType(committeeType),
       committee_ein: ein,
-      election_date: formatDate(new Date(electionDate!), DateFormats.isoDate),
+      election_date: formatDate(new Date(electionDate), DateFormats.isoDate),
       filing_address_line1,
       filing_city: city?.long_name,
       filing_state: state?.short_name,
@@ -581,7 +604,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       locality: peerlyLocale,
       state: state?.short_name,
       campaign_website: domain ? `https://${domain?.name}` : undefined,
-      ...(peerlyLocale === PEERLY_LOCALITIES.local
+      // Federal-specific fields
+      ...(isFederal
+        ? {
+            fec_committee_id: fecCommitteeId,
+          }
+        : {}),
+      // Local-specific fields
+      ...(isLocal
         ? {
             city_county:
               ballotLevel === BallotReadyPositionLevel.COUNTY

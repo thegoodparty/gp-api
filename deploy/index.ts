@@ -4,6 +4,7 @@ import { createService } from './components/service'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
 import { createVpc } from './components/vpc'
+import { createNewRelicLogForwarder } from './components/newrelic-log-forwarder'
 
 export = async () => {
   const config = new pulumi.Config()
@@ -147,48 +148,15 @@ export = async () => {
     restrictPublicBuckets: true,
   })
 
-  if (environment === 'prod') {
-    const sqsSecurityGroup = new aws.ec2.SecurityGroup('sqs-sg', {
-      vpcId,
-      ingress: [
-        {
-          protocol: 'tcp',
-          fromPort: 443,
-          toPort: 443,
-          cidrBlocks: [vpcCidr],
-        },
-      ],
-      egress: [
-        {
-          protocol: '-1',
-          fromPort: 0,
-          toPort: 0,
-          cidrBlocks: ['0.0.0.0/0'],
-        },
-      ],
-    })
-
-    new aws.ec2.VpcEndpoint('sqs-endpoint', {
-      vpcId,
-      serviceName: `com.amazonaws.us-west-2.sqs`,
-      vpcEndpointType: 'Interface',
-      subnetIds: vpcSubnetIds.private,
-      securityGroupIds: [sqsSecurityGroup.id],
-      privateDnsEnabled: true,
-    })
-  }
-
   // Assets bucket - used for storing uploaded files, images, etc.
   if (environment !== 'preview') {
     const assetsBucket = createAssetsBucket({ environment })
 
-    if (environment !== 'prod') {
-      createAssetsRouter({
-        environment,
-        bucketRegionalDomainName: assetsBucket.bucketRegionalDomainName,
-        hostedZoneId,
-      })
-    }
+    createAssetsRouter({
+      environment,
+      bucketRegionalDomainName: assetsBucket.bucketRegionalDomainName,
+      hostedZoneId,
+    })
   }
 
   const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {
@@ -275,6 +243,7 @@ export = async () => {
       minCapacity: environment === 'prod' ? 1 : 0.5,
       maxCapacity: 64,
     },
+    backupRetentionPeriod: select({ preview: 1, dev: 7, qa: 7, prod: 14 }),
     // Disable these protections for preview environments -- these
     // configs help them tear down more quickly.
     deletionProtection: environment !== 'preview',
@@ -309,6 +278,7 @@ export = async () => {
         storageEncrypted: true,
         deletionProtection: true,
         finalSnapshotIdentifier: `gp-voter-db-${stage}-final-snapshot`,
+        backupRetentionPeriod: environment === 'prod' ? 14 : 7,
         serverlessv2ScalingConfiguration: {
           maxCapacity: 128,
           minCapacity: 0.5,
@@ -461,6 +431,17 @@ export = async () => {
       },
     ],
   })
+
+  if (environment !== 'preview') {
+    createNewRelicLogForwarder({
+      environment,
+      secretArn: secretInfo.arn,
+      secretKey: 'NEW_RELIC_LICENSE_KEY',
+      logGroupName: service.logGroupName,
+      logGroupArn: service.logGroupArn,
+      serviceName: secret.NEW_RELIC_APP_NAME,
+    })
+  }
 
   return {
     serviceUrl: service.url,

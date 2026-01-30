@@ -45,6 +45,10 @@ export class OutreachPurchaseHandlerService
       )
       const finalAmount = discountedContactCount * pricePerContact
 
+      this.logger.log(
+        `Campaign ${campaignId}: applying free texts discount (${contactCount} contacts, ${discountedContactCount} billable, amount: ${finalAmount})`,
+      )
+
       return finalAmount
     }
 
