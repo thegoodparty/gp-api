@@ -160,7 +160,14 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
   ): Promise<PersonOutput> {
     try {
-      const { state } = this.resolveLocationForRequest(campaign)
+      const { state, districtType, districtName } =
+        this.resolveLocationForRequest(campaign)
+
+      const params: Record<string, string> = { state }
+      if (districtType && districtName) {
+        params.districtType = districtType
+        params.districtName = districtName
+      }
 
       const response = await lastValueFrom(
         this.httpService.get<PersonOutput>(
@@ -169,7 +176,7 @@ export class ContactsService {
             headers: {
               Authorization: `Bearer ${this.getValidS2SToken()}`,
             },
-            params: { state },
+            params,
           },
         ),
       )
@@ -378,7 +385,7 @@ export class ContactsService {
     const electionLocation = ptv?.electionLocation
 
     if (electionType && electionLocation) {
-      const cleanedName = this.elections.cleanDistrictName(electionLocation)
+      const cleanedName = this.elections.cleanDistrictName(electionLocation) // removes ##
       const alternativeCleanedName = cleanedName.replace(/^0/, '') // Delete 1 leading zero
       const isStatewide = this.isStatewideSelection(
         state,
