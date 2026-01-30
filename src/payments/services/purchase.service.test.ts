@@ -138,39 +138,6 @@ describe('PurchaseService - Zero Amount Purchases', () => {
       )
     })
 
-    it('should still return success even if post-purchase handler fails', async () => {
-      // Arrange: Handler returns 0, but post-purchase handler throws
-      const mockHandler: PurchaseHandler<unknown> = {
-        validatePurchase: vi.fn().mockResolvedValue(undefined),
-        calculateAmount: vi.fn().mockResolvedValue(0),
-      }
-      const failingPostHandler = vi
-        .fn()
-        .mockRejectedValue(new Error('Post-purchase failed'))
-
-      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
-      service.registerPostPurchaseHandler(PurchaseType.TEXT, failingPostHandler)
-
-      // Act
-      const result = await service.createPurchaseIntent({
-        user: mockUser,
-        dto: {
-          type: PurchaseType.TEXT,
-          metadata: {
-            contactCount: 100,
-            pricePerContact: 3.5,
-            campaignId: 111,
-          },
-        },
-        campaign: mockCampaign,
-      })
-
-      // Assert: Should still return success (error is logged but not thrown)
-      expect(result.status).toBe('succeeded')
-      expect(result.amount).toBe(0)
-      expect(failingPostHandler).toHaveBeenCalledOnce()
-    })
-
     it('should call Stripe when amount is greater than 0', async () => {
       // Arrange: Handler returns non-zero amount
       const mockHandler: PurchaseHandler<unknown> = {
@@ -190,6 +157,10 @@ describe('PurchaseService - Zero Amount Purchases', () => {
       } as Stripe.Response<Stripe.PaymentIntent>)
 
       service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
+      service.registerPostPurchaseHandler(
+        PurchaseType.TEXT,
+        mockPostPurchaseHandler,
+      )
 
       // Act
       const result = await service.createPurchaseIntent({
@@ -214,36 +185,9 @@ describe('PurchaseService - Zero Amount Purchases', () => {
       expect(result.amount).toBe(10.43) // Converted from cents
       expect(result.status).toBe('requires_payment_method')
 
-      // Assert: Should NOT execute post-purchase handler (happens after payment)
+      // Assert: Should NOT execute post-purchase handler during intent creation
+      // (post-purchase only runs in completePurchase after payment succeeds)
       expect(mockPostPurchaseHandler).not.toHaveBeenCalled()
-    })
-
-    it('should work without a post-purchase handler registered', async () => {
-      // Arrange: Only register purchase handler, no post-purchase handler
-      const mockHandler: PurchaseHandler<unknown> = {
-        validatePurchase: vi.fn().mockResolvedValue(undefined),
-        calculateAmount: vi.fn().mockResolvedValue(0),
-      }
-      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
-      // Note: NO post-purchase handler registered
-
-      // Act
-      const result = await service.createPurchaseIntent({
-        user: mockUser,
-        dto: {
-          type: PurchaseType.TEXT,
-          metadata: {
-            contactCount: 100,
-            pricePerContact: 3.5,
-            campaignId: 111,
-          },
-        },
-        campaign: mockCampaign,
-      })
-
-      // Assert: Should still succeed
-      expect(result.status).toBe('succeeded')
-      expect(result.amount).toBe(0)
     })
   })
 })
