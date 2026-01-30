@@ -32,7 +32,6 @@ import {
   HandleApiErrorParams,
   Peerly10DlcBrandData,
   Peerly10DLCBrandSubmitResponseBody,
-  PEERLY_COMMITTEE_TYPE,
   PEERLY_CV_VERIFICATION_TYPE,
   PeerlyCreateCVTokenResponse,
   PeerlyGetCvRequestResponseBody,
