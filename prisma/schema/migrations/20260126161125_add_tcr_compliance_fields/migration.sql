@@ -12,7 +12,7 @@ ALTER TABLE "tcr_compliance"
   ADD COLUMN "office_level" "OfficeLevel";
 
 -- Backfill office_level from campaign.details->>'ballotLevel'
--- Maps: FEDERAL -> federal, STATE -> state, everything else (LOCAL, CITY, COUNTY, or NULL) -> local
+-- Maps: FEDERAL -> federal, STATE -> state, everything else (LOCAL, CITY, COUNTY, REGIONAL, TOWNSHIP, or NULL) -> local  
 UPDATE tcr_compliance tc
 SET office_level = CASE
   WHEN c.details->>'ballotLevel' = 'FEDERAL' THEN 'federal'::"OfficeLevel"
