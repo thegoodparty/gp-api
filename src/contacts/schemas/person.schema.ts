@@ -42,18 +42,6 @@ export interface PersonOutput {
   lng: string | null
 }
 
-export interface PersonListItem extends PersonOutput {
-  lalVoterId?: string | null
-  state?: string | null
-  middleName?: string | null
-  nameSuffix?: string | null
-  residenceAddressesExtraAddressLine?: string | null
-  voterTelephonesLandlineFormatted?: string | null
-  county?: string | null
-  city?: string | null
-  precinct?: string | null
-}
-
 export interface PeopleListResponse {
   pagination: {
     totalResults: number
@@ -63,5 +51,5 @@ export interface PeopleListResponse {
     hasNextPage: boolean
     hasPreviousPage: boolean
   }
-  people: PersonListItem[]
+  people: unknown[]
 }

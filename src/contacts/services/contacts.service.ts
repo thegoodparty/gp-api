@@ -21,11 +21,7 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
-import {
-  PeopleListResponse,
-  PersonListItem,
-  PersonOutput,
-} from '../schemas/person.schema'
+import { PeopleListResponse, PersonOutput } from '../schemas/person.schema'
 import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import {
@@ -147,8 +143,8 @@ export class ContactsService {
           },
         }),
       )
-      const people = this.normalizePeopleResponse(response.data)
-      return people
+
+      return response.data.people
     } catch (error) {
       this.logger.error('Failed to sample contacts from people API', error)
       throw new BadGatewayException('Failed to sample contacts from people API')
@@ -495,22 +491,6 @@ export class ContactsService {
       )
 
     return customSegment ? convertVoterFileFilterToFilters(customSegment) : {}
-  }
-
-  private normalizePeopleResponse(
-    data:
-      | PeopleListResponse
-      | PersonListItem[]
-      | { people: PersonListItem[] }
-      | Record<string, PersonListItem>,
-  ): PersonListItem[] {
-    if (Array.isArray(data)) return data
-    if (typeof data === 'object' && data !== null) {
-      if ('people' in data) return (data as { people: PersonListItem[] }).people
-      const values = Object.values(data as Record<string, PersonListItem>)
-      return values
-    }
-    return []
   }
 
   private async queryAlternativeDistrictName(
