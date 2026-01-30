@@ -258,6 +258,9 @@ export type PeerlyRetrieveCampaignVerifyStatusResponseBody = {
   verification_status: PeerlyCvVerificationStatus
 }
 export enum PEERLY_COMMITTEE_TYPE {
+  House = 'H',
+  Senate = 'S',
+  Presidential = 'P',
   Candidate = 'CA',
 }
 
