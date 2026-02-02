@@ -1,28 +1,29 @@
 model ElectedOffice {
-    id                      String          @id @default(uuid(7))
-    
-    electedDate             DateTime?   @db.Date @map("elected_date")
-    swornInDate             DateTime?   @db.Date @map("sworn_in_date")
-    termStartDate           DateTime?   @db.Date @map("term_start_date")
-    termLengthDays          Int?        @map("term_length_days")
-    termEndDate             DateTime?   @db.Date @map("term_end_date")
+  id String @id @default(uuid(7))
 
-    isActive                Boolean     @map("is_active") @default(true)
+  electedDate    DateTime? @map("elected_date") @db.Date
+  swornInDate    DateTime? @map("sworn_in_date") @db.Date
+  termStartDate  DateTime? @map("term_start_date") @db.Date
+  termLengthDays Int?      @map("term_length_days")
+  termEndDate    DateTime? @map("term_end_date") @db.Date
 
-    user                    User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId                  Int         @map("user_id")
+  isActive Boolean @default(true) @map("is_active")
 
-    createdAt               DateTime    @default(now()) @map("created_at")
-    updatedAt               DateTime    @updatedAt @map("updated_at")
+  user   User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int   @map("user_id")
 
-    // temporary relationship to campaign
-    // goal would be to move away from the hard link to campaign, but is necessary for now
-    campaign                Campaign    @relation(fields: [campaignId], references: [id], onDelete: NoAction)
-    campaignId              Int         @map("campaign_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-    polls                   Poll[]
+  // temporary relationship to campaign
+  // goal would be to move away from the hard link to campaign, but is necessary for now
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: NoAction)
+  campaignId Int      @map("campaign_id")
 
-    @@index([userId])
-    @@index([campaignId])
-    @@map("elected_office")
+  polls                 Poll[]
+  pollIndividualMessage PollIndividualMessage[]
+
+  @@index([userId])
+  @@index([campaignId])
+  @@map("elected_office")
 }
