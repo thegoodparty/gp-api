@@ -62,37 +62,6 @@ export = async () => {
   const secret: Record<string, string> = JSON.parse(
     secretVersion.secretString || '{}',
   ) as Record<string, string>
-  // DO NOT REMOVE THESE. These are here so that we don't use the AWS credentials
-  // that were (at some point) hardcoded in the secret. Instead, we want to make sure
-  // our instances use their NATIVE IAM roles, so that we can easily manage their
-  // permissions as-code.
-  //
-  // Once the migration to IAM auth is complete, we can remove these values from the
-  // secret entirely, and then remove these lines.
-  delete secret.AWS_ACCESS_KEY_ID
-  delete secret.AWS_SECRET_ACCESS_KEY
-  delete secret.AWS_S3_KEY
-  delete secret.AWS_S3_SECRET
-  // DO NOT REMOVE THESE. These are here so that the secret values don't take precedence
-  // over the environment variables set below.
-  // Once this change has deployed to prod, we can remove these entries from the secret entirely.
-  delete secret.LOG_LEVEL
-  delete secret.CORS_ORIGIN
-  delete secret.AWS_REGION
-  delete secret.ASSET_DOMAIN
-  delete secret.WEBAPP_ROOT_URL
-  delete secret.AI_MODELS
-  delete secret.LLAMA_AI_ASSISTANT
-  delete secret.SQS_QUEUE
-  delete secret.SQS_QUEUE_BASE_URL
-  delete secret.SERVE_ANALYSIS_BUCKET_NAME
-  delete secret.TEVYN_POLL_CSVS_BUCKET
-  delete secret.ZIP_TO_AREA_CODE_BUCKET
-  // DO NOT REMOVE THESE. These are here so that the secret values don't take precedence
-  // over the connection strings constructed at runtime in docker-entrypoint.sh.
-  // In AWS ECS, secrets take precedence over environment variables.
-  delete secret.DATABASE_URL
-  delete secret.VOTER_DATASTORE
 
   if (!secret.DB_PASSWORD) {
     throw new Error('DB_PASSWORD must be set in the secret.')
