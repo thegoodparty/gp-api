@@ -9,7 +9,6 @@ import { RolesGuard } from './guards/Roles.guard'
 import { LocalStrategy } from './auth-strategies/Local.strategy'
 import { EmailModule } from 'src/email/email.module'
 import { SocialLoginStrategy } from './auth-strategies/SocialLogin.strategy'
-import { ClerkClientProvider } from './providers/clerk-client.provider'
 
 const JWT_EXPIRATION = '1y'
 
@@ -26,7 +25,6 @@ if (!process.env.AUTH_SECRET) {
     LocalStrategy,
     SocialLoginStrategy,
     JwtAuthStrategy,
-    ClerkClientProvider,
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
