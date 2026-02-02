@@ -136,8 +136,8 @@ export class OutreachController {
       }
 
       const name = `${campaign.slug}${createOutreachDto.date
-          ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
-          : ''
+        ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
+        : ''
         }`
 
       const { aiContent = {} } = campaign
