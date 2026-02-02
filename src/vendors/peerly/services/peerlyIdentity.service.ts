@@ -13,6 +13,7 @@ import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { lastValueFrom } from 'rxjs'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
+import { resolveJobGeographyFromAddress } from 'src/outreach/util/campaignGeography.util'
 import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
@@ -350,14 +351,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.isTestEnvironment ? `TEST-${campaignCommittee}` : campaignCommittee
     ).substring(0, 255) // Limit to 255 characters per Peerly API docs
 
-    const stateCode = state?.short_name
-    const postalCodeValue = postalCode?.long_name
-
-    let areaCodes: string[] | null = null
-    if (postalCodeValue) {
-      areaCodes =
-        await this.areaCodeFromZipService.getAreaCodeFromZip(postalCodeValue)
-    }
+    const geography = await resolveJobGeographyFromAddress(
+      {
+        stateCode: state?.short_name?.trim(),
+        postalCodeValue: postalCode?.long_name ?? '',
+      },
+      { areaCodeFromZipService: this.areaCodeFromZipService },
+    )
 
     const submitBrandData: Peerly10DlcBrandData = {
       entityType: PEERLY_ENTITY_TYPE,
@@ -373,15 +373,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
-      ...(stateCode && areaCodes && areaCodes.length > 0
+      ...(geography.didNpaSubset.length > 0
         ? {
-            jobAreas: [
-              {
-                didState: stateCode,
-                didNpaSubset: areaCodes,
-              },
-            ],
-          }
+          jobAreas: [
+            {
+              didState: geography.didState,
+              didNpaSubset: geography.didNpaSubset,
+            },
+          ],
+        }
         : {}),
     }
 
@@ -568,7 +568,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       if (!fecCommitteeId) {
         this.logger.error(
           `[Campaign Verify] Missing fec_committee_id for federal submission (campaignId=${campaign.id}). ` +
-            `This field is required by Peerly for federal verification.`,
+          `This field is required by Peerly for federal verification.`,
         )
         throw new BadRequestException(
           `FEC Committee ID is required for federal candidates.`,
@@ -581,7 +581,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     if (isMissingLocalLocation) {
       this.logger.warn(
         `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
-          `This field is required by Peerly when locality is 'local'.`,
+        `This field is required by Peerly when locality is 'local'.`,
       )
     }
 
@@ -607,17 +607,17 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       // Federal-specific fields
       ...(isFederal
         ? {
-            fec_committee_id: fecCommitteeId,
-          }
+          fec_committee_id: fecCommitteeId,
+        }
         : {}),
       // Local-specific fields
       ...(isLocal
         ? {
-            city_county:
-              ballotLevel === BallotReadyPositionLevel.COUNTY
-                ? county?.long_name
-                : city?.long_name,
-          }
+          city_county:
+            ballotLevel === BallotReadyPositionLevel.COUNTY
+              ? county?.long_name
+              : city?.long_name,
+        }
         : {}),
     }
 

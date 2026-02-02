@@ -36,7 +36,7 @@ export class OutreachController {
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
-  ) {}
+  ) { }
 
   @Post()
   @UseCampaign()
@@ -135,17 +135,23 @@ export class OutreachController {
         )
       }
 
-      const name = `${campaign.slug}${
-        createOutreachDto.date
+      const name = `${campaign.slug}${createOutreachDto.date
           ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
           : ''
-      }`
+        }`
 
       const { aiContent = {} } = campaign
       const resolvedScriptText = resolveScriptContent(
         createOutreachDto.script!,
         aiContent,
       )
+
+      const resolvedGeography = await this.outreachService.resolveP2pJobGeography(
+        campaign,
+      )
+      const didState = createOutreachDto.didState ?? resolvedGeography.didState
+      const didNpaSubset =
+        createOutreachDto.didNpaSubset ?? resolvedGeography.didNpaSubset
 
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
@@ -160,7 +166,8 @@ export class OutreachController {
         scriptText: resolvedScriptText,
         identityId: peerlyIdentityId!,
         name,
-        didState: createOutreachDto.didState,
+        didState,
+        didNpaSubset,
         scheduledDate: createOutreachDto.date,
       })
 
@@ -170,6 +177,7 @@ export class OutreachController {
           script: resolvedScriptText,
           projectId: jobId,
           status: OutreachStatus.in_progress,
+          didState,
         },
         imageUrl,
       )
@@ -200,8 +208,8 @@ export class OutreachController {
         ...outreach,
         ...(p2pJob
           ? {
-              p2pJob,
-            }
+            p2pJob,
+          }
           : {}),
       }
     })
