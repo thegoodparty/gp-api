@@ -39,9 +39,7 @@ function isDetailsRecord(
   details: Campaign['details'] | null | undefined,
 ): details is Record<string, unknown> {
   return (
-    details != null &&
-    typeof details === 'object' &&
-    !Array.isArray(details)
+    details != null && typeof details === 'object' && !Array.isArray(details)
   )
 }
 

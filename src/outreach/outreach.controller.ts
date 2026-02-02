@@ -36,7 +36,7 @@ export class OutreachController {
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
-  ) { }
+  ) {}
 
   @Post()
   @UseCampaign()
@@ -135,10 +135,11 @@ export class OutreachController {
         )
       }
 
-      const name = `${campaign.slug}${createOutreachDto.date
-        ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
-        : ''
-        }`
+      const name = `${campaign.slug}${
+        createOutreachDto.date
+          ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
+          : ''
+      }`
 
       const { aiContent = {} } = campaign
       const resolvedScriptText = resolveScriptContent(
@@ -146,9 +147,8 @@ export class OutreachController {
         aiContent,
       )
 
-      const resolvedGeography = await this.outreachService.resolveP2pJobGeography(
-        campaign,
-      )
+      const resolvedGeography =
+        await this.outreachService.resolveP2pJobGeography(campaign)
       const didState = createOutreachDto.didState ?? resolvedGeography.didState
       const didNpaSubset =
         createOutreachDto.didNpaSubset ?? resolvedGeography.didNpaSubset
@@ -208,8 +208,8 @@ export class OutreachController {
         ...outreach,
         ...(p2pJob
           ? {
-            p2pJob,
-          }
+              p2pJob,
+            }
           : {}),
       }
     })

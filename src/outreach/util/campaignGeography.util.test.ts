@@ -126,9 +126,7 @@ describe('campaignGeography.util', () => {
     })
 
     it('returns empty didNpaSubset when getAreaCodeFromZip returns empty array', async () => {
-      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue(
-        [],
-      )
+      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([])
       const result = await resolveJobGeographyFromAddress(
         { stateCode: 'CA', postalCodeValue: '99999' },
         { areaCodeFromZipService },
@@ -258,9 +256,7 @@ describe('campaignGeography.util', () => {
     })
 
     it('defaults didState to P2P_JOB_DEFAULTS.DID_STATE when no placeId and no details', async () => {
-      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue(
-        [],
-      )
+      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([])
       const campaign: CampaignGeographyInput = {
         placeId: null,
         details: null,
@@ -278,9 +274,7 @@ describe('campaignGeography.util', () => {
       vi.mocked(placesService.getAddressByPlaceId).mockRejectedValue(
         new Error('Places error'),
       )
-      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue(
-        [],
-      )
+      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([])
       const campaign: CampaignGeographyInput = {
         placeId: 'ChIJ...',
         details: { zip: '92201' },

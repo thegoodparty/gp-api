@@ -33,7 +33,7 @@ export class PeerlyP2pJobService {
   constructor(
     private readonly peerlyMediaService: PeerlyMediaService,
     private readonly peerlyP2pSmsService: PeerlyP2pSmsService,
-  ) { }
+  ) {}
 
   async createPeerlyP2pJob({
     campaignId,

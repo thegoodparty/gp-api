@@ -375,13 +375,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
       ...(geography.didNpaSubset.length > 0
         ? {
-          jobAreas: [
-            {
-              didState: geography.didState,
-              didNpaSubset: geography.didNpaSubset,
-            },
-          ],
-        }
+            jobAreas: [
+              {
+                didState: geography.didState,
+                didNpaSubset: geography.didNpaSubset,
+              },
+            ],
+          }
         : {}),
     }
 
@@ -568,7 +568,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       if (!fecCommitteeId) {
         this.logger.error(
           `[Campaign Verify] Missing fec_committee_id for federal submission (campaignId=${campaign.id}). ` +
-          `This field is required by Peerly for federal verification.`,
+            `This field is required by Peerly for federal verification.`,
         )
         throw new BadRequestException(
           `FEC Committee ID is required for federal candidates.`,
@@ -581,7 +581,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     if (isMissingLocalLocation) {
       this.logger.warn(
         `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
-        `This field is required by Peerly when locality is 'local'.`,
+          `This field is required by Peerly when locality is 'local'.`,
       )
     }
 
@@ -607,17 +607,17 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       // Federal-specific fields
       ...(isFederal
         ? {
-          fec_committee_id: fecCommitteeId,
-        }
+            fec_committee_id: fecCommitteeId,
+          }
         : {}),
       // Local-specific fields
       ...(isLocal
         ? {
-          city_county:
-            ballotLevel === BallotReadyPositionLevel.COUNTY
-              ? county?.long_name
-              : city?.long_name,
-        }
+            city_county:
+              ballotLevel === BallotReadyPositionLevel.COUNTY
+                ? county?.long_name
+                : city?.long_name,
+          }
         : {}),
     }
 

@@ -29,7 +29,7 @@ export class PaymentsController {
     private readonly stripeEvents: PaymentEventsService,
     private readonly campaignsService: CampaignsService,
     private readonly paymentsService: PaymentsService,
-  ) { }
+  ) {}
 
   @Post('events')
   @PublicAccess()
