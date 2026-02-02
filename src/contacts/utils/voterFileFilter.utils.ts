@@ -21,10 +21,7 @@ export type FilterObject = Record<string, FilterValue>
 
 type NumericRange = { min: number; max: number | null }
 
-const processNumericRanges = (
-  ranges: NumericRange[],
-  defaultMax: number,
-): FilterValue => {
+const processNumericRanges = (ranges: NumericRange[]): FilterValue => {
   if (ranges.length === 1) {
     const range = ranges[0]
     if (range.max === null) {
@@ -383,7 +380,7 @@ export const convertVoterFileFilterToFilters = (
   }
 
   if (incomeRanges.length > 0) {
-    const incomeFilter = processNumericRanges(incomeRanges, 10000000)
+    const incomeFilter = processNumericRanges(incomeRanges)
     filters['estimatedIncomeAmountInt'] = segment.incomeUnknown
       ? addIncludeNull(incomeFilter)
       : incomeFilter
