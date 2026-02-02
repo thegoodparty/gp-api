@@ -6,11 +6,10 @@ import {
 import { AuthGuard } from '@nestjs/passport'
 import { Reflector } from '@nestjs/core'
 import { FastifyReply } from 'fastify'
-import { IS_PUBLIC_KEY } from '../decorators/PublicAccess.decorator'
-import { User, UserRole } from '@prisma/client'
-import { ROLES_KEY } from '../decorators/Roles.decorator'
+import { User } from '@prisma/client'
 import { TokenException } from './token.exception'
 import { SessionsService } from '../../users/services/sessions.service'
+import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -22,20 +21,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
-    // Check if the route or class is marked as public
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ])
-
-    // Check if the route or class has specific roles specified
-    const roles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ])
+    const request = context.switchToHttp().getRequest()
 
     // Skip JWT authentication if the route is public and does not have role restrictions
-    if (isPublic && !roles) {
+    if (routeIsPublicAndNoRoles(context, this.reflector) || request.m2mToken) {
       return true
     }
 
