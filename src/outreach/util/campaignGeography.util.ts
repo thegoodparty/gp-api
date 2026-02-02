@@ -59,8 +59,10 @@ export function parseDetailsGeography(
   return { state, zip }
 }
 
-function normalizeZip(z: string): string | undefined {
-  return z ? String(z).trim() : undefined
+function normalizeZip(z: string | undefined): string | undefined {
+  if (z == null || z === '') return undefined
+  const trimmed = String(z).trim()
+  return trimmed === '' ? undefined : trimmed
 }
 
 async function getAreaCodesForZip(
@@ -83,18 +85,18 @@ export interface ResolveJobGeographyFromAddressServices {
 
 /**
  * Use when you already have address (e.g. from Places). Returns didState + didNpaSubset for jobAreas.
- * No Places call; only resolves area codes from zip and normalizes state.
+ * No Places call; only resolves area codes from zip. Callers may trim stateCode before calling.
  */
 export async function resolveJobGeographyFromAddress(
   { stateCode, postalCodeValue }: ResolveJobGeographyFromAddressParams,
   services: ResolveJobGeographyFromAddressServices,
 ): Promise<P2pJobGeographyResult> {
-  const zip = normalizeZip(postalCodeValue ?? '')
+  const zip = normalizeZip(postalCodeValue)
   const didNpaSubset = await getAreaCodesForZip(
     zip,
     services.areaCodeFromZipService,
   )
-  const didState = stateCode?.trim() ?? P2P_JOB_DEFAULTS.DID_STATE
+  const didState = stateCode ?? P2P_JOB_DEFAULTS.DID_STATE
   return { didState, didNpaSubset }
 }
 
@@ -125,7 +127,7 @@ export async function resolveP2pJobGeography(
       return resolveJobGeographyFromAddress(
         {
           stateCode: state?.short_name?.trim(),
-          postalCodeValue: postalCode?.long_name ?? '',
+          postalCodeValue: postalCode?.long_name,
         },
         { areaCodeFromZipService },
       )
@@ -138,7 +140,7 @@ export async function resolveP2pJobGeography(
   }
 
   // 2) Fallback to campaign.details (and zip lookup for state)
-  const zip = normalizeZip(details?.zip ?? '')
+  const zip = normalizeZip(details?.zip)
   const didState =
     details?.state?.trim() ??
     (zip ? zipcodes.lookup(zip)?.state : undefined) ??

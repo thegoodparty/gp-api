@@ -178,6 +178,7 @@ export class OutreachController {
           projectId: jobId,
           status: OutreachStatus.in_progress,
           didState,
+          didNpaSubset,
         },
         imageUrl,
       )

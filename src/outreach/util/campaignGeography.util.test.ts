@@ -103,12 +103,12 @@ describe('campaignGeography.util', () => {
       expect(result.didNpaSubset).toEqual([])
     })
 
-    it('trims stateCode', async () => {
+    it('uses stateCode as-is (callers may trim before calling)', async () => {
       vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([
         '760',
       ])
       const result = await resolveJobGeographyFromAddress(
-        { stateCode: '  CA  ', postalCodeValue: '92201' },
+        { stateCode: 'CA', postalCodeValue: '92201' },
         { areaCodeFromZipService },
       )
       expect(result.didState).toBe('CA')
