@@ -57,7 +57,8 @@ test.describe('Contacts and Segments', () => {
   }) => {
     // This endpoint currently only checks that the user has a "current" elected office.
     // Create one so the scaffolded endpoint can return its dummy response.
-    const createOffice = await request.post(`/v1/elected-office/`, {
+    // Fastify/Nest can be strict about trailing slashes; hit the canonical route.
+    const createOffice = await request.post(`/v1/elected-office`, {
       headers: {
         Authorization: `Bearer ${authToken}`,
       },
