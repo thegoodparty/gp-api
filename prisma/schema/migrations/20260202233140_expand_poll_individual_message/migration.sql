@@ -1,18 +1,10 @@
-/*
-  Warnings:
-
-  - Added the required column `content` to the `poll_individual_message` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `elected_office_id` to the `poll_individual_message` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `is_opt_out` to the `poll_individual_message` table without a default value. This is not possible if the table is not empty.
-
-*/
 -- CreateEnum
 CREATE TYPE "PollIndividualMessageSender" AS ENUM ('ELECTED_OFFICIAL', 'CONSTITUENT');
 
 -- AlterTable
-ALTER TABLE "poll_individual_message" ADD COLUMN     "content" TEXT NOT NULL,
-ADD COLUMN     "elected_office_id" TEXT NOT NULL,
-ADD COLUMN     "is_opt_out" BOOLEAN NOT NULL,
+ALTER TABLE "poll_individual_message" ADD COLUMN     "content" TEXT,
+ADD COLUMN     "elected_office_id" TEXT,
+ADD COLUMN     "is_opt_out" BOOLEAN,
 ADD COLUMN     "sender" "PollIndividualMessageSender" NOT NULL DEFAULT 'ELECTED_OFFICIAL';
 
 -- CreateTable
