@@ -10,10 +10,9 @@ export const CLERK_CLIENT_PROVIDER_TOKEN = 'ClerkClient'
 
 export const ClerkClientProvider = {
   provide: CLERK_CLIENT_PROVIDER_TOKEN,
-  useFactory: () => {
-    return createClerkClient({
+  useFactory: () =>
+    createClerkClient({
       publishableKey: CLERK_PUBLISHABLE_KEY,
       secretKey: CLERK_SECRET_KEY,
-    })
-  },
+    }),
 }
