@@ -15,14 +15,7 @@ import { EVENTS } from '../segment.types'
  * 2. Check with the team if the HubSpot workflow was also updated
  * 3. Test the full flow manually: App → Segment → HubSpot → Workflow triggers
  *
- * HubSpot Workflow Mappings (as of 2026-01):
- * | Event Name                                       | Sets 10DLC Status To    |
- * |--------------------------------------------------|-------------------------|
- * | Candidate Website - Published                    | Website Created         |
- * | Candidate Website - Purchased domain             | Domain Purchased        |
- * | Voter Outreach - 10DLC Compliance Form Submitted | Registration Submitted  |
- * | Voter Outreach - 10DLC Compliance PIN Submitted  | Compliance Pending      |
- * | Voter Outreach - 10DLC Compliance Completed      | Compliant               |
+ * @see ../HUBSPOT_INTEGRATION.md for full event → workflow mappings
  */
 describe('Segment → HubSpot Event Names', () => {
   describe('10DLC Compliance Flow Events (Backend)', () => {
