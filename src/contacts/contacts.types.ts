@@ -70,9 +70,32 @@ export type StatsResponse = {
   }
 }
 
-type PersonPollResponse = {
-  pollId: string
-  sentAt: Date
-  sender: string
-  isOptOut: boolean
+export enum ConstituentActivityType {
+  POLL_INTERACTIONS,
+}
+
+export enum ConstituentActivityEventType {
+  SENT,
+  RESPONDED,
+  OPTED_OUT,
+}
+
+type ConstituentActivityEvent = {
+  type: ConstituentActivityEventType
+  date: string
+}
+
+type ConstituentActivity = {
+  type: ConstituentActivityType
+  date: string
+  data: {
+    pollId: string
+    pollTitle: string
+    events: ConstituentActivityEvent[]
+  }
+}
+
+export type GetIndividualActivitiesResponse = {
+  nextCursor: string | null
+  results: ConstituentActivity[]
 }

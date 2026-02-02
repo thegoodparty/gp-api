@@ -14,7 +14,13 @@ import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import {
+  ConstituentActivityEventType,
+  ConstituentActivityType,
+  GetIndividualActivitiesResponse,
+} from './contacts.types'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
+import { IndividualActivityDTO } from './schemas/individualActivity.schema'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
@@ -68,9 +74,9 @@ export class ContactsController {
 
   @Get('/:id/activities')
   async getIndividualActivities(
-    @Param('id') id: string,
+    @Param() params: IndividualActivityDTO,
     @ReqUser() user: User,
-  ) {
+  ): Promise<GetIndividualActivitiesResponse> {
     const existing = await this.electedOfficeService.getCurrentElectedOffice(
       user.id,
     )
@@ -79,6 +85,26 @@ export class ContactsController {
         'You do not have permission to update this elected office',
       )
     }
-    // await prisma.pollIndividualMessage.fetchMany({ where: { electedOfficeId: existing.id, personId: id}})
+    // return async getIndividualMessages(input: IndividualActivityInput)
+    // Dummy response for scaffolding
+    return {
+      nextCursor: 'last-seen-id',
+      results: [
+        {
+          type: ConstituentActivityType.POLL_INTERACTIONS,
+          date: 'myDate',
+          data: {
+            pollId: 'poll-id',
+            pollTitle: 'poll-title',
+            events: [
+              {
+                type: ConstituentActivityEventType.SENT,
+                date: 'myDate',
+              },
+            ],
+          },
+        },
+      ],
+    }
   }
 }
