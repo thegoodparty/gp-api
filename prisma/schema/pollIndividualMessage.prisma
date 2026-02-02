@@ -1,9 +1,23 @@
-model PollIndividualMessage {
-  id       String   @id
-  poll     Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  pollId   String   @map("poll_id")
-  personId String   @map("person_id")
-  sentAt   DateTime @map("sent_at")
+enum PollIndividualMessageSender {
+  ELECTED_OFFICIAL
+  CONSTITUENT
+}
 
+model PollIndividualMessage {
+  id       String                      @id
+  personId String                      @map("person_id")
+  sentAt   DateTime                    @map("sent_at")
+  isOptOut Boolean                     @map("is_opt_out")
+  sender   PollIndividualMessageSender @default(ELECTED_OFFICIAL) @map("sender")
+  content  String                      @map("content") // The message itself
+
+  // Relations
+  electedOffice   ElectedOffice @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
+  electedOfficeId String        @map("elected_office_id")
+  poll            Poll          @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollId          String        @map("poll_id")
+  pollIssues      PollIssue[]
+
+  @@index([electedOfficeId, personId, sentAt])
   @@map("poll_individual_message")
 }
