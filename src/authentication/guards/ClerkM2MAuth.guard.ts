@@ -32,6 +32,7 @@ export class ClerkM2MAuthGuard implements CanActivate {
     // Skip M2M authentication if this isn't a M2M token or the route is public
     // and does not have role restrictions
     if (
+      !token ||
       (token && !token.startsWith('mt_')) ||
       routeIsPublicAndNoRoles(context, this.reflector)
     ) {
