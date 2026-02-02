@@ -1,3 +1,7 @@
+/**
+ * Resolves P2P job geography (state + area codes) from a campaign’s placeId or details.
+ * Used by outreach and 10DLC flows so Peerly jobs get correct didState and didNpaSubset.
+ */
 import { P2P_JOB_DEFAULTS } from '@/vendors/peerly/constants/p2pJob.constants'
 import { Campaign } from '@prisma/client'
 import { extractAddressComponents } from 'src/vendors/google/util/GooglePlaces.util'
@@ -31,18 +35,27 @@ export interface ResolveP2pJobGeographyServices {
   logger?: { warn: (context: object, message: string) => void }
 }
 
+function isDetailsRecord(
+  details: Campaign['details'] | null | undefined,
+): details is Record<string, unknown> {
+  return (
+    details != null &&
+    typeof details === 'object' &&
+    !Array.isArray(details)
+  )
+}
+
 export function parseDetailsGeography(
   details: Campaign['details'] | null | undefined,
 ): CampaignDetailsGeography | null {
-  if (details == null || typeof details !== 'object') return null
-  const d = details as Record<string, unknown>
+  if (!isDetailsRecord(details)) return null
   const state =
-    typeof d.state === 'string' && d.state.trim() !== ''
-      ? d.state.trim()
+    typeof details.state === 'string' && details.state.trim() !== ''
+      ? details.state.trim()
       : undefined
   const zip =
-    typeof d.zip === 'string' && d.zip.trim() !== ''
-      ? d.zip.trim()
+    typeof details.zip === 'string' && details.zip.trim() !== ''
+      ? details.zip.trim()
       : undefined
   if (state === undefined && zip === undefined) return null
   return { state, zip }
