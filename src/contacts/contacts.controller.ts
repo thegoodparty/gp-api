@@ -1,5 +1,15 @@
-import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
-import { Campaign, PathToVictory } from '@prisma/client'
+import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
+import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Query,
+  Res,
+  UsePipes,
+} from '@nestjs/common'
+import { Campaign, PathToVictory, User } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
@@ -19,7 +29,10 @@ type CampaignWithPathToVictory = Campaign & {
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(
+    private readonly contactsService: ContactsService,
+    private readonly electedOfficeService: ElectedOfficeService,
+  ) {}
 
   @Get()
   listContacts(
@@ -51,5 +64,21 @@ export class ContactsController {
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
     return this.contactsService.findPerson(params.id, campaign)
+  }
+
+  @Get('/:id/activities')
+  async getIndividualActivities(
+    @Param('id') id: string,
+    @ReqUser() user: User,
+  ) {
+    const existing = await this.electedOfficeService.getCurrentElectedOffice(
+      user.id,
+    )
+    if (!existing || existing.userId !== user.id) {
+      throw new ForbiddenException(
+        'You do not have permission to update this elected office',
+      )
+    }
+    // await prisma.pollIndividualMessage.fetchMany({ where: { electedOfficeId: existing.id, personId: id}})
   }
 }

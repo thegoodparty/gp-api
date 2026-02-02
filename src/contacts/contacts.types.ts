@@ -69,3 +69,10 @@ export type StatsResponse = {
     estimatedIncomeRange: DistrictStatSummary
   }
 }
+
+type PersonPollResponse = {
+  pollId: string
+  sentAt: Date
+  sender: string
+  isOptOut: boolean
+}
