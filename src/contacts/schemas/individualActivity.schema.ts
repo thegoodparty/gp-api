@@ -1,14 +1,23 @@
 import { createZodDto } from 'nestjs-zod'
 import z from 'zod'
 
-const individualActivitySchema = z.object({
-  id: z.coerce.number().optional(),
-  take: z.string().optional(),
+const individualActivityParamsSchema = z.object({
+  id: z.string(),
+})
+
+const individualActivityQuerySchema = z.object({
+  take: z.coerce.number().optional(),
   after: z.string().optional(),
 })
 
-export class IndividualActivityDTO extends createZodDto(
-  individualActivitySchema,
+export class IndividualActivityParamsDTO extends createZodDto(
+  individualActivityParamsSchema,
 ) {}
 
-export type IndividualActivityInput = z.infer<typeof individualActivitySchema>
+export class IndividualActivityQueryDTO extends createZodDto(
+  individualActivityQuerySchema,
+) {}
+
+export type IndividualActivityInput = z.infer<
+  typeof individualActivityParamsSchema
+>

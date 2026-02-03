@@ -20,7 +20,10 @@ import {
   GetIndividualActivitiesResponse,
 } from './contacts.types'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
-import { IndividualActivityDTO } from './schemas/individualActivity.schema'
+import {
+  IndividualActivityParamsDTO,
+  IndividualActivityQueryDTO,
+} from './schemas/individualActivity.schema'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
@@ -74,7 +77,8 @@ export class ContactsController {
 
   @Get('/:id/activities')
   async getIndividualActivities(
-    @Param() params: IndividualActivityDTO,
+    @Param() params: IndividualActivityParamsDTO,
+    @Query() query: IndividualActivityQueryDTO,
     @ReqUser() user: User,
   ): Promise<GetIndividualActivitiesResponse> {
     const existing = await this.electedOfficeService.getCurrentElectedOffice(
