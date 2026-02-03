@@ -1,4 +1,4 @@
-import { ExtendedVoterFileFilter } from '../contacts.types'
+import { VoterFileFilter } from '@prisma/client'
 
 export type FilterObject = Record<
   string,
@@ -13,7 +13,7 @@ export type FilterObject = Record<
 >
 
 export const convertVoterFileFilterToFilters = (
-  segment: ExtendedVoterFileFilter,
+  segment: VoterFileFilter,
 ): FilterObject => {
   const filters: FilterObject = {}
   const excludeFields = new Set([
@@ -93,9 +93,15 @@ export const convertVoterFileFilterToFilters = (
       filters[key] = true
     } else if (Array.isArray(value) && value.length > 0) {
       if (key === 'languageCodes') {
-        const normalizedLanguages = value.map((lang: string) =>
-          lang.toLowerCase() === 'other' ? 'Other' : lang,
-        )
+        const filterMap: Record<string, string> = {
+          en: 'English',
+          es: 'Spanish',
+          other: 'Other',
+        }
+        const normalizedLanguages: string[] = value
+          .map((lang: string) => filterMap[lang])
+          .filter(Boolean)
+
         filters['language'] =
           normalizedLanguages.length === 1
             ? { eq: normalizedLanguages[0] }
