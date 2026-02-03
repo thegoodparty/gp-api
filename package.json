@@ -131,6 +131,18 @@
     "zipcodes": "^8.0.0",
     "zod": "^3.23.8"
   },
+  "overrides": {
+    "@smithy/eventstream-codec": "^4.0.0",
+    "@smithy/types": "^4.0.0",
+    "@smithy/util-hex-encoding": "^4.0.0",
+    "@smithy/protocol-http": "^5.0.0",
+    "@smithy/signature-v4": "^5.0.0",
+    "@smithy/util-utf8": "^4.0.0",
+    "@aws-crypto/crc32": "^5.0.0",
+    "@aws-crypto/util": "^5.0.0",
+    "ignore": "^7.0.0",
+    "tslib": "^2.0.0"
+  },
   "devDependencies": {
     "@contentful/rich-text-types": "^17.0.0",
     "@graphql-codegen/cli": "^5.0.4",
