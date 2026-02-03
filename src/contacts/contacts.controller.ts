@@ -86,10 +86,10 @@ export class ContactsController {
     )
     if (!existing || existing.userId !== user.id) {
       throw new ForbiddenException(
-        'You do not have permission to update this elected office',
+        'You do not have permission to access this elected office',
       )
     }
-    // return async getIndividualMessages(input: IndividualActivityInput)
+    // return getIndividualActivities(...params, ...query)
     // Dummy response for scaffolding
     return {
       nextCursor: 'last-seen-id',

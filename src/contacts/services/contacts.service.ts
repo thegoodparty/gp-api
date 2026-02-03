@@ -302,7 +302,7 @@ export class ContactsService {
     )
   }
 
-  async getIndividualMessages(input: IndividualActivityInput) {}
+  async getIndividualActivites(input: IndividualActivityInput) {}
 
   private getValidS2SToken(): string {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
