@@ -10,6 +10,7 @@ import { User } from '@prisma/client'
 import { TokenException } from './token.exception'
 import { SessionsService } from '../../users/services/sessions.service'
 import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
+import { IncomingRequest } from '@/authentication/authentication.types'
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -21,7 +22,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest()
+    const request = context.switchToHttp().getRequest<IncomingRequest>()
 
     // Skip JWT authentication if the route is public and does not have role restrictions
     if (routeIsPublicAndNoRoles(context, this.reflector) || request.m2mToken) {

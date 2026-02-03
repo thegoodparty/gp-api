@@ -9,6 +9,7 @@ import { Reflector } from '@nestjs/core'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/authentication/providers/clerk-client.provider'
 import { ClerkClient } from '@clerk/backend'
 import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
+import { IncomingRequest } from '@/authentication/authentication.types'
 
 const { CLERK_SECRET_KEY, GP_WEBAPP_MACHINE_SECRET } = process.env
 
@@ -26,7 +27,7 @@ export class ClerkM2MAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest()
+    const request = context.switchToHttp().getRequest<IncomingRequest>()
     const token = request.headers.authorization?.replace('Bearer ', '')
 
     // Skip M2M authentication if this isn't a M2M token or the route is public
