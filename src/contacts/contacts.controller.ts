@@ -2,8 +2,8 @@ import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
 import {
   Controller,
+  ForbiddenException,
   Get,
-  NotFoundException,
   Param,
   Query,
   Res,
@@ -85,8 +85,8 @@ export class ContactsController {
       user.id,
     )
     if (!existing) {
-      throw new NotFoundException(
-        'No electedOffice found associated with that userId',
+      throw new ForbiddenException(
+        'Access to constituent activities requires an elected office',
       )
     }
     // return getIndividualActivities(...params, ...query)
