@@ -2,8 +2,8 @@ import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
 import {
   Controller,
-  ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Query,
   Res,
@@ -84,9 +84,9 @@ export class ContactsController {
     const existing = await this.electedOfficeService.getCurrentElectedOffice(
       user.id,
     )
-    if (!existing || existing.userId !== user.id) {
-      throw new ForbiddenException(
-        'You do not have permission to access this elected office',
+    if (!existing) {
+      throw new NotFoundException(
+        'No electedOffice found associated with that userId',
       )
     }
     // return getIndividualActivities(...params, ...query)
