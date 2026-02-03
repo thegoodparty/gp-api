@@ -5,7 +5,7 @@ import {
   Campaign,
   PathToVictory,
   Poll,
-  PollIndividualMessage,
+  Prisma,
   TcrComplianceStatus,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
@@ -770,7 +770,7 @@ export class QueueConsumerService {
     await this.pollsService.client.$transaction(
       async (tx) => {
         for (const person of people) {
-          const message: PollIndividualMessage = {
+          const message: Prisma.PollIndividualMessageUncheckedCreateInput = {
             // It's important that this id be deterministic, so that we can safely re-upsert
             // a previous CSV.
             id: `${poll.id}-${person.id}`,
@@ -781,7 +781,7 @@ export class QueueConsumerService {
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
             create: message,
-            update: message,
+            update: { sentAt: now },
           })
         }
       },
