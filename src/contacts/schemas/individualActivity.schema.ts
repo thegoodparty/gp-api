@@ -20,4 +20,5 @@ export class IndividualActivityQueryDTO extends createZodDto(
 
 export type IndividualActivityInput = z.infer<
   typeof individualActivityParamsSchema
->
+> &
+  z.infer<typeof individualActivityQuerySchema>
