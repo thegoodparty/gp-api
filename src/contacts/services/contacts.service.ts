@@ -17,6 +17,7 @@ import { ElectionsService } from 'src/elections/services/elections.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import { CampaignWithPathToVictory, StatsResponse } from '../contacts.types'
+import { IndividualActivityInput } from '../schemas/individualActivity.schema'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
@@ -300,6 +301,8 @@ export class ContactsService {
       },
     )
   }
+
+  async getIndividualActivites(input: IndividualActivityInput) {}
 
   private getValidS2SToken(): string {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
