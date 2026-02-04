@@ -11,7 +11,7 @@ const individualActivityQuerySchema = z.object({
     .nativeEnum(ConstituentActivityType)
     .optional()
     .default(ConstituentActivityType.POLL_INTERACTIONS),
-  take: z.coerce.number().optional(),
+  take: z.coerce.number().int().optional(),
   after: z.string().optional(), // Last seen pollIndividualMessage ID
 })
 
