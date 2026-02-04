@@ -34,7 +34,7 @@ export class ClerkM2MAuthGuard implements CanActivate {
     // and does not have role restrictions
     if (
       !token ||
-      (token && !token.startsWith('mt_')) ||
+      !token.startsWith('mt_') ||
       routeIsPublicAndNoRoles(context, this.reflector)
     ) {
       return true
