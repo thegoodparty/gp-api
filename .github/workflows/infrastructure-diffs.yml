@@ -43,6 +43,7 @@ jobs:
         run: |
           declare -A STAGES=([dev]=develop [qa]=qa [prod]=master)
           HAS_CHANGES=false
+          HAS_ERRORS=false
 
           echo "## Infrastructure Diff" > /tmp/pr-comment.md
           echo "" >> /tmp/pr-comment.md
@@ -60,7 +61,23 @@ jobs:
             # Count changes
             CHANGES=$(jq '[.changeSummary.create, .changeSummary.update, .changeSummary.delete, .changeSummary.replace | values] | add // 0' /tmp/preview-$env.json)
 
+            # Check for errors in diagnostics
+            ERRORS=$(jq '[.diagnostics // [] | .[] | select(.severity == "error")] | length' /tmp/preview-$env.json)
+
             echo "### \`$env\`" >> /tmp/pr-comment.md
+
+            # Surface errors first if present
+            if [ "$ERRORS" -gt 0 ]; then
+              HAS_CHANGES=true
+              HAS_ERRORS=true
+              echo "⛔ **$ERRORS error(s) during preview:**" >> /tmp/pr-comment.md
+              echo '' >> /tmp/pr-comment.md
+              echo '```' >> /tmp/pr-comment.md
+              jq -r '.diagnostics // [] | .[] | select(.severity == "error") | .message' /tmp/preview-$env.json >> /tmp/pr-comment.md
+              echo '```' >> /tmp/pr-comment.md
+              echo '' >> /tmp/pr-comment.md
+            fi
+
             if [ "$CHANGES" -gt 0 ]; then
               HAS_CHANGES=true
               jq -r '"**\(.changeSummary | to_entries | map("\(.value) \(.key)") | join(", "))**"' /tmp/preview-$env.json >> /tmp/pr-comment.md
@@ -70,13 +87,14 @@ jobs:
               echo "$(npm run --silent infra diff $env 2>&1)" >> /tmp/pr-comment.md
               echo '```' >> /tmp/pr-comment.md
               echo '</details>' >> /tmp/pr-comment.md
-            else
+            elif [ "$ERRORS" -eq 0 ]; then
               echo "✅ No changes" >> /tmp/pr-comment.md
             fi
             echo "" >> /tmp/pr-comment.md
           done
 
           echo "has_changes=$HAS_CHANGES" >> $GITHUB_OUTPUT
+          echo "has_errors=$HAS_ERRORS" >> $GITHUB_OUTPUT
 
       - name: Find existing diff comment
         uses: peter-evans/find-comment@v3
@@ -105,3 +123,9 @@ jobs:
               repo: context.repo.repo,
               comment_id: ${{ steps.find-comment.outputs.comment-id }}
             })
+
+      - name: Fail if preview errors
+        if: steps.preview.outputs.has_errors == 'true'
+        run: |
+          echo "::error::Pulumi preview encountered errors. Check the PR comment for details."
+          exit 1
