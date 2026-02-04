@@ -9,11 +9,13 @@ import {
   Res,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, PathToVictory, User } from '@prisma/client'
+import { Campaign, ElectedOffice, PathToVictory, User } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
+import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import {
   ConstituentActivityEventType,
   ConstituentActivityType,
@@ -80,18 +82,12 @@ export class ContactsController {
   }
 
   @Get(':id/issues')
+  @UseElectedOffice()
   async getConstituentIssues(
     @Param() params: ConstituentIssuesParamsDTO,
     @Query() query: ConstituentIssuesQueryDTO,
-    @ReqUser() user: User,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
   ) {
-    const electedOffice =
-      await this.electedOfficeService.getCurrentElectedOffice(user.id)
-    if (!electedOffice) {
-      throw new ForbiddenException(
-        'Access to constituent issues requires an elected office',
-      )
-    }
     return this.contactsService.getConstituentIssues(
       params.id,
       electedOffice.id,
