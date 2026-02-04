@@ -332,6 +332,7 @@ export class ContactsService {
     input: IndividualActivityInput,
   ): Promise<GetIndividualActivitiesResponse> {
     const { personId, type, take, after, electedOfficeId } = input
+    const limit = take ?? 20
 
     if (type == ConstituentActivityType.POLL_INTERACTIONS) {
       const messages: PollIndividualMessageWithPoll[] =
@@ -344,7 +345,7 @@ export class ContactsService {
             poll: true,
           },
           orderBy: { sentAt: Prisma.SortOrder.desc },
-          take: take ?? 20,
+          take: limit + 1,
           ...(after ? { cursor: { id: after }, skip: 1 } : {}),
         })
 
@@ -354,8 +355,12 @@ export class ContactsService {
         )
       }
 
+      // Check if there are more results beyond the requested limit
+      const nextCursor = messages.at(limit)?.id ?? null
+      const messagesToProcess = messages.slice(0, limit)
+
       const pollsWithActivitesByPollId = new Map<string, ConstituentActivity>()
-      for (const message of messages) {
+      for (const message of messagesToProcess) {
         const eventType =
           message.sender == PollIndividualMessageSender.ELECTED_OFFICIAL
             ? ConstituentActivityEventType.SENT
@@ -388,7 +393,7 @@ export class ContactsService {
         }
       }
       return {
-        nextCursor: messages[messages.length - 1].id,
+        nextCursor,
         results: Array.from(pollsWithActivitesByPollId.values()),
       }
     } else {
