@@ -39,6 +39,20 @@ export const sendTevynAPIPollMessage = async (
           emoji: true,
         },
       },
+      ...(isExpansion
+        ? [
+            {
+              type: 'section' as const,
+              text: {
+                type: 'mrkdwn' as const,
+                text: '*NOTE*: This is a poll _expansion_. When uploading the results CSV via S3, be sure to COMBINE previous responses with the new responses, and upload a single CSV.',
+              },
+            },
+            {
+              type: 'divider' as const,
+            },
+          ]
+        : []),
       {
         type: 'section',
         text: {
@@ -193,20 +207,6 @@ export const sendTevynAPIPollMessage = async (
           ].join('\n'),
         },
       },
-      {
-        type: 'divider',
-      },
-      ...(isExpansion
-        ? [
-            {
-              type: 'section' as const,
-              text: {
-                type: 'mrkdwn' as const,
-                text: '*NOTE*: This is a poll _expansion_. When uploading the results CSV via S3, be sure to COMBINE previous responses with the new responses, and upload a single CSV.',
-              },
-            },
-          ]
-        : []),
     ],
   })
 }
