@@ -15,9 +15,15 @@ import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { PrismaService } from 'src/prisma/prisma.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
-import { CampaignWithPathToVictory, StatsResponse } from '../contacts.types'
+import {
+  CampaignWithPathToVictory,
+  ConstituentIssue,
+  GetConstituentIssuesResponse,
+  StatsResponse,
+} from '../contacts.types'
 import { IndividualActivityInput } from '../schemas/individualActivity.schema'
 import {
   DownloadContactsDTO,
@@ -54,6 +60,7 @@ export class ContactsService {
     private readonly elections: ElectionsService,
     private readonly campaigns: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async withFallbackDistrictName<Result>(
@@ -310,7 +317,56 @@ export class ContactsService {
     )
   }
 
-  async getIndividualActivites(input: IndividualActivityInput) {}
+  async getIndividualActivites(_input: IndividualActivityInput) {}
+
+  async getConstituentIssues(
+    personId: string,
+    electedOfficeId: string,
+    take: number,
+    after: string | undefined,
+  ): Promise<GetConstituentIssuesResponse> {
+    type MessageWithIssuesAndPoll = {
+      sentAt: Date
+      pollIssues: Array<{ title: string; summary: string }>
+      poll: { id: string; name: string }
+    }
+    const messages = (await this.prisma.pollIndividualMessage.findMany({
+      where: {
+        personId,
+        electedOfficeId,
+        sender: 'CONSTITUENT',
+        pollIssues: { some: {} },
+      },
+      include: {
+        pollIssues: true,
+        poll: { select: { id: true, name: true } },
+      },
+      orderBy: { sentAt: 'desc' },
+    } as Parameters<
+      PrismaService['pollIndividualMessage']['findMany']
+    >[0])) as unknown as MessageWithIssuesAndPoll[]
+    const all: ConstituentIssue[] = []
+    for (const msg of messages) {
+      const date = msg.sentAt.toISOString()
+      for (const issue of msg.pollIssues) {
+        all.push({
+          issueTitle: issue.title,
+          issueSummary: issue.summary,
+          pollTitle: msg.poll.name,
+          pollId: msg.poll.id,
+          date,
+        })
+      }
+    }
+    const offset = after ? Math.max(0, parseInt(after, 10) || 0) : 0
+    const results = all.slice(offset, offset + take)
+    const nextOffset = offset + results.length
+    const hasMore = nextOffset < all.length
+    return {
+      nextCursor: hasMore ? String(nextOffset) : null,
+      results,
+    }
+  }
 
   private getValidS2SToken(): string {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {

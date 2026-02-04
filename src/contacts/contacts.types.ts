@@ -57,3 +57,16 @@ export type GetIndividualActivitiesResponse = {
   nextCursor: string | null
   results: ConstituentActivity[]
 }
+
+export type ConstituentIssue = {
+  issueTitle: string
+  issueSummary: string
+  pollTitle: string
+  pollId: string
+  date: string
+}
+
+export type GetConstituentIssuesResponse = {
+  nextCursor: string | null
+  results: ConstituentIssue[]
+}
