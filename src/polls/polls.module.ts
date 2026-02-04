@@ -13,6 +13,7 @@ import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PollPurchaseHandlerService } from './services/pollPurchase.service'
 import { PollsService } from './services/polls.service'
+import { ContactsModule } from '@/contacts/contacts.module'
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PollsService } from './services/polls.service'
     CampaignsModule,
     AwsModule,
     LlmModule,
+    ContactsModule,
   ],
   providers: [
     PollsService,
