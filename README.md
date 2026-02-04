@@ -132,6 +132,14 @@ You can run the tests in the Postman desktop app or you can run them using the P
 
 (This will eventually be automated to run in a npm/npx script to automatically fetch the collection and environment keys for you)
 
+### AWS Setup
+
+To set up your AWS CLI locally, run the following script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thegoodparty/gp-api/master/scripts/aws-setup.sh | bash
+```
+
 ## Deployment
 
 This project's deployment is managed via [Pulumi](https://www.pulumi.com/) within the [deploy](./deploy) directory.
