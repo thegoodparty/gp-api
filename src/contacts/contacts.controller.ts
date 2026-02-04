@@ -85,27 +85,7 @@ export class ContactsController {
         'Access to constituent activities requires an elected office',
       )
     }
-    // return getIndividualActivities(...params, ...query)
-    // Dummy response for scaffolding
-    // return {
-    //   nextCursor: 'last-seen-id',
-    //   results: [
-    //     {
-    //       type: ConstituentActivityType.POLL_INTERACTIONS,
-    //       date: 'myDate',
-    //       data: {
-    //         pollId: 'poll-id',
-    //         pollTitle: 'poll-title',
-    //         events: [
-    //           {
-    //             type: ConstituentActivityEventType.SENT,
-    //             date: 'myDate',
-    //           },
-    //         ],
-    //       },
-    //     },
-    //   ],
-    // }
+
     return this.contactsService.getIndividualActivities({
       personId: params.id,
       ...query,
