@@ -1,8 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { Campaign, VoterFileFilter } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
-import { VoterFileFilterService } from '../services/voterFileFilter.service'
 import { VoterFileController } from './voterFile.controller'
 
 describe('VoterFileController', () => {
@@ -73,9 +71,9 @@ describe('VoterFileController', () => {
         controller.createVoterFileFilter(campaign, body),
       ).rejects.toThrow('Campaign is not pro')
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
       expect(mockVoterFileFilterService.create).not.toHaveBeenCalled()
     })
 
@@ -86,9 +84,9 @@ describe('VoterFileController', () => {
 
       const result = await controller.createVoterFileFilter(campaign, body)
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
       expect(mockVoterFileFilterService.create).toHaveBeenCalledWith(
         campaign.id,
         body,
@@ -107,9 +105,9 @@ describe('VoterFileController', () => {
 
       const result = await controller.createVoterFileFilter(campaign, body)
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
       expect(mockVoterFileFilterService.create).toHaveBeenCalledWith(
         campaign.id,
         body,
@@ -131,10 +129,12 @@ describe('VoterFileController', () => {
         controller.updateVoterFileFilter(1, body, campaign),
       ).rejects.toThrow('Campaign is not pro')
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
-      expect(mockVoterFileFilterService.updateByIdAndCampaignId).not.toHaveBeenCalled()
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
+      expect(
+        mockVoterFileFilterService.updateByIdAndCampaignId,
+      ).not.toHaveBeenCalled()
     })
 
     it('updates filter when campaign is pro', async () => {
@@ -144,18 +144,15 @@ describe('VoterFileController', () => {
 
       const result = await controller.updateVoterFileFilter(1, body, campaign)
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
-      expect(mockVoterFileFilterService.findByIdAndCampaignId).toHaveBeenCalledWith(
-        1,
-        campaign.id,
-      )
-      expect(mockVoterFileFilterService.updateByIdAndCampaignId).toHaveBeenCalledWith(
-        1,
-        campaign.id,
-        body,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
+      expect(
+        mockVoterFileFilterService.findByIdAndCampaignId,
+      ).toHaveBeenCalledWith(1, campaign.id)
+      expect(
+        mockVoterFileFilterService.updateByIdAndCampaignId,
+      ).toHaveBeenCalledWith(1, campaign.id, body)
       expect(result).toEqual(mockFilter)
     })
 
@@ -170,14 +167,12 @@ describe('VoterFileController', () => {
 
       const result = await controller.updateVoterFileFilter(1, body, campaign)
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
-      expect(mockVoterFileFilterService.updateByIdAndCampaignId).toHaveBeenCalledWith(
-        1,
-        campaign.id,
-        body,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
+      expect(
+        mockVoterFileFilterService.updateByIdAndCampaignId,
+      ).toHaveBeenCalledWith(1, campaign.id, body)
       expect(result).toEqual(mockFilter)
     })
 
@@ -194,7 +189,9 @@ describe('VoterFileController', () => {
         controller.updateVoterFileFilter(1, body, campaign),
       ).rejects.toThrow('Voter file filter not found')
 
-      expect(mockVoterFileFilterService.updateByIdAndCampaignId).not.toHaveBeenCalled()
+      expect(
+        mockVoterFileFilterService.updateByIdAndCampaignId,
+      ).not.toHaveBeenCalled()
     })
   })
 })

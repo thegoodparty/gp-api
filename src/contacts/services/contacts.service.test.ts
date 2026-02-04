@@ -10,7 +10,10 @@ vi.mock('@nestjs/axios', () => ({
 
 describe('ContactsService', () => {
   let service: ContactsService
-  let mockHttpService: { post: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> }
+  let mockHttpService: {
+    post: ReturnType<typeof vi.fn>
+    get: ReturnType<typeof vi.fn>
+  }
   let mockVoterFileFilterService: {
     findByIdAndCampaignId: ReturnType<typeof vi.fn>
   }
@@ -32,7 +35,9 @@ describe('ContactsService', () => {
 
   beforeEach(() => {
     mockHttpService = {
-      post: vi.fn().mockReturnValue(of({ data: { people: [], pagination: {} } })),
+      post: vi
+        .fn()
+        .mockReturnValue(of({ data: { people: [], pagination: {} } })),
       get: vi.fn(),
     }
     mockVoterFileFilterService = {
@@ -76,9 +81,9 @@ describe('ContactsService', () => {
         ),
       ).rejects.toThrow('Search is only available for pro campaigns')
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
     })
 
     it('does not throw when search is used and campaign is pro', async () => {
@@ -92,9 +97,9 @@ describe('ContactsService', () => {
         ),
       ).resolves.toBeDefined()
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
     })
 
     it('does not throw when search is used and user has elected office', async () => {
@@ -112,9 +117,9 @@ describe('ContactsService', () => {
         ),
       ).resolves.toBeDefined()
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
     })
   })
 
@@ -131,9 +136,9 @@ describe('ContactsService', () => {
         service.downloadContacts({ segment: 'all' }, campaign, res),
       ).rejects.toThrow('Campaign is not pro')
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
     })
 
     it('does not throw when campaign is pro', async () => {
@@ -152,9 +157,9 @@ describe('ContactsService', () => {
         service.downloadContacts({ segment: 'all' }, campaign, res),
       ).resolves.toBeUndefined()
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
     })
 
     it('does not throw when user has elected office', async () => {
@@ -177,9 +182,9 @@ describe('ContactsService', () => {
         service.downloadContacts({ segment: 'all' }, campaign, res),
       ).resolves.toBeUndefined()
 
-      expect(mockElectedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        campaign.userId,
-      )
+      expect(
+        mockElectedOfficeService.getCurrentElectedOffice,
+      ).toHaveBeenCalledWith(campaign.userId)
     })
   })
 })
