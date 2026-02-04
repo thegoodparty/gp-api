@@ -19,6 +19,10 @@ import {
   ConstituentActivityType,
   GetIndividualActivitiesResponse,
 } from './contacts.types'
+import {
+  ConstituentIssuesParamsDTO,
+  ConstituentIssuesQueryDTO,
+} from './schemas/constituentIssues.schema'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
 import {
   IndividualActivityParamsDTO,
@@ -75,7 +79,28 @@ export class ContactsController {
     return this.contactsService.findPerson(params.id, campaign)
   }
 
-  @Get('/:id/activities')
+  @Get(':id/issues')
+  async getConstituentIssues(
+    @Param() params: ConstituentIssuesParamsDTO,
+    @Query() query: ConstituentIssuesQueryDTO,
+    @ReqUser() user: User,
+  ) {
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(user.id)
+    if (!electedOffice) {
+      throw new ForbiddenException(
+        'Access to constituent issues requires an elected office',
+      )
+    }
+    return this.contactsService.getConstituentIssues(
+      params.id,
+      electedOffice.id,
+      query.take,
+      query.after,
+    )
+  }
+
+  @Get(':id/activities')
   async getIndividualActivities(
     @Param() params: IndividualActivityParamsDTO,
     @Query() query: IndividualActivityQueryDTO,
