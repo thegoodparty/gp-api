@@ -49,7 +49,7 @@ export class UsersController {
   @Get(':id')
   async findOne(@Param('id') id: string, @ReqUser() user: User) {
     const paramId = parseInt(id)
-    if (paramId === user.id) {
+    if (user && paramId === user.id) {
       // No need to hit the DB again if the user is requesting their own data
       return ReadUserOutputSchema.parse(user)
     }
