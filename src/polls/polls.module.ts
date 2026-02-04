@@ -13,6 +13,7 @@ import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PollPurchaseHandlerService } from './services/pollPurchase.service'
 import { PollsService } from './services/polls.service'
+import { PollIndividualMessageService } from './services/pollIndividualMessage.service'
 
 @Module({
   imports: [
@@ -31,7 +32,12 @@ import { PollsService } from './services/polls.service'
     PollBiasAnalysisService,
   ],
   controllers: [PollsController],
-  exports: [PollsService, PollIssuesService, PollBiasAnalysisService],
+  exports: [
+    PollsService,
+    PollIssuesService,
+    PollBiasAnalysisService,
+    PollIndividualMessageService,
+  ],
 })
 export class PollsModule {
   constructor(

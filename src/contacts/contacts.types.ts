@@ -43,7 +43,7 @@ type ConstituentActivityEvent = {
   date: string
 }
 
-type ConstituentActivity = {
+export type ConstituentActivity = {
   type: ConstituentActivityType
   date: string
   data: {

@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  NotImplementedException,
 } from '@nestjs/common'
 import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
@@ -16,7 +17,14 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
-import { CampaignWithPathToVictory, StatsResponse } from '../contacts.types'
+import {
+  CampaignWithPathToVictory,
+  ConstituentActivity,
+  ConstituentActivityEventType,
+  ConstituentActivityType,
+  GetIndividualActivitiesResponse,
+  StatsResponse,
+} from '../contacts.types'
 import { IndividualActivityInput } from '../schemas/individualActivity.schema'
 import {
   DownloadContactsDTO,
@@ -29,6 +37,16 @@ import {
   convertVoterFileFilterToFilters,
   type FilterObject,
 } from '../utils/voterFileFilter.utils'
+import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
+import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
+import {
+  Poll,
+  PollIndividualMessage,
+  PollIndividualMessageSender,
+  Prisma,
+} from '@prisma/client'
+
+type PollIndividualMessageWithPoll = PollIndividualMessage & { poll: Poll }
 
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
@@ -52,6 +70,8 @@ export class ContactsService {
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly elections: ElectionsService,
     private readonly campaigns: CampaignsService,
+    private readonly pollIndividualMessage: PollIndividualMessageService,
+    private readonly electedOffice: ElectedOfficeService,
   ) {}
 
   async withFallbackDistrictName<Result>(
@@ -302,7 +322,73 @@ export class ContactsService {
     )
   }
 
-  async getIndividualActivites(input: IndividualActivityInput) {}
+  async getIndividualActivites(
+    input: IndividualActivityInput,
+  ): Promise<GetIndividualActivitiesResponse> {
+    const { personId, type, take, after, electedOfficeId } = input
+
+    if (type == ConstituentActivityType.POLL_INTERACTIONS) {
+      const messages: PollIndividualMessageWithPoll[] =
+        await this.pollIndividualMessage.findMany({
+          where: {
+            electedOfficeId,
+            personId,
+          },
+          include: {
+            poll: true,
+          },
+          orderBy: { sentAt: Prisma.SortOrder.desc },
+          take: take ?? 20,
+          ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+        })
+
+      if (!messages.length) {
+        throw new NotFoundException(
+          'No individual messages found for that electedOffice',
+        )
+      }
+
+      const pollsWithActivitesByPollId: Record<string, ConstituentActivity> = {}
+      for (const message of messages) {
+        const eventType =
+          message.sender == PollIndividualMessageSender.ELECTED_OFFICIAL
+            ? ConstituentActivityEventType.SENT
+            : message.isOptOut
+              ? ConstituentActivityEventType.OPTED_OUT
+              : ConstituentActivityEventType.RESPONDED
+        if (!pollsWithActivitesByPollId[message.pollId]) {
+          pollsWithActivitesByPollId[message.pollId] = {
+            type: ConstituentActivityType.POLL_INTERACTIONS,
+            date: message.poll.createdAt?.toISOString() ?? '',
+            data: {
+              pollId: message.pollId,
+              pollTitle: message.poll.name ?? '',
+              events: [
+                {
+                  type: eventType,
+                  date: message.sentAt.toISOString(),
+                },
+              ],
+            },
+          }
+          continue
+        }
+
+        pollsWithActivitesByPollId[message.pollId].data.events.push({
+          type: eventType,
+          date: message.sentAt.toISOString(),
+        })
+      }
+      return {
+        nextCursor: messages[messages.length - 1].id,
+        results: Object.values(pollsWithActivitesByPollId),
+      }
+    } else {
+      throw new NotImplementedException(
+        'Only poll-interactions are supported for constituent activites',
+      )
+    }
+  }
 
   private getValidS2SToken(): string {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
