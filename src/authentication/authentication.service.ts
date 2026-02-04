@@ -21,6 +21,8 @@ import {
 } from './authentication.types'
 import { OAuth2Client, TokenInfo } from 'google-auth-library'
 
+export const GP_API_ISSUER = 'gp-api'
+
 const googleOAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
 const PASSWORD_RESET_TOKEN_TTL = '1h'
@@ -77,7 +79,7 @@ export class AuthenticationService {
   ) {}
 
   generateAuthToken(payload: { email: string; sub: number }) {
-    return this.jwtService.sign(payload)
+    return this.jwtService.sign({ ...payload, iss: GP_API_ISSUER })
   }
 
   async register(userData: CreateUserInputDto) {

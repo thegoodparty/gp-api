@@ -1,7 +1,9 @@
 import { BasePurchaseMetadata } from '../payments/purchase.types'
-import { DomainSuggestion } from '@aws-sdk/client-route-53-domains/dist-types/models'
 import { PaymentStatus } from '../payments/payments.types'
-import { DomainAvailability } from '@aws-sdk/client-route-53-domains'
+import {
+  DomainAvailability,
+  DomainSuggestion,
+} from '@aws-sdk/client-route-53-domains'
 
 export interface DomainPurchaseMetadata extends BasePurchaseMetadata {
   domainName: string

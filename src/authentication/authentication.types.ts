@@ -1,5 +1,6 @@
 import { ReadUserOutput } from '../users/schemas/ReadUserOutput.schema'
 import { Campaign } from '@prisma/client'
+import { M2MToken } from '@clerk/backend'
 
 export type LoginResult = {
   user: ReadUserOutput
@@ -22,3 +23,8 @@ export type SocialTokenValidator = (
   token: string,
   email: string,
 ) => Promise<string>
+
+export interface IncomingRequest extends Request {
+  headers: Headers & { authorization?: string }
+  m2mToken?: M2MToken
+}

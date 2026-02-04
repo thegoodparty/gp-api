@@ -14,6 +14,7 @@ import jwt from 'jsonwebtoken'
 import { lastValueFrom } from 'rxjs'
 import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
@@ -70,6 +71,7 @@ export class ContactsService {
     private readonly elections: ElectionsService,
     private readonly campaigns: CampaignsService,
     private readonly pollIndividualMessage: PollIndividualMessageService,
+    private readonly electedOfficeService: ElectedOfficeService,
   ) {}
 
   async withFallbackDistrictName<Result>(
@@ -108,10 +110,14 @@ export class ContactsService {
     { resultsPerPage, page, search, segment }: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    if (search && !campaign.isPro) {
-      throw new BadRequestException(
-        'Search is only available for pro campaigns',
-      )
+    if (search) {
+      const electedOffice =
+        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+      if (!campaign.isPro && !electedOffice) {
+        throw new BadRequestException(
+          'Search is only available for pro campaigns',
+        )
+      }
     }
     const filters = await this.segmentToFilters(segment, campaign)
 
@@ -240,7 +246,9 @@ export class ContactsService {
     campaign: CampaignWithPathToVictory,
     res: FastifyReply,
   ) {
-    if (!campaign.isPro) {
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    if (!campaign.isPro && !electedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
     const filters = await this.segmentToFilters(segment, campaign)

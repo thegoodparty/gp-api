@@ -5,6 +5,7 @@ import { EmailModule } from 'src/email/email.module'
 import { FilesModule } from 'src/files/files.module'
 import { OutreachModule } from 'src/outreach/outreach.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { ElectedOfficeModule } from '../electedOffice/electedOffice.module'
 import { PeerlyModule } from '../vendors/peerly/peerly.module'
 import { VoterDatabaseService } from './services/voterDatabase.service'
 import { VoterFileFilterService } from './services/voterFileFilter.service'
@@ -23,6 +24,7 @@ import { VotersController } from './voters.controller'
     PeerlyModule,
     SlackModule,
     ElectionsModule,
+    ElectedOfficeModule,
   ],
   controllers: [VotersController, VoterFileController],
   providers: [
