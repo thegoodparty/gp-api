@@ -16,7 +16,6 @@ import { PollsModule } from '@/polls/polls.module'
     ElectionsModule,
     ElectedOfficeModule,
     PollsModule,
-    ElectedOfficeModule,
   ],
   controllers: [ContactsController],
   providers: [ContactsService],

@@ -30,6 +30,7 @@ import { PollIndividualMessageService } from './services/pollIndividualMessage.s
     PollIssuesService,
     PollPurchaseHandlerService,
     PollBiasAnalysisService,
+    PollIndividualMessageService,
   ],
   controllers: [PollsController],
   exports: [

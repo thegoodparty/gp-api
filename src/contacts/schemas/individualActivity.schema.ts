@@ -3,14 +3,14 @@ import z from 'zod'
 import { ConstituentActivityType } from '../contacts.types'
 
 const individualActivityParamsSchema = z.object({
-  personId: z.string(),
+  id: z.string(),
+})
+
+const individualActivityQuerySchema = z.object({
   type: z
     .nativeEnum(ConstituentActivityType)
     .optional()
     .default(ConstituentActivityType.POLL_INTERACTIONS),
-})
-
-const individualActivityQuerySchema = z.object({
   take: z.coerce.number().optional(),
   after: z.string().optional(), // Last seen pollIndividualMessage ID
 })
@@ -23,7 +23,7 @@ export class IndividualActivityQueryDTO extends createZodDto(
   individualActivityQuerySchema,
 ) {}
 
-export type IndividualActivityInput = z.infer<
-  typeof individualActivityParamsSchema
-> &
-  z.infer<typeof individualActivityQuerySchema> & { electedOfficeId: string }
+export type IndividualActivityInput = {
+  personId: string
+  electedOfficeId: string
+} & z.infer<typeof individualActivityQuerySchema>

@@ -38,7 +38,6 @@ import {
   type FilterObject,
 } from '../utils/voterFileFilter.utils'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
-import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
 import {
   Poll,
   PollIndividualMessage,
@@ -71,7 +70,6 @@ export class ContactsService {
     private readonly elections: ElectionsService,
     private readonly campaigns: CampaignsService,
     private readonly pollIndividualMessage: PollIndividualMessageService,
-    private readonly electedOffice: ElectedOfficeService,
   ) {}
 
   async withFallbackDistrictName<Result>(
@@ -322,7 +320,7 @@ export class ContactsService {
     )
   }
 
-  async getIndividualActivites(
+  async getIndividualActivities(
     input: IndividualActivityInput,
   ): Promise<GetIndividualActivitiesResponse> {
     const { personId, type, take, after, electedOfficeId } = input
@@ -348,7 +346,7 @@ export class ContactsService {
         )
       }
 
-      const pollsWithActivitesByPollId: Record<string, ConstituentActivity> = {}
+      const pollsWithActivitesByPollId = new Map<string, ConstituentActivity>()
       for (const message of messages) {
         const eventType =
           message.sender == PollIndividualMessageSender.ELECTED_OFFICIAL
@@ -356,8 +354,15 @@ export class ContactsService {
             : message.isOptOut
               ? ConstituentActivityEventType.OPTED_OUT
               : ConstituentActivityEventType.RESPONDED
-        if (!pollsWithActivitesByPollId[message.pollId]) {
-          pollsWithActivitesByPollId[message.pollId] = {
+        const existing = pollsWithActivitesByPollId.get(message.pollId)
+        if (existing) {
+          existing.data.events.push({
+            type: eventType,
+            date: message.sentAt.toISOString(),
+          })
+        }
+        if (!existing) {
+          pollsWithActivitesByPollId.set(message.pollId, {
             type: ConstituentActivityType.POLL_INTERACTIONS,
             date: message.poll.createdAt?.toISOString() ?? '',
             data: {
@@ -370,18 +375,13 @@ export class ContactsService {
                 },
               ],
             },
-          }
+          })
           continue
         }
-
-        pollsWithActivitesByPollId[message.pollId].data.events.push({
-          type: eventType,
-          date: message.sentAt.toISOString(),
-        })
       }
       return {
         nextCursor: messages[messages.length - 1].id,
-        results: Object.values(pollsWithActivitesByPollId),
+        results: Array.from(pollsWithActivitesByPollId.values()),
       }
     } else {
       throw new NotImplementedException(

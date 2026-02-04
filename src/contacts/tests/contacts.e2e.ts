@@ -52,12 +52,22 @@ test.describe('Contacts and Segments', () => {
     expect(contacts).toHaveProperty('contacts')
   })
 
-  test('should get individual activities for a contact', async ({
+  test('should return 403 when user has no elected office', async ({
     request,
   }) => {
-    // This endpoint currently only checks that the user has a "current" elected office.
-    // Create one so the scaffolded endpoint can return its dummy response.
-    // Fastify/Nest can be strict about trailing slashes; hit the canonical route.
+    const response = await request.get(`/v1/contacts/123/activities`, {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    })
+
+    expect(response.status()).toBe(HttpStatus.FORBIDDEN)
+  })
+
+  test('should return 404 when no poll messages exist for contact', async ({
+    request,
+  }) => {
+    // Create an elected office so the user passes the authorization check
     const createOffice = await request.post(`/v1/elected-office`, {
       headers: {
         Authorization: `Bearer ${authToken}`,
@@ -68,21 +78,18 @@ test.describe('Contacts and Segments', () => {
     })
     expect(createOffice.status()).toBe(HttpStatus.CREATED)
 
+    // Request activities for a person with no poll messages
     const response = await request.get(`/v1/contacts/123/activities`, {
       headers: {
         Authorization: `Bearer ${authToken}`,
       },
     })
 
-    expect(response.status()).toBe(HttpStatus.OK)
+    expect(response.status()).toBe(HttpStatus.NOT_FOUND)
 
-    const body = (await response.json()) as {
-      nextCursor: unknown
-      results: unknown
-    }
-
-    expect(body).toHaveProperty('nextCursor')
-    expect(body).toHaveProperty('results')
-    expect(Array.isArray(body.results)).toBe(true)
+    const body = (await response.json()) as { message: string }
+    expect(body.message).toBe(
+      'No individual messages found for that electedOffice',
+    )
   })
 })

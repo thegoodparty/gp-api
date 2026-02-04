@@ -14,11 +14,7 @@ import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import {
-  ConstituentActivityEventType,
-  ConstituentActivityType,
-  GetIndividualActivitiesResponse,
-} from './contacts.types'
+import { GetIndividualActivitiesResponse } from './contacts.types'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
 import {
   IndividualActivityParamsDTO,
@@ -91,24 +87,29 @@ export class ContactsController {
     }
     // return getIndividualActivities(...params, ...query)
     // Dummy response for scaffolding
-    return {
-      nextCursor: 'last-seen-id',
-      results: [
-        {
-          type: ConstituentActivityType.POLL_INTERACTIONS,
-          date: 'myDate',
-          data: {
-            pollId: 'poll-id',
-            pollTitle: 'poll-title',
-            events: [
-              {
-                type: ConstituentActivityEventType.SENT,
-                date: 'myDate',
-              },
-            ],
-          },
-        },
-      ],
-    }
+    // return {
+    //   nextCursor: 'last-seen-id',
+    //   results: [
+    //     {
+    //       type: ConstituentActivityType.POLL_INTERACTIONS,
+    //       date: 'myDate',
+    //       data: {
+    //         pollId: 'poll-id',
+    //         pollTitle: 'poll-title',
+    //         events: [
+    //           {
+    //             type: ConstituentActivityEventType.SENT,
+    //             date: 'myDate',
+    //           },
+    //         ],
+    //       },
+    //     },
+    //   ],
+    // }
+    return this.contactsService.getIndividualActivities({
+      personId: params.id,
+      ...query,
+      electedOfficeId: existing.id,
+    })
   }
 }

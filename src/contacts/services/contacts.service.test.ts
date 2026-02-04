@@ -19,20 +19,19 @@ describe('ContactsService', () => {
       findMany: vi.fn(),
     }
 
-    // Create a minimal service instance with only the dependencies we need
     service = {
       pollIndividualMessage: mockPollIndividualMessageService,
-      getIndividualActivites: ContactsService.prototype.getIndividualActivites,
+      getIndividualActivities:
+        ContactsService.prototype.getIndividualActivities,
     } as unknown as ContactsService
 
-    // Bind the method to our mock service
-    service.getIndividualActivites =
-      service.getIndividualActivites.bind(service)
+    service.getIndividualActivities =
+      service.getIndividualActivities.bind(service)
 
     vi.clearAllMocks()
   })
 
-  describe('getIndividualActivites', () => {
+  describe('getIndividualActivities', () => {
     const baseInput: IndividualActivityInput = {
       personId: 'person-123',
       type: ConstituentActivityType.POLL_INTERACTIONS,
@@ -71,7 +70,7 @@ describe('ContactsService', () => {
 
       mockPollIndividualMessageService.findMany.mockResolvedValue(mockMessages)
 
-      const result = await service.getIndividualActivites(baseInput)
+      const result = await service.getIndividualActivities(baseInput)
 
       expect(mockPollIndividualMessageService.findMany).toHaveBeenCalledWith({
         where: {
@@ -139,7 +138,7 @@ describe('ContactsService', () => {
 
       mockPollIndividualMessageService.findMany.mockResolvedValue(mockMessages)
 
-      const result = await service.getIndividualActivites(baseInput)
+      const result = await service.getIndividualActivities(baseInput)
 
       expect(result.results).toHaveLength(2)
       expect(result.results.map((r) => r.data.pollId)).toContain('poll-1')
@@ -165,7 +164,7 @@ describe('ContactsService', () => {
 
       mockPollIndividualMessageService.findMany.mockResolvedValue(mockMessages)
 
-      const result = await service.getIndividualActivites(baseInput)
+      const result = await service.getIndividualActivities(baseInput)
 
       expect(result.results[0].data.events[0].type).toBe(
         ConstituentActivityEventType.OPTED_OUT,
@@ -175,10 +174,10 @@ describe('ContactsService', () => {
     it('throws NotFoundException when no messages found', async () => {
       mockPollIndividualMessageService.findMany.mockResolvedValue([])
 
-      await expect(service.getIndividualActivites(baseInput)).rejects.toThrow(
+      await expect(service.getIndividualActivities(baseInput)).rejects.toThrow(
         NotFoundException,
       )
-      await expect(service.getIndividualActivites(baseInput)).rejects.toThrow(
+      await expect(service.getIndividualActivities(baseInput)).rejects.toThrow(
         'No individual messages found for that electedOffice',
       )
     })
@@ -190,10 +189,10 @@ describe('ContactsService', () => {
       }
 
       await expect(
-        service.getIndividualActivites(inputWithUnsupportedType),
+        service.getIndividualActivities(inputWithUnsupportedType),
       ).rejects.toThrow(NotImplementedException)
       await expect(
-        service.getIndividualActivites(inputWithUnsupportedType),
+        service.getIndividualActivities(inputWithUnsupportedType),
       ).rejects.toThrow(
         'Only poll-interactions are supported for constituent activites',
       )
@@ -223,7 +222,7 @@ describe('ContactsService', () => {
         take: 50,
       }
 
-      await service.getIndividualActivites(inputWithTake)
+      await service.getIndividualActivities(inputWithTake)
 
       expect(mockPollIndividualMessageService.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -256,7 +255,7 @@ describe('ContactsService', () => {
         after: 'msg-1',
       }
 
-      await service.getIndividualActivites(inputWithAfter)
+      await service.getIndividualActivities(inputWithAfter)
 
       expect(mockPollIndividualMessageService.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -311,7 +310,7 @@ describe('ContactsService', () => {
 
       mockPollIndividualMessageService.findMany.mockResolvedValue(mockMessages)
 
-      const result = await service.getIndividualActivites(baseInput)
+      const result = await service.getIndividualActivities(baseInput)
 
       expect(result.nextCursor).toBe('msg-3')
     })

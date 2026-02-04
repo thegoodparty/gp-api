@@ -16,7 +16,7 @@ describe('ContactsController', () => {
 
   beforeEach(() => {
     contactsService = {
-      getIndividualActivites: vi.fn(),
+      getIndividualActivities: vi.fn(),
     } as unknown as ContactsService
 
     electedOfficeService = {
@@ -30,10 +30,12 @@ describe('ContactsController', () => {
   describe('getIndividualActivities', () => {
     const mockUser = { id: 1 } as User
     const mockParams = {
-      personId: 'person-123',
-      type: ConstituentActivityType.POLL_INTERACTIONS,
+      id: 'person-123',
     }
-    const mockQuery = { take: 20 }
+    const mockQuery = {
+      type: ConstituentActivityType.POLL_INTERACTIONS,
+      take: 20,
+    }
 
     it('returns individual activities when user has an elected office', async () => {
       const mockElectedOffice = {
@@ -50,23 +52,7 @@ describe('ContactsController', () => {
         updatedAt: new Date(),
       }
 
-      vi.spyOn(
-        electedOfficeService,
-        'getCurrentElectedOffice',
-      ).mockResolvedValue(mockElectedOffice)
-
-      const result = await controller.getIndividualActivities(
-        mockParams,
-        mockQuery,
-        mockUser,
-      )
-
-      expect(electedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        1,
-      )
-
-      // The current controller returns a dummy response
-      expect(result).toEqual({
+      const mockServiceResponse = {
         nextCursor: 'last-seen-id',
         results: [
           {
@@ -84,7 +70,35 @@ describe('ContactsController', () => {
             },
           },
         ],
+      }
+
+      vi.spyOn(
+        electedOfficeService,
+        'getCurrentElectedOffice',
+      ).mockResolvedValue(mockElectedOffice)
+
+      vi.spyOn(contactsService, 'getIndividualActivities').mockResolvedValue(
+        mockServiceResponse,
+      )
+
+      const result = await controller.getIndividualActivities(
+        mockParams,
+        mockQuery,
+        mockUser,
+      )
+
+      expect(electedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
+        1,
+      )
+
+      expect(contactsService.getIndividualActivities).toHaveBeenCalledWith({
+        personId: 'person-123',
+        type: ConstituentActivityType.POLL_INTERACTIONS,
+        take: 20,
+        electedOfficeId: 'office-1',
       })
+
+      expect(result).toEqual(mockServiceResponse)
     })
 
     it('throws ForbiddenException when user has no elected office', async () => {
