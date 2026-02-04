@@ -92,12 +92,14 @@ export class ContactsService {
     { resultsPerPage, page, search, segment }: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    const electedOffice =
-      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-    if (search && !campaign.isPro && !electedOffice) {
-      throw new BadRequestException(
-        'Search is only available for pro campaigns',
-      )
+    if (search) {
+      const electedOffice =
+        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+      if (!campaign.isPro && !electedOffice) {
+        throw new BadRequestException(
+          'Search is only available for pro campaigns',
+        )
+      }
     }
     const filters = await this.segmentToFilters(segment, campaign)
 
