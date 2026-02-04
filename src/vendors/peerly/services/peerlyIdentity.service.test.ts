@@ -20,6 +20,7 @@ import { SlackService } from '../../slack/services/slack.service'
 import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import { createMockLogger } from '../../../shared/test-utils/mockLogger.util'
 
 function createMockUser(overrides: Partial<User> = {}): User {
   return {
@@ -181,6 +182,12 @@ describe('PeerlyIdentityService', () => {
     }).compile()
 
     service = module.get<PeerlyIdentityService>(PeerlyIdentityService)
+
+    const mockLogger = createMockLogger()
+    Object.defineProperty(service, 'logger', {
+      get: () => mockLogger,
+      configurable: true,
+    })
   })
 
   describe('submitCampaignVerifyRequest', () => {

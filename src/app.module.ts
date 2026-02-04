@@ -38,6 +38,8 @@ import { PeerlyModule } from '@/vendors/peerly/peerly.module'
 import { SegmentModule } from '@/vendors/segment/segment.module'
 import { VotersModule } from '@/voters/voters.module'
 import { WebsitesModule } from '@/websites/websites.module'
+import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
+import { ClerkM2MAuthGuard } from '@/authentication/guards/ClerkM2MAuth.guard'
 
 @Module({
   imports: [
@@ -85,6 +87,10 @@ import { WebsitesModule } from '@/websites/websites.module'
     SessionsService,
     {
       provide: APP_GUARD,
+      useClass: ClerkM2MAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
     {
@@ -96,6 +102,7 @@ import { WebsitesModule } from '@/websites/websites.module'
       useClass: BlockedStateInterceptor,
     },
     JwtAuthStrategy,
+    ClerkClientProvider,
   ],
 })
 export class AppModule {}

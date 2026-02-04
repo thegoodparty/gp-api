@@ -23,6 +23,7 @@ import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { userHasRole } from 'src/users/util/users.util'
 import { OutreachService } from '../../outreach/services/outreach.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -47,6 +48,7 @@ export class VoterFileController {
     private readonly campaigns: CampaignsService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
+    private readonly electedOfficeService: ElectedOfficeService,
   ) {}
 
   @Get()
@@ -126,11 +128,13 @@ export class VoterFileController {
 
   @Post('filter')
   @UseCampaign()
-  createVoterFileFilter(
+  async createVoterFileFilter(
     @ReqCampaign() campaign: Campaign,
     @Body() voterFileFilter: CreateVoterFileFilterSchema,
   ) {
-    if (!campaign.isPro) {
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    if (!campaign.isPro && !electedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
     return this.voterFileFilterService.create(campaign.id, voterFileFilter)
@@ -163,7 +167,9 @@ export class VoterFileController {
     @Body() body: UpdateVoterFileFilterSchema,
     @ReqCampaign() campaign: Campaign,
   ) {
-    if (!campaign.isPro) {
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    if (!campaign.isPro && !electedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
     const filter: VoterFileFilter | null =
