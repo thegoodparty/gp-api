@@ -22,3 +22,20 @@ export type IndividualActivityInput = {
   personId: string
   electedOfficeId: string
 } & z.infer<typeof individualActivityQuerySchema>
+
+const constituentIssuesParamsSchema = z.object({
+  id: z.string(),
+})
+
+const constituentIssuesQuerySchema = z.object({
+  take: z.coerce.number().int().min(1).max(20).optional().default(3),
+  after: z.string().optional(),
+})
+
+export class ConstituentIssuesParamsDTO extends createZodDto(
+  constituentIssuesParamsSchema,
+) {}
+
+export class ConstituentIssuesQueryDTO extends createZodDto(
+  constituentIssuesQuerySchema,
+) {}

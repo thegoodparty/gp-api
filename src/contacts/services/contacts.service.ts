@@ -15,17 +15,9 @@ import { BallotReadyPositionLevel } from 'src/campaigns/campaigns.types'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { PrismaService } from 'src/prisma/prisma.service'
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import { CampaignWithPathToVictory, StatsResponse } from '../contacts.types'
-import {
-  CampaignWithPathToVictory,
-  ConstituentIssue,
-  GetConstituentIssuesResponse,
-  StatsResponse,
-} from '../contacts.types'
-import { IndividualActivityInput } from '../schemas/individualActivity.schema'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
@@ -61,7 +53,6 @@ export class ContactsService {
     private readonly elections: ElectionsService,
     private readonly campaigns: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
-    private readonly prisma: PrismaService,
   ) {}
 
   async withFallbackDistrictName<Result>(
@@ -318,58 +309,6 @@ export class ContactsService {
     )
   }
 
-<<<<<<< HEAD
-=======
-  async getIndividualActivites(_input: IndividualActivityInput) {}
-
-  async getConstituentIssues(
-    personId: string,
-    electedOfficeId: string,
-    take: number,
-    after: string | undefined,
-  ): Promise<GetConstituentIssuesResponse> {
-    const skip = after ? Math.max(0, parseInt(after, 10) || 0) : 0
-    // oversample by 1 to check if there are more messages
-    const messageLimit = Math.max(1, take) + 1
-    const messages = await this.prisma.pollIndividualMessage.findMany({
-      where: {
-        personId,
-        electedOfficeId,
-        sender: 'CONSTITUENT',
-        pollIssues: { some: {} },
-      },
-      include: {
-        pollIssues: true,
-        poll: { select: { id: true, name: true } },
-      },
-      orderBy: { sentAt: 'desc' },
-      skip,
-      take: messageLimit,
-    })
-    const hasMore = messages.length > take
-    const nextCursor = hasMore ? String(skip + take) : null
-    //split off the oversampled message
-    const pageMessages = hasMore ? messages.slice(0, take) : messages
-    const results: ConstituentIssue[] = []
-    for (const msg of pageMessages) {
-      const date = msg.sentAt.toISOString()
-      for (const issue of msg.pollIssues) {
-        results.push({
-          issueTitle: issue.title,
-          issueSummary: issue.summary ?? '',
-          pollTitle: msg.poll.name,
-          pollId: msg.poll.id,
-          date,
-        })
-      }
-    }
-    return {
-      nextCursor,
-      results,
-    }
-  }
-
->>>>>>> origin/develop
   private getValidS2SToken(): string {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
       return this.cachedToken
