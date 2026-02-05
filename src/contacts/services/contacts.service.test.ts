@@ -336,9 +336,9 @@ describe('ContactsService', () => {
       expect(result.results).toHaveLength(1)
       expect(result.results[0].issueTitle).toBe('C')
       expect(result.nextCursor).toBeNull()
-      expect(mockPrismaService.pollIndividualMessage.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 2, take: 3 }),
-      )
+      expect(
+        mockPrismaService.pollIndividualMessage.findMany,
+      ).toHaveBeenCalledWith(expect.objectContaining({ skip: 2, take: 3 }))
     })
 
     it('treats invalid after as 0', async () => {

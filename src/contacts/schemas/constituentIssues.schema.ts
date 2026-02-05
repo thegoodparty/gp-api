@@ -6,7 +6,7 @@ const constituentIssuesParamsSchema = z.object({
 })
 
 const constituentIssuesQuerySchema = z.object({
-  take: z.coerce.number().min(1).max(20).optional().default(3),
+  take: z.coerce.number().int().min(1).max(20).optional().default(3),
   after: z.string().optional(),
 })
 
