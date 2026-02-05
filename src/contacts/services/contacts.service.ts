@@ -331,6 +331,8 @@ export class ContactsService {
   async getIndividualActivities(
     input: IndividualActivityInput,
   ): Promise<GetIndividualActivitiesResponse> {
+    // This method returns the activities by **most recent** first
+    // Events within the activity are sorted by **oldest** first
     const { personId, type, take, after, electedOfficeId } = input
     const limit = take ?? 20
 
@@ -348,12 +350,6 @@ export class ContactsService {
           take: limit + 1,
           ...(after ? { cursor: { id: after }, skip: 1 } : {}),
         })
-
-      if (!messages.length) {
-        throw new NotFoundException(
-          'No individual messages found for that electedOffice',
-        )
-      }
 
       // Check if there are more results beyond the requested limit
       const nextCursor = messages.at(limit)?.id ?? null
@@ -394,7 +390,15 @@ export class ContactsService {
       }
       return {
         nextCursor,
-        results: Array.from(pollsWithActivitesByPollId.values()),
+        results: Array.from(pollsWithActivitesByPollId.values()).map(
+          (activity) => ({
+            ...activity,
+            data: {
+              ...activity.data,
+              events: [...activity.data.events].reverse(),
+            },
+          }),
+        ),
       }
     } else {
       throw new NotImplementedException(

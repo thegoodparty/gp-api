@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  NotFoundException,
-  NotImplementedException,
-} from '@nestjs/common'
+import { BadRequestException, NotImplementedException } from '@nestjs/common'
 import { PollIndividualMessageSender } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { of } from 'rxjs'
@@ -49,20 +45,8 @@ describe('ContactsService', () => {
     }
 
     it('returns poll interactions grouped by poll', async () => {
+      // Messages returned in descending order by sentAt (newest first, matching query)
       const mockMessages = [
-        {
-          id: 'msg-1',
-          pollId: 'poll-1',
-          personId: 'person-123',
-          sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
-          isOptOut: false,
-          sentAt: new Date('2025-01-15T10:00:00Z'),
-          poll: {
-            id: 'poll-1',
-            name: 'Community Survey',
-            createdAt: new Date('2025-01-01T00:00:00Z'),
-          },
-        },
         {
           id: 'msg-2',
           pollId: 'poll-1',
@@ -70,6 +54,19 @@ describe('ContactsService', () => {
           sender: PollIndividualMessageSender.CONSTITUENT,
           isOptOut: false,
           sentAt: new Date('2025-01-15T12:00:00Z'),
+          poll: {
+            id: 'poll-1',
+            name: 'Community Survey',
+            createdAt: new Date('2025-01-01T00:00:00Z'),
+          },
+        },
+        {
+          id: 'msg-1',
+          pollId: 'poll-1',
+          personId: 'person-123',
+          sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+          isOptOut: false,
+          sentAt: new Date('2025-01-15T10:00:00Z'),
           poll: {
             id: 'poll-1',
             name: 'Community Survey',
@@ -97,6 +94,7 @@ describe('ContactsService', () => {
       // No extra item returned, so nextCursor is null
       expect(result.nextCursor).toBeNull()
       expect(result.results).toHaveLength(1)
+      // Events should be in chronological order (oldest first)
       expect(result.results[0]).toEqual({
         type: ConstituentActivityType.POLL_INTERACTIONS,
         date: '2025-01-01T00:00:00.000Z',
@@ -156,6 +154,101 @@ describe('ContactsService', () => {
       expect(result.results.map((r) => r.data.pollId)).toContain('poll-2')
     })
 
+    it('returns polls newest first with events oldest first within each poll', async () => {
+      // Messages returned in descending order by sentAt (newest first, matching query)
+      // Poll 2 (newer poll) has messages on Jan 20, Poll 1 (older poll) has messages on Jan 15
+      const mockMessages = [
+        // Poll 2's newest message first
+        {
+          id: 'msg-4',
+          pollId: 'poll-2',
+          personId: 'person-123',
+          sender: PollIndividualMessageSender.CONSTITUENT,
+          isOptOut: false,
+          sentAt: new Date('2025-01-20T14:00:00Z'),
+          poll: {
+            id: 'poll-2',
+            name: 'Newer Poll',
+            createdAt: new Date('2025-01-18T00:00:00Z'),
+          },
+        },
+        {
+          id: 'msg-3',
+          pollId: 'poll-2',
+          personId: 'person-123',
+          sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+          isOptOut: false,
+          sentAt: new Date('2025-01-20T10:00:00Z'),
+          poll: {
+            id: 'poll-2',
+            name: 'Newer Poll',
+            createdAt: new Date('2025-01-18T00:00:00Z'),
+          },
+        },
+        // Poll 1's messages (older poll)
+        {
+          id: 'msg-2',
+          pollId: 'poll-1',
+          personId: 'person-123',
+          sender: PollIndividualMessageSender.CONSTITUENT,
+          isOptOut: false,
+          sentAt: new Date('2025-01-15T12:00:00Z'),
+          poll: {
+            id: 'poll-1',
+            name: 'Older Poll',
+            createdAt: new Date('2025-01-01T00:00:00Z'),
+          },
+        },
+        {
+          id: 'msg-1',
+          pollId: 'poll-1',
+          personId: 'person-123',
+          sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+          isOptOut: false,
+          sentAt: new Date('2025-01-15T10:00:00Z'),
+          poll: {
+            id: 'poll-1',
+            name: 'Older Poll',
+            createdAt: new Date('2025-01-01T00:00:00Z'),
+          },
+        },
+      ]
+
+      mockPollIndividualMessageService.findMany.mockResolvedValue(mockMessages)
+
+      const result = await service.getIndividualActivities(baseInput)
+
+      expect(result.results).toHaveLength(2)
+
+      // Polls should be in order of first encounter (newest messages first = poll-2 first)
+      expect(result.results[0].data.pollId).toBe('poll-2')
+      expect(result.results[1].data.pollId).toBe('poll-1')
+
+      // Events within poll-2 should be oldest first
+      expect(result.results[0].data.events).toEqual([
+        {
+          type: ConstituentActivityEventType.SENT,
+          date: '2025-01-20T10:00:00.000Z',
+        },
+        {
+          type: ConstituentActivityEventType.RESPONDED,
+          date: '2025-01-20T14:00:00.000Z',
+        },
+      ])
+
+      // Events within poll-1 should be oldest first
+      expect(result.results[1].data.events).toEqual([
+        {
+          type: ConstituentActivityEventType.SENT,
+          date: '2025-01-15T10:00:00.000Z',
+        },
+        {
+          type: ConstituentActivityEventType.RESPONDED,
+          date: '2025-01-15T12:00:00.000Z',
+        },
+      ])
+    })
+
     it('correctly identifies opted-out events', async () => {
       const mockMessages = [
         {
@@ -182,15 +275,13 @@ describe('ContactsService', () => {
       )
     })
 
-    it('throws NotFoundException when no messages found', async () => {
+    it('returns empty results when no messages found', async () => {
       mockPollIndividualMessageService.findMany.mockResolvedValue([])
 
-      await expect(service.getIndividualActivities(baseInput)).rejects.toThrow(
-        NotFoundException,
-      )
-      await expect(service.getIndividualActivities(baseInput)).rejects.toThrow(
-        'No individual messages found for that electedOffice',
-      )
+      const result = await service.getIndividualActivities(baseInput)
+
+      expect(result.nextCursor).toBeNull()
+      expect(result.results).toEqual([])
     })
 
     it('throws NotImplementedException for unsupported activity types', async () => {
