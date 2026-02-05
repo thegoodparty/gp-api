@@ -122,7 +122,7 @@ export function createService({
     deregistrationDelay: 120,
     healthCheck: {
       path: '/v1/health',
-      interval: 10,
+      interval: 60,
       timeout: 5,
       healthyThreshold: 2,
       unhealthyThreshold: 3,
