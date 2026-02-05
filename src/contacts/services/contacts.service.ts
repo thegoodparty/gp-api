@@ -6,7 +6,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  NotImplementedException,
 } from '@nestjs/common'
 import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
@@ -333,77 +332,71 @@ export class ContactsService {
   ): Promise<GetIndividualActivitiesResponse> {
     // This method returns the activities by **most recent** first
     // Events within the activity are sorted by **oldest** first
-    const { personId, type, take, after, electedOfficeId } = input
+    const { personId, take, after, electedOfficeId } = input
     const limit = take ?? 20
 
-    if (type == ConstituentActivityType.POLL_INTERACTIONS) {
-      const messages: PollIndividualMessageWithPoll[] =
-        await this.pollIndividualMessage.findMany({
-          where: {
-            electedOfficeId,
-            personId,
-          },
-          include: {
-            poll: true,
-          },
-          orderBy: { sentAt: Prisma.SortOrder.desc },
-          take: limit + 1,
-          ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+    const messages: PollIndividualMessageWithPoll[] =
+      await this.pollIndividualMessage.findMany({
+        where: {
+          electedOfficeId,
+          personId,
+        },
+        include: {
+          poll: true,
+        },
+        orderBy: { sentAt: Prisma.SortOrder.desc },
+        take: limit + 1,
+        ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+      })
+
+    // Check if there are more results beyond the requested limit
+    const nextCursor = messages.at(limit)?.id ?? null
+    const messagesToProcess = messages.slice(0, limit)
+
+    const pollsWithActivitesByPollId = new Map<string, ConstituentActivity>()
+    for (const message of messagesToProcess) {
+      const eventType =
+        message.sender == PollIndividualMessageSender.ELECTED_OFFICIAL
+          ? ConstituentActivityEventType.SENT
+          : message.isOptOut
+            ? ConstituentActivityEventType.OPTED_OUT
+            : ConstituentActivityEventType.RESPONDED
+      const existing = pollsWithActivitesByPollId.get(message.pollId)
+      if (existing) {
+        existing.data.events.push({
+          type: eventType,
+          date: message.sentAt.toISOString(),
         })
-
-      // Check if there are more results beyond the requested limit
-      const nextCursor = messages.at(limit)?.id ?? null
-      const messagesToProcess = messages.slice(0, limit)
-
-      const pollsWithActivitesByPollId = new Map<string, ConstituentActivity>()
-      for (const message of messagesToProcess) {
-        const eventType =
-          message.sender == PollIndividualMessageSender.ELECTED_OFFICIAL
-            ? ConstituentActivityEventType.SENT
-            : message.isOptOut
-              ? ConstituentActivityEventType.OPTED_OUT
-              : ConstituentActivityEventType.RESPONDED
-        const existing = pollsWithActivitesByPollId.get(message.pollId)
-        if (existing) {
-          existing.data.events.push({
-            type: eventType,
-            date: message.sentAt.toISOString(),
-          })
-        }
-        if (!existing) {
-          pollsWithActivitesByPollId.set(message.pollId, {
-            type: ConstituentActivityType.POLL_INTERACTIONS,
-            date: message.poll.createdAt?.toISOString() ?? '',
-            data: {
-              pollId: message.pollId,
-              pollTitle: message.poll.name,
-              events: [
-                {
-                  type: eventType,
-                  date: message.sentAt.toISOString(),
-                },
-              ],
-            },
-          })
-          continue
-        }
       }
-      return {
-        nextCursor,
-        results: Array.from(pollsWithActivitesByPollId.values()).map(
-          (activity) => ({
-            ...activity,
-            data: {
-              ...activity.data,
-              events: [...activity.data.events].reverse(),
-            },
-          }),
-        ),
+      if (!existing) {
+        pollsWithActivitesByPollId.set(message.pollId, {
+          type: ConstituentActivityType.POLL_INTERACTIONS,
+          date: message.sentAt.toISOString(),
+          data: {
+            pollId: message.pollId,
+            pollTitle: message.poll.name,
+            events: [
+              {
+                type: eventType,
+                date: message.sentAt.toISOString(),
+              },
+            ],
+          },
+        })
+        continue
       }
-    } else {
-      throw new NotImplementedException(
-        'Only poll-interactions are supported for constituent activites',
-      )
+    }
+    return {
+      nextCursor,
+      results: Array.from(pollsWithActivitesByPollId.values()).map(
+        (activity) => ({
+          ...activity,
+          data: {
+            ...activity.data,
+            events: [...activity.data.events].reverse(),
+          },
+        }),
+      ),
     }
   }
 

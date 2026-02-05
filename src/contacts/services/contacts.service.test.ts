@@ -1,4 +1,4 @@
-import { BadRequestException, NotImplementedException } from '@nestjs/common'
+import { BadRequestException } from '@nestjs/common'
 import { PollIndividualMessageSender } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { of } from 'rxjs'
@@ -40,7 +40,6 @@ describe('ContactsService', () => {
 
     const baseInput: IndividualActivityInput = {
       personId: 'person-123',
-      type: ConstituentActivityType.POLL_INTERACTIONS,
       electedOfficeId: 'office-123',
     }
 
@@ -282,22 +281,6 @@ describe('ContactsService', () => {
 
       expect(result.nextCursor).toBeNull()
       expect(result.results).toEqual([])
-    })
-
-    it('throws NotImplementedException for unsupported activity types', async () => {
-      const inputWithUnsupportedType = {
-        ...baseInput,
-        type: 999 as ConstituentActivityType, // Unsupported type
-      }
-
-      await expect(
-        service.getIndividualActivities(inputWithUnsupportedType),
-      ).rejects.toThrow(NotImplementedException)
-      await expect(
-        service.getIndividualActivities(inputWithUnsupportedType),
-      ).rejects.toThrow(
-        'Only poll-interactions are supported for constituent activites',
-      )
     })
 
     it('uses custom take value when provided', async () => {

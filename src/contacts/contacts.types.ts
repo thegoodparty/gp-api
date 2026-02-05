@@ -38,7 +38,7 @@ export enum ConstituentActivityEventType {
   OPTED_OUT,
 }
 
-type ConstituentActivityEvent = {
+export type ConstituentActivityEvent = {
   type: ConstituentActivityEventType
   date: string
 }
