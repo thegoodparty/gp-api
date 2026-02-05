@@ -190,7 +190,8 @@ export class DomainsService
 
     // Get user from PaymentIntent metadata (legacy flow)
     // getValidatedPaymentUser also validates the payment succeeded
-    const { user } = await this.payments.getValidatedPaymentUser(paymentIntentId)
+    const { user } =
+      await this.payments.getValidatedPaymentUser(paymentIntentId)
 
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
 

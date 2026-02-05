@@ -96,6 +96,10 @@ export class PurchaseService {
       }),
     )
 
+    if (!Object.values(PurchaseType).includes(dto.type)) {
+      throw new Error(`Invalid purchase type: ${dto.type}`)
+    }
+
     const handler = this.handlers.get(dto.type)
     if (!handler) {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
@@ -264,6 +268,10 @@ export class PurchaseService {
     amount: number
     status: Stripe.PaymentIntent.Status
   }> {
+    if (!Object.values(PurchaseType).includes(dto.type)) {
+      throw new Error(`Invalid purchase type: ${dto.type}`)
+    }
+
     const handler = this.handlers.get(dto.type)
     if (!handler) {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
