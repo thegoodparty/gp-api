@@ -43,7 +43,7 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
     const prodCloudfrontDistributionArn =
       'arn:aws:cloudfront::333022194791:distribution/E2LRA7IV6F5YST'
 
-    new aws.s3.BucketPolicy('assetsBucketPolicy', {
+    new aws.s3.BucketPolicy('assetsOacBucketPolicyProd', {
       bucket: bucket.id,
       policy: aws.iam.getPolicyDocumentOutput({
         statements: [

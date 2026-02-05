@@ -85,7 +85,7 @@ export function createAssetsRouter({
 
   // Create bucket policy that only allows CloudFront OAC access
   // This restricts direct S3 access - all requests must go through CloudFront
-  new aws.s3.BucketPolicy('assetsBucketPolicy', {
+  new aws.s3.BucketPolicy('assetsOacBucketPolicy', {
     bucket: bucket.id,
     policy: aws.iam.getPolicyDocumentOutput({
       statements: [
