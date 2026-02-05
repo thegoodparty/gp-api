@@ -33,6 +33,11 @@ const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
   : 12 * 60 * 60 // Defaults to 12 hrs
 
+/** When PEERLY_CV_BYPASS_PIN is set, this PIN skips real Peerly CV calls (for local/dev testing). */
+const PEERLY_CV_BYPASS_PIN = process.env.PEERLY_CV_BYPASS_PIN
+
+const CV_BYPASS_TOKEN = 'LOCAL_CV_BYPASS'
+
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
   MODELS.TcrCompliance,
@@ -325,6 +330,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         'TCR compliance does not have a Peerly identity ID',
       )
     }
+
+    if (PEERLY_CV_BYPASS_PIN && pin === PEERLY_CV_BYPASS_PIN) {
+      return CV_BYPASS_TOKEN
+    }
+
     const { campaign } = await this.model.findFirstOrThrow({
       where: { peerlyIdentityId },
       include: {
@@ -351,6 +361,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     tcrCompliance: TcrCompliance,
     campaignVerifyToken: string,
   ) {
+    if (campaignVerifyToken === CV_BYPASS_TOKEN) {
+      return { status: 'approved', displayName: 'Local bypass' } as Awaited<
+        ReturnType<PeerlyIdentityService['approve10DLCBrand']>
+      >
+    }
     return this.peerlyIdentityService.approve10DLCBrand(
       tcrCompliance,
       campaignVerifyToken,

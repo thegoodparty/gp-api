@@ -308,6 +308,8 @@ export interface HandleApiErrorParams {
   error: unknown
   requestConfig: PeerlyHttpRequestConfig
   httpExceptionMethod?: HttpExceptionConstructor<HttpException>
+  /** Optional message to throw when using httpExceptionMethod (e.g. API error body). */
+  message?: string
   peerlyIdentityId?: string
   campaign: Campaign
 }

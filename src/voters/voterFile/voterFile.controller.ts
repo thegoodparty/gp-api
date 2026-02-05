@@ -7,6 +7,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -40,6 +41,8 @@ import { VoterFileService } from './voterFile.service'
 @Controller(VOTER_FILE_ROUTE)
 @UsePipes(ZodValidationPipe)
 export class VoterFileController {
+  private readonly logger = new Logger(VoterFileController.name)
+
   constructor(
     private readonly voterFileService: VoterFileService,
     private readonly voterOutreachService: VoterOutreachService,
@@ -47,7 +50,7 @@ export class VoterFileController {
     private readonly campaigns: CampaignsService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
-  ) {}
+  ) { }
 
   @Get()
   @UseCampaign({
@@ -91,10 +94,16 @@ export class VoterFileController {
     @ReqCampaign() campaign: Campaign,
     @Body() { outreachId, audienceRequest }: ScheduleOutreachCampaignSchema,
   ) {
-    const outreach = await this.outreachService.model.findUniqueOrThrow({
-      where: { id: outreachId },
+    const outreach = await this.outreachService.model.findUnique({
+      where: { id: outreachId, campaignId: campaign.id },
       include: { voterFileFilter: true },
     })
+    if (!outreach) {
+      this.logger.warn(
+        `Outreach not found for schedule: outreachId=${outreachId}, campaignId=${campaign.id}. Ensure the client uses the outreach id from the POST /outreach 201 response.`,
+      )
+      throw new NotFoundException('Outreach not found')
+    }
     return this.voterOutreachService.scheduleOutreachCampaign(
       user,
       campaign,

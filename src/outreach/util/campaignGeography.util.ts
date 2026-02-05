@@ -141,13 +141,12 @@ export async function resolveP2pJobGeography(
 
   // 2) Fallback to campaign.details (and zip lookup for state)
   const zip = normalizeZip(details?.zip)
-  const didState =
+  const stateCode =
     details?.state?.trim() ??
-    (zip ? zipcodes.lookup(zip)?.state : undefined) ??
-    P2P_JOB_DEFAULTS.DID_STATE
+    (zip ? zipcodes.lookup(zip)?.state : undefined)
 
-  return {
-    didState,
-    didNpaSubset: await getAreaCodesForZip(zip, areaCodeFromZipService),
-  }
+  return resolveJobGeographyFromAddress(
+    { stateCode, postalCodeValue: zip },
+    { areaCodeFromZipService },
+  )
 }
