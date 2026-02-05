@@ -58,6 +58,28 @@ export interface PersonOutput {
   language: 'English' | 'Spanish' | 'Other'
 }
 
+/**
+ * Redacted version of PersonOutput for non-pro users.
+ * Sensitive contact information (phone numbers, detailed address) is removed.
+ */
+export type RedactedPersonOutput = Omit<
+  PersonOutput,
+  'cellPhone' | 'landline' | 'address'
+> & {
+  address: {
+    line1: null
+    line2: null
+    city: string | null
+    state: string | null
+    zip: string | null
+    zipPlus4: null
+    latitude: null
+    longitude: null
+  }
+  cellPhone: null
+  landline: null
+}
+
 export interface PeopleListResponse {
   pagination: {
     totalResults: number
@@ -68,4 +90,9 @@ export interface PeopleListResponse {
     hasPreviousPage: boolean
   }
   people: PersonOutput[]
+}
+
+export interface RedactedPeopleListResponse {
+  pagination: PeopleListResponse['pagination']
+  people: RedactedPersonOutput[]
 }

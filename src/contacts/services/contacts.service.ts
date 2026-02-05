@@ -23,7 +23,12 @@ import {
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
-import { PeopleListResponse, PersonOutput } from '../schemas/person.schema'
+import {
+  PeopleListResponse,
+  PersonOutput,
+  RedactedPeopleListResponse,
+  RedactedPersonOutput,
+} from '../schemas/person.schema'
 import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import {
@@ -91,19 +96,17 @@ export class ContactsService {
   async findContacts(
     { resultsPerPage, page, search, segment }: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
-  ) {
-    if (search) {
-      const electedOffice =
-        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-      if (!campaign.isPro && !electedOffice) {
-        throw new BadRequestException(
-          'Search is only available for pro campaigns',
-        )
-      }
+  ): Promise<PeopleListResponse | RedactedPeopleListResponse> {
+    const hasProAccess = await this.canAccessProFeatures(campaign)
+
+    if (search && !hasProAccess) {
+      throw new BadRequestException(
+        'Search is only available for pro campaigns',
+      )
     }
     const filters = await this.segmentToFilters(segment, campaign)
 
-    return this.withFallbackDistrictName(
+    const result = await this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
         try {
@@ -133,6 +136,13 @@ export class ContactsService {
         }
       },
     )
+
+    // Redact sensitive contact information for non-pro users
+    if (!hasProAccess) {
+      return this.redactPeopleList(result)
+    }
+
+    return result
   }
 
   async sampleContacts(
@@ -178,8 +188,10 @@ export class ContactsService {
   async findPerson(
     id: string,
     campaign: CampaignWithPathToVictory,
-  ): Promise<PersonOutput> {
-    return this.withFallbackDistrictName(
+  ): Promise<PersonOutput | RedactedPersonOutput> {
+    const hasProAccess = await this.canAccessProFeatures(campaign)
+
+    const result = await this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
         try {
@@ -221,6 +233,13 @@ export class ContactsService {
         }
       },
     )
+
+    // Redact sensitive contact information for non-pro users
+    if (!hasProAccess) {
+      return this.redactPerson(result)
+    }
+
+    return result
   }
 
   async downloadContacts(
@@ -311,6 +330,50 @@ export class ContactsService {
   }
 
   async getIndividualActivites(input: IndividualActivityInput) {}
+
+  /**
+   * Checks if user has access to pro features (is pro or has elected office)
+   * Always checks elected office to maintain consistent behavior for analytics/logging
+   */
+  async canAccessProFeatures(
+    campaign: CampaignWithPathToVictory,
+  ): Promise<boolean> {
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    return campaign.isPro || !!electedOffice
+  }
+
+  /**
+   * Redacts sensitive contact information from a person record.
+   * Removes phone numbers and detailed address information.
+   */
+  redactPerson(person: PersonOutput): RedactedPersonOutput {
+    return {
+      ...person,
+      cellPhone: null,
+      landline: null,
+      address: {
+        line1: null,
+        line2: null,
+        city: person.address?.city ?? null,
+        state: person.address?.state ?? null,
+        zip: person.address?.zip ?? null,
+        zipPlus4: null,
+        latitude: null,
+        longitude: null,
+      },
+    }
+  }
+
+  /**
+   * Redacts sensitive contact information from a list of people.
+   */
+  redactPeopleList(response: PeopleListResponse): RedactedPeopleListResponse {
+    return {
+      ...response,
+      people: response.people.map((person) => this.redactPerson(person)),
+    }
+  }
 
   private getValidS2SToken(): string {
     if (this.cachedToken && this.isTokenValid(this.cachedToken)) {
