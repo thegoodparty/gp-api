@@ -9,16 +9,22 @@ import {
   Res,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, PathToVictory, User } from '@prisma/client'
+import { Campaign, ElectedOffice, PathToVictory, User } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
+import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import {
   ConstituentActivityEventType,
   ConstituentActivityType,
   GetIndividualActivitiesResponse,
 } from './contacts.types'
+import {
+  ConstituentIssuesParamsDTO,
+  ConstituentIssuesQueryDTO,
+} from './schemas/constituentIssues.schema'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
 import {
   IndividualActivityParamsDTO,
@@ -75,7 +81,22 @@ export class ContactsController {
     return this.contactsService.findPerson(params.id, campaign)
   }
 
-  @Get('/:id/activities')
+  @Get(':id/issues')
+  @UseElectedOffice()
+  async getConstituentIssues(
+    @Param() params: ConstituentIssuesParamsDTO,
+    @Query() query: ConstituentIssuesQueryDTO,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+  ) {
+    return this.contactsService.getConstituentIssues(
+      params.id,
+      electedOffice.id,
+      query.take,
+      query.after,
+    )
+  }
+
+  @Get(':id/activities')
   async getIndividualActivities(
     @Param() params: IndividualActivityParamsDTO,
     @Query() query: IndividualActivityQueryDTO,
