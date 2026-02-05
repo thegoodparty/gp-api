@@ -123,18 +123,11 @@ export class PurchaseService {
         dto.type,
       )
       if (postPurchaseHandler) {
-        try {
-          await postPurchaseHandler(freeSessionId, {
-            ...(dto.metadata as Record<string, unknown>),
-            ...(campaign?.id ? { campaignId: campaign.id } : {}),
-            purchaseType: dto.type,
-          })
-        } catch (error) {
-          this.logger.error(
-            `Failed to execute post-purchase handler for free checkout ${freeSessionId}`,
-            error,
-          )
-        }
+        await postPurchaseHandler(freeSessionId, {
+          ...(dto.metadata as Record<string, unknown>),
+          ...(campaign?.id ? { campaignId: campaign.id } : {}),
+          purchaseType: dto.type,
+        })
       }
 
       return {
@@ -295,20 +288,12 @@ export class PurchaseService {
         `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe`,
       )
 
-      // Execute post-purchase handler immediately for free purchases
       const postPurchaseHandler = this.postPurchaseHandlers.get(dto.type)
       if (postPurchaseHandler) {
-        try {
-          await postPurchaseHandler(freePaymentId, {
-            ...(dto.metadata as Record<string, unknown>),
-            purchaseType: dto.type,
-          })
-        } catch (error) {
-          this.logger.error(
-            `Failed to execute post-purchase handler for free purchase ${freePaymentId}`,
-            error,
-          )
-        }
+        await postPurchaseHandler(freePaymentId, {
+          ...(dto.metadata as Record<string, unknown>),
+          purchaseType: dto.type,
+        })
       }
 
       return {

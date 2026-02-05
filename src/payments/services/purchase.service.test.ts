@@ -254,6 +254,31 @@ describe('PurchaseService', () => {
       // (post-purchase only runs in completePurchase after payment succeeds)
       expect(mockPostPurchaseHandler).not.toHaveBeenCalled()
     })
+
+    it('should propagate errors from post-purchase handler on zero-amount purchase', async () => {
+      // Arrange
+      const mockHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
+      const failingHandler = vi
+        .fn()
+        .mockRejectedValue(new Error('Failed to redeem free texts'))
+      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
+      service.registerPostPurchaseHandler(PurchaseType.TEXT, failingHandler)
+
+      // Act & Assert: Error should propagate, not be swallowed
+      await expect(
+        service.createPurchaseIntent({
+          user: mockUser,
+          dto: {
+            type: PurchaseType.TEXT,
+            metadata: { contactCount: 100 },
+          },
+          campaign: mockCampaign,
+        }),
+      ).rejects.toThrow('Failed to redeem free texts')
+    })
   })
 
   describe('createCheckoutSession', () => {
@@ -399,6 +424,34 @@ describe('PurchaseService', () => {
           purchaseType: PurchaseType.TEXT,
         }),
       )
+    })
+
+    it('should propagate errors from post-purchase handler on zero-amount checkout', async () => {
+      // Arrange
+      const mockHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
+      const failingHandler = vi
+        .fn()
+        .mockRejectedValue(new Error('Failed to redeem free texts'))
+      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
+      service.registerCheckoutSessionPostPurchaseHandler(
+        PurchaseType.TEXT,
+        failingHandler,
+      )
+
+      // Act & Assert: Error should propagate, not be swallowed
+      await expect(
+        service.createCheckoutSession({
+          user: mockUser,
+          dto: {
+            type: PurchaseType.TEXT,
+            metadata: { contactCount: 100 },
+          },
+          campaign: mockCampaign,
+        }),
+      ).rejects.toThrow('Failed to redeem free texts')
     })
   })
 

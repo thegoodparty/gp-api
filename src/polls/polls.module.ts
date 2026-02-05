@@ -52,10 +52,9 @@ export class PollsModule {
       ),
     )
 
-    // Also register for Custom Checkout Sessions (used for promo code support)
     this.purchaseService.registerCheckoutSessionPostPurchaseHandler(
       PurchaseType.POLL,
-      this.pollPurchaseHandler.executePostPurchase.bind(
+      this.pollPurchaseHandler.handlePollPostPurchase.bind(
         this.pollPurchaseHandler,
       ),
     )

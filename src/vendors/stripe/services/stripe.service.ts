@@ -195,9 +195,10 @@ export class StripeService {
     return {
       id: session.id,
       clientSecret: session.client_secret,
-      amount: session.amount_total
-        ? session.amount_total / 100
-        : payload.amount / 100,
+      amount:
+        session.amount_total != null
+          ? session.amount_total / 100
+          : payload.amount / 100,
     }
   }
 
