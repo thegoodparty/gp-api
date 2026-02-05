@@ -6,7 +6,7 @@ const individualActivityParamsSchema = z.object({
 })
 
 const individualActivityQuerySchema = z.object({
-  take: z.coerce.number().int().optional(),
+  take: z.coerce.number().int().min(1).max(20).optional().default(20),
   after: z.string().optional(), // Last seen pollIndividualMessage ID
 })
 
