@@ -14,6 +14,7 @@ import { PollIssuesService } from './services/pollIssues.service'
 import { PollPurchaseHandlerService } from './services/pollPurchase.service'
 import { PollsService } from './services/polls.service'
 import { PollIndividualMessageService } from './services/pollIndividualMessage.service'
+import { ContactsModule } from '@/contacts/contacts.module'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PollIndividualMessageService } from './services/pollIndividualMessage.s
     CampaignsModule,
     AwsModule,
     LlmModule,
+    ContactsModule,
   ],
   providers: [
     PollsService,
