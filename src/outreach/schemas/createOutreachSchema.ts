@@ -23,6 +23,7 @@ export class CreateOutreachSchema extends createZodDto(
       phoneListId: z.coerce.number().int().positive().optional(),
       // P2P-specific fields
       didState: z.string().optional(),
+      didNpaSubset: z.array(z.string()).optional(),
       title: z.string().optional(),
     })
     .strict()

@@ -147,6 +147,12 @@ export class OutreachController {
         aiContent,
       )
 
+      const resolvedGeography =
+        await this.outreachService.resolveP2pJobGeography(campaign)
+      const didState = createOutreachDto.didState ?? resolvedGeography.didState
+      const didNpaSubset =
+        createOutreachDto.didNpaSubset ?? resolvedGeography.didNpaSubset
+
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         crmCompanyId: campaign.data?.hubspotId,
@@ -160,7 +166,8 @@ export class OutreachController {
         scriptText: resolvedScriptText,
         identityId: peerlyIdentityId!,
         name,
-        didState: createOutreachDto.didState,
+        didState,
+        didNpaSubset,
         scheduledDate: createOutreachDto.date,
       })
 
@@ -170,6 +177,7 @@ export class OutreachController {
           script: resolvedScriptText,
           projectId: jobId,
           status: OutreachStatus.in_progress,
+          didState,
         },
         imageUrl,
       )

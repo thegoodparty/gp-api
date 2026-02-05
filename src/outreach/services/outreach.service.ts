@@ -1,10 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { CreateOutreachSchema } from '../schemas/createOutreachSchema'
+import { Campaign } from '@prisma/client'
+import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
+import { CreateOutreachSchema } from '../schemas/createOutreachSchema'
+import {
+  resolveP2pJobGeography as resolveP2pJobGeographyUtil,
+  type P2pJobGeographyResult,
+} from '../util/campaignGeography.util'
+
+export type { P2pJobGeographyResult } from '../util/campaignGeography.util'
 
 @Injectable()
 export class OutreachService extends createPrismaBase(MODELS.Outreach) {
-  constructor() {
+  constructor(
+    private readonly placesService: GooglePlacesService,
+    private readonly areaCodeFromZipService: AreaCodeFromZipService,
+  ) {
     super()
   }
 
@@ -35,5 +47,15 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     }
 
     return outreachCampaigns
+  }
+
+  async resolveP2pJobGeography(
+    campaign: Campaign,
+  ): Promise<P2pJobGeographyResult> {
+    return resolveP2pJobGeographyUtil(campaign, {
+      placesService: this.placesService,
+      areaCodeFromZipService: this.areaCodeFromZipService,
+      logger: this.logger,
+    })
   }
 }
