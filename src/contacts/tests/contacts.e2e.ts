@@ -51,45 +51,4 @@ test.describe('Contacts and Segments', () => {
     const contacts = (await response.json()) as { contacts: unknown[] }
     expect(contacts).toHaveProperty('contacts')
   })
-
-  test('should return 403 when user has no elected office', async ({
-    request,
-  }) => {
-    const response = await request.get(`/v1/contacts/123/activities`, {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    })
-
-    expect(response.status()).toBe(HttpStatus.FORBIDDEN)
-  })
-
-  test('should return 404 when no poll messages exist for contact', async ({
-    request,
-  }) => {
-    // Create an elected office so the user passes the authorization check
-    const createOffice = await request.post(`/v1/elected-office`, {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-      data: {
-        electedDate: '2025-01-01',
-      },
-    })
-    expect(createOffice.status()).toBe(HttpStatus.CREATED)
-
-    // Request activities for a person with no poll messages
-    const response = await request.get(`/v1/contacts/123/activities`, {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    })
-
-    expect(response.status()).toBe(HttpStatus.NOT_FOUND)
-
-    const body = (await response.json()) as { message: string }
-    expect(body.message).toBe(
-      'No individual messages found for that electedOffice',
-    )
-  })
 })

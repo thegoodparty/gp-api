@@ -1,29 +1,32 @@
 import { ForbiddenException } from '@nestjs/common'
 import { User } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ContactsController } from './contacts.controller'
+import { ContactEngagementController } from '../contactEngagement.controller'
 import {
   ConstituentActivityEventType,
   ConstituentActivityType,
-} from './contacts.types'
-import { ContactsService } from './services/contacts.service'
+} from '../contactEngagement.types'
+import { ContactEngagementService } from '../contactEngagement.service'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
 
-describe('ContactsController', () => {
-  let controller: ContactsController
-  let contactsService: ContactsService
+describe('ContactEngagementController', () => {
+  let controller: ContactEngagementController
+  let contactEngagementService: ContactEngagementService
   let electedOfficeService: ElectedOfficeService
 
   beforeEach(() => {
-    contactsService = {
+    contactEngagementService = {
       getIndividualActivities: vi.fn(),
-    } as unknown as ContactsService
+    } as unknown as ContactEngagementService
 
     electedOfficeService = {
       getCurrentElectedOffice: vi.fn(),
     } as unknown as ElectedOfficeService
 
-    controller = new ContactsController(contactsService, electedOfficeService)
+    controller = new ContactEngagementController(
+      contactEngagementService,
+      electedOfficeService,
+    )
     vi.clearAllMocks()
   })
 
@@ -77,9 +80,10 @@ describe('ContactsController', () => {
         'getCurrentElectedOffice',
       ).mockResolvedValue(mockElectedOffice)
 
-      vi.spyOn(contactsService, 'getIndividualActivities').mockResolvedValue(
-        mockServiceResponse,
-      )
+      vi.spyOn(
+        contactEngagementService,
+        'getIndividualActivities',
+      ).mockResolvedValue(mockServiceResponse)
 
       const result = await controller.getIndividualActivities(
         mockParams,
@@ -91,7 +95,9 @@ describe('ContactsController', () => {
         1,
       )
 
-      expect(contactsService.getIndividualActivities).toHaveBeenCalledWith({
+      expect(
+        contactEngagementService.getIndividualActivities,
+      ).toHaveBeenCalledWith({
         personId: 'person-123',
         type: ConstituentActivityType.POLL_INTERACTIONS,
         take: 20,

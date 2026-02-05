@@ -1,25 +1,10 @@
-import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
-import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
-import {
-  Controller,
-  ForbiddenException,
-  Get,
-  Param,
-  Query,
-  Res,
-  UsePipes,
-} from '@nestjs/common'
-import { Campaign, PathToVictory, User } from '@prisma/client'
+import { Controller, Get, Param, Query, Res, UsePipes } from '@nestjs/common'
+import { Campaign, PathToVictory } from '@prisma/client'
 import { FastifyReply } from 'fastify'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { GetIndividualActivitiesResponse } from './contacts.types'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
-import {
-  IndividualActivityParamsDTO,
-  IndividualActivityQueryDTO,
-} from './schemas/individualActivity.schema'
 import {
   DownloadContactsDTO,
   ListContactsDTO,
@@ -34,10 +19,7 @@ type CampaignWithPathToVictory = Campaign & {
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class ContactsController {
-  constructor(
-    private readonly contactsService: ContactsService,
-    private readonly electedOfficeService: ElectedOfficeService,
-  ) {}
+  constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
   listContacts(
@@ -69,27 +51,5 @@ export class ContactsController {
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
     return this.contactsService.findPerson(params.id, campaign)
-  }
-
-  @Get('/:id/activities')
-  async getIndividualActivities(
-    @Param() params: IndividualActivityParamsDTO,
-    @Query() query: IndividualActivityQueryDTO,
-    @ReqUser() user: User,
-  ): Promise<GetIndividualActivitiesResponse> {
-    const existing = await this.electedOfficeService.getCurrentElectedOffice(
-      user.id,
-    )
-    if (!existing) {
-      throw new ForbiddenException(
-        'Access to constituent activities requires an elected office',
-      )
-    }
-
-    return this.contactsService.getIndividualActivities({
-      personId: params.id,
-      ...query,
-      electedOfficeId: existing.id,
-    })
   }
 }
