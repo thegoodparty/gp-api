@@ -1,5 +1,4 @@
-import { ForbiddenException } from '@nestjs/common'
-import { User } from '@prisma/client'
+import { ElectedOffice } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContactEngagementController } from '../contactEngagement.controller'
 import {
@@ -19,9 +18,7 @@ describe('ContactEngagementController', () => {
       getIndividualActivities: vi.fn(),
     } as unknown as ContactEngagementService
 
-    electedOfficeService = {
-      getCurrentElectedOffice: vi.fn(),
-    } as unknown as ElectedOfficeService
+    electedOfficeService = {} as unknown as ElectedOfficeService
 
     controller = new ContactEngagementController(
       contactEngagementService,
@@ -31,7 +28,20 @@ describe('ContactEngagementController', () => {
   })
 
   describe('getIndividualActivities', () => {
-    const mockUser = { id: 1 } as User
+    const mockElectedOffice = {
+      id: 'office-1',
+      userId: 1,
+      campaignId: 1,
+      isActive: true,
+      electedDate: new Date('2024-01-01'),
+      swornInDate: null,
+      termStartDate: null,
+      termEndDate: null,
+      termLengthDays: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as ElectedOffice
+
     const mockParams = {
       id: 'person-123',
     }
@@ -40,21 +50,7 @@ describe('ContactEngagementController', () => {
       take: 20,
     }
 
-    it('returns individual activities when user has an elected office', async () => {
-      const mockElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
+    it('returns individual activities with the provided elected office', async () => {
       const mockServiceResponse = {
         nextCursor: 'last-seen-id',
         results: [
@@ -76,11 +72,6 @@ describe('ContactEngagementController', () => {
       }
 
       vi.spyOn(
-        electedOfficeService,
-        'getCurrentElectedOffice',
-      ).mockResolvedValue(mockElectedOffice)
-
-      vi.spyOn(
         contactEngagementService,
         'getIndividualActivities',
       ).mockResolvedValue(mockServiceResponse)
@@ -88,11 +79,7 @@ describe('ContactEngagementController', () => {
       const result = await controller.getIndividualActivities(
         mockParams,
         mockQuery,
-        mockUser,
-      )
-
-      expect(electedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        1,
+        mockElectedOffice,
       )
 
       expect(
@@ -107,30 +94,8 @@ describe('ContactEngagementController', () => {
       expect(result).toEqual(mockServiceResponse)
     })
 
-    it('throws ForbiddenException when user has no elected office', async () => {
-      vi.spyOn(
-        electedOfficeService,
-        'getCurrentElectedOffice',
-      ).mockResolvedValue(null)
-
-      await expect(
-        controller.getIndividualActivities(mockParams, mockQuery, mockUser),
-      ).rejects.toThrow(ForbiddenException)
-
-      await expect(
-        controller.getIndividualActivities(mockParams, mockQuery, mockUser),
-      ).rejects.toThrow(
-        'Access to constituent activities requires an elected office',
-      )
-
-      expect(electedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        1,
-      )
-    })
-
-    it('checks elected office for the requesting user', async () => {
-      const differentUser = { id: 42 } as User
-      const mockElectedOffice = {
+    it('uses the elected office id from the decorator', async () => {
+      const differentElectedOffice = {
         id: 'office-42',
         userId: 42,
         campaignId: 1,
@@ -142,22 +107,27 @@ describe('ContactEngagementController', () => {
         termLengthDays: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      }
+      } as ElectedOffice
 
       vi.spyOn(
-        electedOfficeService,
-        'getCurrentElectedOffice',
-      ).mockResolvedValue(mockElectedOffice)
+        contactEngagementService,
+        'getIndividualActivities',
+      ).mockResolvedValue({ nextCursor: null, results: [] })
 
       await controller.getIndividualActivities(
         mockParams,
         mockQuery,
-        differentUser,
+        differentElectedOffice,
       )
 
-      expect(electedOfficeService.getCurrentElectedOffice).toHaveBeenCalledWith(
-        42,
-      )
+      expect(
+        contactEngagementService.getIndividualActivities,
+      ).toHaveBeenCalledWith({
+        personId: 'person-123',
+        type: ConstituentActivityType.POLL_INTERACTIONS,
+        take: 20,
+        electedOfficeId: 'office-42',
+      })
     })
   })
 })

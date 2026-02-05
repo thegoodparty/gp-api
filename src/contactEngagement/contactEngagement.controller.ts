@@ -1,16 +1,8 @@
-import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
-import {
-  Controller,
-  ForbiddenException,
-  Get,
-  Param,
-  Query,
-  UsePipes,
-} from '@nestjs/common'
-import { ElectedOffice, User } from '@prisma/client'
+import { Controller, Get, Param, Query, UsePipes } from '@nestjs/common'
+import { ElectedOffice } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { GetIndividualActivitiesResponse } from './contactEngagement.types'
 import {
@@ -33,21 +25,12 @@ export class ContactEngagementController {
   async getIndividualActivities(
     @Param() params: IndividualActivityParamsDTO,
     @Query() query: IndividualActivityQueryDTO,
-    @ReqUser() user: User,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
   ): Promise<GetIndividualActivitiesResponse> {
-    const existing = await this.electedOfficeService.getCurrentElectedOffice(
-      user.id,
-    )
-    if (!existing) {
-      throw new ForbiddenException(
-        'Access to constituent activities requires an elected office',
-      )
-    }
-
     return this.contactEngagementService.getIndividualActivities({
       personId: params.id,
       ...query,
-      electedOfficeId: existing.id,
+      electedOfficeId: electedOffice.id,
     })
   }
 
