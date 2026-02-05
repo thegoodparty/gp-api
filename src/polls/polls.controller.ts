@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -30,6 +31,10 @@ import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PollsService } from './services/polls.service'
 import { BiasAnalysisResponse } from './types/pollBias.types'
+import { ContactsService } from '@/contacts/services/contacts.service'
+import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
+import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
+import { CampaignWithPathToVictory } from '@/campaigns/campaigns.types'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -80,6 +85,7 @@ export class PollsController {
     private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly s3Service: S3Service,
+    private readonly contactService: ContactsService,
   ) {}
   private readonly logger = new Logger(this.constructor.name)
 
@@ -112,10 +118,12 @@ export class PollsController {
   }
 
   @Post('initial-poll')
+  @UseCampaign()
   async createInitialPoll(
     @ReqUser() user: User,
     @Body()
     { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
     // TEMPORARY FIX START
     // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
@@ -153,12 +161,19 @@ export class PollsController {
       })
     }
 
-    const userHasPolls: boolean = await this.pollsService.hasPolls(
-      electedOffice.id,
-    )
+    const [userHasPolls, districtStats] = await Promise.all([
+      this.pollsService.hasPolls(electedOffice.id),
+      this.contactService.getDistrictStats(campaign),
+    ])
     if (userHasPolls) {
       throw new ConflictException(
         'You already have a poll. You cannot create an initial poll.',
+      )
+    }
+
+    if (districtStats.totalConstituentsWithCellPhone < 500) {
+      throw new BadRequestException(
+        'You need at least 500 constituents with cell phones to create a poll.',
       )
     }
 
