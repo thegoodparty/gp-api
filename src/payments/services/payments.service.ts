@@ -58,6 +58,30 @@ export class PaymentsService {
     return { paymentIntent, user }
   }
 
+  /**
+   * Gets a validated user from a checkout session.
+   * Used for Custom Checkout flows where metadata is passed directly from the session.
+   */
+  async getValidatedSessionUser(
+    sessionId: string,
+    metadata: Record<string, string>,
+  ): Promise<{ session: { id: string }; user: User }> {
+    const userId = metadata?.userId
+    if (!userId) {
+      throw new BadGatewayException('No userId found in session metadata')
+    }
+
+    const user = await this.usersService.findUser({
+      id: parseInt(userId),
+    })
+
+    if (!user) {
+      throw new BadGatewayException('User not found for session')
+    }
+
+    return { session: { id: sessionId }, user }
+  }
+
   async updateMissingCustomerId(email: string) {
     const user = await this.usersService.findUserByEmail(email)
     if (!user) {

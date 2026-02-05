@@ -161,22 +161,15 @@ export class DomainsService
     return validatedResult.price! * 100
   }
 
+  /**
+   * Legacy post-purchase handler for PaymentIntent-based domain purchases.
+   * @deprecated Use handleDomainPostPurchase for Checkout Session flow instead.
+   *
+   * This method is registered with registerPostPurchaseHandler and receives
+   * a PaymentIntent ID directly. It's kept for backward compatibility with
+   * any existing PaymentIntent-based flows.
+   */
   async executePostPurchase(
-    paymentIntentId: string,
-    metadata: DomainPurchaseMetadata,
-  ): Promise<{
-    domain: Domain
-    registrationResult: {
-      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
-      projectResult: AddProjectDomainResponseBody | null
-      message: string
-    }
-    message: string
-  }> {
-    return this.handleDomainPostPurchase(paymentIntentId, metadata)
-  }
-
-  async handleDomainPostPurchase(
     paymentIntentId: string,
     metadata: DomainPurchaseMetadata,
   ): Promise<{
@@ -195,8 +188,9 @@ export class DomainsService
       )
     }
 
-    const { user } =
-      await this.payments.getValidatedPaymentUser(paymentIntentId)
+    // Get user from PaymentIntent metadata (legacy flow)
+    // getValidatedPaymentUser also validates the payment succeeded
+    const { user } = await this.payments.getValidatedPaymentUser(paymentIntentId)
 
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
 
@@ -223,6 +217,132 @@ export class DomainsService
         `Creating new domain record for website id ${validWebsiteId}: ${JSON.stringify(domainParams)}`,
       )
       domain = await this.model.create({ data: domainParams })
+    } else if (domain.paymentId !== paymentIntentId) {
+      // Update the existing domain with the new PaymentIntent ID
+      // This handles cases where a previous payment failed or the domain
+      // was created without a paymentId
+      this.logger.debug(
+        `Updating domain ${domain.id} paymentId from ${domain.paymentId} to ${paymentIntentId}`,
+      )
+      domain = await this.model.update({
+        where: { id: domain.id },
+        data: {
+          paymentId: paymentIntentId,
+          status: DomainStatus.pending,
+        },
+      })
+    }
+
+    const contactInfo = this.buildContactInfo(user, website.content)
+
+    try {
+      const registrationResult = await this.completeDomainRegistration(
+        validWebsiteId,
+        contactInfo,
+      )
+
+      return {
+        domain,
+        registrationResult,
+        message: 'Domain registration initiated with Vercel',
+      }
+    } catch (error) {
+      await this.model.update({
+        where: { id: domain.id },
+        data: { status: DomainStatus.inactive },
+      })
+
+      throw new BadGatewayException(
+        `Failed to register domain with Vercel: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      )
+    }
+  }
+
+  /**
+   * Post-purchase handler for Checkout Session-based domain purchases.
+   * This is the preferred flow that supports promo codes.
+   */
+
+  async handleDomainPostPurchase(
+    sessionId: string,
+    metadata: DomainPurchaseMetadata & { userId?: string },
+  ): Promise<{
+    domain: Domain
+    registrationResult: {
+      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
+      projectResult: AddProjectDomainResponseBody | null
+      message: string
+    }
+    message: string
+  }> {
+    const { domainName, websiteId, userId } = metadata
+    if (!websiteId) {
+      throw new BadRequestException(
+        'Website ID is required for domain registration',
+      )
+    }
+
+    if (!userId) {
+      throw new BadRequestException(
+        'User ID is required for domain registration',
+      )
+    }
+
+    // Retrieve the checkout session to get the PaymentIntent ID
+    // The domain.paymentId field expects a PaymentIntent ID, not a session ID
+    const session = await this.stripe.retrieveCheckoutSession(sessionId)
+    const paymentIntentId = session.payment_intent as string
+    if (!paymentIntentId) {
+      throw new BadRequestException(
+        'No payment intent found for checkout session',
+      )
+    }
+
+    // Get user from metadata (validation already done in completeCheckoutSession)
+    const { user } = await this.payments.getValidatedSessionUser(
+      sessionId,
+      metadata as unknown as Record<string, string>,
+    )
+
+    const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
+
+    const website = await this.client.website.findUniqueOrThrow({
+      where: { id: validWebsiteId },
+      select: {
+        content: true,
+        domain: true,
+      },
+    })
+
+    let domain: Domain | null = website.domain || null
+
+    if (!domain) {
+      const searchResult = await this.searchForDomain(domainName!)
+      const domainParams = {
+        websiteId: validWebsiteId,
+        name: domainName as string,
+        price: this.validateDomainSearchResult(searchResult).price as number,
+        paymentId: paymentIntentId,
+        status: DomainStatus.pending,
+      }
+      this.logger.debug(
+        `Creating new domain record for website id ${validWebsiteId}: ${JSON.stringify(domainParams)}`,
+      )
+      domain = await this.model.create({ data: domainParams })
+    } else if (domain.paymentId !== paymentIntentId) {
+      // Update the existing domain with the new PaymentIntent ID
+      // This handles cases where a previous payment failed or the domain
+      // was created without a paymentId
+      this.logger.debug(
+        `Updating domain ${domain.id} paymentId from ${domain.paymentId} to ${paymentIntentId}`,
+      )
+      domain = await this.model.update({
+        where: { id: domain.id },
+        data: {
+          paymentId: paymentIntentId,
+          status: DomainStatus.pending,
+        },
+      })
     }
 
     const contactInfo = this.buildContactInfo(user, website.content)
