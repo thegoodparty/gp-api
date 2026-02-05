@@ -380,7 +380,7 @@ export class ContactsService {
             date: message.poll.createdAt?.toISOString() ?? '',
             data: {
               pollId: message.pollId,
-              pollTitle: message.poll.name ?? '',
+              pollTitle: message.poll.name,
               events: [
                 {
                   type: eventType,
