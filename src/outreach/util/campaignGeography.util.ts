@@ -4,9 +4,15 @@
  */
 import { P2P_JOB_DEFAULTS } from '@/vendors/peerly/constants/p2pJob.constants'
 import { Campaign } from '@prisma/client'
-import { extractAddressComponents } from 'src/vendors/google/util/GooglePlaces.util'
 import type { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.types'
+import { extractAddressComponents } from 'src/vendors/google/util/GooglePlaces.util'
 import zipcodes from 'zipcodes'
+
+
+interface DetailsGeographyRecord {
+  state?: string
+  zip?: string
+}
 
 /** Minimal shape for area-code lookup (avoids full service dependency in tests). */
 export interface AreaCodeFromZipLookup {
@@ -37,7 +43,7 @@ export interface ResolveP2pJobGeographyServices {
 
 function isDetailsRecord(
   details: Campaign['details'] | null | undefined,
-): details is Record<string, unknown> {
+): details is DetailsGeographyRecord {
   return (
     details != null && typeof details === 'object' && !Array.isArray(details)
   )

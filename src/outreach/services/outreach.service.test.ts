@@ -8,6 +8,10 @@ import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/servic
 import { PrismaService } from 'src/prisma/prisma.service'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
 import { PeerlyP2pJobService } from 'src/vendors/peerly/services/peerlyP2pJob.service'
+import type {
+  CampaignGeographyInput,
+  ResolveP2pJobGeographyServices,
+} from '../util/campaignGeography.util'
 import type { CreateOutreachSchema } from '../schemas/createOutreachSchema'
 import {
   OutreachService,
@@ -22,8 +26,10 @@ const mockPeerlyCreateJob = vi.fn()
 const mockResolveP2pJobGeography = vi.fn()
 
 vi.mock('../util/campaignGeography.util', () => ({
-  resolveP2pJobGeography: (...args: unknown[]) =>
-    mockResolveP2pJobGeography(...args),
+  resolveP2pJobGeography: (
+    campaign: CampaignGeographyInput,
+    services: ResolveP2pJobGeographyServices,
+  ) => mockResolveP2pJobGeography(campaign, services),
 }))
 
 describe('OutreachService', () => {
