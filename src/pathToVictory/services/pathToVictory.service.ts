@@ -21,6 +21,7 @@ import {
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
+import { serializeError } from 'serialize-error'
 
 enum SpecialOfficePhrase {
   AtLarge = 'At Large',
@@ -138,6 +139,9 @@ export class PathToVictoryService extends createPrismaBase(
       }
 
       let attempts = 1
+      let lastMatchedDistrictType: string | undefined
+      let lastMatchedDistrictName: string | undefined
+
       if (!searchColumns || searchColumns.length === 0) {
         this.logger.warn(
           `No district type candidates returned for slug=${input.slug}, office="${input.officeName}"`,
@@ -183,6 +187,9 @@ export class PathToVictoryService extends createPrismaBase(
           continue
         }
 
+        lastMatchedDistrictType = electionType
+        lastMatchedDistrictName = electionLocation
+
         this.logger.debug(
           `Found Column! Election Type: ${electionType}. Location: ${electionLocation}`,
         )
@@ -222,6 +229,34 @@ export class PathToVictoryService extends createPrismaBase(
         if (++attempts > 10) break
       }
 
+      const isSuccess = pathToVictoryResponse.counts.projectedTurnout > 0
+      const reason = isSuccess
+        ? undefined
+        : lastMatchedDistrictType
+          ? 'no_projected_turnout'
+          : 'no_district_match'
+
+      this.logger.log(
+        JSON.stringify({
+          event: 'DistrictMatch',
+          matchType: 'silver',
+          result: isSuccess ? 'success' : 'failure',
+          reason,
+          slug: input.slug,
+          campaignId: input.campaignId,
+          officeName: input.officeName,
+          electionState: input.electionState,
+          electionLevel: input.electionLevel,
+          electionDate: input.electionDate,
+          L2DistrictType:
+            pathToVictoryResponse.electionType || lastMatchedDistrictType,
+          L2DistrictName:
+            pathToVictoryResponse.electionLocation || lastMatchedDistrictName,
+          projectedTurnout:
+            pathToVictoryResponse.counts.projectedTurnout || undefined,
+        }),
+      )
+
       return {
         pathToVictoryResponse,
         ...input,
@@ -229,6 +264,24 @@ export class PathToVictoryService extends createPrismaBase(
     } catch (error: unknown) {
       const err: Error =
         error instanceof Error ? error : new Error(String(error))
+
+      this.logger.log(
+        JSON.stringify({
+          event: 'DistrictMatch',
+          matchType: 'silver',
+          result: 'failure',
+          reason: error instanceof Error ? error.message : String(error),
+          error: serializeError(error),
+          slug: input.slug,
+          campaignId: input.campaignId,
+          officeName: input.officeName,
+          electionState: input.electionState,
+          electionLevel: input.electionLevel,
+          electionDate: input.electionDate,
+          errorMessage: err.message,
+        }),
+      )
+
       this.logger.error('Error in handle-p2v', err)
       await this.slackService.errorMessage({
         message: 'Error in handle-p2v',
