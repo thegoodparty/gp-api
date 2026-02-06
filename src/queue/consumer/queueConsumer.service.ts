@@ -763,7 +763,7 @@ export class QueueConsumerService {
       })
     }
 
-    const people = await parseCsv<{ id: string }>(csv)
+    const people = await parseCsv<{ id: string; cellPhone: string }>(csv)
 
     // 2. Create individual poll messages
     const now = new Date()
@@ -777,6 +777,7 @@ export class QueueConsumerService {
             pollId: poll.id,
             personId: person.id!,
             sentAt: now,
+            personCellPhone: person.cellPhone,
           }
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
