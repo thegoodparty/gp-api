@@ -121,7 +121,15 @@ export class PurchaseService {
       )
     }
 
-    const amount = await handler.calculateAmount(dto.metadata)
+    // Merge server-side campaignId into metadata for calculateAmount.
+    // Handlers like outreach need campaignId to check free texts eligibility.
+    // We must use the server-validated campaign, not trust the client's campaignId.
+    const mergedMetadata = {
+      ...(dto.metadata as Record<string, unknown>),
+      ...(campaign?.id ? { campaignId: campaign.id } : {}),
+    }
+
+    const amount = await handler.calculateAmount(mergedMetadata)
 
     // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
     // Stripe doesn't need a real Checkout Session for $0
@@ -295,7 +303,14 @@ export class PurchaseService {
         ...(dto.metadata as Record<string, unknown>),
         ...(campaign?.id ? { campaignId: campaign?.id } : {}),
       })
-    const amount = await handler.calculateAmount(dto.metadata)
+
+    // Merge server-side campaignId into metadata for calculateAmount.
+    // Handlers like outreach need campaignId to check free texts eligibility.
+    const mergedMetadata = {
+      ...(dto.metadata as Record<string, unknown>),
+      ...(campaign?.id ? { campaignId: campaign.id } : {}),
+    }
+    const amount = await handler.calculateAmount(mergedMetadata)
 
     // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
     // Stripe rejects PaymentIntents with $0 so we our own response
@@ -311,6 +326,8 @@ export class PurchaseService {
       if (postPurchaseHandler) {
         await postPurchaseHandler(freePaymentId, {
           ...(dto.metadata as Record<string, unknown>),
+          ...(campaign?.id ? { campaignId: campaign.id } : {}),
+          userId: String(user.id),
           purchaseType: dto.type,
         })
       }

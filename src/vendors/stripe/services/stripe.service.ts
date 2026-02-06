@@ -44,11 +44,11 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
-    // Filter out undefined values from metadata before passing to Stripe
+    // Filter out undefined and null values from metadata before passing to Stripe.
+    // String(null) produces the string "null" which would break downstream parsers.
     const cleanedMetadata = Object.entries(restMetadata)
       .filter(
-        ([_, value]: [string, PurchaseIntentPayloadEntry]) =>
-          value !== undefined,
+        ([_, value]: [string, PurchaseIntentPayloadEntry]) => value != null,
       )
       .reduce(
         (acc, [key, value]: [string, PurchaseIntentPayloadEntry]) => ({
@@ -66,10 +66,12 @@ export class StripeService {
       automatic_payment_methods: {
         enabled: true,
       },
+      // Server-set fields MUST come after cleanedMetadata to prevent
+      // client-supplied metadata from overwriting trusted values.
       metadata: {
+        ...(cleanedMetadata as Record<string, string | number>),
         userId,
         paymentType: type,
-        ...(cleanedMetadata as Record<string, string | number>),
       },
     })
   }
@@ -180,11 +182,13 @@ export class StripeService {
       ],
       ...(payload.allowPromoCodes ? { allow_promotion_codes: true } : {}),
       return_url: payload.returnUrl,
+      // Server-set fields MUST come after cleanedMetadata to prevent
+      // client-supplied metadata from overwriting trusted values.
       metadata: {
+        ...cleanedMetadata,
         userId: String(userId),
         paymentType: payload.type,
         purchaseType: payload.purchaseType,
-        ...cleanedMetadata,
       },
     })
 
