@@ -185,17 +185,17 @@ export class ElectionsService {
           electionDate,
           campaignId,
           ballotreadyPositionId,
-          districtType: positionWithDistrict.district.L2DistrictType,
-          districtName: positionWithDistrict.district.L2DistrictName,
+          districtType: positionWithDistrict?.district?.L2DistrictType,
+          districtName: positionWithDistrict?.district?.L2DistrictName,
           projectedTurnout:
-            positionWithDistrict.district.projectedTurnout.projectedTurnout,
+            positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
         }),
       )
       return {
         district: positionWithDistrict?.district,
         ...(includeTurnout
           ? this.calculateRaceTargetMetrics(
-              positionWithDistrict?.district.projectedTurnout.projectedTurnout,
+              positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
             )
           : {
               // Sentinel values to overwrite previously assigned, no longer correct ones
@@ -215,10 +215,10 @@ export class ElectionsService {
           electionDate,
           campaignId,
           ballotreadyPositionId,
-          districtType: positionWithDistrict?.district.L2DistrictType,
-          districtName: positionWithDistrict?.district.L2DistrictName,
+          districtType: positionWithDistrict?.district?.L2DistrictType,
+          districtName: positionWithDistrict?.district?.L2DistrictName,
           projectedTurnout:
-            positionWithDistrict?.district.projectedTurnout.projectedTurnout,
+            positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
         }),
       )
       const message = this.buildSlackErrorMessage(
