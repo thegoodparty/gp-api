@@ -289,8 +289,16 @@ export class DomainsService
       )
     }
 
-    // Retrieve the checkout session to get the PaymentIntent ID
-    // The domain.paymentId field expects a PaymentIntent ID, not a session ID
+    // Retrieve the checkout session to get the PaymentIntent ID.
+    // Domain purchases always have a non-zero amount (price comes from Vercel/Route53),
+    // so they always go through Stripe — the zero-amount path in PurchaseService
+    // (which generates synthetic free_ IDs) is only reachable for TEXT purchases
+    // with a free texts offer.
+    //
+    // Even when a Stripe promo code reduces the total to $0, Stripe still creates
+    // a real PaymentIntent in `payment` mode (payment_method_collection defaults
+    // to `always` and `if_required` is subscription-only). The null check below
+    // is a defensive guard for any unexpected Stripe behavior.
     const session = await this.stripe.retrieveCheckoutSession(sessionId)
     const paymentIntentId = session.payment_intent as string
     if (!paymentIntentId) {

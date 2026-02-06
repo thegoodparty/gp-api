@@ -130,6 +130,7 @@ export class PurchaseService {
         await postPurchaseHandler(freeSessionId, {
           ...(dto.metadata as Record<string, unknown>),
           ...(campaign?.id ? { campaignId: campaign.id } : {}),
+          userId: String(user.id),
           purchaseType: dto.type,
         })
       }

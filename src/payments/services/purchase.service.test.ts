@@ -426,6 +426,94 @@ describe('PurchaseService', () => {
       )
     })
 
+    it('should include userId in zero-amount checkout metadata', async () => {
+      // Arrange: This covers the Bugbot issue where zero-amount checkouts
+      // did not include userId, breaking handlers that require it
+      // (e.g., handlePollPostPurchase). The zero-amount path is only
+      // reachable for TEXT purchases (free texts offer), not domain
+      // purchases (which always have a real price from Vercel/Route53).
+      const mockHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
+      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
+      service.registerCheckoutSessionPostPurchaseHandler(
+        PurchaseType.TEXT,
+        mockCheckoutSessionPostPurchaseHandler,
+      )
+
+      // Act
+      await service.createCheckoutSession({
+        user: mockUser,
+        dto: {
+          type: PurchaseType.TEXT,
+          metadata: {
+            contactCount: 100,
+            pricePerContact: 3.5,
+          },
+        },
+        campaign: mockCampaign,
+      })
+
+      // Assert: Handler metadata MUST include userId
+      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledWith(
+        expect.stringMatching(/^free_\d+_1$/),
+        expect.objectContaining({
+          userId: '1',
+          contactCount: 100,
+          pricePerContact: 3.5,
+          campaignId: 111,
+          purchaseType: PurchaseType.TEXT,
+        }),
+      )
+    })
+
+    it('should pass synthetic free_ session ID to post-purchase handler for zero-amount checkout', async () => {
+      // Arrange: The zero-amount path generates a synthetic free_ session ID.
+      // This only applies to TEXT purchases (free texts offer covers the cost).
+      // Domain purchases always have a real price from Vercel/Route53 and
+      // always go through Stripe, so they never hit this path.
+      const mockHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
+      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
+      service.registerCheckoutSessionPostPurchaseHandler(
+        PurchaseType.TEXT,
+        mockCheckoutSessionPostPurchaseHandler,
+      )
+
+      // Act
+      const result = await service.createCheckoutSession({
+        user: mockUser,
+        dto: {
+          type: PurchaseType.TEXT,
+          metadata: { contactCount: 200, pricePerContact: 3.5 },
+        },
+      })
+
+      // Assert: Session ID must start with free_ prefix
+      expect(result.id).toMatch(/^free_/)
+      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledWith(
+        expect.stringMatching(/^free_/),
+        expect.any(Object),
+      )
+    })
+
+    it('should reject invalid purchase types', async () => {
+      // Arrange: This covers the CodeQL "unvalidated dynamic method call" alert
+      // where dto.type was used to look up handlers without validation
+      await expect(
+        service.createCheckoutSession({
+          user: mockUser,
+          dto: {
+            type: 'INVALID_TYPE' as PurchaseType,
+            metadata: {},
+          },
+        }),
+      ).rejects.toThrow('Invalid purchase type: INVALID_TYPE')
+    })
+
     it('should propagate errors from post-purchase handler on zero-amount checkout', async () => {
       // Arrange
       const mockHandler: PurchaseHandler<unknown> = {
@@ -779,6 +867,20 @@ describe('PurchaseService', () => {
       ).rejects.toThrow('Domain already registered')
 
       expect(mockPaymentsService.createPayment).not.toHaveBeenCalled()
+    })
+
+    it('should reject invalid purchase types', async () => {
+      // Arrange: This covers the CodeQL "unvalidated dynamic method call" alert
+      // where dto.type was used to look up handlers without validation
+      await expect(
+        service.createPurchaseIntent({
+          user: mockUser,
+          dto: {
+            type: 'MALICIOUS_TYPE' as PurchaseType,
+            metadata: {},
+          },
+        }),
+      ).rejects.toThrow('Invalid purchase type: MALICIOUS_TYPE')
     })
   })
 
