@@ -23,7 +23,7 @@
     "seed:all": "npx prisma db seed -- --type all",
     "seed:csv": "npx prisma db seed -- --type csv",
     "generate": "npx prisma generate",
-    "postinstall": "prisma generate",
+    "postinstall": "tsx scripts/prisma-generate-if-needed.ts",
     "codegen": "graphql-codegen",
     "test:e2e": "playwright test --config=e2e-tests/playwright.config.ts",
     "test:e2e:ui": "playwright test --config=e2e-tests/playwright.config.ts --ui",
