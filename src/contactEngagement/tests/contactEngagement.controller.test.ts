@@ -1,29 +1,22 @@
 import { ElectedOffice } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContactEngagementController } from '../contactEngagement.controller'
+import { ContactEngagementService } from '../contactEngagement.service'
 import {
   ConstituentActivityEventType,
   ConstituentActivityType,
 } from '../contactEngagement.types'
-import { ContactEngagementService } from '../contactEngagement.service'
-import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
 
 describe('ContactEngagementController', () => {
   let controller: ContactEngagementController
   let contactEngagementService: ContactEngagementService
-  let electedOfficeService: ElectedOfficeService
 
   beforeEach(() => {
     contactEngagementService = {
       getIndividualActivities: vi.fn(),
     } as unknown as ContactEngagementService
 
-    electedOfficeService = {} as unknown as ElectedOfficeService
-
-    controller = new ContactEngagementController(
-      contactEngagementService,
-      electedOfficeService,
-    )
+    controller = new ContactEngagementController(contactEngagementService)
     vi.clearAllMocks()
   })
 
