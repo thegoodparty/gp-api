@@ -106,10 +106,20 @@ export class PurchaseService {
     }
 
     // Validate the purchase (checks for existing payments, etc.)
-    await handler.validatePurchase({
+    // For domains, validatePurchase returns an existing succeeded PaymentIntent
+    // if the domain was already purchased. In the legacy createPurchaseIntent flow
+    // this PI is reused. For checkout sessions we must reject the duplicate to
+    // prevent charging the user twice for the same purchase.
+    const existingPayment = await handler.validatePurchase({
       ...(dto.metadata as Record<string, unknown>),
       ...(campaign?.id ? { campaignId: campaign?.id } : {}),
     })
+
+    if (existingPayment) {
+      throw new Error(
+        'This purchase has already been completed. Please refresh the page.',
+      )
+    }
 
     const amount = await handler.calculateAmount(dto.metadata)
 
