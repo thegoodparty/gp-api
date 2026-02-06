@@ -187,6 +187,11 @@ export class DomainsService
         'Website ID is required for domain registration',
       )
     }
+    if (!domainName) {
+      throw new BadRequestException(
+        'Domain name is required for domain registration',
+      )
+    }
 
     // Get user from PaymentIntent metadata (legacy flow)
     // getValidatedPaymentUser also validates the payment succeeded
@@ -196,7 +201,7 @@ export class DomainsService
     return this.processDomainRegistration({
       user,
       websiteId,
-      domainName: domainName!,
+      domainName,
       paymentId: paymentIntentId,
     })
   }
@@ -222,6 +227,12 @@ export class DomainsService
     if (!websiteId) {
       throw new BadRequestException(
         'Website ID is required for domain registration',
+      )
+    }
+
+    if (!domainName) {
+      throw new BadRequestException(
+        'Domain name is required for domain registration',
       )
     }
 
@@ -258,7 +269,7 @@ export class DomainsService
     return this.processDomainRegistration({
       user,
       websiteId,
-      domainName: domainName!,
+      domainName,
       paymentId: paymentIntentId,
     })
   }

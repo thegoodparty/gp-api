@@ -93,38 +93,13 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
     )
 
     if (metadata.pollPurchaseType === PollPurchaseType.expansion) {
-      await this.pollsService.expandPoll({
-        pollId: metadata.pollId,
-        additionalRecipientCount: metadata.count,
-        scheduledDate: metadata.scheduledDate
-          ? new Date(metadata.scheduledDate)
-          : new Date(),
-      })
-      return
+      return this.processExpansion(metadata)
     }
 
     const { user } =
       await this.paymentsService.getValidatedPaymentUser(paymentIntentId)
 
-    const electedOffice = await this.electedOfficeService.findFirst({
-      where: { userId: user.id },
-    })
-
-    if (!electedOffice) {
-      throw new BadRequestException(
-        `Elected office not found for userId ${user.id} poll ${metadata.pollId}`,
-      )
-    }
-
-    await this.pollsService.create({
-      id: metadata.pollId,
-      name: metadata.name,
-      electedOfficeId: electedOffice.id,
-      messageContent: metadata.message,
-      imageUrl: metadata.imageUrl,
-      targetAudienceSize: metadata.audienceSize,
-      scheduledDate: metadata.scheduledDate,
-    })
+    return this.processNewPoll(metadata, user.id)
   }
 
   async handlePollPostPurchase(
@@ -138,14 +113,7 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
     )
 
     if (metadata.pollPurchaseType === PollPurchaseType.expansion) {
-      await this.pollsService.expandPoll({
-        pollId: metadata.pollId,
-        additionalRecipientCount: metadata.count,
-        scheduledDate: metadata.scheduledDate
-          ? new Date(metadata.scheduledDate)
-          : new Date(),
-      })
-      return
+      return this.processExpansion(metadata)
     }
 
     const userId = (rawMetadata as Record<string, string>)?.userId
@@ -158,13 +126,42 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
       throw new BadRequestException(`User not found: ${userId}`)
     }
 
+    return this.processNewPoll(metadata, user.id)
+  }
+
+  /**
+   * Shared logic for expanding an existing poll with additional recipients.
+   */
+  private async processExpansion(
+    metadata: z.infer<typeof PollPurchaseMetadataSchema> & {
+      pollPurchaseType: PollPurchaseType.expansion
+    },
+  ): Promise<void> {
+    await this.pollsService.expandPoll({
+      pollId: metadata.pollId,
+      additionalRecipientCount: metadata.count,
+      scheduledDate: metadata.scheduledDate
+        ? new Date(metadata.scheduledDate)
+        : new Date(),
+    })
+  }
+
+  /**
+   * Shared logic for creating a new poll after purchase.
+   */
+  private async processNewPoll(
+    metadata: z.infer<typeof PollPurchaseMetadataSchema> & {
+      pollPurchaseType: PollPurchaseType.new
+    },
+    userId: number,
+  ): Promise<void> {
     const electedOffice = await this.electedOfficeService.findFirst({
-      where: { userId: user.id },
+      where: { userId },
     })
 
     if (!electedOffice) {
       throw new BadRequestException(
-        `Elected office not found for userId ${user.id} poll ${metadata.pollId}`,
+        `Elected office not found for userId ${userId} poll ${metadata.pollId}`,
       )
     }
 
