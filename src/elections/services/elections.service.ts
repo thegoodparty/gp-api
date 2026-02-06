@@ -195,7 +195,8 @@ export class ElectionsService {
         district: positionWithDistrict?.district,
         ...(includeTurnout
           ? this.calculateRaceTargetMetrics(
-              positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
+              positionWithDistrict?.district?.projectedTurnout
+                ?.projectedTurnout,
             )
           : {
               // Sentinel values to overwrite previously assigned, no longer correct ones
