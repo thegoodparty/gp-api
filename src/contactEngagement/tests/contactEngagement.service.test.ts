@@ -81,7 +81,6 @@ describe('ContactEngagementService', () => {
           poll: true,
         },
         orderBy: { sentAt: 'desc' },
-        take: 21, // limit + 1 to check for more results
       })
 
       // No extra item returned, so nextCursor is null
@@ -302,28 +301,45 @@ describe('ContactEngagementService', () => {
         take: 50,
       }
 
-      await service.getIndividualActivities(inputWithTake)
+      const result = await service.getIndividualActivities(inputWithTake)
 
-      expect(mockPollIndividualMessageService.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 51, // limit + 1 to check for more results
-        }),
-      )
+      expect(mockPollIndividualMessageService.findMany).toHaveBeenCalledWith({
+        where: {
+          electedOfficeId: 'office-123',
+          personId: 'person-123',
+        },
+        include: { poll: true },
+        orderBy: { sentAt: 'desc' },
+      })
+      expect(result.results).toHaveLength(1)
     })
 
     it('uses cursor for pagination when after is provided', async () => {
       const mockMessages = [
         {
-          id: 'msg-2',
+          id: 'msg-1',
           pollId: 'poll-1',
+          personId: 'person-123',
+          sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+          isOptOut: false,
+          sentAt: new Date('2025-01-20T10:00:00Z'),
+          poll: {
+            id: 'poll-1',
+            name: 'Poll One',
+            createdAt: new Date('2025-01-01T00:00:00Z'),
+          },
+        },
+        {
+          id: 'msg-2',
+          pollId: 'poll-2',
           personId: 'person-123',
           sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
           isOptOut: false,
           sentAt: new Date('2025-01-15T10:00:00Z'),
           poll: {
-            id: 'poll-1',
-            name: 'Community Survey',
-            createdAt: new Date('2025-01-01T00:00:00Z'),
+            id: 'poll-2',
+            name: 'Poll Two',
+            createdAt: new Date('2025-01-05T00:00:00Z'),
           },
         },
       ]
@@ -332,17 +348,22 @@ describe('ContactEngagementService', () => {
 
       const inputWithAfter = {
         ...baseInput,
-        after: 'msg-1',
+        take: 1,
+        after: 'poll-1',
       }
 
-      await service.getIndividualActivities(inputWithAfter)
+      const result = await service.getIndividualActivities(inputWithAfter)
 
-      expect(mockPollIndividualMessageService.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cursor: { id: 'msg-1' },
-          skip: 1,
-        }),
-      )
+      expect(mockPollIndividualMessageService.findMany).toHaveBeenCalledWith({
+        where: {
+          electedOfficeId: 'office-123',
+          personId: 'person-123',
+        },
+        include: { poll: true },
+        orderBy: { sentAt: 'desc' },
+      })
+      expect(result.results).toHaveLength(1)
+      expect(result.results[0].data.pollId).toBe('poll-2')
     })
 
     it('returns nextCursor when more results exist', async () => {
@@ -395,14 +416,11 @@ describe('ContactEngagementService', () => {
       const inputWithTake = { ...baseInput, take: 2 }
       const result = await service.getIndividualActivities(inputWithTake)
 
-      // The 3rd message (at index 2, which equals the limit) indicates more data exists
-      expect(result.nextCursor).toBe('msg-3')
-      // Only the first 2 messages should be processed into results (each from different polls)
+      expect(result.nextCursor).toBe('poll-2')
       expect(result.results).toHaveLength(2)
     })
 
     it('returns null nextCursor when data is exhausted', async () => {
-      // With take=2, we request 3 items (limit + 1)
       // If only 2 items are returned, nextCursor should be null
       const mockMessages = [
         {
