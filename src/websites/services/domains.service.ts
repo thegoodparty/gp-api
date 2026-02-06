@@ -193,70 +193,12 @@ export class DomainsService
     const { user } =
       await this.payments.getValidatedPaymentUser(paymentIntentId)
 
-    const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
-
-    const website = await this.client.website.findUniqueOrThrow({
-      where: { id: validWebsiteId },
-      select: {
-        content: true,
-        domain: true,
-      },
+    return this.processDomainRegistration({
+      user,
+      websiteId,
+      domainName: domainName!,
+      paymentId: paymentIntentId,
     })
-
-    let domain: Domain | null = website.domain || null
-
-    if (!domain) {
-      const searchResult = await this.searchForDomain(domainName!)
-      const domainParams = {
-        websiteId: validWebsiteId,
-        name: domainName as string,
-        price: this.validateDomainSearchResult(searchResult).price as number,
-        paymentId: paymentIntentId,
-        status: DomainStatus.pending,
-      }
-      this.logger.debug(
-        `Creating new domain record for website id ${validWebsiteId}: ${JSON.stringify(domainParams)}`,
-      )
-      domain = await this.model.create({ data: domainParams })
-    } else if (domain.paymentId !== paymentIntentId) {
-      // Update the existing domain with the new PaymentIntent ID
-      // This handles cases where a previous payment failed or the domain
-      // was created without a paymentId
-      this.logger.debug(
-        `Updating domain ${domain.id} paymentId from ${domain.paymentId} to ${paymentIntentId}`,
-      )
-      domain = await this.model.update({
-        where: { id: domain.id },
-        data: {
-          paymentId: paymentIntentId,
-          status: DomainStatus.pending,
-        },
-      })
-    }
-
-    const contactInfo = this.buildContactInfo(user, website.content)
-
-    try {
-      const registrationResult = await this.completeDomainRegistration(
-        validWebsiteId,
-        contactInfo,
-      )
-
-      return {
-        domain,
-        registrationResult,
-        message: 'Domain registration initiated with Vercel',
-      }
-    } catch (error) {
-      await this.model.update({
-        where: { id: domain.id },
-        data: { status: DomainStatus.inactive },
-      })
-
-      throw new BadGatewayException(
-        `Failed to register domain with Vercel: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      )
-    }
   }
 
   /**
@@ -313,6 +255,38 @@ export class DomainsService
       metadata as unknown as Record<string, string>,
     )
 
+    return this.processDomainRegistration({
+      user,
+      websiteId,
+      domainName: domainName!,
+      paymentId: paymentIntentId,
+    })
+  }
+
+  /**
+   * Shared domain registration logic used by both the legacy PaymentIntent flow
+   * and the Checkout Session flow. Handles domain record creation/update,
+   * contact info resolution, and Vercel registration.
+   */
+  private async processDomainRegistration({
+    user,
+    websiteId,
+    domainName,
+    paymentId,
+  }: {
+    user: User
+    websiteId: string | number
+    domainName: string
+    paymentId: string
+  }): Promise<{
+    domain: Domain
+    registrationResult: {
+      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
+      projectResult: AddProjectDomainResponseBody | null
+      message: string
+    }
+    message: string
+  }> {
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
 
     const website = await this.client.website.findUniqueOrThrow({
@@ -326,29 +300,29 @@ export class DomainsService
     let domain: Domain | null = website.domain || null
 
     if (!domain) {
-      const searchResult = await this.searchForDomain(domainName!)
+      const searchResult = await this.searchForDomain(domainName)
       const domainParams = {
         websiteId: validWebsiteId,
-        name: domainName as string,
+        name: domainName,
         price: this.validateDomainSearchResult(searchResult).price as number,
-        paymentId: paymentIntentId,
+        paymentId,
         status: DomainStatus.pending,
       }
       this.logger.debug(
         `Creating new domain record for website id ${validWebsiteId}: ${JSON.stringify(domainParams)}`,
       )
       domain = await this.model.create({ data: domainParams })
-    } else if (domain.paymentId !== paymentIntentId) {
-      // Update the existing domain with the new PaymentIntent ID
+    } else if (domain.paymentId !== paymentId) {
+      // Update the existing domain with the new payment ID
       // This handles cases where a previous payment failed or the domain
       // was created without a paymentId
       this.logger.debug(
-        `Updating domain ${domain.id} paymentId from ${domain.paymentId} to ${paymentIntentId}`,
+        `Updating domain ${domain.id} paymentId from ${domain.paymentId} to ${paymentId}`,
       )
       domain = await this.model.update({
         where: { id: domain.id },
         data: {
-          paymentId: paymentIntentId,
+          paymentId,
           status: DomainStatus.pending,
         },
       })

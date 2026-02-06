@@ -142,9 +142,11 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
-    // Filter out undefined values from metadata
+    // Filter out undefined and null values from metadata.
+    // String(null) produces the string "null" which would break downstream
+    // parsers that expect actual null (e.g., poll imageUrl validation).
     const cleanedMetadata = Object.entries(payload.metadata || {})
-      .filter(([_, value]) => value !== undefined)
+      .filter(([_, value]) => value != null)
       .reduce(
         (acc, [key, value]) => ({
           ...acc,
