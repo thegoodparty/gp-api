@@ -119,6 +119,18 @@ export class EnqueuePathToVictoryService {
       }
 
       this.logger.debug('queueing Message', queueMessage)
+      this.logger.log(
+        JSON.stringify({
+          event: 'DistrictMatch',
+          action: 'silver_fallback_triggered',
+          slug,
+          campaignId,
+          officeName: queueMessage.data.officeName,
+          electionState: queueMessage.data.electionState,
+          electionLevel: queueMessage.data.electionLevel,
+          electionDate: queueMessage.data.electionDate,
+        }),
+      )
       await this.queueService.sendMessage(queueMessage!, MessageGroup.p2v)
       return { message: 'ok' }
     } catch (e) {
