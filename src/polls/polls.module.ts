@@ -58,5 +58,12 @@ export class PollsModule {
         this.pollPurchaseHandler,
       ),
     )
+
+    this.purchaseService.registerCheckoutSessionPostPurchaseHandler(
+      PurchaseType.POLL,
+      this.pollPurchaseHandler.handlePollPostPurchase.bind(
+        this.pollPurchaseHandler,
+      ),
+    )
   }
 }

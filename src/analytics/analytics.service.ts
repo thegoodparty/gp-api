@@ -190,18 +190,19 @@ export class AnalyticsService {
         )
       }
 
-      // Extract renewal date safely
+      // Extract renewal date safely (from subscription items in newer Stripe API)
       let renewalDate: string
-      if (subscription.current_period_end) {
+      const firstItem = subscription.items?.data?.[0]
+      if (firstItem?.current_period_end) {
         renewalDate = new Date(
-          subscription.current_period_end * 1000,
+          firstItem.current_period_end * 1000,
         ).toISOString()
         this.logger.debug(
           `[ANALYTICS] Extracted renewal date: ${renewalDate} for user ${userId}`,
         )
       } else {
         this.logger.warn(
-          `[ANALYTICS] No current_period_end found in subscription for user ${userId}`,
+          `[ANALYTICS] No current_period_end found in subscription items for user ${userId}`,
         )
         renewalDate = new Date().toISOString()
       }

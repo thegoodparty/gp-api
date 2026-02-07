@@ -32,5 +32,13 @@ export class OutreachModule {
         this.outreachPurchaseHandler,
       ),
     )
+
+    // Also register for Custom Checkout Sessions (used for promo code support)
+    this.purchaseService.registerCheckoutSessionPostPurchaseHandler(
+      PurchaseType.TEXT,
+      this.outreachPurchaseHandler.executePostPurchase.bind(
+        this.outreachPurchaseHandler,
+      ),
+    )
   }
 }

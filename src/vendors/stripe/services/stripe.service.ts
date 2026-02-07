@@ -1,6 +1,7 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { User } from '@prisma/client'
 import {
+  CustomCheckoutSessionPayload,
   PaymentIntentPayload,
   PaymentType,
   PurchaseIntentPayloadEntry,
@@ -43,11 +44,11 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
-    // Filter out undefined values from metadata before passing to Stripe
+    // Filter out undefined and null values from metadata before passing to Stripe.
+    // String(null) produces the string "null" which would break downstream parsers.
     const cleanedMetadata = Object.entries(restMetadata)
       .filter(
-        ([_, value]: [string, PurchaseIntentPayloadEntry]) =>
-          value !== undefined,
+        ([_, value]: [string, PurchaseIntentPayloadEntry]) => value != null,
       )
       .reduce(
         (acc, [key, value]: [string, PurchaseIntentPayloadEntry]) => ({
@@ -65,16 +66,31 @@ export class StripeService {
       automatic_payment_methods: {
         enabled: true,
       },
+      // Server-set fields MUST come after cleanedMetadata to prevent
+      // client-supplied metadata from overwriting trusted values.
       metadata: {
+        ...(cleanedMetadata as Record<string, string | number>),
         userId,
         paymentType: type,
-        ...(cleanedMetadata as Record<string, string | number>),
       },
     })
   }
 
   async retrievePaymentIntent(paymentId: string) {
     return await this.stripe.paymentIntents.retrieve(paymentId)
+  }
+
+  async updatePaymentIntentMetadata(
+    paymentIntentId: string,
+    metadata: Record<string, string>,
+  ) {
+    return await this.stripe.paymentIntents.update(paymentIntentId, {
+      metadata,
+    })
+  }
+
+  async retrieveCheckoutSession(sessionId: string) {
+    return await this.stripe.checkout.sessions.retrieve(sessionId)
   }
 
   async createCheckoutSession(userId: number) {
@@ -92,6 +108,7 @@ export class StripeService {
         },
       ],
       mode: 'subscription',
+      allow_promotion_codes: true,
       // Expanding for Segment / analytics
       expand: [
         'subscription',
@@ -104,6 +121,91 @@ export class StripeService {
 
     const { url: redirectUrl, id: checkoutSessionId } = session
     return { redirectUrl, checkoutSessionId }
+  }
+
+  /**
+   * Creates a Checkout Session with `ui_mode: 'custom'` for one-time payments.
+   * This enables embedded payment forms with promo code support.
+   *
+   * Migration reference: https://docs.stripe.com/payments/payment-element/migration-ewcs
+   *
+   * @param user - The user making the purchase
+   * @param payload - The checkout session payload containing product details
+   * @returns The checkout session with client_secret for frontend initialization
+   */
+  async createCustomCheckoutSession(
+    user: User,
+    payload: CustomCheckoutSessionPayload,
+  ): Promise<{
+    id: string
+    clientSecret: string
+    amount: number
+  }> {
+    const userId = user.id
+    const customerId = user.metaData?.customerId
+
+    // Filter out undefined and null values from metadata.
+    // String(null) produces the string "null" which would break downstream
+    // parsers that expect actual null (e.g., poll imageUrl validation).
+    const cleanedMetadata = Object.entries(payload.metadata || {})
+      .filter(([_, value]) => value != null)
+      .reduce(
+        (acc, [key, value]) => ({
+          ...acc,
+          [key]: String(value),
+        }),
+        {},
+      )
+
+    const session = await this.stripe.checkout.sessions.create({
+      ui_mode: 'custom',
+      mode: 'payment',
+      // If user has a Stripe customerId, link to existing customer.
+      // Otherwise, provide customer_email so Stripe can prefill and send receipts.
+      ...(customerId
+        ? { customer: customerId }
+        : { customer_email: user.email }),
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: payload.productName,
+              ...(payload.productDescription
+                ? { description: payload.productDescription }
+                : {}),
+            },
+            unit_amount: Math.floor(payload.amount), // Stripe expects cents as integer
+          },
+          quantity: 1,
+        },
+      ],
+      ...(payload.allowPromoCodes ? { allow_promotion_codes: true } : {}),
+      return_url: payload.returnUrl,
+      // Server-set fields MUST come after cleanedMetadata to prevent
+      // client-supplied metadata from overwriting trusted values.
+      metadata: {
+        ...cleanedMetadata,
+        userId: String(userId),
+        paymentType: payload.type,
+        purchaseType: payload.purchaseType,
+      },
+    })
+
+    if (!session.client_secret) {
+      throw new BadGatewayException(
+        'Failed to create checkout session: no client_secret returned',
+      )
+    }
+
+    return {
+      id: session.id,
+      clientSecret: session.client_secret,
+      amount:
+        session.amount_total != null
+          ? session.amount_total / 100
+          : payload.amount / 100,
+    }
   }
 
   async createPortalSession(customerId: string) {

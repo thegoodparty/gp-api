@@ -161,22 +161,15 @@ export class DomainsService
     return validatedResult.price! * 100
   }
 
+  /**
+   * Legacy post-purchase handler for PaymentIntent-based domain purchases.
+   * @deprecated Use handleDomainPostPurchase for Checkout Session flow instead.
+   *
+   * This method is registered with registerPostPurchaseHandler and receives
+   * a PaymentIntent ID directly. It's kept for backward compatibility with
+   * any existing PaymentIntent-based flows.
+   */
   async executePostPurchase(
-    paymentIntentId: string,
-    metadata: DomainPurchaseMetadata,
-  ): Promise<{
-    domain: Domain
-    registrationResult: {
-      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
-      projectResult: AddProjectDomainResponseBody | null
-      message: string
-    }
-    message: string
-  }> {
-    return this.handleDomainPostPurchase(paymentIntentId, metadata)
-  }
-
-  async handleDomainPostPurchase(
     paymentIntentId: string,
     metadata: DomainPurchaseMetadata,
   ): Promise<{
@@ -194,10 +187,117 @@ export class DomainsService
         'Website ID is required for domain registration',
       )
     }
+    if (!domainName) {
+      throw new BadRequestException(
+        'Domain name is required for domain registration',
+      )
+    }
 
+    // Get user from PaymentIntent metadata (legacy flow)
+    // getValidatedPaymentUser also validates the payment succeeded
     const { user } =
       await this.payments.getValidatedPaymentUser(paymentIntentId)
 
+    return this.processDomainRegistration({
+      user,
+      websiteId,
+      domainName,
+      paymentId: paymentIntentId,
+    })
+  }
+
+  /**
+   * Post-purchase handler for Checkout Session-based domain purchases.
+   * This is the preferred flow that supports promo codes.
+   */
+
+  async handleDomainPostPurchase(
+    sessionId: string,
+    metadata: DomainPurchaseMetadata & { userId?: string },
+  ): Promise<{
+    domain: Domain
+    registrationResult: {
+      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
+      projectResult: AddProjectDomainResponseBody | null
+      message: string
+    }
+    message: string
+  }> {
+    const { domainName, websiteId, userId } = metadata
+    if (!websiteId) {
+      throw new BadRequestException(
+        'Website ID is required for domain registration',
+      )
+    }
+
+    if (!domainName) {
+      throw new BadRequestException(
+        'Domain name is required for domain registration',
+      )
+    }
+
+    if (!userId) {
+      throw new BadRequestException(
+        'User ID is required for domain registration',
+      )
+    }
+
+    // Retrieve the checkout session to get the PaymentIntent ID.
+    // Domain purchases always have a non-zero amount (price comes from Vercel/Route53),
+    // so they always go through Stripe — the zero-amount path in PurchaseService
+    // (which generates synthetic free_ IDs) is only reachable for TEXT purchases
+    // with a free texts offer.
+    //
+    // Even when a Stripe promo code reduces the total to $0, Stripe still creates
+    // a real PaymentIntent in `payment` mode (payment_method_collection defaults
+    // to `always` and `if_required` is subscription-only). The null check below
+    // is a defensive guard for any unexpected Stripe behavior.
+    const session = await this.stripe.retrieveCheckoutSession(sessionId)
+    const paymentIntentId = session.payment_intent as string
+    if (!paymentIntentId) {
+      throw new BadRequestException(
+        'No payment intent found for checkout session',
+      )
+    }
+
+    // Get user from metadata (validation already done in completeCheckoutSession)
+    const { user } = await this.payments.getValidatedSessionUser(
+      sessionId,
+      metadata as unknown as Record<string, string>,
+    )
+
+    return this.processDomainRegistration({
+      user,
+      websiteId,
+      domainName,
+      paymentId: paymentIntentId,
+    })
+  }
+
+  /**
+   * Shared domain registration logic used by both the legacy PaymentIntent flow
+   * and the Checkout Session flow. Handles domain record creation/update,
+   * contact info resolution, and Vercel registration.
+   */
+  private async processDomainRegistration({
+    user,
+    websiteId,
+    domainName,
+    paymentId,
+  }: {
+    user: User
+    websiteId: string | number
+    domainName: string
+    paymentId: string
+  }): Promise<{
+    domain: Domain
+    registrationResult: {
+      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
+      projectResult: AddProjectDomainResponseBody | null
+      message: string
+    }
+    message: string
+  }> {
     const validWebsiteId = this.convertWebsiteIdToNumber(websiteId)
 
     const website = await this.client.website.findUniqueOrThrow({
@@ -211,18 +311,32 @@ export class DomainsService
     let domain: Domain | null = website.domain || null
 
     if (!domain) {
-      const searchResult = await this.searchForDomain(domainName!)
+      const searchResult = await this.searchForDomain(domainName)
       const domainParams = {
         websiteId: validWebsiteId,
-        name: domainName as string,
+        name: domainName,
         price: this.validateDomainSearchResult(searchResult).price as number,
-        paymentId: paymentIntentId,
+        paymentId,
         status: DomainStatus.pending,
       }
       this.logger.debug(
         `Creating new domain record for website id ${validWebsiteId}: ${JSON.stringify(domainParams)}`,
       )
       domain = await this.model.create({ data: domainParams })
+    } else if (domain.paymentId !== paymentId) {
+      // Update the existing domain with the new payment ID
+      // This handles cases where a previous payment failed or the domain
+      // was created without a paymentId
+      this.logger.debug(
+        `Updating domain ${domain.id} paymentId from ${domain.paymentId} to ${paymentId}`,
+      )
+      domain = await this.model.update({
+        where: { id: domain.id },
+        data: {
+          paymentId,
+          status: DomainStatus.pending,
+        },
+      })
     }
 
     const contactInfo = this.buildContactInfo(user, website.content)

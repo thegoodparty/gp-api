@@ -12,7 +12,12 @@ import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UsersService } from '../users/services/users.service'
 import { StripeService } from '../vendors/stripe/services/stripe.service'
-import { CompletePurchaseDto, CreatePurchaseIntentDto } from './purchase.types'
+import {
+  CompleteCheckoutSessionDto,
+  CompletePurchaseDto,
+  CreateCheckoutSessionDto,
+  CreatePurchaseIntentDto,
+} from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
 
 @Controller('payments/purchase')
@@ -25,7 +30,7 @@ export class PurchaseController {
   ) {}
 
   @Post('checkout-session')
-  async createCheckoutSession(@ReqUser() user: User) {
+  async createProCheckoutSession(@ReqUser() user: User) {
     const { redirectUrl, checkoutSessionId } =
       await this.stripeService.createCheckoutSession(user.id)
 
@@ -77,8 +82,51 @@ export class PurchaseController {
     }
   }
 
+  /**
+   * Creates a Custom Checkout Session for one-time payments with promo code support.
+   * This is the new preferred method for purchases that should support promo codes.
+   *
+   * Migration reference: https://docs.stripe.com/payments/payment-element/migration-ewcs
+   */
+  @Post('create-checkout-session')
+  @UseCampaign()
+  async createCheckoutSession(
+    @ReqUser() user: User,
+    @Body() dto: CreateCheckoutSessionDto<unknown>,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    try {
+      const result = await this.purchaseService.createCheckoutSession({
+        user,
+        dto,
+        campaign,
+      })
+      return result
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          err: serializeError(error),
+          user: user.id,
+          campaign,
+          dto,
+          msg: 'Error creating checkout session',
+        }),
+      )
+      throw error
+    }
+  }
+
   @Post('complete')
   async completePurchase(@Body() dto: CompletePurchaseDto) {
     return this.purchaseService.completePurchase(dto)
+  }
+
+  /**
+   * Completes a purchase made via Checkout Session.
+   * Called after the user completes payment and is redirected back.
+   */
+  @Post('complete-checkout-session')
+  async completeCheckoutSession(@Body() dto: CompleteCheckoutSessionDto) {
+    return this.purchaseService.completeCheckoutSession(dto)
   }
 }
