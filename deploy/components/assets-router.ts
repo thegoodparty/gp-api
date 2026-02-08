@@ -3,12 +3,14 @@ import * as aws from '@pulumi/aws'
 
 export interface AssetsRouterConfig {
   environment: 'dev' | 'qa' | 'prod'
+  bucket: aws.s3.BucketV2
   bucketRegionalDomainName: pulumi.Input<string>
   hostedZoneId: string
 }
 
 export function createAssetsRouter({
   environment,
+  bucket,
   bucketRegionalDomainName,
   hostedZoneId,
 }: AssetsRouterConfig) {
@@ -79,6 +81,33 @@ export function createAssetsRouter({
       },
     },
     waitForDeployment: true,
+  })
+
+  // Create bucket policy that only allows CloudFront OAC access
+  // This restricts direct S3 access - all requests must go through CloudFront
+  new aws.s3.BucketPolicy('assetsOacBucketPolicy', {
+    bucket: bucket.id,
+    policy: aws.iam.getPolicyDocumentOutput({
+      statements: [
+        {
+          principals: [
+            {
+              type: 'Service',
+              identifiers: ['cloudfront.amazonaws.com'],
+            },
+          ],
+          actions: ['s3:GetObject'],
+          resources: [pulumi.interpolate`${bucket.arn}/*`],
+          conditions: [
+            {
+              test: 'StringEquals',
+              variable: 'AWS:SourceArn',
+              values: [distribution.arn],
+            },
+          ],
+        },
+      ],
+    }).json,
   })
 
   new aws.route53.Record('assetsARecord', {
