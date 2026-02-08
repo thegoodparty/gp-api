@@ -4,12 +4,14 @@ enum PollIndividualMessageSender {
 }
 
 model PollIndividualMessage {
-  id       String                      @id
-  personId String                      @map("person_id")
-  sentAt   DateTime                    @map("sent_at")
-  isOptOut Boolean?                    @map("is_opt_out")
-  sender   PollIndividualMessageSender @default(ELECTED_OFFICIAL) @map("sender")
-  content  String?                     @map("content") // The message itself
+  id              String                      @id
+  personId        String                      @map("person_id")
+  // TODO: we'd need to backfill this value for existing messages
+  personCellPhone String                      @default("") @map("person_cell_phone")
+  sentAt          DateTime                    @map("sent_at")
+  isOptOut        Boolean?                    @map("is_opt_out")
+  sender          PollIndividualMessageSender @default(ELECTED_OFFICIAL) @map("sender")
+  content         String?                     @map("content") // The message itself
 
   // Relations
   electedOffice   ElectedOffice? @relation(fields: [electedOfficeId], references: [id], onDelete: Cascade)
@@ -19,5 +21,6 @@ model PollIndividualMessage {
   pollIssues      PollIssue[]
 
   @@index([electedOfficeId, personId, sentAt])
+  @@index([electedOfficeId, pollId, personCellPhone])
   @@map("poll_individual_message")
 }

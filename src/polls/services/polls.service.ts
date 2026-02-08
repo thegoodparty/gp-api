@@ -1,6 +1,10 @@
 import { addBusinessDays } from 'date-fns'
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { PollConfidence, Prisma } from '@prisma/client'
+import {
+  PollConfidence,
+  PollIndividualMessageSender,
+  Prisma,
+} from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
@@ -112,5 +116,50 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     )
 
     return result
+  }
+
+  // maybe we do individual lookups
+  async findPersonIdForCellPhone(params: {
+    electedOfficeId: string
+    pollId: string
+    personCellPhone: string
+  }) {
+    return this.client.pollIndividualMessage.findFirst({
+      where: {
+        electedOfficeId: params.electedOfficeId,
+        pollId: params.pollId,
+        personCellPhone: params.personCellPhone,
+        sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+      },
+    })
+  }
+
+  // or maybe we do batch lookups
+  async findPersonIdsForCellPhones(params: {
+    electedOfficeId: string
+    pollId: string
+    personCellPhones: string[]
+  }): Promise<string[]> {
+    const messages = await this.client.pollIndividualMessage.findMany({
+      where: {
+        electedOfficeId: params.electedOfficeId,
+        pollId: params.pollId,
+        sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+      },
+    })
+
+    return params.personCellPhones.map((cellPhone) => {
+      const matchingMessage = messages.find(
+        (message) => message.personCellPhone === cellPhone,
+      )
+
+      if (!matchingMessage) {
+        throw new Error(
+          `Person with cell phone ${cellPhone} not found in poll ${params.pollId}`,
+        )
+      }
+
+      return matchingMessage.personId
+    })
   }
 }
