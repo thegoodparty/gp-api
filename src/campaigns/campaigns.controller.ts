@@ -30,10 +30,7 @@ import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
-import {
-  UpdateRaceTargetDetailsBySlugQueryDTO,
-  UpdateRaceTargetDetailsDTO,
-} from './schemas/adminRaceTargetDetails.schema'
+import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
@@ -297,10 +294,7 @@ export class CampaignsController {
 
   @Put('mine/race-target-details')
   @UseCampaign()
-  async updateRaceTargetDetails(
-    @ReqCampaign() campaign: Campaign,
-    @Body() body: UpdateRaceTargetDetailsDTO,
-  ) {
+  async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
     if (!campaign?.details?.positionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
@@ -312,7 +306,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
-        officeName: body.officeName,
+        officeName: campaign.details.office,
       })
     if (!raceTargetDetails) {
       throw new NotFoundException(
@@ -361,7 +355,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
-        officeName: query.officeName,
+        officeName: campaign.details.office,
       })
     if (!raceTargetDetails) {
       throw new NotFoundException(
