@@ -94,7 +94,7 @@ export class VoterFileController {
     @ReqCampaign() campaign: Campaign,
     @Body() { outreachId, audienceRequest }: ScheduleOutreachCampaignSchema,
   ) {
-    const outreach = await this.outreachService.model.findUnique({
+    const outreach = await this.outreachService.model.findFirst({
       where: { id: outreachId, campaignId: campaign.id },
       include: { voterFileFilter: true },
     })

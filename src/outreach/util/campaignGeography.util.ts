@@ -65,10 +65,16 @@ export function parseDetailsGeography(
   return { state, zip }
 }
 
+/**
+ * Normalizes zip for lookups: trims and strips US ZIP+4 suffix (e.g. 12345-6789 → 12345)
+ * so zipcodes.lookup() and area-code services receive the 5-digit portion.
+ */
 function normalizeZip(z: string | undefined): string | undefined {
   if (z == null || z === '') return undefined
   const trimmed = String(z).trim()
-  return trimmed === '' ? undefined : trimmed
+  if (trimmed === '') return undefined
+  const fiveDigit = trimmed.replace(/-\d{4}$/, '')
+  return fiveDigit
 }
 
 async function getAreaCodesForZip(
@@ -102,7 +108,10 @@ export async function resolveJobGeographyFromAddress(
     zip,
     services.areaCodeFromZipService,
   )
-  const didState = stateCode ?? P2P_JOB_DEFAULTS.DID_STATE
+  // Derive state from ZIP when stateCode is missing to avoid defaulting to P2P_JOB_DEFAULTS.DID_STATE
+  const stateFromZip =
+    stateCode == null && zip ? zipcodes.lookup(zip)?.state : undefined
+  const didState = stateCode ?? stateFromZip ?? P2P_JOB_DEFAULTS.DID_STATE
   return { didState, didNpaSubset }
 }
 

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
-import { Campaign, OutreachStatus } from '@prisma/client'
+import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -113,7 +113,8 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
 
   /**
    * Single entry point for creating outreach (text or P2P).
-   * When p2pImage is provided, runs TCR + geography + Peerly job then persists; otherwise persists only.
+   * When outreachType is p2p, imageUrl and p2pImage are required and the TCR/geography/Peerly flow runs.
+   * Guard: never create a plain record for P2P — require p2pImage so TCR, geography, and Peerly job run.
    */
   async create(
     campaign: Campaign,
@@ -121,19 +122,28 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     imageUrl?: string,
     p2pImage?: P2pOutreachImageInput,
   ) {
-    if (p2pImage && !imageUrl) {
+    const isP2p = createOutreachDto.outreachType === OutreachType.p2p
+
+    if (isP2p && !p2pImage) {
       throw new BadRequestException(
-        'imageUrl is required when creating P2P outreach',
+        'P2P outreach requires an image with filename and MIME type; cannot create P2P outreach without Peerly job setup',
       )
     }
-    if (p2pImage && imageUrl) {
+
+    if (isP2p) {
+      if (!imageUrl) {
+        throw new BadRequestException(
+          'imageUrl is required for P2P outreach',
+        )
+      }
       return this.createP2pOutreach(
         campaign,
         createOutreachDto,
-        p2pImage,
+        p2pImage!, // defined: we threw above when isP2p && !p2pImage
         imageUrl,
       )
     }
+
     return this.createRecord(createOutreachDto, imageUrl)
   }
 

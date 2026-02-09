@@ -226,13 +226,31 @@ describe('OutreachService', () => {
       expect(mockOutreachCreate).not.toHaveBeenCalled()
     })
 
-    it('throws BadRequest when p2pImage is provided without imageUrl', async () => {
+    it('throws BadRequest when P2P is requested without imageUrl or p2pImage', async () => {
       await expect(
         service.create(mockCampaign, p2pCreateDto, undefined, p2pImage),
       ).rejects.toThrow(BadRequestException)
       await expect(
         service.create(mockCampaign, p2pCreateDto, undefined, p2pImage),
-      ).rejects.toThrow(/imageUrl is required when creating P2P outreach/)
+      ).rejects.toThrow(/required for P2P outreach/)
+
+      await expect(
+        service.create(
+          mockCampaign,
+          p2pCreateDto,
+          'https://cdn.example.com/p2p.png',
+          undefined,
+        ),
+      ).rejects.toThrow(BadRequestException)
+      await expect(
+        service.create(
+          mockCampaign,
+          p2pCreateDto,
+          'https://cdn.example.com/p2p.png',
+          undefined,
+        ),
+      ).rejects.toThrow(/filename and MIME type|Peerly job setup/)
+
       expect(mockTcrFindFirstOrThrow).not.toHaveBeenCalled()
       expect(mockOutreachCreate).not.toHaveBeenCalled()
     })

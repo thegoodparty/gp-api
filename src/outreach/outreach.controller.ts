@@ -61,16 +61,22 @@ export class OutreachController {
 
     const { outreachType, date } = createOutreachDto
 
-    if (outreachType === OutreachType.text && !image) {
-      throw new BadRequestException(
-        'image is required for text outreach campaigns',
-      )
-    }
-
-    if (outreachType === OutreachType.p2p && !image) {
-      throw new BadRequestException(
-        'image is required for P2P outreach campaigns',
-      )
+    const requiresImage =
+      outreachType === OutreachType.text || outreachType === OutreachType.p2p
+    if (requiresImage) {
+      if (!image) {
+        throw new BadRequestException(
+          `Image is required for ${outreachType} outreach campaigns`,
+        )
+      }
+      if (
+        outreachType === OutreachType.p2p &&
+        (!image.filename || !image.mimetype)
+      ) {
+        throw new BadRequestException(
+          'Image filename and MIME type are required for P2P outreach',
+        )
+      }
     }
 
     const imageUrl =

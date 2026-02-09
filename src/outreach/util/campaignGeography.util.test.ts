@@ -93,14 +93,29 @@ describe('campaignGeography.util', () => {
       )
     })
 
-    it('defaults didState to P2P_JOB_DEFAULTS.DID_STATE when stateCode missing', async () => {
+    it('defaults didState to P2P_JOB_DEFAULTS.DID_STATE when stateCode and zip lookup missing', async () => {
       vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([])
+      vi.mocked(zipcodes.lookup).mockReturnValue(undefined)
       const result = await resolveJobGeographyFromAddress(
         { stateCode: undefined, postalCodeValue: '92020' },
         { areaCodeFromZipService },
       )
       expect(result.didState).toBe(P2P_JOB_DEFAULTS.DID_STATE)
       expect(result.didNpaSubset).toEqual([])
+    })
+
+    it('derives didState from zip via zipcodes.lookup when stateCode missing', async () => {
+      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([
+        '619',
+      ])
+      vi.mocked(zipcodes.lookup).mockReturnValue({ state: 'CA' } as zipcodes.ZipCode)
+      const result = await resolveJobGeographyFromAddress(
+        { stateCode: undefined, postalCodeValue: '92020' },
+        { areaCodeFromZipService },
+      )
+      expect(zipcodes.lookup).toHaveBeenCalledWith('92020')
+      expect(result.didState).toBe('CA')
+      expect(result.didNpaSubset).toEqual(['619'])
     })
 
     it('uses stateCode as-is (callers may trim before calling)', async () => {
@@ -132,6 +147,20 @@ describe('campaignGeography.util', () => {
         { areaCodeFromZipService },
       )
       expect(result.didNpaSubset).toEqual([])
+    })
+
+    it('strips ZIP+4 suffix so area-code lookup receives 5-digit zip', async () => {
+      vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([
+        '518',
+      ])
+      const result = await resolveJobGeographyFromAddress(
+        { stateCode: 'NY', postalCodeValue: '12345-6789' },
+        { areaCodeFromZipService },
+      )
+      expect(areaCodeFromZipService.getAreaCodeFromZip).toHaveBeenCalledWith(
+        '12345',
+      )
+      expect(result).toEqual({ didState: 'NY', didNpaSubset: ['518'] })
     })
   })
 
