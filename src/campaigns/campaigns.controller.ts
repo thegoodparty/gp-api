@@ -291,14 +291,21 @@ export class CampaignsController {
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
         districtManuallySet: true,
+        // buildRaceTargetDetails returns p2vStatus: Complete and turnout fields
+        // (possibly 0). When there's no turnout, override with sentinel -1
+        // values to clear stale turnout from a previous district, and set
+        // status to DistrictMatched instead of Complete.
         ...(!hasTurnout
           ? {
-              projectedTurnout: undefined,
-              winNumber: undefined,
-              voterContactGoal: undefined,
+              projectedTurnout: -1,
+              winNumber: -1,
+              voterContactGoal: -1,
               p2vStatus: P2VStatus.districtMatched,
             }
           : {}),
+        // Reset stale silver state when district changes
+        p2vAttempts: 0,
+        officeContextFingerprint: null,
       },
     })
   }
