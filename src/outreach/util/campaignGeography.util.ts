@@ -8,7 +8,6 @@ import type { GooglePlacesApiResponse } from 'src/shared/types/GooglePlaces.type
 import { extractAddressComponents } from 'src/vendors/google/util/GooglePlaces.util'
 import zipcodes from 'zipcodes'
 
-
 interface DetailsGeographyRecord {
   state?: string
   zip?: string
@@ -157,8 +156,7 @@ export async function resolveP2pJobGeography(
   // 2) Fallback to campaign.details (and zip lookup for state)
   const zip = normalizeZip(details?.zip)
   const stateCode =
-    details?.state?.trim() ??
-    (zip ? zipcodes.lookup(zip)?.state : undefined)
+    details?.state?.trim() ?? (zip ? zipcodes.lookup(zip)?.state : undefined)
 
   return resolveJobGeographyFromAddress(
     { stateCode, postalCodeValue: zip },

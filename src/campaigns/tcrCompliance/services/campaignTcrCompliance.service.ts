@@ -38,8 +38,7 @@ const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
 const PEERLY_CV_BYPASS_PIN = process.env.PEERLY_CV_BYPASS_PIN
 
 /** Bypass is only allowed when PIN is set and we are not in production. */
-const CV_BYPASS_ALLOWED =
-  Boolean(PEERLY_CV_BYPASS_PIN) && !IS_PROD
+const CV_BYPASS_ALLOWED = Boolean(PEERLY_CV_BYPASS_PIN) && !IS_PROD
 
 const CV_BYPASS_TOKEN = 'LOCAL_CV_BYPASS'
 
@@ -379,10 +378,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     campaignVerifyToken: string,
   ) {
     // Only treat bypass token as special when the feature is enabled (defense-in-depth)
-    if (
-      campaignVerifyToken === CV_BYPASS_TOKEN &&
-      PEERLY_CV_BYPASS_PIN
-    ) {
+    if (campaignVerifyToken === CV_BYPASS_TOKEN && PEERLY_CV_BYPASS_PIN) {
       if (CV_BYPASS_ALLOWED) {
         return { status: 'approved', displayName: 'Local bypass' } as Awaited<
           ReturnType<PeerlyIdentityService['approve10DLCBrand']>

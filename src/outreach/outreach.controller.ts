@@ -36,7 +36,7 @@ export class OutreachController {
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
-  ) { }
+  ) {}
 
   @Post()
   @UseCampaign()
@@ -126,8 +126,8 @@ export class OutreachController {
         ...outreach,
         ...(p2pJob
           ? {
-            p2pJob,
-          }
+              p2pJob,
+            }
           : {}),
       }
     })

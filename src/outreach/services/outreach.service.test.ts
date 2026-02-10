@@ -13,10 +13,7 @@ import type {
   ResolveP2pJobGeographyServices,
 } from '../util/campaignGeography.util'
 import type { CreateOutreachSchema } from '../schemas/createOutreachSchema'
-import {
-  OutreachService,
-  type P2pOutreachImageInput,
-} from './outreach.service'
+import { OutreachService, type P2pOutreachImageInput } from './outreach.service'
 
 const mockOutreachCreate = vi.fn()
 const mockOutreachFindMany = vi.fn()
@@ -112,7 +109,12 @@ describe('OutreachService', () => {
   describe('create', () => {
     it('creates non-P2P outreach via createRecord when p2pImage is not provided', async () => {
       const imageUrl = 'https://cdn.example.com/image.png'
-      const created = { id: 1, ...baseCreateDto, imageUrl, voterFileFilter: null }
+      const created = {
+        id: 1,
+        ...baseCreateDto,
+        imageUrl,
+        voterFileFilter: null,
+      }
       mockOutreachCreate.mockResolvedValue(created)
 
       const result = await service.create(

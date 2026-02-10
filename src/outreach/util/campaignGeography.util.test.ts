@@ -108,7 +108,9 @@ describe('campaignGeography.util', () => {
       vi.mocked(areaCodeFromZipService.getAreaCodeFromZip).mockResolvedValue([
         '619',
       ])
-      vi.mocked(zipcodes.lookup).mockReturnValue({ state: 'CA' } as zipcodes.ZipCode)
+      vi.mocked(zipcodes.lookup).mockReturnValue({
+        state: 'CA',
+      } as zipcodes.ZipCode)
       const result = await resolveJobGeographyFromAddress(
         { stateCode: undefined, postalCodeValue: '92020' },
         { areaCodeFromZipService },

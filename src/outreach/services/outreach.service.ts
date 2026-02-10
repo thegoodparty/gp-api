@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { CampaignTcrComplianceService } from 'src/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
@@ -54,10 +58,11 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
         )
       }
 
-      const name = `${campaign.slug}${createOutreachDto.date
-        ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
-        : ''
-        }`
+      const name = `${campaign.slug}${
+        createOutreachDto.date
+          ? ` - ${formatDate(createOutreachDto.date, DateFormats.usIsoSlashes)}`
+          : ''
+      }`
 
       const { aiContent = {} } = campaign
       const resolvedScriptText = resolveScriptContent(
@@ -65,8 +70,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
         aiContent,
       )
 
-      const resolvedGeography =
-        await this.resolveP2pJobGeography(campaign)
+      const resolvedGeography = await this.resolveP2pJobGeography(campaign)
       const didState = createOutreachDto.didState ?? resolvedGeography.didState
       const didNpaSubset =
         createOutreachDto.didNpaSubset ?? resolvedGeography.didNpaSubset
@@ -102,8 +106,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
       )
     } catch (error) {
       this.logger.error('Failed to create P2P outreach', error)
-      const message =
-        error instanceof Error ? error.message : 'Unknown error'
+      const message = error instanceof Error ? error.message : 'Unknown error'
       throw new BadRequestException(
         `Failed to create P2P outreach: ${message}. Please check your parameters and try again.`,
         { cause: error },
@@ -132,9 +135,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
 
     if (isP2p) {
       if (!imageUrl) {
-        throw new BadRequestException(
-          'imageUrl is required for P2P outreach',
-        )
+        throw new BadRequestException('imageUrl is required for P2P outreach')
       }
       return this.createP2pOutreach(
         campaign,

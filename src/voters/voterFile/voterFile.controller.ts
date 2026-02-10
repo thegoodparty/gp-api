@@ -52,7 +52,7 @@ export class VoterFileController {
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
     private readonly electedOfficeService: ElectedOfficeService,
-  ) { }
+  ) {}
 
   @Get()
   @UseCampaign({
