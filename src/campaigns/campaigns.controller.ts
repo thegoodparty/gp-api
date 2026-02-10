@@ -277,17 +277,28 @@ export class CampaignsController {
       state: campaign.details?.state || '',
     })
 
-    if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
+    if (!raceTargetDetails) {
       throw new InternalServerErrorException(
-        'Error: An invalid L2District was likely passed to the user and selected by the user',
+        'Error: Failed to look up the provided L2District',
       )
     }
+    const hasTurnout =
+      !!raceTargetDetails.projectedTurnout &&
+      raceTargetDetails.projectedTurnout > 0
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         ...raceTargetDetails,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
         districtManuallySet: true,
+        ...(!hasTurnout
+          ? {
+              projectedTurnout: undefined,
+              winNumber: undefined,
+              voterContactGoal: undefined,
+              p2vStatus: P2VStatus.districtMatched,
+            }
+          : {}),
       },
     })
   }
@@ -315,16 +326,17 @@ export class CampaignsController {
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
+    const hasTurnout = projectedTurnout > 0
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
-        winNumber,
-        voterContactGoal,
-        projectedTurnout,
+        ...(hasTurnout
+          ? { winNumber, voterContactGoal, projectedTurnout }
+          : {}),
         source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
+        p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
       },
@@ -363,16 +375,17 @@ export class CampaignsController {
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
+    const hasTurnout = projectedTurnout > 0
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
-        winNumber,
-        voterContactGoal,
-        projectedTurnout,
+        ...(hasTurnout
+          ? { winNumber, voterContactGoal, projectedTurnout }
+          : {}),
         source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
+        p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
       },

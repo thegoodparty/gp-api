@@ -1,5 +1,6 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
+import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignCreatedBy, ElectionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -21,7 +22,6 @@ import {
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
-import { serializeError } from 'serialize-error'
 
 enum SpecialOfficePhrase {
   AtLarge = 'At Large',
@@ -229,18 +229,31 @@ export class PathToVictoryService extends createPrismaBase(
         if (++attempts > 10) break
       }
 
-      const isSuccess = pathToVictoryResponse.counts.projectedTurnout > 0
-      const reason = isSuccess
+      const hasTurnout = pathToVictoryResponse.counts.projectedTurnout > 0
+      // If no turnout was found but a district was matched, preserve the district info
+      if (!hasTurnout && lastMatchedDistrictType && lastMatchedDistrictName) {
+        pathToVictoryResponse.electionType = lastMatchedDistrictType
+        pathToVictoryResponse.electionLocation = lastMatchedDistrictName
+      }
+      const hasDistrict =
+        !!pathToVictoryResponse.electionType &&
+        !!pathToVictoryResponse.electionLocation
+      const reason = hasTurnout
         ? undefined
-        : lastMatchedDistrictType
+        : hasDistrict
           ? 'no_projected_turnout'
           : 'no_district_match'
+      const result = hasTurnout
+        ? 'success'
+        : hasDistrict
+          ? 'partial'
+          : 'failure'
 
       this.logger.log(
         JSON.stringify({
           event: 'DistrictMatch',
           matchType: 'silver',
-          result: isSuccess ? 'success' : 'failure',
+          result,
           reason,
           slug: input.slug,
           campaignId: input.campaignId,
@@ -401,34 +414,56 @@ export class PathToVictoryService extends createPrismaBase(
       sendEmailFlag =
         campaign.pathToVictory?.data?.p2vStatus !== P2VStatus.complete
     } else {
-      let debugMessage = 'No Path To Victory Found with projected turnout.\n'
-      if (pathToVictoryResponse) {
-        debugMessage +=
-          'pathToVictoryResponse: ' + JSON.stringify(pathToVictoryResponse)
+      const hasDistrict =
+        !!pathToVictoryResponse.electionType &&
+        !!pathToVictoryResponse.electionLocation
+
+      if (hasDistrict) {
+        // District matched but no projected turnout available
+        await this.slackService.formattedMessage({
+          message:
+            candidateSlackMessage +
+            pathToVictorySlackMessage +
+            '\nDistrict matched but no projected turnout available.',
+          channel: SlackChannel.botPathToVictoryIssues,
+        })
+        statusOverride = P2VStatus.districtMatched
+
+        await this.crmService.handleUpdateCampaign(
+          campaign,
+          'path_to_victory_status',
+          P2VStatus.districtMatched,
+        )
+      } else {
+        let debugMessage = 'No Path To Victory Found with projected turnout.\n'
+        if (pathToVictoryResponse) {
+          debugMessage +=
+            'pathToVictoryResponse: ' + JSON.stringify(pathToVictoryResponse)
+        }
+        await this.slackService.formattedMessage({
+          message: candidateSlackMessage + debugMessage,
+          channel: SlackChannel.botPathToVictoryIssues,
+        })
+        statusOverride = P2VStatus.failed
+
+        recordCustomEvent(CustomEventType.BlockedState, {
+          service: 'gp-api',
+          environment: process.env.NODE_ENV,
+          userId: campaign.userId,
+          campaignId: campaign.id,
+          slug: campaign.slug,
+          feature: 'path_to_victory',
+          rootCause: 'p2v_failed',
+          isBackground: true,
+          reason: 'no_district_match',
+        })
+
+        await this.crmService.handleUpdateCampaign(
+          campaign,
+          'path_to_victory_status',
+          P2VStatus.failed,
+        )
       }
-      await this.slackService.formattedMessage({
-        message: candidateSlackMessage + debugMessage,
-        channel: SlackChannel.botPathToVictoryIssues,
-      })
-      statusOverride = P2VStatus.failed
-
-      recordCustomEvent(CustomEventType.BlockedState, {
-        service: 'gp-api',
-        environment: process.env.NODE_ENV,
-        userId: campaign.userId,
-        campaignId: campaign.id,
-        slug: campaign.slug,
-        feature: 'path_to_victory',
-        rootCause: 'p2v_failed',
-        isBackground: true,
-        reason: 'no_projected_turnout',
-      })
-
-      await this.crmService.handleUpdateCampaign(
-        campaign,
-        'path_to_victory_status',
-        P2VStatus.failed,
-      )
     }
 
     await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
@@ -436,7 +471,12 @@ export class PathToVictoryService extends createPrismaBase(
       p2vStatusOverride: statusOverride,
       officeFingerprint,
     })
-    return hasTurnout
+    // Treat both full success and district-only match as success
+    // to prevent retry/failure logic in the queue consumer
+    const hasDistrict =
+      !!pathToVictoryResponse.electionType &&
+      !!pathToVictoryResponse.electionLocation
+    return hasTurnout || hasDistrict
   }
 
   async completePathToVictory(
@@ -484,14 +524,44 @@ export class PathToVictoryService extends createPrismaBase(
         })
       }
 
-      const p2vStatus: P2VStatus =
+      const p2vData = (p2v.data || {}) as PrismaJson.PathToVictoryData
+      const existingStatus = p2vData.p2vStatus as P2VStatus | undefined
+
+      let p2vStatus: P2VStatus =
         options?.p2vStatusOverride ??
         (pathToVictoryResponse?.counts?.projectedTurnout &&
         pathToVictoryResponse.counts.projectedTurnout > 0
           ? P2VStatus.complete
           : P2VStatus.waiting)
 
-      const p2vData = (p2v.data || {}) as PrismaJson.PathToVictoryData
+      // Don't downgrade status: if gold flow already set a better status,
+      // don't let a failing silver flow overwrite it
+      const STATUS_RANK: Record<string, number> = {
+        [P2VStatus.failed]: 0,
+        [P2VStatus.waiting]: 1,
+        [P2VStatus.districtMatched]: 2,
+        [P2VStatus.complete]: 3,
+      }
+
+      if (
+        existingStatus &&
+        (STATUS_RANK[existingStatus] ?? 0) > (STATUS_RANK[p2vStatus] ?? 0)
+      ) {
+        p2vStatus = existingStatus
+      }
+
+      // If the existing record has district data (possibly from gold flow),
+      // ensure the status is at least DistrictMatched, even if createPathToVictory
+      // reset it to Waiting due to a race condition.
+      const existingHasDistrict =
+        !!p2vData.electionType && !!p2vData.electionLocation
+      if (
+        existingHasDistrict &&
+        (STATUS_RANK[p2vStatus] ?? 0) <
+          (STATUS_RANK[P2VStatus.districtMatched] ?? 0)
+      ) {
+        p2vStatus = P2VStatus.districtMatched
+      }
 
       // Detect office/district change using an office fingerprint stored on P2V.data
       const previousOfficeFingerprint: string | null =
@@ -506,7 +576,10 @@ export class PathToVictoryService extends createPrismaBase(
         )
       }
 
-      // Build a base data object, optionally clearing stale fields if office changed
+      // Build a base data object, optionally clearing stale fields if office changed.
+      // When office changed, strip turnout/viability/attempts/status but KEEP
+      // district data (electionType, electionLocation) it may have been set by
+      // the gold flow and we should only overwrite it if we have better data.
       let baseData: Partial<PrismaJson.PathToVictoryData>
       if (hasOfficeChanged) {
         const {
@@ -517,29 +590,51 @@ export class PathToVictoryService extends createPrismaBase(
           p2vAttempts: _attempts,
           p2vCompleteDate: _p2vCompleteDate,
           p2vStatus: _p2vStatus,
-          // electionType and electionLocation will be overwritten below
-          electionType: _oldElectionType,
-          electionLocation: _oldElectionLocation,
           ...rest
         } = p2vData
         baseData = rest as Partial<PrismaJson.PathToVictoryData>
       } else {
         baseData = { ...p2vData }
       }
+      // Only overwrite district/turnout fields if the new response has meaningful data.
+      // This prevents a failing silver flow from wiping out data set by a prior gold flow.
+      const incomingTurnout = Number(
+        pathToVictoryResponse.counts?.projectedTurnout ?? 0,
+      )
+      const incomingHasDistrict =
+        !!pathToVictoryResponse.electionType &&
+        !!pathToVictoryResponse.electionLocation
+      const incomingHasTurnout = incomingTurnout > 0
+
+      // Only overwrite when we have actual data to write.
+      // Do NOT use hasOfficeChanged here. The gold flow may have already written
+      // correct district data for the new office, and wiping it with empty strings
+      // would lose that data.
+      const shouldOverwriteDistrict = incomingHasDistrict
+      const shouldOverwriteTurnout = incomingHasTurnout
+
       await this.prisma.pathToVictory.update({
         where: { id: p2v.id },
         data: {
           data: {
             ...baseData,
-            projectedTurnout: Number(
-              pathToVictoryResponse.counts?.projectedTurnout ?? 0,
-            ),
-            winNumber: Number(pathToVictoryResponse.counts?.winNumber ?? 0),
-            voterContactGoal: Number(
-              pathToVictoryResponse.counts?.voterContactGoal ?? 0,
-            ),
-            electionType: pathToVictoryResponse.electionType,
-            electionLocation: pathToVictoryResponse.electionLocation,
+            ...(shouldOverwriteTurnout
+              ? {
+                  projectedTurnout: incomingTurnout,
+                  winNumber: Number(
+                    pathToVictoryResponse.counts?.winNumber ?? 0,
+                  ),
+                  voterContactGoal: Number(
+                    pathToVictoryResponse.counts?.voterContactGoal ?? 0,
+                  ),
+                }
+              : {}),
+            ...(shouldOverwriteDistrict
+              ? {
+                  electionType: pathToVictoryResponse.electionType,
+                  electionLocation: pathToVictoryResponse.electionLocation,
+                }
+              : {}),
             ...(hasOfficeChanged ? { p2vAttempts: 0 } : {}),
             p2vCompleteDate: formatDate(new Date(), DateFormats.isoDate),
             p2vStatus,

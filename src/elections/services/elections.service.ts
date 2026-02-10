@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
+import { serializeError } from 'serialize-error'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -21,7 +22,6 @@ import {
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
-import { serializeError } from 'serialize-error'
 
 // TODO: Revisit this file after the stakeholders decide on the direction we're going...
 // ...for the win number / p2v solution. Remove any unneeded code at that time.
@@ -40,7 +40,7 @@ export class ElectionsService {
     private readonly slack: SlackService,
   ) {
     if (!ElectionsService.BASE_URL) {
-      throw new Error(`Please set ELECTION_API_URL in your .env. 
+      throw new Error(`Please set ELECTION_API_URL in your .env.
         Recommendation is to point it at dev if you are developing`)
     }
   }
@@ -138,6 +138,9 @@ export class ElectionsService {
     }
   }
 
+  // Gold flow: match a district via BallotReady position ID.
+  // Returns district data even when projected turnout is unavailable,
+  // using sentinel values (-1) so callers can distinguish partial matches.
   async getBallotReadyMatchedRaceTargetDetails(params: {
     ballotreadyPositionId: string
     electionDate?: string
@@ -168,38 +171,29 @@ export class ElectionsService {
         throw new NotFoundException('No positionWithDistrict found')
       }
 
-      if (
-        includeTurnout &&
-        !positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
-      ) {
-        throw new NotFoundException(
-          'Failed to fetch a district with a projected turnout.',
-        )
-      }
+      const turnoutValue =
+        positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
+      const hasTurnout = includeTurnout && !!turnoutValue
 
       this.logger.log(
         JSON.stringify({
           event: 'DistrictMatch',
           matchType: 'gold',
-          result: 'success',
+          result: hasTurnout ? 'success' : 'partial',
           electionDate,
           campaignId,
           ballotreadyPositionId,
           districtType: positionWithDistrict?.district?.L2DistrictType,
           districtName: positionWithDistrict?.district?.L2DistrictName,
-          projectedTurnout:
-            positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
+          projectedTurnout: turnoutValue,
         }),
       )
       return {
         district: positionWithDistrict?.district,
-        ...(includeTurnout
-          ? this.calculateRaceTargetMetrics(
-              positionWithDistrict?.district?.projectedTurnout
-                ?.projectedTurnout,
-            )
+        ...(hasTurnout
+          ? this.calculateRaceTargetMetrics(turnoutValue)
           : {
-              // Sentinel values to overwrite previously assigned, no longer correct ones
+              // Sentinel values: turnout unavailable or not requested
               winNumber: -1,
               voterContactGoal: -1,
               projectedTurnout: -1,
