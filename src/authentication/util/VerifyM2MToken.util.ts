@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common'
 import { ClerkClient } from '@clerk/backend'
 
-export const { GP_WEBAPP_MACHINE_SECRET } = process.env
+const { GP_WEBAPP_MACHINE_SECRET } = process.env
 
 if (!GP_WEBAPP_MACHINE_SECRET)
   throw new Error(
