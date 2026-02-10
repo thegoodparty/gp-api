@@ -237,7 +237,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       name,
       templates,
       did_state: didState,
-      did_npa_subset: didNpaSubset,
+      ...(didNpaSubset.length > 0 && { did_npa_subset: didNpaSubset }),
       can_use_mms: hasMms,
       ...(agentIds.length > 0 && { agent_ids: agentIds }),
       schedule_id: this.scheduleId,
