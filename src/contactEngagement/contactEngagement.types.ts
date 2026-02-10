@@ -1,11 +1,11 @@
 export enum ConstituentActivityType {
-  POLL_INTERACTIONS,
+  POLL_INTERACTIONS = 'POLL_INTERACTIONS',
 }
 
 export enum ConstituentActivityEventType {
-  SENT,
-  RESPONDED,
-  OPTED_OUT,
+  SENT = 'SENT',
+  RESPONDED = 'RESPONDED',
+  OPTED_OUT = 'OPTED_OUT',
 }
 
 export type ConstituentActivityEvent = {
