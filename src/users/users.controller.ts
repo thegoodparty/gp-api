@@ -51,7 +51,11 @@ export class UsersController {
   @UseGuards(M2MOnly)
   @Get()
   async list(@Query() query: ListUsersPaginationSchema) {
-    return this.usersService.listUsers(query)
+    const { data, meta } = await this.usersService.listUsers(query)
+    return {
+      data: data.map((user) => ReadUserOutputSchema.parse(user)),
+      meta,
+    }
   }
 
   @UseGuards(UserOwnerOrAdminGuard)
