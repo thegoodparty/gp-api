@@ -101,7 +101,7 @@ export class WebsitesController {
       sortBy,
       sortOrder = 'desc',
       limit = 25,
-      page = 1,
+      offset = 0,
     }: GetWebsiteContactsSchema,
   ) {
     const website = await this.websites.findUniqueOrThrow({
@@ -111,9 +111,9 @@ export class WebsitesController {
     const [contacts, total] = await Promise.all([
       this.contacts.findMany({
         where: { websiteId: website.id },
-        orderBy: sortBy ? { [sortBy]: sortOrder } : undefined,
         take: limit,
-        skip: (page - 1) * limit,
+        skip: offset,
+        ...(sortBy ? { orderBy: { [sortBy]: sortOrder } } : {}),
       }),
       this.contacts.count({
         where: { websiteId: website.id },
@@ -123,7 +123,7 @@ export class WebsitesController {
     return {
       contacts,
       total,
-      page,
+      offset,
       limit,
       totalPages: Math.ceil(total / limit),
     }

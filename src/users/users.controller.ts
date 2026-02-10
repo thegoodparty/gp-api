@@ -11,6 +11,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UnauthorizedException,
   UseGuards,
   UseInterceptors,
@@ -33,6 +34,8 @@ import { MimeTypes } from 'http-constants-ts'
 import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
 import { AuthenticationService } from '../authentication/authentication.service'
 import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
@@ -44,6 +47,12 @@ export class UsersController {
     private readonly filesService: FilesService,
     private readonly authenticationService: AuthenticationService,
   ) {}
+
+  @UseGuards(M2MOnly)
+  @Get()
+  async list(@Query() query: ListUsersPaginationSchema) {
+    return this.usersService.listUsers(query)
+  }
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Get(':id')
