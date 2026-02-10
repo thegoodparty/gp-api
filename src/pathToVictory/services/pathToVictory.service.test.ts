@@ -309,7 +309,19 @@ describe('PathToVictoryService', () => {
       )
     })
 
-    it('keeps electionType/electionLocation when office changed but strips turnout fields', async () => {
+    it('keeps electionType/electionLocation when office changed and writes sentinel turnout values', async () => {
+      // Scenario: candidate had complete P2V, switches office, gold flow
+      // matches a district but finds no turnout (sentinel -1 values)
+      const sentinelResponse = {
+        counts: {
+          projectedTurnout: -1,
+          winNumber: -1,
+          voterContactGoal: -1,
+        },
+        electionType: 'State_Senate',
+        electionLocation: 'STATE SENATE 010',
+      }
+
       mockPrisma.campaign.findUnique.mockResolvedValue(
         makeCampaign({
           p2vStatus: P2VStatus.complete,
@@ -324,18 +336,22 @@ describe('PathToVictoryService', () => {
       )
       mockPrisma.pathToVictory.update.mockResolvedValue({})
 
-      await service.completePathToVictory('test-slug', emptyResponse, {
+      await service.completePathToVictory('test-slug', sentinelResponse, {
         officeFingerprint: 'new-fingerprint',
-        p2vStatusOverride: P2VStatus.failed,
+        p2vStatusOverride: P2VStatus.districtMatched,
       })
 
       const updateCall = mockPrisma.pathToVictory.update.mock.calls[0][0]
       const writtenData = updateCall.data.data
 
-      // District data should be preserved (from baseData)
-      expect(writtenData.electionType).toBe('State_House')
-      expect(writtenData.electionLocation).toBe('STATE HOUSE 005')
-      // Turnout fields should be stripped (not in baseData, not in incoming)
+      // New district data should overwrite old
+      expect(writtenData.electionType).toBe('State_Senate')
+      expect(writtenData.electionLocation).toBe('STATE SENATE 010')
+      // Stale turnout should be replaced with sentinel -1 values,
+      // not left absent — so the record explicitly reflects "no turnout found"
+      expect(writtenData.projectedTurnout).toBe(-1)
+      expect(writtenData.winNumber).toBe(-1)
+      expect(writtenData.voterContactGoal).toBe(-1)
       // p2vAttempts should be reset to 0 because office changed
       expect(writtenData.p2vAttempts).toBe(0)
       // New fingerprint should be set

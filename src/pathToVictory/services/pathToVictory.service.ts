@@ -607,11 +607,15 @@ export class PathToVictoryService extends createPrismaBase(
       const incomingHasTurnout = incomingTurnout > 0
 
       // Only overwrite when we have actual data to write.
-      // Do NOT use hasOfficeChanged here. The gold flow may have already written
-      // correct district data for the new office, and wiping it with empty strings
-      // would lose that data.
+      // Do NOT use hasOfficeChanged for district — the gold flow may have already
+      // written correct district data for the new office, and wiping it with empty
+      // strings would lose that data.
+      // DO use hasOfficeChanged for turnout — when the office changed, stale turnout
+      // was already stripped from baseData, and we should write the incoming values
+      // (even -1 sentinels) so the record reflects "district matched, no turnout"
+      // rather than having ambiguous absent fields.
       const shouldOverwriteDistrict = incomingHasDistrict
-      const shouldOverwriteTurnout = incomingHasTurnout
+      const shouldOverwriteTurnout = incomingHasTurnout || hasOfficeChanged
 
       await this.prisma.pathToVictory.update({
         where: { id: p2v.id },
