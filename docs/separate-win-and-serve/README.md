@@ -68,188 +68,280 @@ Campaign is not just a data model — it is the **authorization and scoping mech
 
 Every protected endpoint effectively requires `User → Campaign → [resource]` as its access chain.
 
-### 2.3 Key Fields Currently on Campaign That Serve Both Products
+The Serve team has already built a parallel pattern:
+- **`@UseElectedOffice()` decorator + guard** — Used by polls and contact engagement controllers
+- **`@ReqElectedOffice()`** — Parameter decorator extracting elected office from request
 
-| Field / Concept | Win (Candidates) | Serve (Officials) | Notes |
-|---|---|---|---|
-| `isPro` | Subscription status | Used as access gate for voter file | Payment tied to campaign |
-| `details.positionId` | BallotReady position | Reused for official's position | Stored in campaign JSON |
-| `details.ballotLevel` | Election level | Office level | Same field |
-| `details.office` | Office running for | Office held | Same field, different semantics |
-| `details.electionDate` | Upcoming election | N/A for serving | Candidates-only |
-| `details.state/city/county` | Election geography | Serving geography | Often the same |
-| `pathToVictory` | Win number + turnout | Not applicable | Campaign-only concept |
-| `details.subscriptionId` | Stripe subscription | Could be separate | Currently campaign-scoped |
-| Voter File access | Pro-gated | ElectedOffice-gated | Already diverged (see voterFile.controller.ts:137) |
+### 2.3 What's Actually Shared Between Win and Serve Today
+
+The shared surface area between the two products is **small**. An audit of every file referencing ElectedOffice shows:
+
+**Truly shared (code explicitly branches on both):**
+
+| Feature | Where | Pattern |
+|---|---|---|
+| District/position data | Campaign.details JSON, PathToVictory.data JSON | Both products need office, BallotReady position, L2 district |
+| Voter file filter CRUD | `voterFile.controller.ts:137,172` | `isPro \|\| hasElectedOffice` access gate |
+| Contacts search | `contacts.service.ts:95-101` | `isPro \|\| hasElectedOffice` access gate |
+| Contacts download | `contacts.service.ts:230-234` | `isPro \|\| hasElectedOffice` access gate |
+| Contacts table (frontend) | `ContactsTableProvider.tsx:163` | `canUseProFeatures = isPro \|\| !!electedOffice` |
+
+**Already Serve-only (use `@UseElectedOffice()`, not `@UseCampaign()`):**
+- Polls — `polls.controller.ts`
+- Contact engagement — `contactEngagement.controller.ts`
+
+**Win-only (no ElectedOffice awareness at all):**
+- AI content, AI chat, website, outreach, ecanvasser, P2V, campaign tasks, TCR compliance, campaign positions/top issues, campaign plan versions
 
 ### 2.4 Frontend Architecture
 
-The frontend mirrors this coupling:
-
 - **`CampaignProvider` / `useCampaign()`** — Global React context providing the single campaign. Fetches from `GET /campaigns/mine`.
-- **`ElectedOfficeProvider` / `useElectedOffice()`** — Separate context, but fetches via `GET /elected-office/current` which still returns an office tied to a campaignId.
+- **`ElectedOfficeProvider` / `useElectedOffice()`** — Separate context, fetches via `GET /elected-office/current`.
 - **`DashboardMenu`** — Conditionally shows Serve features (Polls, Contacts) when `electedOffice` exists, but still operates within the campaign context.
 - **`serveAccess()`** — Server-side redirect guard: if no elected office, redirect to `/dashboard`.
 - **Feature flag `serve-access`** — Controls Serve feature visibility in the nav.
 - **`campaign.isPro`** — Referenced in 20+ frontend files for feature gating.
-- **API routes** — All campaign endpoints use `/campaigns/mine` (singular), assuming one campaign per user.
 
 ### 2.5 Integration Points Summary
 
-| System | Campaign References | Impact |
+| System | Campaign References | Impact of This Change |
 |---|---|---|
-| API Controllers | 16 controllers use `@UseCampaign()` | High — authorization boundary |
-| API Services | 80+ files import Campaign | High — business logic |
-| Database (FK) | 15+ tables have `campaignId` | High — schema migration |
-| Queue/Jobs | All async jobs routed by `campaignId` | Medium — message routing |
-| Payments (Stripe) | `campaignId` in checkout metadata | Medium — billing model |
-| CRM (HubSpot) | Campaign-centric contact sync | Medium — CRM schema |
-| Analytics | Campaign user identification | Low — tracking changes |
-| Frontend Contexts | `CampaignProvider`, `ElectedOfficeProvider` | High — state management |
-| Frontend Pages | 60+ files reference campaign | High — UI coupling |
+| API Controllers | 16 controllers use `@UseCampaign()` | Low — most stay as-is |
+| API Services | 80+ files import Campaign | Low — most stay as-is |
+| Database (FK) | 15+ tables have `campaignId` | Low — only VoterFileFilter moves to Seat |
+| Shared features (voter/contacts) | 4 files with `isPro \|\| hasElectedOffice` | Medium — these move to Seat-based access |
+| Queue/Jobs | All async jobs routed by `campaignId` | Low — unchanged |
+| Payments (Stripe) | `campaignId` in checkout metadata | Low — isPro stays on Campaign |
+| Frontend Contexts | `CampaignProvider`, `ElectedOfficeProvider` | Medium — add SeatProvider |
 
 ---
 
-## 3. Major Technical Subproblems
+## 3. Recommendation: Introduce "Seat" as Shared Position Context
 
-### Subproblem 1: Introduce a Shared Parent Entity (or Strategy)
+### 3.1 The Approach
 
-**The core question:** What replaces Campaign as the universal organizing concept?
+Introduce a **Seat** model that represents a user's relationship to a political position. Seat is **not** a universal parent entity that replaces Campaign — it is specifically the **shared position context** between Win and Serve.
 
-**Options to consider:**
+The key principle: **only shared features FK to Seat.** Product-specific features keep their existing FKs.
 
-**A) Introduce a "Seat" or "Position" abstraction** — A new model that represents "a user's relationship to a political position." Both Campaign and ElectedOffice become children of this entity. PathToVictory, district data, and BallotReady IDs attach to the Seat rather than the Campaign.
+- **Win-only features** → `campaignId` (P2V, website, AI content, ecanvasser, TCR, outreach, etc.)
+- **Serve-only features** → `electedOfficeId` (polls, contact engagement)
+- **Shared features** → `seatId` (voter file filters, contacts access)
+
+A Seat can have a Campaign, an ElectedOffice, or both (e.g., holding office while running for re-election). A User can have multiple Seats (e.g., serving on city council while running for state senate).
 
 ```
-User
-  └── Seat (new model)
-        ├── Campaign? (optional — Win product)
-        ├── ElectedOffice? (optional — Serve product)
-        ├── pathToVictory (moved from Campaign)
-        ├── districtData (currently in campaign.details JSON)
-        └── ballotReadyPositionId, office, level, geography
+User (1)
+  └── seats (1:many)
+        └── Seat
+              ├── position/geography/district data
+              ├── campaign? (optional 1:1) — Win product
+              ├── electedOffice? (optional 1:1) — Serve product
+              └── voterFileFilters (1:many) — shared feature
 ```
 
-**B) Let Campaign and ElectedOffice be fully independent peers** — Each has its own position/district data. Shared concepts (voter data, contacts, outreach) reference either a `campaignId` OR an `electedOfficeId`.
+### 3.2 Why Seat (and why not the alternatives)
 
-**C) Keep Campaign as-is but make ElectedOffice a first-class citizen** — Duplicate the necessary fields onto ElectedOffice and update all guards/services to accept either. This is the most incremental approach but risks permanent duplication.
+We considered three options:
 
-**Recommendation:** Option A gives the cleanest long-term architecture. Option C is the fastest path for incremental delivery. The choice depends on how many shared fields truly need to be shared vs. duplicated.
+**Option A: Seat as universal parent** — Every feature FKs to Seat, Campaign and ElectedOffice are just extensions. Cleanest architecture, but requires touching 80+ services and 16 controllers. Too costly and risky for a startup.
 
-### Subproblem 2: Redesign Authorization & Multi-Entity Scoping
+**Option B: Fully independent peers** — Campaign and ElectedOffice each have their own position/district data, no shared entity. Gets ElectedOffice unblocked fast, but shared features need polymorphic `campaignId | electedOfficeId` patterns that get messy. Multi-user RBAC would require two parallel membership systems. No natural entity for the product switcher.
 
-**The problem:** `@UseCampaign()` is the only authorization decorator, used by 16 controllers. We need to support:
-- Endpoints that require a Campaign specifically (e.g., AI campaign content)
-- Endpoints that require an ElectedOffice specifically (e.g., polls, community issues)
-- Endpoints that work with either (e.g., voter data, contacts, outreach)
-- Endpoints that need to know which "mode" the user is in
+**Option C: Incremental duplication** — Keep ElectedOffice coupled to Campaign, keep adding `|| hasElectedOffice` branches. Fastest but doesn't solve the core problem: ElectedOffice can't exist without a Campaign.
 
-**Changes needed:**
-- New guard/decorator pattern: `@UseContext()` that resolves to either Campaign or ElectedOffice (or Seat) based on a header, query param, or session state
-- Refactor `request.campaign` → `request.context` (or similar) across all controllers
-- Multi-entity support: user selects which campaign/office they're operating in via the top-level switcher
-- The "current" concept changes from "the one campaign" to "the selected campaign or office"
+**Our recommendation: Seat as minimal shared context.** This gets the key benefits of Option A (shared position data, clean FK for shared features, natural switcher entity, future RBAC anchor) without the migration cost (most FKs stay on Campaign/ElectedOffice). The blast radius is small because the shared surface area is small.
 
-**Key files:**
-- `src/campaigns/guards/UseCampaign.guard.ts`
-- `src/campaigns/decorators/UseCampaign.decorator.ts`
-- `src/campaigns/decorators/ReqCampaign.decorator.ts`
+### 3.3 Design Decisions Made
 
-### Subproblem 3: Data Migration — Extracting Shared Concerns from Campaign
+| Decision | Resolution | Rationale |
+|---|---|---|
+| Where does `isPro` live? | Stays on Campaign | Serve features are gated by ElectedOffice existence, not subscription. No Serve billing for now. |
+| Where does PathToVictory live? | Stays on Campaign | Win numbers are candidate-specific. Seat holds district data; P2V holds the historical calculation. |
+| Extract fields from campaign.details JSON? | No (beyond what Seat needs) | Don't increase migration scope. Campaign.details stays as-is. Seat gets its own position/district columns. |
+| Can a Seat have both Campaign and ElectedOffice? | Yes | Running for re-election while holding office. Product-specific features use their own FKs, so no ambiguity. |
+| Historical campaigns/offices? | New Seat per engagement | Today we mutate the single Campaign. Going forward, old Seats stay in DB. Active status derived from children. |
 
-**The problem:** Campaign's JSON fields (`details`, `data`) contain a mix of candidate-specific, office-specific, and shared data. The `isPro` subscription status lives on Campaign but gates features for both products.
+### 3.4 Proposed Schema
 
-**Key extractions needed:**
+```prisma
+model Seat {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-1. **Position/Geography data** — `details.positionId`, `details.ballotLevel`, `details.office`, `details.state`, `details.city`, `details.county`, `details.district` — These describe a political position and should live on the shared entity (Seat) or be duplicated to ElectedOffice.
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @map("user_id")
 
-2. **Subscription/Billing** — `isPro`, `details.subscriptionId`, `details.isProUpdatedAt` — Should this move to User level? Or should each Campaign/Office have its own subscription? The `voterFile.controller.ts` already checks `campaign.isPro || hasElectedOffice` (line 137), suggesting subscription could become user-level or per-entity.
+  // Position identity
+  positionId  String?                    @map("position_id")
+  raceId      String?                    @map("race_id")
+  office      String?
+  ballotLevel BallotReadyPositionLevel?  @map("ballot_level")
+  level       ElectionLevel?
+  state       String?
+  county      String?
+  city        String?
+  district    String?
+  zip         String?
 
-3. **PathToVictory** — Currently 1:1 with Campaign. Win numbers and voter contact goals are candidate-specific. For Serve, similar district/voter data might be needed but without the "win" framing. Consider whether P2V should attach to the shared entity or remain Campaign-only with a parallel "constituency profile" for ElectedOffice.
+  // L2 district match — drives voter file + contacts access
+  l2DistrictId        String?  @map("l2_district_id")
+  l2DistrictType      String?  @map("l2_district_type")
+  l2DistrictName      String?  @map("l2_district_name")
+  districtManuallySet Boolean  @default(false) @map("district_manually_set")
 
-4. **Campaign.details field refactoring** — This JSON blob has 40+ optional fields mixing concerns. Regardless of the Win/Serve split, extracting these into proper columns or related tables would reduce fragility. At minimum, position-related fields should be separated.
+  // Children
+  campaign      Campaign?
+  electedOffice ElectedOffice?
 
-**Migration approach:**
-- Schema migration that creates new tables/columns
-- Backfill script that copies data from `campaign.details` JSON into new locations
-- Dual-read period where code checks both old and new locations
-- Cleanup migration removing old fields
+  // Shared features
+  voterFileFilters VoterFileFilter[]
 
-### Subproblem 4: Frontend State Management & Product Switcher
+  @@index([userId])
+  @@map("seat")
+}
 
-**The problem:** The frontend has a single `CampaignProvider` context that assumes one campaign per user. Adding a product switcher requires:
+model Campaign {
+  // ... all existing fields unchanged ...
 
-1. **Multi-entity state** — Replace the single `useCampaign()` with something that can hold multiple campaigns and offices, with a "selected" entity.
+  // NEW: FK to Seat
+  seat   Seat @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  seatId Int  @unique @map("seat_id")
 
-2. **Product switcher UI** — Top-level control for switching between Win and Serve mode. This sets which entity's data is loaded and which nav items are shown.
+  // Kept for now: user FK (backward compat during migration)
+  user   User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int   @map("user_id")
 
-3. **Route structure** — Currently everything is under `/dashboard/*`. Consider:
-   - `/dashboard/win/*` and `/dashboard/serve/*` prefixes
-   - Or keep flat routes with mode state in context
-   - Route guards that redirect if wrong mode
+  // Win-only relations — all unchanged
+  pathToVictory         PathToVictory?
+  campaignUpdateHistory CampaignUpdateHistory[]
+  topIssues             TopIssue[]
+  campaignPositions     CampaignPosition[]
+  campaignPlanVersion   CampaignPlanVersion?
+  aiChats               AiChat[]
+  ecanvasser            Ecanvasser?
+  ScheduledMessage      ScheduledMessage[]
+  tcrCompliance         TcrCompliance?
+  website               Website?
+  outreach              Outreach[]
+  communityIssue        CommunityIssue[]
 
-4. **API integration** — Frontend currently calls `/campaigns/mine` (singular). With multiple campaigns, it needs to specify which one: `/campaigns/:id` or pass context via header.
+  // REMOVED: electedOffices relation (moved to Seat)
 
-**Key frontend files:**
-- `app/shared/hooks/CampaignProvider.tsx` — Needs multi-entity support
-- `app/shared/hooks/ElectedOfficeProvider.tsx` — May merge into unified context
-- `app/(candidate)/dashboard/shared/DashboardMenu.tsx` — Nav must be mode-aware
-- `app/(candidate)/dashboard/shared/serveAccess.ts` — Access guard pattern
-- `gpApi/routes.ts` — API route definitions need parameterization
-- `helpers/types.ts` — Campaign interface needs updating
+  @@index([slug])
+  @@index([seatId])
+  @@map("campaign")
+}
 
-### Subproblem 5: Incremental Migration Strategy
+model ElectedOffice {
+  // ... all existing fields unchanged ...
 
-**The problem:** This is a massive change touching 80+ services, 16 controllers, 15+ DB tables, and 60+ frontend files. It cannot be done in a single PR or sprint. We need a phased approach that:
+  // NEW: FK to Seat (replaces campaignId)
+  seat   Seat @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  seatId Int  @unique @map("seat_id")
 
-- Maintains backward compatibility at each phase
-- Allows Win and Serve teams to work independently
-- Doesn't require a "big bang" deployment
-- Minimizes risk to the production user base
+  // DEPRECATED: kept nullable during migration, remove later
+  campaignId Int? @map("campaign_id")
 
-**Proposed phases:**
+  // Serve-only relations — unchanged
+  polls                  Poll[]
+  pollIndividualMessages PollIndividualMessage[]
 
-**Phase 1: Foundation (No user-visible changes)**
-- Create the new shared entity (Seat) or expand ElectedOffice with its own position/district fields
-- Add new columns/tables alongside existing ones
-- Write backfill scripts
-- Add new guards/decorators that coexist with `@UseCampaign()`
+  @@index([userId])
+  @@index([seatId])
+  @@map("elected_office")
+}
 
-**Phase 2: API Dual-Path Support**
-- Update controllers to accept both campaign-scoped and office-scoped requests
-- Introduce context header/param for multi-entity selection
-- Frontend sends context identifier with requests
-- Both old and new code paths work simultaneously
+model VoterFileFilter {
+  // ... all existing filter columns unchanged ...
 
-**Phase 3: Frontend Product Switcher**
-- Introduce multi-entity state management
-- Build the product switcher UI
-- Update dashboard nav to be mode-aware
-- Roll out behind feature flag
+  // NEW: FK to Seat (replaces campaignId)
+  seat   Seat @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  seatId Int  @map("seat_id")
 
-**Phase 4: ElectedOffice Independence**
-- Remove `campaignId` FK from ElectedOffice
-- ElectedOffice gets its own position/district/subscription data
-- Serve features no longer require a Campaign to exist
+  // DEPRECATED: kept nullable during migration, remove later
+  campaignId Int? @map("campaign_id")
 
-**Phase 5: Cleanup**
+  @@index([seatId])
+  @@index([id, seatId])
+  @@map("voter_file_filter")
+}
+```
+
+**What's changing:**
+- **New model:** Seat — position/geography/district fields
+- **Campaign:** gains `seatId` FK, loses `electedOffices` relation
+- **ElectedOffice:** gains `seatId` FK, `campaignId` becomes nullable (deprecated)
+- **VoterFileFilter:** gains `seatId` FK, `campaignId` becomes nullable (deprecated)
+
+**What's NOT changing:**
+- `campaign.details` JSON — untouched
+- All Campaign-only relations (website, outreach, AI, P2V, etc.) — still FK to Campaign
+- All ElectedOffice-only relations (polls, poll messages) — still FK to ElectedOffice
+- PathToVictory — still FKs to Campaign
+- `isPro` — stays on Campaign
+- `@UseCampaign()` — stays for Win-only endpoints
+- `@UseElectedOffice()` — stays for Serve-only endpoints
+
+---
+
+## 4. Migration Plan
+
+### Phase 1: Schema + Data Foundation
+
+- Create Seat table with position/geography/district columns
+- Add `seatId` FK to Campaign, ElectedOffice, and VoterFileFilter (alongside existing FKs)
+- Backfill: create one Seat per existing Campaign, populate position/district data from `campaign.details` JSON and `pathToVictory.data` JSON
+- Backfill: point existing ElectedOffice records at the correct Seat
+- Backfill: point existing VoterFileFilter records at the correct Seat
+
+### Phase 2: Shared Features Move to Seat
+
+- Voter file filter CRUD uses `seatId` instead of `campaignId`
+- Contacts search/download access check uses Seat (replaces `isPro || hasElectedOffice` with Seat-based lookup)
+- Create `@UseSeat()` guard for shared feature endpoints
+- Frontend: add `SeatProvider` / `useSeat()` for shared context
+
+### Phase 3: ElectedOffice Independence
+
+- ElectedOffice creation no longer requires a Campaign — only a Seat
+- `campaignId` on ElectedOffice goes unused for new records
+- Serve endpoints fully decoupled from Campaign
+- Frontend: product switcher (select a Seat, then Win or Serve mode)
+
+### Phase 4: Cleanup
+
+- Remove nullable `campaignId` from ElectedOffice
+- Remove nullable `campaignId` from VoterFileFilter
+- Remove `electedOffices` relation from Campaign model
 - Remove dual-read code
-- Drop deprecated columns/fields
-- Remove old `@UseCampaign()` usage from Serve-only endpoints
-- Clean up campaign.details JSON
 
----
+### Future: Multi-User RBAC
 
-## 4. Key Design Decisions Needed
+When team member access is needed, Seat is the natural anchor:
 
-| Decision | Options | Who Decides |
-|---|---|---|
-| Shared parent entity vs. peer entities | Seat model (A) vs. Independent peers (B) vs. Incremental duplication (C) | Eng leads, both pods |
-| Where does subscription/billing live? | Per-Campaign, per-Office, or per-User | Product + Eng |
-| PathToVictory for Serve? | Reuse P2V, create "ConstituencyProfile", or skip | Serve pod |
-| Route structure for switcher | Prefixed routes vs. context state | Frontend leads |
-| Migration approach | Big migration vs. incremental dual-write | Eng leads |
-| Feature flag strategy | Per-phase flags vs. single "new-architecture" flag | Platform team |
+```prisma
+model SeatMember {
+  id     Int      @id @default(autoincrement())
+  seatId Int
+  seat   Seat     @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   SeatRole @default(member)
+
+  @@unique([seatId, userId])
+}
+
+enum SeatRole {
+  owner
+  admin
+  manager
+  member
+}
+```
+
+One membership record per user per Seat. A team member managing both the campaign and the elected office gets one record — access to both children comes through the Seat.
 
 ---
 
@@ -257,53 +349,47 @@ User
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Data loss during migration | Low | Critical | Dual-write period, thorough backfill testing |
-| Breaking existing Campaign flows | Medium | High | Feature flags, incremental rollout, e2e tests |
-| Scope creep — "while we're at it" | High | Medium | Strict phase boundaries, resist refactoring unrelated code |
-| Frontend/API version mismatch | Medium | Medium | API versioning or backward-compatible endpoints |
-| Performance regression (multi-entity queries) | Low | Medium | Index planning, query review |
-| Team coordination overhead | High | Medium | Clear ownership per phase, shared RFC review |
+| Data loss during Seat backfill | Low | Critical | Backfill script tested in staging; Seat data is copied, not moved |
+| Breaking voter file / contacts flows | Medium | High | Dual-FK period (both seatId and campaignId); feature flags |
+| Position data on Seat drifts from campaign.details | Medium | Low | Seat is source of truth going forward; campaign.details becomes read-only for position fields |
+| Scope creep — "while we're at it" refactoring | High | Medium | Strict rule: don't extract non-position fields from campaign.details JSON |
+| Team coordination overhead | Medium | Medium | Serve team drives migration; Win team reviews; clear phase boundaries |
 
 ---
 
 ## 6. Open Questions
 
-1. **Do elected officials need their own "subscription" tier?** Or does having an ElectedOffice record inherently grant Serve features? (Currently, `electedOffice` existence is used as an access gate alongside `isPro`.)
+1. **What happens to existing users with both a Campaign and ElectedOffice during migration?** Their ElectedOffice currently points to their Campaign. During backfill, both get pointed at the same Seat. This preserves the current behavior while enabling future independence.
 
-2. **Can a user run a campaign for a _different_ office than the one they currently hold?** e.g., a city council member running for state senate. This affects whether Campaign and ElectedOffice share position data or are fully independent.
+2. **How does the product switcher work with Seats?** User sees a list of their Seats. Each Seat shows its office name and which products are active (Campaign, ElectedOffice, or both). Selecting a Seat sets the context; within that context, the UI shows Win features, Serve features, or both.
 
-3. **What happens to existing users with both a Campaign and ElectedOffice during migration?** Their ElectedOffice currently points to their Campaign. Do we clone data or restructure the relationship?
+3. **Should district data updates write to Seat or PathToVictory?** Going forward, district matching (L2 district type/name/ID) writes to Seat. PathToVictory keeps its copy as part of the historical win-number calculation. Seat is the live source of truth for "what district is this."
 
-4. **How do CRM (HubSpot) contacts map to the new model?** Currently campaign-centric. Does each entity get its own CRM pipeline?
+4. **How do CRM (HubSpot) contacts map to the new model?** Currently campaign-centric. Short-term: unchanged. Long-term: may need a Seat-level CRM association.
 
-5. **Should the Ecanvasser/door knocking integration be shared or Campaign-only?** Elected officials may also do door-to-door constituent engagement.
+5. **Should Outreach move to Seat?** Currently Win-only. If elected officials need outreach, it could move to Seat. Not needed now — revisit when Serve outreach is prioritized.
 
 ---
 
-## Appendix A: Files With Highest Campaign Coupling
+## Appendix A: Files Requiring Changes
 
-These are the files that will require the most significant changes:
+**Phase 1-2 (direct changes needed):**
 
-**API (Backend):**
-- `src/campaigns/campaigns.controller.ts` — 15+ endpoints, main campaign CRUD
-- `src/campaigns/services/campaigns.service.ts` — 39 methods, core business logic
-- `src/campaigns/guards/UseCampaign.guard.ts` — Authorization boundary
-- `src/voters/voterFile/voterFile.controller.ts` — Already has dual pro/electedOffice checks
-- `src/pathToVictory/services/pathToVictory.service.ts` — Win number calculation
-- `src/payments/services/paymentEventsService.ts` — Stripe integration
-- `src/campaigns/services/crmCampaigns.service.ts` — HubSpot sync
-- `src/queue/consumer/queueConsumer.service.ts` — All async job routing
-- `src/contacts/contacts.service.ts` — Contact/voter data access
+| File | Change |
+|---|---|
+| `prisma/schema/` (new file) | Seat model definition |
+| `prisma/schema/campaign.prisma` | Add `seatId` FK, remove `electedOffices` relation |
+| `prisma/schema/electedOffice.prisma` | Add `seatId` FK, make `campaignId` nullable |
+| `prisma/schema/voterFileFilter.prisma` | Add `seatId` FK, make `campaignId` nullable |
+| `src/voters/voterFile/voterFile.controller.ts` | Voter file filter CRUD uses Seat |
+| `src/contacts/services/contacts.service.ts` | Contacts search/download uses Seat |
+| `src/electedOffice/services/electedOffice.service.ts` | Create ElectedOffice with Seat |
+| Frontend: `ContactsTableProvider.tsx` | `canUseProFeatures` check uses Seat |
 
-**Frontend:**
-- `app/shared/hooks/CampaignProvider.tsx` — Global campaign state
-- `app/shared/hooks/ElectedOfficeProvider.tsx` — Global office state
-- `app/(candidate)/dashboard/shared/DashboardMenu.tsx` — Navigation
-- `helpers/types.ts` — Campaign type definition (40+ fields)
-- `gpApi/routes.ts` — All API route definitions
-
-**Schema:**
-- `prisma/schema/campaign.prisma` — Campaign model
-- `prisma/schema/electedOffice.prisma` — ElectedOffice model
-- `prisma/schema/campaign.jsonTypes.d.ts` — Campaign JSON field types (40+ fields in details)
-- `prisma/schema/pathToVictory.prisma` — P2V model
+**Unchanged (vast majority of codebase):**
+- All 16 controllers using `@UseCampaign()` — unchanged
+- All Campaign-only services (AI, website, outreach, P2V, etc.) — unchanged
+- All ElectedOffice-only controllers (polls, contact engagement) — unchanged
+- `campaign.details` JSON — unchanged
+- Payment/Stripe integration — unchanged
+- Queue consumer — unchanged
