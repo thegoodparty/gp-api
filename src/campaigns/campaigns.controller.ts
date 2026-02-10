@@ -251,7 +251,8 @@ export class CampaignsController {
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
-    @Body() { slug, L2DistrictType, L2DistrictName }: SetDistrictDTO,
+    @Body()
+    { slug, L2DistrictType, L2DistrictName, allowMissingTurnout }: SetDistrictDTO,
   ) {
     if (
       slug &&
@@ -268,6 +269,7 @@ export class CampaignsController {
       slug,
       L2DistrictType,
       L2DistrictName,
+      allowMissingTurnout,
     })
 
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
@@ -277,18 +279,37 @@ export class CampaignsController {
       state: campaign.details?.state || '',
     })
 
-    if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
+    // When allowMissingTurnout is true (admin override), allow saving districts without projected turnout
+    const hasMissingTurnout =
+      !raceTargetDetails || raceTargetDetails?.projectedTurnout === 0
+    if (hasMissingTurnout && !allowMissingTurnout) {
       throw new InternalServerErrorException(
         'Error: An invalid L2District was likely passed to the user and selected by the user',
       )
     }
+
+    // If we have valid race target details, use them; otherwise save with sentinel values
+    const pathToVictoryData: PrismaJson.PathToVictoryData = hasMissingTurnout
+      ? {
+          electionType: L2DistrictType,
+          electionLocation: L2DistrictName,
+          districtManuallySet: true,
+          // Use sentinel values to indicate turnout data is missing
+          projectedTurnout: -1,
+          winNumber: -1,
+          voterContactGoal: -1,
+          source: P2VSource.ElectionApi,
+          p2vStatus: P2VStatus.waiting,
+        }
+      : {
+          ...raceTargetDetails,
+          electionType: L2DistrictType,
+          electionLocation: L2DistrictName,
+          districtManuallySet: true,
+        }
+
     return this.campaigns.updateJsonFields(campaign.id, {
-      pathToVictory: {
-        ...raceTargetDetails,
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
-        districtManuallySet: true,
-      },
+      pathToVictory: pathToVictoryData,
     })
   }
 

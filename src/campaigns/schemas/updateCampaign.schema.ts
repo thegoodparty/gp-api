@@ -104,5 +104,6 @@ export class SetDistrictDTO extends createZodDto(
     slug: z.string().optional(),
     L2DistrictType: z.string(),
     L2DistrictName: z.string(),
+    allowMissingTurnout: z.boolean().optional(),
   }),
 ) {}
