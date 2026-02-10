@@ -37,6 +37,7 @@ export const PollAnalysisCompleteEventSchema = z.object({
   data: z.object({
     pollId: z.string(),
     totalResponses: z.number(),
+    responsesLocation: z.string(),
     issues: z.array(
       z.object({
         pollId: z.string(),
@@ -76,3 +77,50 @@ export enum MessageGroup {
   domainEmailRedirect = 'domainEmailRedirect',
   polls = 'polls',
 }
+
+export type PollResponseCSV = {
+  atomic_id: string
+  phone_number: string
+  original_message: string
+  atomic_message: string
+  poll_id: string
+  round: string
+  age: string
+  location: string
+  ward: string
+  gender: string
+  voting_performance: string
+  homeowner: string
+  income: string
+  education: string
+  k2_cluster_id: string
+  k2_theme: string
+  k2_category: string
+  k2_summary: string
+  k2_sentiment: string
+}
+
+/** Poll response row after parsing CSV and converting keys to camelCase (all values are strings) */
+export type PollResponse = {
+  atomicId: string
+  phoneNumber: string
+  originalMessage: string
+  atomicMessage: string
+  pollId: string
+  round: string
+  age: string
+  location: string
+  ward: string
+  gender: string
+  votingPerformance: string
+  homeowner: string
+  income: string
+  education: string
+  k2ClusterId: string
+  k2Theme: string
+  k2Category: string
+  k2Summary: string
+  k2Sentiment: string
+}
+
+export const OPT_OUT_THEME = 'Opt Out Request' as const

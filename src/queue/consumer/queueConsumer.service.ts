@@ -5,6 +5,7 @@ import {
   Campaign,
   PathToVictory,
   Poll,
+  PollIndividualMessageSender,
   Prisma,
   TcrComplianceStatus,
 } from '@prisma/client'
@@ -44,16 +45,22 @@ import { DomainsService } from '../../websites/services/domains.service'
 import {
   DomainEmailForwardingMessage,
   GenerateAiContentMessageData,
+  OPT_OUT_THEME,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
   PollCreationEventSchema,
   PollExpansionEvent,
   PollExpansionEventSchema,
+  PollResponse,
+  PollResponseCSV,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import neatCsv from 'neat-csv'
+import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
+import { toCamelCaseKeys } from 'es-toolkit'
 
 @Injectable()
 export class QueueConsumerService {
@@ -69,6 +76,7 @@ export class QueueConsumerService {
     private readonly domainsService: DomainsService,
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
+    private readonly pollIndividualMessage: PollIndividualMessageService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly contactsService: ContactsService,
     private readonly s3Service: S3Service,
@@ -635,6 +643,33 @@ export class QueueConsumerService {
       })),
     })
     this.logger.log('Successfully created new poll issues')
+    const SERVE_DATA_S3_BUCKET = process.env.SERVE_DATA_S3_BUCKET
+    if (!SERVE_DATA_S3_BUCKET) {
+      throw new Error('Please set SERVE_DATA_S3_BUCKET in your .env')
+    }
+    const pollResponsesCsv = await this.s3Service.getFile(
+      SERVE_DATA_S3_BUCKET,
+      event.data.responsesLocation,
+    )
+
+    if (pollResponsesCsv) {
+      const parsed: PollResponseCSV[] = await neatCsv(pollResponsesCsv)
+      const rows: PollResponse[] = parsed.map((row) => toCamelCaseKeys(row))
+      for (const response of rows) {
+        const { phoneNumber, originalMessage, atomicMessage, pollId, k2Theme } =
+          response
+        const personId = this.pollIndividualMessage.create({
+          personId: '',
+          sentAt: '',
+          isOptOut: k2Theme === OPT_OUT_THEME,
+          pollIssues: k2Theme,
+        })
+      }
+    } else {
+      this.logger.warn(
+        `Failed to fetch poll responses for pollId: ${event.data.pollId}`,
+      )
+    }
 
     await this.pollsService.markPollComplete({
       pollId: poll.id,
@@ -763,7 +798,7 @@ export class QueueConsumerService {
       })
     }
 
-    const people = await parseCsv<{ id: string }>(csv)
+    const people = await parseCsv<{ id: string; cellPhone: string }>(csv)
 
     // 2. Create individual poll messages
     const now = new Date()
@@ -777,6 +812,7 @@ export class QueueConsumerService {
             pollId: poll.id,
             personId: person.id!,
             sentAt: now,
+            personCellPhone: person.cellPhone,
           }
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
@@ -848,6 +884,34 @@ export class QueueConsumerService {
       return
     }
     return { poll, office, campaign }
+  }
+
+  private async findPersonIdsForCellPhones(params: {
+    electedOfficeId: string
+    pollId: string
+    personCellPhones: string[]
+  }): Promise<string[]> {
+    const messages = await this.pollIndividualMessage.findMany({
+      where: {
+        electedOfficeId: params.electedOfficeId,
+        pollId: params.pollId,
+        sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+      },
+    })
+
+    return params.personCellPhones.map((cellPhone) => {
+      const matchingMessage = messages.find(
+        (message) => message.personCellPhone === cellPhone,
+      )
+
+      if (!matchingMessage) {
+        throw new Error(
+          `Person with cell phone ${cellPhone} not found in poll ${params.pollId}`,
+        )
+      }
+
+      return matchingMessage.personId
+    })
   }
 }
 
