@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { createZodDto } from 'nestjs-zod'
+import { z } from 'zod'
 import { SortablePaginationSchema } from 'src/shared/schemas/Pagination.schema'
 
 const FIELDS = Prisma.WebsiteContactScalarFieldEnum
@@ -12,5 +13,7 @@ export class GetWebsiteContactsSchema extends createZodDto(
     FIELDS.email,
     FIELDS.phone,
     FIELDS.smsConsent,
-  ]),
+  ]).extend({
+    page: z.coerce.number().min(1).optional(),
+  }),
 ) {}
