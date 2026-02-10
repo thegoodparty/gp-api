@@ -109,17 +109,20 @@ export class WebsitesController {
       where: { campaignId },
     })
 
-    const total = await this.contacts.count({
-      where: { websiteId: website.id },
-    })
-
-    return {
-      contacts: await this.contacts.findMany({
+    const [contacts, total] = await Promise.all([
+      this.contacts.findMany({
         where: { websiteId: website.id },
         take: limit,
         skip: offset,
         ...(sortBy ? { orderBy: { [sortBy]: sortOrder } } : {}),
       }),
+      this.contacts.count({
+        where: { websiteId: website.id },
+      }),
+    ])
+
+    return {
+      contacts,
       total,
       page,
       limit,
