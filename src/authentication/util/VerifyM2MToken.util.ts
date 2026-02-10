@@ -13,8 +13,6 @@ export const verifyM2MToken = async (
   clerkClient: ClerkClient,
 ) => {
   try {
-    // Verify M2M token using your NestJS machine's secret
-    console.debug(`Verifying M2M token: ${token}`)
     return await clerkClient.m2m.verify({
       token,
       machineSecretKey: GP_WEBAPP_MACHINE_SECRET,
