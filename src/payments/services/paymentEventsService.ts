@@ -337,9 +337,19 @@ export class PaymentEventsService {
       )
     }
 
-    await this.usersService.patchUserMetaData(parseInt(userId), {
-      checkoutSessionId: null,
-    })
+    try {
+      await this.usersService.patchUserMetaData(parseInt(userId), {
+        checkoutSessionId: null,
+      })
+    } catch (error) {
+      // User may not exist in this environment's database (e.g., session was
+      // created from a different environment sharing the same Stripe test key).
+      // Since this is just cleanup, log and move on rather than failing the webhook.
+      // Stripe retries when it receives a non-2xx response, so we don't want to cause repeated failures.
+      this.logger.warn(
+        `[WEBHOOK] Could not clear checkoutSessionId for userId ${userId} — user may not exist in this environment`,
+      )
+    }
   }
 
   async customerSubscriptionDeletedHandler(
