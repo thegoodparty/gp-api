@@ -5,7 +5,7 @@ const { GP_WEBAPP_MACHINE_SECRET } = process.env
 
 if (!GP_WEBAPP_MACHINE_SECRET)
   throw new Error(
-    'CLERK_SECRET_KEY and GP_WEBAPP_MACHINE_SECRET must be set in the environment variables',
+    'GP_WEBAPP_MACHINE_SECRET must be set in the environment variables',
   )
 
 export const verifyM2MToken = async (
