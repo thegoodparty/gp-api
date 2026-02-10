@@ -10,6 +10,7 @@ import { ClerkClient } from '@clerk/backend'
 import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { verifyM2MToken } from '@/authentication/util/VerifyM2MToken.util'
+import { M2M_TOKEN_PREFIX } from '../authentication.consts'
 
 @Injectable()
 export class ClerkM2MAuthGuard implements CanActivate {
@@ -27,7 +28,7 @@ export class ClerkM2MAuthGuard implements CanActivate {
     // and does not have role restrictions
     if (
       !token ||
-      !token.startsWith('mt_') ||
+      !token.startsWith(M2M_TOKEN_PREFIX) ||
       routeIsPublicAndNoRoles(context, this.reflector)
     ) {
       return true
