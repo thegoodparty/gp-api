@@ -17,6 +17,7 @@ When we introduced the **ElectedOffice** concept (for the "Serve" product), we a
 > — `prisma/schema/electedOffice.prisma:18-20`
 
 We now need to:
+
 1. Allow a user to have **both** a Campaign (Win) **and** an ElectedOffice (Serve) simultaneously
 2. Support **multiple** campaigns and/or offices per user
 3. Cleanly separate what "belongs to a campaign" vs. what "belongs to an elected office" vs. what's shared
@@ -69,6 +70,7 @@ Campaign is not just a data model — it is the **authorization and scoping mech
 Every protected endpoint effectively requires `User → Campaign → [resource]` as its access chain.
 
 The Serve team has already built a parallel pattern:
+
 - **`@UseElectedOffice()` decorator + guard** — Used by polls and contact engagement controllers
 - **`@ReqElectedOffice()`** — Parameter decorator extracting elected office from request
 
@@ -78,19 +80,21 @@ The shared surface area between the two products is **small**. An audit of every
 
 **Truly shared (code explicitly branches on both):**
 
-| Feature | Where | Pattern |
-|---|---|---|
-| District/position data | Campaign.details JSON, PathToVictory.data JSON | Both products need office, BallotReady position, L2 district |
-| Voter file filter CRUD | `voterFile.controller.ts:137,172` | `isPro \|\| hasElectedOffice` access gate |
-| Contacts search | `contacts.service.ts:95-101` | `isPro \|\| hasElectedOffice` access gate |
-| Contacts download | `contacts.service.ts:230-234` | `isPro \|\| hasElectedOffice` access gate |
-| Contacts table (frontend) | `ContactsTableProvider.tsx:163` | `canUseProFeatures = isPro \|\| !!electedOffice` |
+| Feature                   | Where                                          | Pattern                                                      |
+| ------------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| District/position data    | Campaign.details JSON, PathToVictory.data JSON | Both products need office, BallotReady position, L2 district |
+| Voter file filter CRUD    | `voterFile.controller.ts:137,172`              | `isPro \|\| hasElectedOffice` access gate                    |
+| Contacts search           | `contacts.service.ts:95-101`                   | `isPro \|\| hasElectedOffice` access gate                    |
+| Contacts download         | `contacts.service.ts:230-234`                  | `isPro \|\| hasElectedOffice` access gate                    |
+| Contacts table (frontend) | `ContactsTableProvider.tsx:163`                | `canUseProFeatures = isPro \|\| !!electedOffice`             |
 
 **Already Serve-only (use `@UseElectedOffice()`, not `@UseCampaign()`):**
+
 - Polls — `polls.controller.ts`
 - Contact engagement — `contactEngagement.controller.ts`
 
 **Win-only (no ElectedOffice awareness at all):**
+
 - AI content, AI chat, website, outreach, ecanvasser, P2V, campaign tasks, TCR compliance, campaign positions/top issues, campaign plan versions
 
 ### 2.4 Frontend Architecture
@@ -104,15 +108,15 @@ The shared surface area between the two products is **small**. An audit of every
 
 ### 2.5 Integration Points Summary
 
-| System | Campaign References | Impact of This Change |
-|---|---|---|
-| API Controllers | 16 controllers use `@UseCampaign()` | Low — most stay as-is |
-| API Services | 80+ files import Campaign | Low — most stay as-is |
-| Database (FK) | 15+ tables have `campaignId` | Low — only VoterFileFilter moves to Seat |
-| Shared features (voter/contacts) | 4 files with `isPro \|\| hasElectedOffice` | Medium — these move to Seat-based access |
-| Queue/Jobs | All async jobs routed by `campaignId` | Low — unchanged |
-| Payments (Stripe) | `campaignId` in checkout metadata | Low — isPro stays on Campaign |
-| Frontend Contexts | `CampaignProvider`, `ElectedOfficeProvider` | Medium — add SeatProvider |
+| System                           | Campaign References                         | Impact of This Change                    |
+| -------------------------------- | ------------------------------------------- | ---------------------------------------- |
+| API Controllers                  | 16 controllers use `@UseCampaign()`         | Low — most stay as-is                    |
+| API Services                     | 80+ files import Campaign                   | Low — most stay as-is                    |
+| Database (FK)                    | 15+ tables have `campaignId`                | Low — only VoterFileFilter moves to Seat |
+| Shared features (voter/contacts) | 4 files with `isPro \|\| hasElectedOffice`  | Medium — these move to Seat-based access |
+| Queue/Jobs                       | All async jobs routed by `campaignId`       | Low — unchanged                          |
+| Payments (Stripe)                | `campaignId` in checkout metadata           | Low — isPro stays on Campaign            |
+| Frontend Contexts                | `CampaignProvider`, `ElectedOfficeProvider` | Medium — add SeatProvider                |
 
 ---
 
@@ -154,13 +158,13 @@ We considered three options:
 
 ### 3.3 Design Decisions Made
 
-| Decision | Resolution | Rationale |
-|---|---|---|
-| Where does `isPro` live? | Stays on Campaign | Serve features are gated by ElectedOffice existence, not subscription. No Serve billing for now. |
-| Where does PathToVictory live? | Stays on Campaign | Win numbers are candidate-specific. Seat holds district data; P2V holds the historical calculation. |
-| Extract fields from campaign.details JSON? | No (beyond what Seat needs) | Don't increase migration scope. Campaign.details stays as-is. Seat gets its own position/district columns. |
-| Can a Seat have both Campaign and ElectedOffice? | Yes | Running for re-election while holding office. Product-specific features use their own FKs, so no ambiguity. |
-| Historical campaigns/offices? | New Seat per engagement | Today we mutate the single Campaign. Going forward, old Seats stay in DB. Active status derived from children. |
+| Decision                                         | Resolution                  | Rationale                                                                                                      |
+| ------------------------------------------------ | --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Where does `isPro` live?                         | Stays on Campaign           | Serve features are gated by ElectedOffice existence, not subscription. No Serve billing for now.               |
+| Where does PathToVictory live?                   | Stays on Campaign           | Win numbers are candidate-specific. Seat holds district data; P2V holds the historical calculation.            |
+| Extract fields from campaign.details JSON?       | No (beyond what Seat needs) | Don't increase migration scope. Campaign.details stays as-is. Seat gets its own position/district columns.     |
+| Can a Seat have both Campaign and ElectedOffice? | Yes                         | Running for re-election while holding office. Product-specific features use their own FKs, so no ambiguity.    |
+| Historical campaigns/offices?                    | New Seat per engagement     | Today we mutate the single Campaign. Going forward, old Seats stay in DB. Active status derived from children. |
 
 ### 3.4 Proposed Schema
 
@@ -270,12 +274,14 @@ model VoterFileFilter {
 ```
 
 **What's changing:**
+
 - **New model:** Seat — position/geography/district fields
 - **Campaign:** gains `seatId` FK, loses `electedOffices` relation
 - **ElectedOffice:** gains `seatId` FK, `campaignId` becomes nullable (deprecated)
 - **VoterFileFilter:** gains `seatId` FK, `campaignId` becomes nullable (deprecated)
 
 **What's NOT changing:**
+
 - `campaign.details` JSON — untouched
 - All Campaign-only relations (website, outreach, AI, P2V, etc.) — still FK to Campaign
 - All ElectedOffice-only relations (polls, poll messages) — still FK to ElectedOffice
@@ -317,6 +323,10 @@ model VoterFileFilter {
 - Remove `electedOffices` relation from Campaign model
 - Remove dual-read code
 
+### Future: Onboarding Elected Officials outside of Win
+
+Now that ElectedOffice has been fully separated from Campaign, we have a clean path to support onboarding fully new Elected Officials in the future. But, we've avoided needing to invest too early in their onboarding experience.
+
 ### Future: Multi-User RBAC
 
 When team member access is needed, Seat is the natural anchor:
@@ -347,13 +357,13 @@ One membership record per user per Seat. A team member managing both the campaig
 
 ## 5. Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Data loss during Seat backfill | Low | Critical | Backfill script tested in staging; Seat data is copied, not moved |
-| Breaking voter file / contacts flows | Medium | High | Dual-FK period (both seatId and campaignId); feature flags |
-| Position data on Seat drifts from campaign.details | Medium | Low | Seat is source of truth going forward; campaign.details becomes read-only for position fields |
-| Scope creep — "while we're at it" refactoring | High | Medium | Strict rule: don't extract non-position fields from campaign.details JSON |
-| Team coordination overhead | Medium | Medium | Serve team drives migration; Win team reviews; clear phase boundaries |
+| Risk                                               | Likelihood | Impact   | Mitigation                                                                                    |
+| -------------------------------------------------- | ---------- | -------- | --------------------------------------------------------------------------------------------- |
+| Data loss during Seat backfill                     | Low        | Critical | Backfill script tested in staging; Seat data is copied, not moved                             |
+| Breaking voter file / contacts flows               | Medium     | High     | Dual-FK period (both seatId and campaignId); feature flags                                    |
+| Position data on Seat drifts from campaign.details | Medium     | Low      | Seat is source of truth going forward; campaign.details becomes read-only for position fields |
+| Scope creep — "while we're at it" refactoring      | High       | Medium   | Strict rule: don't extract non-position fields from campaign.details JSON                     |
+| Team coordination overhead                         | Medium     | Medium   | Serve team drives migration; Win team reviews; clear phase boundaries                         |
 
 ---
 
@@ -375,18 +385,19 @@ One membership record per user per Seat. A team member managing both the campaig
 
 **Phase 1-2 (direct changes needed):**
 
-| File | Change |
-|---|---|
-| `prisma/schema/` (new file) | Seat model definition |
-| `prisma/schema/campaign.prisma` | Add `seatId` FK, remove `electedOffices` relation |
-| `prisma/schema/electedOffice.prisma` | Add `seatId` FK, make `campaignId` nullable |
-| `prisma/schema/voterFileFilter.prisma` | Add `seatId` FK, make `campaignId` nullable |
-| `src/voters/voterFile/voterFile.controller.ts` | Voter file filter CRUD uses Seat |
-| `src/contacts/services/contacts.service.ts` | Contacts search/download uses Seat |
-| `src/electedOffice/services/electedOffice.service.ts` | Create ElectedOffice with Seat |
-| Frontend: `ContactsTableProvider.tsx` | `canUseProFeatures` check uses Seat |
+| File                                                  | Change                                            |
+| ----------------------------------------------------- | ------------------------------------------------- |
+| `prisma/schema/` (new file)                           | Seat model definition                             |
+| `prisma/schema/campaign.prisma`                       | Add `seatId` FK, remove `electedOffices` relation |
+| `prisma/schema/electedOffice.prisma`                  | Add `seatId` FK, make `campaignId` nullable       |
+| `prisma/schema/voterFileFilter.prisma`                | Add `seatId` FK, make `campaignId` nullable       |
+| `src/voters/voterFile/voterFile.controller.ts`        | Voter file filter CRUD uses Seat                  |
+| `src/contacts/services/contacts.service.ts`           | Contacts search/download uses Seat                |
+| `src/electedOffice/services/electedOffice.service.ts` | Create ElectedOffice with Seat                    |
+| Frontend: `ContactsTableProvider.tsx`                 | `canUseProFeatures` check uses Seat               |
 
 **Unchanged (vast majority of codebase):**
+
 - All 16 controllers using `@UseCampaign()` — unchanged
 - All Campaign-only services (AI, website, outreach, P2V, etc.) — unchanged
 - All ElectedOffice-only controllers (polls, contact engagement) — unchanged

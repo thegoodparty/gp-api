@@ -26,6 +26,7 @@ Designs Link: TODO
 
 **Not In Scope**
 
+- **Standalone elected official onboarding.** There is no new way to become an elected official. The only path to an ElectedOffice remains: complete a Campaign on GoodParty, win, and confirm via the in-app "I won" modal (`POST /elected-office`). We are not building a separate onboarding flow for elected officials.
 - Extracting non-position fields from `campaign.details` JSON
 - Changing where `isPro` lives (stays on Campaign)
 - Moving PathToVictory off Campaign
@@ -45,14 +46,15 @@ Campaign is the authorization boundary and data scoping mechanism for the entire
 
 However, the **actual shared surface area** between Win and Serve is small. An audit of every file referencing ElectedOffice reveals only four features that explicitly branch on both products:
 
-| Shared Feature | Location | Current Pattern |
-|---|---|---|
+| Shared Feature                  | Location                          | Current Pattern               |
+| ------------------------------- | --------------------------------- | ----------------------------- |
 | Voter file filter create/update | `voterFile.controller.ts:137,172` | `isPro \|\| hasElectedOffice` |
-| Contacts search | `contacts.service.ts:95-101` | `isPro \|\| hasElectedOffice` |
-| Contacts download | `contacts.service.ts:230-234` | `isPro \|\| hasElectedOffice` |
-| Contacts table (frontend) | `ContactsTableProvider.tsx:163` | `isPro \|\| !!electedOffice` |
+| Contacts search                 | `contacts.service.ts:95-101`      | `isPro \|\| hasElectedOffice` |
+| Contacts download               | `contacts.service.ts:230-234`     | `isPro \|\| hasElectedOffice` |
+| Contacts table (frontend)       | `ContactsTableProvider.tsx:163`   | `isPro \|\| !!electedOffice`  |
 
 Everything else is already clearly one product or the other:
+
 - **Win-only:** P2V, AI content/chat, website, outreach, ecanvasser, TCR, campaign tasks, positions/top issues, plan versions
 - **Serve-only:** Polls (`@UseElectedOffice()`), contact engagement (`@UseElectedOffice()`)
 
@@ -74,6 +76,7 @@ User (1:many)
 ```
 
 **Key design rules:**
+
 - A Seat has exactly **one** child: either a Campaign or an ElectedOffice, never both. The `type` enum field enforces this.
 - Win-only features FK to **Campaign** (unchanged)
 - Serve-only features FK to **ElectedOffice** (unchanged)
@@ -172,6 +175,7 @@ model VoterFileFilter {
 **Goal:** Create the Seat table and wire up FK relationships without changing any application behavior.
 
 **Steps:**
+
 1. Create `Seat` table with all position/geography/district columns
 2. Add nullable `seatId` column to Campaign, ElectedOffice, and VoterFileFilter
 3. Run backfill migration:
@@ -188,6 +192,7 @@ model VoterFileFilter {
 **Goal:** Voter file filters and contacts access use Seat instead of Campaign. ElectedOffice no longer needs Campaign for shared features.
 
 **Steps:**
+
 1. Create `SeatService` with basic CRUD and lookup methods
 2. Create `@UseSeat()` guard and `@ReqSeat()` decorator
 3. Update VoterFileFilter service to read/write `seatId` instead of `campaignId`
@@ -196,15 +201,17 @@ model VoterFileFilter {
 
 ```typescript
 // Before (contacts.service.ts)
-const electedOffice = await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+const electedOffice = await this.electedOfficeService.getCurrentElectedOffice(
+  campaign.userId,
+)
 if (!campaign.isPro && !electedOffice) {
   throw new BadRequestException('Campaign is not pro')
 }
 
 // After
 const seat = request.seat // from @UseSeat() guard
-const hasAccess = seat.type === 'electedOffice'
-  || (seat.campaign && seat.campaign.isPro)
+const hasAccess =
+  seat.type === 'electedOffice' || (seat.campaign && seat.campaign.isPro)
 if (!hasAccess) {
   throw new BadRequestException('Pro subscription or elected office required')
 }
@@ -216,20 +223,21 @@ if (!hasAccess) {
 
 #### Phase 3: ElectedOffice Independence + Product Switcher
 
-**Goal:** An ElectedOffice can be created without a Campaign. Users can hold office and run for a different seat. Frontend product switcher is live.
+**Goal:** ElectedOffice creation produces its own Seat. Users can hold office and run for a different seat. Frontend product switcher is live.
 
 **Steps:**
+
 1. Make `campaignId` nullable on ElectedOffice (already done in schema, now enforce in application)
-2. Update ElectedOffice creation flow to create a Seat directly (no Campaign required)
-3. Update poll creation — currently auto-creates an ElectedOffice linked to a Campaign. Instead, auto-creates a Seat and ElectedOffice.
+2. **Update `POST /elected-office` ("I won" flow)** — this is the sole entry point for creating an ElectedOffice (`electedOffice.controller.ts:58-80`). Today it finds the user's Campaign, creates an ElectedOffice linked to it, and returns. After this change, it also creates a new Seat with `type = electedOffice`, copying position/geography data from the Campaign's Seat, and links the new ElectedOffice to it. The Campaign FK on ElectedOffice becomes optional and is no longer set.
+3. Update poll creation — currently auto-creates an ElectedOffice linked to a Campaign (`polls.controller.ts:128-132`, marked TEMPORARY). Instead, auto-creates a Seat and ElectedOffice using the same pattern as step 2.
 4. Implement product switcher
 
 **Product switcher — server-side:**
 
-The API needs a way to resolve "which Seat is the user operating in." We add a `GET /seats` endpoint and a `x-seat-id` header convention:
+The API needs a way to resolve "which Seat is the user operating in." We add a `GET /seats` endpoint (to power the product switcher) and a `x-seat-id` header convention (to power the `@UseSeat()` guard):
 
 ```typescript
-// GET /seats — returns all seats for the current user
+// GET /seats — returns all seats for the current user.
 @Get()
 @UseGuards(AuthGuard)
 async listSeats(@ReqUser() user: User) {
@@ -349,6 +357,7 @@ const ProductSwitcher = () => {
 **Goal:** Remove deprecated columns and dual-read code.
 
 **Steps:**
+
 1. Remove nullable `campaignId` from ElectedOffice
 2. Remove nullable `campaignId` from VoterFileFilter
 3. Remove `electedOffices` relation from Campaign model
