@@ -7,7 +7,7 @@
 
 ## Summary
 
-Today, Campaign is the sole organizing entity across the entire GoodParty product. ElectedOffice (the Serve product) is coupled to Campaign via a required FK, meaning an elected official can't exist without a campaign, and a user can't hold an office and run for a different one simultaneously. We propose introducing a **Seat** model — a lightweight shared context representing a user's relationship to a political position — that both Campaign and ElectedOffice become children of. This decouples the two products while keeping the blast radius small: only the few truly shared features (voter file filters, contacts access) move to Seat, while the vast majority of Campaign and ElectedOffice code stays untouched.
+Today, Campaign is the sole organizing entity across the entire GoodParty product. ElectedOffice (the Serve product) is coupled to Campaign via a required FK, meaning an elected official can't exist without a campaign, and a user can't hold an office and run for a different one simultaneously. We propose introducing a **Seat** model — a lightweight shared context representing a user's relationship to a political position — that either a Campaign or an ElectedOffice (but not both) becomes a child of. This decouples the two products while keeping the blast radius small: only the few truly shared features (voter file filters, contacts access) move to Seat, while the vast majority of Campaign and ElectedOffice code stays untouched.
 
 Designs Link: TODO
 
@@ -63,26 +63,33 @@ A **Seat** represents a user's relationship to a specific political position. It
 ```
 User (1:many)
   └── Seat
+        ├── type: campaign | electedOffice
         ├── position identity (office, level, BallotReady IDs)
         ├── geography (state, city, county, zip)
         ├── L2 district match (districtId, type, name)
         │
-        ├── campaign? (optional 1:1) — Win product
-        ├── electedOffice? (optional 1:1) — Serve product
+        ├── campaign? (1:1, present when type = campaign)
+        ├── electedOffice? (1:1, present when type = electedOffice)
         └── voterFileFilters (1:many) — shared feature
 ```
 
 **Key design rules:**
+- A Seat has exactly **one** child: either a Campaign or an ElectedOffice, never both. The `type` enum field enforces this.
 - Win-only features FK to **Campaign** (unchanged)
 - Serve-only features FK to **ElectedOffice** (unchanged)
 - Shared features FK to **Seat**
 - `isPro` stays on Campaign; ElectedOffice access is gated by existence of the record
-- A Seat can have both a Campaign and an ElectedOffice (e.g., running for re-election while holding office)
-- A User can have multiple Seats (e.g., holding city council while running for state senate)
+- A User can have multiple Seats (e.g., a `campaign` Seat for a state senate run and an `electedOffice` Seat for a current city council position)
+- Re-election scenario: a user who holds office and is running for re-election in the same position has **two Seats** with the same position data — one of type `campaign` and one of type `electedOffice`
 
 ### 3. Schema
 
 ```prisma
+enum SeatType {
+  campaign
+  electedOffice @map("elected_office")
+}
+
 model Seat {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now()) @map("created_at")
@@ -91,7 +98,8 @@ model Seat {
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId Int  @map("user_id")
 
-  // Position identity
+  type SeatType
+
   positionId  String?                    @map("position_id")
   raceId      String?                    @map("race_id")
   office      String?
@@ -103,23 +111,22 @@ model Seat {
   district    String?
   zip         String?
 
-  // L2 district match
   l2DistrictId        String?  @map("l2_district_id")
   l2DistrictType      String?  @map("l2_district_type")
   l2DistrictName      String?  @map("l2_district_name")
   districtManuallySet Boolean  @default(false) @map("district_manually_set")
 
-  // Children
   campaign      Campaign?
   electedOffice ElectedOffice?
 
-  // Shared features
   voterFileFilters VoterFileFilter[]
 
   @@index([userId])
   @@map("seat")
 }
 ```
+
+The `type` field determines which child relation is populated. Application-level validation enforces that only the matching child exists (e.g., a Seat with `type = campaign` must have a Campaign and no ElectedOffice).
 
 **Changes to existing models:**
 
@@ -168,10 +175,9 @@ model VoterFileFilter {
 1. Create `Seat` table with all position/geography/district columns
 2. Add nullable `seatId` column to Campaign, ElectedOffice, and VoterFileFilter
 3. Run backfill migration:
-   - For each existing Campaign, create a Seat populated from `campaign.details` JSON (office, state, city, county, zip, positionId, raceId, ballotLevel, level, district) and `pathToVictory.data` JSON (districtId → l2DistrictId, electionType → l2DistrictType, electionLocation → l2DistrictName, districtManuallySet)
-   - Set `campaign.seatId` to the new Seat
-   - For each existing ElectedOffice, set `electedOffice.seatId` to the Seat associated with its current Campaign
-   - For each existing VoterFileFilter, set `voterFileFilter.seatId` to the Seat associated with its current Campaign
+   - For each existing Campaign, create a Seat with `type = campaign`, populated from `campaign.details` JSON (office, state, city, county, zip, positionId, raceId, ballotLevel, level, district) and `pathToVictory.data` JSON (districtId → l2DistrictId, electionType → l2DistrictType, electionLocation → l2DistrictName, districtManuallySet). Set `campaign.seatId` to the new Seat.
+   - For each existing ElectedOffice, create a **separate** Seat with `type = electedOffice`, copying position/geography data from the linked Campaign's Seat. Set `electedOffice.seatId` to this new Seat. (Each ElectedOffice gets its own Seat, even if it currently shares a Campaign.)
+   - For each existing VoterFileFilter, set `voterFileFilter.seatId` to the Campaign's Seat (these are all Win-originated today)
 4. Make `seatId` non-nullable on all three tables
 5. Add indexes
 
@@ -197,8 +203,9 @@ if (!campaign.isPro && !electedOffice) {
 
 // After
 const seat = request.seat // from @UseSeat() guard
-const campaign = await seat.campaign
-if (!campaign?.isPro && !seat.electedOffice) {
+const hasAccess = seat.type === 'electedOffice'
+  || (seat.campaign && seat.campaign.isPro)
+if (!hasAccess) {
   throw new BadRequestException('Pro subscription or elected office required')
 }
 ```
@@ -327,8 +334,7 @@ const ProductSwitcher = () => {
       {seats.map(seat => (
         <option key={seat.id} value={seat.id}>
           {seat.office} — {seat.city || seat.county}, {seat.state}
-          {seat.campaign && seat.electedOffice ? ' (Win + Serve)' :
-           seat.campaign ? ' (Win)' : ' (Serve)'}
+          {seat.type === 'campaign' ? ' (Win)' : ' (Serve)'}
         </option>
       ))}
     </select>
@@ -336,7 +342,7 @@ const ProductSwitcher = () => {
 }
 ```
 
-**Value delivered:** Users can hold office in one seat and run for a different one. Product switcher lets users toggle between seats. ElectedOffice is fully independent of Campaign.
+**Value delivered:** Users can hold office in one Seat (type `electedOffice`) and run for a different position in another Seat (type `campaign`). Product switcher lets users toggle between seats. ElectedOffice is fully independent of Campaign.
 
 #### Phase 4: Cleanup
 
@@ -393,7 +399,7 @@ The design is intentionally narrow. The following are **not modified**:
 - **The shared surface area between Win and Serve is only ~4 features.** Most features are already clearly one product or the other. This means the migration blast radius is small.
 - **Existing routes don't change.** `@UseCampaign()` and `@UseElectedOffice()` stay as-is. Only the shared features get a new `@UseSeat()` guard.
 - **Phase 1 is pure infrastructure** with zero application behavior changes, making it safe to deploy early.
-- **ElectedOffice independence is the key unlock.** Once ElectedOffice FKs to Seat instead of Campaign, an official can exist without a campaign, and a user can hold one office while running for a different one.
+- **ElectedOffice independence is the key unlock.** Once ElectedOffice FKs to its own Seat instead of Campaign, an official can exist without a campaign, and a user can hold one office (Seat type `electedOffice`) while running for a different position (Seat type `campaign`).
 - **Multi-user RBAC attaches to Seat later.** One membership table, one invite flow, access to both Campaign and ElectedOffice via the Seat. This avoids building two parallel team systems.
 - **`isPro` stays on Campaign.** Serve access is gated by ElectedOffice existence. No billing model changes needed now.
 
@@ -401,7 +407,7 @@ The design is intentionally narrow. The following are **not modified**:
 
 1. **How do we handle district data updates going forward?** When P2V recalculates or a user manually sets their district, do we write to both Seat and PathToVictory.data? Or does P2V start reading from Seat? Need to define the write path clearly.
 
-2. **What happens to existing ElectedOffice records during Phase 1 backfill?** They currently point to a Campaign. We create a Seat from that Campaign's data and point both the Campaign and ElectedOffice at it. But if the user later wants to run for a *different* office, they'd need a new Seat + Campaign. Is the backfill assumption (same Seat for both) always correct for existing data?
+2. **What happens to existing ElectedOffice records during Phase 1 backfill?** They currently point to a Campaign. The backfill creates two Seats: one `campaign` Seat for the Campaign, and one `electedOffice` Seat (with copied position data) for the ElectedOffice. This means existing users will immediately have two Seats. Is there any edge case where we'd want to avoid creating the second Seat (e.g., if the ElectedOffice is inactive)?
 
 3. **Should the `x-seat-id` header be required for all authenticated requests, or only for Seat-scoped endpoints?** Requiring it everywhere is simpler but adds friction. Only requiring it for `@UseSeat()` endpoints means most routes don't need to change. Recommendation: only `@UseSeat()` endpoints.
 
@@ -421,7 +427,7 @@ Every feature FKs to Seat. Campaign and ElectedOffice become pure extension tabl
 
 Campaign and ElectedOffice each get their own position/district fields. No Seat model. Shared features accept `campaignId | electedOfficeId` polymorphically.
 
-**Why we rejected it:** Shared features need a polymorphic `campaignId | electedOfficeId` pattern that leaks into service signatures, queue messages, and DB queries. No natural entity for the product switcher or future RBAC. The "same position, two products" case (running for re-election) requires duplicated position data with no structural guarantee of consistency.
+**Why we rejected it:** Shared features need a polymorphic `campaignId | electedOfficeId` pattern that leaks into service signatures, queue messages, and DB queries. No natural entity for the product switcher or future RBAC. (Note: our approach also duplicates position data when a user has both a Win and Serve Seat for the same position, but Seat provides a single FK target for shared features and a natural anchor for RBAC — the polymorphic approach does not.)
 
 ### C: Incremental Duplication (Keep Campaign Coupling)
 
