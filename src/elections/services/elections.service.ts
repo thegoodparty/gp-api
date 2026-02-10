@@ -21,6 +21,7 @@ import {
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
+import { serializeError } from 'serialize-error'
 
 // TODO: Revisit this file after the stakeholders decide on the direction we're going...
 // ...for the win number / p2v solution. Remove any unneeded code at that time.
@@ -137,13 +138,23 @@ export class ElectionsService {
     }
   }
 
-  async getBallotReadyMatchedRaceTargetDetails(
-    ballotreadyPositionId: string,
-    electionDate?: string,
-    includeTurnout: boolean = true,
-  ) {
+  async getBallotReadyMatchedRaceTargetDetails(params: {
+    ballotreadyPositionId: string
+    electionDate?: string
+    includeTurnout: boolean
+    campaignId: number
+    officeName: string | undefined
+  }) {
+    const {
+      ballotreadyPositionId,
+      electionDate,
+      includeTurnout,
+      campaignId,
+      officeName,
+    } = params
+    let positionWithDistrict: PositionWithMatchedDistrict | null = null
     try {
-      const positionWithDistrict = await this.electionApiGet<
+      positionWithDistrict = await this.electionApiGet<
         PositionWithMatchedDistrict,
         {
           electionDate: string | undefined
@@ -163,29 +174,62 @@ export class ElectionsService {
         throw new NotFoundException('No positionWithDistrict found')
       }
 
-      if (includeTurnout) {
-        if (
-          !positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
-        ) {
-          throw new NotFoundException(
-            'Failed to fetch a district with a projected turnout.',
-          )
-        }
-        return {
-          ...this.calculateRaceTargetMetrics(
-            positionWithDistrict?.district.projectedTurnout.projectedTurnout,
-          ),
-          district: positionWithDistrict.district,
-        }
+      if (
+        includeTurnout &&
+        !positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
+      ) {
+        throw new NotFoundException(
+          'Failed to fetch a district with a projected turnout.',
+        )
       }
+
+      this.logger.log(
+        JSON.stringify({
+          event: 'DistrictMatch',
+          matchType: 'gold',
+          result: 'success',
+          electionDate,
+          campaignId,
+          ballotreadyPositionId,
+          officeName,
+          districtType: positionWithDistrict?.district?.L2DistrictType,
+          districtName: positionWithDistrict?.district?.L2DistrictName,
+          projectedTurnout:
+            positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
+        }),
+      )
       return {
         district: positionWithDistrict?.district,
-        // Sentinel values to overwrite previously assigned, no longer correct ones
-        winNumber: -1,
-        voterContactGoal: -1,
-        projectedTurnout: -1,
+        ...(includeTurnout
+          ? this.calculateRaceTargetMetrics(
+              positionWithDistrict?.district?.projectedTurnout
+                ?.projectedTurnout,
+            )
+          : {
+              // Sentinel values to overwrite previously assigned, no longer correct ones
+              winNumber: -1,
+              voterContactGoal: -1,
+              projectedTurnout: -1,
+            }),
       }
     } catch (error) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'DistrictMatch',
+          matchType: 'gold',
+          result: 'failure',
+          reason: error instanceof Error ? error.message : String(error),
+          error: serializeError(error),
+          electionDate,
+          campaignId,
+          ballotreadyPositionId,
+          officeName,
+          districtType: positionWithDistrict?.district?.L2DistrictType,
+          districtName: positionWithDistrict?.district?.L2DistrictName,
+          projectedTurnout:
+            positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
+        }),
+      )
       const message = this.buildSlackErrorMessage(
         'Election API error: getBallotReadyMatchedRaceTargetDetails',
         { ballotreadyPositionId, electionDate },

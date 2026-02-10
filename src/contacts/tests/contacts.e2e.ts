@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
+import { expect, test } from '@playwright/test'
 import {
-  registerUser,
   deleteUser,
   generateRandomEmail,
   generateRandomName,
+  registerUser,
 } from '../../../e2e-tests/utils/auth.util'
 
 test.describe('Contacts and Segments', () => {

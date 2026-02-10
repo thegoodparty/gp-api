@@ -41,6 +41,11 @@ export async function loginUser(
   email: string,
   password: string,
 ): Promise<LoginResponse> {
+  if (!email || !password) {
+    throw new Error(
+      `Email and password are required for login: email: ${email}, password: ${password}`,
+    )
+  }
   const response = await request.post('/v1/authentication/login', {
     data: {
       email,

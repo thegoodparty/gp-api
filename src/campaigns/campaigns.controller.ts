@@ -301,10 +301,13 @@ export class CampaignsController {
       )
     }
     const raceTargetDetails =
-      await this.elections.getBallotReadyMatchedRaceTargetDetails(
-        campaign.details.positionId,
-        campaign.details.electionDate,
-      )
+      await this.elections.getBallotReadyMatchedRaceTargetDetails({
+        campaignId: campaign.id,
+        ballotreadyPositionId: campaign.details.positionId,
+        electionDate: campaign.details.electionDate,
+        includeTurnout: true,
+        officeName: campaign.details.otherOffice,
+      })
     if (!raceTargetDetails) {
       throw new NotFoundException(
         'Failed to fetch the raceTargetDetails for the requested campaign',
@@ -347,11 +350,13 @@ export class CampaignsController {
       )
     }
     const raceTargetDetails =
-      await this.elections.getBallotReadyMatchedRaceTargetDetails(
-        campaign.details.positionId,
-        campaign.details.electionDate,
-        includeTurnout,
-      )
+      await this.elections.getBallotReadyMatchedRaceTargetDetails({
+        campaignId: campaign.id,
+        ballotreadyPositionId: campaign.details.positionId,
+        electionDate: campaign.details.electionDate,
+        includeTurnout: includeTurnout ?? true,
+        officeName: campaign.details.otherOffice,
+      })
     if (!raceTargetDetails) {
       throw new NotFoundException(
         'Failed to fetch the raceTargetDetails for the requested campaign',

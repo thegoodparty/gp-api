@@ -1,14 +1,14 @@
-import { Module } from '@nestjs/common'
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
-import { ScheduleModule } from '@nestjs/schedule'
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
 import { JwtAuthStrategy } from '@/authentication/auth-strategies/JwtAuth.strategy'
 import { AuthenticationModule } from '@/authentication/authentication.module'
+import { ClerkM2MAuthGuard } from '@/authentication/guards/ClerkM2MAuth.guard'
 import { JwtAuthGuard } from '@/authentication/guards/JwtAuth.guard'
 import { AdminAuditInterceptor } from '@/authentication/interceptors/AdminAudit.interceptor'
+import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { CampaignsModule } from '@/campaigns/campaigns.module'
 import { CommunityIssuesModule } from '@/communityIssues/communityIssues.module'
+import { ContactEngagementModule } from '@/contactEngagement/contactEngagement.module'
 import { ContactsModule } from '@/contacts/contacts.module'
 import { ContentModule } from '@/content/content.module'
 import { CrmModule } from '@/crm/crmModule'
@@ -38,6 +38,9 @@ import { PeerlyModule } from '@/vendors/peerly/peerly.module'
 import { SegmentModule } from '@/vendors/segment/segment.module'
 import { VotersModule } from '@/voters/voters.module'
 import { WebsitesModule } from '@/websites/websites.module'
+import { Module } from '@nestjs/common'
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { ScheduleModule } from '@nestjs/schedule'
 
 @Module({
   imports: [
@@ -71,6 +74,7 @@ import { WebsitesModule } from '@/websites/websites.module'
     CommunityIssuesModule,
     PeerlyModule,
     ContactsModule,
+    ContactEngagementModule,
     PollsModule,
     ElectedOfficeModule,
   ]
@@ -85,6 +89,10 @@ import { WebsitesModule } from '@/websites/websites.module'
     SessionsService,
     {
       provide: APP_GUARD,
+      useClass: ClerkM2MAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
     {
@@ -96,6 +104,7 @@ import { WebsitesModule } from '@/websites/websites.module'
       useClass: BlockedStateInterceptor,
     },
     JwtAuthStrategy,
+    ClerkClientProvider,
   ],
 })
 export class AppModule {}
