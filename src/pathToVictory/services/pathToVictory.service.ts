@@ -231,9 +231,16 @@ export class PathToVictoryService extends createPrismaBase(
 
       const hasTurnout = pathToVictoryResponse.counts.projectedTurnout > 0
       // If no turnout was found but a district was matched, preserve the district info
+      // and use sentinel -1 values to signal "district matched, no turnout" (consistent
+      // with the gold flow). This ensures completePathToVictory overwrites stale turnout.
       if (!hasTurnout && lastMatchedDistrictType && lastMatchedDistrictName) {
         pathToVictoryResponse.electionType = lastMatchedDistrictType
         pathToVictoryResponse.electionLocation = lastMatchedDistrictName
+        pathToVictoryResponse.counts = {
+          projectedTurnout: -1,
+          winNumber: -1,
+          voterContactGoal: -1,
+        }
       }
       const hasDistrict =
         !!pathToVictoryResponse.electionType &&
@@ -604,18 +611,16 @@ export class PathToVictoryService extends createPrismaBase(
       const incomingHasDistrict =
         !!pathToVictoryResponse.electionType &&
         !!pathToVictoryResponse.electionLocation
-      const incomingHasTurnout = incomingTurnout > 0
-
       // Only overwrite when we have actual data to write.
       // Do NOT use hasOfficeChanged for district — the gold flow may have already
       // written correct district data for the new office, and wiping it with empty
       // strings would lose that data.
-      // DO use hasOfficeChanged for turnout — when the office changed, stale turnout
-      // was already stripped from baseData, and we should write the incoming values
-      // (even -1 sentinels) so the record reflects "district matched, no turnout"
-      // rather than having ambiguous absent fields.
+      // For turnout: overwrite when we have real data (> 0) OR sentinel values (-1,
+      // meaning "district matched, no turnout"). Only skip overwrite when incoming
+      // is exactly 0 (total failure) — unless office changed, in which case stale
+      // turnout was already stripped from baseData and we should write whatever we have.
       const shouldOverwriteDistrict = incomingHasDistrict
-      const shouldOverwriteTurnout = incomingHasTurnout || hasOfficeChanged
+      const shouldOverwriteTurnout = incomingTurnout !== 0 || hasOfficeChanged
 
       await this.prisma.pathToVictory.update({
         where: { id: p2v.id },

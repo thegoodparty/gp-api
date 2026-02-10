@@ -358,6 +358,45 @@ describe('PathToVictoryService', () => {
       expect(writtenData.officeContextFingerprint).toBe('new-fingerprint')
     })
 
+    it('overwrites turnout with sentinel -1 when same office but turnout no longer available', async () => {
+      // Scenario: same office, previously had turnout, now gold flow returns
+      // district match but no turnout (sentinel -1). Should overwrite stale turnout.
+      const sentinelResponse = {
+        counts: {
+          projectedTurnout: -1,
+          winNumber: -1,
+          voterContactGoal: -1,
+        },
+        electionType: 'State_House',
+        electionLocation: 'STATE HOUSE 005',
+      }
+
+      mockPrisma.campaign.findUnique.mockResolvedValue(
+        makeCampaign({
+          p2vStatus: P2VStatus.complete,
+          projectedTurnout: 500,
+          winNumber: 251,
+          voterContactGoal: 1255,
+          electionType: 'State_House',
+          electionLocation: 'STATE HOUSE 005',
+          officeContextFingerprint: 'same-fingerprint',
+        }),
+      )
+      mockPrisma.pathToVictory.update.mockResolvedValue({})
+
+      await service.completePathToVictory('test-slug', sentinelResponse, {
+        officeFingerprint: 'same-fingerprint',
+        p2vStatusOverride: P2VStatus.districtMatched,
+      })
+
+      const updateCall = mockPrisma.pathToVictory.update.mock.calls[0][0]
+      const writtenData = updateCall.data.data
+
+      expect(writtenData.projectedTurnout).toBe(-1)
+      expect(writtenData.winNumber).toBe(-1)
+      expect(writtenData.voterContactGoal).toBe(-1)
+    })
+
     it('does not overwrite district when incoming has empty values', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(
         makeCampaign({

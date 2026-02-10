@@ -333,9 +333,12 @@ export class CampaignsController {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
-        ...(hasTurnout
-          ? { winNumber, voterContactGoal, projectedTurnout }
-          : {}),
+        // Always write turnout values: real data when available, sentinel -1
+        // when district matched but no turnout. This ensures stale turnout
+        // from a previous district is cleared.
+        winNumber,
+        voterContactGoal,
+        projectedTurnout,
         source: P2VSource.ElectionApi,
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
@@ -383,9 +386,12 @@ export class CampaignsController {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
-        ...(hasTurnout
-          ? { winNumber, voterContactGoal, projectedTurnout }
-          : {}),
+        // Always write turnout values: real data when available, sentinel -1
+        // when district matched but no turnout. This ensures stale turnout
+        // from a previous district is cleared.
+        winNumber,
+        voterContactGoal,
+        projectedTurnout,
         source: P2VSource.ElectionApi,
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
