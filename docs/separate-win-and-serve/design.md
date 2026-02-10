@@ -232,9 +232,18 @@ if (!hasAccess) {
 3. Update poll creation — currently auto-creates an ElectedOffice linked to a Campaign (`polls.controller.ts:128-132`, marked TEMPORARY). Instead, auto-creates a Seat and ElectedOffice using the same pattern as step 2.
 4. Implement product switcher
 
+**Why use an `x-seat-id` header?**
+
+With multiple Seats per user, the API needs a way to resolve which Seat a request targets. Two obvious alternatives:
+
+- **Path parameter** (`/seats/:seatId/voter-filters`): Explicit and RESTful, but changes the URL structure for every shared endpoint. Since `@UseCampaign()` routes don't use a path param today (they resolve from the authenticated user), introducing one only for Seat-scoped routes creates an inconsistency.
+- **Query parameter** (`/voter-file/filters?seatId=123`): Doesn't change URLs, but scoping mutations (POST/PUT/DELETE) via query param feels awkward and is easy to forget.
+
+A header keeps the URL structure unchanged, matches the existing implicit-resolution pattern (`@UseCampaign()` resolves from `request.user`, `@UseSeat()` resolves from `request.headers['x-seat-id']`), and is set once in a fetch wrapper so every request carries it automatically. The `@UseSeat()` guard falls back to the user's sole Seat when the header is absent, so single-seat users (the majority today) don't need to send it at all.
+
 **Product switcher — server-side:**
 
-The API needs a way to resolve "which Seat is the user operating in." We add a `GET /seats` endpoint (to power the product switcher) and a `x-seat-id` header convention (to power the `@UseSeat()` guard):
+We add a `GET /seats` endpoint (to power the product switcher) and a `x-seat-id` header convention (to power the `@UseSeat()` guard):
 
 ```typescript
 // GET /seats — returns all seats for the current user.
