@@ -171,6 +171,9 @@ REQUIRED BEHAVIOR:
 - If asked to create a service, create ONLY the service file
 - Wait for explicit instructions before adding any additional functionality
 - Ask for clarification if the scope is unclear rather than assuming
+- When modifying existing code, preserve the existing code structure and patterns — do NOT refactor, reorganize, or "improve" surrounding code that is not directly related to the requested change
+- If existing code uses inline awaits in a return statement, keep that pattern — do NOT restructure it into Promise.all, destructured variables, or any other form
+- Only touch the lines necessary to fulfill the request
 
 ## Rule 6: Use Available Libraries
 
@@ -680,6 +683,69 @@ model BlogArticle {
 ```
 
 Before adding a JSON column, ask: "Can I model this with proper columns and relations?" If yes, use proper columns.
+
+## Rule 26: Use Library-Provided Enums and Constants Over Magic Strings
+
+CRITICAL REQUIREMENT:
+
+- Before using ANY string literal or numeric literal as a function argument, object property value, or configuration value, ALWAYS check whether the library provides an enum, constant, or type for that value
+- This applies to ALL libraries: Prisma, NestJS, http-constants-ts, Zod, and any other dependency
+
+REQUIRED WORKFLOW:
+
+1. Identify the library that owns the function/method/property you are calling
+2. Inspect the library's type definitions for enums, constants, or literal union types
+3. Use the library's provided constant instead of a magic string
+
+EXAMPLES:
+
+**Prisma:**
+
+```typescript
+import { Prisma } from '@prisma/client'
+
+// ❌ Bad: magic string
+{ mode: 'insensitive' }
+
+// ✅ Good: Prisma enum
+{ mode: Prisma.QueryMode.insensitive }
+
+// ❌ Bad: magic string for sort direction
+{ orderBy: { createdAt: 'desc' } }
+
+// ✅ Good: Prisma enum
+{ orderBy: { createdAt: Prisma.SortOrder.desc } }
+```
+
+**NestJS:**
+
+```typescript
+import { HttpStatus } from '@nestjs/common'
+
+// ❌ Bad: magic number
+expect(response.status).toBe(200)
+
+// ✅ Good: NestJS enum
+expect(response.status).toBe(HttpStatus.OK)
+```
+
+**http-constants-ts:**
+
+```typescript
+import { MediaType } from 'http-constants-ts'
+
+// ❌ Bad: magic string
+const contentType = 'application/json'
+
+// ✅ Good: library constant
+const contentType = MediaType.APPLICATION_JSON
+```
+
+ENFORCEMENT:
+
+- This rule applies to ALL code: controllers, services, schemas, tests, utilities
+- Review every string/number literal to determine if a library constant exists
+- When in doubt, inspect the library's type definitions before using a literal value
 
 ## General NestJS Patterns
 

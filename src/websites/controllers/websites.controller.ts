@@ -104,6 +104,7 @@ export class WebsitesController {
       page = 1,
     }: GetWebsiteContactsSchema,
   ) {
+    const offset = (page - 1) * limit
     const website = await this.websites.findUniqueOrThrow({
       where: { campaignId },
     })
@@ -111,9 +112,9 @@ export class WebsitesController {
     const [contacts, total] = await Promise.all([
       this.contacts.findMany({
         where: { websiteId: website.id },
-        orderBy: sortBy ? { [sortBy]: sortOrder } : undefined,
         take: limit,
-        skip: (page - 1) * limit,
+        skip: offset,
+        ...(sortBy ? { orderBy: { [sortBy]: sortOrder } } : {}),
       }),
       this.contacts.count({
         where: { websiteId: website.id },
