@@ -20,8 +20,6 @@ export const verifyM2MToken = async (
       machineSecretKey: GP_WEBAPP_MACHINE_SECRET,
     })
   } catch (error) {
-    console.dir(error, { depth: 4, colors: true })
-    console.error(error instanceof Error ? error.message : 'Unknown error')
-    throw new UnauthorizedException('Invalid M2M token')
+    throw new UnauthorizedException('M2M token verification failed')
   }
 }
