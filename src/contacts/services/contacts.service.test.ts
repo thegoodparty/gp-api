@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { of } from 'rxjs'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignWithPathToVictory } from '../contacts.types'
 import { ContactsService } from './contacts.service'
 

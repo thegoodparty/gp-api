@@ -9,7 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:dev": "tsx scripts/check-pending-migrations.ts && nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node -r ./newrelic.js dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
