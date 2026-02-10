@@ -146,9 +146,15 @@ export class ElectionsService {
     electionDate?: string
     includeTurnout: boolean
     campaignId: number
+    officeName: string | undefined
   }) {
-    const { ballotreadyPositionId, electionDate, includeTurnout, campaignId } =
-      params
+    const {
+      ballotreadyPositionId,
+      electionDate,
+      includeTurnout,
+      campaignId,
+      officeName,
+    } = params
     let positionWithDistrict: PositionWithMatchedDistrict | null = null
     try {
       positionWithDistrict = await this.electionApiGet<
@@ -183,6 +189,7 @@ export class ElectionsService {
           electionDate,
           campaignId,
           ballotreadyPositionId,
+          officeName,
           districtType: positionWithDistrict?.district?.L2DistrictType,
           districtName: positionWithDistrict?.district?.L2DistrictName,
           projectedTurnout: turnoutValue,
@@ -210,6 +217,7 @@ export class ElectionsService {
           electionDate,
           campaignId,
           ballotreadyPositionId,
+          officeName,
           districtType: positionWithDistrict?.district?.L2DistrictType,
           districtName: positionWithDistrict?.district?.L2DistrictName,
           projectedTurnout:

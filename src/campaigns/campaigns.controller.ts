@@ -317,6 +317,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
+        officeName: campaign.details.otherOffice,
       })
     if (!raceTargetDetails) {
       throw new NotFoundException(
@@ -366,6 +367,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
+        officeName: campaign.details.otherOffice,
       })
     if (!raceTargetDetails) {
       throw new NotFoundException(
