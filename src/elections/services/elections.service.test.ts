@@ -1,11 +1,11 @@
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { SlackService } from '@/vendors/slack/services/slack.service'
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { SlackService } from '@/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ElectionsService } from './elections.service'
 import { PositionWithMatchedDistrict } from '../types/elections.types'
+import { ElectionsService } from './elections.service'
 
 const makePosition = (
   turnoutValue: number | null,
@@ -78,12 +78,11 @@ describe('ElectionsService', () => {
       electionDate: '2024-11-05',
       includeTurnout: true,
       campaignId: 123,
+      officeName: 'City Council',
     }
 
     it('returns calculated metrics when district and turnout are present', async () => {
-      mockHttpGet.mockReturnValue(
-        of({ data: makePosition(1000), status: 200 }),
-      )
+      mockHttpGet.mockReturnValue(of({ data: makePosition(1000), status: 200 }))
 
       const result =
         await service.getBallotReadyMatchedRaceTargetDetails(defaultParams)
@@ -96,9 +95,7 @@ describe('ElectionsService', () => {
     })
 
     it('returns district with sentinel values when turnout is null', async () => {
-      mockHttpGet.mockReturnValue(
-        of({ data: makePosition(null), status: 200 }),
-      )
+      mockHttpGet.mockReturnValue(of({ data: makePosition(null), status: 200 }))
 
       const result =
         await service.getBallotReadyMatchedRaceTargetDetails(defaultParams)
