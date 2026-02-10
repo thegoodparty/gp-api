@@ -1,18 +1,18 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { PrismaService } from '@/prisma/prisma.service'
-import { SlackService } from '@/vendors/slack/services/slack.service'
-import { SlackChannel } from '@/vendors/slack/slackService.types'
-import { EmailService } from '@/email/email.service'
 import { CrmCampaignsService } from '@/campaigns/services/crmCampaigns.service'
-import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
+import { EmailService } from '@/email/email.service'
 import { CustomEventType } from '@/observability/newrelic/newrelic.events'
+import { PrismaService } from '@/prisma/prisma.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { SegmentService } from '@/vendors/segment/segment.service'
-import { PathToVictoryService } from './pathToVictory.service'
-import { OfficeMatchService } from './officeMatch.service'
+import { SlackService } from '@/vendors/slack/services/slack.service'
+import { SlackChannel } from '@/vendors/slack/slackService.types'
+import { Test, TestingModule } from '@nestjs/testing'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { OfficeMatchService } from './officeMatch.service'
+import { PathToVictoryService } from './pathToVictory.service'
 
 const mockRecordCustomEvent = vi.fn()
 vi.mock('src/observability/newrelic/newrelic.client', () => ({
@@ -161,7 +161,7 @@ describe('PathToVictoryService', () => {
       )
     })
 
-    it('returns true and sets DistrictMatched when district found but no turnout', async () => {
+    it('returns false and skips completePathToVictory when district found but no turnout', async () => {
       const input = makeAnalyzeInput({
         pathToVictoryResponse: {
           counts: { projectedTurnout: 0, winNumber: 0, voterContactGoal: 0 },
@@ -173,7 +173,8 @@ describe('PathToVictoryService', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await service.analyzePathToVictoryResponse(input as any)
 
-      expect(result).toBe(true)
+      // Returns false so queue consumer retries silver (LLM is non-deterministic)
+      expect(result).toBe(false)
       expect(mockSlack.formattedMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           channel: SlackChannel.botPathToVictoryIssues,
@@ -184,16 +185,12 @@ describe('PathToVictoryService', () => {
         'path_to_victory_status',
         P2VStatus.districtMatched,
       )
-      expect(service.completePathToVictory).toHaveBeenCalledWith(
-        'test-slug',
-        expect.anything(),
-        expect.objectContaining({
-          p2vStatusOverride: P2VStatus.districtMatched,
-        }),
-      )
+      // completePathToVictory is NOT called — gold's data is preserved.
+      // handlePathToVictoryFailure in the queue consumer will track p2vAttempts.
+      expect(service.completePathToVictory).not.toHaveBeenCalled()
     })
 
-    it('returns false and sets Failed when no district and no turnout', async () => {
+    it('returns false and skips completePathToVictory when no district and no turnout', async () => {
       const input = makeAnalyzeInput()
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -217,13 +214,9 @@ describe('PathToVictoryService', () => {
         'path_to_victory_status',
         P2VStatus.failed,
       )
-      expect(service.completePathToVictory).toHaveBeenCalledWith(
-        'test-slug',
-        expect.anything(),
-        expect.objectContaining({
-          p2vStatusOverride: P2VStatus.failed,
-        }),
-      )
+      // completePathToVictory is NOT called — gold's data (source, sentinels)
+      // is preserved. handlePathToVictoryFailure handles retries and final status.
+      expect(service.completePathToVictory).not.toHaveBeenCalled()
     })
   })
 
@@ -436,6 +429,5 @@ describe('PathToVictoryService', () => {
       expect(writtenData.winNumber).toBe(251)
       expect(writtenData.voterContactGoal).toBe(1255)
     })
-
   })
 })

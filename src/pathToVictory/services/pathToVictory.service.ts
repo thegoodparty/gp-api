@@ -473,17 +473,19 @@ export class PathToVictoryService extends createPrismaBase(
       }
     }
 
-    await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
-      sendEmail: sendEmailFlag,
-      p2vStatusOverride: statusOverride,
-      officeFingerprint,
-    })
-    // Treat both full success and district-only match as success
-    // to prevent retry/failure logic in the queue consumer
-    const hasDistrict =
-      !!pathToVictoryResponse.electionType &&
-      !!pathToVictoryResponse.electionLocation
-    return hasTurnout || hasDistrict
+    // Only call completePathToVictory when silver actually found turnout.
+    // When silver fails (district-only or nothing), skip it entirely so gold's
+    // authoritative data (district, sentinels, source=ElectionApi) is preserved.
+    // Returning false lets handlePathToVictoryFailure track p2vAttempts and
+    // handle retries (up to 3) or final status.
+    if (hasTurnout) {
+      await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
+        sendEmail: sendEmailFlag,
+        p2vStatusOverride: statusOverride,
+        officeFingerprint,
+      })
+    }
+    return hasTurnout
   }
 
   async completePathToVictory(

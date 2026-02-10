@@ -328,7 +328,7 @@ export class CampaignsController {
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
     const hasTurnout = projectedTurnout > 0
-    return this.campaigns.updateJsonFields(campaign.id, {
+    const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
@@ -343,8 +343,20 @@ export class CampaignsController {
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
+        // Always reset stale silver state when district changes
+        p2vAttempts: 0,
+        officeContextFingerprint: null,
       },
     })
+
+    // When gold matched a district but found no turnout, enqueue silver
+    // to try finding turnout via LLM-based matching (non-deterministic,
+    // may find a different district that has turnout data).
+    if (!hasTurnout) {
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
+
+    return result
   }
 
   @Put('admin/:slug/race-target-details')
@@ -381,7 +393,7 @@ export class CampaignsController {
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
     const hasTurnout = projectedTurnout > 0
-    return this.campaigns.updateJsonFields(campaign.id, {
+    const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
@@ -396,7 +408,19 @@ export class CampaignsController {
         p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
+        // Always reset stale silver state when district changes
+        p2vAttempts: 0,
+        officeContextFingerprint: null,
       },
     })
+
+    // When gold matched a district but found no turnout, enqueue silver
+    // to try finding turnout via LLM-based matching (non-deterministic,
+    // may find a different district that has turnout data).
+    if (!hasTurnout) {
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+    }
+
+    return result
   }
 }
