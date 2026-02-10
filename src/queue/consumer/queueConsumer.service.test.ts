@@ -1,21 +1,21 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { P2VStatus } from '@/elections/types/pathToVictory.types'
-import { QueueConsumerService } from './queueConsumer.service'
 import { AiContentService } from '@/campaigns/ai/content/aiContent.service'
-import { SlackService } from '@/vendors/slack/services/slack.service'
-import { PathToVictoryService } from '@/pathToVictory/services/pathToVictory.service'
-import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { CampaignTcrComplianceService } from '@/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { DomainsService } from '@/websites/services/domains.service'
-import { PollsService } from '@/polls/services/polls.service'
-import { PollIssuesService } from '@/polls/services/pollIssues.service'
-import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
 import { ContactsService } from '@/contacts/services/contacts.service'
-import { S3Service } from '@/vendors/aws/services/s3.service'
+import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
+import { P2VStatus } from '@/elections/types/pathToVictory.types'
+import { PathToVictoryService } from '@/pathToVictory/services/pathToVictory.service'
+import { PollIssuesService } from '@/polls/services/pollIssues.service'
+import { PollsService } from '@/polls/services/polls.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { UsersService } from '@/users/services/users.service'
+import { S3Service } from '@/vendors/aws/services/s3.service'
+import { SlackService } from '@/vendors/slack/services/slack.service'
+import { DomainsService } from '@/websites/services/domains.service'
+import { Test, TestingModule } from '@nestjs/testing'
+import { AnalyticsService } from 'src/analytics/analytics.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueueConsumerService } from './queueConsumer.service'
 
 const mockRecordCustomEvent = vi.fn()
 vi.mock('src/observability/newrelic/newrelic.client', () => ({
@@ -111,7 +111,9 @@ describe('QueueConsumerService - P2V handling', () => {
   describe('handlePathToVictoryFailure', () => {
     // Access private method
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let handleFailure: (campaign: ReturnType<typeof makeCampaign>) => Promise<boolean>
+    let handleFailure: (
+      campaign: ReturnType<typeof makeCampaign>,
+    ) => Promise<boolean>
 
     beforeEach(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -204,12 +206,9 @@ describe('QueueConsumerService - P2V handling', () => {
 
       // processMessage is wrapped in withLegacyErrorSwallowing.
       // When handlePathToVictoryMessage does NOT throw, it returns true.
-      const result = await service.processMessage(
-        makeQueueMessage() as never,
-      )
+      const result = await service.processMessage(makeQueueMessage() as never)
 
       expect(result).toBe(true)
     })
-
   })
 })
