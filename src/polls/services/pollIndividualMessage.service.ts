@@ -21,4 +21,8 @@ export class PollIndividualMessageService extends createPrismaBase(
   async create(data: PollIndividualMessageCreateData) {
     return this.model.create({ data })
   }
+
+  async createMany(data: PollIndividualMessageCreateData[]) {
+    return this.model.createMany({ data })
+  }
 }

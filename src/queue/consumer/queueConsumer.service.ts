@@ -1,6 +1,11 @@
 import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
 import { Message } from '@aws-sdk/client-sqs'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
 import {
   Campaign,
   PathToVictory,
@@ -59,7 +64,10 @@ import {
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import neatCsv from 'neat-csv'
-import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
+import {
+  PollIndividualMessageCreateData,
+  PollIndividualMessageService,
+} from '@/polls/services/pollIndividualMessage.service'
 import { toCamelCaseKeys } from 'es-toolkit'
 
 @Injectable()
@@ -584,15 +592,22 @@ export class QueueConsumerService {
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
-    this.logger.log(
-      `Handling poll analysis complete event for poll ${event.data.pollId}`,
-    )
-    const data = await this.getPollAndCampaign(event.data.pollId)
+    const { pollId, totalResponses, responsesLocation, issues } = event.data
+    this.logger.log(`Handling poll analysis complete event for poll ${pollId}`)
+    const data = await this.getPollAndCampaign(pollId)
     if (!data) {
       this.logger.log('Poll not found, ignoring event')
       return
     }
     const { poll, campaign } = data
+    const { electedOfficeId } = poll
+    const { userId: campaignUserId, pathToVictory } = campaign
+
+    if (!electedOfficeId) {
+      throw new InternalServerErrorException(
+        `Error: pollId ${pollId} has no elected office`,
+      )
+    }
 
     // We want to allow completing scheduled polls for testing purposes. In E2E tests
     // we create polls and want to simulate completing them quickly.
@@ -619,18 +634,18 @@ export class QueueConsumerService {
       //  - responses from >=10%
       // This was last decided here: https://goodparty.clickup.com/t/90132012119/ENG-4771
       highConfidence =
-        event.data.totalResponses > 75 ||
-        event.data.totalResponses / constituency.pagination.totalResults >= 0.1
+        totalResponses > 75 ||
+        totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
     await this.pollIssuesService.model.deleteMany({
-      where: { pollId: event.data.pollId },
+      where: { pollId },
     })
     this.logger.log('Successfully deleted existing poll issues')
     await this.pollIssuesService.client.pollIssue.createMany({
-      data: event.data.issues.map((issue) => ({
-        id: `${event.data.pollId}-${issue.rank}`,
-        pollId: event.data.pollId,
+      data: issues.map((issue) => ({
+        id: `${pollId}-${issue.rank}`,
+        pollId,
         title: issue.theme,
         summary: issue.summary,
         details: issue.analysis,
@@ -649,54 +664,75 @@ export class QueueConsumerService {
     }
     const pollResponsesCsv = await this.s3Service.getFile(
       SERVE_DATA_S3_BUCKET,
-      event.data.responsesLocation,
+      responsesLocation,
     )
-
-    if (pollResponsesCsv) {
-      const parsed: PollResponseCSV[] = await neatCsv(pollResponsesCsv)
-      const rows: PollResponse[] = parsed.map((row) => toCamelCaseKeys(row))
-      for (const response of rows) {
-        const { phoneNumber, originalMessage, atomicMessage, pollId, k2Theme } =
-          response
-        const personId = this.pollIndividualMessage.create({
-          personId: '',
-          sentAt: '',
-          isOptOut: k2Theme === OPT_OUT_THEME,
-          pollIssues: k2Theme,
-        })
-      }
-    } else {
-      this.logger.warn(
-        `Failed to fetch poll responses for pollId: ${event.data.pollId}`,
+    if (!pollResponsesCsv) {
+      throw new InternalServerErrorException(
+        `Unable to fetch responses from S3 for pollId: ${pollId}`,
       )
     }
 
+    const parsed: PollResponseCSV[] = await neatCsv(pollResponsesCsv)
+    const rows: PollResponse[] = parsed.map((row) => toCamelCaseKeys(row))
+    const createData: PollIndividualMessageCreateData[] = []
+    const phoneNumbers = [...new Set(rows.map((r) => r.phoneNumber))]
+    const phoneToPersonIdMap = await this.findMappedPersonIdsForCellPhones({
+      electedOfficeId,
+      pollId,
+      phoneNumbers,
+    })
+
+    for (const row of rows) {
+      const { phoneNumber, originalMessage, k2Theme } = row
+      const personId = phoneToPersonIdMap.get(phoneNumber)
+      if (!personId) {
+        throw new InternalServerErrorException(
+          `Person with cell phone ${phoneNumber} not found in poll ${pollId}`,
+        )
+      }
+      const createDataRecord: PollIndividualMessageCreateData = {
+        id: `${pollId}-${personId}`,
+        personId: personId,
+        sentAt: new Date(),
+        isOptOut: k2Theme === OPT_OUT_THEME,
+        content: originalMessage ?? null,
+        electedOfficeId,
+        pollId,
+        pollIssues: { connect: [] },
+      }
+      createData.push(createDataRecord)
+    }
+
+    await this.pollIndividualMessage.createMany(createData)
+
     await this.pollsService.markPollComplete({
-      pollId: poll.id,
-      totalResponses: event.data.totalResponses,
+      pollId,
+      totalResponses,
       confidence: highConfidence ? 'HIGH' : 'LOW',
     })
 
     const pollCount = await this.pollsService.model.count({
       where: {
-        electedOfficeId: poll.electedOfficeId,
+        electedOfficeId,
         isCompleted: true,
       },
     })
 
-    await this.analytics.identify(campaign.userId, { pollcount: pollCount })
-    await this.analytics.track(
-      campaign.userId,
-      EVENTS.Polls.ResultsSynthesisCompleted,
-      {
-        pollId: poll.id,
-        path: `/dashboard/polls/${poll.id}`,
-        constituencyName: campaign.pathToVictory?.data.electionLocation,
-        'issue 1': event.data.issues?.at(0)?.theme || null,
-        'issue 2': event.data.issues?.at(1)?.theme || null,
-        'issue 3': event.data.issues?.at(2)?.theme || null,
-      },
-    )
+    await Promise.all([
+      this.analytics.identify(campaignUserId, { pollcount: pollCount }),
+      this.analytics.track(
+        campaignUserId,
+        EVENTS.Polls.ResultsSynthesisCompleted,
+        {
+          pollId,
+          path: `/dashboard/polls/${pollId}`,
+          constituencyName: pathToVictory?.data.electionLocation,
+          'issue 1': issues?.at(0)?.theme || null,
+          'issue 2': issues?.at(1)?.theme || null,
+          'issue 3': issues?.at(2)?.theme || null,
+        },
+      ),
+    ])
     return true
   }
 
@@ -886,32 +922,31 @@ export class QueueConsumerService {
     return { poll, office, campaign }
   }
 
-  private async findPersonIdsForCellPhones(params: {
+  async findMappedPersonIdsForCellPhones(params: {
     electedOfficeId: string
     pollId: string
-    personCellPhones: string[]
-  }): Promise<string[]> {
+    phoneNumbers: string[]
+  }) {
+    const { electedOfficeId, pollId, phoneNumbers } = params
+    const cellPhonesToPeopleIds: Map<string, string> = new Map()
     const messages = await this.pollIndividualMessage.findMany({
       where: {
-        electedOfficeId: params.electedOfficeId,
-        pollId: params.pollId,
+        electedOfficeId,
+        pollId,
+        personCellPhone: { in: phoneNumbers },
         sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
       },
     })
-
-    return params.personCellPhones.map((cellPhone) => {
-      const matchingMessage = messages.find(
-        (message) => message.personCellPhone === cellPhone,
-      )
-
-      if (!matchingMessage) {
-        throw new Error(
-          `Person with cell phone ${cellPhone} not found in poll ${params.pollId}`,
+    for (const message of messages) {
+      const { personCellPhone, personId } = message
+      if (!personCellPhone) {
+        throw new InternalServerErrorException(
+          'Encountered unexpected message without a cellphone',
         )
       }
-
-      return matchingMessage.personId
-    })
+      cellPhonesToPeopleIds.set(personCellPhone, personId)
+    }
+    return cellPhonesToPeopleIds
   }
 }
 
