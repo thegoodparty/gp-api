@@ -5,12 +5,12 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 /** Create input with isOptOut, content, electedOfficeId, and pollIssues required */
 export type PollIndividualMessageCreateData = Omit<
   Prisma.PollIndividualMessageUncheckedCreateInput,
-  'isOptOut' | 'content' | 'electedOfficeId' | 'pollIssues'
+  'isOptOut' | 'content' | 'electedOfficeId'
 > &
   Required<
     Pick<
       Prisma.PollIndividualMessageUncheckedCreateInput,
-      'isOptOut' | 'content' | 'electedOfficeId' | 'pollIssues'
+      'isOptOut' | 'content' | 'electedOfficeId'
     >
   >
 

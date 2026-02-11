@@ -50,7 +50,6 @@ import { DomainsService } from '../../websites/services/domains.service'
 import {
   DomainEmailForwardingMessage,
   GenerateAiContentMessageData,
-  OPT_OUT_THEME,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -58,17 +57,16 @@ import {
   PollExpansionEvent,
   PollExpansionEventSchema,
   PollResponse,
-  PollResponseCSV,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
 import neatCsv from 'neat-csv'
-import {
-  PollIndividualMessageCreateData,
-  PollIndividualMessageService,
-} from '@/polls/services/pollIndividualMessage.service'
-import { toCamelCaseKeys } from 'es-toolkit'
+import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
+import { v5 as uuidv5 } from 'uuid'
+
+const POLL_INDIVIDUAL_MESSAGE_NAMESPACE =
+  'a0e5f0a1-2b3c-4d5e-6f70-8192a3b4c5d6' as const
 
 @Injectable()
 export class QueueConsumerService {
@@ -672,9 +670,12 @@ export class QueueConsumerService {
       )
     }
 
-    const parsed: PollResponseCSV[] = await neatCsv(pollResponsesCsv)
-    const rows: PollResponse[] = parsed.map((row) => toCamelCaseKeys(row))
-    const createData: PollIndividualMessageCreateData[] = []
+    const rows = await neatCsv<PollResponse>(pollResponsesCsv)
+    const pollIssueIds = issues.map((issue) => ({
+      id: `${pollId}-${issue.rank}`,
+    }))
+    const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
+    const joinValues: Prisma.Sql[] = []
     const phoneNumbers = [...new Set(rows.map((r) => r.phoneNumber))]
     const phoneToPersonIdMap = await this.findMappedPersonIdsForCellPhones({
       electedOfficeId,
@@ -683,27 +684,50 @@ export class QueueConsumerService {
     })
 
     for (const row of rows) {
-      const { phoneNumber, originalMessage, k2Theme } = row
+      const {
+        phoneNumber,
+        originalMessage,
+        receivedAt,
+        isOptOut: isOptOutStr,
+      } = row
       const personId = phoneToPersonIdMap.get(phoneNumber)
       if (!personId) {
         throw new InternalServerErrorException(
           `Person with cell phone ${phoneNumber} not found in poll ${pollId}`,
         )
       }
-      const createDataRecord: PollIndividualMessageCreateData = {
-        id: `${pollId}-${personId}`,
-        personId: personId,
-        sentAt: new Date(),
-        isOptOut: k2Theme === OPT_OUT_THEME,
+
+      const id = uuidv5(
+        `${pollId}-${personId}-${originalMessage ?? ''}`,
+        POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
+      )
+      const isOptOut =
+        isOptOutStr === 'true' || isOptOutStr === '1' || isOptOutStr === 'yes'
+      const sentAt = receivedAt ? new Date(receivedAt) : new Date()
+      scalarData.push({
+        id,
+        personId,
+        sentAt,
+        isOptOut,
         content: originalMessage ?? null,
         electedOfficeId,
         pollId,
-        pollIssues: { connect: [] },
+      })
+      for (const issue of pollIssueIds) {
+        joinValues.push(Prisma.sql`(${id}, ${issue.id})`)
       }
-      createData.push(createDataRecord)
     }
 
-    await this.pollIndividualMessage.createMany(createData)
+    const prisma = this.pollIndividualMessage.client
+    await prisma.$transaction(async (tx) => {
+      await tx.pollIndividualMessage.createMany({ data: scalarData })
+      if (joinValues.length > 0) {
+        await tx.$executeRaw`
+          INSERT INTO "_PollIndividualMessageToPollIssue" ("A", "B")
+          VALUES ${Prisma.join(joinValues, ', ')}
+        `
+      }
+    })
 
     await this.pollsService.markPollComplete({
       pollId,
