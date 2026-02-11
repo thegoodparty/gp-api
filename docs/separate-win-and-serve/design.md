@@ -15,34 +15,33 @@ Designs Link: TODO
 
 **In Scope**
 
-- New `Seat` model holding position/geography/district data
 - Breaking the `ElectedOffice → Campaign` FK dependency
+- Allowing a serve user to transition _back_ to Win mode
+- New `Seat` model holding position/geography/district data, used by both Win and Serve
 - Moving `VoterFileFilter` to FK to Seat instead of Campaign
 - Updating contacts search/download access checks to use Seat
 - Frontend product switcher (selecting which Seat to operate in)
-- Supporting a user who holds office in one seat and runs for a different one
 - Data migration: backfilling Seats from existing Campaign + ElectedOffice records
 - Phased rollout plan that delivers value incrementally
 
 **Not In Scope**
 
-- **Standalone elected official onboarding.** There is no new way to become an elected official. The only path to an ElectedOffice remains: complete a Campaign on GoodParty, win, and confirm via the in-app "I won" modal (`POST /elected-office`). We are not building a separate onboarding flow for elected officials.
+- **Standalone elected official onboarding.** There is no new way to become an elected official. The only path to an ElectedOffice remains: complete a Campaign on GoodParty, win, and confirm via the in-app "I won" modal (`POST /elected-office`). We are not building a separate onboarding flow for elected officials (yet 🙂).
 - Extracting non-position fields from `campaign.details` JSON
 - Changing where `isPro` lives (stays on Campaign)
 - Moving PathToVictory off Campaign
 - Modifying Win-only features (AI content, website, outreach, ecanvasser, TCR, etc.)
 - Modifying Serve-only features (polls, contact engagement)
-- Multi-user RBAC / team member access (future work, Seat is designed to support it)
+- Multi-user RBAC / team member access
 - Touching existing `@UseCampaign()` or `@UseElectedOffice()` decorated routes
 - Refactoring `campaign.details` or `campaign.data` JSON blobs
 - Changes to payments/Stripe integration
-- Changes to CRM/HubSpot sync
 
 ## Proposed Solution
 
 ### 1. Current State
 
-Campaign is the authorization boundary and data scoping mechanism for the entire API. 16 controllers use `@UseCampaign()`, 80+ services import Campaign, and 15+ tables have a `campaignId` FK. ElectedOffice has a required `campaignId` FK — the schema itself calls this "temporary."
+**Campaign** is the authorization boundary and data scoping mechanism for the entire API. 16 controllers use `@UseCampaign()`, 80+ services import Campaign, and 15+ tables have a `campaignId` FK. ElectedOffice has a required `campaignId` FK — the schema itself calls this "temporary."
 
 However, the **actual shared surface area** between Win and Serve is small. An audit of every file referencing ElectedOffice reveals only four features that explicitly branch on both products:
 

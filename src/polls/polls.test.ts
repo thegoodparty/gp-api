@@ -39,19 +39,16 @@ beforeEach(async () => {
 })
 
 describe('POST /polls/initial-poll', () => {
-  it.each([{ message: '', swornInDate: '2025-01-01' }])(
-    'blocks bad input',
-    async (payload) => {
-      const result = await service.client.post(
-        '/v1/polls/initial-poll',
-        payload,
-      )
-      expect(result).toMatchObject({
-        status: 400,
-        data: { message: 'Validation failed' },
-      })
-    },
-  )
+  it.each([
+    { message: '', swornInDate: '2025-01-01' },
+    { message: '', swornInDate: '2024-01-01' },
+  ])('blocks bad input', async (payload) => {
+    const result = await service.client.post('/v1/polls/initial-poll', payload)
+    expect(result).toMatchObject({
+      status: 400,
+      data: { message: 'Validation failed' },
+    })
+  })
 
   it('fails if total constituents is less than 500', async () => {
     getStats.mockResolvedValue({
