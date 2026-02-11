@@ -109,7 +109,6 @@ describe('QueueConsumerService - P2V handling', () => {
   })
 
   describe('handlePathToVictoryFailure', () => {
-    // Access private method
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let handleFailure: (
       campaign: ReturnType<typeof makeCampaign>,
@@ -120,31 +119,48 @@ describe('QueueConsumerService - P2V handling', () => {
       handleFailure = (service as any).handlePathToVictoryFailure.bind(service)
     })
 
-    it('returns false and keeps status when already DistrictMatched after 3+ attempts', async () => {
+    it('returns true (requeue) and increments p2vAttempts when < 3 attempts', async () => {
       mockP2vService.findUniqueOrThrow.mockResolvedValue(
-        makeP2V({
-          p2vAttempts: 2,
-          p2vStatus: P2VStatus.districtMatched,
-          electionType: 'State_House',
-          electionLocation: 'STATE HOUSE 005',
-        }),
+        makeP2V({ p2vAttempts: 1, p2vStatus: P2VStatus.districtMatched }),
+      )
+
+      const result = await handleFailure(makeCampaign())
+
+      expect(result).toBe(true)
+      const updateData = mockP2vService.update.mock.calls[0][0].data.data
+      expect(updateData.p2vAttempts).toBe(2)
+      // Should NOT mark as failed or send Slack
+      expect(updateData.p2vStatus).toBe(P2VStatus.districtMatched)
+      expect(mockSlack.message).not.toHaveBeenCalled()
+    })
+
+    it('returns false and marks Failed when exhausted retries and status is Waiting', async () => {
+      mockP2vService.findUniqueOrThrow.mockResolvedValue(
+        makeP2V({ p2vAttempts: 2, p2vStatus: P2VStatus.waiting }),
       )
 
       const result = await handleFailure(makeCampaign())
 
       expect(result).toBe(false)
-      // Should persist p2vAttempts to prevent infinite retry
-      expect(mockP2vService.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            data: expect.objectContaining({ p2vAttempts: 3 }),
-          }),
-        }),
-      )
-      // Should NOT overwrite status to Failed
       const updateData = mockP2vService.update.mock.calls[0][0].data.data
+      expect(updateData.p2vAttempts).toBe(3)
+      expect(updateData.p2vStatus).toBe(P2VStatus.failed)
+      expect(mockSlack.message).toHaveBeenCalled()
+      expect(mockRecordCustomEvent).toHaveBeenCalled()
+    })
+
+    it('returns false and preserves DistrictMatched when exhausted retries', async () => {
+      mockP2vService.findUniqueOrThrow.mockResolvedValue(
+        makeP2V({ p2vAttempts: 2, p2vStatus: P2VStatus.districtMatched }),
+      )
+
+      const result = await handleFailure(makeCampaign())
+
+      expect(result).toBe(false)
+      const updateData = mockP2vService.update.mock.calls[0][0].data.data
+      expect(updateData.p2vAttempts).toBe(3)
+      // Status preserved — gold's DistrictMatched is NOT overwritten to Failed
       expect(updateData.p2vStatus).toBe(P2VStatus.districtMatched)
-      // Should NOT send failure Slack or record BlockedState
       expect(mockSlack.message).not.toHaveBeenCalled()
       expect(mockRecordCustomEvent).not.toHaveBeenCalled()
     })
@@ -196,7 +212,7 @@ describe('QueueConsumerService - P2V handling', () => {
         pathToVictory: { id: 100, data: {} },
       })
       mockP2vService.analyzePathToVictoryResponse.mockResolvedValue(false)
-      // handlePathToVictoryFailure will return false (don't requeue)
+      // handlePathToVictoryFailure returns false (don't requeue)
       mockP2vService.findUniqueOrThrow.mockResolvedValue(
         makeP2V({
           p2vAttempts: 2,
@@ -204,8 +220,7 @@ describe('QueueConsumerService - P2V handling', () => {
         }),
       )
 
-      // processMessage is wrapped in withLegacyErrorSwallowing.
-      // When handlePathToVictoryMessage does NOT throw, it returns true.
+      // withLegacyErrorSwallowing: no throw → returns true (message processed)
       const result = await service.processMessage(makeQueueMessage() as never)
 
       expect(result).toBe(true)

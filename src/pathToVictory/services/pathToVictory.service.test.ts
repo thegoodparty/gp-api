@@ -258,7 +258,7 @@ describe('PathToVictoryService', () => {
       )
     })
 
-    it('upgrades status from Waiting to Complete when incoming has turnout', async () => {
+    it('upgrades status from Waiting to Complete and writes source GpApi', async () => {
       mockPrisma.campaign.findUnique.mockResolvedValue(
         makeCampaign({ p2vStatus: P2VStatus.waiting }),
       )
@@ -266,15 +266,14 @@ describe('PathToVictoryService', () => {
 
       await service.completePathToVictory('test-slug', responseWithTurnout)
 
-      expect(mockPrisma.pathToVictory.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            data: expect.objectContaining({
-              p2vStatus: P2VStatus.complete,
-            }),
-          }),
-        }),
-      )
+      const updateCall = mockPrisma.pathToVictory.update.mock.calls[0][0]
+      const writtenData = updateCall.data.data
+
+      expect(writtenData.p2vStatus).toBe('Complete')
+      expect(writtenData.source).toBe('GpApi')
+      expect(writtenData.projectedTurnout).toBe(500)
+      expect(writtenData.winNumber).toBe(251)
+      expect(writtenData.voterContactGoal).toBe(1255)
     })
 
     it('infers DistrictMatched when existing record has district data but status is Waiting', async () => {
