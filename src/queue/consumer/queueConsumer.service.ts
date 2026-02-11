@@ -539,74 +539,50 @@ export class QueueConsumerService {
     }
     p2vAttempts += 1
 
-    if (p2vAttempts >= 3) {
-      // Don't downgrade to Failed if gold flow already matched a district
-      const existingStatus = p2v.data.p2vStatus as string | undefined
-      const isAlreadyMatched =
-        existingStatus === P2VStatus.districtMatched ||
-        existingStatus === P2VStatus.complete
+    const existingStatus = p2v.data.p2vStatus as string | undefined
+    const isAlreadyMatched =
+      existingStatus === P2VStatus.districtMatched ||
+      existingStatus === P2VStatus.complete
+    const exhaustedRetries = p2vAttempts >= 3
+    const markAsFailed = exhaustedRetries && !isAlreadyMatched
 
-      if (isAlreadyMatched) {
-        this.logger.log(
-          `P2V silver flow exhausted retries for ${campaign.slug}, but gold flow already set status=${existingStatus}. Keeping existing status.`,
-        )
-        // Still persist p2vAttempts so we don't retry infinitely
-        await this.pathToVictoryService.update({
-          where: { id: p2v.id },
-          data: {
-            data: {
-              ...p2v.data,
-              p2vAttempts,
-            },
-          },
-        })
-        return false // don't requeue
-      } else {
-        await this.slackService.message(
-          {
-            body: `Path To Victory has failed 3 times for ${campaign.slug}. Marking as failed`,
-          },
-          SlackChannel.botPathToVictoryIssues,
-        )
-
-        // mark the p2vStatus as Failed
-        await this.pathToVictoryService.update({
-          where: { id: p2v.id },
-          data: {
-            data: {
-              ...p2v.data,
-              p2vAttempts,
-              p2vStatus: P2VStatus.failed,
-            },
-          },
-        })
-
-        recordCustomEvent(CustomEventType.BlockedState, {
-          service: 'gp-api',
-          environment: process.env.NODE_ENV,
-          userId: campaign.userId,
-          campaignId: campaign.id,
-          slug: campaign.slug,
-          feature: 'path_to_victory',
-          rootCause: 'p2v_failed',
-          isBackground: true,
-          p2vAttempts,
-        })
-        return false // don't requeue, marked as failed
-      }
-    } else {
-      // otherwise, increment the p2vAttempts
-      await this.pathToVictoryService.update({
-        where: { id: p2v.id },
-        data: {
-          data: {
-            ...p2v.data,
-            p2vAttempts,
-          },
-        },
-      })
-      return true // requeue for another attempt
+    if (exhaustedRetries && isAlreadyMatched) {
+      this.logger.log(
+        `P2V silver flow exhausted retries for ${campaign.slug}, but gold flow already set status=${existingStatus}. Keeping existing status.`,
+      )
     }
+
+    if (markAsFailed) {
+      await this.slackService.message(
+        {
+          body: `Path To Victory has failed 3 times for ${campaign.slug}. Marking as failed`,
+        },
+        SlackChannel.botPathToVictoryIssues,
+      )
+      recordCustomEvent(CustomEventType.BlockedState, {
+        service: 'gp-api',
+        environment: process.env.NODE_ENV,
+        userId: campaign.userId,
+        campaignId: campaign.id,
+        slug: campaign.slug,
+        feature: 'path_to_victory',
+        rootCause: 'p2v_failed',
+        isBackground: true,
+        p2vAttempts,
+      })
+    }
+
+    const updateData = {
+      ...p2v.data,
+      p2vAttempts,
+      ...(markAsFailed ? { p2vStatus: P2VStatus.failed } : {}),
+    }
+    await this.pathToVictoryService.update({
+      where: { id: p2v.id },
+      data: { data: updateData },
+    })
+
+    return !exhaustedRetries
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
