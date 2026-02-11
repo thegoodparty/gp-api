@@ -67,7 +67,7 @@ import { PollIndividualMessageService } from '@/polls/services/pollIndividualMes
 import { v5 as uuidv5 } from 'uuid'
 
 const POLL_INDIVIDUAL_MESSAGE_NAMESPACE =
-  'a0e5f0a1-2b3c-4d5e-6f70-8192a3b4c5d6' as const
+  'a0e5f0a1-2b3c-4d5e-8f70-8192a3b4c5d6' as const
 
 @Injectable()
 export class QueueConsumerService {
