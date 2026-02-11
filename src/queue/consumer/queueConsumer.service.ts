@@ -43,6 +43,7 @@ import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
+import { toBoolean } from '../../shared/util/strings.util'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
 import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
@@ -674,22 +675,34 @@ export class QueueConsumerService {
     const pollIssueIds = issues.map((issue) => ({
       id: `${pollId}-${issue.rank}`,
     }))
-    const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
-    const joinValues: Prisma.Sql[] = []
-    const phoneNumbers = [...new Set(rows.map((r) => r.phoneNumber))]
+    const validIssueIds = new Set(pollIssueIds.map((i) => i.id))
+
+    // One response can span multiple CSV rows (one per atomic message), and there may be duplicate rows
+    const groupKey = (r: PollResponse) =>
+      `${r.phoneNumber}\n${r.receivedAt ?? ''}`
+    const groups = new Map<string, PollResponse[]>()
+    for (const row of rows) {
+      const key = groupKey(row)
+      const existing = groups.get(key)
+      if (existing) existing.push(row)
+      else groups.set(key, [row])
+    }
+
+    const phoneNumbers = [
+      ...new Set([...groups.keys()].map((k) => k.split('\n')[0])),
+    ]
     const phoneToPersonIdMap = await this.findMappedPersonIdsForCellPhones({
       electedOfficeId,
       pollId,
       phoneNumbers,
     })
 
-    for (const row of rows) {
-      const {
-        phoneNumber,
-        originalMessage,
-        receivedAt,
-        isOptOut: isOptOutStr,
-      } = row
+    const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
+    const joinValues: Prisma.Sql[] = []
+
+    for (const [, groupRows] of groups) {
+      const first = groupRows[0]
+      const { phoneNumber, originalMessage, receivedAt } = first
       const personId = phoneToPersonIdMap.get(phoneNumber)
       if (!personId) {
         throw new InternalServerErrorException(
@@ -698,12 +711,12 @@ export class QueueConsumerService {
       }
 
       const id = uuidv5(
-        `${pollId}-${personId}-${originalMessage ?? ''}`,
+        `${pollId}-${personId}-${receivedAt ?? ''}`,
         POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
       )
-      const isOptOut =
-        isOptOutStr === 'true' || isOptOutStr === '1' || isOptOutStr === 'yes'
+      const isOptOut = groupRows.some((r) => toBoolean(r.isOptOut))
       const sentAt = receivedAt ? new Date(receivedAt) : new Date()
+
       scalarData.push({
         id,
         personId,
@@ -713,8 +726,14 @@ export class QueueConsumerService {
         electedOfficeId,
         pollId,
       })
-      for (const issue of pollIssueIds) {
-        joinValues.push(Prisma.sql`(${id}, ${issue.id})`)
+
+      // Each group / "originalMessage" can be linked to multiple PollIssues
+      const clusterIds = new Set(groupRows.map((r) => r.clusterId))
+      for (const clusterId of clusterIds) {
+        const issueId = `${pollId}-${clusterId}`
+        if (validIssueIds.has(issueId)) {
+          joinValues.push(Prisma.sql`(${id}, ${issueId})`)
+        }
       }
     }
 
