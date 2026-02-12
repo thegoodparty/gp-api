@@ -11,7 +11,6 @@ import {
   TcrComplianceStatus,
   User,
 } from '@prisma/client'
-import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from '../../../queue/producer/queueProducer.service'
 import {
@@ -20,8 +19,6 @@ import {
 } from '../../../queue/queue.types'
 import { getUserFullName } from '../../../users/util/users.util'
 import {
-  BrandApprovalBypassResult,
-  BrandApprovalResult,
   PeerlyIdentity,
   PeerlyIdentityProfile,
   PeerlyIdentityProfileResponseBody,
@@ -36,14 +33,6 @@ const TCR_COMPLIANCE_CHECK_INTERVAL = process.env.TCR_COMPLIANCE_CHECK_INTERVAL
   ? parseInt(process.env.TCR_COMPLIANCE_CHECK_INTERVAL)
   : 12 * 60 * 60 // Defaults to 12 hrs
 
-/** When set (non-production only), this PIN skips real Peerly CV calls (for local/dev testing). */
-const PEERLY_CV_BYPASS_PIN = process.env.PEERLY_CV_BYPASS_PIN
-
-/** Bypass is only allowed when PIN is set and we are not in production. */
-const CV_BYPASS_ALLOWED = Boolean(PEERLY_CV_BYPASS_PIN) && !IS_PROD
-
-const CV_BYPASS_TOKEN = 'LOCAL_CV_BYPASS'
-
 @Injectable()
 export class CampaignTcrComplianceService extends createPrismaBase(
   MODELS.TcrCompliance,
@@ -54,15 +43,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     private queueService: QueueProducerService,
   ) {
     super()
-    if (PEERLY_CV_BYPASS_PIN && IS_PROD) {
-      this.logger.warn(
-        'PEERLY_CV_BYPASS_PIN is set in production; bypass is disabled. Remove the env var in production.',
-      )
-    } else if (CV_BYPASS_ALLOWED) {
-      this.logger.warn(
-        'PEERLY_CV_BYPASS_PIN is set: Campaign Verify bypass is ENABLED for this environment (non-production only).',
-      )
-    }
   }
 
   @Interval(TCR_COMPLIANCE_CHECK_INTERVAL * 1000) // This will run based on the environment variable
@@ -345,14 +325,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         'TCR compliance does not have a Peerly identity ID',
       )
     }
-
-    if (CV_BYPASS_ALLOWED && pin === PEERLY_CV_BYPASS_PIN) {
-      this.logger.warn(
-        'PEERLY_CV_BYPASS_PIN used: Campaign Verify bypassed; 10DLC will auto-approve. Only use in non-production.',
-      )
-      return CV_BYPASS_TOKEN
-    }
-
     const { campaign } = await this.model.findFirstOrThrow({
       where: { peerlyIdentityId },
       include: {
@@ -378,16 +350,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     user: User,
     tcrCompliance: TcrCompliance,
     campaignVerifyToken: string,
-  ): Promise<BrandApprovalResult | BrandApprovalBypassResult | undefined> {
-    // Only treat bypass token as special when the feature is enabled (defense-in-depth)
-    if (campaignVerifyToken === CV_BYPASS_TOKEN && PEERLY_CV_BYPASS_PIN) {
-      if (CV_BYPASS_ALLOWED) {
-        return { status: 'approved', displayName: 'Local bypass' }
-      }
-      throw new UnprocessableEntityException(
-        'Campaign Verify bypass is not allowed in production',
-      )
-    }
+  ) {
     return this.peerlyIdentityService.approve10DLCBrand(
       tcrCompliance,
       campaignVerifyToken,
