@@ -78,18 +78,25 @@ export enum MessageGroup {
   polls = 'polls',
 }
 
-/** Poll response CSV row (camelCase headers; all values are strings) */
-export type PollResponse = {
-  atomicId: string
+/**
+ * One row from the consolidated poll cluster analysis JSON (S3).
+ * One response can span multiple rows (one per atomic message); group by phoneNumber + receivedAt.
+ * Matches output from serve-analyze-data (e.g. .../consolidated/{pollId}_all_cluster_analysis.json).
+ */
+export type PollResponseJsonRow = {
+  atomicId?: string
   phoneNumber: string
   receivedAt: string
   originalMessage: string
-  atomicMessage: string
-  pollId: string
-  clusterId: string
-  theme: string
-  category: string
-  summary: string
-  sentiment: string
-  isOptOut: string
+  atomicMessage?: string
+  pollId?: string
+  // Cluster index; empty string for opt-out rows. Number otherwise.
+  clusterId: number | string
+  theme?: string
+  category?: string
+  summary?: string
+  sentiment?: string
+  isOptOut?: boolean
 }
+
+export type PollClusterAnalysisJson = PollResponseJsonRow[]

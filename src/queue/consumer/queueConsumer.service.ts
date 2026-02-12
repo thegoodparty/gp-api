@@ -43,7 +43,6 @@ import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
-import { toBoolean } from '../../shared/util/strings.util'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
 import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
@@ -57,12 +56,12 @@ import {
   PollCreationEventSchema,
   PollExpansionEvent,
   PollExpansionEventSchema,
-  PollResponse,
+  PollClusterAnalysisJson,
+  PollResponseJsonRow,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
-import neatCsv from 'neat-csv'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
 
@@ -661,26 +660,26 @@ export class QueueConsumerService {
     if (!SERVE_DATA_S3_BUCKET) {
       throw new Error('Please set SERVE_DATA_S3_BUCKET in your .env')
     }
-    const pollResponsesCsv = await this.s3Service.getFile(
+    const responsesFileContent = await this.s3Service.getFile(
       SERVE_DATA_S3_BUCKET,
       responsesLocation,
     )
-    if (!pollResponsesCsv) {
+    if (!responsesFileContent) {
       throw new InternalServerErrorException(
         `Unable to fetch responses from S3 for pollId: ${pollId}`,
       )
     }
 
-    const rows = await neatCsv<PollResponse>(pollResponsesCsv)
+    const rows = JSON.parse(responsesFileContent) as PollClusterAnalysisJson
     const pollIssueIds = issues.map((issue) => ({
       id: `${pollId}-${issue.rank}`,
     }))
     const validIssueIds = new Set(pollIssueIds.map((i) => i.id))
 
-    // One response can span multiple CSV rows (one per atomic message), and there may be duplicate rows
-    const groupKey = (r: PollResponse) =>
+    // One response can span multiple rows (one per atomic message), and there may be duplicate rows
+    const groupKey = (r: PollResponseJsonRow) =>
       `${r.phoneNumber}\n${r.receivedAt ?? ''}`
-    const groups = new Map<string, PollResponse[]>()
+    const groups = new Map<string, PollResponseJsonRow[]>()
     for (const row of rows) {
       const key = groupKey(row)
       const existing = groups.get(key)
@@ -714,7 +713,7 @@ export class QueueConsumerService {
         `${pollId}-${personId}-${receivedAt ?? ''}`,
         POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
       )
-      const isOptOut = groupRows.some((r) => toBoolean(r.isOptOut))
+      const isOptOut = groupRows.some((r) => Boolean(r.isOptOut))
       const sentAt = receivedAt ? new Date(receivedAt) : new Date()
 
       scalarData.push({
@@ -727,8 +726,12 @@ export class QueueConsumerService {
         pollId,
       })
 
-      // Each group / "originalMessage" can be linked to multiple PollIssues
-      const clusterIds = new Set(groupRows.map((r) => r.clusterId))
+      // Each group can be linked to multiple PollIssues
+      const clusterIds = new Set(
+        groupRows
+          .map((r) => r.clusterId)
+          .filter((id) => id !== '' && id !== undefined),
+      )
       for (const clusterId of clusterIds) {
         const issueId = `${pollId}-${clusterId}`
         if (validIssueIds.has(issueId)) {

@@ -1,6 +1,9 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { InternalServerErrorException } from '@nestjs/common'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PollResponseJsonRow } from '../queue.types'
 import { QueueType } from '../queue.types'
 import { QueueConsumerService } from './queueConsumer.service'
 import type { Message } from '@aws-sdk/client-sqs'
@@ -31,7 +34,8 @@ const createPollAnalysisCompleteMessage = (data: {
     data: {
       pollId: data.pollId,
       totalResponses: data.totalResponses ?? 10,
-      responsesLocation: data.responsesLocation ?? 'polls/poll-1/responses.csv',
+      responsesLocation:
+        data.responsesLocation ?? 'polls/poll-1/all_cluster_analysis.json',
       issues: data.issues ?? [
         {
           pollId: data.pollId,
@@ -47,11 +51,8 @@ const createPollAnalysisCompleteMessage = (data: {
   }),
 })
 
-const createCsv = (rows: Record<string, string>[]) => {
-  const headers = Object.keys(rows[0] ?? {}).join(',')
-  const lines = rows.map((r) => Object.values(r).join(','))
-  return [headers, ...lines].join('\n')
-}
+const createPollAnalysisJson = (responses: PollResponseJsonRow[]): string =>
+  JSON.stringify(responses)
 
 describe('QueueConsumerService - handlePollAnalysisComplete', () => {
   let service: QueueConsumerService
@@ -206,23 +207,15 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
 
   it('throws when person with cell phone is not found in poll', async () => {
     pollIndividualMessage.findMany.mockResolvedValue([])
-    const csv = createCsv([
+    const json = createPollAnalysisJson([
       {
-        atomicId: 'a1',
         phoneNumber: '+15559999999',
         receivedAt: '2024-01-15T10:00:00Z',
         originalMessage: 'Hello',
-        atomicMessage: 'Hello',
-        pollId,
-        clusterId: '1',
-        theme: 'T',
-        category: 'C',
-        summary: 'S',
-        sentiment: 'pos',
-        isOptOut: 'false',
+        clusterId: 1,
       },
     ])
-    s3Service.getFile.mockResolvedValue(csv)
+    s3Service.getFile.mockResolvedValue(json)
     const message = createPollAnalysisCompleteMessage({ pollId })
 
     await expect(service.processMessage(message)).rejects.toThrow(
@@ -233,38 +226,23 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     )
   })
 
-  it('creates poll issues, coalesces CSV rows by phone+receivedAt, creates messages and links by clusterId', async () => {
-    const csv = createCsv([
+  it('creates poll issues, coalesces JSON rows by phone+receivedAt, creates messages and links by clusterId', async () => {
+    const json = createPollAnalysisJson([
       {
-        atomicId: 'a1',
         phoneNumber,
         receivedAt: '2024-01-15T10:00:00Z',
         originalMessage: 'My response',
-        atomicMessage: 'Part 1',
-        pollId,
-        clusterId: '1',
-        theme: 'T1',
-        category: 'C1',
-        summary: 'S1',
-        sentiment: 'pos',
-        isOptOut: 'false',
+        clusterId: 1,
       },
       {
-        atomicId: 'a2',
         phoneNumber,
         receivedAt: '2024-01-15T10:00:00Z',
         originalMessage: 'My response',
-        atomicMessage: 'Part 2',
-        pollId,
-        clusterId: '2',
-        theme: 'T2',
-        category: 'C2',
-        summary: 'S2',
-        sentiment: 'pos',
-        isOptOut: 'true',
+        clusterId: 2,
+        isOptOut: true,
       },
     ])
-    s3Service.getFile.mockResolvedValue(csv)
+    s3Service.getFile.mockResolvedValue(json)
     const message = createPollAnalysisCompleteMessage({
       pollId,
       issues: [
@@ -316,24 +294,17 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     })
   })
 
-  it('coerces isOptOut via toBoolean (yes/1/true)', async () => {
-    const csv = createCsv([
+  it('respects isOptOut true in JSON', async () => {
+    const json = createPollAnalysisJson([
       {
-        atomicId: 'a1',
         phoneNumber,
         receivedAt: '2024-01-15T10:00:00Z',
         originalMessage: 'Ok',
-        atomicMessage: 'Ok',
-        pollId,
-        clusterId: '1',
-        theme: 'T',
-        category: 'C',
-        summary: 'S',
-        sentiment: 'pos',
-        isOptOut: 'yes',
+        clusterId: 1,
+        isOptOut: true,
       },
     ])
-    s3Service.getFile.mockResolvedValue(csv)
+    s3Service.getFile.mockResolvedValue(json)
     const message = createPollAnalysisCompleteMessage({ pollId })
 
     await service.processMessage(message)
@@ -354,23 +325,16 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
   })
 
   it('calls markPollComplete and analytics.identify/track', async () => {
-    const csv = createCsv([
+    const json = createPollAnalysisJson([
       {
-        atomicId: 'a1',
         phoneNumber,
         receivedAt: '2024-01-15T10:00:00Z',
         originalMessage: 'Hi',
-        atomicMessage: 'Hi',
-        pollId,
-        clusterId: '1',
-        theme: 'T',
-        category: 'C',
-        summary: 'S',
-        sentiment: 'pos',
-        isOptOut: 'false',
+        clusterId: 1,
+        isOptOut: false,
       },
     ])
-    s3Service.getFile.mockResolvedValue(csv)
+    s3Service.getFile.mockResolvedValue(json)
     const message = createPollAnalysisCompleteMessage({
       pollId,
       totalResponses: 50,
@@ -392,5 +356,92 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       expect.any(String),
       expect.objectContaining({ pollId }),
     )
+  })
+
+  it('processes real-data-shaped JSON (array root, clusterId number or empty string)', async () => {
+    const fixturePath = join(
+      __dirname,
+      'fixtures',
+      'all_cluster_analysis_sample.json',
+    )
+    const fixtureContent = readFileSync(fixturePath, 'utf-8')
+    const fixturePollId = '019c29d4-81aa-733e-a72a-3983baf19a22'
+    const fixturePhones = ['12088508796', '12088639774', '12817265015']
+
+    pollsService.findUnique.mockResolvedValue({
+      id: fixturePollId,
+      electedOfficeId,
+      isCompleted: false,
+      scheduledDate: new Date('2020-01-01'),
+    })
+    pollIndividualMessage.findMany.mockResolvedValue(
+      fixturePhones.map((phone, i) => ({
+        personCellPhone: phone,
+        personId: `person-fixture-${i + 1}`,
+      })),
+    )
+    s3Service.getFile.mockResolvedValue(fixtureContent)
+
+    const message = createPollAnalysisCompleteMessage({
+      pollId: fixturePollId,
+      totalResponses: 4,
+      issues: [
+        {
+          pollId: fixturePollId,
+          rank: 1,
+          theme: 'T1',
+          summary: 'S1',
+          analysis: 'A1',
+          responseCount: 1,
+          quotes: [],
+        },
+        {
+          pollId: fixturePollId,
+          rank: 2,
+          theme: 'T2',
+          summary: 'S2',
+          analysis: 'A2',
+          responseCount: 1,
+          quotes: [],
+        },
+      ],
+    })
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    expect(pollIssuesService.model.deleteMany).toHaveBeenCalledWith({
+      where: { pollId: fixturePollId },
+    })
+    expect(pollIndividualMessage.client.$transaction).toHaveBeenCalled()
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    // Fixture has 3 unique groups (phone+receivedAt): opt-out, single-row traffic, two-row community/biking
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          personId: 'person-fixture-1',
+          content: 'STOP',
+          isOptOut: true,
+        }),
+        expect.objectContaining({
+          personId: 'person-fixture-2',
+          content: 'Traffic',
+          isOptOut: false,
+        }),
+        expect.objectContaining({
+          personId: 'person-fixture-3',
+          content: expect.stringContaining('Community development'),
+          isOptOut: false,
+        }),
+      ]),
+    })
+    expect(
+      mockTx.pollIndividualMessage.createMany.mock.calls[0][0].data,
+    ).toHaveLength(3)
   })
 })
