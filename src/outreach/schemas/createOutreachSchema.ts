@@ -24,7 +24,10 @@ export class CreateOutreachSchema extends createZodDto(
       // P2P-specific fields
       didState: z
         .string()
-        .length(2, 'didState must be a 2-letter US state code')
+        .regex(
+          /^([A-Z]{2}|USA)$/,
+          'didState must be a 2-letter US state code or "USA"',
+        )
         .optional(),
       didNpaSubset: z
         .array(z.string().regex(/^\d{3}$/, 'Each area code must be 3 digits'))
