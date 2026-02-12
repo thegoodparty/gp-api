@@ -696,9 +696,11 @@ export class QueueConsumerService {
       else groups.set(key, [row])
     }
 
-    const phoneNumbers = [
-      ...new Set([...groups.keys()].map((k) => k.split('\n')[0])),
-    ]
+    const phoneNumberSet = new Set<string>()
+    for (const key of groups.keys()) {
+      phoneNumberSet.add(key.split('\n')[0])
+    }
+    const phoneNumbers = Array.from(phoneNumberSet)
     const phoneToPersonIdMap = await this.findMappedPersonIdsForCellPhones({
       electedOfficeId,
       pollId,
