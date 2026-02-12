@@ -44,8 +44,6 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
-    // Filter out undefined and null values from metadata before passing to Stripe.
-    // String(null) produces the string "null" which would break downstream parsers.
     const cleanedMetadata = Object.entries(restMetadata)
       .filter(
         ([_, value]: [string, PurchaseIntentPayloadEntry]) => value != null,
@@ -66,8 +64,6 @@ export class StripeService {
       automatic_payment_methods: {
         enabled: true,
       },
-      // Server-set fields MUST come after cleanedMetadata to prevent
-      // client-supplied metadata from overwriting trusted values.
       metadata: {
         ...(cleanedMetadata as Record<string, string | number>),
         userId,
@@ -123,16 +119,6 @@ export class StripeService {
     return { redirectUrl, checkoutSessionId }
   }
 
-  /**
-   * Creates a Checkout Session with `ui_mode: 'custom'` for one-time payments.
-   * This enables embedded payment forms with promo code support.
-   *
-   * Migration reference: https://docs.stripe.com/payments/payment-element/migration-ewcs
-   *
-   * @param user - The user making the purchase
-   * @param payload - The checkout session payload containing product details
-   * @returns The checkout session with client_secret for frontend initialization
-   */
   async createCustomCheckoutSession(
     user: User,
     payload: CustomCheckoutSessionPayload,
@@ -144,9 +130,6 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
-    // Filter out undefined and null values from metadata.
-    // String(null) produces the string "null" which would break downstream
-    // parsers that expect actual null (e.g., poll imageUrl validation).
     const cleanedMetadata = Object.entries(payload.metadata || {})
       .filter(([_, value]) => value != null)
       .reduce(
@@ -160,8 +143,6 @@ export class StripeService {
     const session = await this.stripe.checkout.sessions.create({
       ui_mode: 'custom',
       mode: 'payment',
-      // If user has a Stripe customerId, link to existing customer.
-      // Otherwise, provide customer_email so Stripe can prefill and send receipts.
       ...(customerId
         ? { customer: customerId }
         : { customer_email: user.email }),
@@ -182,8 +163,6 @@ export class StripeService {
       ],
       ...(payload.allowPromoCodes ? { allow_promotion_codes: true } : {}),
       return_url: payload.returnUrl,
-      // Server-set fields MUST come after cleanedMetadata to prevent
-      // client-supplied metadata from overwriting trusted values.
       metadata: {
         ...cleanedMetadata,
         userId: String(userId),

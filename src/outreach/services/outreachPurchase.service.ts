@@ -82,9 +82,6 @@ export class OutreachPurchaseHandlerService
     metadata: OutreachPurchaseMetadata,
   ): Promise<void> {
     const { outreachType } = metadata
-    // Coerce campaignId to number — Stripe stringifies all metadata values,
-    // so when this handler runs from completeCheckoutSession, campaignId
-    // arrives as string "123" instead of number 123.
     const campaignId = metadata.campaignId
       ? Number(metadata.campaignId)
       : undefined
