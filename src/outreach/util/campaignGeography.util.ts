@@ -35,7 +35,7 @@ export interface P2pJobGeographyResult {
 }
 
 export interface GeographyLogger {
-  warn: (context: object, message: string) => void
+  warn: (message: string, context?: object) => void
 }
 
 export interface ResolveP2pJobGeographyServices {
@@ -88,7 +88,7 @@ async function getAreaCodesForZip(
   if (zip == null || zip === '') return []
   const codes = await areaCodeFromZipService.getAreaCodeFromZip(zip)
   if (!Array.isArray(codes) || codes.length === 0) {
-    logger?.warn({ zip }, 'Area code lookup returned no results for zip')
+    logger?.warn('Area code lookup returned no results for zip', { zip })
     return []
   }
   return codes
@@ -157,10 +157,10 @@ export async function resolveP2pJobGeography(
         { areaCodeFromZipService, logger },
       )
     } catch (err) {
-      logger?.warn(
-        { err, placeId: campaign.placeId },
-        'Failed to resolve placeId geography',
-      )
+      logger?.warn('Failed to resolve placeId geography', {
+        err,
+        placeId: campaign.placeId,
+      })
     }
   }
 

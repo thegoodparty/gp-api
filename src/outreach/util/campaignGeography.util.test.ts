@@ -184,7 +184,7 @@ describe('campaignGeography.util', () => {
 
     let placesService: PlacesAddressLookup
     let areaCodeFromZipService: AreaCodeFromZipLookup
-    let logger: { warn: (context: object, message: string) => void }
+    let logger: { warn: (message: string, context?: object) => void }
 
     beforeEach(() => {
       placesService = {
@@ -237,8 +237,8 @@ describe('campaignGeography.util', () => {
         logger,
       })
       expect(logger.warn).toHaveBeenCalledWith(
-        { err: expect.any(Error), placeId: 'ChIJ...' },
         'Failed to resolve placeId geography',
+        { err: expect.any(Error), placeId: 'ChIJ...' },
       )
       expect(result).toEqual({ didState: 'CA', didNpaSubset: ['760'] })
     })

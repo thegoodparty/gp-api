@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { BadRequestException, UnauthorizedException } from '@nestjs/common'
 import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OutreachController } from './outreach.controller'
@@ -71,7 +68,11 @@ describe('OutreachController', () => {
       const mismatchedDto = { ...textDto, campaignId: 999 }
 
       await expect(
-        controller.create(baseCampaign, mismatchedDto as never, mockImage as never),
+        controller.create(
+          baseCampaign,
+          mismatchedDto as never,
+          mockImage as never,
+        ),
       ).rejects.toThrow(UnauthorizedException)
     })
 
@@ -141,7 +142,11 @@ describe('OutreachController', () => {
       )
       mockOutreachService.create.mockResolvedValue({ id: 1, ...textDto })
 
-      await controller.create(baseCampaign, textDto as never, mockImage as never)
+      await controller.create(
+        baseCampaign,
+        textDto as never,
+        mockImage as never,
+      )
 
       expect(mockFilesService.uploadFile).toHaveBeenCalledWith(
         mockImage,
@@ -176,7 +181,11 @@ describe('OutreachController', () => {
     })
 
     it('does not pass p2pImage for non-P2P outreach types', async () => {
-      await controller.create(baseCampaign, textDto as never, mockImage as never)
+      await controller.create(
+        baseCampaign,
+        textDto as never,
+        mockImage as never,
+      )
 
       const createCall = mockOutreachService.create.mock.calls[0]
       expect(createCall[3]).toBeUndefined() // p2pImage arg
