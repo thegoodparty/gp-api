@@ -288,7 +288,9 @@ describe('PurchaseService', () => {
         validatePurchase: vi.fn().mockResolvedValue(undefined),
         calculateAmount: vi.fn().mockResolvedValue(5000), // $50.00 in cents
         getProductName: vi.fn().mockReturnValue('SMS Outreach - 500 texts'),
-        getProductDescription: vi.fn().mockReturnValue('Send 500 text messages'),
+        getProductDescription: vi
+          .fn()
+          .mockReturnValue('Send 500 text messages'),
       }
       service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
 
@@ -312,7 +314,9 @@ describe('PurchaseService', () => {
       })
 
       // Assert
-      expect(mockStripeService.createCustomCheckoutSession).toHaveBeenCalledWith(
+      expect(
+        mockStripeService.createCustomCheckoutSession,
+      ).toHaveBeenCalledWith(
         mockUser,
         expect.objectContaining({
           purchaseType: PurchaseType.TEXT,
@@ -368,7 +372,9 @@ describe('PurchaseService', () => {
       })
 
       // Assert: Should use default product name
-      expect(mockStripeService.createCustomCheckoutSession).toHaveBeenCalledWith(
+      expect(
+        mockStripeService.createCustomCheckoutSession,
+      ).toHaveBeenCalledWith(
         mockUser,
         expect.objectContaining({
           productName: 'Poll Credits',
@@ -591,7 +597,9 @@ describe('PurchaseService', () => {
         }),
       )
       // Should mark as processed after handler succeeds
-      expect(mockStripeService.updatePaymentIntentMetadata).toHaveBeenCalledWith(
+      expect(
+        mockStripeService.updatePaymentIntentMetadata,
+      ).toHaveBeenCalledWith(
         'pi_test_payment',
         expect.objectContaining({
           postPurchaseCompletedAt: expect.any(String),
@@ -635,7 +643,9 @@ describe('PurchaseService', () => {
       // Assert
       expect(result.alreadyProcessed).toBe(true)
       expect(mockCheckoutSessionPostPurchaseHandler).not.toHaveBeenCalled()
-      expect(mockStripeService.updatePaymentIntentMetadata).not.toHaveBeenCalled()
+      expect(
+        mockStripeService.updatePaymentIntentMetadata,
+      ).not.toHaveBeenCalled()
     })
 
     it('should throw if session is not complete', async () => {
@@ -751,7 +761,9 @@ describe('PurchaseService', () => {
       ).rejects.toThrow('Handler failed')
 
       // Should NOT mark as processed since handler failed
-      expect(mockStripeService.updatePaymentIntentMetadata).not.toHaveBeenCalled()
+      expect(
+        mockStripeService.updatePaymentIntentMetadata,
+      ).not.toHaveBeenCalled()
     })
   })
 
