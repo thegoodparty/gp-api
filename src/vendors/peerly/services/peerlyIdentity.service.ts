@@ -14,6 +14,7 @@ import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { lastValueFrom } from 'rxjs'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { resolveJobGeographyFromAddress } from 'src/outreach/util/campaignGeography.util'
+import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
@@ -374,7 +375,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
-      ...(geography.didState
+      ...(geography.didState !== P2P_JOB_DEFAULTS.DID_STATE
         ? {
             jobAreas: [
               {

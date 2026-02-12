@@ -436,7 +436,7 @@ describe('PeerlyIdentityService', () => {
       expect(lastSubmittedData.jobAreas).toEqual([{ didState: 'IL' }])
     })
 
-    it('always sends state in both top-level field and jobAreas', async () => {
+    it('sends state in both top-level field and jobAreas when geography is resolved', async () => {
       const areaCodeService = module.get(AreaCodeFromZipService)
       vi.mocked(areaCodeService.getAreaCodeFromZip).mockResolvedValue([])
 
@@ -458,6 +458,28 @@ describe('PeerlyIdentityService', () => {
         didState: string
       }>
       expect(jobAreas[0].didState).toBe('IL')
+    })
+
+    it('omits jobAreas when geography falls back to USA default', async () => {
+      const placesService = module.get(GooglePlacesService)
+      vi.mocked(placesService.getAddressByPlaceId).mockResolvedValue({
+        address_components: [],
+      })
+      const areaCodeService = module.get(AreaCodeFromZipService)
+      vi.mocked(areaCodeService.getAreaCodeFromZip).mockResolvedValue([])
+
+      const campaign = createMockCampaign({
+        details: { campaignCommittee: 'Jane for Springfield' },
+      })
+
+      await service.submit10DlcBrand(
+        'peerly-123',
+        baseTcrPayload as never,
+        campaign,
+        baseDomain,
+      )
+
+      expect(lastSubmittedData).not.toHaveProperty('jobAreas')
     })
 
     it('throws BadRequestException when campaignCommittee is missing', async () => {
