@@ -884,6 +884,11 @@ export class QueueConsumerService {
 
     const people = await parseCsv<{ id: string; cellPhone: string }>(csv)
 
+    const uuid = uuidv5(
+      `${poll.id}-${person.id!}-${receivedAt ?? ''}`,
+      POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
+    )
+
     // 2. Create individual poll messages
     const now = new Date()
     await this.pollsService.client.$transaction(
@@ -892,7 +897,13 @@ export class QueueConsumerService {
           const message: Prisma.PollIndividualMessageUncheckedCreateInput = {
             // It's important that this id be deterministic, so that we can safely re-upsert
             // a previous CSV.
-            id: `${poll.id}-${person.id}`,
+            //id: `${poll.id}-${person.id}`,
+            // UPDATE 2/12/2025: The above is no longer unique. We now add the sent at / received at...
+            // ...to what we deterministically hash
+            id: uuidv5(
+              `${poll.id}-${person.id!}-${new Date()}`,
+              POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
+            ),
             pollId: poll.id,
             personId: person.id!,
             sentAt: now,
