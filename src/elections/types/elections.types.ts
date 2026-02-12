@@ -126,7 +126,7 @@ export type PositionWithMatchedDistrict = {
     id: string
     L2DistrictType: string
     L2DistrictName: string
-    projectedTurnout: SourceProjectedTurnout
+    projectedTurnout: SourceProjectedTurnout | null
   }
 }
 
