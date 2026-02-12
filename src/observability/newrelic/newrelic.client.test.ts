@@ -5,13 +5,18 @@ const recordCustomEventAgentMock = vi.fn()
 const addCustomAttributeAgentMock = vi.fn()
 const addCustomAttributesAgentMock = vi.fn()
 
-vi.mock('newrelic', () => ({
+const agentMock = {
   recordCustomEvent: (...args: unknown[]) =>
     recordCustomEventAgentMock(...args),
   addCustomAttribute: (...args: unknown[]) =>
     addCustomAttributeAgentMock(...args),
   addCustomAttributes: (...args: unknown[]) =>
     addCustomAttributesAgentMock(...args),
+}
+
+vi.mock('newrelic', () => ({
+  __esModule: true,
+  default: agentMock,
 }))
 
 // Import after mocking `newrelic`
