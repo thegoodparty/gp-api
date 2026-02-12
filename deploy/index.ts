@@ -2,7 +2,6 @@ import * as aws from '@pulumi/aws'
 import * as pulumi from '@pulumi/pulumi'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
-import { createEinDocumentsBucket } from './components/ein-documents-bucket'
 import { createNewRelicLogForwarder } from './components/newrelic-log-forwarder'
 import { createService } from './components/service'
 import { createVpc } from './components/vpc'
@@ -128,13 +127,6 @@ export = async () => {
       bucketRegionalDomainName: assetsBucket.bucketRegionalDomainName,
       hostedZoneId,
     })
-  }
-
-  // EIN supporting documents bucket - contains sensitive campaign filing documents
-  // Only deployed for prod to manage the existing bucket, not for preview/dev/qa
-  // since they share the same bucket
-  if (environment === 'prod') {
-    createEinDocumentsBucket({ environment })
   }
 
   const rdsSecurityGroup = new aws.ec2.SecurityGroup('rdsSecurityGroup', {

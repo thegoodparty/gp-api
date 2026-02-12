@@ -33,41 +33,8 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
     restrictPublicBuckets: true,
   })
 
-  // NOTE: Bucket policy allowing CloudFront OAC access is created in assets-router.ts
-  // for dev/qa environments. For prod, the CloudFront distribution ARN needs to be
-  // provided separately (see PROD_CLOUDFRONT_DISTRIBUTION_ARN below).
-
-  // For prod environment, we need to create the CloudFront-only bucket policy here
-  // since it doesn't go through assets-router.ts
-  if (environment === 'prod') {
-    const prodCloudfrontDistributionArn =
-      'arn:aws:cloudfront::333022194791:distribution/E2LRA7IV6F5YST'
-
-    new aws.s3.BucketPolicy('assetsOacBucketPolicyProd', {
-      bucket: bucket.id,
-      policy: aws.iam.getPolicyDocumentOutput({
-        statements: [
-          {
-            principals: [
-              {
-                type: 'Service',
-                identifiers: ['cloudfront.amazonaws.com'],
-              },
-            ],
-            actions: ['s3:GetObject'],
-            resources: [pulumi.interpolate`${bucket.arn}/*`],
-            conditions: [
-              {
-                test: 'StringEquals',
-                variable: 'AWS:SourceArn',
-                values: [prodCloudfrontDistributionArn],
-              },
-            ],
-          },
-        ],
-      }).json,
-    })
-  }
+  // Bucket policy allowing CloudFront OAC access is created in assets-router.ts
+  // for all environments, scoped to the CloudFront distribution it manages.
 
   new aws.s3.BucketCorsConfigurationV2('assetsBucketCors', {
     bucket: bucket.id,
