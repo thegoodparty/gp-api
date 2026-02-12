@@ -274,6 +274,98 @@ These features exist exclusively in Grafana Cloud and have no self-hosted equiva
 
 ---
 
+## 4. Sentry
+
+### What Sentry Is (and Isn't)
+
+Sentry is **primarily an error tracking and performance monitoring tool**, not a full observability platform. It excels at catching, triaging, and fixing application errors, with strong session replay and decent APM for standard use cases. However, it has critical gaps as a standalone observability solution: **no infrastructure monitoring, no GA metrics product, no OTLP metrics ingestion, and minimal incident management**.
+
+### Pricing Model (Event-Based)
+
+Sentry prices by **event/span count**, not by GB or host. **Seats are unlimited on all paid plans** (no per-seat charge).
+
+| Plan | Base Price (Monthly) | Base Price (Annual) |
+|------|---------------------|---------------------|
+| Developer | Free (1 user) | N/A |
+| Team | $29/month | ~$26/month |
+| Business | $89/month | ~$80/month |
+| Enterprise | Custom | Custom |
+
+**Included monthly quotas (all paid plans):**
+
+| Data Type | Included |
+|-----------|----------|
+| Errors | 50,000 |
+| Logs | 5 GB |
+| Spans (Tracing) | 5,000,000 |
+| Session Replays | 50 |
+
+**Overage rates (Team, reserved):**
+
+| Data Type | Rate |
+|-----------|------|
+| Errors | ~$0.00029/error (decreasing with volume) |
+| Spans | ~$0.0000016/span |
+| Logs | $0.50/GB (PAYG only) |
+| Session Replays | ~$0.003/replay |
+| Seer AI (debugging) | $40/month per active contributor (2+ PRs) |
+
+**Retention**: 30 days for spans, logs, profiles on Team plan. Business adds 13-month sampled span retention.
+
+### Estimated Monthly Cost
+
+| Component | Calculation | Estimate |
+|-----------|-------------|----------|
+| Base plan (Team) | flat | $29 |
+| Seats (15 devs) | unlimited on paid plans | $0 |
+| Logs (24 GB/mo) | 5 GB included, 19 GB × $0.50 | ~$10 |
+| Metrics (~35 GB/mo) | **Not possible** — no GA metrics, no OTLP metrics | N/A |
+| Spans/Traces | Depends on span count, not GB. 5M included. | ~$50-$300 (varies) |
+| Errors/APM | Depends on error count. 50k included. | ~$30-$200 (varies) |
+| Browser/RUM | Errors + spans + replay costs combined | included above |
+| Seer AI (15 devs) | 15 × $40 | $600 (optional) |
+| **Total (without AI)** | | **~$120-$540/month** |
+| **Total (with AI)** | | **~$720-$1,140/month** |
+
+> **Critical gap**: Sentry **cannot handle your metrics workload** (~35 GB/month). You would need a separate platform for metrics, infrastructure monitoring, and advanced log analytics. This means Sentry cannot be a standalone "home" for observability.
+
+### Features
+
+| Feature | Support | Notes |
+|---------|---------|-------|
+| APM | ⚠️ Partial | Performance monitoring with tracing, slow query detection, N+1 detection. But no infrastructure monitoring, limited service maps, no synthetic monitoring. |
+| Logging | ⚠️ Emerging | Structured Logs (GA Sep 2025), trace-connected. Basic search/filtering. $0.50/GB, 30-day retention, limited query power vs Loki/Datadog. |
+| RUM / Browser Monitoring | ✅ Strong | Session Replay (video-like), Web Vitals, frontend error tracking with full stack traces. Best-in-class error context. |
+| OpenTelemetry | ⚠️ Traces+Logs only | OTLP ingestion for traces and logs (open beta). **No OTLP metrics support.** Sentry's own SDK provides richer context than pure OTel. |
+| Alerting | ✅ Basic | Issue alerts + metric alerts. Up to 20 metric alerts on Team plan. Email, Slack, PagerDuty, Teams, webhooks. |
+| Incident Management | ❌ Minimal | Issue assignment and status tracking only. No on-call, no escalation, no war rooms. Integrate PagerDuty/OpsGenie externally. |
+| Terraform | ✅ Official | Sentry Terraform Provider — orgs, teams, projects, alerts, dashboards |
+| Pulumi | ⚠️ Community | [pulumiverse/pulumi-sentry](https://github.com/pulumiverse/pulumi-sentry) — bridged Terraform provider |
+| AI / MCP | ✅ Strong | Hosted MCP server (OAuth, no install). Seer AI debugger for root cause analysis and fix suggestions. $40/contributor/month. |
+| Tracing | ✅ Good | Distributed tracing with span-level detail, waterfall views, trace-connected logs/errors. Less sophisticated than Datadog for complex topologies. |
+
+### What's Missing for Full Observability
+
+- **No infrastructure monitoring** (CPU, memory, disk, network, Kubernetes, cloud resources)
+- **No metrics platform** (custom metrics are beta, JS/Python only, no OTLP metrics)
+- **No synthetic monitoring** (only basic uptime checks)
+- **No incident management** (no on-call, no escalation policies)
+- **Limited log analytics** compared to dedicated platforms
+
+### Implementation Complexity: Very Low
+
+- Extremely easy to set up — `@sentry/nestjs` package, `Sentry.init()`, done
+- Automatic instrumentation for HTTP, DB queries, errors
+- Session Replay for frontend: add `@sentry/browser` SDK
+- Source map upload for readable stack traces (CI/CD step)
+- **1-2 hours** for basic setup, 1-2 days for full rollout across services
+
+### Verdict
+
+Sentry is best-in-class for **error tracking and session replay**, but it is a **complement to an observability platform, not a replacement**. It cannot serve as the sole "home" of observability due to the metrics gap, lack of infrastructure monitoring, and minimal incident management.
+
+---
+
 ## Comparison Matrix
 
 ### Cost Summary
@@ -281,29 +373,31 @@ These features exist exclusively in Grafana Cloud and have no self-hosted equiva
 | Vendor               | Est. Monthly Cost  | Cost Predictability                                                             |
 | -------------------- | ------------------ | ------------------------------------------------------------------------------- |
 | **Grafana Cloud**    | **~$344**          | Medium — metrics cardinality is the wildcard                                    |
+| **Sentry**           | **~$120-$540**     | Medium — event/span-based, but cannot cover metrics workload (needs second tool) |
 | **Datadog**          | **~$1,222**        | Low — many SKUs, custom metrics can explode costs, bill shock is common         |
 | **Self-hosted LGTM** | **~$5,930-$9,160** | Medium — infrastructure is predictable, but engineering time is the hidden cost |
 
 ### Feature Parity
 
-| Requirement                           | Grafana Cloud  |      Datadog       | Self-hosted LGTM |
-| ------------------------------------- | :------------: | :----------------: | :--------------: |
-| General APM                           |       ✅       |  ✅ Best-in-class  |        ❌        |
-| Logging (slice & dice, dashboards)    |       ✅       |         ✅         |        ✅        |
-| Browser Monitoring (RUM)              |       ✅       |         ✅         |    ⚠️ Partial    |
-| OpenTelemetry (minimal custom agents) | ✅ First-class | ⚠️ Pushes dd-agent |        ✅        |
-| Alerting                              |       ✅       |         ✅         |        ✅        |
-| Incident Management                   |       ✅       | ✅ (separate SKUs) |   ⚠️ Degrading   |
-| Terraform IaC                         |  ✅ Official   |    ✅ Official     |   ✅ Official    |
-| Pulumi IaC                            |  ⚠️ Community  |    ✅ Official     |   ⚠️ Community   |
-| AI / MCP                              |   ✅ Strong    |     ✅ Strong      |        ❌        |
-| Tracing                               |       ✅       |         ✅         |        ✅        |
+| Requirement                           | Grafana Cloud  |      Datadog       |         Sentry          | Self-hosted LGTM |
+| ------------------------------------- | :------------: | :----------------: | :---------------------: | :--------------: |
+| General APM                           |       ✅       |  ✅ Best-in-class  |       ⚠️ Partial        |        ❌        |
+| Logging (slice & dice, dashboards)    |       ✅       |         ✅         |       ⚠️ Emerging       |        ✅        |
+| Browser Monitoring (RUM)              |       ✅       |         ✅         | ✅ Strong (Session Replay) |    ⚠️ Partial    |
+| OpenTelemetry (minimal custom agents) | ✅ First-class | ⚠️ Pushes dd-agent |  ⚠️ Traces+Logs only   |        ✅        |
+| Alerting                              |       ✅       |         ✅         |        ✅ Basic         |        ✅        |
+| Incident Management                   |       ✅       | ✅ (separate SKUs) |        ❌ Minimal        |   ⚠️ Degrading   |
+| Terraform IaC                         |  ✅ Official   |    ✅ Official     |       ✅ Official       |   ✅ Official    |
+| Pulumi IaC                            |  ⚠️ Community  |    ✅ Official     |      ⚠️ Community       |   ⚠️ Community   |
+| AI / MCP                              |   ✅ Strong    |     ✅ Strong      |       ✅ Strong         |        ❌        |
+| Tracing                               |       ✅       |         ✅         |        ✅ Good          |        ✅        |
 
 ### Implementation Complexity
 
 | Vendor               | Complexity | Time to Value |               Maintenance Burden               |
 | -------------------- | :--------: | :-----------: | :--------------------------------------------: |
 | **Grafana Cloud**    |    Low     |     Days      |                 None (managed)                 |
+| **Sentry**           |  Very Low  |     Hours     |    None (managed), but incomplete coverage     |
 | **Datadog**          | Low-Medium |     Days      | None (managed), but billing complexity is high |
 | **Self-hosted LGTM** |    High    | Weeks-Months  |          Ongoing (dedicated SRE time)          |
 
@@ -321,6 +415,15 @@ These features exist exclusively in Grafana Cloud and have no self-hosted equiva
 4. **Simplicity**: Fully managed with low implementation complexity
 5. **Open standards**: Built on open-source backends (Loki, Mimir, Tempo) — data is portable if you ever need to move
 6. **Gartner recognition**: Named a Leader in the 2025 Gartner Magic Quadrant for Observability Platforms
+
+### Why not Sentry:
+
+- Sentry is **not a full observability platform** — it's an error tracking + performance monitoring tool
+- **No metrics support** (beta only, no OTLP metrics) — cannot handle our ~35 GB/month metrics workload
+- **No infrastructure monitoring** — cannot monitor hosts, containers, Kubernetes
+- **Minimal incident management** — no on-call, no escalation policies
+- Would require pairing with another platform anyway, defeating the purpose of choosing a single "home"
+- That said, Sentry's error tracking and session replay are best-in-class — worth considering as a **complement** to Grafana Cloud if we want deeper error triage
 
 ### Why not Datadog:
 
