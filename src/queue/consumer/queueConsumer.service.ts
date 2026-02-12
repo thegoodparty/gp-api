@@ -884,11 +884,6 @@ export class QueueConsumerService {
 
     const people = await parseCsv<{ id: string; cellPhone: string }>(csv)
 
-    const uuid = uuidv5(
-      `${poll.id}-${person.id!}-${receivedAt ?? ''}`,
-      POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
-    )
-
     // 2. Create individual poll messages
     const now = new Date()
     await this.pollsService.client.$transaction(
