@@ -671,12 +671,9 @@ export class QueueConsumerService {
     }
 
     const rows = JSON.parse(responsesFileContent) as PollClusterAnalysisJson
-    const pollIssueIds = issues.map((issue) => ({
-      id: `${pollId}-${issue.rank}`,
-    }))
-    const validIssueIds = new Set(pollIssueIds.map((i) => i.id))
 
-    // One response can span multiple rows (one per atomic message), and there may be duplicate rows
+    // One response can span multiple rows / elements in the array (one per atomic message)
+    // and there may be duplicate rows
     const groupKey = (r: PollResponseJsonRow) =>
       `${r.phoneNumber}\n${r.receivedAt ?? ''}`
     const groups = new Map<string, PollResponseJsonRow[]>()
@@ -709,7 +706,7 @@ export class QueueConsumerService {
         )
       }
 
-      const id = uuidv5(
+      const uuid = uuidv5(
         `${pollId}-${personId}-${receivedAt ?? ''}`,
         POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
       )
@@ -717,7 +714,7 @@ export class QueueConsumerService {
       const sentAt = receivedAt ? new Date(receivedAt) : new Date()
 
       scalarData.push({
-        id,
+        id: uuid,
         personId,
         sentAt,
         isOptOut,
@@ -726,20 +723,25 @@ export class QueueConsumerService {
         pollId,
       })
 
-      // Each group can be linked to multiple PollIssues
-      const clusterIds = new Set(
-        groupRows
-          .map((r) => r.clusterId)
-          .filter((id) => id !== '' && id !== undefined),
-      )
-      for (const clusterId of clusterIds) {
-        const issueId = `${pollId}-${clusterId}`
-        if (validIssueIds.has(issueId)) {
-          joinValues.push(Prisma.sql`(${id}, ${issueId})`)
+      const validIssueIds = new Set(issues.map((i) => `${i.pollId}-${i.rank}`))
+
+      // Several rows / elements in the same group can have the same clusterId
+      // So we have to guard against that to ensure we're not creating duplicate join records
+      // If that is changed, then seenIssueIds is no longer needed
+      const seenIssueIds = new Set<string>()
+      for (const row of groupRows) {
+        const cid = row.clusterId
+        if (cid == '' || cid === undefined) continue
+        const issueId = `${pollId}-${cid}`
+        if (validIssueIds.has(issueId) && !seenIssueIds.has(issueId)) {
+          seenIssueIds.add(issueId)
+          joinValues.push(Prisma.sql`(${uuid}, ${issueId})`)
         }
       }
     }
 
+    // Prisma does not support a createMany on an implicit many-to-many join table
+    // so we have to dip into raw SQL here
     const prisma = this.pollIndividualMessage.client
     await prisma.$transaction(async (tx) => {
       await tx.pollIndividualMessage.createMany({ data: scalarData })
