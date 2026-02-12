@@ -9,3 +9,19 @@ export type WithOptional<T, F extends keyof T> = Omit<T, F> &
  */
 export type WithRequired<T, F extends keyof T> = Omit<T, F> &
   Required<Pick<T, F>>
+
+export type PaginationOptions = {
+  offset?: number
+  limit?: number
+}
+
+export type PaginationMeta = {
+  total: number
+  offset: number
+  limit: number
+}
+
+export type PaginatedResults<T> = {
+  data: T[]
+  meta: PaginationMeta
+}
