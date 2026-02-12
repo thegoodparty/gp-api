@@ -734,6 +734,7 @@ export class QueueConsumerService {
         personId,
         sentAt,
         isOptOut,
+        sender: PollIndividualMessageSender.CONSTITUENT,
         content: originalMessage ?? null,
         electedOfficeId,
         pollId,
@@ -754,10 +755,18 @@ export class QueueConsumerService {
       }
     }
 
-    // Prisma does not support a createMany on an implicit many-to-many join table
-    // so we have to dip into raw SQL here
+    // Idempotency: delete constituent responses we're about to replace (same deterministic ids).
+    // Does not touch ELECTED_OFFICIAL messages (outreach); join rows removed by FK CASCADE.
+    const idsToReplace = scalarData.map((d) => d.id)
     const prisma = this.pollIndividualMessage.client
     await prisma.$transaction(async (tx) => {
+      await tx.pollIndividualMessage.deleteMany({
+        where: {
+          id: { in: idsToReplace },
+          pollId,
+          sender: PollIndividualMessageSender.CONSTITUENT,
+        },
+      })
       await tx.pollIndividualMessage.createMany({ data: scalarData })
       if (joinValues.length > 0) {
         await tx.$executeRaw`

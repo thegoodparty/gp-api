@@ -132,6 +132,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
           .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
             const mockTx = {
               pollIndividualMessage: {
+                deleteMany: vi.fn().mockResolvedValue(undefined),
                 createMany: vi.fn().mockResolvedValue(undefined),
               },
               $executeRaw: vi.fn().mockResolvedValue(undefined),
@@ -277,7 +278,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     expect(pollIndividualMessage.client.$transaction).toHaveBeenCalled()
     const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
     const mockTx = {
-      pollIndividualMessage: { createMany: vi.fn() },
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
       $executeRaw: vi.fn(),
     }
     await txCb(mockTx)
@@ -311,7 +312,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
 
     const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
     const mockTx = {
-      pollIndividualMessage: { createMany: vi.fn() },
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
       $executeRaw: vi.fn(),
     }
     await txCb(mockTx)
@@ -416,7 +417,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     expect(pollIndividualMessage.client.$transaction).toHaveBeenCalled()
     const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
     const mockTx = {
-      pollIndividualMessage: { createMany: vi.fn() },
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
       $executeRaw: vi.fn(),
     }
     await txCb(mockTx)
@@ -443,5 +444,43 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     expect(
       mockTx.pollIndividualMessage.createMany.mock.calls[0][0].data,
     ).toHaveLength(3)
+  })
+
+  it('is idempotent: processing the same poll analysis complete event twice succeeds both times', async () => {
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber,
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'Same response',
+        clusterId: 1,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({ pollId })
+
+    const first = await service.processMessage(message)
+    const second = await service.processMessage(message)
+
+    expect(first).toBe(true)
+    expect(second).toBe(true)
+    expect(pollIndividualMessage.client.$transaction).toHaveBeenCalledTimes(2)
+
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    expect(mockTx.pollIndividualMessage.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: expect.any(Array) },
+        pollId,
+        sender: expect.anything(),
+      },
+    })
+    const deleteWhere =
+      mockTx.pollIndividualMessage.deleteMany.mock.calls[0][0].where
+    expect(deleteWhere.id.in).toHaveLength(1)
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalled()
   })
 })
