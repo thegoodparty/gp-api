@@ -34,10 +34,14 @@ export interface P2pJobGeographyResult {
   didNpaSubset: string[]
 }
 
+export interface GeographyLogger {
+  warn: (context: object, message: string) => void
+}
+
 export interface ResolveP2pJobGeographyServices {
   placesService: PlacesAddressLookup
   areaCodeFromZipService: AreaCodeFromZipLookup
-  logger?: { warn: (context: object, message: string) => void }
+  logger?: GeographyLogger
 }
 
 function isDetailsRecord(
@@ -79,10 +83,15 @@ function normalizeZip(z: string | undefined): string | undefined {
 async function getAreaCodesForZip(
   zip: string | undefined,
   areaCodeFromZipService: AreaCodeFromZipLookup,
+  logger?: GeographyLogger,
 ): Promise<string[]> {
   if (zip == null || zip === '') return []
   const codes = await areaCodeFromZipService.getAreaCodeFromZip(zip)
-  return Array.isArray(codes) && codes.length > 0 ? codes : []
+  if (!Array.isArray(codes) || codes.length === 0) {
+    logger?.warn({ zip }, 'Area code lookup returned no results for zip')
+    return []
+  }
+  return codes
 }
 
 export interface ResolveJobGeographyFromAddressParams {
@@ -92,6 +101,7 @@ export interface ResolveJobGeographyFromAddressParams {
 
 export interface ResolveJobGeographyFromAddressServices {
   areaCodeFromZipService: AreaCodeFromZipLookup
+  logger?: GeographyLogger
 }
 
 /**
@@ -106,6 +116,7 @@ export async function resolveJobGeographyFromAddress(
   const didNpaSubset = await getAreaCodesForZip(
     zip,
     services.areaCodeFromZipService,
+    services.logger,
   )
   // Derive state from ZIP when stateCode is missing to avoid defaulting to P2P_JOB_DEFAULTS.DID_STATE
   const stateFromZip =
@@ -143,7 +154,7 @@ export async function resolveP2pJobGeography(
           stateCode: state?.short_name?.trim(),
           postalCodeValue: postalCode?.long_name,
         },
-        { areaCodeFromZipService },
+        { areaCodeFromZipService, logger },
       )
     } catch (err) {
       logger?.warn(
@@ -160,6 +171,6 @@ export async function resolveP2pJobGeography(
 
   return resolveJobGeographyFromAddress(
     { stateCode, postalCodeValue: zip },
-    { areaCodeFromZipService },
+    { areaCodeFromZipService, logger },
   )
 }

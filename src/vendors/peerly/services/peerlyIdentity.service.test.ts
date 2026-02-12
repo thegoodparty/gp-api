@@ -99,6 +99,7 @@ function createMockDomain(overrides: Partial<Domain> = {}): Domain {
 
 describe('PeerlyIdentityService', () => {
   let service: PeerlyIdentityService
+  let module: TestingModule
   let lastSubmittedData: Record<string, unknown>
 
   const mockPlacesResponse = {
@@ -139,7 +140,7 @@ describe('PeerlyIdentityService', () => {
     // The service accesses httpService[method.name], so the function needs a proper name
     Object.defineProperty(mockPostFn, 'name', { value: 'post' })
 
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         PeerlyIdentityService,
         {
@@ -362,6 +363,138 @@ describe('PeerlyIdentityService', () => {
           baseDomain,
         ),
       ).rejects.toThrow(BadRequestException)
+    })
+  })
+
+  describe('submit10DlcBrand', () => {
+    const baseTcrPayload = {
+      phone: '+15551234567',
+      websiteDomain: 'https://janedoe.com',
+      ein: '12-3456789',
+    }
+
+    it('includes jobAreas with didState and didNpaSubset when area codes are resolved', async () => {
+      const areaCodeService = module.get(AreaCodeFromZipService)
+      vi.mocked(areaCodeService.getAreaCodeFromZip).mockResolvedValue([
+        '217',
+        '618',
+      ])
+
+      const campaign = createMockCampaign({
+        details: { campaignCommittee: 'Jane for Springfield' },
+      })
+
+      await service.submit10DlcBrand(
+        'peerly-123',
+        baseTcrPayload as never,
+        campaign,
+        baseDomain,
+      )
+
+      expect(lastSubmittedData.jobAreas).toEqual([
+        {
+          didState: 'IL',
+          didNpaSubset: ['217', '618'],
+        },
+      ])
+    })
+
+    it('includes jobAreas with only didState when area code lookup returns empty', async () => {
+      const areaCodeService = module.get(AreaCodeFromZipService)
+      vi.mocked(areaCodeService.getAreaCodeFromZip).mockResolvedValue([])
+
+      const campaign = createMockCampaign({
+        details: { campaignCommittee: 'Jane for Springfield' },
+      })
+
+      await service.submit10DlcBrand(
+        'peerly-123',
+        baseTcrPayload as never,
+        campaign,
+        baseDomain,
+      )
+
+      // jobAreas is present with didState even when no area codes resolved
+      expect(lastSubmittedData.jobAreas).toEqual([{ didState: 'IL' }])
+    })
+
+    it('includes jobAreas with only didState when area code lookup returns null', async () => {
+      const areaCodeService = module.get(AreaCodeFromZipService)
+      vi.mocked(areaCodeService.getAreaCodeFromZip).mockResolvedValue(null)
+
+      const campaign = createMockCampaign({
+        details: { campaignCommittee: 'Jane for Springfield' },
+      })
+
+      await service.submit10DlcBrand(
+        'peerly-123',
+        baseTcrPayload as never,
+        campaign,
+        baseDomain,
+      )
+
+      expect(lastSubmittedData.jobAreas).toEqual([{ didState: 'IL' }])
+    })
+
+    it('always sends state in both top-level field and jobAreas', async () => {
+      const areaCodeService = module.get(AreaCodeFromZipService)
+      vi.mocked(areaCodeService.getAreaCodeFromZip).mockResolvedValue([])
+
+      const campaign = createMockCampaign({
+        details: { campaignCommittee: 'Jane for Springfield' },
+      })
+
+      await service.submit10DlcBrand(
+        'peerly-123',
+        baseTcrPayload as never,
+        campaign,
+        baseDomain,
+      )
+
+      // state at top level from extractAddressComponents
+      expect(lastSubmittedData.state).toBe('IL')
+      // state also in jobAreas for DID routing
+      const jobAreas = lastSubmittedData.jobAreas as Array<{
+        didState: string
+      }>
+      expect(jobAreas[0].didState).toBe('IL')
+    })
+
+    it('throws BadRequestException when campaignCommittee is missing', async () => {
+      const campaign = createMockCampaign({
+        details: { electionDate: '2024-11-05' },
+      })
+
+      await expect(
+        service.submit10DlcBrand(
+          'peerly-123',
+          baseTcrPayload as never,
+          campaign,
+          baseDomain,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('sends correctly formatted brand data fields', async () => {
+      const areaCodeService = module.get(AreaCodeFromZipService)
+      vi.mocked(areaCodeService.getAreaCodeFromZip).mockResolvedValue(['217'])
+
+      const campaign = createMockCampaign({
+        details: { campaignCommittee: 'Jane for Springfield' },
+      })
+
+      await service.submit10DlcBrand(
+        'peerly-123',
+        baseTcrPayload as never,
+        campaign,
+        baseDomain,
+      )
+
+      expect(lastSubmittedData.ein).toBe('12-3456789')
+      expect(lastSubmittedData.is_political).toBe(true)
+      expect(lastSubmittedData.state).toBe('IL')
+      expect(lastSubmittedData.postalCode).toBe('62701')
+      expect(lastSubmittedData.email).toBe('info@candidate.com')
     })
   })
 })
