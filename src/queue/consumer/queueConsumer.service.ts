@@ -926,10 +926,10 @@ export class QueueConsumerService {
             // It's important that this id be deterministic, so that we can safely re-upsert
             // a previous CSV.
             //id: `${poll.id}-${person.id}`,
-            // UPDATE 2/12/2025: The above is no longer unique. We now add the sent at / received at...
-            // ...to what we deterministically hash
+            // UPDATE 2/12/2025: The above is no longer unique, so only for the initial poll send event
+            // We add the below enum to the hash
             id: uuidv5(
-              `${poll.id}-${person.id!}-${new Date()}`,
+              `${poll.id}-${person.id!}-${PollIndividualMessageSender.ELECTED_OFFICIAL}`,
               POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
             ),
             pollId: poll.id,
