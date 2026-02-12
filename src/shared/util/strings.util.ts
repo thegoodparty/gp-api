@@ -53,10 +53,3 @@ export const ensureUrlHasProtocol = (url: string) =>
 export const urlIncludesPath = (urlStr: string): boolean =>
   // optional protocol, but must have path (e.g. http://example.com/path not just http://example.com)
   /^(https?:\/\/)?[^\/\s]+\/[^\/\s]+.*$/i.test(urlStr)
-
-/** Coerce CSV-style string to boolean (true for 'true', '1', 'yes' case-insensitive) */
-export function toBoolean(s: string | undefined): boolean {
-  if (s == null || s === '') return false
-  const lower = s.toLowerCase()
-  return lower === 'true' || lower === '1' || lower === 'yes'
-}
