@@ -28,5 +28,7 @@ model User {
   aiChats               AiChat[]
   electedOffices       ElectedOffice[]
 
+  @@index([firstName])
+  @@index([lastName])
   @@map("user")
 }

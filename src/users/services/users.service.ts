@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { WithOptional } from 'src/shared/types/utility.types'
+import { PaginatedResults, WithOptional } from 'src/shared/types/utility.types'
 import { AnalyticsService } from '../../analytics/analytics.service'
 import { trimMany } from '../../shared/util/strings.util'
 import {
@@ -23,6 +23,11 @@ import { subHours } from 'date-fns'
 import throttle from 'p-throttle'
 import { chunk } from 'es-toolkit'
 import ms from 'ms'
+import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+} from '@/shared/constants/paginationOptions.consts'
+import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
@@ -289,6 +294,52 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         updated_at = NOW()
       WHERE u.id = ${userId}
     `
+  }
+
+  async listUsers({
+    offset: skip = DEFAULT_PAGINATION_OFFSET,
+    limit = DEFAULT_PAGINATION_LIMIT,
+    sortBy = 'createdAt',
+    sortOrder = 'desc',
+    firstName,
+    lastName,
+    email,
+  }: ListUsersPaginationSchema): Promise<PaginatedResults<User>> {
+    const where: Prisma.UserWhereInput = {
+      ...(firstName
+        ? {
+            firstName: {
+              contains: firstName,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          }
+        : {}),
+      ...(lastName
+        ? {
+            lastName: {
+              contains: lastName,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          }
+        : {}),
+      ...(email
+        ? { email: { contains: email, mode: Prisma.QueryMode.insensitive } }
+        : {}),
+    }
+
+    return {
+      data: await this.model.findMany({
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        where,
+      }),
+      meta: {
+        total: await this.model.count({ where }),
+        offset: skip,
+        limit,
+      },
+    }
   }
 
   /**
