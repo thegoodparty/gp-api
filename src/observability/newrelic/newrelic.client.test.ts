@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CustomEventType } from './newrelic.events'
 
-const recordCustomEventAgentMock = vi.fn()
-const addCustomAttributeAgentMock = vi.fn()
-const addCustomAttributesAgentMock = vi.fn()
+const {
+  recordCustomEventAgentMock,
+  addCustomAttributeAgentMock,
+  addCustomAttributesAgentMock,
+} = vi.hoisted(() => ({
+  recordCustomEventAgentMock: vi.fn(),
+  addCustomAttributeAgentMock: vi.fn(),
+  addCustomAttributesAgentMock: vi.fn(),
+}))
 
 vi.mock('newrelic', () => ({
-  recordCustomEvent: (...args: unknown[]) =>
-    recordCustomEventAgentMock(...args),
-  addCustomAttribute: (...args: unknown[]) =>
-    addCustomAttributeAgentMock(...args),
-  addCustomAttributes: (...args: unknown[]) =>
-    addCustomAttributesAgentMock(...args),
+  __esModule: true,
+  default: {
+    recordCustomEvent: (...args: unknown[]) =>
+      recordCustomEventAgentMock(...args),
+    addCustomAttribute: (...args: unknown[]) =>
+      addCustomAttributeAgentMock(...args),
+    addCustomAttributes: (...args: unknown[]) =>
+      addCustomAttributesAgentMock(...args),
+  },
 }))
 
 // Import after mocking `newrelic`

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common'
-import * as newrelic from 'newrelic'
+import newrelic from 'newrelic'
 import {
   CustomEventAttributesByType,
   CustomEventType,
