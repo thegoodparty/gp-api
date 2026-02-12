@@ -120,6 +120,18 @@ export type Approve10DLCBrandResponseBody = {
   campaign_verify_token: string
 }
 
+/** Full brand data returned by the Peerly approve 10DLC endpoint. */
+export type BrandApprovalResult = Omit<
+  Approve10DLCBrandResponseBody,
+  'campaign_verify_token'
+>
+
+/** Minimal brand data returned by the local CV bypass. */
+export type BrandApprovalBypassResult = Pick<
+  BrandApprovalResult,
+  'status' | 'displayName'
+>
+
 // Media status enum
 export enum MediaStatus {
   ERROR = 'ERROR',

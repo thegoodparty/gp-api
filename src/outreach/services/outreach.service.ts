@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -43,6 +44,8 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
     createOutreachDto: CreateOutreachSchema,
     p2pImage: P2pOutreachImageInput,
     imageUrl: string,
+    script: string,
+    phoneListId: number,
   ) {
     try {
       const { peerlyIdentityId } =
@@ -65,10 +68,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
       }`
 
       const { aiContent = {} } = campaign
-      const resolvedScriptText = resolveScriptContent(
-        createOutreachDto.script!,
-        aiContent,
-      )
+      const resolvedScriptText = resolveScriptContent(script, aiContent)
 
       const resolvedGeography = await this.resolveP2pJobGeography(campaign)
       const didState = createOutreachDto.didState ?? resolvedGeography.didState
@@ -78,7 +78,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
       const jobId = await this.peerlyP2pJobService.createPeerlyP2pJob({
         campaignId: campaign.id,
         crmCompanyId: campaign.data?.hubspotId,
-        listId: createOutreachDto.phoneListId!,
+        listId: phoneListId,
         imageInfo: {
           fileStream: p2pImage.stream,
           fileName: p2pImage.filename,
@@ -86,7 +86,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
           title: createOutreachDto.title,
         },
         scriptText: resolvedScriptText,
-        identityId: peerlyIdentityId!,
+        identityId: peerlyIdentityId,
         name,
         didState,
         didNpaSubset,
@@ -106,9 +106,12 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
       )
     } catch (error) {
       this.logger.error('Failed to create P2P outreach', error)
+      if (error instanceof HttpException) {
+        throw error
+      }
       const message = error instanceof Error ? error.message : 'Unknown error'
       throw new BadRequestException(
-        `Failed to create P2P outreach: ${message}. Please check your parameters and try again.`,
+        `Failed to create P2P outreach: ${message}`,
         { cause: error },
       )
     }
@@ -127,21 +130,30 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
   ) {
     const isP2p = createOutreachDto.outreachType === OutreachType.p2p
 
-    if (isP2p && !p2pImage) {
-      throw new BadRequestException(
-        'P2P outreach requires an image with filename and MIME type; cannot create P2P outreach without Peerly job setup',
-      )
-    }
-
     if (isP2p) {
       if (!imageUrl) {
         throw new BadRequestException('imageUrl is required for P2P outreach')
       }
+      if (!p2pImage) {
+        throw new BadRequestException(
+          'P2P outreach requires an image with filename and MIME type; cannot create P2P outreach without Peerly job setup',
+        )
+      }
+      if (!createOutreachDto.script) {
+        throw new BadRequestException('Script is required for P2P outreach')
+      }
+      if (!createOutreachDto.phoneListId) {
+        throw new BadRequestException(
+          'Phone list ID is required for P2P outreach',
+        )
+      }
       return this.createP2pOutreach(
         campaign,
         createOutreachDto,
-        p2pImage!, // defined: we threw above when isP2p && !p2pImage
+        p2pImage,
         imageUrl,
+        createOutreachDto.script,
+        createOutreachDto.phoneListId,
       )
     }
 

@@ -28,6 +28,7 @@ import { SlackChannel, SlackMessageType } from '../../slack/slackService.types'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import {
   Approve10DLCBrandResponseBody,
+  BrandApprovalResult,
   BuildPeerlyErrorSlackMessageBlocksParams,
   CampaignVerificationStatus,
   HandleApiErrorParams,
@@ -417,7 +418,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async approve10DLCBrand(
     { committeeName, peerlyIdentityId, campaignId }: TcrCompliance,
     campaignVerifyToken: string = '',
-  ) {
+  ): Promise<BrandApprovalResult | undefined> {
     const campaign = await this.campaignsService.findFirstOrThrow({
       where: {
         id: campaignId,

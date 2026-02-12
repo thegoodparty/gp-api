@@ -20,6 +20,8 @@ import {
 } from '../../../queue/queue.types'
 import { getUserFullName } from '../../../users/util/users.util'
 import {
+  BrandApprovalBypassResult,
+  BrandApprovalResult,
   PeerlyIdentity,
   PeerlyIdentityProfile,
   PeerlyIdentityProfileResponseBody,
@@ -376,13 +378,11 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     user: User,
     tcrCompliance: TcrCompliance,
     campaignVerifyToken: string,
-  ) {
+  ): Promise<BrandApprovalResult | BrandApprovalBypassResult | undefined> {
     // Only treat bypass token as special when the feature is enabled (defense-in-depth)
     if (campaignVerifyToken === CV_BYPASS_TOKEN && PEERLY_CV_BYPASS_PIN) {
       if (CV_BYPASS_ALLOWED) {
-        return { status: 'approved', displayName: 'Local bypass' } as Awaited<
-          ReturnType<PeerlyIdentityService['approve10DLCBrand']>
-        >
+        return { status: 'approved', displayName: 'Local bypass' }
       }
       throw new UnprocessableEntityException(
         'Campaign Verify bypass is not allowed in production',
