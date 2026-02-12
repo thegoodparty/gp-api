@@ -669,8 +669,20 @@ export class QueueConsumerService {
         `Unable to fetch responses from S3 for pollId: ${pollId}`,
       )
     }
+    let rows: PollClusterAnalysisJson
+    try {
+      rows = JSON.parse(responsesFileContent) as PollClusterAnalysisJson
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Unable to parse PollClusterAnalysisJson: ${error}`,
+      )
+    }
 
-    const rows = JSON.parse(responsesFileContent) as PollClusterAnalysisJson
+    if (!Array.isArray(rows)) {
+      throw new InternalServerErrorException(
+        'Received unexpected PollClusterAnalysisJson',
+      )
+    }
 
     // One response can span multiple rows / elements in the array (one per atomic message)
     // and there may be duplicate rows
@@ -695,6 +707,8 @@ export class QueueConsumerService {
 
     const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
     const joinValues: Prisma.Sql[] = []
+
+    const validIssueIds = new Set(issues.map((i) => `${i.pollId}-${i.rank}`))
 
     for (const [, groupRows] of groups) {
       const first = groupRows[0]
@@ -723,15 +737,13 @@ export class QueueConsumerService {
         pollId,
       })
 
-      const validIssueIds = new Set(issues.map((i) => `${i.pollId}-${i.rank}`))
-
       // Several rows / elements in the same group can have the same clusterId
       // So we have to guard against that to ensure we're not creating duplicate join records
       // If that is changed, then seenIssueIds is no longer needed
       const seenIssueIds = new Set<string>()
       for (const row of groupRows) {
         const cid = row.clusterId
-        if (cid == '' || cid === undefined) continue
+        if (cid == '' || cid === undefined || cid == null) continue
         const issueId = `${pollId}-${cid}`
         if (validIssueIds.has(issueId) && !seenIssueIds.has(issueId)) {
           seenIssueIds.add(issueId)
@@ -970,7 +982,7 @@ export class QueueConsumerService {
     })
 
     if (!campaign) {
-      this.logger.log('No campagin found, ignoring event')
+      this.logger.log('No campaign found, ignoring event')
       return
     }
     return { poll, office, campaign }
