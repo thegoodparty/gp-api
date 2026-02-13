@@ -181,10 +181,10 @@ export class UsersController {
   ) {
     const { hasPassword, password } = user
     const { newPassword, oldPassword } = body
-    if (hasPassword) {
-      if (!oldPassword) {
-        throw new BadRequestException('oldPassword is required')
-      }
+    if (hasPassword && !oldPassword) {
+      throw new BadRequestException('oldPassword is required')
+    }
+    if (oldPassword) {
       const passwordValidated =
         await this.authenticationService.validatePassword(
           oldPassword,
