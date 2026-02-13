@@ -1001,12 +1001,13 @@ export class QueueConsumerService {
     phoneNumbers: string[]
   }) {
     const { electedOfficeId, pollId, phoneNumbers } = params
+    const normalizedPhones = phoneNumbers.map(normalizePhoneNumber)
     const cellPhonesToPeopleIds: Map<string, string> = new Map()
     const messages = await this.pollIndividualMessage.findMany({
       where: {
         electedOfficeId,
         pollId,
-        personCellPhone: { in: phoneNumbers },
+        personCellPhone: { in: normalizedPhones },
         sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
       },
     })
