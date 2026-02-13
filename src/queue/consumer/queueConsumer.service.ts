@@ -666,12 +666,12 @@ export class QueueConsumerService {
       })),
     })
     this.logger.log('Successfully created new poll issues')
-    const SERVE_DATA_S3_BUCKET = process.env.SERVE_ANALYZE_S3_BUCKET
-    if (!SERVE_DATA_S3_BUCKET) {
-      throw new Error('Please set SERVE_DATA_S3_BUCKET in your .env')
+    const SERVE_ANALYZE_S3_BUCKET = process.env.SERVE_ANALYZE_S3_BUCKET
+    if (!SERVE_ANALYZE_S3_BUCKET) {
+      throw new Error('Please set SERVE_ANALYZE_S3_BUCKET in your .env')
     }
     const responsesFileContent = await this.s3Service.getFile(
-      SERVE_DATA_S3_BUCKET,
+      SERVE_ANALYZE_S3_BUCKET,
       responsesLocation,
     )
     if (!responsesFileContent) {
