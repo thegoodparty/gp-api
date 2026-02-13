@@ -33,7 +33,10 @@ import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
 import { AuthenticationService } from '../authentication/authentication.service'
-import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
+import {
+  UpdateUserAdminInputSchema,
+  UpdateUserInputSchema,
+} from './schemas/UpdateUserInput.schema'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
 
@@ -56,6 +59,17 @@ export class UsersController {
       data: data.map((user) => ReadUserOutputSchema.parse(user)),
       meta,
     }
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  async updateUser(
+    @Param('id') id: string,
+    @Body() body: UpdateUserAdminInputSchema,
+  ) {
+    return ReadUserOutputSchema.parse(
+      await this.usersService.updateUser({ id: parseInt(id) }, body),
+    )
   }
 
   @UseGuards(UserOwnerOrAdminGuard)
