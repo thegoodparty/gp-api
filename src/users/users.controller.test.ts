@@ -229,7 +229,9 @@ describe('UsersController', () => {
 
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(userWithPassword)
 
-      const result = await controller.updateUser(String(userId), { firstName: 'Test' })
+      const result = await controller.updateUser(String(userId), {
+        firstName: 'Test',
+      })
 
       expect(result).not.toHaveProperty('password')
       expect(result).toHaveProperty('hasPassword', true)
@@ -442,7 +444,9 @@ describe('UsersController', () => {
         new Error('DB connection lost'),
       )
 
-      await expect(controller.delete(String(userId))).rejects.toThrow('DB connection lost')
+      await expect(controller.delete(String(userId))).rejects.toThrow(
+        'DB connection lost',
+      )
     })
 
     it('throws BadRequestException for non-numeric id', async () => {
@@ -484,7 +488,10 @@ describe('UsersController', () => {
       )
 
       expect(authService.validatePassword).not.toHaveBeenCalled()
-      expect(usersService.updatePassword).toHaveBeenCalledWith(userId, 'NewPass123')
+      expect(usersService.updatePassword).toHaveBeenCalledWith(
+        userId,
+        'NewPass123',
+      )
     })
 
     it('validates against empty string when user has no existing password but oldPassword is provided', async () => {
@@ -497,7 +504,10 @@ describe('UsersController', () => {
       )
 
       expect(authService.validatePassword).toHaveBeenCalledWith('SomePass1', '')
-      expect(usersService.updatePassword).toHaveBeenCalledWith(userId, 'NewPass123')
+      expect(usersService.updatePassword).toHaveBeenCalledWith(
+        userId,
+        'NewPass123',
+      )
     })
 
     it('throws BadRequestException when user has password but oldPassword is not provided', async () => {
@@ -533,7 +543,10 @@ describe('UsersController', () => {
         'OldPass123',
         'hashed_old',
       )
-      expect(usersService.updatePassword).toHaveBeenCalledWith(userId, 'NewPass123')
+      expect(usersService.updatePassword).toHaveBeenCalledWith(
+        userId,
+        'NewPass123',
+      )
     })
 
     it('throws UnauthorizedException when old password is incorrect', async () => {
