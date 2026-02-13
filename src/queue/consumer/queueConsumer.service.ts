@@ -682,17 +682,9 @@ export class QueueConsumerService {
     }
     const rows = PollClusterAnalysisJsonSchema.parse(
       JSON.parse(responsesFileContent),
-    )
-
     // One response can span multiple rows / elements in the array (one per atomic message)
-    // and there may be duplicate rows. Group by normalized phone so formats match.
-    const groups = new Map<string, PollResponseJsonRow[]>()
-    for (const row of rows) {
-      const key = `${normalizePhoneNumber(row.phoneNumber)}\n${row.receivedAt}`
-      const existing = groups.get(key)
-      if (existing) existing.push(row)
-      else groups.set(key, [row])
-    }
+    // and there may be duplicate rows
+    const groups = groupBy(rows, r => `${r.phoneNumber}\n${r.receivedAt ?? ''}`)
 
     const phoneNumbers = Array.from(
       new Set(rows.map((r) => normalizePhoneNumber(r.phoneNumber))),
