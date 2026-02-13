@@ -696,15 +696,7 @@ export class QueueConsumerService {
 
     // One response can span multiple rows / elements in the array (one per atomic message)
     // and there may be duplicate rows
-    const groupKey = (r: PollResponseJsonRow) =>
-      `${r.phoneNumber}\n${r.receivedAt ?? ''}`
-    const groups = new Map<string, PollResponseJsonRow[]>()
-    for (const row of rows) {
-      const key = groupKey(row)
-      const existing = groups.get(key)
-      if (existing) existing.push(row)
-      else groups.set(key, [row])
-    }
+    const groups = groupBy(rows, r => `${r.phoneNumber}\n${r.receivedAt ?? ''}`)
 
     const phoneNumberSet = new Set<string>()
     for (const key of groups.keys()) {
