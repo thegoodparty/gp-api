@@ -33,7 +33,11 @@ import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
 import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
 import { AuthenticationService } from '../authentication/authentication.service'
-import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
+import {
+  UpdateUserAdminInputSchema,
+  UpdateUserInputSchema,
+} from './schemas/UpdateUserInput.schema'
+import { UserIdParamSchema } from './schemas/UserIdParam.schema'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
 
@@ -58,22 +62,6 @@ export class UsersController {
     }
   }
 
-  @UseGuards(UserOwnerOrAdminGuard)
-  @Get(':id')
-  async findOne(@Param('id') id: string, @ReqUser() user: User) {
-    const paramId = parseInt(id)
-    if (user && paramId === user.id) {
-      // No need to hit the DB again if the user is requesting their own data
-      return ReadUserOutputSchema.parse(user)
-    }
-
-    const dbUser = await this.usersService.findUser({ id: paramId })
-    if (!dbUser) {
-      throw new NotFoundException('User not found')
-    }
-    return ReadUserOutputSchema.parse(dbUser)
-  }
-
   @Get('me')
   async findMe(@ReqUser() user: User) {
     return ReadUserOutputSchema.parse(
@@ -82,8 +70,10 @@ export class UsersController {
   }
 
   @Put('me')
-  updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
-    return this.usersService.updateUser({ id: user.id }, body ?? {})
+  async updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
+    return ReadUserOutputSchema.parse(
+      await this.usersService.updateUser({ id: user.id }, body ?? {}),
+    )
   }
 
   @Get('me/metadata')
@@ -123,31 +113,55 @@ export class UsersController {
     return ReadUserOutputSchema.parse(updatedUser)
   }
 
+  @Put('files/generate-signed-upload-url')
+  async generateSignedUploadUrl(@Body() args: GenerateSignedUploadUrlArgsDto) {
+    return {
+      signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
+    }
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  async updateUser(
+    @Param() { id }: UserIdParamSchema,
+    @Body() body: UpdateUserAdminInputSchema,
+  ) {
+    return ReadUserOutputSchema.parse(
+      await this.usersService.updateUser({ id }, body),
+    )
+  }
+
+  @UseGuards(UserOwnerOrAdminGuard)
+  @Get(':id')
+  async findOne(@Param() { id }: UserIdParamSchema, @ReqUser() user: User) {
+    if (user && id === user.id) {
+      return ReadUserOutputSchema.parse(user)
+    }
+
+    const dbUser = await this.usersService.findUser({ id })
+    if (!dbUser) {
+      throw new NotFoundException('User not found')
+    }
+    return ReadUserOutputSchema.parse(dbUser)
+  }
+
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') id: string) {
+  async delete(@Param() { id }: UserIdParamSchema) {
     try {
-      return await this.usersService.deleteUser(parseInt(id))
+      return await this.usersService.deleteUser(id)
     } catch (error: unknown | PrismaClientKnownRequestError) {
       if (
         error instanceof PrismaClientKnownRequestError &&
         error.code === 'P2025'
       ) {
-        // P2025: Prisma error code for "Record to delete does not exist"
         this.logger.warn(
           `request to delete user that does not exist, w/ id: ${id}`,
         )
         return
       }
       throw error
-    }
-  }
-
-  @Put('files/generate-signed-upload-url')
-  async generateSignedUploadUrl(@Body() args: GenerateSignedUploadUrlArgsDto) {
-    return {
-      signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
     }
   }
 
