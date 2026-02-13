@@ -698,11 +698,7 @@ export class QueueConsumerService {
     // and there may be duplicate rows
     const groups = groupBy(rows, r => `${r.phoneNumber}\n${r.receivedAt ?? ''}`)
 
-    const phoneNumberSet = new Set<string>()
-    for (const key of groups.keys()) {
-      phoneNumberSet.add(key.split('\n')[0])
-    }
-    const phoneNumbers = Array.from(phoneNumberSet)
+    const phoneNumbers = uniq(rows.map(r => r.phoneNumber))
     const phoneToPersonIdMap = await this.findMappedPersonIdsForCellPhones({
       electedOfficeId,
       pollId,
