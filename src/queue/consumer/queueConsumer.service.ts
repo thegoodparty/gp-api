@@ -18,6 +18,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
+import { groupBy } from 'es-toolkit'
 import { formatInTimeZone } from 'date-fns-tz'
 import parseCsv from 'neat-csv'
 import { serializeError } from 'serialize-error'
@@ -58,7 +59,6 @@ import {
   PollExpansionEvent,
   PollExpansionEventSchema,
   PollClusterAnalysisJsonSchema,
-  PollResponseJsonRow,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
@@ -682,9 +682,13 @@ export class QueueConsumerService {
     }
     const rows = PollClusterAnalysisJsonSchema.parse(
       JSON.parse(responsesFileContent),
+    )
     // One response can span multiple rows / elements in the array (one per atomic message)
     // and there may be duplicate rows
-    const groups = groupBy(rows, r => `${r.phoneNumber}\n${r.receivedAt ?? ''}`)
+    const groups = groupBy(
+      rows,
+      (r) => `${r.phoneNumber}\n${r.receivedAt ?? ''}`,
+    )
 
     const phoneNumbers = Array.from(
       new Set(rows.map((r) => normalizePhoneNumber(r.phoneNumber))),
@@ -700,7 +704,7 @@ export class QueueConsumerService {
 
     const validIssueIds = new Set(issues.map((i) => i.rank))
 
-    for (const [, groupRows] of groups) {
+    for (const [, groupRows] of Object.entries(groups)) {
       const first = groupRows[0]
       const { phoneNumber, originalMessage, receivedAt } = first
       const normalizedPhone = normalizePhoneNumber(phoneNumber)
