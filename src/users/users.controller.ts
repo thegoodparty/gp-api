@@ -51,6 +51,14 @@ export class UsersController {
     private readonly authenticationService: AuthenticationService,
   ) {}
 
+  private parseId(id: string): number {
+    const parsed = parseInt(id)
+    if (isNaN(parsed)) {
+      throw new BadRequestException(`Invalid id: ${id}`)
+    }
+    return parsed
+  }
+
   @UseGuards(M2MOnly)
   @Get()
   async list(@Query() query: ListUsersPaginationSchema) {
@@ -61,33 +69,6 @@ export class UsersController {
     }
   }
 
-  @UseGuards(M2MOnly)
-  @Put(':id')
-  async updateUser(
-    @Param('id') id: string,
-    @Body() body: UpdateUserAdminInputSchema,
-  ) {
-    return ReadUserOutputSchema.parse(
-      await this.usersService.updateUser({ id: parseInt(id) }, body),
-    )
-  }
-
-  @UseGuards(UserOwnerOrAdminGuard)
-  @Get(':id')
-  async findOne(@Param('id') id: string, @ReqUser() user: User) {
-    const paramId = parseInt(id)
-    if (user && paramId === user.id) {
-      // No need to hit the DB again if the user is requesting their own data
-      return ReadUserOutputSchema.parse(user)
-    }
-
-    const dbUser = await this.usersService.findUser({ id: paramId })
-    if (!dbUser) {
-      throw new NotFoundException('User not found')
-    }
-    return ReadUserOutputSchema.parse(dbUser)
-  }
-
   @Get('me')
   async findMe(@ReqUser() user: User) {
     return ReadUserOutputSchema.parse(
@@ -96,8 +77,10 @@ export class UsersController {
   }
 
   @Put('me')
-  updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
-    return this.usersService.updateUser({ id: user.id }, body ?? {})
+  async updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
+    return ReadUserOutputSchema.parse(
+      await this.usersService.updateUser({ id: user.id }, body ?? {}),
+    )
   }
 
   @Get('me/metadata')
@@ -137,31 +120,56 @@ export class UsersController {
     return ReadUserOutputSchema.parse(updatedUser)
   }
 
+  @Put('files/generate-signed-upload-url')
+  async generateSignedUploadUrl(@Body() args: GenerateSignedUploadUrlArgsDto) {
+    return {
+      signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
+    }
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  async updateUser(
+    @Param('id') id: string,
+    @Body() body: UpdateUserAdminInputSchema,
+  ) {
+    return ReadUserOutputSchema.parse(
+      await this.usersService.updateUser({ id: this.parseId(id) }, body),
+    )
+  }
+
+  @UseGuards(UserOwnerOrAdminGuard)
+  @Get(':id')
+  async findOne(@Param('id') id: string, @ReqUser() user: User) {
+    const paramId = this.parseId(id)
+    if (user && paramId === user.id) {
+      return ReadUserOutputSchema.parse(user)
+    }
+
+    const dbUser = await this.usersService.findUser({ id: paramId })
+    if (!dbUser) {
+      throw new NotFoundException('User not found')
+    }
+    return ReadUserOutputSchema.parse(dbUser)
+  }
+
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id') id: string) {
     try {
-      return await this.usersService.deleteUser(parseInt(id))
+      return await this.usersService.deleteUser(this.parseId(id))
     } catch (error: unknown | PrismaClientKnownRequestError) {
       if (
         error instanceof PrismaClientKnownRequestError &&
         error.code === 'P2025'
       ) {
-        // P2025: Prisma error code for "Record to delete does not exist"
         this.logger.warn(
           `request to delete user that does not exist, w/ id: ${id}`,
         )
         return
       }
       throw error
-    }
-  }
-
-  @Put('files/generate-signed-upload-url')
-  async generateSignedUploadUrl(@Body() args: GenerateSignedUploadUrlArgsDto) {
-    return {
-      signedUploadUrl: await this.filesService.generateSignedUploadUrl(args),
     }
   }
 
@@ -173,10 +181,10 @@ export class UsersController {
   ) {
     const { hasPassword, password } = user
     const { newPassword, oldPassword } = body
-    if (hasPassword && !oldPassword) {
-      throw new BadRequestException('oldPassword is required')
-    }
-    if (oldPassword) {
+    if (hasPassword) {
+      if (!oldPassword) {
+        throw new BadRequestException('oldPassword is required')
+      }
       const passwordValidated =
         await this.authenticationService.validatePassword(
           oldPassword,
