@@ -7,7 +7,6 @@ import { FileUpload } from 'src/files/files.types'
 import { AuthenticationService } from '../authentication/authentication.service'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
-import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
 import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
 import {
   BadRequestException,
@@ -48,23 +47,26 @@ describe('UsersController', () => {
   let authService: AuthenticationService
 
   beforeEach(() => {
-    usersService = {
+    const usersServiceMock: Partial<UsersService> = {
       listUsers: vi.fn(),
       updateUser: vi.fn(),
       findUser: vi.fn(),
       deleteUser: vi.fn(),
       patchUserMetaData: vi.fn(),
       updatePassword: vi.fn(),
-    } as unknown as UsersService
+    }
+    usersService = usersServiceMock as UsersService
 
-    filesService = {
+    const filesServiceMock: Partial<FilesService> = {
       uploadFile: vi.fn(),
       generateSignedUploadUrl: vi.fn(),
-    } as unknown as FilesService
+    }
+    filesService = filesServiceMock as FilesService
 
-    authService = {
+    const authServiceMock: Partial<AuthenticationService> = {
       validatePassword: vi.fn(),
-    } as unknown as AuthenticationService
+    }
+    authService = authServiceMock as AuthenticationService
 
     controller = new UsersController(usersService, filesService, authService)
   })
@@ -329,10 +331,8 @@ describe('UsersController', () => {
     it('passes empty object when body is falsy', async () => {
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(mockUser)
 
-      await controller.updateMe(
-        mockUser,
-        undefined as unknown as UpdateUserInputSchema,
-      )
+      // @ts-expect-error testing defensive null coalescing in controller
+      await controller.updateMe(mockUser, undefined)
 
       expect(usersService.updateUser).toHaveBeenCalledWith({ id: 1 }, {})
     })
