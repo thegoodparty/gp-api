@@ -37,6 +37,7 @@ interface CreateJobParams {
   name: string
   templates: Template[]
   didState: string
+  didNpaSubset?: string[]
   identityId?: string
   scheduledDate?: string
 }
@@ -199,6 +200,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
     name,
     templates,
     didState,
+    didNpaSubset = [],
     identityId,
     scheduledDate,
   }: CreateJobParams): Promise<string> {
@@ -235,6 +237,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       name,
       templates,
       did_state: didState,
+      ...(didNpaSubset.length > 0 && { did_npa_subset: didNpaSubset }),
       can_use_mms: hasMms,
       ...(agentIds.length > 0 && { agent_ids: agentIds }),
       schedule_id: this.scheduleId,

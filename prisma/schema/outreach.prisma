@@ -38,6 +38,7 @@ model Outreach {
   // P2P-specific fields
   identityId        String?          @map("identity_id")
   didState          String?          @map("did_state")
+  didNpaSubset      String[]         @default([]) @map("did_npa_subset")
   title             String?
 
   @@index([campaignId])

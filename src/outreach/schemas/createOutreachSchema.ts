@@ -22,7 +22,17 @@ export class CreateOutreachSchema extends createZodDto(
       voterFileFilterId: z.coerce.number().int().positive().optional(),
       phoneListId: z.coerce.number().int().positive().optional(),
       // P2P-specific fields
-      didState: z.string().optional(),
+      didState: z
+        .string()
+        .regex(
+          /^([A-Z]{2}|USA)$/,
+          'didState must be a 2-letter US state code or "USA"',
+        )
+        .optional(),
+      didNpaSubset: z
+        .array(z.string().regex(/^\d{3}$/, 'Each area code must be 3 digits'))
+        .max(50, 'didNpaSubset cannot exceed 50 area codes')
+        .optional(),
       title: z.string().optional(),
     })
     .strict()
