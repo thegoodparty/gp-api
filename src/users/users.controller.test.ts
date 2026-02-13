@@ -237,7 +237,6 @@ describe('UsersController', () => {
       expect(result).not.toHaveProperty('password')
       expect(result).toHaveProperty('hasPassword', true)
     })
-
   })
 
   describe('findOne', () => {
@@ -281,7 +280,6 @@ describe('UsersController', () => {
 
       expect(result).not.toHaveProperty('password')
     })
-
   })
 
   describe('findMe', () => {
@@ -435,7 +433,6 @@ describe('UsersController', () => {
         'DB connection lost',
       )
     })
-
   })
 
   describe('generateSignedUploadUrl', () => {
