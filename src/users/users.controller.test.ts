@@ -485,7 +485,8 @@ describe('UsersController', () => {
       expect(usersService.updatePassword).toHaveBeenCalledWith(1, 'NewPass123')
     })
 
-    it('skips old password validation when user has no existing password even if oldPassword is provided', async () => {
+    it('validates against empty string when user has no existing password but oldPassword is provided', async () => {
+      vi.spyOn(authService, 'validatePassword').mockResolvedValue(true)
       vi.spyOn(usersService, 'updatePassword').mockResolvedValue(mockUser)
 
       await controller.updatePassword(
@@ -493,7 +494,7 @@ describe('UsersController', () => {
         mockUser,
       )
 
-      expect(authService.validatePassword).not.toHaveBeenCalled()
+      expect(authService.validatePassword).toHaveBeenCalledWith('SomePass1', '')
       expect(usersService.updatePassword).toHaveBeenCalledWith(1, 'NewPass123')
     })
 
