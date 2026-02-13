@@ -120,7 +120,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
   const phoneNumber = '+15551234567'
 
   beforeEach(() => {
-    vi.stubEnv('SERVE_DATA_S3_BUCKET', 'test-bucket')
+    vi.stubEnv('SERVE_ANALYSIS_BUCKET_NAME', 'test-analysis-bucket')
     const mockFindUniquePoll = vi.fn().mockResolvedValue({
       id: pollId,
       electedOfficeId,

@@ -56,7 +56,7 @@ import {
   PollCreationEventSchema,
   PollExpansionEvent,
   PollExpansionEventSchema,
-  PollClusterAnalysisJson,
+  PollClusterAnalysisJsonSchema,
   PollResponseJsonRow,
   QueueMessage,
   QueueType,
@@ -666,12 +666,12 @@ export class QueueConsumerService {
       })),
     })
     this.logger.log('Successfully created new poll issues')
-    const SERVE_ANALYZE_S3_BUCKET = process.env.SERVE_ANALYZE_S3_BUCKET
-    if (!SERVE_ANALYZE_S3_BUCKET) {
-      throw new Error('Please set SERVE_ANALYZE_S3_BUCKET in your .env')
+    const bucket = process.env.SERVE_ANALYSIS_BUCKET_NAME
+    if (!bucket) {
+      throw new Error('Please set SERVE_ANALYSIS_BUCKET_NAME in your .env')
     }
     const responsesFileContent = await this.s3Service.getFile(
-      SERVE_ANALYZE_S3_BUCKET,
+      bucket,
       responsesLocation,
     )
     if (!responsesFileContent) {
@@ -679,20 +679,9 @@ export class QueueConsumerService {
         `Unable to fetch responses from S3 for pollId: ${pollId}`,
       )
     }
-    let rows: PollClusterAnalysisJson
-    try {
-      rows = JSON.parse(responsesFileContent) as PollClusterAnalysisJson
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Unable to parse PollClusterAnalysisJson: ${error}`,
-      )
-    }
-
-    if (!Array.isArray(rows)) {
-      throw new InternalServerErrorException(
-        'Received unexpected PollClusterAnalysisJson',
-      )
-    }
+    const rows = PollClusterAnalysisJsonSchema.parse(
+      JSON.parse(responsesFileContent),
+    )
 
     // One response can span multiple rows / elements in the array (one per atomic message)
     // and there may be duplicate rows
