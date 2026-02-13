@@ -187,17 +187,17 @@ describe('UsersController', () => {
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(updatedUser)
 
       const body = { firstName: 'Updated' }
-      const result = await controller.updateUser(String(userId), body)
+      const result = await controller.updateUser({ id: userId }, body)
 
       expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, body)
       expect(result).toHaveProperty('firstName', 'Updated')
       expect(result).not.toHaveProperty('password')
     })
 
-    it('parses the id parameter as an integer', async () => {
+    it('passes the id to the service', async () => {
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(mockUser)
 
-      await controller.updateUser('42', { lastName: 'Smith' })
+      await controller.updateUser({ id: 42 }, { lastName: 'Smith' })
 
       expect(usersService.updateUser).toHaveBeenCalledWith(
         { id: 42 },
@@ -214,7 +214,7 @@ describe('UsersController', () => {
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(updatedUser)
 
       const body = { roles: [UserRole.admin, UserRole.sales] }
-      const result = await controller.updateUser(String(userId), body)
+      const result = await controller.updateUser({ id: userId }, body)
 
       expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, body)
       expect(result).toHaveProperty('roles', [UserRole.admin, UserRole.sales])
@@ -229,26 +229,20 @@ describe('UsersController', () => {
 
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(userWithPassword)
 
-      const result = await controller.updateUser(String(userId), {
-        firstName: 'Test',
-      })
+      const result = await controller.updateUser(
+        { id: userId },
+        { firstName: 'Test' },
+      )
 
       expect(result).not.toHaveProperty('password')
       expect(result).toHaveProperty('hasPassword', true)
     })
 
-    it('throws BadRequestException for non-numeric id', async () => {
-      await expect(
-        controller.updateUser('abc', { firstName: 'Test' }),
-      ).rejects.toThrow(BadRequestException)
-
-      expect(usersService.updateUser).not.toHaveBeenCalled()
-    })
   })
 
   describe('findOne', () => {
     it('returns the requesting user without a DB call when requesting own data', async () => {
-      const result = await controller.findOne(String(userId), mockUser)
+      const result = await controller.findOne({ id: userId }, mockUser)
 
       expect(usersService.findUser).not.toHaveBeenCalled()
       expect(result).toHaveProperty('id', userId)
@@ -259,7 +253,7 @@ describe('UsersController', () => {
       const otherUser = { ...mockUser, id: 2, email: 'other@example.com' }
       vi.spyOn(usersService, 'findUser').mockResolvedValue(otherUser)
 
-      const result = await controller.findOne('2', mockUser)
+      const result = await controller.findOne({ id: 2 }, mockUser)
 
       expect(usersService.findUser).toHaveBeenCalledWith({ id: 2 })
       expect(result).toHaveProperty('id', 2)
@@ -269,7 +263,7 @@ describe('UsersController', () => {
     it('throws NotFoundException when user is not found in DB', async () => {
       vi.spyOn(usersService, 'findUser').mockResolvedValue(null)
 
-      await expect(controller.findOne('999', mockUser)).rejects.toThrow(
+      await expect(controller.findOne({ id: 999 }, mockUser)).rejects.toThrow(
         NotFoundException,
       )
     })
@@ -283,18 +277,11 @@ describe('UsersController', () => {
       }
       vi.spyOn(usersService, 'findUser').mockResolvedValue(userWithPassword)
 
-      const result = await controller.findOne('2', mockUser)
+      const result = await controller.findOne({ id: 2 }, mockUser)
 
       expect(result).not.toHaveProperty('password')
     })
 
-    it('throws BadRequestException for non-numeric id', async () => {
-      await expect(controller.findOne('abc', mockUser)).rejects.toThrow(
-        BadRequestException,
-      )
-
-      expect(usersService.findUser).not.toHaveBeenCalled()
-    })
   })
 
   describe('findMe', () => {
@@ -412,7 +399,7 @@ describe('UsersController', () => {
     it('deletes the user by id', async () => {
       vi.spyOn(usersService, 'deleteUser').mockResolvedValue(mockUser)
 
-      await controller.delete(String(userId))
+      await controller.delete({ id: userId })
 
       expect(usersService.deleteUser).toHaveBeenCalledWith(userId)
     })
@@ -424,7 +411,7 @@ describe('UsersController', () => {
       )
       vi.spyOn(usersService, 'deleteUser').mockRejectedValue(prismaError)
 
-      await expect(controller.delete('999')).resolves.toBeUndefined()
+      await expect(controller.delete({ id: 999 })).resolves.toBeUndefined()
     })
 
     it('rethrows non-P2025 Prisma errors', async () => {
@@ -434,7 +421,7 @@ describe('UsersController', () => {
       )
       vi.spyOn(usersService, 'deleteUser').mockRejectedValue(prismaError)
 
-      await expect(controller.delete(String(userId))).rejects.toThrow(
+      await expect(controller.delete({ id: userId })).rejects.toThrow(
         PrismaClientKnownRequestError,
       )
     })
@@ -444,18 +431,11 @@ describe('UsersController', () => {
         new Error('DB connection lost'),
       )
 
-      await expect(controller.delete(String(userId))).rejects.toThrow(
+      await expect(controller.delete({ id: userId })).rejects.toThrow(
         'DB connection lost',
       )
     })
 
-    it('throws BadRequestException for non-numeric id', async () => {
-      await expect(controller.delete('abc')).rejects.toThrow(
-        BadRequestException,
-      )
-
-      expect(usersService.deleteUser).not.toHaveBeenCalled()
-    })
   })
 
   describe('generateSignedUploadUrl', () => {

@@ -37,6 +37,7 @@ import {
   UpdateUserAdminInputSchema,
   UpdateUserInputSchema,
 } from './schemas/UpdateUserInput.schema'
+import { UserIdParamSchema } from './schemas/UserIdParam.schema'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
 
@@ -50,14 +51,6 @@ export class UsersController {
     private readonly filesService: FilesService,
     private readonly authenticationService: AuthenticationService,
   ) {}
-
-  private parseId(id: string): number {
-    const parsed = parseInt(id)
-    if (isNaN(parsed)) {
-      throw new BadRequestException(`Invalid id: ${id}`)
-    }
-    return parsed
-  }
 
   @UseGuards(M2MOnly)
   @Get()
@@ -130,23 +123,22 @@ export class UsersController {
   @UseGuards(M2MOnly)
   @Put(':id')
   async updateUser(
-    @Param('id') id: string,
+    @Param() { id }: UserIdParamSchema,
     @Body() body: UpdateUserAdminInputSchema,
   ) {
     return ReadUserOutputSchema.parse(
-      await this.usersService.updateUser({ id: this.parseId(id) }, body),
+      await this.usersService.updateUser({ id }, body),
     )
   }
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Get(':id')
-  async findOne(@Param('id') id: string, @ReqUser() user: User) {
-    const paramId = this.parseId(id)
-    if (user && paramId === user.id) {
+  async findOne(@Param() { id }: UserIdParamSchema, @ReqUser() user: User) {
+    if (user && id === user.id) {
       return ReadUserOutputSchema.parse(user)
     }
 
-    const dbUser = await this.usersService.findUser({ id: paramId })
+    const dbUser = await this.usersService.findUser({ id })
     if (!dbUser) {
       throw new NotFoundException('User not found')
     }
@@ -156,9 +148,9 @@ export class UsersController {
   @UseGuards(UserOwnerOrAdminGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') id: string) {
+  async delete(@Param() { id }: UserIdParamSchema) {
     try {
-      return await this.usersService.deleteUser(this.parseId(id))
+      return await this.usersService.deleteUser(id)
     } catch (error: unknown | PrismaClientKnownRequestError) {
       if (
         error instanceof PrismaClientKnownRequestError &&
