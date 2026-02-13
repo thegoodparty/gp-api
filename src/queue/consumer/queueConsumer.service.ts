@@ -43,6 +43,7 @@ import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
+import { normalizePhoneNumber } from '../../shared/util/strings.util'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
 import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
@@ -684,10 +685,18 @@ export class QueueConsumerService {
     )
 
     // One response can span multiple rows / elements in the array (one per atomic message)
-    // and there may be duplicate rows
-    const groups = groupBy(rows, r => `${r.phoneNumber}\n${r.receivedAt ?? ''}`)
+    // and there may be duplicate rows. Group by normalized phone so formats match.
+    const groups = new Map<string, PollResponseJsonRow[]>()
+    for (const row of rows) {
+      const key = `${normalizePhoneNumber(row.phoneNumber)}\n${row.receivedAt}`
+      const existing = groups.get(key)
+      if (existing) existing.push(row)
+      else groups.set(key, [row])
+    }
 
-    const phoneNumbers = uniq(rows.map(r => r.phoneNumber))
+    const phoneNumbers = Array.from(
+      new Set(rows.map((r) => normalizePhoneNumber(r.phoneNumber))),
+    )
     const phoneToPersonIdMap = await this.findMappedPersonIdsForCellPhones({
       electedOfficeId,
       pollId,
@@ -702,7 +711,8 @@ export class QueueConsumerService {
     for (const [, groupRows] of groups) {
       const first = groupRows[0]
       const { phoneNumber, originalMessage, receivedAt } = first
-      const personId = phoneToPersonIdMap.get(phoneNumber)
+      const normalizedPhone = normalizePhoneNumber(phoneNumber)
+      const personId = phoneToPersonIdMap.get(normalizedPhone)
       if (!personId) {
         throw new InternalServerErrorException(
           `Person with cell phone ${phoneNumber} not found in poll ${pollId}`,
@@ -710,7 +720,7 @@ export class QueueConsumerService {
       }
 
       const uuid = uuidv5(
-        `${pollId}-${personId}-${receivedAt ?? ''}`,
+        `${pollId}-${personId}-${receivedAt}`,
         POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
       )
       const isOptOut = groupRows.some((r) => Boolean(r.isOptOut))
@@ -719,10 +729,11 @@ export class QueueConsumerService {
       scalarData.push({
         id: uuid,
         personId,
+        personCellPhone: normalizedPhone,
         sentAt,
         isOptOut,
         sender: PollIndividualMessageSender.CONSTITUENT,
-        content: originalMessage ?? null,
+        content: originalMessage,
         electedOfficeId,
         pollId,
       })
@@ -910,7 +921,7 @@ export class QueueConsumerService {
             pollId: poll.id,
             personId: person.id!,
             sentAt: now,
-            personCellPhone: person.cellPhone,
+            personCellPhone: normalizePhoneNumber(person.cellPhone),
           }
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
@@ -1006,7 +1017,7 @@ export class QueueConsumerService {
           'Encountered unexpected message without a cellphone',
         )
       }
-      cellPhonesToPeopleIds.set(personCellPhone, personId)
+      cellPhonesToPeopleIds.set(normalizePhoneNumber(personCellPhone), personId)
     }
     return cellPhonesToPeopleIds
   }

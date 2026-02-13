@@ -85,8 +85,29 @@ const createPollAnalysisCompleteMessage = (data: {
   }),
 })
 
-const createPollAnalysisJson = (responses: PollResponseJsonRow[]): string =>
-  JSON.stringify(responses)
+/** Fills required fields so partial test rows satisfy PollResponseJsonRow. */
+const toFullRow = (
+  r: Partial<PollResponseJsonRow> & {
+    phoneNumber: string
+    receivedAt: string
+    originalMessage: string
+    clusterId: number | string
+  },
+): PollResponseJsonRow => ({
+  atomicId: '',
+  atomicMessage: '',
+  pollId: '',
+  theme: '',
+  category: '',
+  summary: '',
+  sentiment: '',
+  isOptOut: false,
+  ...r,
+})
+
+const createPollAnalysisJson = (
+  responses: Parameters<typeof toFullRow>[0][],
+): string => JSON.stringify(responses.map(toFullRow))
 
 describe('QueueConsumerService - handlePollAnalysisComplete', () => {
   let service: QueueConsumerService

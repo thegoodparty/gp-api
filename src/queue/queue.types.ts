@@ -79,18 +79,18 @@ export enum MessageGroup {
 }
 
 const PollResponseJsonRowSchema = z.object({
-  atomicId: z.string().optional(),
+  atomicId: z.string(),
   phoneNumber: z.string(),
   receivedAt: z.string(),
   originalMessage: z.string(),
-  atomicMessage: z.string().optional(),
-  pollId: z.string().optional(),
+  atomicMessage: z.string(),
+  pollId: z.string(),
   clusterId: z.union([z.number(), z.string()]), // Empty string for opt-out rows
-  theme: z.string().optional(),
-  category: z.string().optional(),
-  summary: z.string().optional(),
-  sentiment: z.string().optional(),
-  isOptOut: z.boolean().optional(),
+  theme: z.string(),
+  category: z.string(),
+  summary: z.string(),
+  sentiment: z.string(),
+  isOptOut: z.boolean(),
 })
 
 export type PollResponseJsonRow = z.infer<typeof PollResponseJsonRowSchema>
