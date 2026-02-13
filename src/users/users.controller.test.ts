@@ -15,8 +15,10 @@ import {
 } from '@nestjs/common'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
+const userId = 1
+
 const mockUser: User = {
-  id: 1,
+  id: userId,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
   firstName: 'John',
@@ -185,9 +187,9 @@ describe('UsersController', () => {
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(updatedUser)
 
       const body = { firstName: 'Updated' }
-      const result = await controller.updateUser('1', body)
+      const result = await controller.updateUser(String(userId), body)
 
-      expect(usersService.updateUser).toHaveBeenCalledWith({ id: 1 }, body)
+      expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, body)
       expect(result).toHaveProperty('firstName', 'Updated')
       expect(result).not.toHaveProperty('password')
     })
@@ -212,9 +214,9 @@ describe('UsersController', () => {
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(updatedUser)
 
       const body = { roles: [UserRole.admin, UserRole.sales] }
-      const result = await controller.updateUser('1', body)
+      const result = await controller.updateUser(String(userId), body)
 
-      expect(usersService.updateUser).toHaveBeenCalledWith({ id: 1 }, body)
+      expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, body)
       expect(result).toHaveProperty('roles', [UserRole.admin, UserRole.sales])
     })
 
@@ -227,7 +229,7 @@ describe('UsersController', () => {
 
       vi.spyOn(usersService, 'updateUser').mockResolvedValue(userWithPassword)
 
-      const result = await controller.updateUser('1', { firstName: 'Test' })
+      const result = await controller.updateUser(String(userId), { firstName: 'Test' })
 
       expect(result).not.toHaveProperty('password')
       expect(result).toHaveProperty('hasPassword', true)
@@ -244,10 +246,10 @@ describe('UsersController', () => {
 
   describe('findOne', () => {
     it('returns the requesting user without a DB call when requesting own data', async () => {
-      const result = await controller.findOne('1', mockUser)
+      const result = await controller.findOne(String(userId), mockUser)
 
       expect(usersService.findUser).not.toHaveBeenCalled()
-      expect(result).toHaveProperty('id', 1)
+      expect(result).toHaveProperty('id', userId)
       expect(result).not.toHaveProperty('password')
     })
 
@@ -299,8 +301,8 @@ describe('UsersController', () => {
 
       const result = await controller.findMe(mockUser)
 
-      expect(usersService.findUser).toHaveBeenCalledWith({ id: 1 })
-      expect(result).toHaveProperty('id', 1)
+      expect(usersService.findUser).toHaveBeenCalledWith({ id: userId })
+      expect(result).toHaveProperty('id', userId)
       expect(result).not.toHaveProperty('password')
     })
 
@@ -323,7 +325,7 @@ describe('UsersController', () => {
       const body = { firstName: 'Updated' }
       const result = await controller.updateMe(mockUser, body)
 
-      expect(usersService.updateUser).toHaveBeenCalledWith({ id: 1 }, body)
+      expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, body)
       expect(result).toHaveProperty('firstName', 'Updated')
       expect(result).not.toHaveProperty('password')
     })
@@ -334,7 +336,7 @@ describe('UsersController', () => {
       // @ts-expect-error testing defensive null coalescing in controller
       await controller.updateMe(mockUser, undefined)
 
-      expect(usersService.updateUser).toHaveBeenCalledWith({ id: 1 }, {})
+      expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, {})
     })
   })
 
@@ -362,7 +364,7 @@ describe('UsersController', () => {
       const meta = { customerId: 'cus_456' }
       controller.updateMetadata(mockUser, { meta })
 
-      expect(usersService.patchUserMetaData).toHaveBeenCalledWith(1, meta)
+      expect(usersService.patchUserMetaData).toHaveBeenCalledWith(userId, meta)
     })
   })
 
@@ -387,7 +389,7 @@ describe('UsersController', () => {
 
       expect(filesService.uploadFile).toHaveBeenCalledWith(file, 'uploads')
       expect(usersService.updateUser).toHaveBeenCalledWith(
-        { id: 1 },
+        { id: userId },
         { avatar: 'https://cdn.example.com/avatar.png' },
       )
       expect(result).toHaveProperty(
@@ -408,9 +410,9 @@ describe('UsersController', () => {
     it('deletes the user by id', async () => {
       vi.spyOn(usersService, 'deleteUser').mockResolvedValue(mockUser)
 
-      await controller.delete('1')
+      await controller.delete(String(userId))
 
-      expect(usersService.deleteUser).toHaveBeenCalledWith(1)
+      expect(usersService.deleteUser).toHaveBeenCalledWith(userId)
     })
 
     it('silently handles Prisma P2025 (record not found) error', async () => {
@@ -430,7 +432,7 @@ describe('UsersController', () => {
       )
       vi.spyOn(usersService, 'deleteUser').mockRejectedValue(prismaError)
 
-      await expect(controller.delete('1')).rejects.toThrow(
+      await expect(controller.delete(String(userId))).rejects.toThrow(
         PrismaClientKnownRequestError,
       )
     })
@@ -440,7 +442,7 @@ describe('UsersController', () => {
         new Error('DB connection lost'),
       )
 
-      await expect(controller.delete('1')).rejects.toThrow('DB connection lost')
+      await expect(controller.delete(String(userId))).rejects.toThrow('DB connection lost')
     })
 
     it('throws BadRequestException for non-numeric id', async () => {
@@ -482,7 +484,7 @@ describe('UsersController', () => {
       )
 
       expect(authService.validatePassword).not.toHaveBeenCalled()
-      expect(usersService.updatePassword).toHaveBeenCalledWith(1, 'NewPass123')
+      expect(usersService.updatePassword).toHaveBeenCalledWith(userId, 'NewPass123')
     })
 
     it('validates against empty string when user has no existing password but oldPassword is provided', async () => {
@@ -495,7 +497,7 @@ describe('UsersController', () => {
       )
 
       expect(authService.validatePassword).toHaveBeenCalledWith('SomePass1', '')
-      expect(usersService.updatePassword).toHaveBeenCalledWith(1, 'NewPass123')
+      expect(usersService.updatePassword).toHaveBeenCalledWith(userId, 'NewPass123')
     })
 
     it('throws BadRequestException when user has password but oldPassword is not provided', async () => {
@@ -531,7 +533,7 @@ describe('UsersController', () => {
         'OldPass123',
         'hashed_old',
       )
-      expect(usersService.updatePassword).toHaveBeenCalledWith(1, 'NewPass123')
+      expect(usersService.updatePassword).toHaveBeenCalledWith(userId, 'NewPass123')
     })
 
     it('throws UnauthorizedException when old password is incorrect', async () => {
