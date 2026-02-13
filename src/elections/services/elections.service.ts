@@ -226,7 +226,7 @@ export class ElectionsService {
       )
       const message = this.buildSlackErrorMessage(
         'Election API error: getBallotReadyMatchedRaceTargetDetails',
-        { ballotreadyPositionId, electionDate },
+        { ballotreadyPositionId, electionDate, campaignId },
         error,
       )
       await this.slack.formattedMessage({

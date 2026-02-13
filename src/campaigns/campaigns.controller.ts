@@ -318,19 +318,33 @@ export class CampaignsController {
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
     }
-    const raceTargetDetails =
-      await this.elections.getBallotReadyMatchedRaceTargetDetails({
+
+    // Gold flow: look up district + turnout from election-api.
+    // If this fails, fall back to silver (LLM-based matching).
+    const raceTargetDetails = await this.elections
+      .getBallotReadyMatchedRaceTargetDetails({
         campaignId: campaign.id,
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
         officeName: campaign.details.otherOffice,
       })
+      .catch(() => null)
+
     if (!raceTargetDetails) {
-      throw new NotFoundException(
-        'Failed to fetch the raceTargetDetails for the requested campaign',
-      )
+      // Gold flow failed or returned nothing. Ensure a P2V record exists
+      // with Waiting status so silver can attempt district matching.
+      const result = await this.campaigns.updateJsonFields(campaign.id, {
+        pathToVictory: {
+          p2vStatus: P2VStatus.waiting,
+          p2vAttempts: 0,
+          officeContextFingerprint: null,
+        },
+      })
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      return result
     }
+
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
@@ -383,19 +397,32 @@ export class CampaignsController {
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
     }
-    const raceTargetDetails =
-      await this.elections.getBallotReadyMatchedRaceTargetDetails({
+    // Gold flow: look up district + turnout from election-api.
+    // If this fails, fall back to silver (LLM-based matching).
+    const raceTargetDetails = await this.elections
+      .getBallotReadyMatchedRaceTargetDetails({
         campaignId: campaign.id,
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
         officeName: campaign.details.otherOffice,
       })
+      .catch(() => null)
+
     if (!raceTargetDetails) {
-      throw new NotFoundException(
-        'Failed to fetch the raceTargetDetails for the requested campaign',
-      )
+      // Gold flow failed or returned nothing. Ensure a P2V record exists
+      // with Waiting status so silver can attempt district matching.
+      const result = await this.campaigns.updateJsonFields(campaign.id, {
+        pathToVictory: {
+          p2vStatus: P2VStatus.waiting,
+          p2vAttempts: 0,
+          officeContextFingerprint: null,
+        },
+      })
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      return result
     }
+
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
