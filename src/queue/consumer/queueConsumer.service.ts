@@ -706,7 +706,7 @@ export class QueueConsumerService {
     const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
     const joinValues: Prisma.Sql[] = []
 
-    const validIssueIds = new Set(issues.map((i) => `${i.pollId}-${i.rank}`))
+    const validIssueIds = new Set(issues.map((i) => i.rank))
 
     for (const [, groupRows] of groups) {
       const first = groupRows[0]
@@ -746,7 +746,7 @@ export class QueueConsumerService {
         const cid = row.clusterId
         if (cid == '' || cid === undefined || cid == null) continue
         const issueId = `${pollId}-${cid}`
-        if (validIssueIds.has(issueId) && !seenIssueIds.has(issueId)) {
+        if (validIssueIds.has(Number(cid)) && !seenIssueIds.has(issueId)) {
           seenIssueIds.add(issueId)
           joinValues.push(Prisma.sql`(${uuid}, ${issueId})`)
         }
