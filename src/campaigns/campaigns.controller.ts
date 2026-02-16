@@ -14,6 +14,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
 import { Campaign, Prisma, User, UserRole } from '@prisma/client'
@@ -40,6 +41,9 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { UserIdParamSchema } from '@/users/schemas/UserIdParam.schema'
+import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -138,6 +142,13 @@ export class CampaignsController {
   @UseCampaign()
   async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
+  }
+
+  @UseGuards(M2MOnly)
+  @Get('by-user/:id')
+  async findByUserId(@Param() { id }: UserIdParamSchema) {
+    const campaigns = await this.campaigns.findMany({ where: { userId: id } })
+    return campaigns.map((c) => ReadCampaignOutputSchema.parse(c))
   }
 
   @Get('mine/status')
