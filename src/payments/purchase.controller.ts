@@ -14,6 +14,7 @@ import { UsersService } from '../users/services/users.service'
 import { StripeService } from '../vendors/stripe/services/stripe.service'
 import {
   CompleteCheckoutSessionDto,
+  CompleteFreePurchaseDto,
   CompletePurchaseDto,
   CreateCheckoutSessionDto,
   CreatePurchaseIntentDto,
@@ -128,5 +129,35 @@ export class PurchaseController {
   @Post('complete-checkout-session')
   async completeCheckoutSession(@Body() dto: CompleteCheckoutSessionDto) {
     return this.purchaseService.completeCheckoutSession(dto)
+  }
+
+  /**
+   * Completes a zero-amount (free) purchase by executing post-purchase handlers.
+   * Called when the user explicitly confirms a free purchase (e.g., clicks
+   * "Schedule text" after the free texts offer covers the entire cost).
+   * The campaignId is server-validated via @UseCampaign().
+   */
+  @Post('complete-free-purchase')
+  @UseCampaign()
+  async completeFreePurchase(
+    @Body() dto: CompleteFreePurchaseDto,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    try {
+      return await this.purchaseService.completeFreePurchase({
+        dto,
+        campaign,
+      })
+    } catch (error) {
+      this.logger.error(
+        JSON.stringify({
+          err: serializeError(error),
+          campaign: campaign?.id,
+          dto,
+          msg: 'Error completing free purchase',
+        }),
+      )
+      throw error
+    }
   }
 }

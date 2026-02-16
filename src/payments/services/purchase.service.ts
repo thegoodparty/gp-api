@@ -4,6 +4,7 @@ import {
   CheckoutSessionPostPurchaseHandler,
   CompletePurchaseDto,
   CompleteCheckoutSessionDto,
+  CompleteFreePurchaseDto,
   CreateCheckoutSessionDto,
   CreatePurchaseIntentDto,
   PostPurchaseHandler,
@@ -133,25 +134,15 @@ export class PurchaseService {
 
     // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
     // Stripe doesn't need a real Checkout Session for $0
-    // Immediately execute post-purchase handlers (e.g., redeem free texts offer)
+    // Do NOT execute post-purchase handlers here — the user hasn't confirmed yet.
+    // Post-purchase (e.g., redeeming free texts) is deferred to completeFreePurchase(),
+    // which the frontend calls when the user explicitly clicks "Schedule text".
     if (amount === 0) {
       const freeSessionId = `free_${Date.now()}_${user.id}`
 
       this.logger.log(
-        `Zero-amount checkout for user ${user.id}, type ${dto.type} - skipping Stripe`,
+        `Zero-amount checkout for user ${user.id}, type ${dto.type} - skipping Stripe, deferring post-purchase until user confirmation`,
       )
-
-      const postPurchaseHandler = this.checkoutSessionPostPurchaseHandlers.get(
-        dto.type,
-      )
-      if (postPurchaseHandler) {
-        await postPurchaseHandler(freeSessionId, {
-          ...(dto.metadata as Record<string, unknown>),
-          ...(campaign?.id ? { campaignId: campaign.id } : {}),
-          userId: String(user.id),
-          purchaseType: dto.type,
-        })
-      }
 
       return {
         id: freeSessionId,
@@ -313,24 +304,16 @@ export class PurchaseService {
     const amount = await handler.calculateAmount(mergedMetadata)
 
     // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
-    // Stripe rejects PaymentIntents with $0 so we our own response
-    // and immediately execute post-purchase handlers (e.g., redeem free texts offer)
+    // Stripe rejects PaymentIntents with $0 so we return our own response.
+    // Do NOT execute post-purchase handlers here — the user hasn't confirmed yet.
+    // Post-purchase (e.g., redeeming free texts) is deferred to completeFreePurchase(),
+    // which the frontend calls when the user explicitly confirms.
     if (amount === 0) {
       const freePaymentId = `free_${Date.now()}_${user.id}`
 
       this.logger.log(
-        `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe`,
+        `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe, deferring post-purchase until user confirmation`,
       )
-
-      const postPurchaseHandler = this.postPurchaseHandlers.get(dto.type)
-      if (postPurchaseHandler) {
-        await postPurchaseHandler(freePaymentId, {
-          ...(dto.metadata as Record<string, unknown>),
-          ...(campaign?.id ? { campaignId: campaign.id } : {}),
-          userId: String(user.id),
-          purchaseType: dto.type,
-        })
-      }
 
       return {
         id: freePaymentId,
@@ -383,6 +366,47 @@ export class PurchaseService {
       dto.paymentIntentId,
       paymentIntent.metadata,
     )
+  }
+
+  /**
+   * Completes a zero-amount (free) purchase by executing the post-purchase handler.
+   * This is called when the user explicitly confirms a free purchase (e.g., clicks
+   * "Schedule text" after the free texts offer covers the entire cost).
+   *
+   * The post-purchase handler is idempotent — redeemFreeTexts uses an atomic
+   * updateMany with hasFreeTextsOffer: true as a guard, so duplicate calls are safe.
+   */
+  async completeFreePurchase({
+    dto,
+    campaign,
+  }: {
+    dto: CompleteFreePurchaseDto
+    campaign?: Campaign
+  }): Promise<{ result?: unknown }> {
+    const { purchaseType } = dto
+
+    if (!Object.values(PurchaseType).includes(purchaseType)) {
+      throw new Error(`Invalid purchase type: ${purchaseType}`)
+    }
+
+    const postPurchaseHandler =
+      this.checkoutSessionPostPurchaseHandlers.get(purchaseType)
+    if (postPurchaseHandler) {
+      const freeSessionId = `free_confirmed_${Date.now()}`
+      const result = await postPurchaseHandler(freeSessionId, {
+        ...(dto.metadata as Record<string, unknown>),
+        ...(campaign?.id ? { campaignId: campaign.id } : {}),
+        purchaseType,
+      })
+
+      this.logger.log(
+        `Free purchase completed for type ${purchaseType}, campaign ${campaign?.id}`,
+      )
+
+      return { result }
+    }
+
+    return {}
   }
 
   private getPaymentType(purchaseType: PurchaseType): PaymentType {
