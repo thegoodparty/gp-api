@@ -33,6 +33,7 @@ import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
+import { ListCampaignsPaginationSchema } from './schemas/ListCampaignsPagination.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   SetDistrictDTO,
@@ -42,7 +43,6 @@ import { CampaignPlanVersionsService } from './services/campaignPlanVersions.ser
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
-import { UserIdParamSchema } from '@/users/schemas/UserIdParam.schema'
 import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
 import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
 import { UpdateCampaignM2MSchema } from './schemas/UpdateCampaignM2M.schema'
@@ -147,10 +147,13 @@ export class CampaignsController {
   }
 
   @UseGuards(M2MOnly)
-  @Get('by-user/:id')
-  async findByUserId(@Param() { id }: UserIdParamSchema) {
-    const campaigns = await this.campaigns.findMany({ where: { userId: id } })
-    return campaigns.map((c) => ReadCampaignOutputSchema.parse(c))
+  @Get('list')
+  async list(@Query() query: ListCampaignsPaginationSchema) {
+    const { data, meta } = await this.campaigns.listCampaigns(query)
+    return {
+      data: data.map((c) => ReadCampaignOutputSchema.parse(c)),
+      meta,
+    }
   }
 
   @Get('mine/status')

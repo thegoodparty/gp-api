@@ -151,6 +151,7 @@ describe('CampaignsController', () => {
       findFirst: vi.fn(),
       findFirstOrThrow: vi.fn(),
       findByUserId: vi.fn(),
+      listCampaigns: vi.fn(),
       getStatus: vi.fn(),
       createForUser: vi.fn(),
       updateJsonFields: vi.fn(),
@@ -384,32 +385,40 @@ describe('CampaignsController', () => {
     })
   })
 
+  describe('list', () => {
+    it('returns paginated campaigns filtered by userId', async () => {
+      vi.spyOn(campaignsService, 'listCampaigns').mockResolvedValue({
+        data: [mockCampaign],
+        meta: { total: 1, offset: 0, limit: 100 },
+      })
+
+      const result = await controller.list({ userId: 1 })
+
+      expect(campaignsService.listCampaigns).toHaveBeenCalledWith({
+        userId: 1,
+      })
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0]).toHaveProperty('id', mockCampaign.id)
+      expect(result.meta).toEqual({ total: 1, offset: 0, limit: 100 })
+    })
+
+    it('returns empty data when no campaigns exist', async () => {
+      vi.spyOn(campaignsService, 'listCampaigns').mockResolvedValue({
+        data: [],
+        meta: { total: 0, offset: 0, limit: 100 },
+      })
+
+      const result = await controller.list({ userId: 999 })
+
+      expect(result.data).toEqual([])
+      expect(result.meta.total).toBe(0)
+    })
+  })
+
   describe('findMine', () => {
     it('returns the campaign directly', async () => {
       const result = await controller.findMine(mockCampaign)
       expect(result).toBe(mockCampaign)
-    })
-  })
-
-  describe('findByUserId', () => {
-    it('returns parsed campaigns', async () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([mockCampaign])
-
-      const result = await controller.findByUserId({ id: 1 })
-
-      expect(campaignsService.findMany).toHaveBeenCalledWith({
-        where: { userId: 1 },
-      })
-      expect(result).toHaveLength(1)
-      expect(result[0]).toHaveProperty('id', mockCampaign.id)
-    })
-
-    it('returns empty array when no campaigns exist', async () => {
-      vi.spyOn(campaignsService, 'findMany').mockResolvedValue([])
-
-      const result = await controller.findByUserId({ id: 999 })
-
-      expect(result).toEqual([])
     })
   })
 

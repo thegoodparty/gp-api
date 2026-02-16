@@ -6,6 +6,12 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
+import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+} from 'src/shared/constants/paginationOptions.consts'
+import { PaginatedResults } from 'src/shared/types/utility.types'
+import { ListCampaignsPaginationSchema } from '../schemas/ListCampaignsPagination.schema'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -60,6 +66,36 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       where: { userId },
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+  }
+
+  async listCampaigns({
+    offset: skip = DEFAULT_PAGINATION_OFFSET,
+    limit = DEFAULT_PAGINATION_LIMIT,
+    sortBy = 'createdAt',
+    sortOrder = 'desc',
+    userId,
+    slug,
+  }: ListCampaignsPaginationSchema): Promise<PaginatedResults<Campaign>> {
+    const where: Prisma.CampaignWhereInput = {
+      ...(userId ? { userId } : {}),
+      ...(slug
+        ? { slug: { contains: slug, mode: Prisma.QueryMode.insensitive } }
+        : {}),
+    }
+
+    return {
+      data: await this.model.findMany({
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        where,
+      }),
+      meta: {
+        total: await this.model.count({ where }),
+        offset: skip,
+        limit,
+      },
+    }
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
