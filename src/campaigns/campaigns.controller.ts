@@ -257,7 +257,7 @@ export class CampaignsController {
 
     const { data, details, aiContent, ...scalarFields } = body
 
-    await this.campaigns.updateJsonFields(
+    const updated = await this.campaigns.updateJsonFields(
       id,
       { data, details, aiContent },
       true,
@@ -266,9 +266,7 @@ export class CampaignsController {
         : undefined,
     )
 
-    return ReadCampaignOutputSchema.parse(
-      await this.campaigns.findUniqueOrThrow({ where: { id } }),
-    )
+    return ReadCampaignOutputSchema.parse(updated)
   }
 
   @Post('launch')
