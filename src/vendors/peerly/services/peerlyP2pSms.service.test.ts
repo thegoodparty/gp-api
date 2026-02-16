@@ -474,6 +474,53 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
       expect(body.agent_ids).toEqual(['agent-123@11537225'])
     })
 
+    it('should include did_npa_subset in body when didNpaSubset is non-empty', async () => {
+      crmCampaigns.getCrmCompanyOwner.mockResolvedValue(undefined)
+
+      await service.createJob({
+        ...baseJobParams,
+        crmCompanyId: '',
+        didNpaSubset: ['619', '858'],
+      })
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body.did_npa_subset).toEqual(['619', '858'])
+      expect(body.did_state).toBe('NY')
+    })
+
+    it('should NOT include did_npa_subset in body when didNpaSubset is empty', async () => {
+      crmCampaigns.getCrmCompanyOwner.mockResolvedValue(undefined)
+
+      await service.createJob({
+        ...baseJobParams,
+        crmCompanyId: '',
+        didNpaSubset: [],
+      })
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('did_npa_subset')
+      expect(body.did_state).toBe('NY')
+    })
+
+    it('should NOT include did_npa_subset when didNpaSubset is not provided (defaults to empty)', async () => {
+      crmCampaigns.getCrmCompanyOwner.mockResolvedValue(undefined)
+
+      await service.createJob({
+        ...baseJobParams,
+        crmCompanyId: '',
+        // didNpaSubset not provided — defaults to []
+      })
+
+      const callArgs = httpService.post.mock.calls[0]
+      const body = callArgs[1] as Record<string, unknown>
+
+      expect(body).not.toHaveProperty('did_npa_subset')
+    })
+
     it('should include other required fields in job creation', async () => {
       crmCampaigns.getCrmCompanyOwner.mockResolvedValue(
         createMockOwner({

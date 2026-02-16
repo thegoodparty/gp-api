@@ -81,7 +81,10 @@ export class OutreachPurchaseHandlerService
     paymentIntentId: string,
     metadata: OutreachPurchaseMetadata,
   ): Promise<void> {
-    const { campaignId, outreachType } = metadata
+    const { outreachType } = metadata
+    const campaignId = metadata.campaignId
+      ? Number(metadata.campaignId)
+      : undefined
 
     if (!campaignId || outreachType !== 'p2p') {
       return

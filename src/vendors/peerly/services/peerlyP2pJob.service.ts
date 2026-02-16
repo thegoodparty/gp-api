@@ -22,6 +22,7 @@ interface CreateP2pJobParams {
   identityId: string
   name?: string
   didState?: string
+  didNpaSubset?: string[]
   scheduledDate?: string
 }
 
@@ -43,6 +44,7 @@ export class PeerlyP2pJobService {
     identityId,
     name = P2P_JOB_DEFAULTS.CAMPAIGN_NAME,
     didState = P2P_JOB_DEFAULTS.DID_STATE,
+    didNpaSubset = [],
     scheduledDate,
   }: CreateP2pJobParams): Promise<string> {
     let mediaId: string | undefined
@@ -80,6 +82,7 @@ export class PeerlyP2pJobService {
           },
         ],
         didState,
+        didNpaSubset,
         identityId,
         scheduledDate: dateOnly,
       })

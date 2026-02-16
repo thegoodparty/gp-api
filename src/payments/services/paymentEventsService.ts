@@ -1,12 +1,14 @@
 import {
   BadGatewayException,
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
-import { WebhookEventType } from '../payments.types'
+import { CheckoutSessionMode, WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/services/users.service'
@@ -22,6 +24,7 @@ import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.servi
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { PurchaseService } from './purchase.service'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -41,6 +44,8 @@ export class PaymentEventsService {
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly stripeService: StripeService,
     private readonly analytics: AnalyticsService,
+    @Inject(forwardRef(() => PurchaseService))
+    private readonly purchaseService: PurchaseService,
   ) {}
 
   async handleEvent(event: Stripe.Event) {
@@ -174,6 +179,24 @@ export class PaymentEventsService {
     event: Stripe.CheckoutSessionCompletedEvent,
   ) {
     const session = event.data.object
+    const { mode } = session
+
+    // Route to appropriate handler based on checkout session mode
+    if (mode === CheckoutSessionMode.SUBSCRIPTION) {
+      return this.handleSubscriptionCheckoutCompleted(session)
+    } else if (mode === CheckoutSessionMode.PAYMENT) {
+      return this.handleOneTimePaymentCheckoutCompleted(session)
+    }
+
+    this.logger.warn(`Unknown checkout session mode: ${mode}`)
+  }
+
+  /**
+   * Handles checkout.session.completed events for subscription checkouts (Pro plan).
+   */
+  private async handleSubscriptionCheckoutCompleted(
+    session: Stripe.Checkout.Session,
+  ) {
     const { customer: customerId, subscription: subscriptionId } = session
     if (!customerId) {
       throw new BadGatewayException('No customerId found in checkout session')
@@ -256,6 +279,53 @@ export class PaymentEventsService {
     })
   }
 
+  /**
+   * Handles checkout.session.completed events for one-time payment checkouts.
+   * Routes to the appropriate post-purchase handler based on purchaseType in metadata.
+   *
+   * This handler is used for Custom Checkout Sessions created with `ui_mode: 'custom'`
+   * that support promo codes.
+   */
+  private async handleOneTimePaymentCheckoutCompleted(
+    session: Stripe.Checkout.Session,
+  ) {
+    const { id: sessionId, metadata } = session
+
+    if (!metadata?.userId) {
+      throw new BadGatewayException(
+        'No userId found in checkout session metadata',
+      )
+    }
+
+    if (!metadata?.purchaseType) {
+      throw new BadGatewayException(
+        'No purchaseType found in checkout session metadata',
+      )
+    }
+
+    this.logger.log(
+      JSON.stringify({
+        sessionId,
+        purchaseType: metadata.purchaseType,
+        userId: metadata.userId,
+        msg: 'Processing one-time payment checkout session completion',
+      }),
+    )
+
+    // Delegate to purchase service for post-purchase processing
+    try {
+      await this.purchaseService.completeCheckoutSession({
+        checkoutSessionId: sessionId,
+      })
+    } catch (error) {
+      this.logger.error(
+        `[WEBHOOK] Failed to complete checkout session - Session: ${sessionId}, PurchaseType: ${metadata.purchaseType}`,
+        error,
+      )
+      throw error
+    }
+  }
+
   async checkoutSessionExpiredHandler(
     event: Stripe.CheckoutSessionExpiredEvent,
   ): Promise<void> {
@@ -267,9 +337,19 @@ export class PaymentEventsService {
       )
     }
 
-    await this.usersService.patchUserMetaData(parseInt(userId), {
-      checkoutSessionId: null,
-    })
+    try {
+      await this.usersService.patchUserMetaData(parseInt(userId), {
+        checkoutSessionId: null,
+      })
+    } catch (error) {
+      // User may not exist in this environment's database (e.g., session was
+      // created from a different environment sharing the same Stripe test key).
+      // Since this is just cleanup, log and move on rather than failing the webhook.
+      // Stripe retries when it receives a non-2xx response, so we don't want to cause repeated failures.
+      this.logger.warn(
+        `[WEBHOOK] Could not clear checkoutSessionId for userId ${userId} — user may not exist in this environment`,
+      )
+    }
   }
 
   async customerSubscriptionDeletedHandler(

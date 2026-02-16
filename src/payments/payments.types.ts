@@ -8,6 +8,11 @@ export enum WebhookEventType {
   CustomerSubscriptionResumed = 'customer.subscription.resumed',
 }
 
+export enum CheckoutSessionMode {
+  PAYMENT = 'payment',
+  SUBSCRIPTION = 'subscription',
+}
+
 export enum PaymentStatus {
   REQUIRES_PAYMENT_METHOD = 'requires_payment_method',
   REQUIRES_CONFIRMATION = 'requires_confirmation',
@@ -24,11 +29,19 @@ export enum PaymentType {
   POLL = 'poll',
 }
 
+export interface CustomCheckoutSessionPayload {
+  type: PaymentType
+  purchaseType: PurchaseType
+  amount: number
+  productName: string
+  productDescription?: string
+  allowPromoCodes?: boolean
+  returnUrl: string
+  metadata?: Record<string, string | number | undefined>
+}
+
 export type PaymentIntentPayload<T extends PaymentType> = {
   type: T
-  /**
-   * The amount to charge the user in cents
-   */
   amount: number
   description?: string
   purchaseType: PurchaseType

@@ -13,6 +13,8 @@ import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
 import { lastValueFrom } from 'rxjs'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
+import { resolveJobGeographyFromAddress } from 'src/outreach/util/campaignGeography.util'
+import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
@@ -27,6 +29,7 @@ import { SlackChannel, SlackMessageType } from '../../slack/slackService.types'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import {
   Approve10DLCBrandResponseBody,
+  BrandApprovalResult,
   BuildPeerlyErrorSlackMessageBlocksParams,
   CampaignVerificationStatus,
   HandleApiErrorParams,
@@ -350,14 +353,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.isTestEnvironment ? `TEST-${campaignCommittee}` : campaignCommittee
     ).substring(0, 255) // Limit to 255 characters per Peerly API docs
 
-    const stateCode = state?.short_name
-    const postalCodeValue = postalCode?.long_name
-
-    let areaCodes: string[] | null = null
-    if (postalCodeValue) {
-      areaCodes =
-        await this.areaCodeFromZipService.getAreaCodeFromZip(postalCodeValue)
-    }
+    const geography = await resolveJobGeographyFromAddress(
+      {
+        stateCode: state?.short_name?.trim(),
+        postalCodeValue: postalCode?.long_name ?? '',
+      },
+      { areaCodeFromZipService: this.areaCodeFromZipService },
+    )
 
     const submitBrandData: Peerly10DlcBrandData = {
       entityType: PEERLY_ENTITY_TYPE,
@@ -373,12 +375,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       postalCode: postalCode?.long_name,
       website: websiteDomain.substring(0, 100), // Limit to 100 characters per Peerly API docs
       email: `info@${domain.name}`.substring(0, 100), // Limit to 100 characters per Peerly API docs
-      ...(stateCode && areaCodes && areaCodes.length > 0
+      ...(geography.didState !== P2P_JOB_DEFAULTS.DID_STATE
         ? {
             jobAreas: [
               {
-                didState: stateCode,
-                didNpaSubset: areaCodes,
+                didState: geography.didState,
+                ...(geography.didNpaSubset.length > 0 && {
+                  didNpaSubset: geography.didNpaSubset,
+                }),
               },
             ],
           }
@@ -417,7 +421,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async approve10DLCBrand(
     { committeeName, peerlyIdentityId, campaignId }: TcrCompliance,
     campaignVerifyToken: string = '',
-  ) {
+  ): Promise<BrandApprovalResult | undefined> {
     const campaign = await this.campaignsService.findFirstOrThrow({
       where: {
         id: campaignId,
