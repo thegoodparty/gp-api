@@ -956,15 +956,30 @@ describe('CampaignsController', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
-    it('throws NotFoundException when raceTargetDetails is null', async () => {
+    it('falls back to silver flow when raceTargetDetails is null', async () => {
       vi.spyOn(
         electionsService,
         'getBallotReadyMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
 
-      await expect(
-        controller.updateRaceTargetDetails(mockCampaign),
-      ).rejects.toThrow(NotFoundException)
+      await controller.updateRaceTargetDetails(mockCampaign)
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        {
+          pathToVictory: {
+            p2vStatus: P2VStatus.waiting,
+            p2vAttempts: 0,
+            officeContextFingerprint: null,
+          },
+        },
+      )
+      expect(enqueueP2VService.enqueuePathToVictory).toHaveBeenCalledWith(
+        mockCampaign.id,
+      )
     })
 
     it('updates with complete status when hasTurnout', async () => {
@@ -1129,7 +1144,7 @@ describe('CampaignsController', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
-    it('throws NotFoundException when raceTargetDetails is null', async () => {
+    it('falls back to silver flow when raceTargetDetails is null', async () => {
       vi.spyOn(campaignsService, 'findFirstOrThrow').mockResolvedValue(
         mockCampaign,
       )
@@ -1137,10 +1152,25 @@ describe('CampaignsController', () => {
         electionsService,
         'getBallotReadyMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
 
-      await expect(
-        controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {}),
-      ).rejects.toThrow(NotFoundException)
+      await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        {
+          pathToVictory: {
+            p2vStatus: P2VStatus.waiting,
+            p2vAttempts: 0,
+            officeContextFingerprint: null,
+          },
+        },
+      )
+      expect(enqueueP2VService.enqueuePathToVictory).toHaveBeenCalledWith(
+        mockCampaign.id,
+      )
     })
 
     it('sets complete status when hasTurnout', async () => {
