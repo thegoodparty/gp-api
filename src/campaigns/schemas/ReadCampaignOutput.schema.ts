@@ -1,6 +1,6 @@
+import { CampaignTier } from '@prisma/client'
+import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-
-const CampaignTierSchema = z.enum(['WIN', 'LOSE', 'TOSSUP'])
 
 export const ReadCampaignOutputSchema = z.object({
   id: z.number(),
@@ -13,7 +13,7 @@ export const ReadCampaignOutputSchema = z.object({
   isDemo: z.boolean(),
   didWin: z.boolean().nullish(),
   dateVerified: z.coerce.date().nullish(),
-  tier: CampaignTierSchema.nullish(),
+  tier: z.nativeEnum(CampaignTier).nullish(),
   formattedAddress: z.string().nullish(),
   placeId: z.string().nullish(),
   data: z.record(z.string(), z.unknown()),
@@ -26,4 +26,6 @@ export const ReadCampaignOutputSchema = z.object({
   freeTextsOfferRedeemedAt: z.coerce.date().nullish(),
 })
 
-export type ReadCampaignOutput = z.infer<typeof ReadCampaignOutputSchema>
+export class ReadCampaignOutputDto extends createZodDto(
+  ReadCampaignOutputSchema,
+) {}
