@@ -250,7 +250,10 @@ export class CampaignsController {
     @Param() { id }: IdParamSchema,
     @Body() body: UpdateCampaignM2MSchema,
   ) {
-    await this.campaigns.findUniqueOrThrow({ where: { id } })
+    await this.campaigns.findUniqueOrThrow({
+      where: { id },
+      select: { id: true },
+    })
 
     const { data, details, aiContent, ...scalarFields } = body
 
