@@ -114,6 +114,7 @@ export class CampaignsController {
     return p2v
   }
 
+  //TODO: remove this when we start using the admin portal.
   @Roles(UserRole.admin)
   @Get()
   findAll(@Query() query: CampaignListSchema) {
