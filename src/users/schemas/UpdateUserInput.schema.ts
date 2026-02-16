@@ -8,6 +8,6 @@ export class UpdateUserInputSchema extends createZodDto(
 
 export class UpdateUserAdminInputSchema extends createZodDto(
   CreateUserInputSchema.omit({ password: true }).partial().extend({
-    metaData: UserMetaDataSchema.optional(),
+    metaData: UserMetaDataSchema,
   }),
 ) {}
