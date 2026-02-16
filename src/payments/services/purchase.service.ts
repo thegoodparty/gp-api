@@ -1,15 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import {
+  CheckoutSessionPostPurchaseHandler,
   CompletePurchaseDto,
+  CompleteCheckoutSessionDto,
+  CreateCheckoutSessionDto,
   CreatePurchaseIntentDto,
   PostPurchaseHandler,
   PurchaseHandler,
   PurchaseType,
 } from '../purchase.types'
 import { PaymentsService } from './payments.service'
-import { PaymentIntentPayload, PaymentType } from '../payments.types'
+import {
+  CustomCheckoutSessionPayload,
+  PaymentIntentPayload,
+  PaymentType,
+} from '../payments.types'
 import Stripe from 'stripe'
+import { StripeService } from 'src/vendors/stripe/services/stripe.service'
+
+const { WEBAPP_ROOT_URL } = process.env
 
 @Injectable()
 export class PurchaseService {
@@ -27,8 +37,15 @@ export class PurchaseService {
     PurchaseType,
     PostPurchaseHandler<unknown>
   > = new Map()
+  private checkoutSessionPostPurchaseHandlers: Map<
+    PurchaseType,
+    CheckoutSessionPostPurchaseHandler<unknown>
+  > = new Map()
 
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(
+    private readonly paymentsService: PaymentsService,
+    private readonly stripeService: StripeService,
+  ) {}
 
   registerPurchaseHandler(
     type: PurchaseType,
@@ -42,6 +59,218 @@ export class PurchaseService {
     handler: PostPurchaseHandler<unknown>,
   ): void {
     this.postPurchaseHandlers.set(type, handler)
+  }
+
+  registerCheckoutSessionPostPurchaseHandler(
+    type: PurchaseType,
+    handler: CheckoutSessionPostPurchaseHandler<unknown>,
+  ): void {
+    this.checkoutSessionPostPurchaseHandlers.set(type, handler)
+  }
+
+  /**
+   * Creates a Custom Checkout Session for one-time payments with promo code support.
+   * This is the new preferred method for purchases that should support promo codes.
+   *
+   * Migration reference: https://docs.stripe.com/payments/payment-element/migration-ewcs
+   */
+  async createCheckoutSession({
+    user,
+    dto,
+    campaign,
+  }: {
+    user: User
+    dto: CreateCheckoutSessionDto<unknown>
+    campaign?: Campaign
+  }): Promise<{
+    id: string
+    clientSecret: string
+    amount: number
+  }> {
+    this.logger.log(
+      JSON.stringify({
+        user: user.id,
+        dto,
+        campaign,
+        msg: 'Attempting checkout session creation for user',
+      }),
+    )
+
+    if (!Object.values(PurchaseType).includes(dto.type)) {
+      throw new Error(`Invalid purchase type: ${dto.type}`)
+    }
+
+    const handler = this.handlers.get(dto.type)
+    if (!handler) {
+      throw new Error(`No handler found for purchase type: ${dto.type}`)
+    }
+
+    // Validate the purchase (checks for existing payments, etc.)
+    // For domains, validatePurchase returns an existing succeeded PaymentIntent
+    // if the domain was already purchased. In the legacy createPurchaseIntent flow
+    // this PI is reused. For checkout sessions we must reject the duplicate to
+    // prevent charging the user twice for the same purchase.
+    const existingPayment = await handler.validatePurchase({
+      ...(dto.metadata as Record<string, unknown>),
+      ...(campaign?.id ? { campaignId: campaign?.id } : {}),
+    })
+
+    if (existingPayment) {
+      throw new Error(
+        'This purchase has already been completed. Please refresh the page.',
+      )
+    }
+
+    // Merge server-side campaignId into metadata for calculateAmount.
+    // Handlers like outreach need campaignId to check free texts eligibility.
+    // We must use the server-validated campaign, not trust the client's campaignId.
+    const mergedMetadata = {
+      ...(dto.metadata as Record<string, unknown>),
+      ...(campaign?.id ? { campaignId: campaign.id } : {}),
+    }
+
+    const amount = await handler.calculateAmount(mergedMetadata)
+
+    // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
+    // Stripe doesn't need a real Checkout Session for $0
+    // Immediately execute post-purchase handlers (e.g., redeem free texts offer)
+    if (amount === 0) {
+      const freeSessionId = `free_${Date.now()}_${user.id}`
+
+      this.logger.log(
+        `Zero-amount checkout for user ${user.id}, type ${dto.type} - skipping Stripe`,
+      )
+
+      const postPurchaseHandler = this.checkoutSessionPostPurchaseHandlers.get(
+        dto.type,
+      )
+      if (postPurchaseHandler) {
+        await postPurchaseHandler(freeSessionId, {
+          ...(dto.metadata as Record<string, unknown>),
+          ...(campaign?.id ? { campaignId: campaign.id } : {}),
+          userId: String(user.id),
+          purchaseType: dto.type,
+        })
+      }
+
+      return {
+        id: freeSessionId,
+        clientSecret: '',
+        amount: 0,
+      }
+    }
+
+    const productName = handler.getProductName
+      ? handler.getProductName(dto.metadata)
+      : this.getDefaultProductName(dto.type)
+    const productDescription = handler.getProductDescription
+      ? handler.getProductDescription(dto.metadata)
+      : undefined
+
+    const returnUrl =
+      dto.returnUrl ||
+      `${WEBAPP_ROOT_URL}/dashboard/purchase/complete?session_id={CHECKOUT_SESSION_ID}`
+
+    const checkoutPayload: CustomCheckoutSessionPayload = {
+      type: this.getPaymentType(dto.type),
+      purchaseType: dto.type,
+      amount,
+      productName,
+      productDescription,
+      allowPromoCodes: true,
+      returnUrl,
+      metadata: {
+        ...(dto.metadata as Record<string, unknown>),
+        ...(campaign?.id ? { campaignId: campaign.id } : {}),
+      },
+    }
+
+    return this.stripeService.createCustomCheckoutSession(user, checkoutPayload)
+  }
+
+  /**
+   * Completes a purchase made via Checkout Session.
+   * Called after the user completes payment and is redirected back.
+   *
+   * This method is idempotent - if called multiple times (e.g., from both
+   * webhook and client), the post-purchase handler will only run once.
+   * Uses PaymentIntent metadata to track completion status.
+   *
+   * NOTE: There is a small race window between the idempotency check and
+   * the metadata write. If concurrent calls (webhook + client) both pass
+   * the check before either writes the flag, both may execute the handler.
+   * To fully prevent this, handlers should implement their own idempotency
+   * (e.g., checking for existing records before creating). A database-based
+   * lock using a unique purchase record would eliminate this window entirely.
+   */
+  async completeCheckoutSession(
+    dto: CompleteCheckoutSessionDto,
+  ): Promise<{ alreadyProcessed: boolean; result?: unknown }> {
+    const session = await this.stripeService.retrieveCheckoutSession(
+      dto.checkoutSessionId,
+    )
+
+    if (session.status !== 'complete') {
+      throw new Error(`Checkout session not completed: ${session.status}`)
+    }
+
+    const purchaseType = session.metadata?.purchaseType as PurchaseType
+    if (!purchaseType) {
+      throw new Error('No purchase type found in session metadata')
+    }
+
+    // Check idempotency: verify if post-purchase was already processed
+    const paymentIntentId = session.payment_intent as string
+    if (paymentIntentId) {
+      const paymentIntent =
+        await this.stripeService.retrievePaymentIntent(paymentIntentId)
+      if (paymentIntent.metadata?.postPurchaseCompletedAt) {
+        this.logger.log(
+          JSON.stringify({
+            sessionId: dto.checkoutSessionId,
+            paymentIntentId,
+            completedAt: paymentIntent.metadata.postPurchaseCompletedAt,
+            msg: 'Post-purchase already processed, skipping (idempotent)',
+          }),
+        )
+        return { alreadyProcessed: true }
+      }
+    }
+
+    const postPurchaseHandler =
+      this.checkoutSessionPostPurchaseHandlers.get(purchaseType)
+    if (!postPurchaseHandler) {
+      throw new Error(
+        'No checkout session post-purchase handler found for this purchase type',
+      )
+    }
+
+    const result = await postPurchaseHandler(
+      dto.checkoutSessionId,
+      session.metadata,
+    )
+
+    // Mark as processed AFTER handler succeeds to allow retries on failure
+    if (paymentIntentId) {
+      await this.stripeService.updatePaymentIntentMetadata(paymentIntentId, {
+        postPurchaseCompletedAt: new Date().toISOString(),
+      })
+    }
+
+    return { alreadyProcessed: false, result }
+  }
+
+  private getDefaultProductName(purchaseType: PurchaseType): string {
+    switch (purchaseType) {
+      case PurchaseType.DOMAIN_REGISTRATION:
+        return 'Domain Registration'
+      case PurchaseType.TEXT:
+        return 'SMS Outreach'
+      case PurchaseType.POLL:
+        return 'Poll Credits'
+      default:
+        return 'Purchase'
+    }
   }
 
   async createPurchaseIntent({
@@ -58,6 +287,10 @@ export class PurchaseService {
     amount: number
     status: Stripe.PaymentIntent.Status
   }> {
+    if (!Object.values(PurchaseType).includes(dto.type)) {
+      throw new Error(`Invalid purchase type: ${dto.type}`)
+    }
+
     const handler = this.handlers.get(dto.type)
     if (!handler) {
       throw new Error(`No handler found for purchase type: ${dto.type}`)
@@ -70,7 +303,14 @@ export class PurchaseService {
         ...(dto.metadata as Record<string, unknown>),
         ...(campaign?.id ? { campaignId: campaign?.id } : {}),
       })
-    const amount = await handler.calculateAmount(dto.metadata)
+
+    // Merge server-side campaignId into metadata for calculateAmount.
+    // Handlers like outreach need campaignId to check free texts eligibility.
+    const mergedMetadata = {
+      ...(dto.metadata as Record<string, unknown>),
+      ...(campaign?.id ? { campaignId: campaign.id } : {}),
+    }
+    const amount = await handler.calculateAmount(mergedMetadata)
 
     // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
     // Stripe rejects PaymentIntents with $0 so we our own response
@@ -82,20 +322,14 @@ export class PurchaseService {
         `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe`,
       )
 
-      // Execute post-purchase handler immediately for free purchases
       const postPurchaseHandler = this.postPurchaseHandlers.get(dto.type)
       if (postPurchaseHandler) {
-        try {
-          await postPurchaseHandler(freePaymentId, {
-            ...(dto.metadata as Record<string, unknown>),
-            purchaseType: dto.type,
-          })
-        } catch (error) {
-          this.logger.error(
-            `Failed to execute post-purchase handler for free purchase ${freePaymentId}`,
-            error,
-          )
-        }
+        await postPurchaseHandler(freePaymentId, {
+          ...(dto.metadata as Record<string, unknown>),
+          ...(campaign?.id ? { campaignId: campaign.id } : {}),
+          userId: String(user.id),
+          purchaseType: dto.type,
+        })
       }
 
       return {

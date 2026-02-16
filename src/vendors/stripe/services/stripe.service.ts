@@ -1,6 +1,7 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
 import { User } from '@prisma/client'
 import {
+  CustomCheckoutSessionPayload,
   PaymentIntentPayload,
   PaymentType,
   PurchaseIntentPayloadEntry,
@@ -43,11 +44,9 @@ export class StripeService {
     const userId = user.id
     const customerId = user.metaData?.customerId
 
-    // Filter out undefined values from metadata before passing to Stripe
     const cleanedMetadata = Object.entries(restMetadata)
       .filter(
-        ([_, value]: [string, PurchaseIntentPayloadEntry]) =>
-          value !== undefined,
+        ([_, value]: [string, PurchaseIntentPayloadEntry]) => value != null,
       )
       .reduce(
         (acc, [key, value]: [string, PurchaseIntentPayloadEntry]) => ({
@@ -66,15 +65,28 @@ export class StripeService {
         enabled: true,
       },
       metadata: {
+        ...(cleanedMetadata as Record<string, string | number>),
         userId,
         paymentType: type,
-        ...(cleanedMetadata as Record<string, string | number>),
       },
     })
   }
 
   async retrievePaymentIntent(paymentId: string) {
     return await this.stripe.paymentIntents.retrieve(paymentId)
+  }
+
+  async updatePaymentIntentMetadata(
+    paymentIntentId: string,
+    metadata: Record<string, string>,
+  ) {
+    return await this.stripe.paymentIntents.update(paymentIntentId, {
+      metadata,
+    })
+  }
+
+  async retrieveCheckoutSession(sessionId: string) {
+    return await this.stripe.checkout.sessions.retrieve(sessionId)
   }
 
   async createCheckoutSession(userId: number) {
@@ -92,6 +104,7 @@ export class StripeService {
         },
       ],
       mode: 'subscription',
+      allow_promotion_codes: true,
       // Expanding for Segment / analytics
       expand: [
         'subscription',
@@ -104,6 +117,74 @@ export class StripeService {
 
     const { url: redirectUrl, id: checkoutSessionId } = session
     return { redirectUrl, checkoutSessionId }
+  }
+
+  async createCustomCheckoutSession(
+    user: User,
+    payload: CustomCheckoutSessionPayload,
+  ): Promise<{
+    id: string
+    clientSecret: string
+    amount: number
+  }> {
+    const userId = user.id
+    const customerId = user.metaData?.customerId
+
+    const cleanedMetadata = Object.entries(payload.metadata || {})
+      .filter(([_, value]) => value != null)
+      .reduce(
+        (acc, [key, value]) => ({
+          ...acc,
+          [key]: String(value),
+        }),
+        {},
+      )
+
+    const session = await this.stripe.checkout.sessions.create({
+      ui_mode: 'custom',
+      mode: 'payment',
+      ...(customerId
+        ? { customer: customerId }
+        : { customer_email: user.email }),
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: payload.productName,
+              ...(payload.productDescription
+                ? { description: payload.productDescription }
+                : {}),
+            },
+            unit_amount: Math.floor(payload.amount), // Stripe expects cents as integer
+          },
+          quantity: 1,
+        },
+      ],
+      ...(payload.allowPromoCodes ? { allow_promotion_codes: true } : {}),
+      return_url: payload.returnUrl,
+      metadata: {
+        ...cleanedMetadata,
+        userId: String(userId),
+        paymentType: payload.type,
+        purchaseType: payload.purchaseType,
+      },
+    })
+
+    if (!session.client_secret) {
+      throw new BadGatewayException(
+        'Failed to create checkout session: no client_secret returned',
+      )
+    }
+
+    return {
+      id: session.id,
+      clientSecret: session.client_secret,
+      amount:
+        session.amount_total != null
+          ? session.amount_total / 100
+          : payload.amount / 100,
+    }
   }
 
   async createPortalSession(customerId: string) {

@@ -1,10 +1,10 @@
-import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
-import { createService } from './components/service'
+import * as pulumi from '@pulumi/pulumi'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
-import { createVpc } from './components/vpc'
 import { createNewRelicLogForwarder } from './components/newrelic-log-forwarder'
+import { createService } from './components/service'
+import { createVpc } from './components/vpc'
 
 export = async () => {
   const config = new pulumi.Config()
@@ -359,12 +359,12 @@ export = async () => {
       VOTER_DB_NAME: voterCluster.databaseName,
       ...(environment === 'preview'
         ? {
-            IS_PREVIEW: 'true',
-            ADMIN_EMAIL: process.env.ADMIN_EMAIL,
-            ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
-            CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
-            CANDIDATE_PASSWORD: process.env.CANDIDATE_PASSWORD,
-          }
+          IS_PREVIEW: 'true',
+          ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+          ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+          CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
+          CANDIDATE_PASSWORD: process.env.CANDIDATE_PASSWORD,
+        }
         : {}),
     },
     permissions: [

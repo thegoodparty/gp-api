@@ -2,6 +2,7 @@ import { PaymentsService } from '@/payments/services/payments.service'
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PurchaseHandler } from 'src/payments/purchase.types'
+import { UsersService } from 'src/users/services/users.service'
 import { version as uuidVersion } from 'uuid'
 import z from 'zod'
 import { PollsService } from './polls.service'
@@ -63,6 +64,7 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
     private readonly pollsService: PollsService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly paymentsService: PaymentsService,
+    private readonly usersService: UsersService,
   ) {}
 
   async validatePurchase(rawMetadata: unknown): Promise<void> {
@@ -91,26 +93,75 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
     )
 
     if (metadata.pollPurchaseType === PollPurchaseType.expansion) {
-      await this.pollsService.expandPoll({
-        pollId: metadata.pollId,
-        additionalRecipientCount: metadata.count,
-        scheduledDate: metadata.scheduledDate
-          ? new Date(metadata.scheduledDate)
-          : new Date(),
-      })
-      return
+      return this.processExpansion(metadata)
     }
 
     const { user } =
       await this.paymentsService.getValidatedPaymentUser(paymentIntentId)
 
+    return this.processNewPoll(metadata, user.id)
+  }
+
+  async handlePollPostPurchase(
+    sessionId: string,
+    rawMetadata: unknown,
+  ): Promise<void> {
+    const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
+
+    this.logger.log(
+      `Poll checkout session completed: sessionId=${sessionId} metadata=${JSON.stringify(metadata)}`,
+    )
+
+    if (metadata.pollPurchaseType === PollPurchaseType.expansion) {
+      return this.processExpansion(metadata)
+    }
+
+    const userId = (rawMetadata as Record<string, string>)?.userId
+    if (!userId) {
+      throw new BadRequestException('No userId found in session metadata')
+    }
+
+    const user = await this.usersService.findUser({ id: parseInt(userId) })
+    if (!user) {
+      throw new BadRequestException(`User not found: ${userId}`)
+    }
+
+    return this.processNewPoll(metadata, user.id)
+  }
+
+  /**
+   * Shared logic for expanding an existing poll with additional recipients.
+   */
+  private async processExpansion(
+    metadata: z.infer<typeof PollPurchaseMetadataSchema> & {
+      pollPurchaseType: PollPurchaseType.expansion
+    },
+  ): Promise<void> {
+    await this.pollsService.expandPoll({
+      pollId: metadata.pollId,
+      additionalRecipientCount: metadata.count,
+      scheduledDate: metadata.scheduledDate
+        ? new Date(metadata.scheduledDate)
+        : new Date(),
+    })
+  }
+
+  /**
+   * Shared logic for creating a new poll after purchase.
+   */
+  private async processNewPoll(
+    metadata: z.infer<typeof PollPurchaseMetadataSchema> & {
+      pollPurchaseType: PollPurchaseType.new
+    },
+    userId: number,
+  ): Promise<void> {
     const electedOffice = await this.electedOfficeService.findFirst({
-      where: { userId: user.id },
+      where: { userId },
     })
 
     if (!electedOffice) {
       throw new BadRequestException(
-        `Elected office not found for userId ${user.id} poll ${metadata.pollId}`,
+        `Elected office not found for userId ${userId} poll ${metadata.pollId}`,
       )
     }
 

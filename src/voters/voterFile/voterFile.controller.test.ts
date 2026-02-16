@@ -14,7 +14,9 @@ describe('VoterFileController', () => {
     findByIdAndCampaignId: ReturnType<typeof vi.fn>
     updateByIdAndCampaignId: ReturnType<typeof vi.fn>
   }
-  let mockOutreachService: Record<string, ReturnType<typeof vi.fn>>
+  let mockOutreachService: {
+    model: { findFirst: ReturnType<typeof vi.fn> }
+  }
   let mockElectedOfficeService: {
     getCurrentElectedOffice: ReturnType<typeof vi.fn>
   }
@@ -41,7 +43,9 @@ describe('VoterFileController', () => {
       findByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
       updateByIdAndCampaignId: vi.fn().mockResolvedValue(mockFilter),
     }
-    mockOutreachService = {}
+    mockOutreachService = {
+      model: { findFirst: vi.fn() },
+    }
     mockElectedOfficeService = {
       getCurrentElectedOffice: vi.fn().mockResolvedValue(null),
     }
@@ -192,6 +196,68 @@ describe('VoterFileController', () => {
       expect(
         mockVoterFileFilterService.updateByIdAndCampaignId,
       ).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('scheduleOutreachCampaign', () => {
+    const mockUser = { id: 1, email: 'user@example.com' } as never
+
+    it('queries outreach scoped to campaign ID and delegates to voterOutreachService', async () => {
+      const mockOutreach = {
+        id: 10,
+        campaignId: 1,
+        voterFileFilter: null,
+      }
+      mockOutreachService.model.findFirst.mockResolvedValue(mockOutreach)
+      mockVoterOutreachService.scheduleOutreachCampaign = vi
+        .fn()
+        .mockResolvedValue({ success: true })
+
+      const result = await controller.scheduleOutreachCampaign(
+        mockUser,
+        baseCampaign,
+        { outreachId: 10, audienceRequest: 'all voters' },
+      )
+
+      expect(mockOutreachService.model.findFirst).toHaveBeenCalledWith({
+        where: { id: 10, campaignId: baseCampaign.id },
+        include: { voterFileFilter: true },
+      })
+      expect(
+        mockVoterOutreachService.scheduleOutreachCampaign,
+      ).toHaveBeenCalledWith(mockUser, baseCampaign, mockOutreach, 'all voters')
+      expect(result).toEqual({ success: true })
+    })
+
+    it('throws NotFoundException when outreach does not exist for campaign', async () => {
+      mockOutreachService.model.findFirst.mockResolvedValue(null)
+
+      await expect(
+        controller.scheduleOutreachCampaign(mockUser, baseCampaign, {
+          outreachId: 999,
+        }),
+      ).rejects.toThrow(NotFoundException)
+      await expect(
+        controller.scheduleOutreachCampaign(mockUser, baseCampaign, {
+          outreachId: 999,
+        }),
+      ).rejects.toThrow('Outreach not found')
+    })
+
+    it('prevents accessing outreach from a different campaign (scoping)', async () => {
+      mockOutreachService.model.findFirst.mockResolvedValue(null)
+      const differentCampaign = { ...baseCampaign, id: 999 }
+
+      await expect(
+        controller.scheduleOutreachCampaign(mockUser, differentCampaign, {
+          outreachId: 10,
+        }),
+      ).rejects.toThrow(NotFoundException)
+
+      expect(mockOutreachService.model.findFirst).toHaveBeenCalledWith({
+        where: { id: 10, campaignId: 999 },
+        include: { voterFileFilter: true },
+      })
     })
   })
 })
