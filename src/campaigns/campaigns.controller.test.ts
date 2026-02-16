@@ -19,9 +19,11 @@ import { ElectionsService } from 'src/elections/services/elections.service'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { CampaignStatus } from './campaigns.types'
 
+const CREATED_AT = '2025-01-01'
+
 const userDefaults = {
-  createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
+  createdAt: new Date(CREATED_AT),
+  updatedAt: new Date(CREATED_AT),
   firstName: 'Test',
   lastName: 'User',
   name: 'Test User',
@@ -54,8 +56,8 @@ const mockSalesUser: User = {
 }
 
 const campaignDefaults = {
-  createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
+  createdAt: new Date(CREATED_AT),
+  updatedAt: new Date(CREATED_AT),
   isVerified: false,
   isPro: false,
   isDemo: false,
@@ -96,8 +98,8 @@ const mockTestCampaign: Campaign = {
 
 const mockP2V: PathToVictory = {
   id: 10,
-  createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
+  createdAt: new Date(CREATED_AT),
+  updatedAt: new Date(CREATED_AT),
   campaignId: 100,
   data: { p2vStatus: P2VStatus.waiting },
 }
@@ -444,12 +446,12 @@ describe('CampaignsController', () => {
   describe('getCampaignPlanVersion', () => {
     it('returns version.data', async () => {
       const versionData = {
-        key: [{ date: '2025-01-01', text: 'plan content' }],
+        key: [{ date: CREATED_AT, text: 'plan content' }],
       }
       vi.spyOn(planVersionsService, 'findByCampaignId').mockResolvedValue({
         id: 1,
-        createdAt: new Date('2025-01-01'),
-        updatedAt: new Date('2025-01-01'),
+        createdAt: new Date(CREATED_AT),
+        updatedAt: new Date(CREATED_AT),
         campaignId: mockCampaign.id,
         data: versionData,
       })
