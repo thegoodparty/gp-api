@@ -4,7 +4,6 @@ import {
   BallotReadyPositionLevel,
   ElectionLevel,
 } from 'src/campaigns/campaigns.types'
-import { CampaignSchema } from './Campaign.schema'
 
 // TODO(ENG-6410): This schema uses .passthrough() which allows ANY fields to be sent through,
 // even if not defined here. This is a security/data integrity concern because:
@@ -15,6 +14,7 @@ import { CampaignSchema } from './Campaign.schema'
 //    and explicitly define all allowed fields.
 // See: ENG-4918, ENG-6495 for related subscription sync bugs.
 
+// AI'ed from the CampaignDetails type
 const CampaignDetailsSchema = z
   .object({
     state: z.string(),
@@ -82,19 +82,19 @@ const CampaignDetailsSchema = z
 
 // TODO: make schemas data, pathToVictory, aiContent
 export class UpdateCampaignSchema extends createZodDto(
-  CampaignSchema.pick({
-    slug: true,
-    data: true,
-    aiContent: true,
-    formattedAddress: true,
-    placeId: true,
-    canDownloadFederal: true,
-  })
-    .partial()
-    .extend({
+  z
+    .object({
+      slug: z.string().optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      data: z.record(z.string(), z.unknown()).optional(),
       details: CampaignDetailsSchema.optional(),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      aiContent: z.record(z.string(), z.unknown()).optional(),
+      formattedAddress: z.string().optional(),
+      placeId: z.string().optional(),
+      canDownloadFederal: z.boolean().optional(),
     })
     .strict(),
 ) {}
