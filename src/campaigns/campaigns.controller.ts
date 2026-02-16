@@ -14,6 +14,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
 import { Campaign, Prisma, User, UserRole } from '@prisma/client'
@@ -32,6 +33,7 @@ import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
+import { ListCampaignsPaginationSchema } from './schemas/ListCampaignsPagination.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   SetDistrictDTO,
@@ -40,6 +42,10 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
+import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
+import { UpdateCampaignM2MSchema } from './schemas/UpdateCampaignM2M.schema'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -108,6 +114,7 @@ export class CampaignsController {
     return p2v
   }
 
+  //TODO: remove this when we start using the admin portal.
   @Roles(UserRole.admin)
   @Get()
   findAll(@Query() query: CampaignListSchema) {
@@ -138,6 +145,16 @@ export class CampaignsController {
   @UseCampaign()
   async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
+  }
+
+  @UseGuards(M2MOnly)
+  @Get('list')
+  async list(@Query() query: ListCampaignsPaginationSchema) {
+    const { data, meta } = await this.campaigns.listCampaigns(query)
+    return {
+      data: data.map((c) => ReadCampaignOutputSchema.parse(c)),
+      meta,
+    }
   }
 
   @Get('mine/status')
@@ -226,6 +243,31 @@ export class CampaignsController {
     this.logger.debug('Updating campaign', campaign, { slug, body })
 
     return this.campaigns.updateJsonFields(campaign.id, body)
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  async updateCampaign(
+    @Param() { id }: IdParamSchema,
+    @Body() body: UpdateCampaignM2MSchema,
+  ) {
+    await this.campaigns.findUniqueOrThrow({
+      where: { id },
+      select: { id: true },
+    })
+
+    const { data, details, aiContent, ...scalarFields } = body
+
+    const updated = await this.campaigns.updateJsonFields(
+      id,
+      { data, details, aiContent },
+      true,
+      Object.values(scalarFields).some((v) => v !== undefined)
+        ? scalarFields
+        : undefined,
+    )
+
+    return ReadCampaignOutputSchema.parse(updated)
   }
 
   @Post('launch')
