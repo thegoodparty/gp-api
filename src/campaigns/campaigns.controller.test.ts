@@ -676,6 +676,105 @@ describe('CampaignsController', () => {
     })
   })
 
+  describe('updateCampaign (M2M PUT :id)', () => {
+    const parsedCampaign = {
+      ...mockCampaign,
+      vendorTsData: undefined,
+    }
+
+    beforeEach(() => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+    })
+
+    it('throws NotFoundException when campaign does not exist', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockRejectedValue(
+        new NotFoundException(),
+      )
+
+      await expect(
+        controller.updateCampaign({ id: 999 }, { isActive: true }),
+      ).rejects.toThrow(NotFoundException)
+    })
+
+    it('updates scalar fields only', async () => {
+      const result = await controller.updateCampaign(
+        { id: mockCampaign.id },
+        { isActive: false, slug: 'new-slug' },
+      )
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        { data: undefined, details: undefined, aiContent: undefined },
+        true,
+        { isActive: false, slug: 'new-slug' },
+      )
+      expect(result).toEqual(parsedCampaign)
+    })
+
+    it('updates JSON fields only', async () => {
+      const result = await controller.updateCampaign(
+        { id: mockCampaign.id },
+        { data: { name: 'Updated' } },
+      )
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        { data: { name: 'Updated' }, details: undefined, aiContent: undefined },
+        true,
+        undefined,
+      )
+      expect(result).toEqual(parsedCampaign)
+    })
+
+    it('updates both scalar and JSON fields atomically', async () => {
+      const result = await controller.updateCampaign(
+        { id: mockCampaign.id },
+        { isActive: true, data: { name: 'Updated' }, details: { city: 'LA' } },
+      )
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        {
+          data: { name: 'Updated' },
+          details: { city: 'LA' },
+          aiContent: undefined,
+        },
+        true,
+        { isActive: true },
+      )
+      expect(result).toEqual(parsedCampaign)
+    })
+
+    it('handles empty body without error', async () => {
+      const result = await controller.updateCampaign(
+        { id: mockCampaign.id },
+        {},
+      )
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        { data: undefined, details: undefined, aiContent: undefined },
+        true,
+        undefined,
+      )
+      expect(result).toEqual(parsedCampaign)
+    })
+
+    it('returns response parsed through ReadCampaignOutputSchema (strips vendorTsData)', async () => {
+      const result = await controller.updateCampaign(
+        { id: mockCampaign.id },
+        { isActive: true },
+      )
+
+      expect(result).not.toHaveProperty('vendorTsData')
+    })
+  })
+
   describe('launch', () => {
     it('returns launch result on success', async () => {
       vi.spyOn(campaignsService, 'launch').mockResolvedValue(true)

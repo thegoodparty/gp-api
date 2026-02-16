@@ -25,8 +25,8 @@ import {
   CampaignStatus,
   OnboardingStep,
   PlanVersion,
+  UpdateCampaignFieldsInput,
 } from '../campaigns.types'
-import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
@@ -126,8 +126,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
   async updateJsonFields(
     id: number,
-    body: Omit<UpdateCampaignSchema, 'slug'>,
+    body: UpdateCampaignFieldsInput,
     trackCampaign: boolean = true,
+    scalarFields?: Prisma.CampaignUpdateInput,
   ) {
     const {
       data,
@@ -155,6 +156,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
         // Handle data and details JSON fields
         const campaignUpdateData = {} as Prisma.CampaignUpdateInput
+        if (scalarFields) {
+          Object.assign(campaignUpdateData, scalarFields)
+        }
         if (data) {
           campaignUpdateData.data = deepMerge(campaign.data as object, data)
         }
@@ -240,7 +244,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     // TODO: this should throw an exception if the update failed
     //  https://goodparty.atlassian.net/browse/WEB-4384
     if (updatedCampaign && trackCampaign) {
-      // Track campaign and user
+      if (scalarFields?.isPro) {
+        await this.analytics.identify(updatedCampaign.userId, {
+          isPro: scalarFields.isPro,
+        })
+      }
       await this.crm.trackCampaign(updatedCampaign.id)
     }
 

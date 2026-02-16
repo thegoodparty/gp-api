@@ -43,7 +43,9 @@ import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { UserIdParamSchema } from '@/users/schemas/UserIdParam.schema'
+import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
 import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
+import { UpdateCampaignM2MSchema } from './schemas/UpdateCampaignM2M.schema'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -237,6 +239,30 @@ export class CampaignsController {
     this.logger.debug('Updating campaign', campaign, { slug, body })
 
     return this.campaigns.updateJsonFields(campaign.id, body)
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  async updateCampaign(
+    @Param() { id }: IdParamSchema,
+    @Body() body: UpdateCampaignM2MSchema,
+  ) {
+    await this.campaigns.findUniqueOrThrow({ where: { id } })
+
+    const { data, details, aiContent, ...scalarFields } = body
+
+    await this.campaigns.updateJsonFields(
+      id,
+      { data, details, aiContent },
+      true,
+      Object.values(scalarFields).some((v) => v !== undefined)
+        ? scalarFields
+        : undefined,
+    )
+
+    return ReadCampaignOutputSchema.parse(
+      await this.campaigns.findUniqueOrThrow({ where: { id } }),
+    )
   }
 
   @Post('launch')

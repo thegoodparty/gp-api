@@ -85,3 +85,13 @@ export enum BallotReadyPositionLevel {
   STATE = 'STATE',
   TOWNSHIP = 'TOWNSHIP',
 }
+
+export interface UpdateCampaignFieldsInput {
+  data?: Record<string, unknown>
+  details?: Record<string, unknown>
+  pathToVictory?: Record<string, unknown>
+  aiContent?: Record<string, unknown>
+  formattedAddress?: string | null
+  placeId?: string | null
+  canDownloadFederal?: boolean
+}
