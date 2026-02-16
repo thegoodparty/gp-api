@@ -4,7 +4,6 @@ import { Prisma } from '@prisma/client'
 
 export function buildCampaignListFilters({
   id,
-  userId,
   state,
   slug,
   email,
@@ -20,7 +19,6 @@ export function buildCampaignListFilters({
   const andConditions: Prisma.CampaignWhereInput[] = []
 
   if (id) andConditions.push({ id })
-  if (userId) andConditions.push({ userId })
   if (slug) andConditions.push({ slug: { equals: slug, mode: 'insensitive' } })
   if (email) {
     andConditions.push({
