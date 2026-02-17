@@ -140,13 +140,15 @@ export class PurchaseController {
   @Post('complete-free-purchase')
   @UseCampaign()
   async completeFreePurchase(
+    @ReqUser() user: User,
     @Body() dto: CompleteFreePurchaseDto,
-    @ReqCampaign() campaign: Campaign,
+    @ReqCampaign() campaign?: Campaign,
   ) {
     try {
       return await this.purchaseService.completeFreePurchase({
         dto,
         campaign,
+        user,
       })
     } catch (error) {
       this.logger.error(

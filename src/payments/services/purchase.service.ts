@@ -1,9 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import {
   CheckoutSessionPostPurchaseHandler,
   CompletePurchaseDto,
   CompleteCheckoutSessionDto,
+  CompleteFreePurchaseMetadata,
   CompleteFreePurchaseDto,
   CreateCheckoutSessionDto,
   CreatePurchaseIntentDto,
@@ -376,48 +383,53 @@ export class PurchaseService {
    * The post-purchase handler is idempotent — redeemFreeTexts uses an atomic
    * updateMany with hasFreeTextsOffer: true as a guard, so duplicate calls are safe.
    */
-  async completeFreePurchase({
+  async completeFreePurchase<Metadata extends CompleteFreePurchaseMetadata>({
     dto,
     campaign,
+    user,
   }: {
-    dto: CompleteFreePurchaseDto
+    dto: CompleteFreePurchaseDto<Metadata>
     campaign?: Campaign
+    user: User
   }): Promise<{ result?: unknown }> {
     const { purchaseType } = dto
 
     if (!Object.values(PurchaseType).includes(purchaseType)) {
-      throw new Error(`Invalid purchase type: ${purchaseType}`)
+      throw new BadRequestException(`Invalid purchase type: ${purchaseType}`)
     }
 
     const purchaseHandler = this.handlers.get(purchaseType)
     if (!purchaseHandler) {
-      throw new Error(`No handler found for purchase type: ${purchaseType}`)
+      throw new InternalServerErrorException(
+        `No handler found for purchase type: ${purchaseType}`,
+      )
     }
 
     const postPurchaseHandler =
       this.checkoutSessionPostPurchaseHandlers.get(purchaseType)
     if (!postPurchaseHandler) {
-      throw new Error(
+      throw new InternalServerErrorException(
         `No checkout session post-purchase handler found for purchase type: ${purchaseType}`,
       )
     }
 
     const mergedMetadata = {
-      ...(dto.metadata as Record<string, unknown>),
+      ...dto.metadata,
       ...(campaign?.id ? { campaignId: campaign.id } : {}),
+      userId: String(user.id),
     }
 
     const existingPayment =
       await purchaseHandler.validatePurchase(mergedMetadata)
     if (existingPayment) {
-      throw new Error(
+      throw new ConflictException(
         'This purchase has already been completed. Please refresh the page.',
       )
     }
 
     const amount = await purchaseHandler.calculateAmount(mergedMetadata)
     if (amount !== 0) {
-      throw new Error(
+      throw new BadRequestException(
         `Free purchase completion is only allowed for zero-amount purchases. Calculated amount: ${amount}`,
       )
     }

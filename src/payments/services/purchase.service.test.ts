@@ -912,6 +912,7 @@ describe('PurchaseService', () => {
           },
         },
         campaign: mockCampaign,
+        user: mockUser,
       })
 
       // Assert: Handler should be called with server-validated campaignId
@@ -922,6 +923,7 @@ describe('PurchaseService', () => {
           contactCount: 298,
           outreachType: 'p2p',
           campaignId: 111,
+          userId: '1',
           purchaseType: PurchaseType.TEXT,
         }),
       )
@@ -935,6 +937,7 @@ describe('PurchaseService', () => {
             purchaseType: 'INVALID' as PurchaseType,
             metadata: {},
           },
+          user: mockUser,
         }),
       ).rejects.toThrow('Invalid purchase type: INVALID')
     })
@@ -947,6 +950,7 @@ describe('PurchaseService', () => {
             metadata: { contactCount: 100 },
           },
           campaign: mockCampaign,
+          user: mockUser,
         }),
       ).rejects.toThrow('No handler found for purchase type: TEXT')
     })
@@ -974,6 +978,7 @@ describe('PurchaseService', () => {
             metadata: { contactCount: 100 },
           },
           campaign: mockCampaign,
+          user: mockUser,
         }),
       ).rejects.toThrow('Failed to redeem free texts')
     })
@@ -989,6 +994,7 @@ describe('PurchaseService', () => {
           metadata: { contactCount: 50 },
         },
         // No campaign provided
+        user: mockUser,
       })
 
       // Assert: Handler called without campaignId
@@ -996,6 +1002,7 @@ describe('PurchaseService', () => {
         expect.stringMatching(/^free_confirmed_\d+$/),
         expect.objectContaining({
           contactCount: 50,
+          userId: '1',
           purchaseType: PurchaseType.TEXT,
         }),
       )
@@ -1021,6 +1028,7 @@ describe('PurchaseService', () => {
             metadata: { contactCount: 6000, outreachType: 'p2p' },
           },
           campaign: mockCampaign,
+          user: mockUser,
         }),
       ).rejects.toThrow(
         'Free purchase completion is only allowed for zero-amount purchases. Calculated amount: 1234',

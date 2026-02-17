@@ -28,9 +28,13 @@ export interface CompleteCheckoutSessionDto {
   checkoutSessionId: string
 }
 
-export interface CompleteFreePurchaseDto {
+export type CompleteFreePurchaseMetadata = BasePurchaseMetadata
+
+export interface CompleteFreePurchaseDto<
+  Metadata extends CompleteFreePurchaseMetadata = CompleteFreePurchaseMetadata,
+> {
   purchaseType: PurchaseType
-  metadata: Record<string, unknown>
+  metadata: Metadata
 }
 
 export type PostPurchaseHandler<Metadata> = (
