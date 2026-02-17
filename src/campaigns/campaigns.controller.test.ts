@@ -962,7 +962,7 @@ describe('CampaignsController', () => {
         'getBallotReadyMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
-        mockCampaign,
+        mockCampaignWithP2V,
       )
 
       await controller.updateRaceTargetDetails(mockCampaign)
@@ -1153,7 +1153,7 @@ describe('CampaignsController', () => {
         'getBallotReadyMatchedRaceTargetDetails',
       ).mockResolvedValue(null!)
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
-        mockCampaign,
+        mockCampaignWithP2V,
       )
 
       await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
