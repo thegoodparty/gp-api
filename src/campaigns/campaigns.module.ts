@@ -31,10 +31,13 @@ import { UsersModule } from 'src/users/users.module'
 import { WebsitesModule } from '../websites/websites.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
+import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
+import { AwsModule } from 'src/vendors/aws/aws.module'
 
 @Global()
 @Module({
   imports: [
+    AwsModule,
     EmailModule,
     CampaignsAiModule,
     CrmModule,
@@ -71,6 +74,7 @@ import { SlackModule } from 'src/vendors/slack/slack.module'
     CrmCampaignsService,
     CampaignTasksService,
     CampaignTcrComplianceService,
+    ClerkClientProvider,
   ],
   exports: [
     CampaignsService,

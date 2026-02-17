@@ -14,8 +14,10 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -32,6 +34,7 @@ import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
+import { ListCampaignsPaginationSchema } from './schemas/ListCampaignsPagination.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
   SetDistrictDTO,
@@ -40,6 +43,10 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
+import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
+import { UpdateCampaignM2MSchema } from './schemas/UpdateCampaignM2M.schema'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -54,6 +61,7 @@ export class CampaignsController {
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
     private readonly analytics: AnalyticsService,
+    private readonly s3: S3Service,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -108,6 +116,7 @@ export class CampaignsController {
     return p2v
   }
 
+  //TODO: remove this when we start using the admin portal.
   @Roles(UserRole.admin)
   @Get()
   findAll(@Query() query: CampaignListSchema) {
@@ -138,6 +147,16 @@ export class CampaignsController {
   @UseCampaign()
   async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
+  }
+
+  @UseGuards(M2MOnly)
+  @Get('list')
+  async list(@Query() query: ListCampaignsPaginationSchema) {
+    const { data, meta } = await this.campaigns.listCampaigns(query)
+    return {
+      data: data.map((c) => ReadCampaignOutputSchema.parse(c)),
+      meta,
+    }
   }
 
   @Get('mine/status')
@@ -226,6 +245,31 @@ export class CampaignsController {
     this.logger.debug('Updating campaign', campaign, { slug, body })
 
     return this.campaigns.updateJsonFields(campaign.id, body)
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  async updateCampaign(
+    @Param() { id }: IdParamSchema,
+    @Body() body: UpdateCampaignM2MSchema,
+  ) {
+    await this.campaigns.findUniqueOrThrow({
+      where: { id },
+      select: { id: true },
+    })
+
+    const { data, details, aiContent, ...scalarFields } = body
+
+    const updated = await this.campaigns.updateJsonFields(
+      id,
+      { data, details, aiContent },
+      true,
+      Object.values(scalarFields).some((v) => v !== undefined)
+        ? scalarFields
+        : undefined,
+    )
+
+    return ReadCampaignOutputSchema.parse(updated)
   }
 
   @Post('launch')
@@ -456,5 +500,28 @@ export class CampaignsController {
     }
 
     return result
+  }
+
+  @Get('slug/:slug/ein-document-url')
+  @Roles(UserRole.admin)
+  async getEinDocumentUrl(@Param('slug') slug: string) {
+    const campaign = await this.campaigns.findFirst({
+      where: { slug },
+    })
+
+    if (!campaign) throw new NotFoundException('Campaign not found')
+
+    const documentKey = campaign.details?.einSupportingDocument
+    if (!documentKey) {
+      throw new NotFoundException('No EIN supporting document found')
+    }
+
+    const signedUrl = await this.s3.getSignedUrlForViewing(
+      'ein-supporting-documents',
+      documentKey,
+      { expiresIn: 300 }, // 5 minutes
+    )
+
+    return { signedUrl }
   }
 }
