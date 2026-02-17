@@ -72,4 +72,18 @@ describe('optimisticLockingUpdate', () => {
       expect.objectContaining({ zip: 'second' }),
     )
   })
+
+  it('should allow passing an empty object as the modification function', async () => {
+    const initial = await usersService.findUniqueOrThrow({
+      where: { id: service.user.id },
+    })
+    const result = await usersService.optimisticLockingUpdate(
+      { where: { id: service.user.id } },
+      () => {
+        return {}
+      },
+    )
+    expect(result).toMatchObject({ id: service.user.id })
+    expect(result.updatedAt).not.toEqual(initial.updatedAt)
+  })
 })
