@@ -17,6 +17,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
+import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -60,6 +61,7 @@ export class CampaignsController {
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
     private readonly analytics: AnalyticsService,
+    private readonly s3: S3Service,
   ) {}
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
@@ -498,5 +500,28 @@ export class CampaignsController {
     }
 
     return result
+  }
+
+  @Get('slug/:slug/ein-document-url')
+  @Roles(UserRole.admin)
+  async getEinDocumentUrl(@Param('slug') slug: string) {
+    const campaign = await this.campaigns.findFirst({
+      where: { slug },
+    })
+
+    if (!campaign) throw new NotFoundException('Campaign not found')
+
+    const documentKey = campaign.details?.einSupportingDocument
+    if (!documentKey) {
+      throw new NotFoundException('No EIN supporting document found')
+    }
+
+    const signedUrl = await this.s3.getSignedUrlForViewing(
+      'ein-supporting-documents',
+      documentKey,
+      { expiresIn: 300 }, // 5 minutes
+    )
+
+    return { signedUrl }
   }
 }

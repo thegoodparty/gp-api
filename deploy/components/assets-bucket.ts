@@ -6,6 +6,7 @@ export interface AssetsBucketConfig {
 }
 
 export function createAssetsBucket({ environment }: AssetsBucketConfig): {
+  bucket: aws.s3.BucketV2
   bucketRegionalDomainName: pulumi.Output<string>
 } {
   const select = <T>(values: Record<'dev' | 'qa' | 'prod', T>): T =>
@@ -22,33 +23,18 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
     forceDestroy: false,
   })
 
-  if (environment !== 'prod') {
-    new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
-      bucket: bucket.id,
-      blockPublicAcls: false,
-      blockPublicPolicy: false,
-      ignorePublicAcls: false,
-      restrictPublicBuckets: false,
-    })
-  }
-
-  new aws.s3.BucketPolicy('assetsBucketPolicy', {
+  // Enable public access blocks for ALL environments to prevent direct S3 access
+  // Access should only be allowed through CloudFront OAC
+  new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
     bucket: bucket.id,
-    policy: aws.iam.getPolicyDocumentOutput({
-      statements: [
-        {
-          principals: [
-            {
-              type: '*',
-              identifiers: ['*'],
-            },
-          ],
-          actions: ['s3:GetObject'],
-          resources: [pulumi.interpolate`${bucket.arn}/*`],
-        },
-      ],
-    }).json,
+    blockPublicAcls: true,
+    blockPublicPolicy: true,
+    ignorePublicAcls: true,
+    restrictPublicBuckets: true,
   })
+
+  // Bucket policy allowing CloudFront OAC access is created in assets-router.ts
+  // for all environments, scoped to the CloudFront distribution it manages.
 
   new aws.s3.BucketCorsConfigurationV2('assetsBucketCors', {
     bucket: bucket.id,
@@ -74,6 +60,7 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
   })
 
   return {
+    bucket,
     bucketRegionalDomainName: bucket.bucketRegionalDomainName,
   }
 }
