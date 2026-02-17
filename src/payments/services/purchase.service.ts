@@ -10,7 +10,6 @@ import {
   CheckoutSessionPostPurchaseHandler,
   CompletePurchaseDto,
   CompleteCheckoutSessionDto,
-  CompleteFreePurchaseMetadata,
   CompleteFreePurchaseDto,
   CreateCheckoutSessionDto,
   CreatePurchaseIntentDto,
@@ -383,12 +382,12 @@ export class PurchaseService {
    * The post-purchase handler is idempotent — redeemFreeTexts uses an atomic
    * updateMany with hasFreeTextsOffer: true as a guard, so duplicate calls are safe.
    */
-  async completeFreePurchase<Metadata extends CompleteFreePurchaseMetadata>({
+  async completeFreePurchase({
     dto,
     campaign,
     user,
   }: {
-    dto: CompleteFreePurchaseDto<Metadata>
+    dto: CompleteFreePurchaseDto<unknown>
     campaign?: Campaign
     user: User
   }): Promise<{ result?: unknown }> {
@@ -414,7 +413,7 @@ export class PurchaseService {
     }
 
     const mergedMetadata = {
-      ...dto.metadata,
+      ...(dto.metadata as Record<string, unknown>),
       ...(campaign?.id ? { campaignId: campaign.id } : {}),
       userId: String(user.id),
     }
