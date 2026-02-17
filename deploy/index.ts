@@ -282,6 +282,7 @@ export = async () => {
           engine: aws.rds.EngineType.AuroraPostgresql,
           engineVersion: voterClusterLatest.engineVersion,
         })
+        voterCluster = voterClusterLatest
       }
       break
     case 'preview':
