@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -8,9 +7,6 @@ import {
 import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
 import { PassThrough } from 'stream'
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const UTF8_BOM = '\uFEFF'
 
@@ -34,10 +30,6 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
     pollName: string,
     fileName: string,
   ): Promise<StreamableFile> {
-    if (!UUID_RE.test(pollId)) {
-      throw new BadRequestException('Invalid poll ID format')
-    }
-
     const client = await this.pool.connect()
 
     const sql = `COPY (

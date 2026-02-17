@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common'
 import { PassThrough, Readable } from 'stream'
 import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -60,26 +59,6 @@ describe('PollResponsesDownloadService', () => {
     const VALID_UUID = '01234567-89ab-cdef-0123-456789abcdef'
     const POLL_NAME = 'My Test Poll'
     const FILE_NAME = 'My Test Poll'
-
-    it('rejects invalid poll ID format', async () => {
-      await expect(
-        service.streamPollResponses('not-a-uuid', POLL_NAME, FILE_NAME),
-      ).rejects.toThrow(BadRequestException)
-
-      expect(mockPoolConnect).not.toHaveBeenCalled()
-    })
-
-    it('rejects poll ID with SQL injection attempt', async () => {
-      await expect(
-        service.streamPollResponses(
-          "'; DROP TABLE poll; --",
-          POLL_NAME,
-          FILE_NAME,
-        ),
-      ).rejects.toThrow(BadRequestException)
-
-      expect(mockPoolConnect).not.toHaveBeenCalled()
-    })
 
     it('returns a StreamableFile', async () => {
       const result = await service.streamPollResponses(
@@ -203,20 +182,6 @@ describe('PollResponsesDownloadService', () => {
 
       expect(destroySpy).toHaveBeenCalled()
       expect(mockRelease).toHaveBeenCalled()
-    })
-
-    it('accepts uppercase hex in UUID', async () => {
-      const uppercaseUuid = '01234567-89AB-CDEF-0123-456789ABCDEF'
-
-      const result = await service.streamPollResponses(
-        uppercaseUuid,
-        POLL_NAME,
-        FILE_NAME,
-      )
-      copyStream.end()
-
-      expect(result).toBeDefined()
-      expect(mockPoolConnect).toHaveBeenCalled()
     })
   })
 

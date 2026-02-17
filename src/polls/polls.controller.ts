@@ -44,6 +44,12 @@ class ListPollsQueryDTO extends createZodDto(
   }),
 ) {}
 
+class PollParamsDto extends createZodDto(
+  z.object({
+    pollId: z.string().uuid(),
+  }),
+) {}
+
 class PollImageUploadUrlDto extends createZodDto(
   z.object({
     fileName: z.string(),
@@ -195,7 +201,7 @@ export class PollsController {
   @Get('/:pollId/download-responses')
   @UseElectedOffice()
   async downloadPollResponses(
-    @Param('pollId') pollId: string,
+    @Param() { pollId }: PollParamsDto,
     @ReqElectedOffice() electedOffice: ElectedOffice,
   ) {
     const poll = await this.ensurePollAccess(pollId, electedOffice)
