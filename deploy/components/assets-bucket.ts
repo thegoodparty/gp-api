@@ -23,13 +23,14 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
     forceDestroy: false,
   })
 
-  // Enable public access blocks for ALL environments to prevent direct S3 access
-  // Access should only be allowed through CloudFront OAC
+  // Block public bucket policies but allow per-object ACLs for now.
+  // Legacy AwsS3Service sets ACL: public_read on uploads -- once that code is
+  // migrated to the new S3Service (no ACL), flip these back to true.
   new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
     bucket: bucket.id,
-    blockPublicAcls: true,
+    blockPublicAcls: false,
     blockPublicPolicy: true,
-    ignorePublicAcls: true,
+    ignorePublicAcls: false,
     restrictPublicBuckets: true,
   })
 
