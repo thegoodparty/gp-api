@@ -232,6 +232,7 @@ export = async () => {
   })
 
   let voterCluster: aws.rds.Cluster | aws.rds.GetClusterResult
+  let voterClusterLatest: aws.rds.Cluster | aws.rds.GetClusterResult
 
   switch (environment) {
     case 'dev':
@@ -270,7 +271,7 @@ export = async () => {
       })
 
       if (environment === 'prod') {
-        const voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
+        voterClusterLatest = new aws.rds.Cluster('voterClusterLatest', {
           ...voterDbBaseConfig,
           clusterIdentifier: 'gp-voter-db-20250728',
           finalSnapshotIdentifier: `gp-voter-db-${stage}-20250728-final-snapshot`,
@@ -355,9 +356,9 @@ export = async () => {
       DB_HOST: rdsCluster.endpoint,
       DB_USER: rdsCluster.masterUsername,
       DB_NAME: rdsCluster.databaseName,
-      VOTER_DB_HOST: voterCluster.endpoint,
-      VOTER_DB_USER: voterCluster.masterUsername,
-      VOTER_DB_NAME: voterCluster.databaseName,
+      VOTER_DB_HOST: voterClusterLatest.endpoint,
+      VOTER_DB_USER: voterClusterLatest.masterUsername,
+      VOTER_DB_NAME: voterClusterLatest.databaseName,
       ...(environment === 'preview'
         ? {
           IS_PREVIEW: 'true',
