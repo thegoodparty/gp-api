@@ -885,12 +885,22 @@ describe('PurchaseService', () => {
   })
 
   describe('completeFreePurchase', () => {
-    it('should execute post-purchase handler with server-validated campaignId', async () => {
-      // Arrange
+    const registerZeroAmountFreePurchaseHandlers = () => {
+      const mockHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
+
+      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
       service.registerCheckoutSessionPostPurchaseHandler(
         PurchaseType.TEXT,
         mockCheckoutSessionPostPurchaseHandler,
       )
+    }
+
+    it('should execute post-purchase handler with server-validated campaignId', async () => {
+      // Arrange
+      registerZeroAmountFreePurchaseHandlers()
 
       // Act
       const result = await service.completeFreePurchase({
@@ -929,24 +939,28 @@ describe('PurchaseService', () => {
       ).rejects.toThrow('Invalid purchase type: INVALID')
     })
 
-    it('should return empty result when no handler is registered', async () => {
-      // No handler registered
-      const result = await service.completeFreePurchase({
-        dto: {
-          purchaseType: PurchaseType.TEXT,
-          metadata: { contactCount: 100 },
-        },
-        campaign: mockCampaign,
-      })
-
-      expect(result).toEqual({})
+    it('should throw when no purchase handler is registered', async () => {
+      await expect(
+        service.completeFreePurchase({
+          dto: {
+            purchaseType: PurchaseType.TEXT,
+            metadata: { contactCount: 100 },
+          },
+          campaign: mockCampaign,
+        }),
+      ).rejects.toThrow('No handler found for purchase type: TEXT')
     })
 
     it('should propagate errors from post-purchase handler', async () => {
       // Arrange
+      const purchaseHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
       const failingHandler = vi
         .fn()
         .mockRejectedValue(new Error('Failed to redeem free texts'))
+      service.registerPurchaseHandler(PurchaseType.TEXT, purchaseHandler)
       service.registerCheckoutSessionPostPurchaseHandler(
         PurchaseType.TEXT,
         failingHandler,
@@ -966,10 +980,7 @@ describe('PurchaseService', () => {
 
     it('should work without a campaign (no campaignId merged)', async () => {
       // Arrange
-      service.registerCheckoutSessionPostPurchaseHandler(
-        PurchaseType.TEXT,
-        mockCheckoutSessionPostPurchaseHandler,
-      )
+      registerZeroAmountFreePurchaseHandlers()
 
       // Act
       await service.completeFreePurchase({
@@ -988,6 +999,34 @@ describe('PurchaseService', () => {
           purchaseType: PurchaseType.TEXT,
         }),
       )
+    })
+
+    it('should reject free completion when calculated amount is greater than 0', async () => {
+      // Arrange
+      const nonFreeHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(1234),
+      }
+      service.registerPurchaseHandler(PurchaseType.TEXT, nonFreeHandler)
+      service.registerCheckoutSessionPostPurchaseHandler(
+        PurchaseType.TEXT,
+        mockCheckoutSessionPostPurchaseHandler,
+      )
+
+      // Act & Assert
+      await expect(
+        service.completeFreePurchase({
+          dto: {
+            purchaseType: PurchaseType.TEXT,
+            metadata: { contactCount: 6000, outreachType: 'p2p' },
+          },
+          campaign: mockCampaign,
+        }),
+      ).rejects.toThrow(
+        'Free purchase completion is only allowed for zero-amount purchases. Calculated amount: 1234',
+      )
+
+      expect(mockCheckoutSessionPostPurchaseHandler).not.toHaveBeenCalled()
     })
   })
 })

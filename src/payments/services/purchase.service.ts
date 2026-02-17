@@ -389,24 +389,50 @@ export class PurchaseService {
       throw new Error(`Invalid purchase type: ${purchaseType}`)
     }
 
-    const postPurchaseHandler =
-      this.checkoutSessionPostPurchaseHandlers.get(purchaseType)
-    if (postPurchaseHandler) {
-      const freeSessionId = `free_confirmed_${Date.now()}`
-      const result = await postPurchaseHandler(freeSessionId, {
-        ...(dto.metadata as Record<string, unknown>),
-        ...(campaign?.id ? { campaignId: campaign.id } : {}),
-        purchaseType,
-      })
-
-      this.logger.log(
-        `Free purchase completed for type ${purchaseType}, campaign ${campaign?.id}`,
-      )
-
-      return { result }
+    const purchaseHandler = this.handlers.get(purchaseType)
+    if (!purchaseHandler) {
+      throw new Error(`No handler found for purchase type: ${purchaseType}`)
     }
 
-    return {}
+    const postPurchaseHandler =
+      this.checkoutSessionPostPurchaseHandlers.get(purchaseType)
+    if (!postPurchaseHandler) {
+      throw new Error(
+        `No checkout session post-purchase handler found for purchase type: ${purchaseType}`,
+      )
+    }
+
+    const mergedMetadata = {
+      ...(dto.metadata as Record<string, unknown>),
+      ...(campaign?.id ? { campaignId: campaign.id } : {}),
+    }
+
+    const existingPayment =
+      await purchaseHandler.validatePurchase(mergedMetadata)
+    if (existingPayment) {
+      throw new Error(
+        'This purchase has already been completed. Please refresh the page.',
+      )
+    }
+
+    const amount = await purchaseHandler.calculateAmount(mergedMetadata)
+    if (amount !== 0) {
+      throw new Error(
+        `Free purchase completion is only allowed for zero-amount purchases. Calculated amount: ${amount}`,
+      )
+    }
+
+    const freeSessionId = `free_confirmed_${Date.now()}`
+    const result = await postPurchaseHandler(freeSessionId, {
+      ...mergedMetadata,
+      purchaseType,
+    })
+
+    this.logger.log(
+      `Free purchase completed for type ${purchaseType}, campaign ${campaign?.id}`,
+    )
+
+    return { result }
   }
 
   private getPaymentType(purchaseType: PurchaseType): PaymentType {
