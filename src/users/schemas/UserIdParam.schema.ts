@@ -1,8 +1,1 @@
-import { createZodDto } from 'nestjs-zod'
-import { z } from 'zod'
-
-const userIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-})
-
-export class UserIdParamSchema extends createZodDto(userIdParamSchema) {}
+export { IdParamSchema as UserIdParamSchema } from 'src/shared/schemas/IdParam.schema'

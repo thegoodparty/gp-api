@@ -119,7 +119,7 @@ export function getBasicEmailContent(msg = '', subject = '') {
             <br />
                 <img
                   style="margin: 0 auto"
-                  src="https://s3.us-west-2.amazonaws.com/assets.goodparty.org/logo-hologram.png"
+                  src="https://assets.goodparty.org/logo-hologram.png"
                 />
             </td>
           </tr>

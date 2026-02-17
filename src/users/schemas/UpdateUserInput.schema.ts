@@ -1,4 +1,5 @@
 import { CreateUserInputSchema } from './CreateUserInput.schema'
+import { UserMetaDataSchema } from './UserMetaData.schema'
 import { createZodDto } from 'nestjs-zod'
 
 export class UpdateUserInputSchema extends createZodDto(
@@ -6,5 +7,7 @@ export class UpdateUserInputSchema extends createZodDto(
 ) {}
 
 export class UpdateUserAdminInputSchema extends createZodDto(
-  CreateUserInputSchema.omit({ password: true }).partial(),
+  CreateUserInputSchema.omit({ password: true }).partial().extend({
+    metaData: UserMetaDataSchema,
+  }),
 ) {}
