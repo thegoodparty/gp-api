@@ -79,7 +79,6 @@ User (1:many)
         └── voterFileFilters (1:many) — shared feature
 ```
 
-/
 Organizations follow these **key design rules**:
 
 - An Organization has _exactly one "child"_: either a Campaign or an ElectedOffice, never both.
