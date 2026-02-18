@@ -391,7 +391,7 @@ export class PurchaseService {
     campaign?: Campaign
     user: User
     // TODO: Replace `unknown` with discriminated union return type
-    //  https://app.clickup.com/t/86afh3j9d
+    //  https://app.clickup.com/t/90132012119/ENG-6654
   }): Promise<{ result?: unknown }> {
     const { purchaseType } = dto
 
