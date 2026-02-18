@@ -1,9 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import {
   CheckoutSessionPostPurchaseHandler,
   CompletePurchaseDto,
   CompleteCheckoutSessionDto,
+  CompleteFreePurchaseDto,
   CreateCheckoutSessionDto,
   CreatePurchaseIntentDto,
   PostPurchaseHandler,
@@ -133,25 +140,15 @@ export class PurchaseService {
 
     // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
     // Stripe doesn't need a real Checkout Session for $0
-    // Immediately execute post-purchase handlers (e.g., redeem free texts offer)
+    // Do NOT execute post-purchase handlers here — the user hasn't confirmed yet.
+    // Post-purchase (e.g., redeeming free texts) is deferred to completeFreePurchase(),
+    // which the frontend calls when the user explicitly clicks "Schedule text".
     if (amount === 0) {
       const freeSessionId = `free_${Date.now()}_${user.id}`
 
       this.logger.log(
-        `Zero-amount checkout for user ${user.id}, type ${dto.type} - skipping Stripe`,
+        `Zero-amount checkout for user ${user.id}, type ${dto.type} - skipping Stripe, deferring post-purchase until user confirmation`,
       )
-
-      const postPurchaseHandler = this.checkoutSessionPostPurchaseHandlers.get(
-        dto.type,
-      )
-      if (postPurchaseHandler) {
-        await postPurchaseHandler(freeSessionId, {
-          ...(dto.metadata as Record<string, unknown>),
-          ...(campaign?.id ? { campaignId: campaign.id } : {}),
-          userId: String(user.id),
-          purchaseType: dto.type,
-        })
-      }
 
       return {
         id: freeSessionId,
@@ -313,24 +310,16 @@ export class PurchaseService {
     const amount = await handler.calculateAmount(mergedMetadata)
 
     // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
-    // Stripe rejects PaymentIntents with $0 so we our own response
-    // and immediately execute post-purchase handlers (e.g., redeem free texts offer)
+    // Stripe rejects PaymentIntents with $0 so we return our own response.
+    // Do NOT execute post-purchase handlers here — the user hasn't confirmed yet.
+    // Post-purchase (e.g., redeeming free texts) is deferred to completeFreePurchase(),
+    // which the frontend calls when the user explicitly confirms.
     if (amount === 0) {
       const freePaymentId = `free_${Date.now()}_${user.id}`
 
       this.logger.log(
-        `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe`,
+        `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe, deferring post-purchase until user confirmation`,
       )
-
-      const postPurchaseHandler = this.postPurchaseHandlers.get(dto.type)
-      if (postPurchaseHandler) {
-        await postPurchaseHandler(freePaymentId, {
-          ...(dto.metadata as Record<string, unknown>),
-          ...(campaign?.id ? { campaignId: campaign.id } : {}),
-          userId: String(user.id),
-          purchaseType: dto.type,
-        })
-      }
 
       return {
         id: freePaymentId,
@@ -383,6 +372,80 @@ export class PurchaseService {
       dto.paymentIntentId,
       paymentIntent.metadata,
     )
+  }
+
+  /**
+   * Completes a zero-amount (free) purchase by executing the post-purchase handler.
+   * This is called when the user explicitly confirms a free purchase (e.g., clicks
+   * "Schedule text" after the free texts offer covers the entire cost).
+   *
+   * The post-purchase handler is idempotent — redeemFreeTexts uses an atomic
+   * updateMany with hasFreeTextsOffer: true as a guard, so duplicate calls are safe.
+   */
+  async completeFreePurchase({
+    dto,
+    campaign,
+    user,
+  }: {
+    dto: CompleteFreePurchaseDto
+    campaign?: Campaign
+    user: User
+    // TODO: Replace `unknown` with discriminated union return type
+    //  https://app.clickup.com/t/90132012119/ENG-6654
+  }): Promise<{ result?: unknown }> {
+    const { purchaseType } = dto
+
+    if (!Object.values(PurchaseType).includes(purchaseType)) {
+      throw new BadRequestException(`Invalid purchase type: ${purchaseType}`)
+    }
+
+    const purchaseHandler = this.handlers.get(purchaseType)
+    if (!purchaseHandler) {
+      throw new InternalServerErrorException(
+        `No handler found for purchase type: ${purchaseType}`,
+      )
+    }
+
+    const postPurchaseHandler =
+      this.checkoutSessionPostPurchaseHandlers.get(purchaseType)
+    if (!postPurchaseHandler) {
+      throw new InternalServerErrorException(
+        `No checkout session post-purchase handler found for purchase type: ${purchaseType}`,
+      )
+    }
+
+    const mergedMetadata = {
+      ...dto.metadata,
+      ...(campaign?.id ? { campaignId: campaign.id } : {}),
+      userId: String(user.id),
+    }
+
+    const existingPayment =
+      await purchaseHandler.validatePurchase(mergedMetadata)
+    if (existingPayment) {
+      throw new ConflictException(
+        'This purchase has already been completed. Please refresh the page.',
+      )
+    }
+
+    const amount = await purchaseHandler.calculateAmount(mergedMetadata)
+    if (amount !== 0) {
+      throw new BadRequestException(
+        `Free purchase completion is only allowed for zero-amount purchases. Calculated amount: ${amount}`,
+      )
+    }
+
+    const freeSessionId = `free_confirmed_${Date.now()}`
+    const result = await postPurchaseHandler(freeSessionId, {
+      ...mergedMetadata,
+      purchaseType,
+    })
+
+    this.logger.log(
+      `Free purchase completed for type ${purchaseType}, campaign ${campaign?.id}`,
+    )
+
+    return { result }
   }
 
   private getPaymentType(purchaseType: PurchaseType): PaymentType {
