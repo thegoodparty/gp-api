@@ -908,7 +908,9 @@ describe('PurchaseService', () => {
           purchaseType: PurchaseType.TEXT,
           metadata: {
             contactCount: 298,
+            pricePerContact: 3.5,
             outreachType: 'p2p',
+            audienceSize: 500,
           },
         },
         campaign: mockCampaign,
@@ -947,7 +949,12 @@ describe('PurchaseService', () => {
         service.completeFreePurchase({
           dto: {
             purchaseType: PurchaseType.TEXT,
-            metadata: { contactCount: 100 },
+            metadata: {
+              contactCount: 100,
+              pricePerContact: 3.5,
+              outreachType: 'p2p',
+              audienceSize: 200,
+            },
           },
           campaign: mockCampaign,
           user: mockUser,
@@ -975,7 +982,12 @@ describe('PurchaseService', () => {
         service.completeFreePurchase({
           dto: {
             purchaseType: PurchaseType.TEXT,
-            metadata: { contactCount: 100 },
+            metadata: {
+              contactCount: 100,
+              pricePerContact: 3.5,
+              outreachType: 'p2p',
+              audienceSize: 200,
+            },
           },
           campaign: mockCampaign,
           user: mockUser,
@@ -991,7 +1003,12 @@ describe('PurchaseService', () => {
       await service.completeFreePurchase({
         dto: {
           purchaseType: PurchaseType.TEXT,
-          metadata: { contactCount: 50 },
+          metadata: {
+            contactCount: 50,
+            pricePerContact: 3.5,
+            outreachType: 'p2p',
+            audienceSize: 100,
+          },
         },
         // No campaign provided
         user: mockUser,
@@ -1025,7 +1042,12 @@ describe('PurchaseService', () => {
         service.completeFreePurchase({
           dto: {
             purchaseType: PurchaseType.TEXT,
-            metadata: { contactCount: 6000, outreachType: 'p2p' },
+            metadata: {
+              contactCount: 6000,
+              pricePerContact: 3.5,
+              outreachType: 'p2p',
+              audienceSize: 10000,
+            },
           },
           campaign: mockCampaign,
           user: mockUser,

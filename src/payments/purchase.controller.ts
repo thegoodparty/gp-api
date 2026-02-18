@@ -141,7 +141,7 @@ export class PurchaseController {
   @UseCampaign()
   async completeFreePurchase(
     @ReqUser() user: User,
-    @Body() dto: CompleteFreePurchaseDto<unknown>,
+    @Body() dto: CompleteFreePurchaseDto,
     @ReqCampaign() campaign?: Campaign,
   ) {
     try {

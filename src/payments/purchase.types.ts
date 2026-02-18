@@ -1,3 +1,5 @@
+import type { OutreachPurchaseMetadata } from '../outreach/types/outreach.types'
+import type { DomainPurchaseMetadata } from '../websites/domains.types'
 import Stripe from 'stripe'
 export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
@@ -28,9 +30,14 @@ export interface CompleteCheckoutSessionDto {
   checkoutSessionId: string
 }
 
-export interface CompleteFreePurchaseDto<Metadata> {
+export type FreePurchaseMetadata =
+  | OutreachPurchaseMetadata
+  | DomainPurchaseMetadata
+  | BasePurchaseMetadata
+
+export interface CompleteFreePurchaseDto {
   purchaseType: PurchaseType
-  metadata: Metadata
+  metadata: FreePurchaseMetadata
 }
 
 export type PostPurchaseHandler<Metadata> = (

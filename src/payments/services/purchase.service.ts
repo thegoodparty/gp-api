@@ -387,7 +387,7 @@ export class PurchaseService {
     campaign,
     user,
   }: {
-    dto: CompleteFreePurchaseDto<unknown>
+    dto: CompleteFreePurchaseDto
     campaign?: Campaign
     user: User
   }): Promise<{ result?: unknown }> {
@@ -413,7 +413,7 @@ export class PurchaseService {
     }
 
     const mergedMetadata = {
-      ...(dto.metadata as Record<string, unknown>),
+      ...dto.metadata,
       ...(campaign?.id ? { campaignId: campaign.id } : {}),
       userId: String(user.id),
     }
