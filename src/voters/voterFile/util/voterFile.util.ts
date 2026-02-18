@@ -253,15 +253,17 @@ export function typeToQuery(
     }
   }
 
-  return `SELECT ${justCount ? 'COUNT(*)' : columns} FROM public."Voter${state}" ${nestedWhereClause} ${whereClause !== ''
+  return `SELECT ${justCount ? 'COUNT(*)' : columns} FROM public."Voter${state}" ${nestedWhereClause} ${
+    whereClause !== ''
       ? `WHERE ${whereClause} ${limit ? `LIMIT ${limit}` : ''}`
       : ''
-    }`
+  }`
 }
 
 function extractLocation(input: string, fixColumns?: boolean) {
   logger.debug(
-    `Extracting location from: ${input} ${fixColumns ? '- with fixColumns' : ''
+    `Extracting location from: ${input} ${
+      fixColumns ? '- with fixColumns' : ''
     }`,
   )
   // ## denotes the old raw values coming from L2. If that's not present, we
