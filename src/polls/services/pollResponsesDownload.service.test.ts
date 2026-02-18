@@ -121,6 +121,7 @@ describe('PollResponsesDownloadService', () => {
       expect(sql).toContain("string_agg(DISTINCT pi.title, '; '")
       expect(sql).toContain('ORDER BY pi.title')
       expect(sql).toContain('_PollIndividualMessageToPollIssue')
+      expect(sql).toContain('is_opt_out')
     })
 
     it('pipes COPY stream data after the poll name line', async () => {

@@ -46,6 +46,7 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
         ) AS associated_clusters
       FROM poll_individual_message pim
       WHERE pim.poll_id = '${pollId}'
+        AND (pim.is_opt_out IS NULL OR pim.is_opt_out = false)
       ORDER BY pim.sent_at
     ) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)`
 
