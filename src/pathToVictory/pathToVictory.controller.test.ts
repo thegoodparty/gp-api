@@ -1,9 +1,8 @@
-import { BadGatewayException, NotFoundException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
 import { PathToVictory } from '@prisma/client'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PathToVictoryController } from './pathToVictory.controller'
-import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
 
 const CREATED_AT = '2025-01-01'
@@ -36,7 +35,6 @@ const mockP2V2: PathToVictory = {
 describe('PathToVictoryController', () => {
   let controller: PathToVictoryController
   let pathToVictoryService: PathToVictoryService
-  let enqueueService: EnqueuePathToVictoryService
 
   beforeEach(() => {
     const pathToVictoryServiceMock: Partial<PathToVictoryService> = {
@@ -46,15 +44,7 @@ describe('PathToVictoryController', () => {
     }
     pathToVictoryService = pathToVictoryServiceMock as PathToVictoryService
 
-    const enqueueServiceMock: Partial<EnqueuePathToVictoryService> = {
-      enqueuePathToVictory: vi.fn(),
-    }
-    enqueueService = enqueueServiceMock as EnqueuePathToVictoryService
-
-    controller = new PathToVictoryController(
-      enqueueService,
-      pathToVictoryService,
-    )
+    controller = new PathToVictoryController(pathToVictoryService)
   })
 
   describe('list', () => {
@@ -245,64 +235,6 @@ describe('PathToVictoryController', () => {
 
       await expect(controller.update({ id: 10 }, { data: {} })).rejects.toThrow(
         'DB error',
-      )
-    })
-  })
-
-  describe('enqueuePathToVictory', () => {
-    it('returns success message on successful enqueue', async () => {
-      vi.spyOn(enqueueService, 'enqueuePathToVictory').mockResolvedValue({
-        message: 'ok',
-      })
-
-      const result = await controller.enqueuePathToVictory(100)
-
-      expect(enqueueService.enqueuePathToVictory).toHaveBeenCalledWith(100)
-      expect(result).toEqual({
-        success: true,
-        message:
-          'Path to victory calculation for campaign 100 has been enqueued successfully',
-      })
-    })
-
-    it('re-throws HttpException as-is', async () => {
-      const httpError = new NotFoundException('Campaign not found')
-      vi.spyOn(enqueueService, 'enqueuePathToVictory').mockRejectedValue(
-        httpError,
-      )
-
-      await expect(controller.enqueuePathToVictory(100)).rejects.toThrow(
-        NotFoundException,
-      )
-    })
-
-    it('wraps generic Error in BadGatewayException', async () => {
-      vi.spyOn(enqueueService, 'enqueuePathToVictory').mockRejectedValue(
-        new Error('SQS timeout'),
-      )
-
-      await expect(controller.enqueuePathToVictory(100)).rejects.toThrow(
-        BadGatewayException,
-      )
-    })
-
-    it('uses error message in BadGatewayException', async () => {
-      vi.spyOn(enqueueService, 'enqueuePathToVictory').mockRejectedValue(
-        new Error('Queue unavailable'),
-      )
-
-      await expect(controller.enqueuePathToVictory(100)).rejects.toThrow(
-        'Queue unavailable',
-      )
-    })
-
-    it('uses fallback message when error has no message', async () => {
-      vi.spyOn(enqueueService, 'enqueuePathToVictory').mockRejectedValue(
-        new Error(''),
-      )
-
-      await expect(controller.enqueuePathToVictory(100)).rejects.toThrow(
-        BadGatewayException,
       )
     })
   })
