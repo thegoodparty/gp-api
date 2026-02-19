@@ -685,6 +685,32 @@ describe('CampaignsController', () => {
     })
   })
 
+  describe('findById (M2M GET :id)', () => {
+    it('returns campaign parsed through ReadCampaignOutputSchema', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
+        mockCampaign,
+      )
+
+      const result = await controller.findById({ id: mockCampaign.id })
+
+      expect(campaignsService.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: mockCampaign.id },
+      })
+      expect(result).toHaveProperty('id', mockCampaign.id)
+      expect(result).not.toHaveProperty('vendorTsData')
+    })
+
+    it('throws when campaign does not exist', async () => {
+      vi.spyOn(campaignsService, 'findUniqueOrThrow').mockRejectedValue(
+        new NotFoundException(),
+      )
+
+      await expect(controller.findById({ id: 999 })).rejects.toThrow(
+        NotFoundException,
+      )
+    })
+  })
+
   describe('updateCampaign (M2M PUT :id)', () => {
     const parsedCampaign = {
       ...mockCampaign,
