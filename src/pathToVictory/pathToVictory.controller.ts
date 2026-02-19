@@ -12,12 +12,13 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { UserRole } from '@prisma/client'
+import { PathToVictory, UserRole } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import type { PaginatedResults } from '@/shared/types/utility.types'
 import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
 import { ListPathToVictoryPaginationSchema } from './schemas/ListPathToVictoryPagination.schema'
 import { PathToVictorySchema } from './schemas/PathToVictory.schema'
@@ -36,7 +37,8 @@ export class PathToVictoryController {
   @UseGuards(M2MOnly)
   @Get('list')
   async list(@Query() query: ListPathToVictoryPaginationSchema) {
-    const { data, meta } =
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- IDE-only false positive: resolves correctly via tsc/eslint CLI
+    const { data, meta }: PaginatedResults<PathToVictory> =
       await this.pathToVictoryService.listPathToVictories(query)
     return {
       data: data.map((p2v) => PathToVictorySchema.parse(p2v)),
