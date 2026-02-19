@@ -32,6 +32,7 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
   ): Promise<StreamableFile> {
     const client = await this.pool.connect()
 
+    const escapedPollId = client.escapeLiteral(pollId)
     const sql = `COPY (
       SELECT
         pim.content AS message_content,
@@ -45,7 +46,7 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
           ''
         ) AS associated_clusters
       FROM poll_individual_message pim
-      WHERE pim.poll_id = '${pollId}'
+      WHERE pim.poll_id = ${escapedPollId}
         AND (pim.is_opt_out IS NULL OR pim.is_opt_out = false)
       ORDER BY pim.sent_at
     ) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)`
