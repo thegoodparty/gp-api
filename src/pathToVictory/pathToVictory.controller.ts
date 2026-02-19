@@ -1,51 +1,68 @@
 import {
+  Body,
   Controller,
   Get,
-  Param,
   Logger,
-  BadGatewayException,
-  HttpException,
-  ParseIntPipe,
+  Param,
+  Put,
+  Query,
+  UseGuards,
+  UsePipes,
 } from '@nestjs/common'
-import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
-import { Roles } from '../authentication/decorators/Roles.decorator'
-import { UserRole } from '@prisma/client'
+import { PathToVictory } from '@prisma/client'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { PathToVictoryService } from './services/pathToVictory.service'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import type { PaginatedResults } from '@/shared/types/utility.types'
+import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
+import { ListPathToVictoryPaginationSchema } from './schemas/ListPathToVictoryPagination.schema'
+import { PathToVictorySchema } from './schemas/PathToVictory.schema'
+import { UpdatePathToVictoryM2MSchema } from './schemas/UpdatePathToVictoryM2M.schema'
 
 @Controller('path-to-victory')
-@Roles(UserRole.admin)
+@UseGuards(M2MOnly)
+@UsePipes(ZodValidationPipe)
 export class PathToVictoryController {
   private readonly logger = new Logger(PathToVictoryController.name)
 
-  constructor(
-    private readonly enqueuePathToVictoryService: EnqueuePathToVictoryService,
-  ) {}
+  constructor(private readonly pathToVictoryService: PathToVictoryService) {}
 
-  @Get(':campaignId')
-  async enqueuePathToVictory(
-    @Param('campaignId', ParseIntPipe) campaignId: number,
-  ) {
-    try {
-      await this.enqueuePathToVictoryService.enqueuePathToVictory(campaignId)
-      return {
-        success: true,
-        message: `Path to victory calculation for campaign ${campaignId} has been enqueued successfully`,
-      }
-    } catch (e) {
-      if (e instanceof Error) {
-        this.logger.error(
-          `Error at PathToVictoryController enqueuePathToVictory. e.message: ${e.message}`,
-          e.stack,
-        )
-
-        if (e instanceof HttpException) {
-          throw e
-        }
-
-        throw new BadGatewayException(
-          e.message ||
-            `Error occurred while enqueuing path to victory for campaign ${campaignId}`,
-        )
-      }
+  @Get('list')
+  async list(@Query() query: ListPathToVictoryPaginationSchema) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- IDE-only false positive: resolves correctly via tsc/eslint CLI
+    const { data, meta }: PaginatedResults<PathToVictory> =
+      await this.pathToVictoryService.listPathToVictories(query)
+    return {
+      data: data.map((p2v) => PathToVictorySchema.parse(p2v)),
+      meta,
     }
+  }
+
+  @Get(':id')
+  async getById(@Param() { id }: IdParamSchema) {
+    const p2v = await this.pathToVictoryService.findUniqueOrThrow({
+      where: { id },
+    })
+    return PathToVictorySchema.parse(p2v)
+  }
+
+  @Put(':id')
+  async update(
+    @Param() { id }: IdParamSchema,
+    @Body() body: UpdatePathToVictoryM2MSchema,
+  ) {
+    const existing = await this.pathToVictoryService.findUniqueOrThrow({
+      where: { id },
+    })
+
+    const mergedData = deepMerge((existing.data as object) || {}, body.data)
+
+    const updated = await this.pathToVictoryService.update({
+      where: { id },
+      data: { data: mergedData },
+    })
+
+    return PathToVictorySchema.parse(updated)
   }
 }

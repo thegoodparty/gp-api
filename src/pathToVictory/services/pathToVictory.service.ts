@@ -6,6 +6,13 @@ import { CampaignCreatedBy, ElectionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
 import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
+import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+} from 'src/shared/constants/paginationOptions.consts'
+import { PaginatedResults } from 'src/shared/types/utility.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -21,6 +28,7 @@ import {
   PathToVictoryInput,
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
+import { ListPathToVictoryPaginationSchema } from '../schemas/ListPathToVictoryPagination.schema'
 import { OfficeMatchService } from './officeMatch.service'
 
 enum SpecialOfficePhrase {
@@ -97,6 +105,34 @@ export class PathToVictoryService extends createPrismaBase(
     args: Prisma.SelectSubset<T, Prisma.PathToVictoryUpdateArgs>,
   ): Promise<Prisma.PathToVictoryGetPayload<T>> {
     return this.model.update(args)
+  }
+
+  async listPathToVictories({
+    offset: skip = DEFAULT_PAGINATION_OFFSET,
+    limit = DEFAULT_PAGINATION_LIMIT,
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
+    userId,
+  }: ListPathToVictoryPaginationSchema): Promise<
+    PaginatedResults<PathToVictory>
+  > {
+    const where: Prisma.PathToVictoryWhereInput = {
+      ...(userId ? { campaign: { userId } } : {}),
+    }
+
+    return {
+      data: await this.model.findMany({
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        where,
+      }),
+      meta: {
+        total: await this.model.count({ where }),
+        offset: skip,
+        limit,
+      },
+    }
   }
 
   async handlePathToVictory(input: PathToVictoryInput): Promise<{
