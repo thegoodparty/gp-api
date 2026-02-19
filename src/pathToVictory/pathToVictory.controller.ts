@@ -13,6 +13,7 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { PathToVictory, UserRole } from '@prisma/client'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
@@ -61,14 +62,15 @@ export class PathToVictoryController {
     @Param() { id }: IdParamSchema,
     @Body() body: UpdatePathToVictoryM2MSchema,
   ) {
-    await this.pathToVictoryService.findUniqueOrThrow({
+    const existing = await this.pathToVictoryService.findUniqueOrThrow({
       where: { id },
-      select: { id: true },
     })
+
+    const mergedData = deepMerge((existing.data as object) || {}, body.data)
 
     const updated = await this.pathToVictoryService.update({
       where: { id },
-      data: { data: body.data },
+      data: { data: mergedData },
     })
 
     return PathToVictorySchema.parse(updated)

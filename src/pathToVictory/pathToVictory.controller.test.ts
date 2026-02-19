@@ -161,13 +161,16 @@ describe('PathToVictoryController', () => {
   })
 
   describe('update', () => {
-    it('verifies record exists then updates and returns parsed result', async () => {
+    it('deep merges incoming data with existing record', async () => {
       vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
         mockP2V,
       )
       const updatedP2V = {
         ...mockP2V,
-        data: { ...mockP2V.data, projectedTurnout: 1000 },
+        data: {
+          ...(mockP2V.data as object),
+          projectedTurnout: 1000,
+        },
       }
       vi.spyOn(pathToVictoryService, 'update').mockResolvedValue(updatedP2V)
 
@@ -176,14 +179,49 @@ describe('PathToVictoryController', () => {
 
       expect(pathToVictoryService.findUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: 10 },
-        select: { id: true },
       })
       expect(pathToVictoryService.update).toHaveBeenCalledWith({
         where: { id: 10 },
-        data: { data: body.data },
+        data: {
+          data: {
+            p2vStatus: P2VStatus.waiting,
+            electionType: 'State_House',
+            electionLocation: 'STATE HOUSE 005',
+            projectedTurnout: 1000,
+          },
+        },
       })
       expect(result).toHaveProperty('id', 10)
       expect(result).toHaveProperty('data')
+    })
+
+    it('preserves all existing fields when updating a single field', async () => {
+      vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
+        mockP2V2,
+      )
+      const updatedP2V = {
+        ...mockP2V2,
+        data: {
+          ...(mockP2V2.data as object),
+          winNumber: 300,
+        },
+      }
+      vi.spyOn(pathToVictoryService, 'update').mockResolvedValue(updatedP2V)
+
+      await controller.update({ id: 11 }, { data: { winNumber: 300 } })
+
+      expect(pathToVictoryService.update).toHaveBeenCalledWith({
+        where: { id: 11 },
+        data: {
+          data: {
+            p2vStatus: P2VStatus.complete,
+            electionType: 'City_Council',
+            electionLocation: 'WARD 3',
+            projectedTurnout: 500,
+            winNumber: 300,
+          },
+        },
+      })
     })
 
     it('throws when record does not exist', async () => {
