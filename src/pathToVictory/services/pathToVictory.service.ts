@@ -9,6 +9,8 @@ import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
@@ -108,8 +110,8 @@ export class PathToVictoryService extends createPrismaBase(
   async listPathToVictories({
     offset: skip = DEFAULT_PAGINATION_OFFSET,
     limit = DEFAULT_PAGINATION_LIMIT,
-    sortBy = 'createdAt',
-    sortOrder = 'desc',
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
     userId,
   }: ListPathToVictoryPaginationSchema): Promise<
     PaginatedResults<PathToVictory>
