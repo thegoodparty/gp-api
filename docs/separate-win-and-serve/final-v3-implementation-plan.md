@@ -1,40 +1,44 @@
 There are several key milestones in the proposed implementation path of these changes. Overall, this proposed path optimizes for minimizing breaking changes and sensitive deploys as much as possible.
 
-> **Naming note:** The codebase already has a `Position` model (campaign issue stances). The new table proposed here — representing a BallotReady political office and its L2 district links — will use the name `BallotPosition` to avoid collision.
+> **Position table note:** The Position table already exists in `election-api` and is owned by the Data team. It holds BallotReady position identity and links to District (which has L2 data). We reference it by storing Position's UUID `id` on Campaign and ElectedOffice as an indexed string column (cross-database, no FK).
 
 > **Clerk dependency note:** Phases 1–3 have no dependency on the Clerk migration. Phase 4 is the Clerk switchover, which can happen whenever the Clerk migration team enables Organizations.
 
-#### **Phase 1: BallotPosition table, Organization table, write paths, and backfill**
+#### **Phase 1: Position links, Organization table, write paths, and backfill**
 
 _Schema_
 
-1. Create the `BallotPosition` table, keyed by BallotReady `positionId` (String PK). Columns: `office`, `ballotLevel`, `level`, `state`, `county`, `city`, `district`, `zip`, `l2DistrictId`, `l2DistrictType`, `l2DistrictName`.
-2. Create the `Organization` table with `id` (UUID PK), `ownerId` (FK to User), `type` (enum: `CAMPAIGN` | `ELECTED_OFFICE`).
-3. Add nullable `positionId` FK on Campaign pointing to `BallotPosition`.
-4. Add nullable `positionId` FK on ElectedOffice pointing to `BallotPosition`.
-5. Add nullable `organizationId` String column (indexed, **no FK**) on Campaign.
-6. Add nullable `organizationId` String column (indexed, **no FK**) on ElectedOffice.
-7. Add `districtManuallySet` Boolean column to ElectedOffice.
+1. Create the `Organization` table with `id` (UUID PK), `ownerId` (FK to User), `type` (enum: `CAMPAIGN` | `ELECTED_OFFICE`).
+2. Add nullable `positionId` String column (indexed, **no FK** — cross-database reference to `election-api` Position.id) on Campaign.
+3. Add nullable `positionId` String column (indexed, **no FK**) on ElectedOffice.
+4. Add nullable `organizationId` String column (indexed, **no FK**) on Campaign.
+5. Add nullable `organizationId` String column (indexed, **no FK**) on ElectedOffice.
+6. Add nullable `overrideDistrictId` String column on Campaign (cross-database reference to `election-api` District.id). When set, overrides the district linked via Position.
+7. Add nullable `overrideDistrictId` String column on ElectedOffice (same as above).
 
-_Write paths (double-write)_
+_Data team coordination_
 
-8. Update the "I won" modal (+ `POST /elected-office`) to:
+8. Coordinate with the Data team to add `name` and `normalizedName` fields to the Position table in `election-api`. These are sourced from BallotReady and needed for display in the product switcher and admin UI.
+
+_Write paths_
+
+9. Update the "I won" modal (+ `POST /elected-office`) to:
    - Create an Organization (type: `ELECTED_OFFICE`) for the new ElectedOffice, storing the UUID as `organizationId` on the ElectedOffice.
-   - Upsert a `BallotPosition` record and set `positionId` on the new ElectedOffice.
+   - Look up the corresponding Position record (by BallotReady position ID) and store Position.id as `positionId` on the new ElectedOffice.
    - For now, still also set `campaignId` on the new ElectedOffice.
-9. Update Campaign creation flows to create an Organization (type: `CAMPAIGN`) and store the UUID as `organizationId` on the Campaign.
-10. Update existing office + district selection mechanisms to **double-write** the associated BR+L2 data to both the existing locations (Campaign `data` JSON / PathToVictory `data` JSON) _and_ the `BallotPosition` table:
+10. Update Campaign creation flows to create an Organization (type: `CAMPAIGN`) and store the UUID as `organizationId` on the Campaign.
+11. Update existing office + district selection mechanisms to **double-write**: continue writing BR+L2 data to the existing locations (Campaign `data` JSON / PathToVictory `data` JSON) _and_ set `positionId` (and `overrideDistrictId` when applicable) on Campaign/ElectedOffice:
     - In-Product Office Picker
     - Admin UI District Picker
     - Office selection API endpoint
 
 _Backfill_
 
-11. Backfill `BallotPosition` records from existing Campaign + PathToVictory data. Populate `positionId` on Campaign and ElectedOffice.
-12. Backfill `Organization` records for all existing Campaigns (type: `CAMPAIGN`) and ElectedOffices (type: `ELECTED_OFFICE`). Populate `organizationId` on each.
-13. Make `positionId` and `organizationId` non-nullable on Campaign and ElectedOffice.
+12. Backfill `positionId` on Campaign and ElectedOffice by matching existing BR data (from Campaign `data` JSON / PathToVictory `data` JSON) to Position records in `election-api`. Where the existing district differs from the Position's default district, set `overrideDistrictId`.
+13. Backfill `Organization` records for all existing Campaigns (type: `CAMPAIGN`) and ElectedOffices (type: `ELECTED_OFFICE`). Populate `organizationId` on each.
+14. Make `positionId` and `organizationId` non-nullable on Campaign and ElectedOffice.
 
-**Value Delivered:** BallotPosition table is established as the source-of-truth for BR+L2 fields. Every Campaign and ElectedOffice has an Organization. No Clerk dependency for any of this work.
+**Value Delivered:** Every Campaign and ElectedOffice links to a Position and has an Organization. No Clerk dependency for any of this work.
 
 #### **Phase 2: Product switcher, shared features, and read-path migration**
 
@@ -44,9 +48,9 @@ _Product Switcher + Org Context_
 2. Implement the visual product switcher UI in `gp-webapp`, powered by `GET /organizations`. Store the active Organization ID in app state and attach `X-Organization-Id: <uuid>` to every API request via the centralized API client.
 3. Create `@UseOrganization()` guard and `@ReqOrganization()` decorator on the backend. The guard reads `X-Organization-Id` from the request header, verifies the Organization belongs to the authenticated user (query by id + ownerId), and attaches the `organizationId` to `request.organizationId`.
 
-_Migrate Read Paths to BallotPosition_
+_Migrate Read Paths to Position_
 
-4. Identify all gp-api + gp-webapp code paths that read BallotReady or L2 District links from PathToVictory `data` JSON and/or Campaign `data` JSON. Migrate these to read from `BallotPosition` (via `campaign.position` or `electedOffice.position` relation).
+4. Identify all gp-api + gp-webapp code paths that read BallotReady or L2 District links from PathToVictory `data` JSON and/or Campaign `data` JSON. Migrate these to read from the Position table in `election-api` (via the stored `positionId`).
 
 _Migrate Contacts / VoterFileFilter onto Organization_
 
@@ -63,7 +67,7 @@ _Admin + Profile_
 **Value Delivered:**
 
 - Contact filters are now segmented by Organization
-- The system now uses BallotPosition as single source-of-truth for BR + L2 links
+- The system now uses Position (in `election-api`) as single source-of-truth for BR + L2 links
 - Users can switch between "win" and "serve" mode visually in the UI
 
 #### **Phase 3: Cleanup + "New Campaign"**
@@ -78,12 +82,12 @@ _Cleanup_
 
 _New Campaign Flow_
 
-- Add new UI to allow creating a new campaign as a Serve user going back into campaign season. This should create a new Organization (type: `CAMPAIGN`) + linked Campaign + BallotPosition record.
+- Add new UI to allow creating a new campaign as a Serve user going back into campaign season. This should create a new Organization (type: `CAMPAIGN`) + linked Campaign, with `positionId` set based on the user's office selection.
 
 **Value Delivered:**
 
 - Campaign and ElectedOffice are fully decoupled — no more shared FKs.
-- BallotPosition is the sole source of truth for position/district data — no more dual-writes, no stale copies.
+- Position (in `election-api`) is the sole source of truth for position/district data — no more dual-writes, no stale copies.
 - Serve users can move seamlessly back into Campaign mode.
 
 #### **Phase 4: Migrate to Clerk Organizations**

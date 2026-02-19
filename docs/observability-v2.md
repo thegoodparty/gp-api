@@ -19,7 +19,7 @@ We are evaluating observability vendors to replace New Relic as our "home" of ob
 
 ---
 
-## 1. Grafana Cloud (Recommended)
+## 1. Grafana Cloud
 
 ### Pricing Model (Pro Plan — Pay As You Go)
 
@@ -150,16 +150,16 @@ Fully managed SaaS. Datadog pushes its own dd-agent for full feature set — OTe
 
 ---
 
-## 3. Grafana Cloud + Sentry (Companion)
+## 3. Grafana Cloud + Sentry (Recommended)
 
-This option uses **Grafana Cloud as the primary observability platform** (metrics, logs, traces, dashboards, alerting) and adds **Sentry as a companion** specifically for its best-in-class error tracking and session replay.
+This option uses **Grafana Cloud as the primary observability platform** (metrics, logs, traces, dashboards, alerting) and adds **Sentry exclusively for frontend observability** — specifically its best-in-class error tracking and session replay in the browser. We would _not_ use Sentry for backend instrumentation (no Node.js SDK, no server-side APM, no logs, no tracing). All backend observability stays in Grafana.
 
-### Why Consider This?
+### Why This Combination?
 
 Sentry can't replace a full observability platform (no metrics, no infrastructure monitoring, minimal incident management), but it excels at two things better than anyone else:
 
 - **Error tracking**: Automatic error grouping, stack traces with source context, issue assignment and triage workflows
-- **Session Replay**: Video-like replay of user sessions that triggered errors, with DOM snapshots and network waterfall
+- **Session Replay**: Video-like replay of user sessions that triggered errors, with DOM snapshots and network waterfall. This is a critical fallback debugging tool — when logs, traces, and metrics don't tell the full story, replaying the user's session often does.
 
 These complement Grafana Cloud's strengths rather than overlapping with them.
 
@@ -203,11 +203,9 @@ Sentry's Team plan has **unlimited seats** (no per-user charge) and charges by e
 - Unlimited seats at no additional cost
 - Sentry's MCP server for AI-powered debugging in your IDE
 
-### What You'd Skip in Sentry
+### What We'd Use (and Not Use) in Sentry
 
-Since Grafana handles logs, metrics, traces, and dashboards, you'd use Sentry _only_ for error tracking and replay — no need for Sentry's logs, tracing, or performance monitoring products.
-
-> **Watch: Grafana native session replay is in development.** There's an [open feature request](https://github.com/grafana/faro-web-sdk/issues/989) and a draft PR integrating rrweb (a session recording library) into the Faro SDK. No timeline or milestone yet, but if Grafana ships native session replay, the case for Sentry as a companion narrows to error triage workflows and Seer AI alone — potentially not worth the extra ~$1k/year.
+Sentry is scoped to **frontend only**: the `@sentry/browser` SDK for error tracking and session replay in the browser. We would _not_ install `@sentry/node` or `@sentry/nestjs`, send logs to Sentry, use Sentry for tracing, or use Sentry's performance monitoring. All backend and infrastructure observability stays in Grafana Cloud.
 
 ---
 
@@ -298,25 +296,18 @@ _All estimates exclude incident management — see per-vendor sections for add-o
 
 ## Recommendation
 
-**Grafana Cloud is the clear winner**, with Grafana + Sentry as a strong runner-up if we want best-in-class error triage.
+**Grafana Cloud + Sentry is the recommended stack** — Grafana Cloud as the primary observability platform, with Sentry providing best-in-class error tracking and session replay as a fallback debugging tool.
 
-### Why Grafana Cloud
+### Why Grafana Cloud + Sentry
 
-1. **Cost**: ~$7,732/year — roughly half the price of a negotiated Datadog year-1 deal, and the gap only widens over time
-2. **OpenTelemetry**: First-class native OTLP support, no proprietary agents, no financial penalty for using open standards
-3. **Feature completeness**: Covers all required signals (APM, logs, RUM, metrics, traces, alerting) with IRM available as a future add-on
-4. **Predictable pricing**: Usage-based with generous free tiers. No "bill shock" pattern. Metrics cardinality is the one variable to watch.
-5. **Low lock-in**: Built on open-source backends (Loki, Mimir, Tempo) — data is portable
+1. **Cost**: ~$8,784/year combined — still well under a negotiated Datadog year-1 deal, and the gap only widens over time
+2. **Session replay as a debugging fallback**: When logs, traces, and metrics don't tell the full story, replaying the exact user session often does. This is a key capability gap in Grafana Cloud alone.
+3. **OpenTelemetry**: Grafana has first-class native OTLP support, no proprietary agents, no financial penalty for using open standards
+4. **Feature completeness**: Together they cover all required signals (APM, logs, RUM, metrics, traces, alerting, error triage, session replay) with IRM available as a future add-on
+5. **Predictable pricing**: Both are usage-based with generous free tiers. No "bill shock" pattern. Metrics cardinality is the one variable to watch.
+6. **Low lock-in**: Grafana is built on open-source backends (Loki, Mimir, Tempo) — data is portable. Sentry adds ~$1k/year and can be dropped if Grafana ships native session replay.
 
-### Should We Add Sentry?
-
-Adding Sentry as a companion costs ~$88/month (~$1,052/year) and provides meaningfully better error tracking and session replay. This is worth considering if:
-
-- Error triage and debugging speed are high priorities for the team
-- We want session replay with full DOM snapshots tied to error context
-- We're interested in Seer AI for automated root cause analysis (additional $200-600/month depending on active users)
-
-This is a "nice to have" — Grafana Cloud alone covers all our requirements. Sentry adds depth in one specific area.
+> **Watch: Grafana native session replay is in development.** There's an [open feature request](https://github.com/grafana/faro-web-sdk/issues/989) and a draft PR integrating rrweb into the Faro SDK. No timeline yet, but if/when this ships, we can reevaluate whether Sentry is still worth the extra ~$1k/year.
 
 ### Why Not Datadog
 
@@ -336,5 +327,5 @@ This is a "nice to have" — Grafana Cloud alone covers all our requirements. Se
 ### Next Steps
 
 1. Start a Grafana Cloud free tier to validate metrics cardinality (our biggest cost unknown)
-2. Decide whether to add Sentry as a companion or start with Grafana alone
+2. Set up Sentry Team plan for error tracking and session replay
 3. Plan OTel SDK instrumentation for backend + Faro SDK for frontend

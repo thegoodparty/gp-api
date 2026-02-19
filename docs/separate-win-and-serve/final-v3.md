@@ -6,7 +6,7 @@ This document proposes a direction for how we separate Win and Serve at the data
 
 Before you read, here's what would be most helpful from reviewers at this stage:
 
-- **Does the BallotPosition + thin Organization split feel right?** Position data is normalized into its own table; Organization is just a lightweight linking entity with a type.
+- **Does the Position + thin Organization split feel right?** Position data is already normalized in `election-api`; Organization is just a lightweight linking entity with a type.
 - **Are we comfortable with the "no FK" convention for Organization references?** All references to `organizationId` are indexed strings, not foreign keys — this is intentional to make the Clerk migration trivial.
 - **Does the Clerk migration path make sense?** Phase 4 describes the switchover. Is there anything missing?
 - **Are there impacts to your team's domain that this document doesn't account for?**
@@ -21,7 +21,7 @@ Today, **Campaign** is the sole organizing entity across the GoodParty product �
 
 This document proposes three structural changes to decouple Campaign and ElectedOffice:
 
-1. A **BallotPosition** table that normalizes BallotReady position identity, geography, and L2 district data into a single reusable record — referenced by both Campaign and ElectedOffice.
+1. A link to the existing **Position** table in `election-api` — which already normalizes BallotReady position identity and L2 district data. Both Campaign and ElectedOffice store a `positionId` referencing this table.
 2. A **temporary Organization table** — a thin linking entity that holds a type (`campaign` | `electedOffice`) and links to its child record. It does _not_ hold position data. It serves as the shared key for cross-product features and powers the product switcher until Clerk Organizations are adopted.
 3. A **defined migration path to Clerk Organizations** — Organization references throughout the system are stored as plain strings (no foreign keys). When we backfill Clerk Organizations, we set each Clerk org's `slug` to the in-product Organization UUID. Clerk's JWT includes the slug in its claims (`o.slg`), so the backend guard simply reads the slug — which _is_ the UUID — and everything works without changing a single stored value. The Organization table can then be dropped.
 
@@ -70,56 +70,54 @@ There are a few primary technical problems need solving as part of this work:
 
 ## Detailed Design
 
-### The BallotPosition Table
+### The Position Table (existing, in `election-api`)
 
-Today, BallotReady position identity, geographic data, and L2 district links are duplicated across Campaign and PathToVictory (and would need further duplication on ElectedOffice). This document proposes normalizing that data into a dedicated **BallotPosition** table, keyed by the BallotReady `positionId`.
+Today, BallotReady position identity and L2 district links are duplicated across Campaign and PathToVictory (and would need further duplication on ElectedOffice). Rather than creating a new table, we reuse the existing **Position** table in `election-api`, which already normalizes this data.
 
-> **Naming note:** The codebase already has a `Position` model (for campaign issue stances, linked to TopIssue). The new table uses the name `BallotPosition` to avoid collision.
-
-A BallotPosition represents a single political position (e.g., "Texas State Senate District 14") and its associated geographic and district data. Both Campaign and ElectedOffice reference a BallotPosition by FK.
+The Position table is owned and populated by the **Data team**. It lives in the `election-api` database, not the `gp-api` database. Both Campaign and ElectedOffice store a `positionId` referencing this table as an indexed string column (not a Prisma FK, since it's a cross-database reference).
 
 ```haskell
-BallotPosition (PK: positionId from BallotReady)
-  ├── office, ballotLevel, electionLevel
-  ├── geography (state, city, county, zip, district)
-  ├── L2 district match (districtId, type, name)
+Position (election-api, PK: id UUID)
+  ├── brPositionId (BallotReady position ID)
+  ├── state
+  └── district ──→ District
+                     ├── L2DistrictType
+                     └── L2DistrictName
 
-Campaign (many:1) ──→ BallotPosition
-ElectedOffice (many:1) ──→ BallotPosition
+Campaign (gp-api) ── positionId string ──→ Position.id
+ElectedOffice (gp-api) ── positionId string ──→ Position.id
+```
+
+#### Current schema (in `election-api`)
+
+```kotlin
+model Position {
+  id           String @id @db.Uuid
+  brDatabaseId String @map("br_database_id")
+  brPositionId String @unique @map("br_position_id")
+  state        String
+
+  district   District @relation(fields: [districtId], references: [id])
+  districtId String   @map("district_id") @db.Uuid
+}
+
+model District {
+  id             String @id @db.Uuid
+  state          String
+  L2DistrictType String @map("l2_district_type")
+  L2DistrictName String @map("l2_district_name")
+
+  Positions Position[]
+}
 ```
 
 Key design rules:
 
-- A BallotPosition is **immutable reference data** — it describes a political office, not a user's relationship to it. Multiple Campaigns or ElectedOffices can reference the same BallotPosition.
-- Campaign and ElectedOffice each hold a `positionId` FK (this _is_ a real foreign key — BallotPosition is a permanent table).
-- BallotPosition data is written/updated when a user selects an office (onboarding, office selection, district picker) and during bulk data refreshes from BallotReady.
-- The `districtManuallySet` flag lives on Campaign/ElectedOffice (not BallotPosition), since it describes a user's override, not the position itself.
-
-#### Schema (Prisma format)
-
-```kotlin
-model BallotPosition {
-  positionId String @id @map("position_id")
-
-  name        String
-  ballotLevel BallotReadyPositionLevel @map("ballot_level")
-  level       ElectionLevel
-  state       String?
-  county      String?
-  city        String?
-  district    String?
-  zip         String?
-
-  l2DistrictId   String @map("l2_district_id")
-  l2DistrictType String @map("l2_district_type")
-  l2DistrictName String @map("l2_district_name")
-
-  campaigns      Campaign[]
-  electedOffices ElectedOffice[]
-
-  @@map("ballot_position")
-}
-```
+- Position is **reference data owned by the Data team** — it describes a political office and its L2 district link. The Data team is responsible for populating and maintaining it.
+- Position already links to District, which holds L2 district type and name. The L2 link problem is already solved.
+- Campaign and ElectedOffice each store `positionId` as a **plain indexed string** (not a Prisma `@relation`, since it's a cross-database reference to `election-api`).
+- Campaign and ElectedOffice each support an optional `overrideDistrictId` — a cross-database reference to a District in `election-api`. When set, this overrides the district linked via Position, allowing a user's district to differ from the Position's default. When null, the Position's linked district is used.
+- **Needed addition to Position (Data team):** `name` and `normalizedName` fields, sourced from BallotReady. These are needed for display in the product switcher and admin UI.
 
 ### The Organization Table (temporary)
 
@@ -173,27 +171,27 @@ Changes to Campaign and ElectedOffice:
 model Campaign {
   // ... existing fields ...
 
-  position   BallotPosition? @relation(fields: [positionId], references: [positionId])
-  positionId String?         @map("position_id")
+  positionId         String? @map("position_id")
+  overrideDistrictId String? @map("override_district_id")
+  organizationId     String? @map("organization_id")
 
-  organizationId String? @map("organization_id")
-
+  @@index([positionId])
   @@index([organizationId])
 }
 
 model ElectedOffice {
   // ... existing fields ...
 
-  position   BallotPosition? @relation(fields: [positionId], references: [positionId])
-  positionId String?         @map("position_id")
+  positionId         String? @map("position_id")
+  overrideDistrictId String? @map("override_district_id")
+  organizationId     String? @map("organization_id")
 
-  organizationId String? @map("organization_id")
-
-  districtManuallySet Boolean @default(false) @map("district_manually_set")
-
+  @@index([positionId])
   @@index([organizationId])
 }
 ```
+
+Note: `positionId`, `overrideDistrictId`, and `organizationId` are all **plain String columns** — not Prisma `@relation`s. `positionId` and `overrideDistrictId` reference tables in the `election-api` database (cross-database, no FK possible). `organizationId` references the temporary Organization table (no FK by design, for Clerk migration). The value of `positionId` is the Position's UUID (`id`), not the BallotReady position ID. The value of `overrideDistrictId` is a District UUID from `election-api`.
 
 Changes to VoterFileFilter:
 
@@ -209,6 +207,27 @@ model VoterFileFilter {
 ```
 
 Note: `organizationId` on all three models is a **plain String column with an index** — not a Prisma `@relation`. There is no `onDelete: Cascade`, no referential integrity enforced by the database. This is by design.
+
+### Key Decision: Duplicating `positionId` and `overrideDistrictId` vs. Keeping Organization Long-Term
+
+Both Campaign and ElectedOffice need a `positionId` and an optional `overrideDistrictId`. This raises a natural question: should these shared fields live on the Organization instead?
+
+We _could_ keep the Organization table permanently, pair it 1:1 with Clerk Organizations after the migration, and store `positionId` and `overrideDistrictId` there. Campaign and ElectedOffice would inherit their position/district context through the Organization rather than holding those fields directly.
+
+**This proposal chooses to duplicate.** Both Campaign and ElectedOffice hold their own `positionId` and `overrideDistrictId`. The Organization table remains temporary and will be dropped. Here is the reasoning for each option:
+
+#### Option A: Keep the Organization table long-term
+
+- **SQL-native entity with FK relationships.** Organization stays as a first-class Postgres table. Shared features (VoterFileFilter, future tables) can use real foreign keys with cascading deletes, making it easy to traverse references when examining data in SQL.
+- **Clean home for any future shared fields.** If we later need to share additional fields between Campaign and ElectedOffice, they go on Organization. Without it, every new shared field must be duplicated — or a new resource must be created.
+- **Listing organizations doesn't require the Clerk API.** Backfill scripts, admin tools, and debugging scenarios can query the Organization table directly in SQL. Without it, any time we want to enumerate organizations we must call the Clerk API (and have a valid auth token).
+- **Deleting an organization and its data is a single cascade.** Delete the Organization row and Postgres cascades handle downstream data. Without the table, we must search for all downstream records by `organizationId` string and delete them explicitly.
+
+- **Vendor portability.** An internal Organization table means our data model isn't structurally dependent on Clerk. If we ever move off Clerk to a different auth vendor that supports organizations, the migration is straightforward — the internal table stays, only the auth integration changes.
+
+#### Option B: Duplicate shared fields onto Campaign and ElectedOffice (proposed)
+
+- **One less model.** The Organization table is dropped entirely after Phase 4. There is no permanent infrastructure to maintain alongside Clerk — no two systems to keep in sync, no intermediary joins, no extra table in every migration.
 
 ### The `X-Organization-Id` Header and `@UseOrganization()`
 
@@ -268,27 +287,28 @@ There are several key milestones in the proposed implementation path. Phases 1�
 
 A more detailed implementation path is contained in the [subdoc](./final-v3-implementation-plan.md).
 
-### Phase 1: BallotPosition table, Organization table, and backfill
+### Phase 1: Position links, Organization table, and backfill
 
-- Create the BallotPosition table and the Organization table.
+- Create the Organization table.
 - Add `positionId` and `organizationId` string columns to Campaign and ElectedOffice.
-- Update key write paths to double-write BR+L2 data and create Organizations alongside Campaigns/ElectedOffices.
-- Backfill BallotPosition and Organization records for all existing data. Make columns non-nullable.
+- Update key write paths to set `positionId` (referencing the existing Position table in `election-api`) and create Organizations alongside Campaigns/ElectedOffices.
+- Coordinate with the Data team to add `name` and `normalizedName` fields to the Position table.
+- Backfill `positionId` and Organization records for all existing data. Make columns non-nullable.
 
-**Value Delivered**: BallotPosition is established as the source of truth for BR+L2 data. Every Campaign and ElectedOffice has an Organization. No Clerk dependency.
+**Value Delivered**: Every Campaign and ElectedOffice links to a Position and has an Organization. No Clerk dependency.
 
 ### Phase 2: Migrate Contacts and Read Paths
 
 - Implement the product switcher UI, powered by `GET /organizations` and the `X-Organization-Id` header.
 - Create `@UseOrganization()` guard and `@ReqOrganization()` decorator.
-- Migrate BR+L2 read paths from Campaign/P2V to BallotPosition.
+- Migrate BR+L2 read paths from Campaign/P2V to read from the Position table (via `positionId` → `election-api`).
 - Move VoterFileFilter onto Organization and update Contacts access-checking rules.
 
-**Value Delivered**: Contact filters are segmented by Organization. BallotPosition is the single source of truth for BR+L2 data. Users can switch between Win and Serve in the UI.
+**Value Delivered**: Contact filters are segmented by Organization. Position is the single source of truth for BR+L2 data. Users can switch between Win and Serve in the UI.
 
 ### Phase 3: Cleanup + "New Campaign"
 
-- Remove dual-write paths. Drop deprecated BR+L2 columns from Campaign/P2V.
+- Remove dual-write paths. Drop deprecated BR+L2 data from Campaign/P2V.
 - Drop `ElectedOffice.campaignId` and the `electedOffices` relation on Campaign.
 - Add "new campaign" flow for Serve users.
 
@@ -305,7 +325,7 @@ A more detailed implementation path is contained in the [subdoc](./final-v3-impl
 
 ## Key Takeaways
 
-- **BallotPosition is pure reference data.** It normalizes BR+L2+geography into one place, keyed by BallotReady positionId. It is a permanent table.
+- **Position is existing reference data.** It already lives in `election-api`, normalizes BR+L2 data, and is maintained by the Data team. We just reference it.
 - **Organization is thin and temporary.** It holds a type and an owner — no position data. It exists to unblock the team now and will be replaced by Clerk Organizations.
 - **No foreign keys point to Organization.** All `organizationId` references are plain indexed strings. Combined with the slug trick, this means the Clerk migration requires zero data changes — just a code swap in the guard and frontend.
 - **Existing routes and guards don't change.** `@UseCampaign()` and `@UseElectedOffice()` stay as-is. Only shared features get a new `@UseOrganization()` guard.
@@ -327,7 +347,7 @@ The original proposal placed BR+L2+geography data directly on the Organization m
 
 **Why not:**
 
-- Mixing position reference data with organizational context conflates two concerns. The BallotPosition table is a cleaner separation.
+- Mixing position reference data with organizational context conflates two concerns. The existing Position table in `election-api` already solves the position data problem.
 - Real FKs to Organization make the Clerk migration a schema change (drop FK, rename column) rather than a value update.
 
 ### V2: Pure Clerk Organizations, no in-product table
