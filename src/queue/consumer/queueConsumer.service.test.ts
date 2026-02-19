@@ -501,6 +501,118 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     ).toHaveLength(3)
   })
 
+  it('discards responses that have no clusterId and are not opt-outs', async () => {
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber,
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'irrelevant noise',
+        clusterId: '',
+        isOptOut: false,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({ pollId })
+
+    const result = await service.processMessage(message)
+
+    expect(result).toBe(true)
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalledWith({
+      data: [],
+    })
+  })
+
+  it('keeps opt-out responses even when they have no clusterId', async () => {
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber,
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'STOP',
+        clusterId: '',
+        isOptOut: true,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({ pollId })
+
+    await service.processMessage(message)
+
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          isOptOut: true,
+          content: 'STOP',
+        }),
+      ]),
+    })
+    expect(
+      mockTx.pollIndividualMessage.createMany.mock.calls[0][0].data,
+    ).toHaveLength(1)
+    // No join records should be created for opt-out without clusterId
+    expect(mockTx.$executeRaw).not.toHaveBeenCalled()
+  })
+
+  it('saves responses with a clusterId outside the top 3 but without a poll issue link', async () => {
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber,
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'My niche concern',
+        clusterId: 5,
+        isOptOut: false,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({
+      pollId,
+      issues: [
+        {
+          pollId,
+          rank: 1,
+          theme: 'Top issue',
+          summary: 'S1',
+          analysis: 'A1',
+          responseCount: 3,
+          quotes: [],
+        },
+      ],
+    })
+
+    await service.processMessage(message)
+
+    const txCb = pollIndividualMessage.client.$transaction.mock.calls[0][0]
+    const mockTx = {
+      pollIndividualMessage: { deleteMany: vi.fn(), createMany: vi.fn() },
+      $executeRaw: vi.fn(),
+    }
+    await txCb(mockTx)
+    // The individual message is still created
+    expect(
+      mockTx.pollIndividualMessage.createMany.mock.calls[0][0].data,
+    ).toHaveLength(1)
+    expect(mockTx.pollIndividualMessage.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          content: 'My niche concern',
+        }),
+      ]),
+    })
+    // But no join record is created since clusterId 5 is not in the top 3
+    expect(mockTx.$executeRaw).not.toHaveBeenCalled()
+  })
+
   it('is idempotent: processing the same poll analysis complete event twice succeeds both times', async () => {
     const json = createPollAnalysisJson([
       {
