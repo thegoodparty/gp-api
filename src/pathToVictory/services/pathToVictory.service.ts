@@ -2,7 +2,7 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { CampaignCreatedBy, ElectionLevel } from 'src/campaigns/campaigns.types'
+import { ElectionLevel } from 'src/campaigns/campaigns.types'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
 import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
@@ -17,8 +17,6 @@ import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
-import { EmailService } from '../../email/email.service'
-import { EmailTemplateName } from '../../email/email.types'
 import { PrismaService } from '../../prisma/prisma.service'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { SlackService } from '../../vendors/slack/services/slack.service'
@@ -85,7 +83,6 @@ export class PathToVictoryService extends createPrismaBase(
     private prisma: PrismaService,
     private officeMatchService: OfficeMatchService,
     private slackService: SlackService,
-    private emailService: EmailService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private crmService: CrmCampaignsService,
     @Inject(forwardRef(() => AnalyticsService))
@@ -444,13 +441,9 @@ export class PathToVictoryService extends createPrismaBase(
       !!pathToVictoryResponse.electionLocation
 
     let statusOverride: P2VStatus | undefined
-    let sendEmailFlag = false
 
     // --- Branch 1: Full success — district + turnout found ---
     if (hasTurnout) {
-      // Only send the "victory ready" email if this is the first time reaching Complete
-      sendEmailFlag =
-        campaign.pathToVictory?.data?.p2vStatus !== P2VStatus.complete
       const turnoutSlackMessage = `
       ￮ Projected Turnout: ${pathToVictoryResponse.counts.projectedTurnout}
       ￮ Win Number: ${pathToVictoryResponse.counts.winNumber}
@@ -515,7 +508,6 @@ export class PathToVictoryService extends createPrismaBase(
     // handlePathToVictoryFailure, which tracks p2vAttempts and retries.
     if (hasTurnout) {
       await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
-        sendEmail: sendEmailFlag,
         p2vStatusOverride: statusOverride,
         officeFingerprint,
       })
@@ -535,7 +527,6 @@ export class PathToVictoryService extends createPrismaBase(
       electionLocation: string
     },
     options?: {
-      sendEmail?: boolean
       p2vStatusOverride?: P2VStatus
       officeFingerprint?: string
     },
@@ -700,31 +691,6 @@ export class PathToVictoryService extends createPrismaBase(
         winNumber: pathToVictoryResponse.counts.winNumber,
       })
 
-      const shouldSendEmail = options?.sendEmail ?? true
-      if (p2vStatus === 'Complete' && shouldSendEmail && campaign.user?.email) {
-        const name = campaign.user
-          ? await this.getUserName(campaign.user)
-          : 'Friend'
-        const variables = {
-          name,
-          link: `${process.env.WEBAPP_ROOT}/dashboard`,
-        }
-
-        if (
-          process.env.WEBAPP_ROOT === 'https://goodparty.org' &&
-          campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN
-        ) {
-          this.logger.debug('sending email to user', campaign.user.email)
-          await this.emailService.sendTemplateEmail({
-            to: campaign.user.email,
-            subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-            template: EmailTemplateName.candidateVictoryReady,
-            variables,
-            cc: 'jared@goodparty.org',
-          })
-        }
-      }
-
       await this.crmService.handleUpdateCampaign(
         campaign,
         'path_to_victory_status',
@@ -741,10 +707,6 @@ export class PathToVictoryService extends createPrismaBase(
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async getUserName(user: any): Promise<string> {
-    return user.name || 'Friend'
-  }
 }
 
 export interface P2VResponse {

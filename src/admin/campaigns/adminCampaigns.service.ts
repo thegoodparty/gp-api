@@ -3,8 +3,6 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
-import { getUserFullName } from 'src/users/util/users.util'
-import { EmailTemplateName } from 'src/email/email.types'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
@@ -13,7 +11,6 @@ import {
   CampaignWith,
   OnboardingStep,
 } from 'src/campaigns/campaigns.types'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { formatDate } from 'date-fns'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
@@ -202,23 +199,6 @@ export class AdminCampaignsService {
     }
 
     await this.adminP2V.completeP2V(user.id, pathToVictory)
-
-    if (campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN) {
-      const variables = {
-        name: getUserFullName(user),
-        link: `${WEBAPP_ROOT}/dashboard`,
-      }
-
-      await this.email.sendTemplateEmail({
-        to: user.email,
-        subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-        template: EmailTemplateName.candidateVictoryReady,
-        variables,
-        from: 'jared@goodparty.org',
-      })
-    }
-
-    return true
   }
 
   private async getAutoP2V(electionDate: string) {

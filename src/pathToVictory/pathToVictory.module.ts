@@ -4,7 +4,6 @@ import { SegmentModule } from 'src/vendors/segment/segment.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { AiModule } from '../ai/ai.module'
 import { ElectionsModule } from '../elections/elections.module'
-import { EmailModule } from '../email/email.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { VotersModule } from '../voters/voters.module'
@@ -20,7 +19,6 @@ import { ClerkClientProvider } from '@/authentication/providers/clerk-client.pro
     AiModule,
     ElectionsModule,
     VotersModule,
-    EmailModule,
     QueueProducerModule,
     SegmentModule,
     SlackModule,

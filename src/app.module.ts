@@ -25,7 +25,6 @@ import { PaymentsModule } from '@/payments/payments.module'
 import { PollsModule } from '@/polls/polls.module'
 import { PrismaModule } from '@/prisma/prisma.module'
 import { QueueConsumerModule } from '@/queue/consumer/queueConsumer.module'
-import { ScheduledMessagingModule } from '@/scheduled-messaging/scheduled-messaging.module'
 import { SharedModule } from '@/shared/shared.module'
 import { SubscribeModule } from '@/subscribe/subscribe.module'
 import { TopIssuesModule } from '@/topIssues/topIssues.module'
@@ -67,7 +66,6 @@ import { ScheduleModule } from '@nestjs/schedule'
     CrmModule,
     SubscribeModule,
     EcanvasserIntegrationModule,
-    ScheduledMessagingModule,
     OutreachModule,
     SegmentModule,
     WebsitesModule,

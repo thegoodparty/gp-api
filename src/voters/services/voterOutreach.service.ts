@@ -2,14 +2,11 @@ import { Injectable } from '@nestjs/common'
 import { Campaign, OutreachType, User } from '@prisma/client'
 import sanitizeHtml from 'sanitize-html'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { EmailService } from 'src/email/email.service'
-import { EmailTemplateName } from 'src/email/email.types'
 import {
   IS_PROD,
   WEBAPP_API_PATH,
   WEBAPP_ROOT,
 } from 'src/shared/util/appEnvironment.util'
-import { getUserFullName } from 'src/users/util/users.util'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import {
   SlackChannel,
@@ -65,7 +62,6 @@ export class VoterOutreachService {
     private readonly slack: SlackService,
     private readonly campaignsService: CampaignsService,
     private readonly crmCampaigns: CrmCampaignsService,
-    private readonly email: EmailService,
     private readonly voterFileFilterService: VoterFileFilterService,
   ) {}
 
@@ -171,8 +167,6 @@ export class VoterOutreachService {
 
     this.crmCampaigns.trackCampaign(campaign.id)
 
-    this.sendSubmittedEmail(user, outreach.message!, outreach.date!)
-
     return outreach ? outreach : true
   }
 
@@ -213,17 +207,4 @@ export class VoterOutreachService {
     )
   }
 
-  // TODO: move this out to the OutreachService
-  async sendSubmittedEmail(user: User, message: string = 'N/A', date: Date) {
-    await this.email.sendTemplateEmail({
-      to: user.email,
-      subject: 'Your Texting Campaign is Scheduled - Next Steps Inside',
-      template: EmailTemplateName.textCampaignSubmitted,
-      variables: {
-        name: getUserFullName(user),
-        message,
-        scheduledDate: date.toLocaleDateString(),
-      },
-    })
-  }
 }

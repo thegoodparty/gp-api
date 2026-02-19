@@ -66,8 +66,8 @@ export class AdminCampaignsController {
 
   @Post(':id/send-victory-email')
   @HttpCode(HttpStatus.NO_CONTENT)
-  sendVictoryEmail(@Param('id', ParseIntPipe) id: number) {
-    return this.adminCampaigns.sendVictoryEmail(id)
+  async sendVictoryEmail(@Param('id', ParseIntPipe) id: number) {
+    await this.adminCampaigns.sendVictoryEmail(id)
   }
 
   @Get('pro-no-voter-file')

@@ -20,7 +20,6 @@ import { PathToVictoryModule } from '../pathToVictory/pathToVictory.module'
 import { EcanvasserIntegrationModule } from '../vendors/ecanvasserIntegration/ecanvasserIntegration.module'
 import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
-import { ScheduledMessagingModule } from '../scheduled-messaging/scheduled-messaging.module'
 import { StripeModule } from '../vendors/stripe/stripe.module'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
 import { CampaignTcrComplianceService } from './tcrCompliance/services/campaignTcrCompliance.service'
@@ -42,7 +41,6 @@ import { ClerkClientProvider } from '@/authentication/providers/clerk-client.pro
     ElectionsModule,
     PathToVictoryModule,
     forwardRef(() => EcanvasserIntegrationModule),
-    ScheduledMessagingModule,
     StripeModule,
     PeerlyModule,
     GoogleModule,
