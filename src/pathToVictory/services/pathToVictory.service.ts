@@ -706,7 +706,6 @@ export class PathToVictoryService extends createPrismaBase(
       })
     }
   }
-
 }
 
 export interface P2VResponse {

@@ -439,5 +439,4 @@ export class PaymentEventsService {
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
-
 }

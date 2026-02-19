@@ -206,5 +206,4 @@ export class VoterOutreachService {
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
   }
-
 }
