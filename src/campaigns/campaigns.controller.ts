@@ -246,6 +246,15 @@ export class CampaignsController {
   }
 
   @UseGuards(M2MOnly)
+  @Get(':id')
+  async findById(@Param() { id }: IdParamSchema) {
+    const campaign = await this.campaigns.findUniqueOrThrow({
+      where: { id },
+    })
+    return ReadCampaignOutputSchema.parse(campaign)
+  }
+
+  @UseGuards(M2MOnly)
   @Put(':id')
   async updateCampaign(
     @Param() { id }: IdParamSchema,

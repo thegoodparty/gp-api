@@ -26,6 +26,8 @@ import ms from 'ms'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
 } from '@/shared/constants/paginationOptions.consts'
 import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
 
@@ -305,8 +307,8 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   async listUsers({
     offset: skip = DEFAULT_PAGINATION_OFFSET,
     limit = DEFAULT_PAGINATION_LIMIT,
-    sortBy = 'createdAt',
-    sortOrder = 'desc',
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
     firstName,
     lastName,
     email,
