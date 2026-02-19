@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { PathToVictoryDataSchema } from './PathToVictoryData.schema'
 
 const updatePathToVictoryM2MSchema = z.object({
-  data: PathToVictoryDataSchema,
+  data: PathToVictoryDataSchema.strict(),
 })
 
 export class UpdatePathToVictoryM2MSchema extends createZodDto(

@@ -24,6 +24,7 @@ import { PathToVictorySchema } from './schemas/PathToVictory.schema'
 import { UpdatePathToVictoryM2MSchema } from './schemas/UpdatePathToVictoryM2M.schema'
 
 @Controller('path-to-victory')
+@UsePipes(ZodValidationPipe)
 export class PathToVictoryController {
   private readonly logger = new Logger(PathToVictoryController.name)
 
@@ -33,7 +34,6 @@ export class PathToVictoryController {
   ) {}
 
   @UseGuards(M2MOnly)
-  @UsePipes(ZodValidationPipe)
   @Get('list')
   async list(@Query() query: ListPathToVictoryPaginationSchema) {
     const { data, meta } =
@@ -45,7 +45,6 @@ export class PathToVictoryController {
   }
 
   @UseGuards(M2MOnly)
-  @UsePipes(ZodValidationPipe)
   @Get(':id')
   async getById(@Param() { id }: IdParamSchema) {
     const p2v = await this.pathToVictoryService.findUniqueOrThrow({
@@ -55,12 +54,16 @@ export class PathToVictoryController {
   }
 
   @UseGuards(M2MOnly)
-  @UsePipes(ZodValidationPipe)
   @Put(':id')
   async update(
     @Param() { id }: IdParamSchema,
     @Body() body: UpdatePathToVictoryM2MSchema,
   ) {
+    await this.pathToVictoryService.findUniqueOrThrow({
+      where: { id },
+      select: { id: true },
+    })
+
     const updated = await this.pathToVictoryService.update({
       where: { id },
       data: { data: body.data },

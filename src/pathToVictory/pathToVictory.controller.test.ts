@@ -39,15 +39,17 @@ describe('PathToVictoryController', () => {
   let enqueueService: EnqueuePathToVictoryService
 
   beforeEach(() => {
-    pathToVictoryService = {
+    const pathToVictoryServiceMock: Partial<PathToVictoryService> = {
       listPathToVictories: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
-    } as unknown as PathToVictoryService
+    }
+    pathToVictoryService = pathToVictoryServiceMock as PathToVictoryService
 
-    enqueueService = {
+    const enqueueServiceMock: Partial<EnqueuePathToVictoryService> = {
       enqueuePathToVictory: vi.fn(),
-    } as unknown as EnqueuePathToVictoryService
+    }
+    enqueueService = enqueueServiceMock as EnqueuePathToVictoryService
 
     controller = new PathToVictoryController(
       enqueueService,
@@ -159,7 +161,10 @@ describe('PathToVictoryController', () => {
   })
 
   describe('update', () => {
-    it('updates the record and returns parsed result', async () => {
+    it('verifies record exists then updates and returns parsed result', async () => {
+      vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
+        mockP2V,
+      )
       const updatedP2V = {
         ...mockP2V,
         data: { ...mockP2V.data, projectedTurnout: 1000 },
@@ -169,6 +174,10 @@ describe('PathToVictoryController', () => {
       const body = { data: { projectedTurnout: 1000 } }
       const result = await controller.update({ id: 10 }, body)
 
+      expect(pathToVictoryService.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 10 },
+        select: { id: true },
+      })
       expect(pathToVictoryService.update).toHaveBeenCalledWith({
         where: { id: 10 },
         data: { data: body.data },
@@ -177,14 +186,28 @@ describe('PathToVictoryController', () => {
       expect(result).toHaveProperty('data')
     })
 
-    it('propagates error when update fails', async () => {
-      vi.spyOn(pathToVictoryService, 'update').mockRejectedValue(
-        new Error('DB error'),
+    it('throws when record does not exist', async () => {
+      vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockRejectedValue(
+        new NotFoundException(),
       )
 
       await expect(
         controller.update({ id: 999 }, { data: {} }),
-      ).rejects.toThrow('DB error')
+      ).rejects.toThrow(NotFoundException)
+      expect(pathToVictoryService.update).not.toHaveBeenCalled()
+    })
+
+    it('propagates error when update fails', async () => {
+      vi.spyOn(pathToVictoryService, 'findUniqueOrThrow').mockResolvedValue(
+        mockP2V,
+      )
+      vi.spyOn(pathToVictoryService, 'update').mockRejectedValue(
+        new Error('DB error'),
+      )
+
+      await expect(controller.update({ id: 10 }, { data: {} })).rejects.toThrow(
+        'DB error',
+      )
     })
   })
 
