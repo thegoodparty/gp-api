@@ -9,6 +9,8 @@ import { Campaign, Prisma, User } from '@prisma/client'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
 import { ListCampaignsPaginationSchema } from '../schemas/ListCampaignsPagination.schema'
@@ -71,8 +73,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async listCampaigns({
     offset: skip = DEFAULT_PAGINATION_OFFSET,
     limit = DEFAULT_PAGINATION_LIMIT,
-    sortBy = 'createdAt',
-    sortOrder = 'desc',
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
     userId,
     slug,
   }: ListCampaignsPaginationSchema): Promise<PaginatedResults<Campaign>> {

@@ -12,6 +12,7 @@ import { PathToVictoryController } from './pathToVictory.controller'
 import { EnqueuePathToVictoryService } from './services/enqueuePathToVictory.service'
 import { OfficeMatchService } from './services/officeMatch.service'
 import { PathToVictoryService } from './services/pathToVictory.service'
+import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { PathToVictoryService } from './services/pathToVictory.service'
     OfficeMatchService,
     EnqueuePathToVictoryService,
     BallotReadyService,
+    ClerkClientProvider,
   ],
   exports: [
     PathToVictoryService,
