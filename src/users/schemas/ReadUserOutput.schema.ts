@@ -1,4 +1,5 @@
 import { CreateUserInputSchema } from './CreateUserInput.schema'
+import { UserMetaDataSchema } from './UserMetaData.schema'
 import { z } from 'zod'
 import {
   EmailSchema,
@@ -7,24 +8,6 @@ import {
   ZipSchema,
 } from 'src/shared/schemas'
 import { makeOptional } from 'src/shared/util/zod.util'
-
-const WhyBrowsingSchema = z.enum(['considering', 'learning', 'test', 'else'])
-
-const UserMetaDataSchema = z
-  .object({
-    customerId: z.string().optional(),
-    checkoutSessionId: z.string().nullish(),
-    accountType: z.string().nullish(),
-    lastVisited: z.number().optional(),
-    sessionCount: z.number().optional(),
-    isDeleted: z.boolean().optional(),
-    fsUserId: z.string().optional(),
-    whyBrowsing: WhyBrowsingSchema.nullish(),
-    hubspotId: z.string().optional(),
-    profile_updated_count: z.number().optional(),
-    textNotifications: z.boolean().optional(),
-  })
-  .nullish()
 
 export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   password: true,

@@ -123,6 +123,7 @@ export = async () => {
 
     createAssetsRouter({
       environment,
+      bucket: assetsBucket.bucket,
       bucketRegionalDomainName: assetsBucket.bucketRegionalDomainName,
       hostedZoneId,
     })

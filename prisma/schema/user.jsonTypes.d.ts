@@ -1,11 +1,4 @@
-export {}
-
-enum WhyBrowsing {
-  considering = 'considering',
-  learning = 'learning',
-  test = 'test',
-  else = 'else',
-}
+import { WhyBrowsing } from '@/users/schemas/UserMetaData.schema'
 
 declare global {
   export namespace PrismaJson {

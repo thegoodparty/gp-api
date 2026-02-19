@@ -832,7 +832,10 @@ export class QueueConsumerService {
       sampleParams: async (poll) => {
         const alreadySent =
           await this.pollsService.client.pollIndividualMessage.findMany({
-            where: { pollId: poll.id },
+            where: {
+              pollId: poll.id,
+              sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+            },
             select: { personId: true },
           })
 
@@ -925,6 +928,7 @@ export class QueueConsumerService {
             personId: person.id!,
             sentAt: now,
             personCellPhone: normalizePhoneNumber(person.cellPhone),
+            electedOfficeId: poll.electedOfficeId,
           }
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
