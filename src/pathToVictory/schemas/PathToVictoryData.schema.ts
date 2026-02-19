@@ -43,4 +43,4 @@ export const PathToVictoryDataSchema = z
     districtManuallySet: z.boolean().optional(),
     officeContextFingerprint: z.string().optional(),
   })
-  .passthrough()
+  .strip()

@@ -61,11 +61,6 @@ export class PathToVictoryController {
     @Param() { id }: IdParamSchema,
     @Body() body: UpdatePathToVictoryM2MSchema,
   ) {
-    await this.pathToVictoryService.findUniqueOrThrow({
-      where: { id },
-      select: { id: true },
-    })
-
     const updated = await this.pathToVictoryService.update({
       where: { id },
       data: { data: body.data },
@@ -75,7 +70,7 @@ export class PathToVictoryController {
   }
 
   @Roles(UserRole.admin)
-  @Get(':campaignId')
+  @Get('enqueue/:campaignId')
   async enqueuePathToVictory(
     @Param('campaignId', ParseIntPipe) campaignId: number,
   ) {
