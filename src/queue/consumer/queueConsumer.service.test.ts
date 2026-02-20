@@ -24,7 +24,8 @@ import type { PollResponseJsonRow } from '../queue.types'
 import { QueueType } from '../queue.types'
 import { QueueConsumerService } from './queueConsumer.service'
 
-vi.mock('@/polls/utils/polls.utils', () => ({
+vi.mock('@/polls/utils/polls.utils', async (importOriginal) => ({
+  ...(await importOriginal()),
   sendTevynAPIPollMessage: vi.fn(),
 }))
 

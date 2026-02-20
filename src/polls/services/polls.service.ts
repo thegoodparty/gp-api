@@ -124,6 +124,8 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
 
   @Timeout(0)
   async crmHooksBackfill() {
+    if (process.env.NODE_ENV !== 'production') return
+
     const polls = await this.model.findMany({
       select: { id: true },
     })

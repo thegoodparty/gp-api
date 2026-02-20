@@ -14,7 +14,7 @@ import { isNotNil, uniq } from 'es-toolkit'
 import pMap from 'p-map'
 import z from 'zod'
 import { v5 as uuidv5 } from 'uuid'
-import { POLL_INDIVIDUAL_MESSAGE_NAMESPACE } from '@/queue/consumer/queueConsumer.service'
+import { POLL_INDIVIDUAL_MESSAGE_NAMESPACE } from './polls.utils'
 
 const s3 = new S3()
 
