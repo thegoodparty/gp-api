@@ -6,6 +6,12 @@ import { CreateElectedOfficeDto } from './schemas/electedOffice.schema'
 import { ElectedOfficeService } from './services/electedOffice.service'
 import { IncomingRequest } from '@/authentication/authentication.types'
 
+function mockRequest(
+  overrides: { user?: { id: number }; m2mToken?: object } = {},
+): IncomingRequest {
+  return overrides as IncomingRequest
+}
+
 describe('ElectedOfficeController', () => {
   let controller: ElectedOfficeController
   let electedOfficeService: ElectedOfficeService
@@ -171,7 +177,10 @@ describe('ElectedOfficeController', () => {
         mockElectedOffice,
       )
 
-      const result = await controller.getOne('office-1', {} as IncomingRequest)
+      const result = await controller.getOne(
+        'office-1',
+        mockRequest({ user: { id: 1 } }),
+      )
 
       expect(electedOfficeService.findUnique).toHaveBeenCalledWith({
         where: { id: 'office-1' },
@@ -190,8 +199,10 @@ describe('ElectedOfficeController', () => {
         mockElectedOffice,
       )
 
-      const m2mReq = { m2mToken: {} } as unknown as IncomingRequest
-      const result = await controller.getOne('office-1', m2mReq)
+      const result = await controller.getOne(
+        'office-1',
+        mockRequest({ m2mToken: {} }),
+      )
 
       expect(result).toEqual(mockElectedOffice)
     })
@@ -199,16 +210,31 @@ describe('ElectedOfficeController', () => {
     it('throws NotFoundException when elected office does not exist', async () => {
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(null)
 
-      await expect(
-        controller.getOne('office-1', {} as IncomingRequest),
-      ).rejects.toThrow(NotFoundException)
-      await expect(
-        controller.getOne('office-1', {} as IncomingRequest),
-      ).rejects.toThrow('Elected office not found')
+      const req = mockRequest({ user: { id: 1 } })
+      await expect(controller.getOne('office-1', req)).rejects.toThrow(
+        NotFoundException,
+      )
+      await expect(controller.getOne('office-1', req)).rejects.toThrow(
+        'Elected office not found',
+      )
 
       expect(electedOfficeService.findUnique).toHaveBeenCalledWith({
         where: { id: 'office-1' },
       })
+    })
+
+    it('throws NotFoundException when user does not own the record', async () => {
+      vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
+        mockElectedOffice,
+      )
+
+      const req = mockRequest({ user: { id: 999 } })
+      await expect(controller.getOne('office-1', req)).rejects.toThrow(
+        NotFoundException,
+      )
+      await expect(controller.getOne('office-1', req)).rejects.toThrow(
+        'Elected office not found',
+      )
     })
   })
 
@@ -384,7 +410,7 @@ describe('ElectedOfficeController', () => {
       const result = await controller.update(
         'office-1',
         updateDto,
-        {} as IncomingRequest,
+        mockRequest({ user: { id: 1 } }),
       )
 
       expect(electedOfficeService.findUnique).toHaveBeenCalledWith({
@@ -425,8 +451,11 @@ describe('ElectedOfficeController', () => {
         updatedElectedOffice,
       )
 
-      const m2mReq = { m2mToken: {} } as unknown as IncomingRequest
-      const result = await controller.update('office-1', updateDto, m2mReq)
+      const result = await controller.update(
+        'office-1',
+        updateDto,
+        mockRequest({ m2mToken: {} }),
+      )
 
       expect(result).toEqual(updatedElectedOffice)
     })
@@ -434,18 +463,43 @@ describe('ElectedOfficeController', () => {
     it('throws NotFoundException when elected office does not exist', async () => {
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(null)
 
+      const req = mockRequest({ user: { id: 1 } })
       await expect(
         controller.update(
           'office-1',
           { swornInDate: new Date('2024-01-15') },
-          {} as IncomingRequest,
+          req,
         ),
       ).rejects.toThrow(NotFoundException)
       await expect(
         controller.update(
           'office-1',
           { swornInDate: new Date('2024-01-15') },
-          {} as IncomingRequest,
+          req,
+        ),
+      ).rejects.toThrow('Elected office not found')
+
+      expect(electedOfficeService.update).not.toHaveBeenCalled()
+    })
+
+    it('throws NotFoundException when user does not own the record', async () => {
+      vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
+        existingElectedOffice,
+      )
+
+      const req = mockRequest({ user: { id: 999 } })
+      await expect(
+        controller.update(
+          'office-1',
+          { swornInDate: new Date('2024-01-15') },
+          req,
+        ),
+      ).rejects.toThrow(NotFoundException)
+      await expect(
+        controller.update(
+          'office-1',
+          { swornInDate: new Date('2024-01-15') },
+          req,
         ),
       ).rejects.toThrow('Elected office not found')
 
@@ -486,7 +540,7 @@ describe('ElectedOfficeController', () => {
       const result = await controller.update(
         'office-1',
         updateDto,
-        {} as IncomingRequest,
+        mockRequest({ user: { id: 1 } }),
       )
 
       expect(electedOfficeService.update).toHaveBeenCalledWith({

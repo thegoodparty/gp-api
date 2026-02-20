@@ -23,7 +23,7 @@ import {
   UpdateElectedOfficeDto,
 } from './schemas/electedOffice.schema'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
-import { OwnerOrM2MGuard } from './guards/OwnerOrM2M.guard'
+import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import { ListElectedOfficePaginationSchema } from './schemas/ListElectedOfficePagination.schema'
 import { IncomingRequest } from '@/authentication/authentication.types'
 
@@ -59,11 +59,11 @@ export class ElectedOfficeController {
     return this.toApi(record)
   }
 
-  @UseGuards(OwnerOrM2MGuard)
+  @UseGuards(UserOrM2MGuard)
   @Get(':id')
   async getOne(@Param('id') id: string, @Req() req: IncomingRequest) {
     const record = await this.electedOfficeService.findUnique({ where: { id } })
-    if (!record) {
+    if (!record || (!req.m2mToken && record.userId !== req.user?.id)) {
       throw new NotFoundException('Elected office not found')
     }
     return req.m2mToken ? record : this.toApi(record)
@@ -93,7 +93,7 @@ export class ElectedOfficeController {
     return this.toApi(created)
   }
 
-  @UseGuards(OwnerOrM2MGuard)
+  @UseGuards(UserOrM2MGuard)
   @Put(':id')
   async update(
     @Param('id') id: string,
@@ -103,7 +103,7 @@ export class ElectedOfficeController {
     const existing = await this.electedOfficeService.findUnique({
       where: { id },
     })
-    if (!existing) {
+    if (!existing || (!req.m2mToken && existing.userId !== req.user?.id)) {
       throw new NotFoundException('Elected office not found')
     }
     const data: Prisma.ElectedOfficeUpdateInput = {
