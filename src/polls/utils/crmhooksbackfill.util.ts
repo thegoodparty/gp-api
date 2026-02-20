@@ -241,7 +241,7 @@ export const backfillPollCRMHooksData = async (
           sender: PollIndividualMessageSender.CONSTITUENT,
           content: first.originalMessage,
           sentAt: new Date(first.receivedAt),
-          isOptOut: first.isOptOut,
+          isOptOut: allAtomizedMessagesForPhoneNumber.some((m) => m.isOptOut),
           pollIssues: {
             connect: messageIssues.map((i) => ({
               id: i.id,
