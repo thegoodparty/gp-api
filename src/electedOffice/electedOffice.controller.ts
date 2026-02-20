@@ -63,8 +63,11 @@ export class ElectedOfficeController {
   @Get(':id')
   async getOne(@Param('id') id: string, @Req() req: IncomingRequest) {
     const record = await this.electedOfficeService.findUnique({ where: { id } })
-    if (!record || (!req.m2mToken && record.userId !== req.user?.id)) {
+    if (!record) {
       throw new NotFoundException('Elected office not found')
+    }
+    if (!req.m2mToken && record.userId !== req.user?.id) {
+      throw new ForbiddenException('Not allowed to access this elected office')
     }
     return req.m2mToken ? record : this.toApi(record)
   }
@@ -103,8 +106,11 @@ export class ElectedOfficeController {
     const existing = await this.electedOfficeService.findUnique({
       where: { id },
     })
-    if (!existing || (!req.m2mToken && existing.userId !== req.user?.id)) {
+    if (!existing) {
       throw new NotFoundException('Elected office not found')
+    }
+    if (!req.m2mToken && existing.userId !== req.user?.id) {
+      throw new ForbiddenException('Not allowed to access this elected office')
     }
     const data: Prisma.ElectedOfficeUpdateInput = {
       electedDate: body.electedDate,

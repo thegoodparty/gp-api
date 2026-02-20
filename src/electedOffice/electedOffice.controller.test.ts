@@ -223,17 +223,17 @@ describe('ElectedOfficeController', () => {
       })
     })
 
-    it('throws NotFoundException when user does not own the record', async () => {
+    it('throws ForbiddenException when user does not own the record', async () => {
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
         mockElectedOffice,
       )
 
       const req = mockRequest({ user: { id: 999 } })
       await expect(controller.getOne('office-1', req)).rejects.toThrow(
-        NotFoundException,
+        ForbiddenException,
       )
       await expect(controller.getOne('office-1', req)).rejects.toThrow(
-        'Elected office not found',
+        'Not allowed to access this elected office',
       )
     })
   })
@@ -482,7 +482,7 @@ describe('ElectedOfficeController', () => {
       expect(electedOfficeService.update).not.toHaveBeenCalled()
     })
 
-    it('throws NotFoundException when user does not own the record', async () => {
+    it('throws ForbiddenException when user does not own the record', async () => {
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
         existingElectedOffice,
       )
@@ -494,14 +494,14 @@ describe('ElectedOfficeController', () => {
           { swornInDate: new Date('2024-01-15') },
           req,
         ),
-      ).rejects.toThrow(NotFoundException)
+      ).rejects.toThrow(ForbiddenException)
       await expect(
         controller.update(
           'office-1',
           { swornInDate: new Date('2024-01-15') },
           req,
         ),
-      ).rejects.toThrow('Elected office not found')
+      ).rejects.toThrow('Not allowed to access this elected office')
 
       expect(electedOfficeService.update).not.toHaveBeenCalled()
     })
