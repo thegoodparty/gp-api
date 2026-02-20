@@ -131,13 +131,20 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     })
 
     for (const { id: pollId } of polls) {
-      await backfillPollCRMHooksData(
-        this.client,
-        this.logger,
-        pollId,
-        this.campaignsService,
-        this.contactsService,
-      )
+      try {
+        await backfillPollCRMHooksData(
+          this.client,
+          this.logger,
+          pollId,
+          this.campaignsService,
+          this.contactsService,
+        )
+      } catch (e) {
+        this.logger.error(
+          `[CRM Hooks Backfill] Failed for poll ${pollId}`,
+          e instanceof Error ? e.stack : e,
+        )
+      }
     }
   }
 }

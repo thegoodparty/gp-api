@@ -34,32 +34,38 @@ const backfillPhoneNumbers = async (
   }
 
   // Fetch phone numbers in parallel
-  const phoneNumbers = await pMap(
+  const messagesWithPhones = await pMap(
     messages,
-    (msg) => contacts.findPerson(msg.personId, campaign),
+    async (msg) => ({
+      messageId: msg.id,
+      person: await contacts.findPerson(msg.personId, campaign),
+    }),
     { concurrency: 20 },
   )
 
   await prisma.$transaction(async (tx) => {
-    for (const { id, cellPhone } of phoneNumbers) {
-      if (!cellPhone) {
+    for (const { messageId, person } of messagesWithPhones) {
+      if (!person.cellPhone) {
         continue
       }
       await tx.pollIndividualMessage.update({
-        where: { id },
-        data: { personCellPhone: normalizePhoneNumber(cellPhone) },
+        where: { id: messageId },
+        data: { personCellPhone: normalizePhoneNumber(person.cellPhone) },
       })
     }
   })
 
   logger.log(
-    `Backfilled ${phoneNumbers.length} phone numbers for poll ${pollId}`,
+    `Backfilled ${messagesWithPhones.length} phone numbers for poll ${pollId}`,
   )
 }
 
 const downloadObject = async (bucket: string, key: string) => {
   const obj = await s3.getObject({ Bucket: bucket, Key: key })
-  return obj.Body!.transformToString()
+  if (!obj.Body) {
+    throw new Error(`S3 object ${key} has no body`)
+  }
+  return obj.Body.transformToString()
 }
 
 const findJsonOutputKey = async (pollId: string, issues: PollIssue[]) => {
@@ -72,7 +78,13 @@ const findJsonOutputKey = async (pollId: string, issues: PollIssue[]) => {
   if (!outputs.Contents?.length) {
     return null
   }
-  const extractTimestamp = (key: string) => key.split('/')[2]
+  const extractTimestamp = (key: string) => {
+    const parts = key.split('/')
+    if (parts.length < 3) {
+      throw new Error(`Unexpected S3 key format: ${key}`)
+    }
+    return parts[2]
+  }
 
   const keys = outputs.Contents.map((c) => c.Key!)
 
@@ -86,6 +98,10 @@ const findJsonOutputKey = async (pollId: string, issues: PollIssue[]) => {
 
   if (clusterOutputs.length === 1) {
     return clusterOutputs[0]
+  }
+
+  if (!issues.length) {
+    return null
   }
 
   for (const clusterOutput of clusterOutputs) {
@@ -235,33 +251,25 @@ export const backfillPollCRMHooksData = async (
       })
       .filter(isNotNil)
 
-  const messageWithPerson = await pMap(
-    reducedMessages,
-    async (message) => {
-      const person = await contactsService.findPerson(
-        message.personId,
-        campaign,
-      )
-      return { ...message, personId: person.id }
-    },
-    { concurrency: 20 },
-  )
-
   await prisma.$transaction(async (tx) => {
-    for (const message of messageWithPerson) {
+    for (const message of reducedMessages) {
       if (!message.personCellPhone) {
         continue
       }
 
+      const { pollIssues, ...messageData } = message
       await tx.pollIndividualMessage.upsert({
         where: { id: message.id },
         create: message,
-        update: message,
+        update: {
+          ...messageData,
+          pollIssues: { set: pollIssues?.connect },
+        },
       })
     }
   })
 
   logger.log(
-    `[CRM Hooks Backfill] Backfilled CRM hooks data for poll ${pollId}. Messages backfilled: ${messageWithPerson.length}`,
+    `[CRM Hooks Backfill] Backfilled CRM hooks data for poll ${pollId}. Messages backfilled: ${reducedMessages.length}`,
   )
 }
