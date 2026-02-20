@@ -1,10 +1,16 @@
 import { APIPollStatus, derivePollStatus } from '@/polls/polls.types'
 import { Message } from '@aws-sdk/client-sqs'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
 import {
   Campaign,
   PathToVictory,
   Poll,
+  PollIndividualMessageSender,
   Prisma,
   TcrComplianceStatus,
 } from '@prisma/client'
@@ -12,6 +18,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
 import { isAxiosError } from 'axios'
 import { format, isBefore } from 'date-fns'
+import { groupBy } from 'es-toolkit'
 import { formatInTimeZone } from 'date-fns-tz'
 import parseCsv from 'neat-csv'
 import { serializeError } from 'serialize-error'
@@ -37,6 +44,7 @@ import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CampaignTcrComplianceService } from '../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { P2VResponse } from '../../pathToVictory/services/pathToVictory.service'
 import { isNestJsHttpException } from '../../shared/util/http.util'
+import { normalizePhoneNumber } from '../../shared/util/strings.util'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
 import { PeerlyCvVerificationStatus } from '../../vendors/peerly/peerly.types'
 import { EVENTS } from '../../vendors/segment/segment.types'
@@ -50,10 +58,16 @@ import {
   PollCreationEventSchema,
   PollExpansionEvent,
   PollExpansionEventSchema,
+  PollClusterAnalysisJsonSchema,
   QueueMessage,
   QueueType,
   TcrComplianceStatusCheckMessage,
 } from '../queue.types'
+import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
+import { v5 as uuidv5 } from 'uuid'
+
+const POLL_INDIVIDUAL_MESSAGE_NAMESPACE =
+  'a0e5f0a1-2b3c-4d5e-8f70-8192a3b4c5d6' as const
 
 @Injectable()
 export class QueueConsumerService {
@@ -69,6 +83,7 @@ export class QueueConsumerService {
     private readonly domainsService: DomainsService,
     private readonly pollsService: PollsService,
     private readonly pollIssuesService: PollIssuesService,
+    private readonly pollIndividualMessage: PollIndividualMessageService,
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly contactsService: ContactsService,
     private readonly s3Service: S3Service,
@@ -586,15 +601,22 @@ export class QueueConsumerService {
   }
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
-    this.logger.log(
-      `Handling poll analysis complete event for poll ${event.data.pollId}`,
-    )
-    const data = await this.getPollAndCampaign(event.data.pollId)
+    const { pollId, totalResponses, responsesLocation, issues } = event.data
+    this.logger.log(`Handling poll analysis complete event for poll ${pollId}`)
+    const data = await this.getPollAndCampaign(pollId)
     if (!data) {
       this.logger.log('Poll not found, ignoring event')
       return
     }
     const { poll, campaign } = data
+    const { electedOfficeId } = poll
+    const { userId: campaignUserId, pathToVictory } = campaign
+
+    if (!electedOfficeId) {
+      throw new InternalServerErrorException(
+        `Error: pollId ${pollId} has no elected office`,
+      )
+    }
 
     // We want to allow completing scheduled polls for testing purposes. In E2E tests
     // we create polls and want to simulate completing them quickly.
@@ -621,18 +643,18 @@ export class QueueConsumerService {
       //  - responses from >=10%
       // This was last decided here: https://goodparty.clickup.com/t/90132012119/ENG-4771
       highConfidence =
-        event.data.totalResponses > 75 ||
-        event.data.totalResponses / constituency.pagination.totalResults >= 0.1
+        totalResponses > 75 ||
+        totalResponses / constituency.pagination.totalResults >= 0.1
     }
 
     await this.pollIssuesService.model.deleteMany({
-      where: { pollId: event.data.pollId },
+      where: { pollId },
     })
     this.logger.log('Successfully deleted existing poll issues')
     await this.pollIssuesService.client.pollIssue.createMany({
-      data: event.data.issues.map((issue) => ({
-        id: `${event.data.pollId}-${issue.rank}`,
-        pollId: event.data.pollId,
+      data: issues.map((issue) => ({
+        id: `${pollId}-${issue.rank}`,
+        pollId,
         title: issue.theme,
         summary: issue.summary,
         details: issue.analysis,
@@ -645,33 +667,144 @@ export class QueueConsumerService {
       })),
     })
     this.logger.log('Successfully created new poll issues')
+    const bucket = process.env.SERVE_ANALYSIS_BUCKET_NAME
+    if (!bucket) {
+      throw new Error('Please set SERVE_ANALYSIS_BUCKET_NAME in your .env')
+    }
+    const responsesFileContent = await this.s3Service.getFile(
+      bucket,
+      responsesLocation,
+    )
+    if (!responsesFileContent) {
+      throw new InternalServerErrorException(
+        `Unable to fetch responses from S3 for pollId: ${pollId}`,
+      )
+    }
+    const rows = PollClusterAnalysisJsonSchema.parse(
+      JSON.parse(responsesFileContent),
+    )
+    // One response can span multiple rows / elements in the array (one per atomic message)
+    // and there may be duplicate rows
+    const groups = groupBy(
+      rows,
+      (r) => `${r.phoneNumber}\n${r.receivedAt ?? ''}`,
+    )
+
+    const phoneNumbers = Array.from(
+      new Set(rows.map((r) => normalizePhoneNumber(r.phoneNumber))),
+    )
+    const phoneToPersonIdMap = await this.findMappedPersonIdsForCellPhones({
+      electedOfficeId,
+      pollId,
+      phoneNumbers,
+    })
+
+    const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
+    const joinValues: Prisma.Sql[] = []
+
+    const validIssueIds = new Set(issues.map((i) => i.rank))
+
+    for (const [, groupRows] of Object.entries(groups)) {
+      const first = groupRows[0]
+      const { phoneNumber, originalMessage, receivedAt } = first
+      const isOptOut = groupRows.some((r) => Boolean(r.isOptOut))
+      const hasClusterId = groupRows.some(
+        (r) => r.clusterId !== '' && r.clusterId != null,
+      )
+
+      // Discard responses that have no cluster assignment, unless they are opt-outs
+      if (!hasClusterId && !isOptOut) continue
+
+      const normalizedPhone = normalizePhoneNumber(phoneNumber)
+      const personId = phoneToPersonIdMap.get(normalizedPhone)
+      if (!personId) {
+        throw new InternalServerErrorException(
+          `Person with cell phone ${phoneNumber} not found in poll ${pollId}`,
+        )
+      }
+
+      const uuid = uuidv5(
+        `${pollId}-${personId}-${receivedAt}`,
+        POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
+      )
+      const sentAt = receivedAt ? new Date(receivedAt) : new Date()
+
+      scalarData.push({
+        id: uuid,
+        personId,
+        personCellPhone: normalizedPhone,
+        sentAt,
+        isOptOut,
+        sender: PollIndividualMessageSender.CONSTITUENT,
+        content: originalMessage,
+        electedOfficeId,
+        pollId,
+      })
+
+      // Only link to poll issues that exist in the event data (i.e. the top 3 clusters).
+      // Multiple responses can also have the same cluster
+      // Responses with a clusterId outside the top 3 still get saved above, just without a link.
+      const seenIssueIds = new Set<string>()
+      for (const row of groupRows) {
+        const cid = row.clusterId
+        if (cid == '' || cid === undefined || cid == null) continue
+        const issueId = `${pollId}-${cid}`
+        if (validIssueIds.has(Number(cid)) && !seenIssueIds.has(issueId)) {
+          seenIssueIds.add(issueId)
+          joinValues.push(Prisma.sql`(${uuid}, ${issueId})`)
+        }
+      }
+    }
+
+    // Idempotency: delete constituent responses we're about to replace (same deterministic ids).
+    // Does not touch ELECTED_OFFICIAL messages (outreach); join rows removed by FK CASCADE.
+    const idsToReplace = scalarData.map((d) => d.id)
+    const prisma = this.pollIndividualMessage.client
+    await prisma.$transaction(async (tx) => {
+      await tx.pollIndividualMessage.deleteMany({
+        where: {
+          id: { in: idsToReplace },
+          pollId,
+          sender: PollIndividualMessageSender.CONSTITUENT,
+        },
+      })
+      await tx.pollIndividualMessage.createMany({ data: scalarData })
+      if (joinValues.length > 0) {
+        await tx.$executeRaw`
+          INSERT INTO "_PollIndividualMessageToPollIssue" ("A", "B")
+          VALUES ${Prisma.join(joinValues, ', ')}
+        `
+      }
+    })
 
     await this.pollsService.markPollComplete({
-      pollId: poll.id,
-      totalResponses: event.data.totalResponses,
+      pollId,
+      totalResponses,
       confidence: highConfidence ? 'HIGH' : 'LOW',
     })
 
     const pollCount = await this.pollsService.model.count({
       where: {
-        electedOfficeId: poll.electedOfficeId,
+        electedOfficeId,
         isCompleted: true,
       },
     })
 
-    await this.analytics.identify(campaign.userId, { pollcount: pollCount })
-    await this.analytics.track(
-      campaign.userId,
-      EVENTS.Polls.ResultsSynthesisCompleted,
-      {
-        pollId: poll.id,
-        path: `/dashboard/polls/${poll.id}`,
-        constituencyName: campaign.pathToVictory?.data.electionLocation,
-        'issue 1': event.data.issues?.at(0)?.theme || null,
-        'issue 2': event.data.issues?.at(1)?.theme || null,
-        'issue 3': event.data.issues?.at(2)?.theme || null,
-      },
-    )
+    await Promise.all([
+      this.analytics.identify(campaignUserId, { pollcount: pollCount }),
+      this.analytics.track(
+        campaignUserId,
+        EVENTS.Polls.ResultsSynthesisCompleted,
+        {
+          pollId,
+          path: `/dashboard/polls/${pollId}`,
+          constituencyName: pathToVictory?.data.electionLocation,
+          'issue 1': issues?.at(0)?.theme || null,
+          'issue 2': issues?.at(1)?.theme || null,
+          'issue 3': issues?.at(2)?.theme || null,
+        },
+      ),
+    ])
     return true
   }
 
@@ -699,7 +832,10 @@ export class QueueConsumerService {
       sampleParams: async (poll) => {
         const alreadySent =
           await this.pollsService.client.pollIndividualMessage.findMany({
-            where: { pollId: poll.id },
+            where: {
+              pollId: poll.id,
+              sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+            },
             select: { personId: true },
           })
 
@@ -773,7 +909,7 @@ export class QueueConsumerService {
       })
     }
 
-    const people = await parseCsv<{ id: string }>(csv)
+    const people = await parseCsv<{ id: string; cellPhone: string }>(csv)
 
     // 2. Create individual poll messages
     const now = new Date()
@@ -787,6 +923,8 @@ export class QueueConsumerService {
             pollId: poll.id,
             personId: person.id!,
             sentAt: now,
+            personCellPhone: normalizePhoneNumber(person.cellPhone),
+            electedOfficeId: poll.electedOfficeId,
           }
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
@@ -854,10 +992,37 @@ export class QueueConsumerService {
     })
 
     if (!campaign) {
-      this.logger.log('No campagin found, ignoring event')
+      this.logger.log('No campaign found, ignoring event')
       return
     }
     return { poll, office, campaign }
+  }
+
+  async findMappedPersonIdsForCellPhones(params: {
+    electedOfficeId: string
+    pollId: string
+    phoneNumbers: string[]
+  }) {
+    const { electedOfficeId, pollId, phoneNumbers } = params
+    const cellPhonesToPeopleIds: Map<string, string> = new Map()
+    const messages = await this.pollIndividualMessage.findMany({
+      where: {
+        electedOfficeId,
+        pollId,
+        personCellPhone: { in: phoneNumbers },
+        sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+      },
+    })
+    for (const message of messages) {
+      const { personCellPhone, personId } = message
+      if (!personCellPhone) {
+        throw new InternalServerErrorException(
+          'Encountered unexpected message without a cellphone',
+        )
+      }
+      cellPhonesToPeopleIds.set(normalizePhoneNumber(personCellPhone), personId)
+    }
+    return cellPhonesToPeopleIds
   }
 }
 

@@ -37,6 +37,7 @@ export const PollAnalysisCompleteEventSchema = z.object({
   data: z.object({
     pollId: z.string(),
     totalResponses: z.number(),
+    responsesLocation: z.string(),
     issues: z.array(
       z.object({
         pollId: z.string(),
@@ -76,3 +77,25 @@ export enum MessageGroup {
   domainEmailRedirect = 'domainEmailRedirect',
   polls = 'polls',
 }
+
+const PollResponseJsonRowSchema = z.object({
+  atomicId: z.string(),
+  phoneNumber: z.string(),
+  receivedAt: z.string(),
+  originalMessage: z.string(),
+  atomicMessage: z.string(),
+  pollId: z.string(),
+  clusterId: z.union([z.number(), z.string()]), // Empty string for opt-out rows
+  theme: z.string(),
+  category: z.string(),
+  summary: z.string(),
+  sentiment: z.string(),
+  isOptOut: z.boolean(),
+})
+
+export type PollResponseJsonRow = z.infer<typeof PollResponseJsonRowSchema>
+
+export const PollClusterAnalysisJsonSchema = z.array(PollResponseJsonRowSchema)
+export type PollClusterAnalysisJson = z.infer<
+  typeof PollClusterAnalysisJsonSchema
+>
