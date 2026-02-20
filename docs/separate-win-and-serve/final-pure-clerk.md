@@ -125,7 +125,7 @@ model Campaign {
   position   Position? @relation(fields: [positionId], references: [positionId])
   positionId String?   @map("position_id")
 
-  clerkOrganizationId String? @map("clerk_organization_id")
+  clerkOrganizationId String? @map("clerk_organization_slug")
 
   // campaignId FK on ElectedOffice is REMOVED
 }
@@ -136,7 +136,7 @@ model ElectedOffice {
   position   Position? @relation(fields: [positionId], references: [positionId])
   positionId String?   @map("position_id")
 
-  clerkOrganizationId String? @map("clerk_organization_id")
+  clerkOrganizationId String? @map("clerk_organization_slug")
 
   districtManuallySet Boolean @default(false) @map("district_manually_set")
 
@@ -202,7 +202,7 @@ Features that span both Win and Serve (like VoterFileFilter) store a `clerkOrgan
 model VoterFileFilter {
   id String @id @default(uuid())
 
-  clerkOrganizationId String @map("clerk_organization_id")
+  clerkOrganizationId String @map("clerk_organization_slug")
 
   // ... existing filter fields ...
 

@@ -7,7 +7,7 @@ This document proposes a direction for how we separate Win and Serve at the data
 Before you read, here's what would be most helpful from reviewers at this stage:
 
 - **Does the Position + thin Organization split feel right?** Position data is already normalized in `election-api`; Organization is just a lightweight linking entity with a type.
-- **Are we comfortable with the "no FK" convention for Organization references?** All references to `organizationId` are indexed strings, not foreign keys — this is intentional to make the Clerk migration trivial.
+- **Are we comfortable with the "no FK" convention for Organization references?** All references to `organizationSlug` are indexed strings, not foreign keys — this is intentional to make the Clerk migration trivial.
 - **Does the Clerk migration path make sense?** Phase 4 describes the switchover. Is there anything missing?
 - **Are there impacts to your team's domain that this document doesn't account for?**
 
@@ -130,19 +130,19 @@ User (1:many)
   └── Organization
         ├── type: campaign | electedOffice
         │
-        ├── campaign? (linked via Campaign.organizationId string)
-        └── electedOffice? (linked via ElectedOffice.organizationId string)
+        ├── campaign? (linked via Campaign.organizationSlug string)
+        └── electedOffice? (linked via ElectedOffice.organizationSlug string)
 ```
 
 Organizations follow these **key design rules**:
 
 - An Organization has _exactly one "child"_: either a Campaign or an ElectedOffice, never both.
-- **No foreign keys point to Organization.** Campaign, ElectedOffice, and shared features (like VoterFileFilter) store `organizationId` as an **indexed string column**, not a Prisma relation. This is intentional — the Organization table is temporary scaffolding that will be replaced by Clerk Organizations. Using plain strings means the migration requires zero data changes: we set the Clerk org slug to the UUID, and the existing stored values just work.
+- **No foreign keys point to Organization.** Campaign, ElectedOffice, and shared features (like VoterFileFilter) store `organizationSlug` as an **indexed string column**, not a Prisma relation. This is intentional — the Organization table is temporary scaffolding that will be replaced by Clerk Organizations. Using plain strings means the migration requires zero data changes: we set the Clerk org slug to the UUID, and the existing stored values just work.
 - A User can have multiple Organizations (e.g., a `campaign` Organization for a state senate run and an `electedOffice` Organization for a current city council position).
 - Feature-specific data keys like so:
   - Win-only features FK to Campaign (unchanged)
   - Serve-only features FK to ElectedOffice (unchanged)
-  - Shared features store `organizationId` as an indexed string
+  - Shared features store `organizationSlug` as an indexed string
 
 #### Schema (Prisma format)
 
@@ -173,10 +173,10 @@ model Campaign {
 
   positionId         String? @map("position_id")
   overrideDistrictId String? @map("override_district_id")
-  organizationId     String? @map("organization_id")
+  organizationSlug   String? @map("organization_slug")
 
   @@index([positionId])
-  @@index([organizationId])
+  @@index([organizationSlug])
 }
 
 model ElectedOffice {
@@ -184,14 +184,14 @@ model ElectedOffice {
 
   positionId         String? @map("position_id")
   overrideDistrictId String? @map("override_district_id")
-  organizationId     String? @map("organization_id")
+  organizationSlug   String? @map("organization_slug")
 
   @@index([positionId])
-  @@index([organizationId])
+  @@index([organizationSlug])
 }
 ```
 
-Note: `positionId`, `overrideDistrictId`, and `organizationId` are all **plain String columns** — not Prisma `@relation`s. `positionId` and `overrideDistrictId` reference tables in the `election-api` database (cross-database, no FK possible). `organizationId` references the temporary Organization table (no FK by design, for Clerk migration). The value of `positionId` is the Position's UUID (`id`), not the BallotReady position ID. The value of `overrideDistrictId` is a District UUID from `election-api`.
+Note: `positionId`, `overrideDistrictId`, and `organizationSlug` are all **plain String columns** — not Prisma `@relation`s. `positionId` and `overrideDistrictId` reference tables in the `election-api` database (cross-database, no FK possible). `organizationSlug` references the temporary Organization table (no FK by design, for Clerk migration). The value of `positionId` is the Position's UUID (`id`), not the BallotReady position ID. The value of `overrideDistrictId` is a District UUID from `election-api`.
 
 Changes to VoterFileFilter:
 
@@ -199,14 +199,14 @@ Changes to VoterFileFilter:
 model VoterFileFilter {
   // ... existing fields ...
 
-  organizationId String @map("organization_id")
+  organizationSlug String @map("organization_slug")
 
-  @@index([organizationId])
-  @@index([id, organizationId])
+  @@index([organizationSlug])
+  @@index([id, organizationSlug])
 }
 ```
 
-Note: `organizationId` on all three models is a **plain String column with an index** — not a Prisma `@relation`. There is no `onDelete: Cascade`, no referential integrity enforced by the database. This is by design.
+Note: `organizationSlug` on all three models is a **plain String column with an index** — not a Prisma `@relation`. There is no `onDelete: Cascade`, no referential integrity enforced by the database. This is by design.
 
 ### Key Decision: Duplicating `positionId` and `overrideDistrictId` vs. Keeping Organization Long-Term
 
@@ -221,7 +221,7 @@ We _could_ keep the Organization table permanently, pair it 1:1 with Clerk Organ
 - **SQL-native entity with FK relationships.** Organization stays as a first-class Postgres table. Shared features (VoterFileFilter, future tables) can use real foreign keys with cascading deletes, making it easy to traverse references when examining data in SQL.
 - **Clean home for any future shared fields.** If we later need to share additional fields between Campaign and ElectedOffice, they go on Organization. Without it, every new shared field must be duplicated — or a new resource must be created.
 - **Listing organizations doesn't require the Clerk API.** Backfill scripts, admin tools, and debugging scenarios can query the Organization table directly in SQL. Without it, any time we want to enumerate organizations we must call the Clerk API (and have a valid auth token).
-- **Deleting an organization and its data is a single cascade.** Delete the Organization row and Postgres cascades handle downstream data. Without the table, we must search for all downstream records by `organizationId` string and delete them explicitly.
+- **Deleting an organization and its data is a single cascade.** Delete the Organization row and Postgres cascades handle downstream data. Without the table, we must search for all downstream records by `organizationSlug` string and delete them explicitly.
 
 - **Vendor portability.** An internal Organization table means our data model isn't structurally dependent on Clerk. If we ever move off Clerk to a different auth vendor that supports organizations, the migration is straightforward — the internal table stays, only the auth integration changes.
 
@@ -229,13 +229,13 @@ We _could_ keep the Organization table permanently, pair it 1:1 with Clerk Organ
 
 - **One less model.** The Organization table is dropped entirely after Phase 4. There is no permanent infrastructure to maintain alongside Clerk — no two systems to keep in sync, no intermediary joins, no extra table in every migration.
 
-### The `X-Organization-Id` Header and `@UseOrganization()`
+### The `X-Organization-Slug` Header and `@UseOrganization()`
 
-With multiple organizations per user, and some features (like Contacts) supporting usage from both Win + Serve, we need _some way to resolve which Organization a particular API request is targeting_. This document proposes an `X-Organization-Id` header as the interim mechanism (to be replaced by Clerk's JWT-based org context later).
+With multiple organizations per user, and some features (like Contacts) supporting usage from both Win + Serve, we need _some way to resolve which Organization a particular API request is targeting_. This document proposes an `X-Organization-Slug` header as the interim mechanism (to be replaced by Clerk's JWT-based org context later).
 
 #### How the header works
 
-The frontend stores the user's active Organization selection from their switcher. Our centralized API utilities attach `X-Organization-Id: <id>` to every request automatically. On the server, a `@UseOrganization()` guard reads the header, verifies the Organization belongs to the authenticated user, and attaches the `organizationId` to the request.
+The frontend stores the user's active Organization selection from their switcher. Our centralized API utilities attach `X-Organization-Slug: <slug>` to every request automatically. On the server, a `@UseOrganization()` guard reads the header, verifies the Organization belongs to the authenticated user, and attaches the `organizationSlug` to the request.
 
 #### Why a header?
 
@@ -246,7 +246,7 @@ _Use a path parameter_ (e.g. `GET /orgs/:orgId/voter-filters`) -- why not this:
 - Duplication and boilerplate required in any route that needs to serve both features.
 - We must modify existing route patterns that are in production use (e.g. in Contacts)
 
-_Use a query parameter_ (e.g. use `/voter-file/filters?organizationId=123`) -- why not this:
+_Use a query parameter_ (e.g. use `/voter-file/filters?organizationSlug=123`) -- why not this:
 
 - Duplication and boilerplate required in any route that needs to serve both features.
 - We must modify existing route patterns that are in production use (e.g. in Contacts)
@@ -261,25 +261,25 @@ Using a header provides a few wins:
 
 The in-product Organization table is designed to be replaced by Clerk Organizations. The migration is intentionally zero-cost at the data layer because of two design decisions made upfront:
 
-1. **No foreign keys to Organization.** Every `organizationId` column in the system is a plain indexed string containing a UUID.
-2. **Clerk Organizations support slugs, and UUIDs are valid slugs.** When we create Clerk Organizations, we set each one's `slug` to the corresponding in-product Organization UUID. Clerk's JWT v2 includes the active org's slug in its claims (`o.slg`). The backend guard reads `o.slg` — which _is_ the UUID — and the existing stored `organizationId` values match without any data migration.
-3. **The `@UseOrganization()` guard abstracts the source.** Route handlers read `request.organizationId` — they don't know or care whether it came from a header or a JWT. Only the guard internals change.
+1. **No foreign keys to Organization.** Every `organizationSlug` column in the system is a plain indexed string containing a UUID.
+2. **Clerk Organizations support slugs, and UUIDs are valid slugs.** When we create Clerk Organizations, we set each one's `slug` to the corresponding in-product Organization UUID. Clerk's JWT v2 includes the active org's slug in its claims (`o.slg`). The backend guard reads `o.slg` — which _is_ the UUID — and the existing stored `organizationSlug` values match without any data migration.
+3. **The `@UseOrganization()` guard abstracts the source.** Route handlers read `request.organizationSlug` — they don't know or care whether it came from a header or a JWT. Only the guard internals change.
 
 #### How the migration works
 
 1. **Backfill Clerk Organizations.** For each in-product Organization, create a Clerk Organization via the `@clerk/backend` SDK. Set the Clerk Organization's `slug` to the in-product Organization's UUID. Set `publicMetadata` with `{ type, positionId }`. Set `createdBy` to the corresponding Clerk user ID.
 
-2. **Swap the guard.** Update `@UseOrganization()` to read `o.slg` from the Clerk JWT instead of reading the `X-Organization-Id` header. Since the slug _is_ the UUID, `request.organizationId` produces the exact same value. All downstream route handlers are unaffected. No stored data changes.
+2. **Swap the guard.** Update `@UseOrganization()` to read `o.slg` from the Clerk JWT instead of reading the `X-Organization-Slug` header. Since the slug _is_ the UUID, `request.organizationSlug` produces the exact same value. All downstream route handlers are unaffected. No stored data changes.
 
-3. **Swap the product switcher.** Replace the custom switcher (powered by `GET /organizations` and local state) with Clerk's `<OrganizationSwitcher />` or a custom switcher built on `useOrganizationList()` + `setActive()`. Remove the `X-Organization-Id` header attachment from the frontend API client.
+3. **Swap the product switcher.** Replace the custom switcher (powered by `GET /organizations` and local state) with Clerk's `<OrganizationSwitcher />` or a custom switcher built on `useOrganizationList()` + `setActive()`. Remove the `X-Organization-Slug` header attachment from the frontend API client.
 
 4. **Drop the Organization table.** Remove the model, the `GET /organizations` endpoint, and the Organization service.
 
-**No data migration is needed.** The `organizationId` values stored in Campaign, ElectedOffice, VoterFileFilter, and any future shared-feature tables remain unchanged. The Clerk org slug _is_ the UUID.
+**No data migration is needed.** The `organizationSlug` values stored in Campaign, ElectedOffice, VoterFileFilter, and any future shared-feature tables remain unchanged. The Clerk org slug _is_ the UUID.
 
 #### Why slugs?
 
-Clerk does not allow specifying a custom `id` when creating an Organization — Clerk generates `org_xxx` IDs internally. However, Clerk Organizations support a `slug` field (lowercase alphanumeric + dashes). UUIDs like `550e8400-e29b-41d4-a716-446655440000` are valid slugs. Clerk's JWT v2 format includes the slug in its claims as `o.slg`, meaning the backend can read it directly from the token without any API call. By setting slug = in-product Organization UUID, the existing `organizationId` values throughout the system continue to work as-is — the slug is the bridge that makes the migration a pure code change with zero data changes.
+Clerk does not allow specifying a custom `id` when creating an Organization — Clerk generates `org_xxx` IDs internally. However, Clerk Organizations support a `slug` field (lowercase alphanumeric + dashes). UUIDs like `550e8400-e29b-41d4-a716-446655440000` are valid slugs. Clerk's JWT v2 format includes the slug in its claims as `o.slg`, meaning the backend can read it directly from the token without any API call. By setting slug = in-product Organization UUID, the existing `organizationSlug` values throughout the system continue to work as-is — the slug is the bridge that makes the migration a pure code change with zero data changes.
 
 ## Implementation Path (summarized)
 
@@ -290,7 +290,7 @@ A more detailed implementation path is contained in the [subdoc](./final-v3-impl
 ### Phase 1: Position links, Organization table, and backfill
 
 - Create the Organization table.
-- Add `positionId` and `organizationId` string columns to Campaign and ElectedOffice.
+- Add `positionId` and `organizationSlug` string columns to Campaign and ElectedOffice.
 - Update key write paths to set `positionId` (referencing the existing Position table in `election-api`) and create Organizations alongside Campaigns/ElectedOffices.
 - Coordinate with the Data team to add `name` and `normalizedName` fields to the Position table.
 - Backfill `positionId` and Organization records for all existing data. Make columns non-nullable.
@@ -299,7 +299,7 @@ A more detailed implementation path is contained in the [subdoc](./final-v3-impl
 
 ### Phase 2: Migrate Contacts and Read Paths
 
-- Implement the product switcher UI, powered by `GET /organizations` and the `X-Organization-Id` header.
+- Implement the product switcher UI, powered by `GET /organizations` and the `X-Organization-Slug` header.
 - Create `@UseOrganization()` guard and `@ReqOrganization()` decorator.
 - Migrate BR+L2 read paths from Campaign/P2V to read from the Position table (via `positionId` → `election-api`).
 - Move VoterFileFilter onto Organization and update Contacts access-checking rules.
@@ -318,16 +318,16 @@ A more detailed implementation path is contained in the [subdoc](./final-v3-impl
 
 - Backfill Clerk Organizations with slug = in-product Organization UUID.
 - Swap the guard to read `o.slg` from the Clerk JWT (the slug _is_ the UUID — no data migration needed).
-- Swap the product switcher to Clerk hooks. Remove the `X-Organization-Id` header.
+- Swap the product switcher to Clerk hooks. Remove the `X-Organization-Slug` header.
 - Drop the Organization table.
 
-**Value Delivered**: The system is in the pure Clerk state. No in-product Organization table, no custom header. Clerk handles org context, switching, and (eventually) RBAC. Zero data migration — all existing `organizationId` values remain unchanged.
+**Value Delivered**: The system is in the pure Clerk state. No in-product Organization table, no custom header. Clerk handles org context, switching, and (eventually) RBAC. Zero data migration — all existing `organizationSlug` values remain unchanged.
 
 ## Key Takeaways
 
 - **Position is existing reference data.** It already lives in `election-api`, normalizes BR+L2 data, and is maintained by the Data team. We just reference it.
 - **Organization is thin and temporary.** It holds a type and an owner — no position data. It exists to unblock the team now and will be replaced by Clerk Organizations.
-- **No foreign keys point to Organization.** All `organizationId` references are plain indexed strings. Combined with the slug trick, this means the Clerk migration requires zero data changes — just a code swap in the guard and frontend.
+- **No foreign keys point to Organization.** All `organizationSlug` references are plain indexed strings. Combined with the slug trick, this means the Clerk migration requires zero data changes — just a code swap in the guard and frontend.
 - **Existing routes and guards don't change.** `@UseCampaign()` and `@UseElectedOffice()` stay as-is. Only shared features get a new `@UseOrganization()` guard.
 - **The Clerk migration is Phase 4, not a future unknown.** The design document explicitly accounts for the switchover and sizes the work.
 
