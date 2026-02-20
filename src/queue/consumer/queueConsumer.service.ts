@@ -36,7 +36,10 @@ import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.s
 import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
 import { PollsService } from 'src/polls/services/polls.service'
-import { sendTevynAPIPollMessage } from 'src/polls/utils/polls.utils'
+import {
+  POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
+  sendTevynAPIPollMessage,
+} from 'src/polls/utils/polls.utils'
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -65,9 +68,6 @@ import {
 } from '../queue.types'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
-
-const POLL_INDIVIDUAL_MESSAGE_NAMESPACE =
-  'a0e5f0a1-2b3c-4d5e-8f70-8192a3b4c5d6' as const
 
 @Injectable()
 export class QueueConsumerService {
