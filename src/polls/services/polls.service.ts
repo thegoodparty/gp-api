@@ -6,6 +6,10 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
 import { APIPollStatus, derivePollStatus } from '../polls.types'
+import { ContactsService } from '@/contacts/services/contacts.service'
+import { CampaignsService } from '@/campaigns/services/campaigns.service'
+import { Timeout } from '@nestjs/schedule'
+import { backfillPollCRMHooksData } from '../utils/crmhooksbackfill.util'
 
 type PollCreateInput = Omit<
   Prisma.PollCreateInput,
@@ -19,7 +23,11 @@ const estimatedCompletionDate = (scheduledDate: Date | string) =>
 
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
-  constructor(private readonly queueProducer: QueueProducerService) {
+  constructor(
+    private readonly queueProducer: QueueProducerService,
+    private readonly contactsService: ContactsService,
+    private readonly campaignsService: CampaignsService,
+  ) {
     super()
   }
 
@@ -112,5 +120,22 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
     )
 
     return result
+  }
+
+  @Timeout(0)
+  async crmHooksBackfill() {
+    const polls = await this.model.findMany({
+      select: { id: true },
+    })
+
+    for (const { id: pollId } of polls) {
+      await backfillPollCRMHooksData(
+        this.client,
+        this.logger,
+        pollId,
+        this.campaignsService,
+        this.contactsService,
+      )
+    }
   }
 }
