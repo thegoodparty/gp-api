@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ElectedOfficeController } from './electedOffice.controller'
 import { CreateElectedOfficeDto } from './schemas/electedOffice.schema'
 import { ElectedOfficeService } from './services/electedOffice.service'
+import { IncomingRequest } from '@/authentication/authentication.types'
 
 describe('ElectedOfficeController', () => {
   let controller: ElectedOfficeController
@@ -17,6 +18,7 @@ describe('ElectedOfficeController', () => {
   beforeEach(() => {
     electedOfficeService = {
       getCurrentElectedOffice: vi.fn(),
+      listElectedOffices: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -35,6 +37,60 @@ describe('ElectedOfficeController', () => {
 
     controller = new ElectedOfficeController(electedOfficeService)
     vi.clearAllMocks()
+  })
+
+  describe('list', () => {
+    it('delegates to listElectedOffices and returns result directly', async () => {
+      const mockResult = {
+        data: [
+          {
+            id: 'office-1',
+            userId: 1,
+            campaignId: 1,
+            isActive: true,
+            electedDate: new Date('2024-01-01'),
+            swornInDate: null,
+            termStartDate: null,
+            termEndDate: null,
+            termLengthDays: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        meta: { total: 1, offset: 0, limit: 100 },
+      }
+
+      vi.spyOn(electedOfficeService, 'listElectedOffices').mockResolvedValue(
+        mockResult,
+      )
+
+      const query = { offset: 0, limit: 100 }
+      const result = await controller.list(query)
+
+      expect(electedOfficeService.listElectedOffices).toHaveBeenCalledWith(
+        query,
+      )
+      expect(result).toEqual(mockResult)
+    })
+
+    it('passes filter params to service', async () => {
+      const mockResult = {
+        data: [],
+        meta: { total: 0, offset: 0, limit: 10 },
+      }
+
+      vi.spyOn(electedOfficeService, 'listElectedOffices').mockResolvedValue(
+        mockResult,
+      )
+
+      const query = { offset: 0, limit: 10, sortBy: 'createdAt', userId: 42 }
+      const result = await controller.list(query)
+
+      expect(electedOfficeService.listElectedOffices).toHaveBeenCalledWith(
+        query,
+      )
+      expect(result).toEqual(mockResult)
+    })
   })
 
   describe('getCurrent', () => {
@@ -96,28 +152,26 @@ describe('ElectedOfficeController', () => {
   })
 
   describe('getOne', () => {
-    it('returns elected office when user owns it', async () => {
-      const mockElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: new Date('2024-01-15'),
-        termStartDate: new Date('2024-01-15'),
-        termEndDate: new Date('2026-01-15'),
-        termLengthDays: 730,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+    const mockElectedOffice = {
+      id: 'office-1',
+      userId: 1,
+      campaignId: 1,
+      isActive: true,
+      electedDate: new Date('2024-01-01'),
+      swornInDate: new Date('2024-01-15'),
+      termStartDate: new Date('2024-01-15'),
+      termEndDate: new Date('2026-01-15'),
+      termLengthDays: 730,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
 
-      const user = { id: 1 } as User
-
+    it('returns toApi format for owner request', async () => {
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
         mockElectedOffice,
       )
 
-      const result = await controller.getOne('office-1', user)
+      const result = await controller.getOne('office-1', {} as IncomingRequest)
 
       expect(electedOfficeService.findUnique).toHaveBeenCalledWith({
         where: { id: 'office-1' },
@@ -131,46 +185,26 @@ describe('ElectedOfficeController', () => {
       })
     })
 
-    it('throws NotFoundException when user does not own the elected office', async () => {
-      const mockElectedOffice = {
-        id: 'office-1',
-        userId: 2,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      const user = { id: 1 } as User
-
+    it('returns full record for M2M request', async () => {
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
         mockElectedOffice,
       )
 
-      await expect(controller.getOne('office-1', user)).rejects.toThrow(
-        NotFoundException,
-      )
-      await expect(controller.getOne('office-1', user)).rejects.toThrow(
-        'Elected office not found',
-      )
+      const m2mReq = { m2mToken: {} } as unknown as IncomingRequest
+      const result = await controller.getOne('office-1', m2mReq)
+
+      expect(result).toEqual(mockElectedOffice)
     })
 
     it('throws NotFoundException when elected office does not exist', async () => {
-      const user = { id: 1 } as User
-
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(null)
 
-      await expect(controller.getOne('office-1', user)).rejects.toThrow(
-        NotFoundException,
-      )
-      await expect(controller.getOne('office-1', user)).rejects.toThrow(
-        'Elected office not found',
-      )
+      await expect(
+        controller.getOne('office-1', {} as IncomingRequest),
+      ).rejects.toThrow(NotFoundException)
+      await expect(
+        controller.getOne('office-1', {} as IncomingRequest),
+      ).rejects.toThrow('Elected office not found')
 
       expect(electedOfficeService.findUnique).toHaveBeenCalledWith({
         where: { id: 'office-1' },
@@ -310,21 +344,21 @@ describe('ElectedOfficeController', () => {
   })
 
   describe('update', () => {
-    it('updates elected office when user owns it', async () => {
-      const existingElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+    const existingElectedOffice = {
+      id: 'office-1',
+      userId: 1,
+      campaignId: 1,
+      isActive: true,
+      electedDate: new Date('2024-01-01'),
+      swornInDate: null,
+      termStartDate: null,
+      termEndDate: null,
+      termLengthDays: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
 
+    it('returns toApi format for owner request', async () => {
       const updatedElectedOffice = {
         ...existingElectedOffice,
         swornInDate: new Date('2024-01-15'),
@@ -333,7 +367,6 @@ describe('ElectedOfficeController', () => {
         termLengthDays: 730,
       }
 
-      const user = { id: 1 } as User
       const updateDto = {
         swornInDate: new Date('2024-01-15'),
         termStartDate: new Date('2024-01-15'),
@@ -348,7 +381,11 @@ describe('ElectedOfficeController', () => {
         updatedElectedOffice,
       )
 
-      const result = await controller.update('office-1', user, updateDto)
+      const result = await controller.update(
+        'office-1',
+        updateDto,
+        {} as IncomingRequest,
+      )
 
       expect(electedOfficeService.findUnique).toHaveBeenCalledWith({
         where: { id: 'office-1' },
@@ -371,74 +408,14 @@ describe('ElectedOfficeController', () => {
       })
     })
 
-    it('throws ForbiddenException when user does not own the elected office', async () => {
-      const existingElectedOffice = {
-        id: 'office-1',
-        userId: 2,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      const user = { id: 1 } as User
-      const updateDto = {
-        swornInDate: new Date('2024-01-15'),
-      }
-
-      vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
-        existingElectedOffice,
-      )
-
-      await expect(
-        controller.update('office-1', user, updateDto),
-      ).rejects.toThrow(ForbiddenException)
-      await expect(
-        controller.update('office-1', user, updateDto),
-      ).rejects.toThrow(
-        'You do not have permission to update this elected office',
-      )
-
-      expect(electedOfficeService.findUnique).toHaveBeenCalledWith({
-        where: { id: 'office-1' },
-      })
-      expect(electedOfficeService.update).not.toHaveBeenCalled()
-    })
-
-    it('updates elected office with null values', async () => {
-      const existingElectedOffice = {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: new Date('2024-01-15'),
-        termStartDate: new Date('2024-01-15'),
-        termEndDate: new Date('2026-01-15'),
-        termLengthDays: 730,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
+    it('returns full record for M2M request', async () => {
       const updatedElectedOffice = {
         ...existingElectedOffice,
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
+        swornInDate: new Date('2024-01-15'),
       }
 
-      const user = { id: 1 } as User
       const updateDto = {
-        swornInDate: null as Date | null,
-        termStartDate: null as Date | null,
-        termEndDate: null as Date | null,
-        termLengthDays: null as number | null,
+        swornInDate: new Date('2024-01-15'),
       }
 
       vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
@@ -448,7 +425,69 @@ describe('ElectedOfficeController', () => {
         updatedElectedOffice,
       )
 
-      const result = await controller.update('office-1', user, updateDto)
+      const m2mReq = { m2mToken: {} } as unknown as IncomingRequest
+      const result = await controller.update('office-1', updateDto, m2mReq)
+
+      expect(result).toEqual(updatedElectedOffice)
+    })
+
+    it('throws NotFoundException when elected office does not exist', async () => {
+      vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(null)
+
+      await expect(
+        controller.update(
+          'office-1',
+          { swornInDate: new Date('2024-01-15') },
+          {} as IncomingRequest,
+        ),
+      ).rejects.toThrow(NotFoundException)
+      await expect(
+        controller.update(
+          'office-1',
+          { swornInDate: new Date('2024-01-15') },
+          {} as IncomingRequest,
+        ),
+      ).rejects.toThrow('Elected office not found')
+
+      expect(electedOfficeService.update).not.toHaveBeenCalled()
+    })
+
+    it('updates elected office with null values', async () => {
+      const existingWithDates = {
+        ...existingElectedOffice,
+        swornInDate: new Date('2024-01-15'),
+        termStartDate: new Date('2024-01-15'),
+        termEndDate: new Date('2026-01-15'),
+        termLengthDays: 730,
+      }
+
+      const updatedElectedOffice = {
+        ...existingWithDates,
+        swornInDate: null,
+        termStartDate: null,
+        termEndDate: null,
+        termLengthDays: null,
+      }
+
+      const updateDto = {
+        swornInDate: null as Date | null,
+        termStartDate: null as Date | null,
+        termEndDate: null as Date | null,
+        termLengthDays: null as number | null,
+      }
+
+      vi.spyOn(electedOfficeService, 'findUnique').mockResolvedValue(
+        existingWithDates,
+      )
+      vi.spyOn(electedOfficeService, 'update').mockResolvedValue(
+        updatedElectedOffice,
+      )
+
+      const result = await controller.update(
+        'office-1',
+        updateDto,
+        {} as IncomingRequest,
+      )
 
       expect(electedOfficeService.update).toHaveBeenCalledWith({
         where: { id: 'office-1' },

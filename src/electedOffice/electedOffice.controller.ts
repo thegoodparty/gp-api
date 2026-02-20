@@ -7,6 +7,9 @@ import {
   Param,
   Post,
   Put,
+  Query,
+  Req,
+  UseGuards,
   UsePipes,
 } from '@nestjs/common'
 import { ElectedOfficeService } from './services/electedOffice.service'
@@ -19,6 +22,10 @@ import {
   CreateElectedOfficeDto,
   UpdateElectedOfficeDto,
 } from './schemas/electedOffice.schema'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { OwnerOrM2MGuard } from './guards/OwnerOrM2M.guard'
+import { ListElectedOfficePaginationSchema } from './schemas/ListElectedOfficePagination.schema'
+import { IncomingRequest } from '@/authentication/authentication.types'
 
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)
@@ -35,6 +42,12 @@ export class ElectedOfficeController {
     }
   }
 
+  @UseGuards(M2MOnly)
+  @Get('list')
+  async list(@Query() query: ListElectedOfficePaginationSchema) {
+    return this.electedOfficeService.listElectedOffices(query)
+  }
+
   @Get('current')
   async getCurrent(@ReqUser() user: User) {
     const record = await this.electedOfficeService.getCurrentElectedOffice(
@@ -46,13 +59,14 @@ export class ElectedOfficeController {
     return this.toApi(record)
   }
 
+  @UseGuards(OwnerOrM2MGuard)
   @Get(':id')
-  async getOne(@Param('id') id: string, @ReqUser() user: User) {
+  async getOne(@Param('id') id: string, @Req() req: IncomingRequest) {
     const record = await this.electedOfficeService.findUnique({ where: { id } })
-    if (!record || record.userId !== user.id) {
+    if (!record) {
       throw new NotFoundException('Elected office not found')
     }
-    return this.toApi(record)
+    return req.m2mToken ? record : this.toApi(record)
   }
 
   @Post('/')
@@ -79,19 +93,18 @@ export class ElectedOfficeController {
     return this.toApi(created)
   }
 
+  @UseGuards(OwnerOrM2MGuard)
   @Put(':id')
   async update(
     @Param('id') id: string,
-    @ReqUser() user: User,
     @Body() body: UpdateElectedOfficeDto,
+    @Req() req: IncomingRequest,
   ) {
     const existing = await this.electedOfficeService.findUnique({
       where: { id },
     })
-    if (!existing || existing.userId !== user.id) {
-      throw new ForbiddenException(
-        'You do not have permission to update this elected office',
-      )
+    if (!existing) {
+      throw new NotFoundException('Elected office not found')
     }
     const data: Prisma.ElectedOfficeUpdateInput = {
       electedDate: body.electedDate,
@@ -105,6 +118,6 @@ export class ElectedOfficeController {
       where: { id },
       data,
     })
-    return this.toApi(updated)
+    return req.m2mToken ? updated : this.toApi(updated)
   }
 }
