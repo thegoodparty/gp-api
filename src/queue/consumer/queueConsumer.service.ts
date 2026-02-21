@@ -32,6 +32,7 @@ import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.s
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
 import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
+import { recordBlockedStateEvent } from 'src/observability/grafana/otel.client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import { PollIssuesService } from 'src/polls/services/pollIssues.service'
@@ -598,17 +599,19 @@ export class QueueConsumerService {
         },
         SlackChannel.botPathToVictoryIssues,
       )
-      recordCustomEvent(CustomEventType.BlockedState, {
-        service: 'gp-api',
+      const blockedStateAttributes = {
+        service: 'gp-api' as const,
         environment: process.env.NODE_ENV,
         userId: campaign.userId,
         campaignId: campaign.id,
         slug: campaign.slug,
         feature: 'path_to_victory',
-        rootCause: 'p2v_failed',
+        rootCause: 'p2v_failed' as const,
         isBackground: true,
         p2vAttempts,
-      })
+      }
+      recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
+      recordBlockedStateEvent(blockedStateAttributes)
     }
 
     const updateData = {
