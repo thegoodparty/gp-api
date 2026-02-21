@@ -56,7 +56,7 @@ fi
 # For preview environments, start app in background, sync content, then wait
 if [ "$IS_PREVIEW" = "true" ]; then
   echo "Starting application in background for content sync..."
-  node -r ./newrelic.js dist/src/main &
+  node -r ./newrelic.js -r ./dist/src/otel.js dist/src/main &
   APP_PID=$!
   
   echo "Waiting for app to be healthy..."
@@ -78,6 +78,6 @@ if [ "$IS_PREVIEW" = "true" ]; then
   wait $APP_PID
 else
   # For non-preview environments, start normally
-  exec node -r ./newrelic.js dist/src/main
+  exec node -r ./newrelic.js -r ./dist/src/otel.js dist/src/main
 fi
 

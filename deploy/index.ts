@@ -336,6 +336,7 @@ export = async () => {
       PORT: '80',
       HOST: '0.0.0.0',
       LOG_LEVEL: 'debug',
+      OTEL_SERVICE_ENVIRONMENT: environment,
       CORS_ORIGIN: productDomain,
       AWS_REGION: 'us-west-2',
       ASSET_DOMAIN: select({
@@ -361,12 +362,12 @@ export = async () => {
       VOTER_DB_NAME: voterCluster.databaseName,
       ...(environment === 'preview'
         ? {
-          IS_PREVIEW: 'true',
-          ADMIN_EMAIL: process.env.ADMIN_EMAIL,
-          ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
-          CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
-          CANDIDATE_PASSWORD: process.env.CANDIDATE_PASSWORD,
-        }
+            IS_PREVIEW: 'true',
+            ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+            ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+            CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
+            CANDIDATE_PASSWORD: process.env.CANDIDATE_PASSWORD,
+          }
         : {}),
     },
     permissions: [
