@@ -6,6 +6,14 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
+import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+} from 'src/shared/constants/paginationOptions.consts'
+import { PaginatedResults } from 'src/shared/types/utility.types'
+import { ListCampaignsPaginationSchema } from '../schemas/ListCampaignsPagination.schema'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -25,8 +33,8 @@ import {
   CampaignStatus,
   OnboardingStep,
   PlanVersion,
+  UpdateCampaignFieldsInput,
 } from '../campaigns.types'
-import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
@@ -60,6 +68,36 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       where: { userId },
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+  }
+
+  async listCampaigns({
+    offset: skip = DEFAULT_PAGINATION_OFFSET,
+    limit = DEFAULT_PAGINATION_LIMIT,
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
+    userId,
+    slug,
+  }: ListCampaignsPaginationSchema): Promise<PaginatedResults<Campaign>> {
+    const where: Prisma.CampaignWhereInput = {
+      ...(userId ? { userId } : {}),
+      ...(slug
+        ? { slug: { contains: slug, mode: Prisma.QueryMode.insensitive } }
+        : {}),
+    }
+
+    return {
+      data: await this.model.findMany({
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        where,
+      }),
+      meta: {
+        total: await this.model.count({ where }),
+        offset: skip,
+        limit,
+      },
+    }
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
@@ -126,8 +164,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
   async updateJsonFields(
     id: number,
-    body: Omit<UpdateCampaignSchema, 'slug'>,
+    body: UpdateCampaignFieldsInput,
     trackCampaign: boolean = true,
+    scalarFields?: Prisma.CampaignUpdateInput,
   ) {
     const {
       data,
@@ -155,6 +194,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
         // Handle data and details JSON fields
         const campaignUpdateData = {} as Prisma.CampaignUpdateInput
+        if (scalarFields) {
+          Object.assign(campaignUpdateData, scalarFields)
+        }
         if (data) {
           campaignUpdateData.data = deepMerge(campaign.data as object, data)
         }
@@ -240,7 +282,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     // TODO: this should throw an exception if the update failed
     //  https://goodparty.atlassian.net/browse/WEB-4384
     if (updatedCampaign && trackCampaign) {
-      // Track campaign and user
+      if (scalarFields?.isPro) {
+        await this.analytics.identify(updatedCampaign.userId, {
+          isPro: scalarFields.isPro,
+        })
+      }
       await this.crm.trackCampaign(updatedCampaign.id)
     }
 

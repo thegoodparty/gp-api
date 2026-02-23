@@ -6,6 +6,7 @@ export interface AssetsBucketConfig {
 }
 
 export function createAssetsBucket({ environment }: AssetsBucketConfig): {
+  bucket: aws.s3.BucketV2
   bucketRegionalDomainName: pulumi.Output<string>
 } {
   const select = <T>(values: Record<'dev' | 'qa' | 'prod', T>): T =>
@@ -22,33 +23,19 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
     forceDestroy: false,
   })
 
-  if (environment !== 'prod') {
-    new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
-      bucket: bucket.id,
-      blockPublicAcls: false,
-      blockPublicPolicy: false,
-      ignorePublicAcls: false,
-      restrictPublicBuckets: false,
-    })
-  }
-
-  new aws.s3.BucketPolicy('assetsBucketPolicy', {
+  // Block public bucket policies but allow per-object ACLs for now.
+  // Legacy AwsS3Service sets ACL: public_read on uploads -- once that code is
+  // migrated to the new S3Service (no ACL), flip these back to true.
+  new aws.s3.BucketPublicAccessBlock('assetsBucketPublicAccessBlock', {
     bucket: bucket.id,
-    policy: aws.iam.getPolicyDocumentOutput({
-      statements: [
-        {
-          principals: [
-            {
-              type: '*',
-              identifiers: ['*'],
-            },
-          ],
-          actions: ['s3:GetObject'],
-          resources: [pulumi.interpolate`${bucket.arn}/*`],
-        },
-      ],
-    }).json,
+    blockPublicAcls: false,
+    blockPublicPolicy: true,
+    ignorePublicAcls: false,
+    restrictPublicBuckets: true,
   })
+
+  // Bucket policy allowing CloudFront OAC access is created in assets-router.ts
+  // for all environments, scoped to the CloudFront distribution it manages.
 
   new aws.s3.BucketCorsConfigurationV2('assetsBucketCors', {
     bucket: bucket.id,
@@ -74,6 +61,7 @@ export function createAssetsBucket({ environment }: AssetsBucketConfig): {
   })
 
   return {
+    bucket,
     bucketRegionalDomainName: bucket.bucketRegionalDomainName,
   }
 }

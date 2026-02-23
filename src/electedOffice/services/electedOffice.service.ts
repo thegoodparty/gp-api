@@ -1,6 +1,14 @@
 import { ConflictException, Injectable } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+} from 'src/shared/constants/paginationOptions.consts'
+import { PaginatedResults } from 'src/shared/types/utility.types'
+import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 
 @Injectable()
 export class ElectedOfficeService extends createPrismaBase(
@@ -63,5 +71,33 @@ export class ElectedOfficeService extends createPrismaBase(
     return this.model.findFirst({
       where: { userId, isActive: true },
     })
+  }
+
+  async listElectedOffices({
+    offset: skip = DEFAULT_PAGINATION_OFFSET,
+    limit = DEFAULT_PAGINATION_LIMIT,
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
+    userId,
+  }: ListElectedOfficePaginationSchema): Promise<
+    PaginatedResults<ElectedOffice>
+  > {
+    const where: Prisma.ElectedOfficeWhereInput = {
+      ...(userId ? { userId } : {}),
+    }
+
+    return {
+      data: await this.model.findMany({
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        where,
+      }),
+      meta: {
+        total: await this.model.count({ where }),
+        offset: skip,
+        limit,
+      },
+    }
   }
 }

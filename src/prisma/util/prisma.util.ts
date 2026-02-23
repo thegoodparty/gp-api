@@ -142,7 +142,7 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
             where: {
               AND: [params.where, { updatedAt: existing.updatedAt }],
             },
-            data: patch,
+            data: { ...patch, updatedAt: new Date() },
           } as Parameters<ModelDelegate['updateManyAndReturn']>[0])
 
           if (result.length === 0) {

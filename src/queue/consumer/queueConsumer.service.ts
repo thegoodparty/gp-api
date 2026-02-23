@@ -707,6 +707,14 @@ export class QueueConsumerService {
     for (const [, groupRows] of Object.entries(groups)) {
       const first = groupRows[0]
       const { phoneNumber, originalMessage, receivedAt } = first
+      const isOptOut = groupRows.some((r) => Boolean(r.isOptOut))
+      const hasClusterId = groupRows.some(
+        (r) => r.clusterId !== '' && r.clusterId != null,
+      )
+
+      // Discard responses that have no cluster assignment, unless they are opt-outs
+      if (!hasClusterId && !isOptOut) continue
+
       const normalizedPhone = normalizePhoneNumber(phoneNumber)
       const personId = phoneToPersonIdMap.get(normalizedPhone)
       if (!personId) {
@@ -719,7 +727,6 @@ export class QueueConsumerService {
         `${pollId}-${personId}-${receivedAt}`,
         POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
       )
-      const isOptOut = groupRows.some((r) => Boolean(r.isOptOut))
       const sentAt = receivedAt ? new Date(receivedAt) : new Date()
 
       scalarData.push({
@@ -734,9 +741,9 @@ export class QueueConsumerService {
         pollId,
       })
 
-      // Several rows / elements in the same group can have the same clusterId
-      // So we have to guard against that to ensure we're not creating duplicate join records
-      // If that is changed, then seenIssueIds is no longer needed
+      // Only link to poll issues that exist in the event data (i.e. the top 3 clusters).
+      // Multiple responses can also have the same cluster
+      // Responses with a clusterId outside the top 3 still get saved above, just without a link.
       const seenIssueIds = new Set<string>()
       for (const row of groupRows) {
         const cid = row.clusterId
@@ -825,7 +832,10 @@ export class QueueConsumerService {
       sampleParams: async (poll) => {
         const alreadySent =
           await this.pollsService.client.pollIndividualMessage.findMany({
-            where: { pollId: poll.id },
+            where: {
+              pollId: poll.id,
+              sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
+            },
             select: { personId: true },
           })
 
@@ -918,6 +928,7 @@ export class QueueConsumerService {
             personId: person.id!,
             sentAt: now,
             personCellPhone: normalizePhoneNumber(person.cellPhone),
+            electedOfficeId: poll.electedOfficeId,
           }
           await tx.pollIndividualMessage.upsert({
             where: { id: message.id },
@@ -997,13 +1008,12 @@ export class QueueConsumerService {
     phoneNumbers: string[]
   }) {
     const { electedOfficeId, pollId, phoneNumbers } = params
-    const normalizedPhones = phoneNumbers.map(normalizePhoneNumber)
     const cellPhonesToPeopleIds: Map<string, string> = new Map()
     const messages = await this.pollIndividualMessage.findMany({
       where: {
         electedOfficeId,
         pollId,
-        personCellPhone: { in: normalizedPhones },
+        personCellPhone: { in: phoneNumbers },
         sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
       },
     })
