@@ -63,6 +63,8 @@ jobs:
         if: github.ref_name != 'master' && steps.rc-version.outputs.changed == 'true'
         working-directory: contracts
         run: npx changeset publish --tag rc
+        env:
+          NPM_CONFIG_PROVENANCE: 'true'
 
       - name: Comment RC version on PR
         if: github.event_name == 'pull_request' && steps.rc-version.outputs.changed == 'true'
@@ -94,6 +96,7 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NPM_CONFIG_PROVENANCE: 'true'
 
       - name: Calculate overall coverage
         id: coverage-calc
