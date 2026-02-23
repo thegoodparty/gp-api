@@ -1,0 +1,37 @@
+{
+  "name": "@goodparty_org/contracts",
+  "version": "0.0.1",
+  "description": "Shared Zod schemas and TypeScript types for the GoodParty API",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate-enums": "tsx scripts/generate-enums.ts",
+    "dev": "tsup --watch",
+    "build": "npm run generate-enums && tsup",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "validator": "^13.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/validator": "^13.12.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.6.3"
+  }
+}

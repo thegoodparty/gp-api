@@ -5,6 +5,9 @@
   "author": "Tomer Almog",
   "private": true,
   "license": "CC0-1.0",
+  "workspaces": [
+    "contracts"
+  ],
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",

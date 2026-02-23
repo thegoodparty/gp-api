@@ -1,30 +1,11 @@
-import { z } from 'zod'
+import { CreateUserInputSchema as BaseCreateUserInputSchema, SIGN_UP_MODE } from '@goodparty_org/contracts'
+import { WriteEmailSchema } from 'src/shared/schemas'
 import { createZodDto } from 'nestjs-zod'
-import {
-  PasswordSchema,
-  PhoneSchema,
-  RolesSchema,
-  WriteEmailSchema,
-  ZipSchema,
-} from 'src/shared/schemas'
 
-export enum SIGN_UP_MODE {
-  CANDIDATE = 'candidate',
-  FACILITATED = 'facilitated',
-}
+export { SIGN_UP_MODE } from '@goodparty_org/contracts'
 
-export const CreateUserInputSchema = z.object({
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
+export const CreateUserInputSchema = BaseCreateUserInputSchema.extend({
   email: WriteEmailSchema,
-  password: PasswordSchema.optional(),
-  name: z.string().optional(),
-  zip: ZipSchema.optional(),
-  phone: PhoneSchema.optional(),
-  roles: RolesSchema,
-  signUpMode: z
-    .enum([SIGN_UP_MODE.CANDIDATE, SIGN_UP_MODE.FACILITATED])
-    .optional(),
-  allowTexts: z.boolean().optional(),
 })
+
 export class CreateUserInputDto extends createZodDto(CreateUserInputSchema) {}

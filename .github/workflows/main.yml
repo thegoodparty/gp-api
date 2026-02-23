@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
   pull-requests: write
 
 env:
@@ -36,12 +36,52 @@ jobs:
 
       # Validation
       - run: npm run generate
+
+      - name: Build contracts
+        run: cd contracts && npm run build
+
       - run: npx tsc --noEmit
       - run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
       - run: npx prettier --check "src/**/*.{ts,js,json}"
       - run: npm run test -- --coverage
 
       - run: npm run build
+
+      - name: Snapshot version contracts
+        if: github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'qa')
+        working-directory: contracts
+        run: npx changeset version --snapshot ${{ github.ref_name }}
+
+      - name: Commit snapshot version
+        if: github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'qa')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add contracts/package.json
+          git diff --staged --quiet || git commit -m "chore: snapshot contracts version [skip ci]"
+          git push
+
+      - name: Generate App token
+        if: github.event_name == 'push' && github.ref_name == 'master'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Create Release PR or Publish contracts
+        if: github.event_name == 'push' && github.ref_name == 'master'
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: cd contracts && npx changeset publish
+          title: 'chore: release @goodparty_org/contracts'
+          cwd: contracts
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Calculate overall coverage
         id: coverage-calc

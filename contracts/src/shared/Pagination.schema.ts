@@ -27,3 +27,16 @@ export const FilterablePaginationSchema = <F extends z.ZodRawShape>({
   sortKeys: readonly string[]
   filterFields: F
 }) => SortablePaginationSchema(sortKeys).extend(filterFields)
+
+export const PaginationMetaSchema = z.object({
+  total: z.number(),
+  offset: z.number(),
+  limit: z.number(),
+})
+
+export type PaginationMeta = z.infer<typeof PaginationMetaSchema>
+
+export type PaginatedList<T> = {
+  data: T[]
+  meta: PaginationMeta
+}

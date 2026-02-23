@@ -140,6 +140,77 @@ To set up your AWS CLI locally, run the following script:
 curl -fsSL https://raw.githubusercontent.com/thegoodparty/gp-api/master/scripts/aws-setup.sh | bash
 ```
 
+## Contracts Package (`@goodparty_org/contracts`)
+
+A shared Zod schema and TypeScript types package published to npm as `@goodparty_org/contracts`. It is consumed by `gp-sdk` and other projects to keep API request/response types in sync without duplication.
+
+The contracts source lives in the `contracts/` directory at the repo root and is managed as an npm workspace.
+
+### Local Development
+
+`npm install` at the repo root automatically links contracts via npm workspaces. No extra steps needed for normal gp-api development.
+
+### Building Contracts Locally
+
+```bash
+cd contracts && npm run build
+```
+
+This runs Prisma enum codegen (reads DMMF, writes `src/generated/enums.ts`) then tsup (compiles `src/` to `dist/` with CJS, ESM, and `.d.ts` outputs).
+
+Use watch mode for live rebuilds during development:
+
+```bash
+cd contracts && npm run dev
+```
+
+### When You Modify a Contract Schema
+
+Add a changeset file before opening your PR:
+
+```bash
+cd contracts
+npx changeset
+```
+
+Follow the interactive prompt to select a semver bump type and write a summary, then commit the generated changeset file with your PR.
+
+### When You Modify a Prisma Enum
+
+Run `npm run generate` at the repo root first (to regenerate Prisma client), then:
+
+```bash
+cd contracts && npm run build
+```
+
+This regenerates the enum definitions in `contracts/src/generated/enums.ts`.
+
+### How Publishing Works
+
+Contracts are automatically published to npm when changes are merged to `master`. The `changesets/action` in CI opens a "Version Packages" PR to bump the version. Merging that PR triggers the actual npm publish.
+
+On `develop` and `qa` branches, contracts receive a snapshot version that is committed but not published.
+
+### Testing Against gp-sdk Locally
+
+Build contracts first, then use the path form of `npm link` from gp-sdk:
+
+```bash
+cd ~/dev/good-party/gp-api/contracts
+npm run build
+
+cd ~/dev/good-party/gp-sdk
+npm link ../gp-api/contracts
+```
+
+Run `npm run dev` in both `contracts/` and `gp-sdk/` for live rebuild chaining. To revert to the npm-published version:
+
+```bash
+cd ~/dev/good-party/gp-sdk
+npm unlink @goodparty_org/contracts
+npm install
+```
+
 ## Deployment
 
 This project's deployment is managed via [Pulumi](https://www.pulumi.com/) within the [deploy](./deploy) directory.
