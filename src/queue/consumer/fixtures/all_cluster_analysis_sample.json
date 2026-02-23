@@ -1,0 +1,58 @@
+[
+  {
+    "atomicId": "8a612d61-13e1-4f72-8ad5-c4d411cf0df0",
+    "phoneNumber": "12088508796",
+    "receivedAt": "2026-02-09T18:00:47+00:00",
+    "originalMessage": "STOP",
+    "atomicMessage": "STOP",
+    "pollId": "019c29d4-81aa-733e-a72a-3983baf19a22",
+    "clusterId": "",
+    "theme": "Opt Out Request",
+    "category": "",
+    "summary": "",
+    "sentiment": "",
+    "isOptOut": true
+  },
+  {
+    "atomicId": "d0a91e2d-1e76-4fef-a103-1a03d47b9ee5",
+    "phoneNumber": "12088639774",
+    "receivedAt": "2026-02-09T18:00:55+00:00",
+    "originalMessage": "Traffic",
+    "atomicMessage": "The volume and flow of traffic in the local area requires attention to improve mobility and safety.",
+    "pollId": "019c29d4-81aa-733e-a72a-3983baf19a22",
+    "clusterId": 2,
+    "theme": "Traffic Congestion Management",
+    "category": "Transportation",
+    "summary": "Residents demand immediate action to reduce traffic volume and improve road safety through better infrastructure and enforcement.",
+    "sentiment": "negative",
+    "isOptOut": false
+  },
+  {
+    "atomicId": "4d0c6074-c03b-4afc-8c39-163188ed652a",
+    "phoneNumber": "12817265015",
+    "receivedAt": "2026-02-09T18:02:01+00:00",
+    "originalMessage": "Community development of parks and community engagement opportunities.  That and biking infrastructure that is actually safe ",
+    "atomicMessage": "Community development of parks and community engagement opportunities.",
+    "pollId": "019c29d4-81aa-733e-a72a-3983baf19a22",
+    "clusterId": 1,
+    "theme": "Community Safety Enhancements",
+    "category": "Community Services",
+    "summary": "Residents demand a comprehensive approach to public safety that combines park development with drug prevention and violence reduction.",
+    "sentiment": "concerned",
+    "isOptOut": false
+  },
+  {
+    "atomicId": "f48ce543-5539-4c6b-91d3-ece10ddba634",
+    "phoneNumber": "12817265015",
+    "receivedAt": "2026-02-09T18:02:01+00:00",
+    "originalMessage": "Community development of parks and community engagement opportunities.  That and biking infrastructure that is actually safe ",
+    "atomicMessage": "Biking infrastructure that is actually safe.",
+    "pollId": "019c29d4-81aa-733e-a72a-3983baf19a22",
+    "clusterId": 2,
+    "theme": "Infrastructure Maintenance",
+    "category": "Infrastructure",
+    "summary": "Residents demand immediate repairs to damaged roadways, safer cycling paths, and better management of invasive weeds on public sidewalks.",
+    "sentiment": "negative",
+    "isOptOut": false
+  }
+]
