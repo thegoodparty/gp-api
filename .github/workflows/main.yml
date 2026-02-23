@@ -48,6 +48,12 @@ jobs:
 
       - run: npm run build
 
+      - name: Setup Node 24 for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
       - name: RC version contracts
         if: github.ref_name != 'master'
         id: rc-version
@@ -66,8 +72,6 @@ jobs:
           && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         working-directory: contracts
         run: npx changeset publish --tag rc
-        env:
-          NPM_CONFIG_PROVENANCE: 'true'
 
       - name: Comment RC version on PR
         if: github.event_name == 'pull_request' && steps.rc-version.outputs.changed == 'true'
@@ -99,7 +103,6 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NPM_CONFIG_PROVENANCE: 'true'
 
       - name: Calculate overall coverage
         id: coverage-calc
