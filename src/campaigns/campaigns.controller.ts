@@ -328,24 +328,15 @@ export class CampaignsController {
       state: campaign.details?.state || '',
     })
 
-    if (!raceTargetDetails) {
-      throw new InternalServerErrorException(
-        'Error: Failed to look up the provided L2District',
-      )
-    }
     const hasTurnout =
-      !!raceTargetDetails.projectedTurnout &&
+      !!raceTargetDetails?.projectedTurnout &&
       raceTargetDetails.projectedTurnout > 0
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        ...raceTargetDetails,
+        ...(raceTargetDetails || {}),
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
         districtManuallySet: true,
-        // buildRaceTargetDetails returns p2vStatus: Complete and turnout fields
-        // (possibly 0). When there's no turnout, override with sentinel -1
-        // values to clear stale turnout from a previous district, and set
-        // status to DistrictMatched instead of Complete.
         ...(!hasTurnout
           ? {
               projectedTurnout: -1,
