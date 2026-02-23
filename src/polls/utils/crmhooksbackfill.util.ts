@@ -43,17 +43,22 @@ const backfillPhoneNumbers = async (
     { concurrency: 20 },
   )
 
-  await prisma.$transaction(async (tx) => {
-    for (const { messageId, person } of messagesWithPhones) {
-      if (!person.cellPhone) {
-        continue
+  await prisma.$transaction(
+    async (tx) => {
+      for (const { messageId, person } of messagesWithPhones) {
+        if (!person.cellPhone) {
+          continue
+        }
+        await tx.pollIndividualMessage.update({
+          where: { id: messageId },
+          data: { personCellPhone: normalizePhoneNumber(person.cellPhone) },
+        })
       }
-      await tx.pollIndividualMessage.update({
-        where: { id: messageId },
-        data: { personCellPhone: normalizePhoneNumber(person.cellPhone) },
-      })
-    }
-  })
+    },
+    {
+      timeout: 20000,
+    },
+  )
 
   logger.log(
     `Backfilled ${messagesWithPhones.length} phone numbers for poll ${pollId}`,
