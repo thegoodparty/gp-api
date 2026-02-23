@@ -1,6 +1,6 @@
 {
   "name": "@goodparty_org/contracts",
-  "version": "0.0.1",
+  "version": "0.0.0-rc-20260223213822",
   "description": "Shared Zod schemas and TypeScript types for the GoodParty API",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -29,6 +29,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.8",
     "@types/validator": "^13.12.2",
     "tsup": "^8.5.1",
     "tsx": "^4.20.6",
