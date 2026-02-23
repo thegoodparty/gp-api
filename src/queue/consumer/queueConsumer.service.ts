@@ -919,11 +919,7 @@ export class QueueConsumerService {
           const message: Prisma.PollIndividualMessageUncheckedCreateInput = {
             // It's important that this id be deterministic, so that we can safely re-upsert
             // a previous CSV.
-            //id: `${poll.id}-${person.id}`,
-            id: uuidv5(
-              `${poll.id}-${person.id!}`,
-              POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
-            ),
+            id: `${poll.id}-${person.id}`,
             pollId: poll.id,
             personId: person.id!,
             sentAt: now,
