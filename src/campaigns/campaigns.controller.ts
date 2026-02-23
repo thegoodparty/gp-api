@@ -1,3 +1,5 @@
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
 import {
   BadRequestException,
   Body,
@@ -7,7 +9,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
   Param,
@@ -33,19 +34,17 @@ import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
-import { ListCampaignsPaginationSchema } from './schemas/ListCampaignsPagination.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
+import { ListCampaignsPaginationSchema } from './schemas/ListCampaignsPagination.schema'
+import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
 import {
   SetDistrictDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
+import { UpdateCampaignM2MSchema } from './schemas/UpdateCampaignM2M.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
-import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
-import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
-import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
-import { UpdateCampaignM2MSchema } from './schemas/UpdateCampaignM2M.schema'
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
@@ -328,24 +327,15 @@ export class CampaignsController {
       state: campaign.details?.state || '',
     })
 
-    if (!raceTargetDetails) {
-      throw new InternalServerErrorException(
-        'Error: Failed to look up the provided L2District',
-      )
-    }
     const hasTurnout =
-      !!raceTargetDetails.projectedTurnout &&
+      !!raceTargetDetails?.projectedTurnout &&
       raceTargetDetails.projectedTurnout > 0
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        ...raceTargetDetails,
+        ...(raceTargetDetails || {}),
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
         districtManuallySet: true,
-        // buildRaceTargetDetails returns p2vStatus: Complete and turnout fields
-        // (possibly 0). When there's no turnout, override with sentinel -1
-        // values to clear stale turnout from a previous district, and set
-        // status to DistrictMatched instead of Complete.
         ...(!hasTurnout
           ? {
               projectedTurnout: -1,

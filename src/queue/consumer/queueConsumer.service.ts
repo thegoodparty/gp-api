@@ -651,20 +651,22 @@ export class QueueConsumerService {
       where: { pollId },
     })
     this.logger.log('Successfully deleted existing poll issues')
-    await this.pollIssuesService.client.pollIssue.createMany({
-      data: issues.map((issue) => ({
-        id: `${pollId}-${issue.rank}`,
-        pollId,
-        title: issue.theme,
-        summary: issue.summary,
-        details: issue.analysis,
-        mentionCount: issue.responseCount,
-        representativeComments: issue.quotes.map((quote) => ({
-          quote: quote.quote,
-        })),
-        createdAt: new Date(),
-        updatedAt: new Date(),
+
+    const issuesToWrite = issues.map((issue) => ({
+      id: `${pollId}-${issue.rank}`,
+      pollId,
+      title: issue.theme,
+      summary: issue.summary,
+      details: issue.analysis,
+      mentionCount: issue.responseCount,
+      representativeComments: issue.quotes.map((quote) => ({
+        quote: quote.quote,
       })),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+    await this.pollIssuesService.client.pollIssue.createMany({
+      data: issuesToWrite,
     })
     this.logger.log('Successfully created new poll issues')
     const bucket = process.env.SERVE_ANALYSIS_BUCKET_NAME
@@ -701,8 +703,6 @@ export class QueueConsumerService {
 
     const scalarData: Prisma.PollIndividualMessageCreateManyInput[] = []
     const joinValues: Prisma.Sql[] = []
-
-    const validIssueIds = new Set(issues.map((i) => i.rank))
 
     for (const [, groupRows] of Object.entries(groups)) {
       const first = groupRows[0]
@@ -744,15 +744,11 @@ export class QueueConsumerService {
       // Only link to poll issues that exist in the event data (i.e. the top 3 clusters).
       // Multiple responses can also have the same cluster
       // Responses with a clusterId outside the top 3 still get saved above, just without a link.
-      const seenIssueIds = new Set<string>()
-      for (const row of groupRows) {
-        const cid = row.clusterId
-        if (cid == '' || cid === undefined || cid == null) continue
-        const issueId = `${pollId}-${cid}`
-        if (validIssueIds.has(Number(cid)) && !seenIssueIds.has(issueId)) {
-          seenIssueIds.add(issueId)
-          joinValues.push(Prisma.sql`(${uuid}, ${issueId})`)
-        }
+      const linkedIssues = issuesToWrite.filter((issue) =>
+        groupRows.some((row) => row.theme === issue.title),
+      )
+      for (const issue of linkedIssues) {
+        joinValues.push(Prisma.sql`(${uuid}, ${issue.id})`)
       }
     }
 
