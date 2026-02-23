@@ -31,6 +31,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
 
@@ -47,22 +48,35 @@ jobs:
 
       - run: npm run build
 
-      - name: Snapshot version contracts
-        if: github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'qa')
+      - name: RC version contracts
+        if: github.ref_name != 'master'
+        id: rc-version
         working-directory: contracts
-        run: npx changeset version --snapshot ${{ github.ref_name }}
-
-      - name: Commit snapshot version
-        if: github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'qa')
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add contracts/package.json
-          git diff --staged --quiet || git commit -m "chore: snapshot contracts version [skip ci]"
-          git push
+          BEFORE=$(node -p "require('./package.json').version")
+          npx changeset version --snapshot rc
+          AFTER=$(node -p "require('./package.json').version")
+          echo "changed=$( [ "$BEFORE" != "$AFTER" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "version=$AFTER" >> "$GITHUB_OUTPUT"
+
+      - name: Publish RC contracts
+        if: github.ref_name != 'master' && steps.rc-version.outputs.changed == 'true'
+        working-directory: contracts
+        run: npx changeset publish --tag rc
+
+      - name: Comment RC version on PR
+        if: github.event_name == 'pull_request' && steps.rc-version.outputs.changed == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            **@goodparty_org/contracts** RC published: `${{ steps.rc-version.outputs.version }}`
+            ```
+            npm install @goodparty_org/contracts@${{ steps.rc-version.outputs.version }}
+            ```
 
       - name: Generate App token
-        if: github.event_name == 'push' && github.ref_name == 'master'
+        if: github.ref_name == 'master'
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
@@ -70,7 +84,7 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Create Release PR or Publish contracts
-        if: github.event_name == 'push' && github.ref_name == 'master'
+        if: github.ref_name == 'master'
         id: changesets
         uses: changesets/action@v1
         with:
@@ -80,8 +94,6 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Calculate overall coverage
         id: coverage-calc
