@@ -3,6 +3,9 @@ import { WebClient } from '@slack/web-api'
 
 export const pollMessageGroup = (pollId: string) => `polls-${pollId}`
 
+export const POLL_INDIVIDUAL_MESSAGE_NAMESPACE =
+  'a0e5f0a1-2b3c-4d5e-8f70-8192a3b4c5d6' as const
+
 export const sendTevynAPIPollMessage = async (
   client: WebClient,
   {
