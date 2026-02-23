@@ -1,18 +1,13 @@
-let Prisma: typeof import('@prisma/client').Prisma
-try {
-  Prisma = require('@prisma/client').Prisma
-} catch {
-  console.error(
-    'Error: @prisma/client not found. This script must run from within the gp-api workspace.\n' +
-    'Run `npm install` at the gp-api root, then `npm run generate` before building contracts.',
-  )
-  process.exit(1)
-}
-
+import { Prisma } from '@prisma/client'
 import { writeFileSync, mkdirSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 
-const outputDir = join(__dirname, '..', 'src', 'generated')
+const scriptDir = typeof __dirname !== 'undefined'
+  ? __dirname
+  : dirname(fileURLToPath(import.meta.url))
+
+const outputDir = join(scriptDir, '..', 'src', 'generated')
 const outputPath = join(outputDir, 'enums.ts')
 
 const toConstName = (enumName: string): string => {
