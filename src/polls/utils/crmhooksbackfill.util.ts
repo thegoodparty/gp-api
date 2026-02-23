@@ -202,7 +202,7 @@ export const backfillPollCRMHooksData = async (
   const existingMessages = await prisma.pollIndividualMessage.findMany({
     where: {
       pollId: poll.id,
-      sender: PollIndividualMessageSender.CONSTITUENT,
+      sender: PollIndividualMessageSender.ELECTED_OFFICIAL,
     },
   })
 
@@ -213,6 +213,17 @@ export const backfillPollCRMHooksData = async (
           (m) => m.phoneNumber === phoneNumber,
         )
         const first = allAtomizedMessagesForPhoneNumber[0]
+
+        const isOptOut = allAtomizedMessagesForPhoneNumber.some(
+          (m) => m.isOptOut,
+        )
+
+        if (
+          !isOptOut &&
+          allAtomizedMessagesForPhoneNumber.every((m) => !m.theme)
+        ) {
+          return null
+        }
 
         const messageIssues = issues.filter((i) =>
           allAtomizedMessagesForPhoneNumber.some((m) => m.theme === i.title),
@@ -241,7 +252,7 @@ export const backfillPollCRMHooksData = async (
           sender: PollIndividualMessageSender.CONSTITUENT,
           content: first.originalMessage,
           sentAt: new Date(first.receivedAt),
-          isOptOut: allAtomizedMessagesForPhoneNumber.some((m) => m.isOptOut),
+          isOptOut,
           pollIssues: {
             connect: messageIssues.map((i) => ({
               id: i.id,
