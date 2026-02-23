@@ -289,13 +289,13 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
         phoneNumber,
         receivedAt: '2024-01-15T10:00:00Z',
         originalMessage: 'My response',
-        clusterId: 1,
+        clusterId: 4,
       },
       {
         phoneNumber,
         receivedAt: '2024-01-15T10:00:00Z',
         originalMessage: 'My response',
-        clusterId: 2,
+        clusterId: 16,
         isOptOut: true,
       },
     ])
