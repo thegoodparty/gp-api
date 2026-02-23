@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, PathToVictory, User, UserRole } from '@prisma/client'
@@ -872,14 +871,32 @@ describe('CampaignsController', () => {
       ).rejects.toThrow(NotFoundException)
     })
 
-    it('throws InternalServerErrorException when buildRaceTargetDetails returns null', async () => {
+    it('saves district with sentinel values when buildRaceTargetDetails returns null', async () => {
       vi.spyOn(electionsService, 'buildRaceTargetDetails').mockResolvedValue(
         null,
       )
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
 
-      await expect(
-        controller.setDistrict(mockCampaign, mockUser, districtBody),
-      ).rejects.toThrow(InternalServerErrorException)
+      await controller.setDistrict(mockCampaign, mockUser, districtBody)
+
+      expect(campaignsService.updateJsonFields).toHaveBeenCalledWith(
+        mockCampaign.id,
+        {
+          pathToVictory: expect.objectContaining({
+            electionType: 'State Senate',
+            electionLocation: 'District 5',
+            projectedTurnout: -1,
+            winNumber: -1,
+            voterContactGoal: -1,
+            p2vStatus: P2VStatus.districtMatched,
+            districtManuallySet: true,
+            p2vAttempts: 0,
+            officeContextFingerprint: null,
+          }),
+        },
+      )
     })
 
     it('uses sentinel -1 values when no turnout', async () => {
