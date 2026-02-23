@@ -1,13 +1,8 @@
 import { Prisma } from '@prisma/client'
 import { writeFileSync, mkdirSync } from 'fs'
-import { dirname, join } from 'path'
-import { fileURLToPath } from 'url'
+import { join } from 'path'
 
-const scriptDir = typeof __dirname !== 'undefined'
-  ? __dirname
-  : dirname(fileURLToPath(import.meta.url))
-
-const outputDir = join(scriptDir, '..', 'src', 'generated')
+const outputDir = join(__dirname, '..', 'src', 'generated')
 const outputPath = join(outputDir, 'enums.ts')
 
 const toConstName = (enumName: string): string => {
