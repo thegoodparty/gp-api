@@ -150,7 +150,11 @@ The contracts source lives in the `contracts/` directory at the repo root and is
 
 `npm install` at the repo root automatically links contracts via npm workspaces. No extra steps needed for normal gp-api development.
 
+**Important**: Contracts must always be built from within the gp-api workspace (not in isolation). The enum codegen script depends on `@prisma/client` which is installed at the repo root and shared via npm workspaces.
+
 ### Building Contracts Locally
+
+Ensure you've run `npm install` and `npm run generate` at the repo root first, then:
 
 ```bash
 cd contracts && npm run build

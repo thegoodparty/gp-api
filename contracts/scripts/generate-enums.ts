@@ -1,4 +1,14 @@
-import { Prisma } from '@prisma/client'
+let Prisma: typeof import('@prisma/client').Prisma
+try {
+  Prisma = require('@prisma/client').Prisma
+} catch {
+  console.error(
+    'Error: @prisma/client not found. This script must run from within the gp-api workspace.\n' +
+    'Run `npm install` at the gp-api root, then `npm run generate` before building contracts.',
+  )
+  process.exit(1)
+}
+
 import { writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 

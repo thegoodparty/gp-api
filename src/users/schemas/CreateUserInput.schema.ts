@@ -1,4 +1,4 @@
-import { CreateUserInputSchema as BaseCreateUserInputSchema, SIGN_UP_MODE } from '@goodparty_org/contracts'
+import { CreateUserInputSchema as BaseCreateUserInputSchema } from '@goodparty_org/contracts'
 import { WriteEmailSchema } from 'src/shared/schemas'
 import { createZodDto } from 'nestjs-zod'
 
