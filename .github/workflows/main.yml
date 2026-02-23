@@ -60,7 +60,10 @@ jobs:
           echo "version=$AFTER" >> "$GITHUB_OUTPUT"
 
       - name: Publish RC contracts
-        if: github.ref_name != 'master' && steps.rc-version.outputs.changed == 'true'
+        if: >-
+          github.ref_name != 'master'
+          && steps.rc-version.outputs.changed == 'true'
+          && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         working-directory: contracts
         run: npx changeset publish --tag rc
         env:

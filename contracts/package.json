@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "generate-enums": "tsx scripts/generate-enums.ts",
-    "dev": "tsup --watch",
+    "dev": "npm run generate-enums && tsup --watch",
     "build": "npm run generate-enums && tsup",
     "prepublishOnly": "npm run build"
   },
