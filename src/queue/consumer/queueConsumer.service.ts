@@ -756,22 +756,29 @@ export class QueueConsumerService {
     // Does not touch ELECTED_OFFICIAL messages (outreach); join rows removed by FK CASCADE.
     const idsToReplace = scalarData.map((d) => d.id)
     const prisma = this.pollIndividualMessage.client
-    await prisma.$transaction(async (tx) => {
-      await tx.pollIndividualMessage.deleteMany({
-        where: {
-          id: { in: idsToReplace },
-          pollId,
-          sender: PollIndividualMessageSender.CONSTITUENT,
-        },
-      })
-      await tx.pollIndividualMessage.createMany({ data: scalarData })
-      if (joinValues.length > 0) {
-        await tx.$executeRaw`
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.pollIndividualMessage.deleteMany({
+          where: {
+            id: { in: idsToReplace },
+            pollId,
+            sender: PollIndividualMessageSender.CONSTITUENT,
+          },
+        })
+        await tx.pollIndividualMessage.createMany({ data: scalarData })
+        if (joinValues.length > 0) {
+          await tx.$executeRaw`
           INSERT INTO "_PollIndividualMessageToPollIssue" ("A", "B")
           VALUES ${Prisma.join(joinValues, ', ')}
         `
-      }
-    })
+        }
+      },
+      { timeout: 20000 },
+    )
+
+    this.logger.log(
+      `Created individual messages for poll ${pollId} (linked issues: ${joinValues.length})`,
+    )
 
     await this.pollsService.markPollComplete({
       pollId,
