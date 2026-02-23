@@ -10,6 +10,7 @@ import { makeOptional } from '../shared/zod.util'
 export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   password: true,
   allowTexts: true,
+  signUpMode: true,
 }).extend({
   name: z.string().nullish(),
   zip: makeOptional(ZipSchema),

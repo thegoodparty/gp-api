@@ -3,11 +3,8 @@ import { PasswordSchema } from '../shared/Password.schema'
 
 export const UpdatePasswordSchema = z
   .object({
-    oldPassword: PasswordSchema,
+    oldPassword: PasswordSchema.optional(),
     newPassword: PasswordSchema,
-  })
-  .required({
-    newPassword: true,
   })
   .strict()
 

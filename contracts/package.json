@@ -1,6 +1,6 @@
 {
   "name": "@goodparty_org/contracts",
-  "version": "0.0.0-rc-20260223213822",
+  "version": "0.0.1",
   "description": "Shared Zod schemas and TypeScript types for the GoodParty API",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
