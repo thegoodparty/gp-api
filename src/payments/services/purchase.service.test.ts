@@ -155,7 +155,7 @@ describe('PurchaseService', () => {
   })
 
   describe('createPurchaseIntent with zero amount', () => {
-    it('should skip Stripe and return synthetic response when amount is 0', async () => {
+    it('should skip Stripe and return synthetic response when amount is 0 without calling post-purchase', async () => {
       // Arrange: Register a handler that returns 0 amount (free texts covers all)
       const mockHandler: PurchaseHandler<unknown> = {
         validatePurchase: vi.fn().mockResolvedValue(undefined),
@@ -190,17 +190,9 @@ describe('PurchaseService', () => {
       expect(result.amount).toBe(0)
       expect(result.status).toBe('succeeded')
 
-      // Assert: Should execute post-purchase handler immediately
-      expect(mockPostPurchaseHandler).toHaveBeenCalledOnce()
-      expect(mockPostPurchaseHandler).toHaveBeenCalledWith(
-        expect.stringMatching(/^free_\d+_1$/),
-        expect.objectContaining({
-          contactCount: 298,
-          pricePerContact: 3.5,
-          campaignId: 111,
-          purchaseType: PurchaseType.TEXT,
-        }),
-      )
+      // Assert: Should NOT execute post-purchase handler during intent creation
+      // Post-purchase is deferred to completeFreePurchase() when user explicitly confirms
+      expect(mockPostPurchaseHandler).not.toHaveBeenCalled()
     })
 
     it('should call Stripe when amount is greater than 0', async () => {
@@ -255,7 +247,7 @@ describe('PurchaseService', () => {
       expect(mockPostPurchaseHandler).not.toHaveBeenCalled()
     })
 
-    it('should propagate errors from post-purchase handler on zero-amount purchase', async () => {
+    it('should not call post-purchase handler at all on zero-amount purchase (deferred to confirmation)', async () => {
       // Arrange
       const mockHandler: PurchaseHandler<unknown> = {
         validatePurchase: vi.fn().mockResolvedValue(undefined),
@@ -267,17 +259,19 @@ describe('PurchaseService', () => {
       service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
       service.registerPostPurchaseHandler(PurchaseType.TEXT, failingHandler)
 
-      // Act & Assert: Error should propagate, not be swallowed
-      await expect(
-        service.createPurchaseIntent({
-          user: mockUser,
-          dto: {
-            type: PurchaseType.TEXT,
-            metadata: { contactCount: 100 },
-          },
-          campaign: mockCampaign,
-        }),
-      ).rejects.toThrow('Failed to redeem free texts')
+      // Act: Should NOT throw because post-purchase handler is not called
+      const result = await service.createPurchaseIntent({
+        user: mockUser,
+        dto: {
+          type: PurchaseType.TEXT,
+          metadata: { contactCount: 100 },
+        },
+        campaign: mockCampaign,
+      })
+
+      // Assert: Should return synthetic response without calling handler
+      expect(result.amount).toBe(0)
+      expect(failingHandler).not.toHaveBeenCalled()
     })
   })
 
@@ -382,7 +376,7 @@ describe('PurchaseService', () => {
       )
     })
 
-    it('should skip Stripe and execute post-purchase handler when amount is 0', async () => {
+    it('should skip Stripe and defer post-purchase handler when amount is 0', async () => {
       // Arrange: Handler returns zero amount (free texts offer covers all)
       const mockHandler: PurchaseHandler<unknown> = {
         validatePurchase: vi.fn().mockResolvedValue(undefined),
@@ -419,66 +413,14 @@ describe('PurchaseService', () => {
       expect(result.clientSecret).toBe('')
       expect(result.amount).toBe(0)
 
-      // Assert: Should execute post-purchase handler immediately
-      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledOnce()
-      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledWith(
-        expect.stringMatching(/^free_\d+_1$/),
-        expect.objectContaining({
-          contactCount: 298,
-          pricePerContact: 3.5,
-          campaignId: 111,
-          purchaseType: PurchaseType.TEXT,
-        }),
-      )
+      // Assert: Should NOT execute post-purchase handler during session creation
+      // Post-purchase is deferred to completeFreePurchase() when user explicitly confirms
+      expect(mockCheckoutSessionPostPurchaseHandler).not.toHaveBeenCalled()
     })
 
-    it('should include userId in zero-amount checkout metadata', async () => {
-      // Arrange: This covers the Bugbot issue where zero-amount checkouts
-      // did not include userId, breaking handlers that require it
-      // (e.g., handlePollPostPurchase). The zero-amount path is only
-      // reachable for TEXT purchases (free texts offer), not domain
-      // purchases (which always have a real price from Vercel/Route53).
-      const mockHandler: PurchaseHandler<unknown> = {
-        validatePurchase: vi.fn().mockResolvedValue(undefined),
-        calculateAmount: vi.fn().mockResolvedValue(0),
-      }
-      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
-      service.registerCheckoutSessionPostPurchaseHandler(
-        PurchaseType.TEXT,
-        mockCheckoutSessionPostPurchaseHandler,
-      )
-
-      // Act
-      await service.createCheckoutSession({
-        user: mockUser,
-        dto: {
-          type: PurchaseType.TEXT,
-          metadata: {
-            contactCount: 100,
-            pricePerContact: 3.5,
-          },
-        },
-        campaign: mockCampaign,
-      })
-
-      // Assert: Handler metadata MUST include userId
-      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledWith(
-        expect.stringMatching(/^free_\d+_1$/),
-        expect.objectContaining({
-          userId: '1',
-          contactCount: 100,
-          pricePerContact: 3.5,
-          campaignId: 111,
-          purchaseType: PurchaseType.TEXT,
-        }),
-      )
-    })
-
-    it('should pass synthetic free_ session ID to post-purchase handler for zero-amount checkout', async () => {
+    it('should return synthetic free_ session ID for zero-amount checkout without calling handler', async () => {
       // Arrange: The zero-amount path generates a synthetic free_ session ID.
-      // This only applies to TEXT purchases (free texts offer covers the cost).
-      // Domain purchases always have a real price from Vercel/Route53 and
-      // always go through Stripe, so they never hit this path.
+      // Post-purchase handler is NOT called here — it's deferred to completeFreePurchase.
       const mockHandler: PurchaseHandler<unknown> = {
         validatePurchase: vi.fn().mockResolvedValue(undefined),
         calculateAmount: vi.fn().mockResolvedValue(0),
@@ -500,10 +442,11 @@ describe('PurchaseService', () => {
 
       // Assert: Session ID must start with free_ prefix
       expect(result.id).toMatch(/^free_/)
-      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledWith(
-        expect.stringMatching(/^free_/),
-        expect.any(Object),
-      )
+      expect(result.clientSecret).toBe('')
+      expect(result.amount).toBe(0)
+
+      // Assert: Handler is NOT called during session creation
+      expect(mockCheckoutSessionPostPurchaseHandler).not.toHaveBeenCalled()
     })
 
     it('should reject invalid purchase types', async () => {
@@ -520,7 +463,7 @@ describe('PurchaseService', () => {
       ).rejects.toThrow('Invalid purchase type: INVALID_TYPE')
     })
 
-    it('should propagate errors from post-purchase handler on zero-amount checkout', async () => {
+    it('should not call post-purchase handler on zero-amount checkout (deferred to confirmation)', async () => {
       // Arrange
       const mockHandler: PurchaseHandler<unknown> = {
         validatePurchase: vi.fn().mockResolvedValue(undefined),
@@ -535,17 +478,19 @@ describe('PurchaseService', () => {
         failingHandler,
       )
 
-      // Act & Assert: Error should propagate, not be swallowed
-      await expect(
-        service.createCheckoutSession({
-          user: mockUser,
-          dto: {
-            type: PurchaseType.TEXT,
-            metadata: { contactCount: 100 },
-          },
-          campaign: mockCampaign,
-        }),
-      ).rejects.toThrow('Failed to redeem free texts')
+      // Act: Should NOT throw because post-purchase handler is not called
+      const result = await service.createCheckoutSession({
+        user: mockUser,
+        dto: {
+          type: PurchaseType.TEXT,
+          metadata: { contactCount: 100 },
+        },
+        campaign: mockCampaign,
+      })
+
+      // Assert: Should return synthetic response without calling handler
+      expect(result.amount).toBe(0)
+      expect(failingHandler).not.toHaveBeenCalled()
     })
   })
 
@@ -936,6 +881,182 @@ describe('PurchaseService', () => {
       expect(
         mockStripeService.updatePaymentIntentMetadata,
       ).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('completeFreePurchase', () => {
+    const registerZeroAmountFreePurchaseHandlers = () => {
+      const mockHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
+
+      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
+      service.registerCheckoutSessionPostPurchaseHandler(
+        PurchaseType.TEXT,
+        mockCheckoutSessionPostPurchaseHandler,
+      )
+    }
+
+    it('should execute post-purchase handler with server-validated campaignId', async () => {
+      // Arrange
+      registerZeroAmountFreePurchaseHandlers()
+
+      // Act
+      const result = await service.completeFreePurchase({
+        dto: {
+          purchaseType: PurchaseType.TEXT,
+          metadata: {
+            contactCount: 298,
+            pricePerContact: 3.5,
+            outreachType: 'p2p',
+            audienceSize: 500,
+          },
+        },
+        campaign: mockCampaign,
+        user: mockUser,
+      })
+
+      // Assert: Handler should be called with server-validated campaignId
+      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledOnce()
+      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledWith(
+        expect.stringMatching(/^free_confirmed_\d+$/),
+        expect.objectContaining({
+          contactCount: 298,
+          outreachType: 'p2p',
+          campaignId: 111,
+          userId: '1',
+          purchaseType: PurchaseType.TEXT,
+        }),
+      )
+      expect(result.result).toEqual({ success: true })
+    })
+
+    it('should throw for invalid purchase type', async () => {
+      await expect(
+        service.completeFreePurchase({
+          dto: {
+            purchaseType: 'INVALID' as PurchaseType,
+            metadata: {},
+          },
+          user: mockUser,
+        }),
+      ).rejects.toThrow('Invalid purchase type: INVALID')
+    })
+
+    it('should throw when no purchase handler is registered', async () => {
+      await expect(
+        service.completeFreePurchase({
+          dto: {
+            purchaseType: PurchaseType.TEXT,
+            metadata: {
+              contactCount: 100,
+              pricePerContact: 3.5,
+              outreachType: 'p2p',
+              audienceSize: 200,
+            },
+          },
+          campaign: mockCampaign,
+          user: mockUser,
+        }),
+      ).rejects.toThrow('No handler found for purchase type: TEXT')
+    })
+
+    it('should propagate errors from post-purchase handler', async () => {
+      // Arrange
+      const purchaseHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(0),
+      }
+      const failingHandler = vi
+        .fn()
+        .mockRejectedValue(new Error('Failed to redeem free texts'))
+      service.registerPurchaseHandler(PurchaseType.TEXT, purchaseHandler)
+      service.registerCheckoutSessionPostPurchaseHandler(
+        PurchaseType.TEXT,
+        failingHandler,
+      )
+
+      // Act & Assert
+      await expect(
+        service.completeFreePurchase({
+          dto: {
+            purchaseType: PurchaseType.TEXT,
+            metadata: {
+              contactCount: 100,
+              pricePerContact: 3.5,
+              outreachType: 'p2p',
+              audienceSize: 200,
+            },
+          },
+          campaign: mockCampaign,
+          user: mockUser,
+        }),
+      ).rejects.toThrow('Failed to redeem free texts')
+    })
+
+    it('should work without a campaign (no campaignId merged)', async () => {
+      // Arrange
+      registerZeroAmountFreePurchaseHandlers()
+
+      // Act
+      await service.completeFreePurchase({
+        dto: {
+          purchaseType: PurchaseType.TEXT,
+          metadata: {
+            contactCount: 50,
+            pricePerContact: 3.5,
+            outreachType: 'p2p',
+            audienceSize: 100,
+          },
+        },
+        // No campaign provided
+        user: mockUser,
+      })
+
+      // Assert: Handler called without campaignId
+      expect(mockCheckoutSessionPostPurchaseHandler).toHaveBeenCalledWith(
+        expect.stringMatching(/^free_confirmed_\d+$/),
+        expect.objectContaining({
+          contactCount: 50,
+          userId: '1',
+          purchaseType: PurchaseType.TEXT,
+        }),
+      )
+    })
+
+    it('should reject free completion when calculated amount is greater than 0', async () => {
+      // Arrange
+      const nonFreeHandler: PurchaseHandler<unknown> = {
+        validatePurchase: vi.fn().mockResolvedValue(undefined),
+        calculateAmount: vi.fn().mockResolvedValue(1234),
+      }
+      service.registerPurchaseHandler(PurchaseType.TEXT, nonFreeHandler)
+      service.registerCheckoutSessionPostPurchaseHandler(
+        PurchaseType.TEXT,
+        mockCheckoutSessionPostPurchaseHandler,
+      )
+
+      // Act & Assert
+      await expect(
+        service.completeFreePurchase({
+          dto: {
+            purchaseType: PurchaseType.TEXT,
+            metadata: {
+              contactCount: 6000,
+              pricePerContact: 3.5,
+              outreachType: 'p2p',
+              audienceSize: 10000,
+            },
+          },
+          campaign: mockCampaign,
+          user: mockUser,
+        }),
+      ).rejects.toThrow(
+        'Free purchase completion is only allowed for zero-amount purchases. Calculated amount: 1234',
+      )
+
+      expect(mockCheckoutSessionPostPurchaseHandler).not.toHaveBeenCalled()
     })
   })
 })
