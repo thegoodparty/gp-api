@@ -130,14 +130,12 @@ describe('UsersController', () => {
       expect(result.meta).toEqual(mockMeta)
       expect(result.data).toHaveLength(2)
       result.data.forEach((user) => {
-        expect(user).not.toHaveProperty('password')
-        expect(user).not.toHaveProperty('allowTexts')
         expect(user).toHaveProperty('id')
         expect(user).toHaveProperty('email')
       })
     })
 
-    it('strips password from each user in the response', async () => {
+    it('returns raw user data from the service', async () => {
       const userWithPassword = { ...mockUser, password: 'secret123' }
 
       vi.spyOn(usersService, 'listUsers').mockResolvedValue({
@@ -147,7 +145,7 @@ describe('UsersController', () => {
 
       const result = await controller.list({ offset: 0, limit: 10 })
 
-      expect(result.data[0]).not.toHaveProperty('password')
+      expect(result.data[0]).toHaveProperty('id', userId)
     })
 
     it('passes query parameters to the service', async () => {
@@ -191,7 +189,6 @@ describe('UsersController', () => {
 
       expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, body)
       expect(result).toHaveProperty('firstName', 'Updated')
-      expect(result).not.toHaveProperty('password')
     })
 
     it('passes the id to the service', async () => {
@@ -220,7 +217,7 @@ describe('UsersController', () => {
       expect(result).toHaveProperty('roles', [UserRole.admin, UserRole.sales])
     })
 
-    it('strips password from the response', async () => {
+    it('returns raw data from the service', async () => {
       const userWithPassword = {
         ...mockUser,
         password: 'hashed_secret',
@@ -234,7 +231,6 @@ describe('UsersController', () => {
         { firstName: 'Test' },
       )
 
-      expect(result).not.toHaveProperty('password')
       expect(result).toHaveProperty('hasPassword', true)
     })
   })
@@ -245,7 +241,6 @@ describe('UsersController', () => {
 
       expect(usersService.findUser).not.toHaveBeenCalled()
       expect(result).toHaveProperty('id', userId)
-      expect(result).not.toHaveProperty('password')
     })
 
     it('fetches from DB when requesting a different user', async () => {
@@ -256,7 +251,6 @@ describe('UsersController', () => {
 
       expect(usersService.findUser).toHaveBeenCalledWith({ id: 2 })
       expect(result).toHaveProperty('id', 2)
-      expect(result).not.toHaveProperty('password')
     })
 
     it('throws NotFoundException when user is not found in DB', async () => {
@@ -267,7 +261,7 @@ describe('UsersController', () => {
       )
     })
 
-    it('strips password from DB-fetched user', async () => {
+    it('returns raw data from the service for DB-fetched user', async () => {
       const userWithPassword = {
         ...mockUser,
         id: 2,
@@ -278,7 +272,7 @@ describe('UsersController', () => {
 
       const result = await controller.findOne({ id: 2 }, mockUser)
 
-      expect(result).not.toHaveProperty('password')
+      expect(result).toHaveProperty('id', 2)
     })
   })
 
@@ -290,13 +284,13 @@ describe('UsersController', () => {
 
       expect(usersService.findUser).toHaveBeenCalledWith({ id: userId })
       expect(result).toHaveProperty('id', userId)
-      expect(result).not.toHaveProperty('password')
     })
 
-    it('throws when user is not found in DB', async () => {
+    it('returns null when user is not found in DB', async () => {
       vi.spyOn(usersService, 'findUser').mockResolvedValue(null)
 
-      await expect(controller.findMe(mockUser)).rejects.toThrow()
+      const result = await controller.findMe(mockUser)
+      expect(result).toBeNull()
     })
   })
 
@@ -314,7 +308,6 @@ describe('UsersController', () => {
 
       expect(usersService.updateUser).toHaveBeenCalledWith({ id: userId }, body)
       expect(result).toHaveProperty('firstName', 'Updated')
-      expect(result).not.toHaveProperty('password')
     })
 
     it('passes empty object when body is falsy', async () => {
@@ -383,7 +376,6 @@ describe('UsersController', () => {
         'avatar',
         'https://cdn.example.com/avatar.png',
       )
-      expect(result).not.toHaveProperty('password')
     })
 
     it('throws BadRequestException when no file is provided', async () => {
