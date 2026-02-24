@@ -1,10 +1,10 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import {
-  BallotReadyPositionLevel,
-  ElectionLevel,
-} from 'src/campaigns/campaigns.types'
-import { CampaignSchema } from './Campaign.schema'
+  BallotReadyPositionLevelSchema,
+  CampaignSchema,
+  ElectionLevelSchema,
+} from '@goodparty_org/contracts'
 
 // TODO(ENG-6410): This schema uses .passthrough() which allows ANY fields to be sent through,
 // even if not defined here. This is a security/data integrity concern because:
@@ -18,7 +18,7 @@ import { CampaignSchema } from './Campaign.schema'
 const CampaignDetailsSchema = z
   .object({
     state: z.string(),
-    ballotLevel: z.nativeEnum(BallotReadyPositionLevel),
+    ballotLevel: BallotReadyPositionLevelSchema,
     electionDate: z.string(),
     primaryElectionDate: z.string(),
     zip: z.string(),
@@ -54,7 +54,7 @@ const CampaignDetailsSchema = z
     otherParty: z.string(),
     district: z.string(),
     raceId: z.string(),
-    level: z.nativeEnum(ElectionLevel),
+    level: ElectionLevelSchema,
     noNormalizedOffice: z.boolean(),
     website: z.string(),
     pastExperience: z.union([z.string(), z.record(z.string(), z.string())]),

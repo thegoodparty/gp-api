@@ -27,6 +27,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check contracts changes
+        uses: dorny/paths-filter@v3
+        id: contracts-changed
+        with:
+          filters: |
+            contracts:
+              - 'contracts/src/**'
+              - 'contracts/package.json'
+              - 'contracts/tsup.config.ts'
+              - 'contracts/scripts/**'
+
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
@@ -55,7 +66,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: RC version contracts
-        if: github.ref_name != 'master'
+        if: >-
+          github.ref_name != 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
         id: rc-version
         working-directory: contracts
         run: |
@@ -85,7 +98,9 @@ jobs:
             ```
 
       - name: Generate App token
-        if: github.ref_name == 'master'
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
@@ -93,7 +108,9 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Create Release PR or Publish contracts
-        if: github.ref_name == 'master'
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
         id: changesets
         uses: changesets/action@v1
         with:

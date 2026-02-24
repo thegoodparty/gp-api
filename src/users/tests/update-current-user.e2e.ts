@@ -7,7 +7,7 @@ import {
   generateRandomPassword,
   cleanupTestUser,
 } from '../../../e2e-tests/utils/auth.util'
-import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
+import { type ReadUserOutput } from '@goodparty_org/contracts'
 import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 test.describe('Users - Update Current User', () => {
