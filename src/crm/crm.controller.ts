@@ -1,6 +1,4 @@
 import { Controller, Get, Logger, Param, Query, UsePipes } from '@nestjs/common'
-import { CampaignsService } from '../campaigns/services/campaigns.service'
-import { SlackService } from '../vendors/slack/services/slack.service'
 import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'
@@ -16,11 +14,7 @@ import { HubSpot } from './crm.types'
 export class CrmController {
   logger = new Logger(this.constructor.name)
 
-  constructor(
-    private readonly crmCampaignsService: CrmCampaignsService,
-    private readonly campaigns: CampaignsService,
-    private readonly slack: SlackService,
-  ) {}
+  constructor(private readonly crmCampaignsService: CrmCampaignsService) {}
 
   @Get('companies/:companyId')
   async getCompany(@Param('companyId') companyId: string) {
