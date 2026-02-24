@@ -4,6 +4,7 @@ import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
 import { createNewRelicLogForwarder } from './components/newrelic-log-forwarder'
 import { createService } from './components/service'
+import { createSnsTopics } from './components/sns-topics'
 import { createVpc } from './components/vpc'
 
 export = async () => {
@@ -402,6 +403,11 @@ export = async () => {
       },
     ],
   })
+
+  // Import and encrypt ClickOps SNS topics
+  if (environment !== 'preview') {
+    createSnsTopics({ environment })
+  }
 
   if (environment !== 'preview') {
     createNewRelicLogForwarder({
