@@ -26,3 +26,5 @@ export const UserMetaDataObjectSchema = z.object({
 })
 
 export const UserMetaDataSchema = UserMetaDataObjectSchema.nullish()
+
+export type UserMetaData = z.infer<typeof UserMetaDataSchema>

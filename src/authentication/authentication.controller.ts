@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ReadUserOutputSchema } from '../users/schemas/ReadUserOutput.schema'
+import { ReadUserOutputSchema } from '@goodparty_org/contracts'
 import { RecoverPasswordSchema } from './schemas/RecoverPasswordEmail.schema'
 import { SetPasswordEmailSchema } from './schemas/SetPasswordEmail.schema'
 import { UsersService } from 'src/users/services/users.service'

@@ -1,5 +1,5 @@
 import { CreateUserInputSchema } from './CreateUserInput.schema'
-import { UserMetaDataSchema } from './UserMetaData.schema'
+import { UserMetaDataSchema } from '@goodparty_org/contracts'
 import { createZodDto } from 'nestjs-zod'
 
 export class UpdateUserInputSchema extends createZodDto(

@@ -26,7 +26,7 @@ import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
 import { AdminImpersonateSchema } from './schemas/AdminImpersonate.schema'
 import { AuthenticationService } from 'src/authentication/authentication.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { ReadUserOutputSchema } from 'src/users/schemas/ReadUserOutput.schema'
+import { ReadUserOutputSchema } from '@goodparty_org/contracts'
 import { UserRole } from '@prisma/client'
 
 @Controller('admin/users')
