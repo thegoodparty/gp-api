@@ -1,6 +1,3 @@
-import { CampaignWithPathToVictory } from '@/campaigns/campaigns.types'
-import { CampaignsService } from '@/campaigns/services/campaigns.service'
-import { ContactsService } from '@/contacts/services/contacts.service'
 import { normalizePhoneNumber } from '@/shared/util/strings.util'
 import { S3 } from '@aws-sdk/client-s3'
 import { Logger } from '@nestjs/common'
@@ -11,59 +8,12 @@ import {
   PrismaClient,
 } from '@prisma/client'
 import { isNotNil, uniq } from 'es-toolkit'
-import pMap from 'p-map'
 import z from 'zod'
 import { v5 as uuidv5 } from 'uuid'
 import { POLL_INDIVIDUAL_MESSAGE_NAMESPACE } from './polls.utils'
+import pMap from 'p-map'
 
 const s3 = new S3()
-
-const backfillPhoneNumbers = async (
-  logger: Logger,
-  prisma: PrismaClient,
-  campaign: CampaignWithPathToVictory,
-  pollId: string,
-  contacts: ContactsService,
-) => {
-  const messages = await prisma.pollIndividualMessage.findMany({
-    where: { pollId },
-  })
-
-  if (!messages.length) {
-    return
-  }
-
-  // Fetch phone numbers in parallel
-  const messagesWithPhones = await pMap(
-    messages,
-    async (msg) => ({
-      messageId: msg.id,
-      person: await contacts.findPerson(msg.personId, campaign),
-    }),
-    { concurrency: 20 },
-  )
-
-  await prisma.$transaction(
-    async (tx) => {
-      for (const { messageId, person } of messagesWithPhones) {
-        if (!person.cellPhone) {
-          continue
-        }
-        await tx.pollIndividualMessage.update({
-          where: { id: messageId },
-          data: { personCellPhone: normalizePhoneNumber(person.cellPhone) },
-        })
-      }
-    },
-    {
-      timeout: 20000,
-    },
-  )
-
-  logger.log(
-    `Backfilled ${messagesWithPhones.length} phone numbers for poll ${pollId}`,
-  )
-}
 
 const downloadObject = async (bucket: string, key: string) => {
   const obj = await s3.getObject({ Bucket: bucket, Key: key })
@@ -160,8 +110,6 @@ export const backfillPollCRMHooksData = async (
   prisma: PrismaClient,
   logger: Logger,
   pollId: string,
-  campaignsService: CampaignsService,
-  contactsService: ContactsService,
 ) => {
   logger.log(
     `[CRM Hooks Backfill] Backfilling CRM hooks data for poll ${pollId}`,
@@ -179,23 +127,6 @@ export const backfillPollCRMHooksData = async (
       pollId: poll.id,
     },
   })
-
-  // 1. Backfill elected office on all messages
-  await prisma.pollIndividualMessage.updateMany({
-    where: {
-      pollId: poll.id,
-    },
-    data: {
-      electedOfficeId: poll.electedOfficeId,
-    },
-  })
-
-  // 2. Backfill phone numbers on all messages, via people-api
-  const campaign = await campaignsService.findFirstOrThrow({
-    where: { id: poll.electedOffice.campaignId },
-    include: { pathToVictory: true },
-  })
-  await backfillPhoneNumbers(logger, prisma, campaign, poll.id, contactsService)
 
   // 3. Fetch the atomized response JSON blobs from S3
   const atomizedMessages = await getAtomizedMessages(poll.id, issues)
@@ -267,14 +198,15 @@ export const backfillPollCRMHooksData = async (
       })
       .filter(isNotNil)
 
-  await prisma.$transaction(async (tx) => {
-    for (const message of reducedMessages) {
+  await pMap(
+    reducedMessages,
+    async (message) => {
       if (!message.personCellPhone) {
-        continue
+        return
       }
 
       const { pollIssues, ...messageData } = message
-      await tx.pollIndividualMessage.upsert({
+      await prisma.pollIndividualMessage.upsert({
         where: { id: message.id },
         create: message,
         update: {
@@ -282,8 +214,9 @@ export const backfillPollCRMHooksData = async (
           pollIssues: { set: pollIssues?.connect },
         },
       })
-    }
-  })
+    },
+    { concurrency: 20 },
+  )
 
   logger.log(
     `[CRM Hooks Backfill] Backfilled CRM hooks data for poll ${pollId}. Messages backfilled: ${reducedMessages.length}`,

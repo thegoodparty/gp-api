@@ -6,8 +6,6 @@ import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { QueueType } from 'src/queue/queue.types'
 import { pollMessageGroup } from '../utils/polls.utils'
 import { APIPollStatus, derivePollStatus } from '../polls.types'
-import { ContactsService } from '@/contacts/services/contacts.service'
-import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { Timeout } from '@nestjs/schedule'
 import { backfillPollCRMHooksData } from '../utils/crmhooksbackfill.util'
 
@@ -23,11 +21,7 @@ const estimatedCompletionDate = (scheduledDate: Date | string) =>
 
 @Injectable()
 export class PollsService extends createPrismaBase(MODELS.Poll) {
-  constructor(
-    private readonly queueProducer: QueueProducerService,
-    private readonly contactsService: ContactsService,
-    private readonly campaignsService: CampaignsService,
-  ) {
+  constructor(private readonly queueProducer: QueueProducerService) {
     super()
   }
 
@@ -132,13 +126,7 @@ export class PollsService extends createPrismaBase(MODELS.Poll) {
 
     for (const { id: pollId } of polls) {
       try {
-        await backfillPollCRMHooksData(
-          this.client,
-          this.logger,
-          pollId,
-          this.campaignsService,
-          this.contactsService,
-        )
+        await backfillPollCRMHooksData(this.client, this.logger, pollId)
       } catch (e) {
         this.logger.error(
           `[CRM Hooks Backfill] Failed for poll ${pollId}`,
