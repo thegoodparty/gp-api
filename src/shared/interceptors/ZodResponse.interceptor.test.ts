@@ -1,10 +1,10 @@
+import { CallHandler, ExecutionContext } from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
 import { ZodResponseInterceptor } from './ZodResponse.interceptor'
 import { RESPONSE_SCHEMA_KEY } from '../decorators/ResponseSchema.decorator'
 import { Reflector } from '@nestjs/core'
 import { InternalServerErrorException } from '@nestjs/common'
-import { of } from 'rxjs'
-import { lastValueFrom } from 'rxjs'
+import { of, lastValueFrom } from 'rxjs'
 import { z } from 'zod'
 
 const UserSchema = z.object({
@@ -13,14 +13,19 @@ const UserSchema = z.object({
   name: z.string(),
 })
 
-const createMockExecutionContext = () =>
+const createMockExecutionContext = (): ExecutionContext =>
   ({
     getHandler: vi.fn(),
     getClass: vi.fn(),
     switchToHttp: vi.fn(),
-  }) as ReturnType<typeof vi.fn> & { getHandler: ReturnType<typeof vi.fn> }
+    switchToRpc: vi.fn(),
+    switchToWs: vi.fn(),
+    getType: vi.fn(),
+    getArgs: vi.fn(),
+    getArgByIndex: vi.fn(),
+  }) satisfies Record<keyof ExecutionContext, unknown> as ExecutionContext
 
-const createMockCallHandler = (data: unknown) => ({
+const createMockCallHandler = (data: unknown): CallHandler => ({
   handle: () => of(data),
 })
 
