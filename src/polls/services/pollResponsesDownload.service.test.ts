@@ -42,6 +42,7 @@ describe('PollResponsesDownloadService', () => {
     mockPoolConnect.mockResolvedValue({
       query: mockClientQuery,
       release: mockRelease,
+      escapeLiteral: (str: string) => `'${str.replace(/'/g, "''")}'`,
     })
 
     service = new PollResponsesDownloadService()
