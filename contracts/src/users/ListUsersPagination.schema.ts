@@ -3,24 +3,9 @@ import {
   FilterablePaginationSchema,
   paginationFilter,
 } from '../shared/Pagination.schema'
+import { USER_SCALAR_FIELDS } from '../generated/scalarFields'
 
-export const USER_SORT_KEYS = [
-  'id',
-  'createdAt',
-  'updatedAt',
-  'firstName',
-  'lastName',
-  'name',
-  'avatar',
-  'password',
-  'hasPassword',
-  'email',
-  'phone',
-  'zip',
-  'roles',
-  'metaData',
-  'passwordResetToken',
-] as const
+export const USER_SORT_KEYS = USER_SCALAR_FIELDS
 
 export const ListUsersPaginationSchema = FilterablePaginationSchema({
   sortKeys: USER_SORT_KEYS,
