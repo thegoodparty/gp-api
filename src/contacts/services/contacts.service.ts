@@ -273,33 +273,19 @@ export class ContactsService {
     return this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
-        if (!state || !districtType || !districtName) {
-          const msg =
-            'Could not resolve state, district type, and district name'
-          this.logger.error(
-            JSON.stringify({
-              campaign,
-              msg,
-              state,
-              districtType,
-              districtName,
-            }),
-          )
-          throw new BadRequestException(msg)
-        }
-
         const token = this.getValidS2SToken()
+        const params: Record<string, string> = { state }
+        if (districtType && districtName) {
+          params.districtType = districtType
+          params.districtName = districtName
+        }
 
         const response = await lastValueFrom(
           this.httpService.get<StatsResponse>(
             `${PEOPLE_API_URL}/v1/people/stats`,
             {
               headers: { Authorization: `Bearer ${token}` },
-              params: {
-                state,
-                districtType,
-                districtName,
-              },
+              params,
             },
           ),
         )
