@@ -148,6 +148,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       electedOfficeId,
       isCompleted: false,
       scheduledDate: new Date('2020-01-01'),
+      targetAudienceSize: 500,
     })
     pollsService = {
       findUnique: mockFindUniquePoll,
@@ -381,7 +382,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     })
   })
 
-  it('calls markPollComplete and analytics.identify/track', async () => {
+  it('calls markPollComplete and analytics.identify/track with issue and metadata properties', async () => {
     const json = createPollAnalysisJson([
       {
         phoneNumber,
@@ -392,9 +393,35 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       },
     ])
     s3Service.getFile.mockResolvedValue(json)
+    const issues = [
+      {
+        pollId,
+        rank: 1 as const,
+        theme: 'Infrastructure',
+        summary: 'Roads and bridges need repair',
+        analysis: 'Detailed analysis of infrastructure',
+        responseCount: 25,
+        quotes: [
+          { quote: 'Fix the potholes', phone_number: '+15551111111' },
+          { quote: 'Bridge is unsafe', phone_number: '+15552222222' },
+        ],
+      },
+      {
+        pollId,
+        rank: 2 as const,
+        theme: 'Education',
+        summary: 'Schools need more funding',
+        analysis: 'Detailed analysis of education',
+        responseCount: 15,
+        quotes: [
+          { quote: 'We need better teachers', phone_number: '+15553333333' },
+        ],
+      },
+    ]
     const message = createPollAnalysisCompleteMessage({
       pollId,
       totalResponses: 50,
+      issues,
     })
 
     await service.processMessage(message)
@@ -411,7 +438,59 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     expect(analytics.track).toHaveBeenCalledWith(
       campaignUserId,
       expect.any(String),
-      expect.objectContaining({ pollId }),
+      expect.objectContaining({
+        pollId,
+        'issue 1': 'Infrastructure',
+        'issue 2': 'Education',
+        'issue 3': null,
+        issue1Description: 'Roads and bridges need repair',
+        issue1Quote1: 'Fix the potholes',
+        issue1Quote2: 'Bridge is unsafe',
+        issue1Quote3: '',
+        issue1MentionCount: 25,
+        issue2Description: 'Schools need more funding',
+        issue2Quote1: 'We need better teachers',
+        issue2Quote2: '',
+        issue2Quote3: '',
+        issue2MentionCount: 15,
+        issue3Description: null,
+        issue3Quote1: null,
+        issue3Quote2: null,
+        issue3Quote3: null,
+        issue3MentionCount: null,
+        pollsSent: 500,
+        pollResponses: 50,
+        pollResponseRate: '10.0%',
+      }),
+    )
+  })
+
+  it('sets pollResponseRate to 0% when totalResponses is 0', async () => {
+    const json = createPollAnalysisJson([
+      {
+        phoneNumber,
+        receivedAt: '2024-01-15T10:00:00Z',
+        originalMessage: 'STOP',
+        clusterId: '',
+        isOptOut: true,
+      },
+    ])
+    s3Service.getFile.mockResolvedValue(json)
+    const message = createPollAnalysisCompleteMessage({
+      pollId,
+      totalResponses: 0,
+      issues: [],
+    })
+
+    await service.processMessage(message)
+
+    expect(analytics.track).toHaveBeenCalledWith(
+      campaignUserId,
+      expect.any(String),
+      expect.objectContaining({
+        pollResponses: 0,
+        pollResponseRate: '0%',
+      }),
     )
   })
 
