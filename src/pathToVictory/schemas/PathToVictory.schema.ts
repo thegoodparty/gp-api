@@ -6,9 +6,5 @@ export const PathToVictorySchema = z.object({
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
   campaignId: z.number(),
-  data: z
-    .object(PathToVictoryDataSchema.shape)
-    .passthrough()
-    .nullable()
-    .transform((val) => val ?? {}),
+  data: z.object(PathToVictoryDataSchema.shape),
 })
