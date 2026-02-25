@@ -42,6 +42,7 @@ import {
   UpdateCampaignM2MSchema,
 } from '@goodparty_org/contracts'
 import {
+  CreateCampaignSchema,
   SetDistrictDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
@@ -197,13 +198,12 @@ export class CampaignsController {
   }
 
   @Post()
-  async create(@ReqUser() user: User) {
-    // see if the user already has campaign
+  async create(@ReqUser() user: User, @Body() body: CreateCampaignSchema) {
     const existing = await this.campaigns.findByUserId(user.id)
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return await this.campaigns.createForUser(user)
+    return this.campaigns.createForUser(user, body)
   }
 
   @Put('mine')
