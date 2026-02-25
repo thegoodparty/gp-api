@@ -25,7 +25,6 @@ export const CampaignSchema = z.object({
   completedTaskIds: z.array(z.string()),
   hasFreeTextsOffer: z.boolean(),
   freeTextsOfferRedeemedAt: z.coerce.date().nullish(),
-  derp: z.string().optional(),
 })
 
 export type ReadCampaignOutput = Omit<
@@ -35,5 +34,4 @@ export type ReadCampaignOutput = Omit<
   data: CampaignData
   details: CampaignDetails
   aiContent: CampaignAiContent
-  derp?: string
 }
