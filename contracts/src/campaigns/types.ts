@@ -224,4 +224,9 @@ export type CampaignData = {
 export type CampaignAiContent = {
   generationStatus?: Record<string, AiContentGenerationStatus>
   campaignPlanAttempts?: Record<string, number>
-} & Record<string, AiContentData>
+  [key: string]:
+    | AiContentData
+    | Record<string, AiContentGenerationStatus>
+    | Record<string, number>
+    | undefined
+}
