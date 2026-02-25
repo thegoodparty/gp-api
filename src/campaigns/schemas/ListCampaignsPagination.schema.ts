@@ -3,7 +3,7 @@ import { createZodDto } from 'nestjs-zod'
 import {
   FilterablePaginationSchema,
   paginationFilter,
-} from '@/shared/schemas/Pagination.schema'
+} from '@goodparty_org/contracts'
 import { z } from 'zod'
 
 const FIELDS = Prisma.CampaignScalarFieldEnum

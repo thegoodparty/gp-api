@@ -14,6 +14,7 @@ import { PollIssuesService } from './services/pollIssues.service'
 import { PollPurchaseHandlerService } from './services/pollPurchase.service'
 import { PollsService } from './services/polls.service'
 import { PollIndividualMessageService } from './services/pollIndividualMessage.service'
+import { PollResponsesDownloadService } from './services/pollResponsesDownload.service'
 import { ContactsModule } from '@/contacts/contacts.module'
 
 @Module({
@@ -33,6 +34,7 @@ import { ContactsModule } from '@/contacts/contacts.module'
     PollPurchaseHandlerService,
     PollBiasAnalysisService,
     PollIndividualMessageService,
+    PollResponsesDownloadService,
   ],
   controllers: [PollsController],
   exports: [

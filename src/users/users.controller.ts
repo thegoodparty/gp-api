@@ -40,9 +40,13 @@ import {
 import { UserIdParamSchema } from './schemas/UserIdParam.schema'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
+@UseInterceptors(ZodResponseInterceptor)
 export class UsersController {
   private readonly logger = new Logger(UsersController.name)
 
@@ -54,26 +58,22 @@ export class UsersController {
 
   @UseGuards(M2MOnly)
   @Get()
+  @ResponseSchema(PaginatedResponseSchema(ReadUserOutputSchema))
   async list(@Query() query: ListUsersPaginationSchema) {
     const { data, meta } = await this.usersService.listUsers(query)
-    return {
-      data: data.map((user) => ReadUserOutputSchema.parse(user)),
-      meta,
-    }
+    return { data, meta }
   }
 
   @Get('me')
+  @ResponseSchema(ReadUserOutputSchema)
   async findMe(@ReqUser() user: User) {
-    return ReadUserOutputSchema.parse(
-      await this.usersService.findUser({ id: user.id }),
-    )
+    return this.usersService.findUser({ id: user.id })
   }
 
   @Put('me')
+  @ResponseSchema(ReadUserOutputSchema)
   async updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
-    return ReadUserOutputSchema.parse(
-      await this.usersService.updateUser({ id: user.id }, body ?? {}),
-    )
+    return this.usersService.updateUser({ id: user.id }, body ?? {})
   }
 
   @Get('me/metadata')
@@ -100,17 +100,14 @@ export class UsersController {
       ],
     }),
   )
+  @ResponseSchema(ReadUserOutputSchema)
   async uploadImage(@ReqUser() user: User, @ReqFile() file?: FileUpload) {
     if (!file) {
       throw new BadRequestException('No file found')
     }
 
     const avatar = await this.filesService.uploadFile(file, 'uploads')
-    const updatedUser = await this.usersService.updateUser(
-      { id: user.id },
-      { avatar },
-    )
-    return ReadUserOutputSchema.parse(updatedUser)
+    return this.usersService.updateUser({ id: user.id }, { avatar })
   }
 
   @Put('files/generate-signed-upload-url')
@@ -122,27 +119,27 @@ export class UsersController {
 
   @UseGuards(M2MOnly)
   @Put(':id')
+  @ResponseSchema(ReadUserOutputSchema)
   async updateUser(
     @Param() { id }: UserIdParamSchema,
     @Body() body: UpdateUserAdminInputSchema,
   ) {
-    return ReadUserOutputSchema.parse(
-      await this.usersService.updateUser({ id }, body),
-    )
+    return this.usersService.updateUser({ id }, body)
   }
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Get(':id')
+  @ResponseSchema(ReadUserOutputSchema)
   async findOne(@Param() { id }: UserIdParamSchema, @ReqUser() user: User) {
     if (user && id === user.id) {
-      return ReadUserOutputSchema.parse(user)
+      return user
     }
 
     const dbUser = await this.usersService.findUser({ id })
     if (!dbUser) {
       throw new NotFoundException('User not found')
     }
-    return ReadUserOutputSchema.parse(dbUser)
+    return dbUser
   }
 
   @UseGuards(UserOwnerOrAdminGuard)

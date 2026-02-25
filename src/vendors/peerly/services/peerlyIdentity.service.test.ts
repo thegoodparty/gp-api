@@ -302,6 +302,7 @@ describe('PeerlyIdentityService', () => {
         const tcrComplianceInput = {
           email: 'candidate@example.com',
           ein: '12-3456789',
+          phone: '15551234567',
           peerlyIdentityId: 'peerly-123',
           filingUrl: 'https://fec.gov/filing/123',
           officeLevel: input.officeLevel,
@@ -337,6 +338,45 @@ describe('PeerlyIdentityService', () => {
       })
     })
 
+    it('includes verification_method, filing_phone_number, filing_phone_type, and filing_url_instructions when calling Peerly', async () => {
+      const campaign = createMockCampaign({
+        details: {
+          electionDate: '2024-11-05',
+          ballotLevel: BallotReadyPositionLevel.STATE,
+        },
+      })
+
+      const tcrComplianceInput = {
+        email: 'candidate@example.com',
+        ein: '12-3456789',
+        phone: '15551234567',
+        peerlyIdentityId: 'peerly-123',
+        filingUrl: 'https://state.gov/filing/123',
+        officeLevel: OfficeLevel.state,
+        fecCommitteeId: null,
+        committeeType: CommitteeType.CANDIDATE,
+      }
+
+      await service.submitCampaignVerifyRequest(
+        tcrComplianceInput,
+        baseUser,
+        campaign,
+        baseDomain,
+      )
+
+      // Verify email is the preferred verification method
+      expect(lastSubmittedData.verification_method).toBe('email')
+
+      // Verify fallback instructions are included
+      expect(lastSubmittedData.filing_url_instructions).toBe(
+        "Deliver the PIN using the first contact information that matches the candidate's election filing, in the following order: email, text, phone call, then postal mail. If the filing is not publicly available, contact the election authority.",
+      )
+
+      // Verify filing phone number and type are included
+      expect(lastSubmittedData.filing_phone_number).toBe('15551234567')
+      expect(lastSubmittedData.filing_phone_type).toBe('cell')
+    })
+
     it('throws BadRequestException when federal candidate is missing fecCommitteeId', async () => {
       const campaign = createMockCampaign({
         details: {
@@ -348,6 +388,7 @@ describe('PeerlyIdentityService', () => {
       const tcrComplianceInput = {
         email: 'candidate@example.com',
         ein: '12-3456789',
+        phone: '15551234567',
         peerlyIdentityId: 'peerly-123',
         filingUrl: 'https://fec.gov/filing/123',
         officeLevel: OfficeLevel.federal,

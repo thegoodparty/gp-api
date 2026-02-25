@@ -422,7 +422,7 @@ export class CampaignsController {
   }
 
   @Put('admin/:slug/race-target-details')
-  @Roles(UserRole.admin)
+  @Roles(UserRole.admin, UserRole.sales)
   async updateRaceTargetDetailsBySlug(
     @Param('slug') slug: string,
     @Query() query: UpdateRaceTargetDetailsBySlugQueryDTO,

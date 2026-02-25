@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { SortablePaginationSchema } from 'src/shared/schemas/Pagination.schema'
+import { SortablePaginationSchema } from '@goodparty_org/contracts'
 
 const FIELDS = Prisma.WebsiteContactScalarFieldEnum
 

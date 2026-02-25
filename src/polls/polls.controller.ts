@@ -31,6 +31,7 @@ import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 import { PollIssuesService } from './services/pollIssues.service'
 import { PollsService } from './services/polls.service'
 import { BiasAnalysisResponse } from './types/pollBias.types'
+import { PollResponsesDownloadService } from './services/pollResponsesDownload.service'
 import { ContactsService } from '@/contacts/services/contacts.service'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
@@ -40,6 +41,12 @@ class ListPollsQueryDTO extends createZodDto(
   z.object({
     cursor: z.string().optional(),
     limit: z.coerce.number().min(1).max(100).default(20),
+  }),
+) {}
+
+class PollParamsDto extends createZodDto(
+  z.object({
+    pollId: z.string().uuid(),
   }),
 ) {}
 
@@ -86,6 +93,7 @@ export class PollsController {
     private readonly electedOfficeService: ElectedOfficeService,
     private readonly s3Service: S3Service,
     private readonly contactService: ContactsService,
+    private readonly pollResponsesDownloadService: PollResponsesDownloadService,
   ) {}
   private readonly logger = new Logger(this.constructor.name)
 
@@ -188,6 +196,23 @@ export class PollsController {
     })
 
     return toAPIPoll(poll)
+  }
+
+  @Get('/:pollId/download-responses')
+  @UseElectedOffice()
+  async downloadPollResponses(
+    @Param() { pollId }: PollParamsDto,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
+  ) {
+    const poll = await this.ensurePollAccess(pollId, electedOffice)
+    const sanitizedName =
+      poll.name.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'poll-responses'
+
+    return this.pollResponsesDownloadService.streamPollResponses(
+      pollId,
+      poll.name,
+      sanitizedName,
+    )
   }
 
   @Get('/:pollId')

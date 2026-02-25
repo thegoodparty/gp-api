@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
-import { PasswordSchema, WriteEmailSchema } from 'src/shared/schemas'
+import { PasswordSchema } from '@goodparty_org/contracts'
+import { WriteEmailSchema } from 'src/shared/schemas'
 import { z } from 'zod'
 
 export class ResetPasswordSchema extends createZodDto(

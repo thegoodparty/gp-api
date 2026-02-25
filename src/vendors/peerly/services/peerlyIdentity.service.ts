@@ -517,6 +517,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     {
       email,
       ein,
+      phone,
       peerlyIdentityId,
       filingUrl,
       officeLevel,
@@ -525,6 +526,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }: Pick<
       TcrCompliance,
       | 'ein'
+      | 'phone'
       | 'peerlyIdentityId'
       | 'filingUrl'
       | 'email'
@@ -605,7 +607,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       filing_state: state?.short_name,
       filing_zip: postalCode?.long_name,
       filing_email: email,
+      verification_method: 'email',
+      filing_url_instructions:
+        "Deliver the PIN using the first contact information that matches the candidate's election filing, in the following order: email, text, phone call, then postal mail. If the filing is not publicly available, contact the election authority.",
       locality: peerlyLocale,
+      // Peerly/CV can actually tell themselves if it’s a landline or a cell message.
+      // James from Peerly recommended we send this to cell to have a chance of text messages going through.
+      filing_phone_type: 'cell',
+      filing_phone_number: phone,
       state: state?.short_name,
       campaign_website: domain ? `https://${domain?.name}` : undefined,
       // Federal-specific fields

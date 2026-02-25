@@ -1,7 +1,7 @@
 import { z } from 'zod'
+import { PhoneSchema } from '@goodparty_org/contracts'
 import {
   EinSchema,
-  PhoneSchema,
   UrlOrDomainSchema,
   WriteEmailSchema,
 } from '../../../shared/schemas'
