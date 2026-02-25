@@ -1,5 +1,6 @@
-import { CampaignTier } from '@prisma/client'
 import { z } from 'zod'
+import { CampaignTierSchema } from '../generated/enums'
+import type { CampaignAiContent, CampaignData, CampaignDetails } from './types'
 
 export const CampaignSchema = z.object({
   id: z.number(),
@@ -12,7 +13,7 @@ export const CampaignSchema = z.object({
   isDemo: z.boolean(),
   didWin: z.boolean().nullish(),
   dateVerified: z.coerce.date().nullish(),
-  tier: z.nativeEnum(CampaignTier).nullish(),
+  tier: CampaignTierSchema.nullish(),
   formattedAddress: z.string().nullish(),
   placeId: z.string().nullish(),
   data: z.record(z.string(), z.unknown()),
@@ -25,3 +26,12 @@ export const CampaignSchema = z.object({
   hasFreeTextsOffer: z.boolean(),
   freeTextsOfferRedeemedAt: z.coerce.date().nullish(),
 })
+
+export type ReadCampaignOutput = Omit<
+  z.infer<typeof CampaignSchema>,
+  'vendorTsData' | 'data' | 'details' | 'aiContent'
+> & {
+  data: CampaignData
+  details: CampaignDetails
+  aiContent: CampaignAiContent
+}

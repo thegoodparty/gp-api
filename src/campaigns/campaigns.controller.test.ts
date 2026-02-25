@@ -696,7 +696,6 @@ describe('CampaignsController', () => {
         where: { id: mockCampaign.id },
       })
       expect(result).toHaveProperty('id', mockCampaign.id)
-      expect(result).not.toHaveProperty('vendorTsData')
     })
 
     it('throws when campaign does not exist', async () => {
@@ -711,11 +710,6 @@ describe('CampaignsController', () => {
   })
 
   describe('updateCampaign (M2M PUT :id)', () => {
-    const parsedCampaign = {
-      ...mockCampaign,
-      vendorTsData: undefined,
-    }
-
     beforeEach(() => {
       vi.spyOn(campaignsService, 'findUniqueOrThrow').mockResolvedValue(
         mockCampaign,
@@ -747,7 +741,7 @@ describe('CampaignsController', () => {
         true,
         { isActive: false, slug: 'new-slug' },
       )
-      expect(result).toEqual(parsedCampaign)
+      expect(result).toEqual(mockCampaignWithP2V)
     })
 
     it('updates JSON fields only', async () => {
@@ -762,7 +756,7 @@ describe('CampaignsController', () => {
         true,
         undefined,
       )
-      expect(result).toEqual(parsedCampaign)
+      expect(result).toEqual(mockCampaignWithP2V)
     })
 
     it('updates both scalar and JSON fields atomically', async () => {
@@ -781,7 +775,7 @@ describe('CampaignsController', () => {
         true,
         { isActive: true },
       )
-      expect(result).toEqual(parsedCampaign)
+      expect(result).toEqual(mockCampaignWithP2V)
     })
 
     it('handles empty body without error', async () => {
@@ -796,16 +790,16 @@ describe('CampaignsController', () => {
         true,
         undefined,
       )
-      expect(result).toEqual(parsedCampaign)
+      expect(result).toEqual(mockCampaignWithP2V)
     })
 
-    it('returns response parsed through ReadCampaignOutputSchema (strips vendorTsData)', async () => {
+    it('returns raw data from service (interceptor handles response parsing)', async () => {
       const result = await controller.updateCampaign(
         { id: mockCampaign.id },
         { isActive: true },
       )
 
-      expect(result).not.toHaveProperty('vendorTsData')
+      expect(result).toHaveProperty('id')
     })
   })
 

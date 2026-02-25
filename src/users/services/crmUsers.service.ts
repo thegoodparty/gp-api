@@ -37,7 +37,14 @@ export class CrmUsersService {
     campaign: Campaign,
   ): Promise<CRMContactProperties> {
     const { firstName, lastName, email, phone, zip, metaData } = user
-    const { accountType, whyBrowsing } = metaData || {}
+    const meta =
+      metaData && typeof metaData === 'object' && !Array.isArray(metaData)
+        ? metaData
+        : null
+    const accountType =
+      typeof meta?.accountType === 'string' ? meta.accountType : undefined
+    const whyBrowsing =
+      typeof meta?.whyBrowsing === 'string' ? meta.whyBrowsing : undefined
 
     let browsing_intent: string = ''
     switch (whyBrowsing) {

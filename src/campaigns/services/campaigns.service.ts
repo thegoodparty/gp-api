@@ -13,7 +13,7 @@ import {
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
-import { ListCampaignsPaginationSchema } from '../schemas/ListCampaignsPagination.schema'
+import { type ListCampaignsPagination } from '@goodparty_org/contracts'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -77,7 +77,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     sortOrder = DEFAULT_SORT_ORDER,
     userId,
     slug,
-  }: ListCampaignsPaginationSchema): Promise<PaginatedResults<Campaign>> {
+  }: ListCampaignsPagination): Promise<PaginatedResults<Campaign>> {
     const where: Prisma.CampaignWhereInput = {
       ...(userId ? { userId } : {}),
       ...(slug
