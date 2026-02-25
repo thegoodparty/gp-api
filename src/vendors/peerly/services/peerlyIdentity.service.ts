@@ -612,7 +612,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         "Deliver the PIN using the first contact information that matches the candidate's election filing, in the following order: email, text, phone call, then postal mail. If the filing is not publicly available, contact the election authority.",
       locality: peerlyLocale,
       // Peerly/CV can actually tell themselves if it’s a landline or a cell message.
-      // James from Peerly recommended we sent this to cell to have a chance of text messages going through.
+      // James from Peerly recommended we send this to cell to have a chance of text messages going through.
       filing_phone_type: 'cell',
       filing_phone_number: phone,
       state: state?.short_name,

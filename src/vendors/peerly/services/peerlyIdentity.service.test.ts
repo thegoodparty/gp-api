@@ -364,7 +364,7 @@ describe('PeerlyIdentityService', () => {
         baseDomain,
       )
 
-      // Verify text is the preferred verification method
+      // Verify email is the preferred verification method
       expect(lastSubmittedData.verification_method).toBe('email')
 
       // Verify fallback instructions are included
