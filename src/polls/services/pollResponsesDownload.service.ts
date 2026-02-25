@@ -7,6 +7,7 @@ import {
 import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
 import { PassThrough } from 'stream'
+import { stripLeadingNewlines } from '../utils/polls.utils'
 
 const UTF8_BOM = '\uFEFF'
 
@@ -52,7 +53,8 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
     ) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)`
 
     const output = new PassThrough()
-    const safePollName = pollName.replace(/[\r\n]/g, ' ')
+    const safePollName =
+      pollName.replace(/[\r\n]/g, ' ').trim() || 'Poll responses'
     output.write(UTF8_BOM + safePollName + '\n')
 
     let released = false
@@ -80,7 +82,7 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
         output.end()
       })
 
-    copyStream.pipe(output, { end: false })
+    copyStream.pipe(stripLeadingNewlines()).pipe(output, { end: false })
 
     return new StreamableFile(output, {
       type: 'text/csv; charset=utf-8',
