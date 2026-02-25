@@ -76,6 +76,7 @@ const campaignDefaults = {
 const mockCampaign: Campaign = {
   ...campaignDefaults,
   id: 100,
+  organizationSlug: null,
   slug: 'john-doe',
   userId: 1,
   isActive: true,
