@@ -31,11 +31,12 @@ jobs:
         id: contracts-changed
         run: |
           PREV="${{ github.event.before }}"
+          CURRENT="${{ github.event.pull_request.head.sha || github.sha }}"
           if [ "$PREV" = "0000000000000000000000000000000000000000" ] || [ -z "$PREV" ]; then
             PREV="${{ github.event.pull_request.base.sha }}"
           fi
           git fetch origin "$PREV" --depth=1
-          CHANGED=$(git diff --name-only "$PREV" "${{ github.sha }}" -- 'contracts/src/' 'contracts/package.json' 'contracts/tsup.config.ts' 'contracts/scripts/' | head -1)
+          CHANGED=$(git diff --name-only "$PREV" "$CURRENT" -- 'contracts/src/' 'contracts/package.json' 'contracts/tsup.config.ts' 'contracts/scripts/' | head -1)
           echo "contracts=$( [ -n "$CHANGED" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v6
