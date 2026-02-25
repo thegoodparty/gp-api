@@ -10,7 +10,7 @@ import {
   ElectionLevel,
   OnboardingStep,
   VoterGoals,
-} from 'src/campaigns/campaigns.types'
+} from '@goodparty_org/contracts'
 import { HubSpot } from 'src/crm/crm.types'
 import { CustomVoterFile } from 'src/voters/voterFile/voterFile.types'
 

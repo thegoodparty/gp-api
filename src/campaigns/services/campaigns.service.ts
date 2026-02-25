@@ -29,9 +29,11 @@ import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
   CampaignLaunchStatus,
-  CampaignPlanVersionData,
   CampaignStatus,
   OnboardingStep,
+} from '@goodparty_org/contracts'
+import {
+  CampaignPlanVersionData,
   PlanVersion,
   UpdateCampaignFieldsInput,
 } from '../campaigns.types'

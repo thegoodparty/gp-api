@@ -31,7 +31,7 @@ import { FastifyReply } from 'fastify'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
 import { CrmUsersService } from '../users/services/crmUsers.service'
 import { setTokenCookie } from './util/setTokenCookie.util'
-import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
+import { CampaignCreatedBy } from '@goodparty_org/contracts'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 

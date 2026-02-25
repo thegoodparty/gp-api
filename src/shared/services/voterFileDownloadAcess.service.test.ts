@@ -1,7 +1,5 @@
-import {
-  BallotReadyPositionLevel,
-  CampaignWith,
-} from '@/campaigns/campaigns.types'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
+import { CampaignWith } from '@/campaigns/campaigns.types'
 import { VoterFileDownloadAccessService } from '@/shared/services/voterFileDownloadAccess.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { Logger } from '@nestjs/common'

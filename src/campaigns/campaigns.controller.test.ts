@@ -14,7 +14,7 @@ import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignsController } from './campaigns.controller'
-import { CampaignStatus } from './campaigns.types'
+import { CampaignStatus } from '@goodparty_org/contracts'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 

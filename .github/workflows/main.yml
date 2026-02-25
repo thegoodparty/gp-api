@@ -32,11 +32,12 @@ jobs:
       - name: Check contracts changes
         id: contracts-changed
         run: |
-          PREV="${{ github.event.before }}"
-          CURRENT="${{ github.event.pull_request.head.sha || github.sha }}"
-          if [ "$PREV" = "0000000000000000000000000000000000000000" ] || [ -z "$PREV" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
             PREV="${{ github.event.pull_request.base.sha }}"
+          else
+            PREV="${{ github.event.before }}"
           fi
+          CURRENT="${{ github.event.pull_request.head.sha || github.sha }}"
           CHANGED=$(git diff --name-only "$PREV" "$CURRENT" -- 'contracts/src/' 'contracts/package.json' 'contracts/tsup.config.ts' 'contracts/scripts/' | head -1)
           RESULT=$( [ -n "$CHANGED" ] && echo true || echo false )
           echo "contracts=$RESULT" >> "$GITHUB_OUTPUT"
@@ -76,8 +77,13 @@ jobs:
         id: rc-version
         working-directory: contracts
         run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SNAPSHOT_TAG="rc-pr-${{ github.event.number }}"
+          else
+            SNAPSHOT_TAG="rc-${{ github.ref_name }}"
+          fi
           BEFORE=$(node -p "require('./package.json').version")
-          npx changeset version --snapshot rc
+          npx changeset version --snapshot "$SNAPSHOT_TAG" --snapshot-prerelease-template '{tag}.{commit}'
           AFTER=$(node -p "require('./package.json').version")
           echo "changed=$( [ "$BEFORE" != "$AFTER" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
           echo "version=$AFTER" >> "$GITHUB_OUTPUT"
