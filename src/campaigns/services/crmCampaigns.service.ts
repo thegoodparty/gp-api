@@ -28,7 +28,7 @@ import {
   P2V_LOCKED_STATUS,
   P2VStatus,
 } from 'src/elections/types/pathToVictory.types'
-import { CampaignCreatedBy, OnboardingStep } from '../campaigns.types'
+import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
 
 const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 

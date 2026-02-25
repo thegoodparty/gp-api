@@ -1,4 +1,4 @@
-import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { PEERLY_LOCALITY_CATEGORIES } from '../services/peerly.const'
 
 export const getPeerlyLocaleFromBallotLevel = (
