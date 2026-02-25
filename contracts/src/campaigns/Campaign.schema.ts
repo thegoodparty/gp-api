@@ -1,10 +1,6 @@
 import { z } from 'zod'
 import { CampaignTierSchema } from '../generated/enums'
-import type {
-  CampaignAiContent,
-  CampaignData,
-  CampaignDetails,
-} from './types'
+import type { CampaignAiContent, CampaignData, CampaignDetails } from './types'
 
 export const CampaignSchema = z.object({
   id: z.number(),

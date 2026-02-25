@@ -9,7 +9,7 @@
     "contracts"
   ],
   "scripts": {
-    "build:contracts": "npm run generate && cd contracts && npm run build",
+    "build:contracts": "tsx scripts/build-contracts.ts",
     "build": "npm run build:contracts && nest build",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "nest start",
