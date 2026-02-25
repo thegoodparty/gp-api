@@ -1,4 +1,4 @@
-import { statSync, existsSync } from 'fs'
+import { existsSync } from 'fs'
 import { execSync } from 'child_process'
 import { join } from 'path'
 
@@ -10,7 +10,6 @@ const scriptsDir = join(root, 'contracts/scripts')
 const isUpToDate = (): boolean => {
   if (!existsSync(dist)) return false
 
-  const distMtime = statSync(dist).mtimeMs
   const newerSrc = execSync(
     `find ${srcDir} ${scriptsDir} -name "*.ts" -newer ${dist}`,
     { encoding: 'utf8' },
