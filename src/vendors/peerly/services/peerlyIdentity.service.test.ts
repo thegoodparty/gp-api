@@ -51,6 +51,7 @@ function createMockCampaign(
   const { details, ...rest } = overrides
   const campaign: Campaign = {
     id: 1,
+    organizationSlug: null,
     slug: 'test-campaign',
     isVerified: false,
     isActive: true,

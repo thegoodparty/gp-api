@@ -17,6 +17,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
   const campaign = {
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
+    organizationSlug: null,
     slug: faker.lorem.words(5),
     isActive: faker.datatype.boolean(0.5),
     isVerified: faker.datatype.boolean(0.5),

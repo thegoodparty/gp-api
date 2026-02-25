@@ -1,0 +1,12 @@
+model Organization {
+  slug               String         @id
+  owner              User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId            Int            @map("owner_id")
+  positionId         String?        @map("position_id")
+  overrideDistrictId String?        @map("override_district_id")
+  campaign           Campaign?
+  electedOffice      ElectedOffice?
+
+  @@index([ownerId])
+  @@map("organization")
+}
