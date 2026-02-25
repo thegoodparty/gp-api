@@ -34,10 +34,7 @@ export class PathToVictoryController {
     const { data, meta }: PaginatedResults<PathToVictory> =
       await this.pathToVictoryService.listPathToVictories(query)
     return {
-      data: data.flatMap((p2v) => {
-        const result = PathToVictorySchema.safeParse(p2v)
-        return result.success ? [result.data] : []
-      }),
+      data: data.map((p2v) => PathToVictorySchema.parse(p2v)),
       meta,
     }
   }
