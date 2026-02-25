@@ -31,6 +31,7 @@ jobs:
         uses: dorny/paths-filter@v3
         id: contracts-changed
         with:
+          base: ${{ github.event.before }}
           filters: |
             contracts:
               - 'contracts/src/**'
