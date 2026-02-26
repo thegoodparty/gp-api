@@ -32,6 +32,7 @@
     "noFallthroughCasesInSwitch": false,
     "lib": ["esnext"],
     "resolveJsonModule": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "preserveWatchOutput": true
   }
 }

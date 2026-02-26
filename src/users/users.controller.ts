@@ -18,20 +18,23 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { UsersService } from './services/users.service'
-import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
+import {
+  ListUsersPaginationSchema,
+  ReadUserOutputSchema,
+  UpdatePasswordSchema,
+} from '@goodparty_org/contracts'
 import { User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
-import { ZodValidationPipe } from 'nestjs-zod'
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
 import { FilesService } from 'src/files/files.service'
 import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
-import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
 import { AuthenticationService } from '../authentication/authentication.service'
 import {
   UpdateUserAdminInputSchema,
@@ -39,10 +42,13 @@ import {
 } from './schemas/UpdateUserInput.schema'
 import { UserIdParamSchema } from './schemas/UserIdParam.schema'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
-import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+
+class ListUsersPaginationDto extends createZodDto(ListUsersPaginationSchema) {}
+
+class UpdatePasswordDto extends createZodDto(UpdatePasswordSchema) {}
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
@@ -59,7 +65,7 @@ export class UsersController {
   @UseGuards(M2MOnly)
   @Get()
   @ResponseSchema(PaginatedResponseSchema(ReadUserOutputSchema))
-  async list(@Query() query: ListUsersPaginationSchema) {
+  async list(@Query() query: ListUsersPaginationDto) {
     const { data, meta } = await this.usersService.listUsers(query)
     return { data, meta }
   }
@@ -164,10 +170,7 @@ export class UsersController {
 
   @UseGuards(UserOwnerOrAdminGuard)
   @Put(':id/password')
-  async updatePassword(
-    @Body() body: UpdatePasswordSchemaDto,
-    @ReqUser() user: User,
-  ) {
+  async updatePassword(@Body() body: UpdatePasswordDto, @ReqUser() user: User) {
     const { hasPassword, password } = user
     const { newPassword, oldPassword } = body
     if (hasPassword && !oldPassword) {

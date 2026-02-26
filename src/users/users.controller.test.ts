@@ -7,7 +7,7 @@ import { FileUpload } from 'src/files/files.types'
 import { AuthenticationService } from '../authentication/authentication.service'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
-import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
+import { type UpdatePasswordInput } from '@goodparty_org/contracts'
 import {
   BadRequestException,
   NotFoundException,
@@ -452,7 +452,7 @@ describe('UsersController', () => {
       vi.spyOn(usersService, 'updatePassword').mockResolvedValue(mockUser)
 
       await controller.updatePassword(
-        { newPassword: 'NewPass123' } as UpdatePasswordSchemaDto,
+        { newPassword: 'NewPass123' } as UpdatePasswordInput,
         mockUser,
       )
 
@@ -488,7 +488,7 @@ describe('UsersController', () => {
 
       await expect(
         controller.updatePassword(
-          { newPassword: 'NewPass123' } as UpdatePasswordSchemaDto,
+          { newPassword: 'NewPass123' } as UpdatePasswordInput,
           userWithPassword,
         ),
       ).rejects.toThrow(BadRequestException)

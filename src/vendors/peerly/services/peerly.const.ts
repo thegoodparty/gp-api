@@ -1,5 +1,5 @@
 import { CommitteeType, OfficeLevel } from '@prisma/client'
-import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { PEERLY_COMMITTEE_TYPE } from '../peerly.types'
 
 export const PEERLY_ENTITY_TYPE = 'NON_PROFIT'

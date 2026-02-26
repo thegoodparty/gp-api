@@ -32,7 +32,7 @@ for (const prismaEnum of enums) {
   enumLines.push('')
 }
 
-const SCALAR_FIELD_MODELS = ['User']
+const SCALAR_FIELD_MODELS = ['User', 'Campaign']
 
 const scalarFieldLines: string[] = []
 

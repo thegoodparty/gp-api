@@ -148,21 +148,16 @@ The contracts source lives in the `contracts/` directory at the repo root and is
 
 ### Local Development
 
-`npm install` at the repo root automatically links contracts via npm workspaces. No extra steps needed for normal gp-api development.
-
-**Important**: Contracts must always be built from within the gp-api workspace (not in isolation). The enum codegen script depends on `@prisma/client` which is installed at the repo root and shared via npm workspaces.
-
-### Building Contracts Locally
-
-Ensure you've run `npm install` and `npm run generate` at the repo root first, then:
+Contracts are built automatically as part of `npm run start:dev` and `npm run build` — no extra steps needed. A fresh clone workflow is:
 
 ```bash
-cd contracts && npm run build
+npm install
+npm run start:dev
 ```
 
-This runs Prisma enum codegen (reads DMMF, writes `src/generated/enums.ts`) then tsup (compiles `src/` to `dist/` with CJS, ESM, and `.d.ts` outputs).
+This runs Prisma client generation, contracts codegen + build, then starts the NestJS watcher.
 
-Use watch mode for live rebuilds during development:
+For live rebuilds of contracts source during development (e.g., when editing schemas for `gp-sdk` consumption):
 
 ```bash
 cd contracts && npm run dev

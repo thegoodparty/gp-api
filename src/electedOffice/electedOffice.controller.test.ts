@@ -51,6 +51,7 @@ describe('ElectedOfficeController', () => {
         data: [
           {
             id: 'office-1',
+            organizationSlug: null,
             userId: 1,
             campaignId: 1,
             isActive: true,
@@ -103,6 +104,7 @@ describe('ElectedOfficeController', () => {
     it('returns current active elected office', async () => {
       const mockElectedOffice = {
         id: 'office-1',
+        organizationSlug: null,
         userId: 1,
         campaignId: 1,
         isActive: true,
@@ -160,6 +162,7 @@ describe('ElectedOfficeController', () => {
   describe('getOne', () => {
     const mockElectedOffice = {
       id: 'office-1',
+      organizationSlug: null,
       userId: 1,
       campaignId: 1,
       isActive: true,
@@ -243,6 +246,7 @@ describe('ElectedOfficeController', () => {
       const mockCampaign = { id: 1 }
       const mockElectedOffice = {
         id: 'office-1',
+        organizationSlug: null,
         userId: 1,
         campaignId: 1,
         isActive: true,
@@ -301,6 +305,7 @@ describe('ElectedOfficeController', () => {
       const mockCampaign = { id: 1 }
       const mockElectedOffice = {
         id: 'office-1',
+        organizationSlug: null,
         userId: 1,
         campaignId: 1,
         isActive: true,
@@ -372,6 +377,7 @@ describe('ElectedOfficeController', () => {
   describe('update', () => {
     const existingElectedOffice = {
       id: 'office-1',
+      organizationSlug: null,
       userId: 1,
       campaignId: 1,
       isActive: true,

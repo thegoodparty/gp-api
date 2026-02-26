@@ -8,7 +8,7 @@ import {
   cleanupTestUser,
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
-import { ReadUserOutput } from '../schemas/ReadUserOutput.schema'
+import { type ReadUserOutput } from '@goodparty_org/contracts'
 import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
 type MetadataResponse = Record<string, unknown>

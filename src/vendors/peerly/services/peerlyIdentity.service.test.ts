@@ -12,7 +12,7 @@ import {
 import { of } from 'rxjs'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AreaCodeFromZipService } from '../../../ai/util/areaCodeFromZip.util'
-import { BallotReadyPositionLevel } from '../../../campaigns/campaigns.types'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { UsersService } from '../../../users/services/users.service'
 import { GooglePlacesService } from '../../google/services/google-places.service'
@@ -51,6 +51,7 @@ function createMockCampaign(
   const { details, ...rest } = overrides
   const campaign: Campaign = {
     id: 1,
+    organizationSlug: null,
     slug: 'test-campaign',
     isVerified: false,
     isActive: true,

@@ -1,4 +1,4 @@
-import { ElectionLevel } from '@/campaigns/campaigns.types'
+import { ElectionLevel } from '@goodparty_org/contracts'
 import { Injectable, Logger } from '@nestjs/common'
 import { getYear, parseISO } from 'date-fns'
 import {

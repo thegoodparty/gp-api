@@ -1,4 +1,4 @@
-import { CampaignCreatedBy } from '@/campaigns/campaigns.types'
+import { CampaignCreatedBy } from '@goodparty_org/contracts'
 import { CrmCampaignsService } from '@/campaigns/services/crmCampaigns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'

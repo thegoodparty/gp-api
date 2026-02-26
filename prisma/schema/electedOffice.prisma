@@ -1,5 +1,7 @@
 model ElectedOffice {
-  id String @id @default(uuid(7))
+  id               String        @id @default(uuid(7))
+  organizationSlug String?       @unique @map("organization_slug")
+  organization     Organization? @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
 
   electedDate    DateTime? @map("elected_date") @db.Date
   swornInDate    DateTime? @map("sworn_in_date") @db.Date

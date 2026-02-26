@@ -29,7 +29,7 @@ import {
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
 } from '@/shared/constants/paginationOptions.consts'
-import { ListUsersPaginationSchema } from '@/users/schemas/ListUsersPagination.schema'
+import { type ListUsersPagination } from '@goodparty_org/contracts'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
@@ -312,7 +312,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     firstName,
     lastName,
     email,
-  }: ListUsersPaginationSchema): Promise<PaginatedResults<User>> {
+  }: ListUsersPagination): Promise<PaginatedResults<User>> {
     const where: Prisma.UserWhereInput = {
       ...(firstName
         ? {

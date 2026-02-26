@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { electedOfficeFactory } from './factories/electedOffice.factory'
-import { BallotReadyPositionLevel } from '../src/campaigns/campaigns.types'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { P2VStatus } from '../src/elections/types/pathToVictory.types'
 import { P2VSource } from '../src/pathToVictory/types/pathToVictory.types'
 

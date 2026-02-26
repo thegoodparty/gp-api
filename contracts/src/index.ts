@@ -56,6 +56,8 @@ export { PasswordSchema } from './shared/Password.schema'
 export { RolesSchema } from './shared/Roles.schema'
 export {
   PaginationSchema,
+  PaginationOptionsSchema,
+  type PaginationOptions,
   SortablePaginationSchema,
   FilterablePaginationSchema,
   paginationFilter,
@@ -71,6 +73,7 @@ export {
   WhyBrowsingSchema,
   UserMetaDataObjectSchema,
   UserMetaDataSchema,
+  type UserMetaData,
 } from './users/UserMetaData.schema'
 
 export {
@@ -94,3 +97,72 @@ export {
   ListUsersPaginationSchema,
   type ListUsersPagination,
 } from './users/ListUsersPagination.schema'
+
+export {
+  UpdateUserInputSchema,
+  type UpdateUserInput,
+} from './users/UpdateUserInput.schema'
+
+export {
+  BALLOT_READY_POSITION_LEVEL_VALUES,
+  BallotReadyPositionLevel,
+  BallotReadyPositionLevelSchema,
+  ELECTION_LEVEL_VALUES,
+  ElectionLevel,
+  ElectionLevelSchema,
+  CAMPAIGN_CREATED_BY_VALUES,
+  CampaignCreatedBy,
+  CampaignCreatedBySchema,
+  CAMPAIGN_LAUNCH_STATUS_VALUES,
+  CampaignLaunchStatus,
+  CampaignLaunchStatusSchema,
+  CAMPAIGN_STATUS_VALUES,
+  CampaignStatus,
+  CampaignStatusSchema,
+  ONBOARDING_STEP_VALUES,
+  OnboardingStep,
+  OnboardingStepSchema,
+  GENERATION_STATUS_VALUES,
+  GenerationStatus,
+  GenerationStatusSchema,
+} from './campaigns/enums'
+
+export type {
+  VoterGoals,
+  CustomVoterFile,
+  AiChatMessage,
+  AiContentInputValues,
+  AiContentGenerationStatus,
+  AiContentData,
+  GeoLocation,
+  CustomIssue,
+  Opponent,
+  HubSpotUpdates,
+  TopIssuePosition,
+  CampaignFinance,
+  CampaignPlan,
+  CampaignPlanStatus,
+  CampaignDetails,
+  CampaignData,
+  CampaignAiContent,
+} from './campaigns/types'
+
+export {
+  CampaignSchema,
+  type ReadCampaignOutput,
+} from './campaigns/Campaign.schema'
+
+export {
+  ReadCampaignOutputSchema,
+} from './campaigns/ReadCampaignOutput.schema'
+
+export {
+  CAMPAIGN_SORT_KEYS,
+  ListCampaignsPaginationSchema,
+  type ListCampaignsPagination,
+} from './campaigns/ListCampaignsPagination.schema'
+
+export {
+  UpdateCampaignM2MSchema,
+  type UpdateCampaignM2MInput,
+} from './campaigns/UpdateCampaignM2M.schema'

@@ -1,4 +1,4 @@
-import { VoterGoals } from 'src/campaigns/campaigns.types'
+import { VoterGoals } from '@goodparty_org/contracts'
 
 export type SyncTrackingResultCounts = {
   updated: number
