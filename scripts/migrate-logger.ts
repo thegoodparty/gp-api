@@ -1,3 +1,4 @@
+import { execSync } from 'child_process'
 import {
   Project,
   SyntaxKind,
@@ -9,7 +10,11 @@ import {
   Expression,
 } from 'ts-morph'
 
-const SKIP_FILES = ['src/shared/test-utils/mockLogger.util.ts', 'src/main.ts']
+const SKIP_FILES = [
+  'src/shared/test-utils/mockLogger.util.ts',
+  'src/main.ts',
+  'src/prisma/util/prisma.util.ts',
+]
 
 const METHOD_RENAMES: Record<string, string> = {
   log: 'info',
@@ -41,10 +46,103 @@ type CallTransform = {
   lineNumber: number
 }
 
-const isStringLike = (node: Expression): boolean =>
-  Node.isStringLiteral(node) ||
-  Node.isTemplateExpression(node) ||
-  Node.isNoSubstitutionTemplateLiteral(node)
+const isStringLike = (node: Expression): boolean => {
+  if (
+    Node.isStringLiteral(node) ||
+    Node.isTemplateExpression(node) ||
+    Node.isNoSubstitutionTemplateLiteral(node)
+  )
+    return true
+  const type = node.getType()
+  return type.isString() || type.isStringLiteral()
+}
+
+const isJsonStringify = (node: Expression): node is CallExpression =>
+  Node.isCallExpression(node) &&
+  Node.isPropertyAccessExpression(node.getExpression()) &&
+  node.getExpression().getText() === 'JSON.stringify'
+
+const argToKey = (arg: Expression): string => {
+  if (Node.isIdentifier(arg)) return arg.getText()
+  if (Node.isPropertyAccessExpression(arg)) return arg.getName()
+  return 'data'
+}
+
+const resolveArg = (arg: Expression): { text: string; inner: Expression } => {
+  if (isJsonStringify(arg)) {
+    const inner = arg.getArguments()[0]
+    return { text: inner.getText(), inner: inner as Expression }
+  }
+  return { text: arg.getText(), inner: arg }
+}
+
+const extractStringifyFromTemplate = (
+  node: Expression,
+): { dataEntries: string[]; cleanedMessage: string } | null => {
+  if (!Node.isTemplateExpression(node)) return null
+
+  const spans = node.getTemplateSpans()
+  const hasStringify = spans.some((s) => isJsonStringify(s.getExpression()))
+  if (!hasStringify) return null
+
+  const dataEntries: string[] = []
+  const headText = node.getHead().getLiteralText()
+
+  const textSegments: string[] = [headText]
+  const keptExprs: string[] = []
+
+  for (const span of spans) {
+    const expr = span.getExpression()
+    const litText = span.getLiteral().getLiteralText()
+
+    if (isJsonStringify(expr)) {
+      const inner = expr.getArguments()[0]
+      const key = argToKey(inner as Expression)
+      const innerText = inner.getText()
+      dataEntries.push(key === innerText ? key : `${key}: ${innerText}`)
+      textSegments[textSegments.length - 1] += litText
+    } else {
+      keptExprs.push(expr.getText())
+      textSegments.push(litText)
+    }
+  }
+
+  let cleanedMessage: string
+  if (keptExprs.length === 0) {
+    const text = textSegments[0].replace(/\s+/g, ' ').trim()
+    cleanedMessage = text ? `'${text}'` : ''
+  } else {
+    cleanedMessage = '`' + textSegments[0]
+    for (let i = 0; i < keptExprs.length; i++) {
+      cleanedMessage += '${' + keptExprs[i] + '}' + textSegments[i + 1]
+    }
+    cleanedMessage += '`'
+  }
+
+  return { dataEntries, cleanedMessage }
+}
+
+const isSafeAsMergeObject = (arg: Expression): boolean => {
+  if (Node.isObjectLiteralExpression(arg)) return true
+
+  const type = arg.getType()
+  if (type.isString() || type.isStringLiteral()) return false
+  if (type.isNumber() || type.isNumberLiteral()) return false
+  if (type.isBoolean() || type.isBooleanLiteral()) return false
+  if (type.isArray() || type.isTuple()) return false
+  if (type.isNull() || type.isUndefined()) return false
+  if (type.isUnion()) return false
+
+  return type.isObject()
+}
+
+const wrapAsObject = (arg: Expression): string => {
+  const text = arg.getText()
+  if (Node.isIdentifier(arg)) return `{ ${text} }`
+  if (Node.isPropertyAccessExpression(arg))
+    return `{ ${arg.getName()}: ${text} }`
+  return `{ data: ${text} }`
+}
 
 const toDataEntry = (
   arg: Expression,
@@ -90,6 +188,19 @@ const buildMultiArgTransform = (
   return { message, dataEntries, needsReview }
 }
 
+const getLoggerLocalNames = (sourceFile: SourceFile): Set<string> => {
+  const names = new Set<string>()
+  const nestImport = sourceFile.getImportDeclaration('@nestjs/common')
+  if (!nestImport) return names
+
+  for (const named of nestImport.getNamedImports()) {
+    if (named.getName() === 'Logger') {
+      names.add(named.getAliasNode()?.getText() ?? 'Logger')
+    }
+  }
+  return names
+}
+
 const transformLoggerCalls = (
   sourceFile: SourceFile,
   warnings: string[],
@@ -109,13 +220,16 @@ const transformLoggerCalls = (
     if (objText !== 'this.logger' && objText !== 'logger') continue
 
     const methodName = expr.getName()
-    if (!['log', 'error', 'warn', 'debug', 'verbose'].includes(methodName))
+    if (
+      !['log', 'error', 'warn', 'debug', 'verbose', 'info', 'trace'].includes(
+        methodName,
+      )
+    )
       continue
 
     const args = call.getArguments()
     const newMethodName = METHOD_RENAMES[methodName] ?? methodName
     const needsRename = newMethodName !== methodName
-    const needsSwap = args.length === 2
 
     if (args.length > 2) {
       // @ts-expect-error - TODO: fix this
@@ -139,15 +253,85 @@ const transformLoggerCalls = (
       continue
     }
 
-    if (!needsRename && !needsSwap) continue
+    if (args.length === 2) {
+      const [first, second] = args
+      const r1 = resolveArg(first as Expression)
+      const r2 = resolveArg(second as Expression)
+
+      if (isStringLike(first as Expression)) {
+        const mergeArg = isSafeAsMergeObject(r2.inner)
+          ? r2.text
+          : wrapAsObject(r2.inner)
+        transforms.push({
+          start: call.getStart(),
+          end: call.getEnd(),
+          replacement: `${objText}.${newMethodName}(${mergeArg}, ${r1.text})`,
+          lineNumber: call.getStartLineNumber(),
+        })
+      } else if (isStringLike(second as Expression)) {
+        const mergeArg = isSafeAsMergeObject(r1.inner)
+          ? r1.text
+          : wrapAsObject(r1.inner)
+        transforms.push({
+          start: call.getStart(),
+          end: call.getEnd(),
+          replacement: `${objText}.${newMethodName}(${mergeArg}, ${r2.text})`,
+          lineNumber: call.getStartLineNumber(),
+        })
+      } else if (needsRename) {
+        transforms.push({
+          start: call.getStart(),
+          end: call.getEnd(),
+          replacement: `${objText}.${newMethodName}(${r1.text}, ${r2.text})`,
+          lineNumber: call.getStartLineNumber(),
+        })
+      }
+      continue
+    }
+
+    // Single-arg: check for JSON.stringify patterns
+    if (args.length === 1) {
+      const arg = args[0]
+
+      if (isJsonStringify(arg as Expression)) {
+        const inner = (arg as CallExpression).getArguments()[0]
+        const mergeArg = isSafeAsMergeObject(inner as Expression)
+          ? inner.getText()
+          : wrapAsObject(inner as Expression)
+        transforms.push({
+          start: call.getStart(),
+          end: call.getEnd(),
+          replacement: `${objText}.${newMethodName}(${mergeArg})`,
+          lineNumber: call.getStartLineNumber(),
+        })
+        continue
+      }
+
+      if (Node.isTemplateExpression(arg)) {
+        const result = extractStringifyFromTemplate(arg as Expression)
+        if (result) {
+          const mergeObj = `{ ${result.dataEntries.join(', ')} }`
+          const replacement = result.cleanedMessage
+            ? `${objText}.${newMethodName}(${mergeObj}, ${result.cleanedMessage})`
+            : `${objText}.${newMethodName}(${mergeObj})`
+          transforms.push({
+            start: call.getStart(),
+            end: call.getEnd(),
+            replacement,
+            lineNumber: call.getStartLineNumber(),
+          })
+          continue
+        }
+      }
+    }
+
+    if (!needsRename) continue
 
     const argTexts = args.map((a) => a.getText())
-    const newArgs = needsSwap ? [argTexts[1], argTexts[0]] : argTexts
-
     transforms.push({
       start: call.getStart(),
       end: call.getEnd(),
-      replacement: `${objText}.${newMethodName}(${newArgs.join(', ')})`,
+      replacement: `${objText}.${newMethodName}(${argTexts.join(', ')})`,
       lineNumber: call.getStartLineNumber(),
     })
   }
@@ -172,13 +356,15 @@ const migrateClassLogger = (
   sourceFile: SourceFile,
   warnings: string[],
 ): boolean => {
+  const loggerNames = getLoggerLocalNames(sourceFile)
+
   const loggerProp = classDecl.getProperties().find((p) => {
     const initializer = p.getInitializer()
     return (
       p.getName() === 'logger' &&
       initializer &&
       Node.isNewExpression(initializer) &&
-      initializer.getExpression().getText() === 'Logger'
+      loggerNames.has(initializer.getExpression().getText())
     )
   })
 
@@ -234,13 +420,15 @@ const migrateModuleLogger = (
   sourceFile: SourceFile,
   warnings: string[],
 ): boolean => {
+  const loggerNames = getLoggerLocalNames(sourceFile)
+
   const varDecls = sourceFile.getVariableDeclarations().filter((v) => {
     const initializer = v.getInitializer()
     return (
       v.getName() === 'logger' &&
       initializer &&
       Node.isNewExpression(initializer) &&
-      initializer.getExpression().getText() === 'Logger'
+      loggerNames.has(initializer.getExpression().getText())
     )
   })
 
@@ -258,14 +446,14 @@ const migrateModuleLogger = (
 const updateImports = (sourceFile: SourceFile, hadClassLogger: boolean) => {
   const nestImport = sourceFile.getImportDeclaration('@nestjs/common')
   if (nestImport) {
-    const loggerSpecifier = nestImport
+    const loggerSpecifiers = nestImport
       .getNamedImports()
-      .find((n) => n.getName() === 'Logger')
-    if (loggerSpecifier) {
+      .filter((n) => n.getName() === 'Logger')
+    for (const spec of loggerSpecifiers) {
       if (nestImport.getNamedImports().length === 1) {
         nestImport.remove()
       } else {
-        loggerSpecifier.remove()
+        spec.remove()
       }
     }
   }
@@ -329,9 +517,10 @@ const run = () => {
     )
   })
 
-  const filesToMigrate = sourceFiles.filter((sf) =>
-    sf.getFullText().includes('new Logger('),
-  )
+  const filesToMigrate = sourceFiles.filter((sf) => {
+    const text = sf.getFullText()
+    return text.includes('new Logger(') || text.includes('this.logger.')
+  })
 
   console.log(`Found ${filesToMigrate.length} files with Logger usage\n`)
 
@@ -345,6 +534,13 @@ const run = () => {
   }
 
   project.saveSync()
+
+  try {
+    execSync('npx prettier --write "src/**/*.ts"', { stdio: 'ignore' })
+  } catch {}
+  try {
+    execSync('npx eslint --fix "src/**/*.ts"', { stdio: 'ignore' })
+  } catch {}
 
   const totalClassLoggers = results.reduce((sum, r) => sum + r.classLoggers, 0)
   const totalModuleLoggers = results.reduce(
