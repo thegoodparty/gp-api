@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -77,22 +78,21 @@ export class ElectedOfficeController {
     // Do this without guard to hopefully slowly move away from the hard link to campaign
     const campaign = await this.electedOfficeService.client.campaign.findFirst({
       where: { userId: user.id },
-      select: { id: true },
     })
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
     }
-    const data: Prisma.ElectedOfficeCreateInput = {
-      electedDate: body.electedDate,
-      swornInDate: body.swornInDate,
-      termStartDate: body.termStartDate,
-      termEndDate: body.termEndDate,
-      termLengthDays: body.termLengthDays,
-      isActive: body.isActive,
-      user: { connect: { id: user.id } },
-      campaign: { connect: { id: campaign.id } },
+
+    if (!campaign.details.positionId) {
+      throw new BadRequestException('Campaign does not have a position')
     }
-    const created = await this.electedOfficeService.create({ data })
+
+    const created = await this.electedOfficeService.create({
+      ...body,
+      userId: user.id,
+      campaignId: campaign.id,
+      ballotreadyPositionId: campaign.details.positionId,
+    })
     return this.toApi(created)
   }
 

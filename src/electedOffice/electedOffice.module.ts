@@ -3,9 +3,10 @@ import { ElectedOfficeController } from './electedOffice.controller'
 import { ElectedOfficeService } from './services/electedOffice.service'
 import { UseElectedOfficeGuard } from './guards/UseElectedOffice.guard'
 import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
+import { ElectionsModule } from '@/elections/elections.module'
 
 @Module({
-  imports: [],
+  imports: [ElectionsModule],
   controllers: [ElectedOfficeController],
   providers: [ElectedOfficeService, UseElectedOfficeGuard, UserOrM2MGuard],
   exports: [ElectedOfficeService],
