@@ -1,15 +1,16 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { HttpService } from '@nestjs/axios'
+import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PositionWithMatchedDistrict } from '../types/elections.types'
+import { PositionWithOptionalDistrict } from '../types/elections.types'
 import { ElectionsService } from './elections.service'
 
 const makePosition = (
   turnoutValue: number | null,
-): PositionWithMatchedDistrict => ({
+): PositionWithOptionalDistrict => ({
   positionId: 'pos-1',
   brPositionId: 'br-pos-1',
   brDatabaseId: 'br-db-1',
@@ -105,6 +106,35 @@ describe('ElectionsService', () => {
       expect(result.winNumber).toBe(-1)
       expect(result.voterContactGoal).toBe(-1)
       expect(result.projectedTurnout).toBe(-1)
+    })
+
+    it('throws NotFoundException when API returns position without district', async () => {
+      const positionNoDistrict: PositionWithOptionalDistrict = {
+        positionId: 'pos-1',
+        brPositionId: 'br-pos-1',
+        brDatabaseId: 'br-db-1',
+      }
+      mockHttpGet.mockReturnValue(of({ data: positionNoDistrict, status: 200 }))
+
+      await expect(
+        service.getBallotReadyMatchedRaceTargetDetails(defaultParams),
+      ).rejects.toThrow(
+        new NotFoundException(
+          'No position and/or associated district was found',
+        ),
+      )
+    })
+
+    it('throws NotFoundException when API returns null', async () => {
+      mockHttpGet.mockReturnValue(of({ data: null, status: 200 }))
+
+      await expect(
+        service.getBallotReadyMatchedRaceTargetDetails(defaultParams),
+      ).rejects.toThrow(
+        new NotFoundException(
+          'No position and/or associated district was found',
+        ),
+      )
     })
   })
 })
