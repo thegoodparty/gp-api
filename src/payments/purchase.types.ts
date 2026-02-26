@@ -11,19 +11,10 @@ export interface BasePurchaseMetadata {
   campaignId?: number
 }
 
-export interface CreatePurchaseIntentDto<Metadata> {
-  type: PurchaseType
-  metadata: Metadata
-}
-
 export interface CreateCheckoutSessionDto<Metadata> {
   type: PurchaseType
   metadata: Metadata
   returnUrl?: string
-}
-
-export interface CompletePurchaseDto {
-  paymentIntentId: string
 }
 
 export interface CompleteCheckoutSessionDto {
@@ -39,11 +30,6 @@ export interface CompleteFreePurchaseDto {
   purchaseType: PurchaseType
   metadata: FreePurchaseMetadata
 }
-
-export type PostPurchaseHandler<Metadata> = (
-  paymentIntentId: string,
-  metadata: Metadata,
-) => Promise<unknown>
 
 export type CheckoutSessionPostPurchaseHandler<Metadata> = (
   sessionId: string,

@@ -10,12 +10,10 @@ import {
   type MockedFunction,
 } from 'vitest'
 import { PurchaseService } from './purchase.service'
-import { PaymentsService } from './payments.service'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import {
   PurchaseType,
   PurchaseHandler,
-  PostPurchaseHandler,
   CheckoutSessionPostPurchaseHandler,
 } from '../purchase.types'
 
@@ -53,10 +51,6 @@ function mockPaymentIntent(
 
 describe('PurchaseService', () => {
   let service: PurchaseService
-  let mockPaymentsService: {
-    createPayment: MockedFunction<PaymentsService['createPayment']>
-    retrievePayment: MockedFunction<PaymentsService['retrievePayment']>
-  }
   let mockStripeService: {
     createCustomCheckoutSession: MockedFunction<
       StripeService['createCustomCheckoutSession']
@@ -71,7 +65,6 @@ describe('PurchaseService', () => {
       StripeService['updatePaymentIntentMetadata']
     >
   }
-  let mockPostPurchaseHandler: MockedFunction<PostPurchaseHandler<unknown>>
   let mockCheckoutSessionPostPurchaseHandler: MockedFunction<
     CheckoutSessionPostPurchaseHandler<unknown>
   >
@@ -121,11 +114,6 @@ describe('PurchaseService', () => {
   }
 
   beforeEach(async () => {
-    mockPaymentsService = {
-      createPayment: vi.fn(),
-      retrievePayment: vi.fn(),
-    }
-
     mockStripeService = {
       createCustomCheckoutSession: vi.fn(),
       retrieveCheckoutSession: vi.fn(),
@@ -133,7 +121,6 @@ describe('PurchaseService', () => {
       updatePaymentIntentMetadata: vi.fn(),
     }
 
-    mockPostPurchaseHandler = vi.fn().mockResolvedValue(undefined)
     mockCheckoutSessionPostPurchaseHandler = vi.fn().mockResolvedValue({
       success: true,
     })
@@ -142,10 +129,6 @@ describe('PurchaseService', () => {
       providers: [
         PurchaseService,
         {
-          provide: PaymentsService,
-          useValue: mockPaymentsService,
-        },
-        {
           provide: StripeService,
           useValue: mockStripeService,
         },
@@ -153,127 +136,6 @@ describe('PurchaseService', () => {
     }).compile()
 
     service = module.get<PurchaseService>(PurchaseService)
-  })
-
-  describe('createPurchaseIntent with zero amount', () => {
-    it('should skip Stripe and return synthetic response when amount is 0 without calling post-purchase', async () => {
-      // Arrange: Register a handler that returns 0 amount (free texts covers all)
-      const mockHandler: PurchaseHandler<unknown> = {
-        validatePurchase: vi.fn().mockResolvedValue(undefined),
-        calculateAmount: vi.fn().mockResolvedValue(0), // Zero amount!
-      }
-      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
-      service.registerPostPurchaseHandler(
-        PurchaseType.TEXT,
-        mockPostPurchaseHandler,
-      )
-
-      // Act
-      const result = await service.createPurchaseIntent({
-        user: mockUser,
-        dto: {
-          type: PurchaseType.TEXT,
-          metadata: {
-            contactCount: 298, // Less than 5000 free texts
-            pricePerContact: 3.5,
-            campaignId: 111,
-          },
-        },
-        campaign: mockCampaign,
-      })
-
-      // Assert: Should NOT call Stripe
-      expect(mockPaymentsService.createPayment).not.toHaveBeenCalled()
-
-      // Assert: Should return synthetic response
-      expect(result.id).toMatch(/^free_\d+_1$/)
-      expect(result.clientSecret).toBe('')
-      expect(result.amount).toBe(0)
-      expect(result.status).toBe('succeeded')
-
-      // Assert: Should NOT execute post-purchase handler during intent creation
-      // Post-purchase is deferred to completeFreePurchase() when user explicitly confirms
-      expect(mockPostPurchaseHandler).not.toHaveBeenCalled()
-    })
-
-    it('should call Stripe when amount is greater than 0', async () => {
-      // Arrange: Handler returns non-zero amount
-      const mockHandler: PurchaseHandler<unknown> = {
-        validatePurchase: vi.fn().mockResolvedValue(undefined),
-        calculateAmount: vi.fn().mockResolvedValue(1043), // $10.43 in cents
-      }
-      mockPaymentsService.createPayment.mockResolvedValue({
-        id: 'pi_test123',
-        client_secret: 'secret_test123',
-        amount: 1043,
-        status: 'requires_payment_method',
-        lastResponse: {
-          headers: {},
-          requestId: 'req_test123',
-          statusCode: 200,
-        },
-      } as Stripe.Response<Stripe.PaymentIntent>)
-
-      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
-      service.registerPostPurchaseHandler(
-        PurchaseType.TEXT,
-        mockPostPurchaseHandler,
-      )
-
-      // Act
-      const result = await service.createPurchaseIntent({
-        user: mockUser,
-        dto: {
-          type: PurchaseType.TEXT,
-          metadata: {
-            contactCount: 5500,
-            pricePerContact: 3.5,
-            campaignId: 111,
-          },
-        },
-        campaign: mockCampaign,
-      })
-
-      // Assert: Should call Stripe
-      expect(mockPaymentsService.createPayment).toHaveBeenCalledOnce()
-
-      // Assert: Should return Stripe response
-      expect(result.id).toBe('pi_test123')
-      expect(result.clientSecret).toBe('secret_test123')
-      expect(result.amount).toBe(10.43) // Converted from cents
-      expect(result.status).toBe('requires_payment_method')
-
-      // Assert: Should NOT execute post-purchase handler during intent creation
-      // (post-purchase only runs in completePurchase after payment succeeds)
-      expect(mockPostPurchaseHandler).not.toHaveBeenCalled()
-    })
-
-    it('should not call post-purchase handler at all on zero-amount purchase (deferred to confirmation)', async () => {
-      // Arrange
-      const mockHandler: PurchaseHandler<unknown> = {
-        validatePurchase: vi.fn().mockResolvedValue(undefined),
-        calculateAmount: vi.fn().mockResolvedValue(0),
-      }
-      const failingHandler = vi
-        .fn()
-        .mockRejectedValue(new Error('Failed to redeem free texts'))
-      service.registerPurchaseHandler(PurchaseType.TEXT, mockHandler)
-      service.registerPostPurchaseHandler(PurchaseType.TEXT, failingHandler)
-
-      // Act: Should NOT throw because post-purchase handler is not called
-      const result = await service.createPurchaseIntent({
-        user: mockUser,
-        dto: {
-          type: PurchaseType.TEXT,
-          metadata: { contactCount: 100 },
-        },
-        campaign: mockCampaign,
-      })
-
-      // Assert: Should return synthetic response without calling handler
-      expect(result.amount).toBe(0)
-      expect(failingHandler).not.toHaveBeenCalled()
-    })
   })
 
   describe('createCheckoutSession', () => {
@@ -710,135 +572,6 @@ describe('PurchaseService', () => {
       expect(
         mockStripeService.updatePaymentIntentMetadata,
       ).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('completePurchase (legacy PaymentIntent flow)', () => {
-    it('should complete purchase and run post-purchase handler', async () => {
-      // Arrange
-      service.registerPostPurchaseHandler(
-        PurchaseType.TEXT,
-        mockPostPurchaseHandler,
-      )
-
-      mockPaymentsService.retrievePayment.mockResolvedValue(
-        mockPaymentIntent({
-          id: 'pi_test_legacy',
-          status: 'succeeded',
-          metadata: {
-            purchaseType: PurchaseType.TEXT,
-            contactCount: '1000',
-            campaignId: '111',
-          },
-        }),
-      )
-
-      // Act
-      await service.completePurchase({
-        paymentIntentId: 'pi_test_legacy',
-      })
-
-      // Assert
-      expect(mockPostPurchaseHandler).toHaveBeenCalledWith(
-        'pi_test_legacy',
-        expect.objectContaining({
-          purchaseType: PurchaseType.TEXT,
-          contactCount: '1000',
-        }),
-      )
-    })
-
-    it('should throw if payment not succeeded', async () => {
-      // Arrange
-      mockPaymentsService.retrievePayment.mockResolvedValue(
-        mockPaymentIntent({
-          id: 'pi_test_pending',
-          status: 'requires_payment_method',
-          metadata: { purchaseType: PurchaseType.TEXT },
-        }),
-      )
-
-      // Act & Assert
-      await expect(
-        service.completePurchase({ paymentIntentId: 'pi_test_pending' }),
-      ).rejects.toThrow('Payment not completed: requires_payment_method')
-    })
-
-    it('should throw if no purchase type in metadata', async () => {
-      // Arrange
-      mockPaymentsService.retrievePayment.mockResolvedValue(
-        mockPaymentIntent({
-          id: 'pi_test_no_type',
-          status: 'succeeded',
-          metadata: {}, // No purchaseType!
-        }),
-      )
-
-      // Act & Assert
-      await expect(
-        service.completePurchase({ paymentIntentId: 'pi_test_no_type' }),
-      ).rejects.toThrow('No purchase type found in payment metadata')
-    })
-
-    it('should throw if no handler registered', async () => {
-      // Arrange
-      mockPaymentsService.retrievePayment.mockResolvedValue(
-        mockPaymentIntent({
-          id: 'pi_test_no_handler',
-          status: 'succeeded',
-          metadata: { purchaseType: PurchaseType.DOMAIN_REGISTRATION },
-        }),
-      )
-
-      // No handler registered for DOMAIN_REGISTRATION
-
-      // Act & Assert
-      await expect(
-        service.completePurchase({ paymentIntentId: 'pi_test_no_handler' }),
-      ).rejects.toThrow('No post-purchase handler found for this purchase type')
-    })
-  })
-
-  describe('createPurchaseIntent validation', () => {
-    it('should throw when handler validation fails', async () => {
-      // Arrange
-      const mockHandler: PurchaseHandler<unknown> = {
-        validatePurchase: vi
-          .fn()
-          .mockRejectedValue(new Error('Domain already registered')),
-        calculateAmount: vi.fn().mockResolvedValue(3500),
-      }
-      service.registerPurchaseHandler(
-        PurchaseType.DOMAIN_REGISTRATION,
-        mockHandler,
-      )
-
-      // Act & Assert
-      await expect(
-        service.createPurchaseIntent({
-          user: mockUser,
-          dto: {
-            type: PurchaseType.DOMAIN_REGISTRATION,
-            metadata: { domainName: 'taken.com', websiteId: 1 },
-          },
-        }),
-      ).rejects.toThrow('Domain already registered')
-
-      expect(mockPaymentsService.createPayment).not.toHaveBeenCalled()
-    })
-
-    it('should reject invalid purchase types', async () => {
-      // Arrange: This covers the CodeQL "unvalidated dynamic method call" alert
-      // where dto.type was used to look up handlers without validation
-      await expect(
-        service.createPurchaseIntent({
-          user: mockUser,
-          dto: {
-            type: 'MALICIOUS_TYPE' as PurchaseType,
-            metadata: {},
-          },
-        }),
-      ).rejects.toThrow('Invalid purchase type: MALICIOUS_TYPE')
     })
   })
 
