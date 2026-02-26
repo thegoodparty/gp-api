@@ -130,22 +130,31 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-  async createForUser(user: User) {
+  async createForUser(
+    user: User,
+    initialData: {
+      details: Record<string, unknown>
+      data?: Record<string, unknown>
+    },
+  ) {
     this.logger.debug('Creating campaign for user', user)
     const slug = await this.findSlug(user)
+
+    const baseDetails: PrismaJson.CampaignDetails = { zip: user.zip }
+    const baseData: PrismaJson.CampaignData = {
+      slug,
+    }
 
     const newCampaign = await this.create({
       data: {
         slug,
         isActive: false,
         userId: user.id,
-        details: {
-          zip: user.zip,
-        },
-        data: {
-          slug,
-          currentStep: OnboardingStep.registration,
-        },
+        // @ts-expect-error - TODO: fix this
+        details: deepMerge(baseDetails, initialData.details),
+        data: initialData.data
+          ? deepMerge(baseData, initialData.data)
+          : baseData,
       },
     })
     this.logger.debug('Created campaign', newCampaign)

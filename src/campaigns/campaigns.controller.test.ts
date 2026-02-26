@@ -15,6 +15,7 @@ import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignsController } from './campaigns.controller'
 import { CampaignStatus } from '@goodparty_org/contracts'
+import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 
@@ -506,10 +507,14 @@ describe('CampaignsController', () => {
   })
 
   describe('create', () => {
+    const mockCreateBody = {
+      details: { state: 'CA', office: 'Mayor' },
+    } as CreateCampaignSchema
+
     it('throws ConflictException when campaign already exists', async () => {
       vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
-      await expect(controller.create(mockUser)).rejects.toThrow(
+      await expect(controller.create(mockUser, mockCreateBody)).rejects.toThrow(
         ConflictException,
       )
     })
@@ -520,9 +525,12 @@ describe('CampaignsController', () => {
         mockCampaign,
       )
 
-      const result = await controller.create(mockUser)
+      const result = await controller.create(mockUser, mockCreateBody)
 
-      expect(campaignsService.createForUser).toHaveBeenCalledWith(mockUser)
+      expect(campaignsService.createForUser).toHaveBeenCalledWith(
+        mockUser,
+        mockCreateBody,
+      )
       expect(result).toEqual(mockCampaign)
     })
   })
