@@ -145,18 +145,38 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       slug,
     }
 
-    const newCampaign = await this.create({
-      data: {
-        slug,
-        isActive: false,
-        userId: user.id,
-        // @ts-expect-error - TODO: fix this
-        details: deepMerge(baseDetails, initialData.details),
-        data: initialData.data
-          ? deepMerge(baseData, initialData.data)
-          : baseData,
-      },
+    // TODO: validate positionID and get it from the user
+    const newCampaign = await this.client.$transaction(async (tx) => {
+      const [{ nextval: id }] = await tx.$queryRaw<[{ nextval: bigint }]>`
+        SELECT nextval('campaign_id_seq')`
+
+      const campaignId = Number(id)
+      const orgSlug = `campaign-${campaignId}`
+
+      await tx.organization.create({
+        data: {
+          slug: orgSlug,
+          ownerId: user.id,
+          positionId: 'TODO SWAIN',
+        },
+      })
+
+      return tx.campaign.create({
+        data: {
+          id: campaignId,
+          slug,
+          organizationSlug: orgSlug,
+          isActive: false,
+          userId: user.id,
+          // @ts-expect-error - TODO: fix this
+          details: deepMerge(baseDetails, initialData.details),
+          data: initialData.data
+            ? deepMerge(baseData, initialData.data)
+            : baseData,
+        },
+      })
     })
+
     this.logger.debug('Created campaign', newCampaign)
     await this.crm.trackCampaign(newCampaign.id)
 
