@@ -22,6 +22,7 @@ import {
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
+import { PositionWithOptionalDistrict } from 'dist/src/elections/types/elections.types'
 
 // TODO: Revisit this file after the stakeholders decide on the direction we're going...
 // ...for the win number / p2v solution. Remove any unneeded code at that time.
@@ -136,6 +137,13 @@ export class ElectionsService {
       voterContactGoal: winNumber * ElectionsService.VOTER_CONTACT_MULTIPLIER,
       projectedTurnout,
     }
+  }
+
+  async getPositionByBallotReadyId(ballotreadyPositionId: string) {
+    return this.electionApiGet<PositionWithOptionalDistrict, object>(
+      ElectionApiRoutes.positions.findByBrId.path + `/${ballotreadyPositionId}`,
+      {},
+    )
   }
 
   // Gold flow: match a district via BallotReady position ID.
