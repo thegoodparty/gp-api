@@ -9,6 +9,7 @@ import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs'
 import { PrismaInstrumentation } from '@prisma/instrumentation'
 import { FastifyOtelInstrumentation } from '@fastify/otel'
+import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino'
 
 const headers = process.env.OTEL_EXPORTER_OTLP_HEADERS
 
@@ -56,7 +57,7 @@ if (!headers) {
         headers: parsedHeaders,
       }),
     ),
-    instrumentations: [new PrismaInstrumentation()],
+    instrumentations: [new PrismaInstrumentation(), new PinoInstrumentation()],
   })
 
   sdk.start()

@@ -9,10 +9,12 @@ import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import { AppModule } from './app.module'
+import { Logger } from 'nestjs-pino'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
+import { randomUUID } from 'crypto'
 
 type BootstrapParams = {
   loggingEnabled: boolean
@@ -23,24 +25,17 @@ export const bootstrap = async (
 ): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({
-      ...(process.env.LOG_LEVEL
-        ? {
-            logger: {
-              level: process.env.LOG_LEVEL,
-              enabled: params.loggingEnabled,
-            },
-          }
-        : {}),
-    }),
+    new FastifyAdapter({ logger: false, genReqId: () => randomUUID() }),
     {
       rawBody: true,
+      bufferLogs: true,
       abortOnError: false, // Don't abort immediately, show all errors
       logger: params.loggingEnabled
         ? ['log', 'error', 'warn', 'debug', 'verbose']
         : false,
     },
   )
+  app.useLogger(app.get(Logger))
   if (global.__fastifyOtelInstrumentation) {
     await app
       .getHttpAdapter()
