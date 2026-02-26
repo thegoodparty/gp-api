@@ -1,4 +1,4 @@
-import { ReadUserOutput } from '../users/schemas/ReadUserOutput.schema'
+import { type ReadUserOutput } from '@goodparty_org/contracts'
 import { Campaign, User } from '@prisma/client'
 import { M2MToken } from '@clerk/backend'
 

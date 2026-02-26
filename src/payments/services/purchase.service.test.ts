@@ -96,6 +96,7 @@ describe('PurchaseService', () => {
 
   const mockCampaign: Campaign = {
     id: 111,
+    organizationSlug: null,
     slug: 'test-campaign',
     createdAt: new Date(),
     updatedAt: new Date(),

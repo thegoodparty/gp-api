@@ -16,10 +16,11 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { Campaign, Prisma, User, UserRole } from '@prisma/client'
-import { ZodValidationPipe } from 'nestjs-zod'
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
@@ -35,19 +36,31 @@ import { UseCampaign } from './decorators/UseCampaign.decorator'
 import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
-import { ListCampaignsPaginationSchema } from './schemas/ListCampaignsPagination.schema'
-import { ReadCampaignOutputSchema } from './schemas/ReadCampaignOutput.schema'
+import {
+  ListCampaignsPaginationSchema,
+  ReadCampaignOutputSchema,
+  UpdateCampaignM2MSchema,
+} from '@goodparty_org/contracts'
 import {
   SetDistrictDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
-import { UpdateCampaignM2MSchema } from './schemas/UpdateCampaignM2M.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+
+class ListCampaignsPaginationDto extends createZodDto(
+  ListCampaignsPaginationSchema,
+) {}
+
+class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) {}
 
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
+@UseInterceptors(ZodResponseInterceptor)
 export class CampaignsController {
   private readonly logger = new Logger(CampaignsController.name)
 
@@ -148,12 +161,10 @@ export class CampaignsController {
 
   @UseGuards(M2MOnly)
   @Get('list')
-  async list(@Query() query: ListCampaignsPaginationSchema) {
+  @ResponseSchema(PaginatedResponseSchema(ReadCampaignOutputSchema))
+  async list(@Query() query: ListCampaignsPaginationDto) {
     const { data, meta } = await this.campaigns.listCampaigns(query)
-    return {
-      data: data.map((c) => ReadCampaignOutputSchema.parse(c)),
-      meta,
-    }
+    return { data, meta }
   }
 
   @Get('mine/status')
@@ -246,18 +257,19 @@ export class CampaignsController {
 
   @UseGuards(M2MOnly)
   @Get(':id')
+  @ResponseSchema(ReadCampaignOutputSchema)
   async findById(@Param() { id }: IdParamSchema) {
-    const campaign = await this.campaigns.findUniqueOrThrow({
+    return this.campaigns.findUniqueOrThrow({
       where: { id },
     })
-    return ReadCampaignOutputSchema.parse(campaign)
   }
 
   @UseGuards(M2MOnly)
   @Put(':id')
+  @ResponseSchema(ReadCampaignOutputSchema)
   async updateCampaign(
     @Param() { id }: IdParamSchema,
-    @Body() body: UpdateCampaignM2MSchema,
+    @Body() body: UpdateCampaignM2MDto,
   ) {
     await this.campaigns.findUniqueOrThrow({
       where: { id },
@@ -266,7 +278,7 @@ export class CampaignsController {
 
     const { data, details, aiContent, ...scalarFields } = body
 
-    const updated = await this.campaigns.updateJsonFields(
+    return this.campaigns.updateJsonFields(
       id,
       { data, details, aiContent },
       true,
@@ -274,8 +286,6 @@ export class CampaignsController {
         ? scalarFields
         : undefined,
     )
-
-    return ReadCampaignOutputSchema.parse(updated)
   }
 
   @Post('launch')
@@ -422,7 +432,7 @@ export class CampaignsController {
   }
 
   @Put('admin/:slug/race-target-details')
-  @Roles(UserRole.admin)
+  @Roles(UserRole.admin, UserRole.sales)
   async updateRaceTargetDetailsBySlug(
     @Param('slug') slug: string,
     @Query() query: UpdateRaceTargetDetailsBySlugQueryDTO,

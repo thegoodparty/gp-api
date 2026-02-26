@@ -1,5 +1,5 @@
 {
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules", "contracts"],
   "compilerOptions": {
     "module": "NodeNext",
     "declaration": true,
@@ -32,6 +32,7 @@
     "noFallthroughCasesInSwitch": false,
     "lib": ["esnext"],
     "resolveJsonModule": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "preserveWatchOutput": true
   }
 }

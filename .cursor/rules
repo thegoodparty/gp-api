@@ -1127,3 +1127,29 @@ expect([200, 404]).toContain(response.status())
 5. ❌ Don't place shared utilities in individual test files
 6. ❌ Don't forget to check for environment variables before using them
 7. ❌ Don't create centralized test files (keep them near the features they test)
+
+## Rule 27: Lint and Format Gate Before Committing
+
+CRITICAL REQUIREMENT:
+
+- ALWAYS run `npm run lint-format` (or the project's equivalent lint/format command) before committing changes
+- If the command exits with a non-zero exit code, DO NOT commit
+- If the failure is in a file you modified, fix it immediately
+- If the failure is in a file you did NOT modify, STOP and raise it as an issue to the user before proceeding
+- NEVER dismiss, ignore, or rationalize away a non-zero exit code from a lint/format check
+
+REQUIRED BEHAVIOR:
+
+1. Run the lint/format command after all code changes are complete
+2. Verify the exit code is 0
+3. If exit code is non-zero, read the error output and determine which files are affected
+4. If the errors are in files you changed: fix them and re-run
+5. If the errors are in files you did NOT change: report them to the user and wait for instructions
+6. Only proceed with committing when the lint/format command exits cleanly
+
+STRICTLY PROHIBITED:
+
+- Committing when lint/format has a non-zero exit code
+- Dismissing pre-existing lint errors as "not my problem"
+- Silently ignoring warnings that are configured as errors in the project's lint config
+- Proceeding without running lint/format at all

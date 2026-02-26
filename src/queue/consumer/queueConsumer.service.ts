@@ -69,6 +69,30 @@ import {
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
 
+type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
+
+const buildIssueProperties = (
+  issue: PollAnalysisIssue | undefined,
+  index: number,
+): Record<string, string | number | null> => {
+  if (!issue) {
+    return {
+      [`issue${index}Description`]: null,
+      [`issue${index}Quote1`]: null,
+      [`issue${index}Quote2`]: null,
+      [`issue${index}Quote3`]: null,
+      [`issue${index}MentionCount`]: null,
+    }
+  }
+  return {
+    [`issue${index}Description`]: issue.summary,
+    [`issue${index}Quote1`]: issue.quotes[0]?.quote ?? '',
+    [`issue${index}Quote2`]: issue.quotes[1]?.quote ?? '',
+    [`issue${index}Quote3`]: issue.quotes[2]?.quote ?? '',
+    [`issue${index}MentionCount`]: issue.responseCount,
+  }
+}
+
 @Injectable()
 export class QueueConsumerService {
   private readonly logger = new Logger(QueueConsumerService.name)
@@ -805,6 +829,15 @@ export class QueueConsumerService {
           'issue 1': issues?.at(0)?.theme || null,
           'issue 2': issues?.at(1)?.theme || null,
           'issue 3': issues?.at(2)?.theme || null,
+          ...buildIssueProperties(issues?.at(0), 1),
+          ...buildIssueProperties(issues?.at(1), 2),
+          ...buildIssueProperties(issues?.at(2), 3),
+          pollsSent: poll.targetAudienceSize,
+          pollResponses: totalResponses,
+          pollResponseRate:
+            totalResponses > 0
+              ? `${((totalResponses / poll.targetAudienceSize) * 100).toFixed(1)}%`
+              : '0%',
         },
       ),
     ])

@@ -26,22 +26,110 @@ jobs:
       service_url: ${{ steps.pulumi.outputs.service_url }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check contracts changes
+        id: contracts-changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PREV="${{ github.event.pull_request.base.sha }}"
+          else
+            PREV="${{ github.event.before }}"
+          fi
+          CURRENT="${{ github.event.pull_request.head.sha || github.sha }}"
+          CHANGED=$(git diff --name-only "$PREV" "$CURRENT" -- 'contracts/src/' 'contracts/package.json' 'contracts/tsup.config.ts' 'contracts/scripts/' | head -1)
+          RESULT=$( [ -n "$CHANGED" ] && echo true || echo false )
+          echo "contracts=$RESULT" >> "$GITHUB_OUTPUT"
+          echo "Contracts changed: $RESULT (comparing $PREV..$CURRENT)"
 
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
 
       # Validation
       - run: npm run generate
+
+      - name: Build contracts
+        run: cd contracts && npm run build
+
       - run: npx tsc --noEmit
       - run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
       - run: npx prettier --check "src/**/*.{ts,js,json}"
       - run: npm run test -- --coverage
 
       - run: npm run build
+
+      - name: Setup Node 24 for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: RC version contracts
+        if: >-
+          github.ref_name != 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        id: rc-version
+        working-directory: contracts
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SNAPSHOT_TAG="rc-pr-${{ github.event.number }}"
+          else
+            SNAPSHOT_TAG="rc-${{ github.ref_name }}"
+          fi
+          BEFORE=$(node -p "require('./package.json').version")
+          npx changeset version --snapshot "$SNAPSHOT_TAG" --snapshot-prerelease-template '{tag}.{commit}'
+          AFTER=$(node -p "require('./package.json').version")
+          echo "changed=$( [ "$BEFORE" != "$AFTER" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "version=$AFTER" >> "$GITHUB_OUTPUT"
+
+      - name: Publish RC contracts
+        if: >-
+          github.ref_name != 'master'
+          && steps.rc-version.outputs.changed == 'true'
+          && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        working-directory: contracts
+        run: npx changeset publish --tag rc
+
+      - name: Comment RC version on PR
+        if: github.event_name == 'pull_request' && steps.rc-version.outputs.changed == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            **@goodparty_org/contracts** RC published: `${{ steps.rc-version.outputs.version }}`
+            ```
+            npm install @goodparty_org/contracts@${{ steps.rc-version.outputs.version }}
+            ```
+
+      - name: Generate App token
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Create Release PR or Publish contracts
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: npx changeset publish
+          title: 'chore: release @goodparty_org/contracts'
+          cwd: contracts
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Calculate overall coverage
         id: coverage-calc

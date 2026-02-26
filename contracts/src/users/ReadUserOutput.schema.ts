@@ -1,17 +1,16 @@
+import { z } from 'zod'
 import { CreateUserInputSchema } from './CreateUserInput.schema'
 import { UserMetaDataSchema } from './UserMetaData.schema'
-import { z } from 'zod'
-import {
-  EmailSchema,
-  PhoneSchema,
-  RolesSchema,
-  ZipSchema,
-} from 'src/shared/schemas'
-import { makeOptional } from 'src/shared/util/zod.util'
+import { EmailSchema } from '../shared/Email.schema'
+import { PhoneSchema } from '../shared/Phone.schema'
+import { RolesSchema } from '../shared/Roles.schema'
+import { ZipSchema } from '../shared/Zip.schema'
+import { makeOptional } from '../shared/zod.util'
 
 export const ReadUserOutputSchema = CreateUserInputSchema.omit({
   password: true,
   allowTexts: true,
+  signUpMode: true,
 }).extend({
   name: z.string().nullish(),
   zip: makeOptional(ZipSchema),
