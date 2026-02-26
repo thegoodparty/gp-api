@@ -162,51 +162,6 @@ export class DomainsService
   }
 
   /**
-   * Legacy post-purchase handler for PaymentIntent-based domain purchases.
-   * @deprecated Use handleDomainPostPurchase for Checkout Session flow instead.
-   *
-   * This method is registered with registerPostPurchaseHandler and receives
-   * a PaymentIntent ID directly. It's kept for backward compatibility with
-   * any existing PaymentIntent-based flows.
-   */
-  async executePostPurchase(
-    paymentIntentId: string,
-    metadata: DomainPurchaseMetadata,
-  ): Promise<{
-    domain: Domain
-    registrationResult: {
-      vercelResult: GetDomainResponseBody | BuySingleDomainResponseBody | null
-      projectResult: AddProjectDomainResponseBody | null
-      message: string
-    }
-    message: string
-  }> {
-    const { domainName, websiteId } = metadata
-    if (!websiteId) {
-      throw new BadRequestException(
-        'Website ID is required for domain registration',
-      )
-    }
-    if (!domainName) {
-      throw new BadRequestException(
-        'Domain name is required for domain registration',
-      )
-    }
-
-    // Get user from PaymentIntent metadata (legacy flow)
-    // getValidatedPaymentUser also validates the payment succeeded
-    const { user } =
-      await this.payments.getValidatedPaymentUser(paymentIntentId)
-
-    return this.processDomainRegistration({
-      user,
-      websiteId,
-      domainName,
-      paymentId: paymentIntentId,
-    })
-  }
-
-  /**
    * Post-purchase handler for Checkout Session-based domain purchases.
    * This is the preferred flow that supports promo codes.
    */

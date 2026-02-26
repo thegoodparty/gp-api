@@ -15,9 +15,7 @@ import { StripeService } from '../vendors/stripe/services/stripe.service'
 import {
   CompleteCheckoutSessionDto,
   CompleteFreePurchaseDto,
-  CompletePurchaseDto,
   CreateCheckoutSessionDto,
-  CreatePurchaseIntentDto,
 } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
 
@@ -55,34 +53,6 @@ export class PurchaseController {
     return { redirectUrl }
   }
 
-  @Post('create-intent')
-  @UseCampaign()
-  async createPurchaseIntent(
-    @ReqUser() user: User,
-    @Body() dto: CreatePurchaseIntentDto<unknown>,
-    @ReqCampaign() campaign: Campaign,
-  ) {
-    try {
-      const result = await this.purchaseService.createPurchaseIntent({
-        user,
-        dto,
-        campaign,
-      })
-      return result
-    } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          err: serializeError(error),
-          user: user.id,
-          campaign,
-          dto,
-          msg: 'Error creating purchase intent',
-        }),
-      )
-      throw error
-    }
-  }
-
   /**
    * Creates a Custom Checkout Session for one-time payments with promo code support.
    * This is the new preferred method for purchases that should support promo codes.
@@ -115,11 +85,6 @@ export class PurchaseController {
       )
       throw error
     }
-  }
-
-  @Post('complete')
-  async completePurchase(@Body() dto: CompletePurchaseDto) {
-    return this.purchaseService.completePurchase(dto)
   }
 
   /**
