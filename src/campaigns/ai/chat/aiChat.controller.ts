@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Param,
   Post,
   Put,
@@ -22,16 +21,18 @@ import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiChatService } from './aiChat.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { PromptReplaceCampaign } from 'src/ai/ai.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/ai/chat')
 @UsePipes(ZodValidationPipe)
 export class AiChatController {
-  private readonly logger = new Logger(AiChatController.name)
-
   constructor(
     private aiChatService: AiChatService,
     private slack: SlackService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiChatController.name)
+  }
 
   @Get()
   async list(@ReqUser() { id: userId }: User) {
@@ -90,13 +91,13 @@ export class AiChatController {
       const e = error as Error & {
         data?: { error?: string }
       }
-      this.logger.error('Error generating AI chat', e)
+      this.logger.error({ e }, 'Error generating AI chat')
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
         error: e,
       })
       if (e.data?.error) {
-        this.logger.error('*** error*** :', e.data.error)
+        this.logger.error({ error: e.data.error }, '*** error*** :')
       }
 
       throw e
@@ -128,13 +129,13 @@ export class AiChatController {
       const e = error as Error & {
         data?: { error?: string }
       }
-      this.logger.error('Error generating AI chat', e)
+      this.logger.error({ e }, 'Error generating AI chat')
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
         error: e,
       })
       if (e.data?.error) {
-        this.logger.error('*** error*** :', e.data.error)
+        this.logger.error({ error: e.data.error }, '*** error*** :')
       }
 
       throw e
@@ -150,7 +151,7 @@ export class AiChatController {
     try {
       return await this.aiChatService.delete(threadId, userId)
     } catch (e) {
-      this.logger.error('Error at ai/chat/delete', e)
+      this.logger.error({ e }, 'Error at ai/chat/delete')
       throw e
     }
   }
@@ -166,7 +167,7 @@ export class AiChatController {
       return await this.aiChatService.feedback(user, threadId, body)
     } catch (error) {
       const e = error as Error
-      this.logger.error('Error giving AI chat feedback', e)
+      this.logger.error(e, 'Error giving AI chat feedback')
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
         error: e,
@@ -175,9 +176,9 @@ export class AiChatController {
         'data' in e &&
         (e as Error & { data?: { error?: string } }).data?.error
       ) {
-        this.logger.log(
+        this.logger.info(
+          { error: (e as Error & { data?: { error?: string } }).data!.error },
           '*** error*** :',
-          (e as Error & { data?: { error?: string } }).data!.error,
         )
       }
       throw e

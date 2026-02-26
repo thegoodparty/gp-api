@@ -1,13 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { FindByRaceIdDto } from '../schemas/public/FindByRaceId.schema'
 import { FindByRaceIdResponse } from '../schemas/public/FindByRaceIdResponse.schema'
 import slugify from 'slugify'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
-  public readonly logger = new Logger(PublicCampaignsService.name)
-
   async findCampaignByRaceId(
     params: FindByRaceIdDto,
   ): Promise<FindByRaceIdResponse> {
@@ -90,7 +89,7 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
         ? campaignsWithBothNames[0]
         : campaignsWithLastName[0]
     } catch (error) {
-      this.logger.error('Error in findCampaignByRaceId:', error)
+      this.logger.error({ error }, 'Error in findCampaignByRaceId:')
       return null
     }
   }
@@ -131,5 +130,10 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
 
     return true
+  }
+
+  constructor(private readonly logger: PinoLogger) {
+    super()
+    this.logger.setContext(PublicCampaignsService.name)
   }
 }

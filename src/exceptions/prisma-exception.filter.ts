@@ -3,9 +3,9 @@ import {
   Catch,
   ExceptionFilter,
   HttpStatus,
-  Logger,
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 const prismaErrorClasses = [
   Prisma.PrismaClientKnownRequestError,
@@ -17,8 +17,6 @@ const prismaErrorClasses = [
 
 @Catch(...prismaErrorClasses)
 export class PrismaExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(PrismaExceptionFilter.name)
-
   catch(
     exception: Prisma.PrismaClientKnownRequestError | Error,
     host: ArgumentsHost,
@@ -35,7 +33,13 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     let message: string | null = null
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      this.logger.error(exception, exception.meta)
+      this.logger.error(
+        {
+          err: exception,
+          meta: exception.meta,
+        },
+        'Encountered known prisma exception',
+      )
       switch (exception.code) {
         case 'P2002': // Unique constraint violation
           statusCode = HttpStatus.CONFLICT
@@ -69,13 +73,15 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     }
 
     this.logger.error(
-      `Exception caught: ${message}`,
-      exception.stack || 'No stack trace available',
       {
-        url: (request as { url: string }).url,
-        method: (request as { method: string }).method,
-        statusCode,
+        _arg0: exception.stack || 'No stack trace available',
+        ...{
+          url: (request as { url: string }).url,
+          method: (request as { method: string }).method,
+          statusCode,
+        },
       },
+      `Exception caught: ${message}`,
     )
 
     const typedResponse = response as {
@@ -89,5 +95,9 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       path: (request as { url: string }).url,
       error: message,
     })
+  }
+
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(PrismaExceptionFilter.name)
   }
 }

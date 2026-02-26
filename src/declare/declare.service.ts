@@ -1,17 +1,22 @@
-import { Injectable, Logger, BadGatewayException } from '@nestjs/common'
+import { Injectable, BadGatewayException } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
 import { Headers } from 'http-constants-ts'
+import { PinoLogger } from 'nestjs-pino'
 
 const capitalizeString = (s: string) =>
   s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().trim()
 
 @Injectable()
 export class DeclareService {
-  private readonly logger = new Logger(DeclareService.name)
   private readonly hubspotApiUrl = 'https://api.hubapi.com'
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(DeclareService.name)
+  }
 
   async getDeclarations() {
     const formId = 'f51c1352-c778-40a8-b589-b911c31e64b1'
@@ -35,8 +40,8 @@ export class DeclareService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       this.logger.error(
+        { data: error?.response?.data || error.stack },
         `Failed to fetch data from HubSpot API: ${error.message}`,
-        error?.response?.data || error.stack,
       )
       throw new BadGatewayException('Failed to fetch data from Hubspot API')
     }

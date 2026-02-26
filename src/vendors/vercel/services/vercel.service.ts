@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common'
+import { HttpStatus, Injectable } from '@nestjs/common'
 import { Vercel } from '@vercel/sdk'
 import type {
   GetRecordsResponseBody,
@@ -8,6 +8,7 @@ import { ForwardEmailDomainResponse } from '../../forwardEmail/forwardEmail.type
 import { NotFound } from '@vercel/sdk/models/notfound'
 import { VercelError } from '@vercel/sdk/models/vercelerror'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
+import { PinoLogger } from 'nestjs-pino'
 
 const { VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID } = process.env
 
@@ -30,7 +31,6 @@ export type DNSRecord = { uid: string; updated?: number }
 
 @Injectable()
 export class VercelService {
-  private readonly logger = new Logger(VercelService.name)
   private readonly client = new Vercel({ bearerToken: VERCEL_TOKEN })
 
   isVercelNotFoundError(e: unknown): e is NotFound {
@@ -48,7 +48,7 @@ export class VercelService {
         teamId: VERCEL_TEAM_ID,
       })
     } catch (error) {
-      this.logger.error(`Error getting domain ${domainName}:`, error)
+      this.logger.error({ error }, `Error getting domain ${domainName}:`)
       throw error
     }
   }
@@ -63,7 +63,10 @@ export class VercelService {
         },
       })
     } catch (error) {
-      this.logger.error(`Error adding domain ${domainName} to project:`, error)
+      this.logger.error(
+        { error },
+        `Error adding domain ${domainName} to project:`,
+      )
       throw error
     }
   }
@@ -77,8 +80,8 @@ export class VercelService {
       })
     } catch (error) {
       this.logger.error(
+        { error },
         `Error removing domain ${domainName} from project:`,
-        error,
       )
       throw error
     }
@@ -92,7 +95,7 @@ export class VercelService {
         teamId: VERCEL_TEAM_ID,
       })
     } catch (error) {
-      this.logger.error(`Error verifying domain ${domainName}:`, error)
+      this.logger.error({ error }, `Error verifying domain ${domainName}:`)
       throw error
     }
   }
@@ -108,7 +111,7 @@ export class VercelService {
         teamId: VERCEL_TEAM_ID,
       })
 
-      this.logger.debug(`Price check for ${domainName}:`, result)
+      this.logger.debug(result, `Price check for ${domainName}:`)
 
       if (result.purchasePrice === null || result.purchasePrice === undefined) {
         throw new Error(
@@ -123,7 +126,10 @@ export class VercelService {
 
       return { price }
     } catch (error) {
-      this.logger.error(`Error checking price for domain ${domainName}:`, error)
+      this.logger.error(
+        { error },
+        `Error checking price for domain ${domainName}:`,
+      )
       throw error
     }
   }
@@ -164,8 +170,8 @@ export class VercelService {
         this.logger.debug(`Formatted phone number: ${formattedPhone}`)
       } catch (phoneError) {
         this.logger.error(
+          { phoneError },
           `Error formatting phone number ${contact.phoneNumber}:`,
-          phoneError,
         )
         throw new Error(
           `Invalid phone number format: ${contact.phoneNumber}. Must be a valid US phone number.`,
@@ -196,10 +202,10 @@ export class VercelService {
         },
       })
 
-      this.logger.debug(`Domain purchase result for ${domainName}:`, result)
+      this.logger.debug(result, `Domain purchase result for ${domainName}:`)
       return result
     } catch (error) {
-      this.logger.error(`Error purchasing domain ${domainName}:`, error)
+      this.logger.error({ error }, `Error purchasing domain ${domainName}:`)
       throw error
     }
   }
@@ -212,8 +218,8 @@ export class VercelService {
       })
     } catch (error) {
       this.logger.error(
+        { error },
         `Error getting domain details for ${domainName}:`,
-        error,
       )
       throw error
     }
@@ -225,7 +231,7 @@ export class VercelService {
         teamId: VERCEL_TEAM_ID,
       })
     } catch (error) {
-      this.logger.error('Error listing domains:', error)
+      this.logger.error({ error }, 'Error listing domains:')
       throw error
     }
   }
@@ -266,7 +272,10 @@ export class VercelService {
       }
       return all
     } catch (error) {
-      this.logger.error(`Error listing DNS records for ${domainName}:`, error)
+      this.logger.error(
+        { error },
+        `Error listing DNS records for ${domainName}:`,
+      )
       throw error
     }
   }
@@ -301,7 +310,7 @@ export class VercelService {
         Boolean((r as DNSRecord).uid),
       )
     } catch (error) {
-      this.logger.error(`Error creating MX records for ${domain}:`, error)
+      this.logger.error({ error }, `Error creating MX records for ${domain}:`)
       throw error
     }
   }
@@ -323,8 +332,12 @@ export class VercelService {
       })
       return res as DNSRecord
     } catch (error) {
-      this.logger.error(`Error creating SPF record for ${domain}:`, error)
+      this.logger.error({ error }, `Error creating SPF record for ${domain}:`)
       throw error
     }
+  }
+
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(VercelService.name)
   }
 }

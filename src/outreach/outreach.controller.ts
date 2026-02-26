@@ -6,7 +6,6 @@ import {
   Body,
   Controller,
   Get,
-  Logger,
   Post,
   UnauthorizedException,
   UseInterceptors,
@@ -25,18 +24,20 @@ import {
   OutreachService,
   type P2pOutreachImageInput,
 } from './services/outreach.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('outreach')
 @UsePipes(ZodValidationPipe)
 export class OutreachController {
-  private readonly logger = new Logger(OutreachController.name)
-
   constructor(
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly outreachService: OutreachService,
     private readonly filesService: FilesService,
     private readonly peerlyP2pJobService: PeerlyP2pJobService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(OutreachController.name)
+  }
 
   @Post()
   @UseCampaign()

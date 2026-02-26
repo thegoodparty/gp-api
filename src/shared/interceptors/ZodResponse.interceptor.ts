@@ -3,19 +3,22 @@ import {
   ExecutionContext,
   Injectable,
   InternalServerErrorException,
-  Logger,
   NestInterceptor,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { Observable, map } from 'rxjs'
 import { ZodSchema } from 'zod'
 import { RESPONSE_SCHEMA_KEY } from '../decorators/ResponseSchema.decorator'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class ZodResponseInterceptor implements NestInterceptor {
-  private readonly logger = new Logger(ZodResponseInterceptor.name)
-
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(ZodResponseInterceptor.name)
+  }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const schema = this.reflector.get<ZodSchema | undefined>(
@@ -32,8 +35,8 @@ export class ZodResponseInterceptor implements NestInterceptor {
         const result = schema.safeParse(data)
         if (!result.success) {
           this.logger.error(
-            'Response validation failed:',
             result.error.flatten(),
+            'Response validation failed:',
           )
           throw new InternalServerErrorException('Response validation failed')
         }

@@ -5,16 +5,20 @@ import {
   NotFoundException,
   HttpException,
   BadGatewayException,
-  Logger,
 } from '@nestjs/common'
 import { JobsService } from './jobs.service'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('jobs')
 @PublicAccess()
 export class JobsController {
-  private readonly logger = new Logger(JobsService.name)
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(JobsService.name)
+  }
 
   @Get()
   async findAll() {
@@ -22,9 +26,9 @@ export class JobsController {
       return await this.jobsService.findAll()
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.log(
-          `Error at jobController findAll. e.message: ${e.message}`,
+        this.logger.info(
           e,
+          `Error at jobController findAll. e.message: ${e.message}`,
         )
         throw new BadGatewayException(
           e.message || 'Error occurred while fetching jobs',
@@ -46,9 +50,9 @@ export class JobsController {
       return job
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.log(
-          `Error at jobController findOne e.message:${e.message}`,
+        this.logger.info(
           e,
+          `Error at jobController findOne e.message:${e.message}`,
         )
         if (e instanceof HttpException) {
           throw e

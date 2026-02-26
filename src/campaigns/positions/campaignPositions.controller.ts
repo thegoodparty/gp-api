@@ -1,7 +1,6 @@
 import {
   Controller,
   UsePipes,
-  Logger,
   Get,
   Post,
   Put,
@@ -18,16 +17,18 @@ import { CampaignPositionsService } from './campaignPositions.service'
 import { CreateCampaignPositionSchema } from './schemas/CreateCampaignPosition.schema'
 import { CampaignOwnerOrAdminGuard } from '../guards/CampaignOwnerOrAdmin.guard'
 import { UpdateCampaignPositionSchema } from './schemas/UpdateCampaignPosition.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/:id/positions')
 @UseGuards(CampaignOwnerOrAdminGuard)
 @UsePipes(ZodValidationPipe)
 export class CampaignPositionsController {
-  private readonly logger = new Logger(CampaignPositionsController.name)
-
   constructor(
     private readonly campaignPositionsService: CampaignPositionsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(CampaignPositionsController.name)
+  }
 
   @Get()
   findByCampaign(@Param('id', ParseIntPipe) id: number) {

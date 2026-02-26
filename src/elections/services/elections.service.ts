@@ -2,7 +2,6 @@ import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { isAxiosError } from 'axios'
@@ -22,6 +21,7 @@ import {
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
+import { PinoLogger } from 'nestjs-pino'
 
 // TODO: Revisit this file after the stakeholders decide on the direction we're going...
 // ...for the win number / p2v solution. Remove any unneeded code at that time.
@@ -33,12 +33,12 @@ export class ElectionsService {
   private static readonly WIN_NUMBER_MULTIPLIER = 0.5
   private static readonly API_VERSION = 'v1'
 
-  private readonly logger = new Logger(ElectionsService.name)
-
   constructor(
     private readonly httpService: HttpService,
     private readonly slack: SlackService,
+    private readonly logger: PinoLogger,
   ) {
+    this.logger.setContext(ElectionsService.name)
     if (!ElectionsService.BASE_URL) {
       throw new Error(`Please set ELECTION_API_URL in your .env.
         Recommendation is to point it at dev if you are developing`)
@@ -59,9 +59,7 @@ export class ElectionsService {
         ([, v]) => v !== undefined && v !== null,
       ),
     ) as Record<string, string | number | boolean>
-    this.logger.debug(
-      `Election API GET ${path} params: ${JSON.stringify(filteredParams)}`,
-    )
+    this.logger.debug({ filteredParams }, `Election API GET ${path} params: `)
     try {
       const { data, status } = (await lastValueFrom(
         this.httpService.get(fullUrl, {
@@ -181,20 +179,18 @@ export class ElectionsService {
         positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
       const hasTurnout = includeTurnout && !!turnoutValue
 
-      this.logger.log(
-        JSON.stringify({
-          event: 'DistrictMatch',
-          matchType: 'gold',
-          result: hasTurnout ? 'success' : 'partial',
-          electionDate,
-          campaignId,
-          ballotreadyPositionId,
-          officeName,
-          districtType: positionWithDistrict?.district?.L2DistrictType,
-          districtName: positionWithDistrict?.district?.L2DistrictName,
-          projectedTurnout: turnoutValue,
-        }),
-      )
+      this.logger.info({
+        event: 'DistrictMatch',
+        matchType: 'gold',
+        result: hasTurnout ? 'success' : 'partial',
+        electionDate,
+        campaignId,
+        ballotreadyPositionId,
+        officeName,
+        districtType: positionWithDistrict?.district?.L2DistrictType,
+        districtName: positionWithDistrict?.district?.L2DistrictName,
+        projectedTurnout: turnoutValue,
+      })
       return {
         district: positionWithDistrict?.district,
         ...(hasTurnout
@@ -207,23 +203,21 @@ export class ElectionsService {
             }),
       }
     } catch (error) {
-      this.logger.log(
-        JSON.stringify({
-          event: 'DistrictMatch',
-          matchType: 'gold',
-          result: 'failure',
-          reason: error instanceof Error ? error.message : String(error),
-          error: serializeError(error),
-          electionDate,
-          campaignId,
-          ballotreadyPositionId,
-          officeName,
-          districtType: positionWithDistrict?.district?.L2DistrictType,
-          districtName: positionWithDistrict?.district?.L2DistrictName,
-          projectedTurnout:
-            positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
-        }),
-      )
+      this.logger.info({
+        event: 'DistrictMatch',
+        matchType: 'gold',
+        result: 'failure',
+        reason: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
+        electionDate,
+        campaignId,
+        ballotreadyPositionId,
+        officeName,
+        districtType: positionWithDistrict?.district?.L2DistrictType,
+        districtName: positionWithDistrict?.district?.L2DistrictName,
+        projectedTurnout:
+          positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
+      })
       const message = this.buildSlackErrorMessage(
         'Election API error: getBallotReadyMatchedRaceTargetDetails',
         { ballotreadyPositionId, electionDate, campaignId },

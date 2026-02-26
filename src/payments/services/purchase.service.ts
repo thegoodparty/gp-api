@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
-  Logger,
 } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import {
@@ -16,12 +15,12 @@ import {
 } from '../purchase.types'
 import { CustomCheckoutSessionPayload, PaymentType } from '../payments.types'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const { WEBAPP_ROOT_URL } = process.env
 
 @Injectable()
 export class PurchaseService {
-  private readonly logger = new Logger('PurchaseService')
   // TODO: Refactor to remove the "handlers" anti-pattern here along w/
   //  implementors of the anti-pattern elsewhere.
   //  It's absolutely over-engineered, causes confusion and obfuscation in the
@@ -36,7 +35,12 @@ export class PurchaseService {
     CheckoutSessionPostPurchaseHandler<unknown>
   > = new Map()
 
-  constructor(private readonly stripeService: StripeService) {}
+  constructor(
+    private readonly stripeService: StripeService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext('PurchaseService')
+  }
 
   registerPurchaseHandler(
     type: PurchaseType,
@@ -71,14 +75,12 @@ export class PurchaseService {
     clientSecret: string
     amount: number
   }> {
-    this.logger.log(
-      JSON.stringify({
-        user: user.id,
-        dto,
-        campaign,
-        msg: 'Attempting checkout session creation for user',
-      }),
-    )
+    this.logger.info({
+      user: user.id,
+      dto,
+      campaign,
+      msg: 'Attempting checkout session creation for user',
+    })
 
     if (!Object.values(PurchaseType).includes(dto.type)) {
       throw new Error(`Invalid purchase type: ${dto.type}`)
@@ -123,7 +125,7 @@ export class PurchaseService {
     if (amount === 0) {
       const freeSessionId = `free_${Date.now()}_${user.id}`
 
-      this.logger.log(
+      this.logger.info(
         `Zero-amount checkout for user ${user.id}, type ${dto.type} - skipping Stripe, deferring post-purchase until user confirmation`,
       )
 
@@ -199,14 +201,12 @@ export class PurchaseService {
       const paymentIntent =
         await this.stripeService.retrievePaymentIntent(paymentIntentId)
       if (paymentIntent.metadata?.postPurchaseCompletedAt) {
-        this.logger.log(
-          JSON.stringify({
-            sessionId: dto.checkoutSessionId,
-            paymentIntentId,
-            completedAt: paymentIntent.metadata.postPurchaseCompletedAt,
-            msg: 'Post-purchase already processed, skipping (idempotent)',
-          }),
-        )
+        this.logger.info({
+          sessionId: dto.checkoutSessionId,
+          paymentIntentId,
+          completedAt: paymentIntent.metadata.postPurchaseCompletedAt,
+          msg: 'Post-purchase already processed, skipping (idempotent)',
+        })
         return { alreadyProcessed: true }
       }
     }
@@ -314,7 +314,7 @@ export class PurchaseService {
       purchaseType,
     })
 
-    this.logger.log(
+    this.logger.info(
       `Free purchase completed for type ${purchaseType}, campaign ${campaign?.id}`,
     )
 

@@ -44,8 +44,8 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
+      { data: isAxiosResponse(error) ? format(error) : error },
       'Failed to communicate with Peerly API',
-      isAxiosResponse(error) ? format(error) : error,
     )
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }
@@ -103,11 +103,11 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
 
       if (validatedData.status === MediaStatus.ERROR) {
         const errorMessage = validatedData.error || 'Media creation failed'
-        this.logger.error('Media creation failed:', errorMessage)
+        this.logger.error({ errorMessage }, 'Media creation failed:')
         throw new BadGatewayException(`Media creation failed: ${errorMessage}`)
       }
 
-      this.logger.debug('Successfully created media', validatedData)
+      this.logger.debug(validatedData, 'Successfully created media')
       return validatedData.media_id
     } catch (error) {
       this.handleApiError(error)

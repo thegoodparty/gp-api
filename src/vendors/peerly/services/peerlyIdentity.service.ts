@@ -88,7 +88,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const genericPeerlyErrorMessage = 'Peerly API ERROR'
     const errorMessage = `${genericPeerlyErrorMessage}: ${formattedError ? JSON.stringify(formattedError) : ''}`
 
-    this.logger.error(errorMessage, !formattedError ? error : '')
+    this.logger.error({ data: !formattedError ? error : '' }, errorMessage)
 
     await this.slackService.message(
       {
@@ -137,12 +137,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     config,
   }: PeerlyHttpRequestConfig): Promise<AxiosResponse> {
     this.logger.debug(
-      `Initializing HTTP request: ${JSON.stringify({
-        url,
-        method: method.name,
-        data,
-        config,
-      })}`,
+      {
+        data: {
+          url,
+          method: method.name,
+          data,
+          config,
+        },
+      },
+      'Initializing HTTP request:',
     )
     const twoArgMethods = [HttpMethod.Get, HttpMethod.Delete, HttpMethod.Head]
     return lastValueFrom(
@@ -175,9 +178,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )) as AxiosResponse<PeerlyIdentityCreateResponseBody>
       const { data } = response
       const { Data: identity } = data
-      this.logger.debug(
-        `Successfully created identity: ${JSON.stringify(identity)}`,
-      )
+      this.logger.debug({ identity }, 'Successfully created identity:')
       return identity
     } catch (error) {
       await this.handleApiError({
@@ -208,7 +209,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { data } = response
       const { identities } = data
       this.logger.debug(
-        `Successfully fetched ${identities.length} identities: ${JSON.stringify(identities.map((identity) => identity.identity_name))}`,
+        { data: identities.map((identity) => identity.identity_name) },
+        `Successfully fetched ${identities.length} identities: `,
       )
       result = identities
     } catch (error) {
@@ -233,14 +235,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )) as AxiosResponse<PeerlyIdentityUseCaseResponseBody>
       const { data: useCases } = response
       this.logger.debug(
-        `Successfully fetched use cases for identityId: ${peerlyIdentityId}: ${JSON.stringify(useCases)}`,
+        { useCases },
+        `Successfully fetched use cases for identityId: ${peerlyIdentityId}: `,
       )
       return useCases
     } catch (e) {
       if (isAxiosError(e) && e.status === 404) {
         this.logger.warn(
-          `Peerly API returned 404 Not Found when fetching use cases. This is likely due to an invalid identity ID: ${peerlyIdentityId}`,
           format(e),
+          `Peerly API returned 404 Not Found when fetching use cases. This is likely due to an invalid identity ID: ${peerlyIdentityId}`,
         )
         throw new NotFoundException(
           'Use cases for given identity ID could not be found',
@@ -274,9 +277,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         requestConfig,
       )) as AxiosResponse<PeerlyIdentityProfileResponseBody>
       const { data } = response
-      this.logger.debug(
-        `Successfully submitted identity profile: ${JSON.stringify(data)}`,
-      )
+      this.logger.debug({ data }, 'Successfully submitted identity profile:')
       result = data
     } catch (error) {
       await this.handleApiError({
@@ -308,14 +309,15 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )) as AxiosResponse<PeerlyIdentityProfileResponseBody>
       const { data } = response
       this.logger.debug(
-        `Successfully fetched identity profile for identityId: ${peerlyIdentityId}: ${JSON.stringify(data)}`,
+        { data },
+        `Successfully fetched identity profile for identityId: ${peerlyIdentityId}: `,
       )
       result = data || null
     } catch (e) {
       if (isAxiosError(e) && e.status === 404) {
         this.logger.warn(
-          `Peerly API returned 404 Not Found when fetching identity profile. This is likely due to an invalid identity ID: ${peerlyIdentityId}`,
           format(e),
+          `Peerly API returned 404 Not Found when fetching identity profile. This is likely due to an invalid identity ID: ${peerlyIdentityId}`,
         )
         throw new NotFoundException(
           'Identity profile for given identity ID could not be found',
@@ -389,9 +391,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         : {}),
     }
 
-    this.logger.debug(
-      `Submitting 10DLC brand with data: ${JSON.stringify(submitBrandData)}`,
-    )
+    this.logger.debug({ submitBrandData }, 'Submitting 10DLC brand with data:')
     const requestConfig = {
       url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit`,
       method: this.httpService.post,
@@ -404,9 +404,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )) as AxiosResponse<Peerly10DLCBrandSubmitResponseBody>
       const { data } = response
       const { submission_key: submissionKey } = data
-      this.logger.debug(
-        `Successfully submitted 10DLC brand: ${JSON.stringify(data)}`,
-      )
+      this.logger.debug({ data }, 'Successfully submitted 10DLC brand:')
       return submissionKey
     } catch (error) {
       await this.handleApiError({
@@ -441,9 +439,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       config: await this.getAxiosRequestConfig(),
     }
     try {
-      this.logger.debug(
-        `Approving 10DLC brand with data: ${JSON.stringify(data)}`,
-      )
+      this.logger.debug({ data }, 'Approving 10DLC brand with data:')
       const response = (await this.makeHttpRequest(
         requestConfig,
       )) as AxiosResponse<Approve10DLCBrandResponseBody>
@@ -486,7 +482,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )) as AxiosResponse<PeerlyGetCvRequestResponseBody>
       const { data } = response
       this.logger.debug(
-        `Successfully fetched Campaign Verify status for identityId: ${peerlyIdentityId}: ${JSON.stringify(data)}`,
+        { data },
+        `Successfully fetched Campaign Verify status for identityId: ${peerlyIdentityId}: `,
       )
       result = data
     } catch (e) {
@@ -642,9 +639,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
     let result: PeerlySubmitCVResponseBody | null = null
     try {
-      this.logger.debug(
-        `Submitting CV request with data: ${JSON.stringify(submitCVData)}`,
-      )
+      this.logger.debug({ submitCVData }, 'Submitting CV request with data:')
       const response = (await this.makeHttpRequest(
         requestConfig,
       )) as AxiosResponse<PeerlySubmitCVResponseBody>
@@ -681,7 +676,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { data } = response
       const { verification_status } = data
       this.logger.debug(
-        `Successfully retrieved campaign verify status: ${JSON.stringify(data)}`,
+        { data },
+        'Successfully retrieved campaign verify status:',
       )
       return verification_status
     } catch (e) {
@@ -717,8 +713,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     } catch (e) {
       if (isAxiosError(e) && e.status === 400) {
         this.logger.warn(
-          'Peerly API returned 400 Bad Request when verifying CV PIN. This is likely due to an invalid PIN. ',
           format(e),
+          'Peerly API returned 400 Bad Request when verifying CV PIN. This is likely due to an invalid PIN. ',
         )
         // throw new UnprocessableEntityException('PIN could not be validated')
         await this.handleApiError({

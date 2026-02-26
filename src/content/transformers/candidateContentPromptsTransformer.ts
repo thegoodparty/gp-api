@@ -20,8 +20,8 @@ export const candidateContentPromptsTransformer: Transformer<
       }
     } else {
       logger.warn(
-        'template.data.name and/or template.data.content not found',
         template,
+        'template.data.name and/or template.data.content not found',
       )
     }
     return acc

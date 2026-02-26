@@ -7,7 +7,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -38,12 +37,11 @@ import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
 import { VOTER_FILE_ROUTE } from './voterFile.constants'
 import { VoterFileService } from './voterFile.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller(VOTER_FILE_ROUTE)
 @UsePipes(ZodValidationPipe)
 export class VoterFileController {
-  private readonly logger = new Logger(VoterFileController.name)
-
   constructor(
     private readonly voterFileService: VoterFileService,
     private readonly voterOutreachService: VoterOutreachService,
@@ -52,7 +50,10 @@ export class VoterFileController {
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
     private readonly electedOfficeService: ElectedOfficeService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(VoterFileController.name)
+  }
 
   @Get()
   @UseCampaign({

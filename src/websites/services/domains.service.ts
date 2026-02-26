@@ -88,7 +88,8 @@ export class DomainsService
         forwardingEmailAddress,
       }
       this.logger.debug(
-        `Found domain with no email forwarding, enqueuing task: ${JSON.stringify(messageData)}`,
+        { messageData },
+        'Found domain with no email forwarding, enqueuing task:',
       )
       await this.queueService.sendMessage(
         {
@@ -275,7 +276,8 @@ export class DomainsService
         status: DomainStatus.pending,
       }
       this.logger.debug(
-        `Creating new domain record for website id ${validWebsiteId}: ${JSON.stringify(domainParams)}`,
+        { domainParams },
+        `Creating new domain record for website id ${validWebsiteId}: `,
       )
       domain = await this.model.create({ data: domainParams })
     } else if (domain.paymentId !== paymentId) {
@@ -374,7 +376,10 @@ export class DomainsService
       const vercelPrice = await this.vercel.checkDomainPrice(domainName)
       searchedDomainPrice = vercelPrice.price
     } catch (error) {
-      this.logger.warn(`Could not get Vercel price for ${domainName}:`, error)
+      this.logger.warn(
+        { error },
+        `Could not get Vercel price for ${domainName}:`,
+      )
     }
 
     const suggestions = suggestionsResp.SuggestionsList || []
@@ -390,8 +395,8 @@ export class DomainsService
           }
         } catch (error) {
           this.logger.warn(
+            { error },
             `Could not get Vercel price for ${suggestion.DomainName}:`,
-            error,
           )
         }
 
@@ -428,7 +433,7 @@ export class DomainsService
       forwardEmailDomain = existingForwardEmailDomain
     } catch (e) {
       if (isAxiosError(e) && e.status !== HttpStatus.NOT_FOUND) {
-        this.logger.error('Error adding domain to forward email service:', e)
+        this.logger.error(e, 'Error adding domain to forward email service:')
         throw new Error('Error adding domain to forward email service:', {
           cause: e,
         })
@@ -438,7 +443,10 @@ export class DomainsService
       try {
         forwardEmailDomain = await this.forwardEmailService.addDomain(domain)
       } catch (e) {
-        this.logger.error('Error adding domain to forward email service:', e)
+        this.logger.error(
+          { e },
+          'Error adding domain to forward email service:',
+        )
         throw new Error('Error adding domain to forward email service:', {
           cause: e,
         })
@@ -451,7 +459,7 @@ export class DomainsService
     try {
       dnsRecords = await this.vercel.listDnsRecords(domain.name)
     } catch (e) {
-      this.logger.error('Error listing DNS records for domain:', e)
+      this.logger.error({ e }, 'Error listing DNS records for domain:')
     }
 
     try {
@@ -468,7 +476,7 @@ export class DomainsService
         await this.vercel.createMXRecords(domain.name)
       }
     } catch (e) {
-      this.logger.error('Error creating DNS MX records for domain:', e)
+      this.logger.error({ e }, 'Error creating DNS MX records for domain:')
       throw new Error('Error creating DNS MX records for domain:', { cause: e })
     }
     this.logger.debug(`MX records created for domain ${domain.name}`)
@@ -491,7 +499,10 @@ export class DomainsService
         )
       }
     } catch (e) {
-      this.logger.error('Error creating TXT verification record for domain:', e)
+      this.logger.error(
+        { e },
+        'Error creating TXT verification record for domain:',
+      )
       throw new Error('Error creating TXT verification record for domain:', {
         cause: e,
       })
@@ -530,8 +541,8 @@ export class DomainsService
       }
     } catch (e) {
       this.logger.error(
+        { e },
         `catch-all alias not created for domain *@${domain.name} -> ${forwardingEmailAddress} :`,
-        e,
       )
       throw new Error(
         `catch-all alias not created for domain *@${domain.name} -> ${forwardingEmailAddress} :`,
@@ -636,7 +647,7 @@ export class DomainsService
           existingProjectDomain ||
           (await this.vercel.addDomainToProject(domain.name))
       } catch (error) {
-        this.logger.error('Error registering domain with Vercel:', error)
+        this.logger.error({ error }, 'Error registering domain with Vercel:')
 
         await this.model.update({
           where: { id: domain.id },
@@ -699,9 +710,9 @@ export class DomainsService
 
     try {
       verifyResult = await this.vercel.verifyProjectDomain(domain.name)
-      this.logger.debug('Domain verification result:', verifyResult)
+      this.logger.debug(verifyResult, 'Domain verification result:')
     } catch (error) {
-      this.logger.error('Error configuring domain:', error)
+      this.logger.error({ error }, 'Error configuring domain:')
       throw new BadGatewayException(
         `Failed to configure domain: ${
           error instanceof Error ? error.message : 'Unknown error'
@@ -728,8 +739,8 @@ export class DomainsService
       return paymentIntent.status as PaymentStatus
     } catch (error) {
       this.logger.warn(
+        { error },
         `Failed to retrieve payment status for ${paymentId}:`,
-        error,
       )
 
       // Handle different error types appropriately

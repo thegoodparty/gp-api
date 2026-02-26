@@ -51,7 +51,7 @@ export function recordCustomEvent<T extends CustomEventType>(
   try {
     api.recordCustomEvent(eventType, toNewRelicAttributes(attributes))
   } catch (error) {
-    logger.error(JSON.stringify(error))
+    logger.error({ error })
   }
 }
 
@@ -67,7 +67,7 @@ export function addCustomAttribute(key: string, value: unknown) {
       api.addCustomAttribute(key, value)
     }
   } catch (error) {
-    logger.error(JSON.stringify(error))
+    logger.error({ error })
   }
 }
 
@@ -83,6 +83,6 @@ export function addCustomAttributes(attributes: NewRelicCustomAttributes) {
   try {
     api.addCustomAttributes(toNewRelicAttributes(attributes))
   } catch (error) {
-    logger.error(JSON.stringify(error))
+    logger.error({ error })
   }
 }

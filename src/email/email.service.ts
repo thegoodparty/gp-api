@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getBasicEmailContent,
@@ -13,13 +13,18 @@ import {
 import { getUserFullName } from '../users/util/users.util'
 import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { isTestEmail } from './util/testEmailValidator.util'
+import { PinoLogger } from 'nestjs-pino'
 
 const SKIPPED_EMAIL_STATUS = { status: 'test-email-skipped', id: 'test-email' }
 
 @Injectable()
 export class EmailService {
-  private readonly logger = new Logger(EmailService.name)
-  constructor(private mailgun: MailgunService) {}
+  constructor(
+    private mailgun: MailgunService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(EmailService.name)
+  }
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
     if (isTestEmail(to)) {
@@ -126,8 +131,8 @@ export class EmailService {
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
           this.logger.error(
+            { data: error.message || error },
             'Error sending email via Mailgun:',
-            error.message || error,
           )
           throw new BadGatewayException(
             'error communicating w/ mail service: ',

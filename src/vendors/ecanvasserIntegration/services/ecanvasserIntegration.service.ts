@@ -2,7 +2,6 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -15,6 +14,7 @@ import { EcanvasserSummary } from '../ecanvasserIntegration.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { EcanvasserService } from './ecanvasser.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
@@ -22,8 +22,6 @@ const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 export class EcanvasserIntegrationService extends createPrismaBase(
   MODELS.Ecanvasser,
 ) {
-  public readonly logger = new Logger(EcanvasserIntegrationService.name)
-
   constructor(
     @Inject(forwardRef(() => CampaignsService))
     private readonly campaignsService: CampaignsService,
@@ -31,8 +29,10 @@ export class EcanvasserIntegrationService extends createPrismaBase(
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
     private slack: SlackService,
+    private readonly logger: PinoLogger,
   ) {
     super()
+    this.logger.setContext(EcanvasserIntegrationService.name)
   }
 
   async create(
@@ -291,7 +291,7 @@ export class EcanvasserIntegrationService extends createPrismaBase(
       await this.crm.trackCampaign(campaignId)
       return updated
     } catch (error) {
-      this.logger.error('Failed to sync with ecanvasserIntegration', error)
+      this.logger.error({ error }, 'Failed to sync with ecanvasserIntegration')
       await this.slack.errorMessage({
         message: `Failed to sync with ecanvasser for campaign ${ecanvasser.campaignId}`,
         error,
@@ -347,8 +347,8 @@ export class EcanvasserIntegrationService extends createPrismaBase(
         await this.sync(ecanvasser.campaignId, true)
       } catch (error) {
         this.logger.error(
+          { error },
           `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
-          error,
         )
       }
     }

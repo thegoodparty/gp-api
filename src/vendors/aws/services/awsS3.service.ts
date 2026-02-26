@@ -100,11 +100,14 @@ export class AwsS3Service extends AwsService {
   async getSignedS3Url(bucket: string, fileName: string, fileType: string) {
     const filePath = `${bucket}/${fileName}`
 
-    this.logger.debug(`Getting signed URL for ${filePath}`, {
-      Bucket: ASSET_DOMAIN,
-      Key: filePath,
-      ContentType: fileType,
-    })
+    this.logger.debug(
+      {
+        Bucket: ASSET_DOMAIN,
+        Key: filePath,
+        ContentType: fileType,
+      },
+      `Getting signed URL for ${filePath}`,
+    )
 
     return this.executeAwsOperation(async () => {
       return await getSignedUrl(

@@ -43,8 +43,8 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
+      { data: isAxiosResponse(error) ? format(error) : error },
       'Failed to communicate with Peerly API',
-      isAxiosResponse(error) ? format(error) : error,
     )
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }

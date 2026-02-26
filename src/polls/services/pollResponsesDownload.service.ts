@@ -1,12 +1,8 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  StreamableFile,
-} from '@nestjs/common'
+import { Injectable, OnModuleDestroy, StreamableFile } from '@nestjs/common'
 import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
 import { PassThrough } from 'stream'
+import { PinoLogger } from 'nestjs-pino'
 
 const UTF8_BOM = '\uFEFF'
 
@@ -14,10 +10,10 @@ const DATABASE_URL = process.env.DATABASE_URL as string
 
 @Injectable()
 export class PollResponsesDownloadService implements OnModuleDestroy {
-  private readonly logger = new Logger(PollResponsesDownloadService.name)
   private readonly pool: Pool
 
-  constructor() {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(PollResponsesDownloadService.name)
     this.pool = new Pool({ connectionString: DATABASE_URL })
   }
 
@@ -71,7 +67,7 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
 
     copyStream
       .on('error', (err) => {
-        this.logger.error('COPY stream error', err)
+        this.logger.error(err, 'COPY stream error')
         cleanup()
         output.destroy(err)
       })
