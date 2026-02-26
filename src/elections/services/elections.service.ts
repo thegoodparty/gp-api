@@ -136,6 +136,15 @@ export class ElectionsService {
     }
   }
 
+  async getPositionByBallotReadyId(ballotreadyPositionId: string) {
+    return this.electionApiGet<
+      PositionWithOptionalDistrict,
+      { includeDistrict: boolean; includeTurnout: boolean }
+    >(
+      ElectionApiRoutes.positions.findByBrId.path + `/${ballotreadyPositionId}`,
+      { includeDistrict: false, includeTurnout: false },
+    )
+  }
   // Gold flow: match a district via BallotReady position ID.
   // Returns district data even when projected turnout is unavailable,
   // using sentinel values (-1) so callers can distinguish partial matches.
