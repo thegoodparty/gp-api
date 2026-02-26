@@ -1,4 +1,3 @@
-import { PaymentsService } from '@/payments/services/payments.service'
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PurchaseHandler } from 'src/payments/purchase.types'
@@ -63,7 +62,6 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
   constructor(
     private readonly pollsService: PollsService,
     private readonly electedOfficeService: ElectedOfficeService,
-    private readonly paymentsService: PaymentsService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -80,26 +78,6 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
     return metadata.pollPurchaseType === PollPurchaseType.expansion
       ? calcAmountInCents(metadata.count)
       : calcAmountInCents(metadata.audienceSize)
-  }
-
-  async executePostPurchase(
-    paymentIntentId: string,
-    rawMetadata: unknown,
-  ): Promise<void> {
-    const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
-
-    this.logger.log(
-      `Poll purchase completed: paymentIntentId=${paymentIntentId} metadata=${JSON.stringify(metadata)}`,
-    )
-
-    if (metadata.pollPurchaseType === PollPurchaseType.expansion) {
-      return this.processExpansion(metadata)
-    }
-
-    const { user } =
-      await this.paymentsService.getValidatedPaymentUser(paymentIntentId)
-
-    return this.processNewPoll(metadata, user.id)
   }
 
   async handlePollPostPurchase(

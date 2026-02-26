@@ -41,8 +41,4 @@ export interface PurchaseHandler<Metadata> {
   calculateAmount(metadata: Metadata): Promise<number>
   getProductName?(metadata: Metadata): string
   getProductDescription?(metadata: Metadata): string | undefined
-  executePostPurchase?(
-    paymentIntentId: string,
-    metadata: Metadata,
-  ): Promise<unknown>
 }
