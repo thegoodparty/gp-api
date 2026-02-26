@@ -1,7 +1,10 @@
 import { ConflictException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ElectedOfficeService } from './electedOffice.service'
+import {
+  CreateElectedOfficeArgs,
+  ElectedOfficeService,
+} from './electedOffice.service'
 
 describe('ElectedOfficeService', () => {
   let service: ElectedOfficeService
@@ -34,13 +37,11 @@ describe('ElectedOfficeService', () => {
 
   describe('create', () => {
     it('throws ConflictException when creating active office and user already has one', async () => {
-      const createArgs: Prisma.ElectedOfficeCreateArgs = {
-        data: {
-          electedDate: new Date('2024-01-01'),
-          isActive: true,
-          user: { connect: { id: 1 } },
-          campaign: { connect: { id: 1 } },
-        },
+      const createArgs: CreateElectedOfficeArgs = {
+        electedDate: new Date('2024-01-01'),
+        isActive: true,
+        userId: 1,
+        campaignId: 1,
       }
 
       mockModel.count.mockResolvedValue(1)
@@ -62,12 +63,10 @@ describe('ElectedOfficeService', () => {
     })
 
     it('throws ConflictException when creating office with isActive not specified and user already has one', async () => {
-      const createArgs: Prisma.ElectedOfficeCreateArgs = {
-        data: {
-          electedDate: new Date('2024-01-01'),
-          user: { connect: { id: 1 } },
-          campaign: { connect: { id: 1 } },
-        },
+      const createArgs: CreateElectedOfficeArgs = {
+        electedDate: new Date('2024-01-01'),
+        userId: 1,
+        campaignId: 1,
       }
 
       mockModel.count.mockResolvedValue(1)
@@ -104,13 +103,11 @@ describe('ElectedOfficeService', () => {
       updatedAt: new Date(),
     }
 
-    const createArgs: Prisma.ElectedOfficeCreateArgs = {
-      data: {
-        electedDate: new Date('2024-01-01'),
-        isActive: true,
-        user: { connect: { id: 1 } },
-        campaign: { connect: { id: 1 } },
-      },
+    const createArgs: CreateElectedOfficeArgs = {
+      electedDate: new Date('2024-01-01'),
+      isActive: true,
+      userId: 1,
+      campaignId: 1,
     }
 
     mockModel.count.mockResolvedValue(0)
@@ -143,13 +140,11 @@ describe('ElectedOfficeService', () => {
       updatedAt: new Date(),
     }
 
-    const createArgs: Prisma.ElectedOfficeCreateArgs = {
-      data: {
-        electedDate: new Date('2024-01-01'),
-        isActive: false,
-        user: { connect: { id: 1 } },
-        campaign: { connect: { id: 1 } },
-      },
+    const createArgs: CreateElectedOfficeArgs = {
+      electedDate: new Date('2024-01-01'),
+      isActive: false,
+      userId: 1,
+      campaignId: 1,
     }
 
     mockModel.create.mockResolvedValue(mockElectedOffice)
