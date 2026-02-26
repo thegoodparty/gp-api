@@ -9,7 +9,7 @@ import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import { AppModule } from './app.module'
-import { Logger } from 'nestjs-pino'
+import { Logger, PinoLogger } from 'nestjs-pino'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
@@ -73,7 +73,9 @@ export const bootstrap = async (
     },
   })
 
-  app.useGlobalFilters(new PrismaExceptionFilter())
+  const logger = await app.resolve(PinoLogger)
+
+  app.useGlobalFilters(new PrismaExceptionFilter(logger))
   app.enableShutdownHooks()
 
   return app

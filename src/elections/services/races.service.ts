@@ -369,7 +369,14 @@ export class RacesService {
           county?: string
           [key: string]: string | undefined
         }
-        this.logger.debug({ slug, locationResp }, 'locationResp')
+        this.logger.debug(
+          {
+            slug,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            locationResp,
+          },
+          'locationResp',
+        )
       }
 
       if (locationResp?.level) {

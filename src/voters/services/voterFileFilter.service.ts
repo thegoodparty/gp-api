@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, VoterFileFilter } from '@prisma/client'
 import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
-import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class VoterFileFilterService extends createPrismaBase(
@@ -116,10 +115,5 @@ export class VoterFileFilterService extends createPrismaBase(
       ...(gender_male === true ? { gender_male } : {}),
       ...(gender_female === true ? { gender_female } : {}),
     }
-  }
-
-  constructor(private readonly logger: PinoLogger) {
-    super()
-    this.logger.setContext(VoterFileFilterService.name)
   }
 }

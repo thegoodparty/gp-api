@@ -161,7 +161,6 @@ export class AreaCodeFromZipService {
         this.logger.error(
           {
             errors: validationResult.error.errors,
-            _arg1: 'Raw response:',
             jsonContent,
           },
           `Invalid area codes response format from OpenAI for zip ${zipCode}:`,
@@ -172,7 +171,7 @@ export class AreaCodeFromZipService {
       return validationResult.data
     } catch (error) {
       this.logger.error(
-        { _arg0: 'Raw response:', jsonContent },
+        { jsonContent },
         `Error parsing JSON response from OpenAI for zip ${zipCode}: ${error}`,
       )
       return null

@@ -131,6 +131,7 @@ export class EmailService {
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
           this.logger.error(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             { data: error.message || error },
             'Error sending email via Mailgun:',
           )

@@ -1,4 +1,5 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { HttpService } from '@nestjs/axios'
 import { Test, TestingModule } from '@nestjs/testing'
@@ -46,6 +47,7 @@ describe('ElectionsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ElectionsService,
+        { provide: PinoLogger, useValue: createMockLogger() },
         {
           provide: HttpService,
           useValue: { get: mockHttpGet },

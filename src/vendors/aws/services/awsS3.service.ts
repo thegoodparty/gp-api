@@ -12,6 +12,7 @@ import { Injectable } from '@nestjs/common'
 import slugify from 'slugify'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { AwsService } from './aws.service'
+import { PinoLogger } from 'nestjs-pino'
 
 export type UploadOptions = {
   cacheControl?: string // Cache-Control header value
@@ -39,8 +40,8 @@ const { AWS_REGION: region = 'us-west-2' } = process.env
 export class AwsS3Service extends AwsService {
   private readonly s3Client: S3Client
 
-  constructor() {
-    super()
+  constructor(protected readonly logger: PinoLogger) {
+    super(logger)
 
     this.s3Client = new S3Client({ region })
   }

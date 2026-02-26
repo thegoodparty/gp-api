@@ -17,6 +17,10 @@ const prismaErrorClasses = [
 
 @Catch(...prismaErrorClasses)
 export class PrismaExceptionFilter implements ExceptionFilter {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(PrismaExceptionFilter.name)
+  }
+
   catch(
     exception: Prisma.PrismaClientKnownRequestError | Error,
     host: ArgumentsHost,
@@ -74,12 +78,10 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     this.logger.error(
       {
-        _arg0: exception.stack || 'No stack trace available',
-        ...{
-          url: (request as { url: string }).url,
-          method: (request as { method: string }).method,
-          statusCode,
-        },
+        err: exception,
+        url: (request as { url: string }).url,
+        method: (request as { method: string }).method,
+        statusCode,
       },
       `Exception caught: ${message}`,
     )
@@ -95,9 +97,5 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       path: (request as { url: string }).url,
       error: message,
     })
-  }
-
-  constructor(private readonly logger: PinoLogger) {
-    this.logger.setContext(PrismaExceptionFilter.name)
   }
 }

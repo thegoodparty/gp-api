@@ -9,6 +9,7 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials.util'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import { PinoLogger } from 'nestjs-pino'
 
 interface Template {
   is_default: boolean
@@ -152,11 +153,12 @@ type PeerlyAxiosError = {
 @Injectable()
 export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   constructor(
+    protected readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly crmCampaigns: CrmCampaignsService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
   ) {
-    super()
+    super(logger)
   }
 
   private handleApiError(error: unknown): never {

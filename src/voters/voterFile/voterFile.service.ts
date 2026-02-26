@@ -70,6 +70,7 @@ export class VoterFileService {
   ): Promise<number> {
     // Try regular count first
     const countQuery = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
@@ -84,6 +85,7 @@ export class VoterFileService {
     // If count is 0, try with fix columns as fallback
     if (count === 0) {
       const countQueryWithFix = typeToQuery(
+        this.logger,
         resolvedType,
         campaign,
         customFilters,
@@ -107,6 +109,7 @@ export class VoterFileService {
   ) {
     // Check if we need to use fixColumns by doing a quick count check
     const countQuery = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
@@ -123,6 +126,7 @@ export class VoterFileService {
 
     // Generate CSV with appropriate fixColumns setting
     const query = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,

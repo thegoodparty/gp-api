@@ -18,6 +18,7 @@ import { CampaignStatus } from '@goodparty_org/contracts'
 import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 const CREATED_AT = '2025-01-01'
 
@@ -201,6 +202,7 @@ describe('CampaignsController', () => {
       enqueueP2VService,
       electionsService,
       analyticsService,
+      createMockLogger(),
     )
   })
 

@@ -101,6 +101,7 @@ export class P2pPhoneListUploadService {
     }
 
     const query = typeToQuery(
+      this.logger,
       VoterFileType.sms,
       campaign,
       customFilters,

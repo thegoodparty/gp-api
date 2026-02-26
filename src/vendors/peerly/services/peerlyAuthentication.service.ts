@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { AxiosResponse } from 'axios'
 import { PeerlyIdentity } from '@/vendors/peerly/peerly.types'
+import { PinoLogger } from 'nestjs-pino'
 
 const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
 
@@ -42,10 +43,11 @@ export class PeerlyAuthenticationService extends PeerlyBaseConfig {
   private readonly tokenRenewalThreshold = 5 * 60 // 5 minutes in seconds
 
   constructor(
+    protected readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly jwtService: JwtService,
   ) {
-    super()
+    super(logger)
   }
 
   private shouldRenewToken(): boolean {

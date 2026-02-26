@@ -2,14 +2,17 @@ import { CampaignWith } from '@/campaigns/campaigns.types'
 import { IS_PROD } from '@/shared/util/appEnvironment.util'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
+import { Inject, OnModuleInit } from '@nestjs/common'
 import { User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
-export class VoterFileDownloadAccessService {
-  constructor(
-    private readonly slack: SlackService,
-    private readonly logger: PinoLogger,
-  ) {
+export class VoterFileDownloadAccessService implements OnModuleInit {
+  @Inject()
+  private readonly logger!: PinoLogger
+
+  constructor(private readonly slack: SlackService) {}
+
+  onModuleInit() {
     this.logger.setContext(VoterFileDownloadAccessService.name)
   }
 

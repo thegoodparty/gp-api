@@ -56,10 +56,12 @@ import {
   PEERLY_USECASE,
 } from './peerly.const'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
   constructor(
+    protected readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
     private readonly placesService: GooglePlacesService,
@@ -68,7 +70,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     private readonly campaignsService: CampaignsService,
     private readonly areaCodeFromZipService: AreaCodeFromZipService,
   ) {
-    super()
+    super(logger)
   }
 
   getTCRIdentityName(userFullName: string, campaignEIN: string) {

@@ -45,11 +45,7 @@ describe('PollResponsesDownloadService', () => {
       escapeLiteral: (str: string) => `'${str.replace(/'/g, "''")}'`,
     })
 
-    service = new PollResponsesDownloadService()
-    Object.defineProperty(service, 'logger', {
-      get: () => createMockLogger(),
-      configurable: true,
-    })
+    service = new PollResponsesDownloadService(createMockLogger())
   })
 
   afterEach(() => {

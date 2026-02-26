@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common'
 import {
   Transformer,
   AIContentTemplateRaw,
@@ -6,12 +5,10 @@ import {
 } from '../content.types'
 import { camelCase } from 'es-toolkit/string'
 
-const logger = new Logger('CandidateContentPromptsTransformer')
-
 export const candidateContentPromptsTransformer: Transformer<
   AIContentTemplateRaw,
   CandidateContentPrompts
-> = (templates: AIContentTemplateRaw[]): CandidateContentPrompts => {
+> = (templates, logger) => {
   const result = templates.reduce<CandidateContentPrompts>((acc, template) => {
     if (template.data.name && template.data.content) {
       return {

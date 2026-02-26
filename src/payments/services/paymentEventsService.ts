@@ -273,6 +273,7 @@ export class PaymentEventsService {
           'send voter file alert',
         ][index]
         this.logger.error(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           { reason: result.reason },
           `[WEBHOOK] Failed to ${action} - User: ${user.id}, CustomerId: ${customerId}`,
         )

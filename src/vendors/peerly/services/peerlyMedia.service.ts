@@ -14,6 +14,7 @@ import FormData from 'form-data'
 import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
 import { MediaStatus } from '../peerly.types'
 import { MimeTypes } from 'http-constants-ts'
+import { PinoLogger } from 'nestjs-pino'
 
 const MAX_FILE_SIZE = 512000 // 500KB
 
@@ -35,10 +36,11 @@ interface CreateMediaParams {
 @Injectable()
 export class PeerlyMediaService extends PeerlyBaseConfig {
   constructor(
+    protected readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
   ) {
-    super()
+    super(logger)
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

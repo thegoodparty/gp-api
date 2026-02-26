@@ -3,7 +3,6 @@ import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { FindByRaceIdDto } from '../schemas/public/FindByRaceId.schema'
 import { FindByRaceIdResponse } from '../schemas/public/FindByRaceIdResponse.schema'
 import slugify from 'slugify'
-import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
@@ -130,10 +129,5 @@ export class PublicCampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
 
     return true
-  }
-
-  constructor(private readonly logger: PinoLogger) {
-    super()
-    this.logger.setContext(PublicCampaignsService.name)
   }
 }

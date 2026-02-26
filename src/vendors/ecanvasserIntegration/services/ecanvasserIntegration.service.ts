@@ -14,7 +14,6 @@ import { EcanvasserSummary } from '../ecanvasserIntegration.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { EcanvasserService } from './ecanvasser.service'
-import { PinoLogger } from 'nestjs-pino'
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 
@@ -29,10 +28,8 @@ export class EcanvasserIntegrationService extends createPrismaBase(
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
     private slack: SlackService,
-    private readonly logger: PinoLogger,
   ) {
     super()
-    this.logger.setContext(EcanvasserIntegrationService.name)
   }
 
   async create(

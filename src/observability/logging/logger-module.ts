@@ -41,7 +41,7 @@ export const loggerModule = LoggerModule.forRoot({
     customReceivedMessage: () => 'Request received',
     customSuccessMessage: () => 'Request completed',
     customErrorMessage: () => 'Request completed',
-    customAttributeKeys: { res: 'response' },
+    customAttributeKeys: { res: 'response', responseTime: 'responseTimeMs' },
     // By default, pino only does proper Error serialization on the `err` argument.
     // This changes that to serialize any Error object on the top-level keys.
     formatters: {
