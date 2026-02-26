@@ -118,11 +118,11 @@ interface ByYearAndCode {
 export type BuildRaceTargetDetailsInput = DistrictInfo &
   (ByDate | ByYearAndCode)
 
-export type PositionWithMatchedDistrict = {
+export type PositionWithOptionalDistrict = {
   positionId: string
   brPositionId: string
   brDatabaseId: string
-  district: {
+  district?: {
     id: string
     L2DistrictType: string
     L2DistrictName: string
