@@ -165,6 +165,7 @@
     "@pulumi/awsx": "~2.18.0",
     "@pulumi/pulumi": "~3.140.0",
     "@pulumi/random": "~4.16.0",
+    "@pulumiverse/grafana": "^2.20.0",
     "@testcontainers/postgresql": "^11.7.1",
     "@types/async-retry": "^1.4.9",
     "@types/bcrypt": "^5.0.2",
