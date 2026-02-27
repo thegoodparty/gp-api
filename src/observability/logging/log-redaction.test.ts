@@ -221,6 +221,149 @@ describe('log-redaction', () => {
     })
   })
 
+  describe('sensitive query parameter redaction', () => {
+    it('redacts token query parameter', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          url: 'https://example.com/callback?token=abc123xyz',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        url: 'https://example.com/callback?token=[REDACTED]',
+      })
+    })
+
+    it('redacts api_key query parameter', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          url: 'https://api.example.com/data?api_key=sk_live_123&format=json',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        url: 'https://api.example.com/data?api_key=[REDACTED]&format=json',
+      })
+    })
+
+    it('redacts multiple sensitive query parameters', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          url: 'https://example.com?client_secret=secret123&access_token=tok456&page=1',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        url: 'https://example.com?client_secret=[REDACTED]&access_token=[REDACTED]&page=1',
+      })
+    })
+
+    it('redacts password query parameter', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          url: 'https://example.com/login?password=hunter2&user=admin',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        url: 'https://example.com/login?password=[REDACTED]&user=admin',
+      })
+    })
+
+    it('redacts camelCase apiKey parameter', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          url: 'https://example.com/api?apiKey=my-key-value',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        url: 'https://example.com/api?apiKey=[REDACTED]',
+      })
+    })
+
+    it('redacts credentials query parameter', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          url: 'https://example.com?credentials=user:pass123',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        url: 'https://example.com?credentials=[REDACTED]',
+      })
+    })
+
+    it('does not redact non-sensitive query parameters', async () => {
+      const redactLine = await loadRedactLine()
+
+      const line = jsonLine({
+        url: 'https://example.com?page=1&limit=50&name=test',
+      })
+      expect(redactLine(line)).toBe(line)
+    })
+  })
+
+  describe('database connection string redaction', () => {
+    it('redacts password in postgres connection string', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          message: 'Connecting to postgres://dbuser:s3cretPass@db.example.com:5432/mydb',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        message: 'Connecting to postgres://dbuser:[REDACTED]@db.example.com:5432/mydb',
+      })
+    })
+
+    it('redacts password in mysql connection string', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          connection: 'mysql://root:admin123@localhost:3306/app',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        connection: 'mysql://root:[REDACTED]@localhost:3306/app',
+      })
+    })
+
+    it('redacts password in redis connection string', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          url: 'redis://default:my-redis-pw@redis.example.com:6379',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        url: 'redis://default:[REDACTED]@redis.example.com:6379',
+      })
+    })
+
+    it('redacts password with special characters in connection string', async () => {
+      const redactLine = await loadRedactLine()
+
+      const result = redactLine(
+        jsonLine({
+          dsn: 'postgresql://user:p%40ss!w0rd#123@host:5432/db',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        dsn: 'postgresql://user:[REDACTED]@host:5432/db',
+      })
+    })
+  })
+
   describe('passthrough behavior', () => {
     it('returns the line unchanged when nothing matches', async () => {
       const redactLine = await loadRedactLine()
