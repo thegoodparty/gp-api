@@ -3,6 +3,7 @@ import { LoggerModule } from 'nestjs-pino'
 import pino from 'pino'
 import jwt from 'jsonwebtoken'
 import { IncomingMessage } from 'http'
+import { redactLine } from './log-redaction'
 
 const determineUserId = (req: IncomingMessage): string | undefined => {
   if (!req.headers.authorization) {
@@ -44,6 +45,9 @@ export const loggerModule = LoggerModule.forRoot({
     customSuccessMessage: () => 'Request completed',
     customErrorMessage: () => 'Request completed',
     customAttributeKeys: { res: 'response', responseTime: 'responseTimeMs' },
+    hooks: {
+      streamWrite: redactLine,
+    },
     // By default, pino only does proper Error serialization on the `err` argument.
     // This changes that to serialize any Error object on the top-level keys.
     formatters: {

@@ -360,6 +360,7 @@ export = async () => {
       VOTER_DB_HOST: voterCluster.endpoint,
       VOTER_DB_USER: voterCluster.masterUsername,
       VOTER_DB_NAME: voterCluster.databaseName,
+      SECRET_NAMES: Object.keys(secret).join(','),
       ...(environment === 'preview'
         ? {
             IS_PREVIEW: 'true',
