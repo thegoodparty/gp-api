@@ -1,5 +1,13 @@
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
+import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+import {
+  ListCampaignsPaginationSchema,
+  ReadCampaignOutputSchema,
+  UpdateCampaignM2MSchema,
+} from '@goodparty_org/contracts'
 import {
   BadRequestException,
   Body,
@@ -36,11 +44,6 @@ import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTarget
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
-  ListCampaignsPaginationSchema,
-  ReadCampaignOutputSchema,
-  UpdateCampaignM2MSchema,
-} from '@goodparty_org/contracts'
-import {
   CreateCampaignSchema,
   SetDistrictDTO,
   UpdateCampaignSchema,
@@ -48,9 +51,6 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
-import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
-import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
-import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
 import { PinoLogger } from 'nestjs-pino'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -428,13 +428,6 @@ export class CampaignsController {
       },
     })
 
-    // When gold matched a district but found no turnout, enqueue silver
-    // to try finding turnout via LLM-based matching (non-deterministic,
-    // may find a different district that has turnout data).
-    if (!hasTurnout) {
-      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-    }
-
     return result
   }
 
@@ -505,13 +498,6 @@ export class CampaignsController {
         officeContextFingerprint: null,
       },
     })
-
-    // When gold matched a district but found no turnout, enqueue silver
-    // to try finding turnout via LLM-based matching (non-deterministic,
-    // may find a different district that has turnout data).
-    if (!hasTurnout) {
-      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-    }
 
     return result
   }

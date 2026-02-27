@@ -16,7 +16,7 @@ import {
   BuildRaceTargetDetailsInput,
   DistrictNameItem,
   DistrictTypeItem,
-  PositionWithMatchedDistrict,
+  PositionWithOptionalDistrict,
   ProjectedTurnout,
   RaceTargetMetrics,
 } from '../types/elections.types'
@@ -153,10 +153,10 @@ export class ElectionsService {
       campaignId,
       officeName,
     } = params
-    let positionWithDistrict: PositionWithMatchedDistrict | null = null
+    let positionWithDistrict: PositionWithOptionalDistrict | null = null
     try {
       positionWithDistrict = await this.electionApiGet<
-        PositionWithMatchedDistrict,
+        PositionWithOptionalDistrict,
         {
           electionDate: string | undefined
           includeDistrict: boolean
@@ -171,8 +171,10 @@ export class ElectionsService {
           includeTurnout,
         },
       )
-      if (!positionWithDistrict) {
-        throw new NotFoundException('No positionWithDistrict found')
+      if (!positionWithDistrict || !positionWithDistrict?.district) {
+        throw new NotFoundException(
+          'No position and/or associated district was found',
+        )
       }
 
       const turnoutValue =

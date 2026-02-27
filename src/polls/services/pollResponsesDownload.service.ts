@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy, StreamableFile } from '@nestjs/common'
 import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
 import { PassThrough } from 'stream'
+import { stripLeadingNewlines } from '../utils/polls.utils'
 import { PinoLogger } from 'nestjs-pino'
 
 const UTF8_BOM = '\uFEFF'
@@ -43,12 +44,14 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
         ) AS associated_clusters
       FROM poll_individual_message pim
       WHERE pim.poll_id = ${escapedPollId}
+        AND pim.sender = 'CONSTITUENT'
         AND (pim.is_opt_out IS NULL OR pim.is_opt_out = false)
       ORDER BY pim.sent_at
     ) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)`
 
     const output = new PassThrough()
-    const safePollName = pollName.replace(/[\r\n]/g, ' ')
+    const safePollName =
+      pollName.replace(/[\r\n]/g, ' ').trim() || 'Poll responses'
     output.write(UTF8_BOM + safePollName + '\n')
 
     let released = false
@@ -76,7 +79,7 @@ export class PollResponsesDownloadService implements OnModuleDestroy {
         output.end()
       })
 
-    copyStream.pipe(output, { end: false })
+    copyStream.pipe(stripLeadingNewlines()).pipe(output, { end: false })
 
     return new StreamableFile(output, {
       type: 'text/csv; charset=utf-8',
