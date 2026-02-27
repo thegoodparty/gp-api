@@ -22,9 +22,7 @@ const getSSMParameter = async (name: string) => {
   })
 
   if (!Parameter?.Value) {
-    console.error(
-      'Error: Failed to pull pulumi state config passphrase from SSM',
-    )
+    console.error(`Error: Failed to pull ${name} from SSM`)
     process.exit(1)
   }
   return Parameter.Value
@@ -35,7 +33,12 @@ const run = (cmd: string, opts?: ExecSyncOptions) => {
     execSync(cmd, {
       stdio: 'inherit',
       cwd: __dirname,
-      env: { ...process.env, AWS_REGION, PULUMI_CONFIG_PASSPHRASE },
+      env: {
+        ...process.env,
+        AWS_REGION,
+        PULUMI_CONFIG_PASSPHRASE,
+        GRAFANA_AUTH,
+      },
       ...opts,
     })
   } catch (e) {
