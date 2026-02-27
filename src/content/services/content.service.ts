@@ -16,6 +16,7 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
 import { preProcessBlogArticleMeta } from '../util/preProcessBlogArticleMeta'
 import { InputJsonObject } from '@prisma/client/runtime/client'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {
@@ -157,9 +158,11 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
   ) {
     const timerId = this.timers.start(`TransformContent type: ${type}`)
     const transformer = CONTENT_TYPE_MAP[type]?.transformer as
-      | ((entries: Content[]) => Content[])
+      | ((entries: Content[], logger: PinoLogger) => Content[])
       | undefined
-    const result: Content[] = transformer ? transformer(entries) : entries
+    const result: Content[] = transformer
+      ? transformer(entries, this.logger)
+      : entries
     this.timers.end(timerId)
     return result
   }

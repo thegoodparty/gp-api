@@ -7,6 +7,7 @@ import { EmailTemplateName } from '@/email/email.types'
 import { CustomEventType } from '@/observability/newrelic/newrelic.events'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 import { SegmentService } from '@/vendors/segment/segment.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
@@ -147,6 +148,7 @@ describe('PathToVictoryService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PathToVictoryService,
+        { provide: PinoLogger, useValue: createMockLogger() },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: OfficeMatchService, useValue: mockOfficeMatch },
         { provide: SlackService, useValue: mockSlack },

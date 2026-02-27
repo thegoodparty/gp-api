@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common'
+import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { gql, GraphQLClient } from 'graphql-request'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
@@ -16,6 +12,7 @@ import {
   RaceWithOfficeHolders,
   RaceWithOfficeHoldersNode,
 } from '../types/ballotReady.types'
+import { PinoLogger } from 'nestjs-pino'
 
 const API_BASE = 'https://bpi.civicengine.com/graphql'
 const BALLOT_READY_KEY = process.env.BALLOT_READY_KEY
@@ -32,7 +29,6 @@ const headers = {
 
 @Injectable()
 export class BallotReadyService {
-  private readonly logger = new Logger(BallotReadyService.name)
   private readonly graphQLClient = new GraphQLClient(API_BASE, {
     headers,
   })
@@ -61,8 +57,8 @@ export class BallotReadyService {
       return result?.node?.normalizedPosition?.name ?? null
     } catch (error) {
       this.logger.error(
+        { error },
         `Error at getNormalizedPosition for id ${raceId}:`,
-        error,
       )
       return null
     }
@@ -115,7 +111,7 @@ export class BallotReadyService {
     try {
       return await this.graphQLClient.request(query)
     } catch (error) {
-      this.logger.error('Error at fetchRaceById:', error)
+      this.logger.error({ error }, 'Error at fetchRaceById:')
       return null
     }
   }
@@ -209,7 +205,7 @@ export class BallotReadyService {
     try {
       return await this.graphQLClient.request(query)
     } catch (error) {
-      this.logger.error('Error at fetchRacesByZipcode: ', error)
+      this.logger.error({ error }, 'Error at fetchRacesByZipcode: ')
       return null
     }
   }
@@ -242,7 +238,7 @@ export class BallotReadyService {
     try {
       return await this.graphQLClient.request(query)
     } catch (error) {
-      this.logger.error('Error at fetchRacesWithElectionDates: ', error)
+      this.logger.error({ error }, 'Error at fetchRacesWithElectionDates: ')
       return null
     }
   }
@@ -364,9 +360,13 @@ export class BallotReadyService {
         await this.graphQLClient.request<RaceWithOfficeHolders>(query)
       return response?.node || null
     } catch (error) {
-      this.logger.error('Error at fetchRacesWithOfficeHolders:', error)
+      this.logger.error({ error }, 'Error at fetchRacesWithOfficeHolders:')
       return null
     }
+  }
+
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(BallotReadyService.name)
   }
 }
 

@@ -1,12 +1,6 @@
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Logger,
-  Post,
-} from '@nestjs/common'
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
@@ -18,15 +12,18 @@ import {
   CreateCheckoutSessionDto,
 } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('payments/purchase')
 export class PurchaseController {
-  private readonly logger = new Logger(PurchaseController.name)
   constructor(
     private readonly stripeService: StripeService,
     private readonly usersService: UsersService,
     private readonly purchaseService: PurchaseService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PurchaseController.name)
+  }
 
   @Post('checkout-session')
   async createProCheckoutSession(@ReqUser() user: User) {
@@ -74,15 +71,13 @@ export class PurchaseController {
       })
       return result
     } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          err: serializeError(error),
-          user: user.id,
-          campaign,
-          dto,
-          msg: 'Error creating checkout session',
-        }),
-      )
+      this.logger.error({
+        err: serializeError(error),
+        user: user.id,
+        campaign,
+        dto,
+        msg: 'Error creating checkout session',
+      })
       throw error
     }
   }
@@ -116,14 +111,12 @@ export class PurchaseController {
         user,
       })
     } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          err: serializeError(error),
-          campaign: campaign?.id,
-          dto,
-          msg: 'Error completing free purchase',
-        }),
-      )
+      this.logger.error({
+        err: serializeError(error),
+        campaign: campaign?.id,
+        dto,
+        msg: 'Error completing free purchase',
+      })
       throw error
     }
   }

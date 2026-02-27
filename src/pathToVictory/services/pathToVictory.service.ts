@@ -184,7 +184,8 @@ export class PathToVictoryService extends createPrismaBase(
         )
       } else {
         this.logger.debug(
-          `District type candidates for slug=${input.slug}: ${JSON.stringify(searchColumns)}`,
+          { searchColumns },
+          `District type candidates for slug=${input.slug}: `,
         )
       }
       for (const searchColumn of searchColumns) {
@@ -292,26 +293,24 @@ export class PathToVictoryService extends createPrismaBase(
           ? 'partial'
           : 'failure'
 
-      this.logger.log(
-        JSON.stringify({
-          event: 'DistrictMatch',
-          matchType: 'silver',
-          result,
-          reason,
-          slug: input.slug,
-          campaignId: input.campaignId,
-          officeName: input.officeName,
-          electionState: input.electionState,
-          electionLevel: input.electionLevel,
-          electionDate: input.electionDate,
-          L2DistrictType:
-            pathToVictoryResponse.electionType || lastMatchedDistrictType,
-          L2DistrictName:
-            pathToVictoryResponse.electionLocation || lastMatchedDistrictName,
-          projectedTurnout:
-            pathToVictoryResponse.counts.projectedTurnout || undefined,
-        }),
-      )
+      this.logger.info({
+        event: 'DistrictMatch',
+        matchType: 'silver',
+        result,
+        reason,
+        slug: input.slug,
+        campaignId: input.campaignId,
+        officeName: input.officeName,
+        electionState: input.electionState,
+        electionLevel: input.electionLevel,
+        electionDate: input.electionDate,
+        L2DistrictType:
+          pathToVictoryResponse.electionType || lastMatchedDistrictType,
+        L2DistrictName:
+          pathToVictoryResponse.electionLocation || lastMatchedDistrictName,
+        projectedTurnout:
+          pathToVictoryResponse.counts.projectedTurnout || undefined,
+      })
 
       return {
         pathToVictoryResponse,
@@ -321,24 +320,22 @@ export class PathToVictoryService extends createPrismaBase(
       const err: Error =
         error instanceof Error ? error : new Error(String(error))
 
-      this.logger.log(
-        JSON.stringify({
-          event: 'DistrictMatch',
-          matchType: 'silver',
-          result: 'failure',
-          reason: error instanceof Error ? error.message : String(error),
-          error: serializeError(error),
-          slug: input.slug,
-          campaignId: input.campaignId,
-          officeName: input.officeName,
-          electionState: input.electionState,
-          electionLevel: input.electionLevel,
-          electionDate: input.electionDate,
-          errorMessage: err.message,
-        }),
-      )
+      this.logger.info({
+        event: 'DistrictMatch',
+        matchType: 'silver',
+        result: 'failure',
+        reason: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
+        slug: input.slug,
+        campaignId: input.campaignId,
+        officeName: input.officeName,
+        electionState: input.electionState,
+        electionLevel: input.electionLevel,
+        electionDate: input.electionDate,
+        errorMessage: err.message,
+      })
 
-      this.logger.error('Error in handle-p2v', err)
+      this.logger.error(err, 'Error in handle-p2v')
       await this.slackService.errorMessage({
         message: 'Error in handle-p2v',
         error: { message: err.message, stack: err.stack },
@@ -540,13 +537,11 @@ export class PathToVictoryService extends createPrismaBase(
       officeFingerprint?: string
     },
   ): Promise<void> {
-    this.logger.debug(
-      JSON.stringify({
-        slug,
-        pathToVictoryResponse,
-        msg: 'completing path to victory',
-      }),
-    )
+    this.logger.debug({
+      slug,
+      pathToVictoryResponse,
+      msg: 'completing path to victory',
+    })
 
     try {
       const campaign = await this.prisma.campaign.findUnique({
@@ -555,7 +550,7 @@ export class PathToVictoryService extends createPrismaBase(
       })
 
       if (!campaign) {
-        this.logger.error('no campaign found for slug', slug)
+        this.logger.error({ slug }, 'no campaign found for slug')
         await this.slackService.errorMessage({
           message: `no campaign found for slug ${slug}`,
         })
@@ -714,7 +709,10 @@ export class PathToVictoryService extends createPrismaBase(
           process.env.WEBAPP_ROOT === 'https://goodparty.org' &&
           campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN
         ) {
-          this.logger.debug('sending email to user', campaign.user.email)
+          this.logger.debug(
+            { email: campaign.user.email },
+            'sending email to user',
+          )
           await this.emailService.sendTemplateEmail({
             to: campaign.user.email,
             subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
@@ -733,7 +731,7 @@ export class PathToVictoryService extends createPrismaBase(
     } catch (error: unknown) {
       const err: Error =
         error instanceof Error ? error : new Error(String(error))
-      this.logger.error('error updating campaign', err)
+      this.logger.error(err, 'error updating campaign')
       await this.slackService.errorMessage({
         message: 'error updating campaign with path to victory',
         error: { message: err.message, stack: err.stack },

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackService } from '../../vendors/slack/services/slack.service'
 import { QueueProducerService } from '../../queue/producer/queueProducer.service'
@@ -10,17 +10,19 @@ import {
   PathToVictoryQueueMessage,
 } from '../types/pathToVictory.types'
 import { MessageGroup, QueueType } from '../../queue/queue.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class EnqueuePathToVictoryService {
-  private readonly logger = new Logger(EnqueuePathToVictoryService.name)
-
   constructor(
     private prisma: PrismaService,
     private slackService: SlackService,
     private queueService: QueueProducerService,
     private racesService: RacesService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(EnqueuePathToVictoryService.name)
+  }
 
   async enqueuePathToVictory(campaignId: number) {
     try {
@@ -67,7 +69,7 @@ export class EnqueuePathToVictoryService {
           return { message: 'not ok' }
         }
 
-        this.logger.debug('race data', raceData)
+        this.logger.debug(raceData, 'race data')
         // queueMessage.data = { campaignId, ...raceData }
 
         queueMessage = {
@@ -118,23 +120,21 @@ export class EnqueuePathToVictoryService {
         }
       }
 
-      this.logger.debug('queueing Message', queueMessage)
-      this.logger.log(
-        JSON.stringify({
-          event: 'DistrictMatch',
-          action: 'silver_fallback_triggered',
-          slug,
-          campaignId,
-          officeName: queueMessage.data.officeName,
-          electionState: queueMessage.data.electionState,
-          electionLevel: queueMessage.data.electionLevel,
-          electionDate: queueMessage.data.electionDate,
-        }),
-      )
+      this.logger.debug(queueMessage, 'queueing Message')
+      this.logger.info({
+        event: 'DistrictMatch',
+        action: 'silver_fallback_triggered',
+        slug,
+        campaignId,
+        officeName: queueMessage.data.officeName,
+        electionState: queueMessage.data.electionState,
+        electionLevel: queueMessage.data.electionLevel,
+        electionDate: queueMessage.data.electionDate,
+      })
       await this.queueService.sendMessage(queueMessage!, MessageGroup.p2v)
       return { message: 'ok' }
     } catch (e) {
-      this.logger.error('error at enqueue', e)
+      this.logger.error({ e }, 'error at enqueue')
       await this.slackService.errorMessage({
         message: 'error at enqueue p2v',
         error: e,

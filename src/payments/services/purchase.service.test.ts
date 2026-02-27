@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { PinoLogger } from 'nestjs-pino'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { User, Campaign } from '@prisma/client'
 import Stripe from 'stripe'
 import {
@@ -128,6 +130,7 @@ describe('PurchaseService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PurchaseService,
+        { provide: PinoLogger, useValue: createMockLogger() },
         {
           provide: StripeService,
           useValue: mockStripeService,

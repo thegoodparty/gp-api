@@ -11,6 +11,7 @@ import { PathToVictoryService } from '@/pathToVictory/services/pathToVictory.ser
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { PollIssuesService } from '@/polls/services/pollIssues.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
 import { S3Service } from '@/vendors/aws/services/s3.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
@@ -218,11 +219,8 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       contactsService as never,
       s3Service as never,
       {} as never,
+      createMockLogger(),
     )
-    Object.defineProperty(service, 'logger', {
-      get: () => createMockLogger(),
-      configurable: true,
-    })
   })
 
   it('returns undefined and does not create messages when poll is not found', async () => {
@@ -769,6 +767,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           QueueConsumerService,
+          { provide: PinoLogger, useValue: createMockLogger() },
           { provide: AiContentService, useValue: {} },
           { provide: SlackService, useValue: mockSlack },
           { provide: PathToVictoryService, useValue: mockP2vService },
@@ -1040,11 +1039,8 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       contactsService as never,
       s3Service as never,
       usersService as never,
+      createMockLogger(),
     )
-    Object.defineProperty(service, 'logger', {
-      get: () => createMockLogger(),
-      configurable: true,
-    })
   })
 
   it('handlePollCreation creates ELECTED_OFFICIAL records with electedOfficeId', async () => {

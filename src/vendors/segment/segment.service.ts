@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import Analytics, { TrackParams } from '@segment/analytics-node'
 import { pickKeys } from 'src/shared/util/objects.util'
 import { SEGMENT_KEYS } from './segment.schema'
@@ -7,13 +7,14 @@ import {
   SegmentTrackEventProperties,
   UserContext,
 } from './segment.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class SegmentService {
   private analytics: Analytics
-  private readonly logger = new Logger(SegmentService.name)
 
-  constructor() {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(SegmentService.name)
     const SEGMENT_WRITE_KEY = process.env.SEGMENT_WRITE_KEY
     if (!SEGMENT_WRITE_KEY) {
       throw new Error(
@@ -61,8 +62,8 @@ export class SegmentService {
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
       this.logger.error(
-        `[SEGMENT] Failed to track event: ${event} for user: ${userId}`,
         error,
+        `[SEGMENT] Failed to track event: ${event} for user: ${userId}`,
       )
       throw error
     }
@@ -89,7 +90,7 @@ export class SegmentService {
       this.logger.debug(`[SEGMENT] User identified - User: ${userId}`)
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
-      this.logger.error(`[SEGMENT] Failed to identify user: ${userId}`, error)
+      this.logger.error(error, `[SEGMENT] Failed to identify user: ${userId}`)
       throw error
     }
   }

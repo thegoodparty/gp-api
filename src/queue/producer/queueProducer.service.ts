@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
 import { queueConfig } from '../queue.config'
 import { MessageGroup, QueueMessage } from '../queue.types'
+import { PinoLogger } from 'nestjs-pino'
 
 const config: SQSClientConfig = {
   region: process.env.AWS_REGION || '',
@@ -30,8 +31,9 @@ const producer = Producer.create({
 
 @Injectable()
 export class QueueProducerService {
-  private readonly logger = new Logger(QueueProducerService.name)
-  constructor() {}
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(QueueProducerService.name)
+  }
   async sendMessage(
     msg: QueueMessage,
     group: MessageGroup | string = MessageGroup.default,
@@ -51,7 +53,7 @@ export class QueueProducerService {
     try {
       await producer.send(message)
     } catch (error) {
-      this.logger.error('error queueing message', error)
+      this.logger.error({ error }, 'error queueing message')
     }
   }
 }

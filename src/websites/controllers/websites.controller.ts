@@ -7,7 +7,6 @@ import {
   Put,
   UsePipes,
   UseInterceptors,
-  Logger,
   ForbiddenException,
   Query,
 } from '@nestjs/common'
@@ -34,6 +33,7 @@ import { WebsiteViewsService } from '../services/websiteViews.service'
 import { TrackWebsiteViewSchema } from '../schemas/TrackWebsiteView.schema'
 import { GetWebsiteViewsSchema } from '../schemas/GetWebsiteViews.schema'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
@@ -54,15 +54,16 @@ const WEBSITE_CONTENT_INCLUDES = {
 @Controller('websites')
 @UsePipes(ZodValidationPipe)
 export class WebsitesController {
-  private readonly logger = new Logger(WebsitesController.name)
-
   constructor(
     private readonly websites: WebsitesService,
     private readonly contacts: WebsiteContactsService,
     private readonly files: FilesService,
     private readonly siteViews: WebsiteViewsService,
     private readonly campaigns: CampaignsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(WebsitesController.name)
+  }
 
   @Post()
   @UseCampaign({

@@ -105,7 +105,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
         imageUrl,
       )
     } catch (error) {
-      this.logger.error('Failed to create P2P outreach', error)
+      this.logger.error({ error }, 'Failed to create P2P outreach')
       if (error instanceof HttpException) {
         throw error
       }

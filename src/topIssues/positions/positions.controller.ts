@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Param,
   ParseIntPipe,
   Post,
@@ -16,13 +15,17 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { PositionsService } from './positions.service'
 import { CreatePositionSchema } from './schemas/CreatePosition.schema'
 import { UpdatePositionSchema } from './schemas/UpdatePosition.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('positions')
 @UsePipes(ZodValidationPipe)
 export class PositionsController {
-  private readonly logger = new Logger(PositionsController.name)
-
-  constructor(private readonly positionsService: PositionsService) {}
+  constructor(
+    private readonly positionsService: PositionsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PositionsController.name)
+  }
 
   @Get()
   list() {

@@ -2,7 +2,6 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -22,8 +21,6 @@ const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
 export class EcanvasserIntegrationService extends createPrismaBase(
   MODELS.Ecanvasser,
 ) {
-  public readonly logger = new Logger(EcanvasserIntegrationService.name)
-
   constructor(
     @Inject(forwardRef(() => CampaignsService))
     private readonly campaignsService: CampaignsService,
@@ -291,7 +288,7 @@ export class EcanvasserIntegrationService extends createPrismaBase(
       await this.crm.trackCampaign(campaignId)
       return updated
     } catch (error) {
-      this.logger.error('Failed to sync with ecanvasserIntegration', error)
+      this.logger.error({ error }, 'Failed to sync with ecanvasserIntegration')
       await this.slack.errorMessage({
         message: `Failed to sync with ecanvasser for campaign ${ecanvasser.campaignId}`,
         error,
@@ -347,8 +344,8 @@ export class EcanvasserIntegrationService extends createPrismaBase(
         await this.sync(ecanvasser.campaignId, true)
       } catch (error) {
         this.logger.error(
+          { error },
           `Failed to sync ecanvasser for campaign ${ecanvasser.campaignId}`,
-          error,
         )
       }
     }

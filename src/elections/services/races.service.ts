@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common'
+import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import {
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
@@ -24,15 +20,18 @@ import { GeoData } from '../types/elections.types'
 import { parseRaces } from '../util/parseRaces.util'
 import { BallotReadyService } from './ballotReady.service'
 import { CensusEntitiesService } from './censusEntities.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class RacesService {
-  private readonly logger = new Logger(RacesService.name)
   constructor(
     private readonly censusEntities: CensusEntitiesService,
     private readonly ballotReadyService: BallotReadyService,
     private readonly ai: AiService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(RacesService.name)
+  }
 
   async getRaceById(raceId: string) {
     const raceNode = await this.ballotReadyService.fetchRaceById(raceId)
@@ -99,12 +98,15 @@ export class RacesService {
           hasNextPage = races.pageInfo.hasNextPage
           const startCursor = races.pageInfo.endCursor ?? null
 
-          this.logger.debug(`Iteration ${iterationCount}: pageInfo`, {
-            hasNextPage,
-            endCursor: startCursor,
-            edgesCount: races.edges.length,
-            totalElectionsSoFar: elections.length,
-          })
+          this.logger.debug(
+            {
+              hasNextPage,
+              endCursor: startCursor,
+              edgesCount: races.edges.length,
+              totalElectionsSoFar: elections.length,
+            },
+            `Iteration ${iterationCount}: pageInfo`,
+          )
 
           // Start the next API request while parsing
           nextRacesPromise = hasNextPage
@@ -135,7 +137,7 @@ export class RacesService {
 
       return elections
     } catch (e) {
-      this.logger.error('error at getRacesByZip', e)
+      this.logger.error({ e }, 'error at getRacesByZip')
       throw new InternalServerErrorException('Error getting races by zipcode')
     }
   }
@@ -226,16 +228,16 @@ export class RacesService {
       string | number | boolean | GeoData | string[] | undefined
     > = {}
 
-    this.logger.debug(slug, 'getting race from ballotReady api...')
+    this.logger.debug({ slug }, 'getting race from ballotReady api...')
 
     let race: RacesByIdNode['node'] | null
     try {
       race = await this.getRaceById(raceId)
     } catch (e) {
-      this.logger.error(slug, 'error getting race details', e)
+      this.logger.error({ slug, e }, 'error getting race details')
       return
     }
-    this.logger.debug(slug, 'got ballotReady Race')
+    this.logger.debug({ slug }, 'got ballotReady Race')
 
     let electionDate: string | undefined
     let termLength = 4
@@ -254,7 +256,7 @@ export class RacesService {
       geoId = race?.position.geoId as string | undefined | null
       tier = race?.position.tier
     } catch (e) {
-      this.logger.error(slug, 'error getting election date', e)
+      this.logger.error({ slug, e }, 'error getting election date')
     }
     if (!electionDate) {
       return
@@ -264,13 +266,13 @@ export class RacesService {
     try {
       electionLevel = this.getRaceLevel(level)
     } catch (e) {
-      this.logger.error(slug, 'error getting election level', e)
+      this.logger.error({ slug, e }, 'error getting election level')
     }
-    this.logger.debug(slug, 'electionLevel', electionLevel)
+    this.logger.debug({ slug, electionLevel }, 'electionLevel')
 
     const officeName = race?.position?.name
     if (!officeName) {
-      this.logger.error(slug, 'error getting office name')
+      this.logger.error({ slug }, 'error getting office name')
       return
     }
 
@@ -293,11 +295,11 @@ export class RacesService {
     if (level !== 'state' && level !== 'federal') {
       // We use the mtfcc and geoId to get the city and county
       // and a more accurate electionLevel
-      this.logger.debug(slug, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
+      this.logger.debug({ slug }, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const geoData = (await this.resolveMtfcc(mtfcc, geoId)) as GeoData
-        this.logger.debug(slug, 'geoData', geoData)
+        this.logger.debug({ slug, geoData }, 'geoData')
         if (geoData?.city) {
           city = geoData.city as string
           if (electionLevel !== 'city') {
@@ -354,7 +356,7 @@ export class RacesService {
         (electionLevel === 'county' && !county)
       ) {
         this.logger.debug(
-          slug,
+          { slug },
           'could not find location from mtfcc. getting location from AI',
         )
 
@@ -367,7 +369,14 @@ export class RacesService {
           county?: string
           [key: string]: string | undefined
         }
-        this.logger.debug(slug, 'locationResp', locationResp)
+        this.logger.debug(
+          {
+            slug,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            locationResp,
+          },
+          'locationResp',
+        )
       }
 
       if (locationResp?.level) {
@@ -386,10 +395,10 @@ export class RacesService {
     }
 
     if (county) {
-      this.logger.debug(slug, 'Found county', county)
+      this.logger.debug({ slug, county }, 'Found county')
     }
     if (city) {
-      this.logger.debug(slug, 'Found city', city)
+      this.logger.debug({ slug, city }, 'Found city')
     }
 
     let priorElectionDates: string[] = []
@@ -546,9 +555,9 @@ export class RacesService {
       decodedContent = JSON.parse(content) as Record<string, string>
       decodedContent.level = level
     } catch (e) {
-      this.logger.debug('error at extract-location-ai helper', e)
+      this.logger.debug({ e }, 'error at extract-location-ai helper')
     }
-    this.logger.debug('extract ai location response', decodedContent)
+    this.logger.debug(decodedContent, 'extract ai location response')
     return decodedContent
   }
 
@@ -580,11 +589,11 @@ export class RacesService {
           }
         }
       }
-      this.logger.debug(slug, 'electionDates', electionDates)
+      this.logger.debug({ slug, electionDates }, 'electionDates')
 
       return electionDates
     } catch (e) {
-      this.logger.error(slug, 'error at getElectionDates', e)
+      this.logger.error({ slug, e }, 'error at getElectionDates')
       return []
     }
   }

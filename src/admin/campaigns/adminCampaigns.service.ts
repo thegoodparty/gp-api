@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
@@ -19,11 +19,10 @@ import { VoterFileDownloadAccessService } from '../../shared/services/voterFileD
 import { AuthenticationService } from 'src/authentication/authentication.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class AdminCampaignsService {
-  private readonly logger = new Logger(AdminCampaignsService.name)
-
   constructor(
     private readonly email: EmailService,
     private readonly users: UsersService,
@@ -33,7 +32,10 @@ export class AdminCampaignsService {
     private readonly crm: CrmCampaignsService,
     private readonly auth: AuthenticationService,
     private readonly analytics: AnalyticsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AdminCampaignsService.name)
+  }
 
   async create(body: AdminCreateCampaignSchema) {
     const {
@@ -126,8 +128,8 @@ export class AdminCampaignsService {
         )
       } catch (error) {
         this.logger.error(
+          { error },
           `[ADMIN] Failed to track admin pro subscription analytics - User: ${updatedCampaign?.userId}, Campaign: ${id}`,
-          error,
         )
         // Don't throw - we don't want to fail the admin operation for analytics issues
       }

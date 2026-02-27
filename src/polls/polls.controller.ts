@@ -5,7 +5,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -36,6 +35,7 @@ import { ContactsService } from '@/contacts/services/contacts.service'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { CampaignWithPathToVictory } from '@/campaigns/campaigns.types'
+import { PinoLogger } from 'nestjs-pino'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -94,8 +94,10 @@ export class PollsController {
     private readonly s3Service: S3Service,
     private readonly contactService: ContactsService,
     private readonly pollResponsesDownloadService: PollResponsesDownloadService,
-  ) {}
-  private readonly logger = new Logger(this.constructor.name)
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(this.constructor.name)
+  }
 
   @Get('/')
   @UseElectedOffice()

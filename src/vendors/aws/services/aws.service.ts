@@ -1,19 +1,17 @@
 import {
-  Logger,
   BadGatewayException,
   BadRequestException,
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common'
 import { ServiceException } from '@smithy/smithy-client'
+import { PinoLogger } from 'nestjs-pino'
 
 /**
  * Base class for AWS services that provides common error handling and functionality
  * Extend this class to create specific AWS service implementations
  */
 export abstract class AwsService {
-  protected readonly logger = new Logger(this.constructor.name)
-
   /**
    * Handles AWS SDK errors by mapping them to appropriate HTTP exceptions
    * - User input errors (400s) -> BadRequestException
@@ -24,7 +22,7 @@ export abstract class AwsService {
    */
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleAwsError(error: unknown, message?: string): never {
-    this.logger.debug(`AWS error: ${message}`, error)
+    this.logger.debug({ error }, `AWS error: ${message}`)
 
     if (error instanceof ServiceException) {
       // Handle user input validation errors (400s)
@@ -84,5 +82,9 @@ export abstract class AwsService {
       // If it's not an AWS error, rethrow it
       throw error
     }
+  }
+
+  constructor(protected readonly logger: PinoLogger) {
+    this.logger.setContext(this.constructor.name)
   }
 }

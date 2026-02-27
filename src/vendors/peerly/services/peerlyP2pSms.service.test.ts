@@ -9,6 +9,7 @@ import { AxiosResponse } from 'axios'
 import { of, throwError } from 'rxjs'
 import { CrmCampaignsService } from '../../../campaigns/services/crmCampaigns.service'
 import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
 import { beforeEach, describe, expect, it, vi, Mocked } from 'vitest'
@@ -74,6 +75,7 @@ describe('PeerlyP2pSmsService - Agent Assignment', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PeerlyP2pSmsService,
+        { provide: PinoLogger, useValue: createMockLogger() },
         {
           provide: HttpService,
           useValue: mockHttpService,

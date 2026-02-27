@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { VoterDatabaseService } from '../../../voters/services/voterDatabase.service'
 import { PeerlyPhoneListService } from './peerlyPhoneList.service'
 import { CampaignTcrComplianceService } from '../../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
@@ -16,16 +16,18 @@ import {
 } from '../utils/audienceMapping.util'
 import { Readable } from 'stream'
 import { CampaignWith } from '../../../campaigns/campaigns.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class P2pPhoneListUploadService {
-  private readonly logger = new Logger(P2pPhoneListUploadService.name)
-
   constructor(
     private readonly voterDatabaseService: VoterDatabaseService,
     private readonly peerlyPhoneListService: PeerlyPhoneListService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(P2pPhoneListUploadService.name)
+  }
 
   async uploadPhoneList(
     campaign: CampaignWith<'pathToVictory'>,
@@ -50,8 +52,8 @@ export class P2pPhoneListUploadService {
       csvBuffer = await this.generatePhoneListCsvStream(campaign, filters)
     } catch (error) {
       this.logger.error(
+        { error },
         `Failed to generate CSV buffer for campaign ${campaign.id}:`,
-        error,
       )
       throw new BadRequestException(
         'Failed to generate voter data for phone list',
@@ -67,8 +69,8 @@ export class P2pPhoneListUploadService {
       })
     } catch (error) {
       this.logger.error(
+        { error },
         `Failed to upload phone list to Peerly for campaign ${campaign.id}:`,
-        error,
       )
       throw new BadRequestException(
         'Failed to upload phone list to Peerly platform',
@@ -99,6 +101,7 @@ export class P2pPhoneListUploadService {
     }
 
     const query = typeToQuery(
+      this.logger,
       VoterFileType.sms,
       campaign,
       customFilters,
@@ -107,7 +110,7 @@ export class P2pPhoneListUploadService {
       P2P_CSV_COLUMN_MAPPINGS,
     )
 
-    this.logger.debug('Generated P2P phone list query:', query)
+    this.logger.debug({ query }, 'Generated P2P phone list query:')
 
     const stream = await this.voterDatabaseService.csvReadableStream(
       query,
@@ -137,7 +140,7 @@ export class P2pPhoneListUploadService {
       })
 
       stream.on('error', (error) => {
-        this.logger.error('Error collecting CSV stream data:', error)
+        this.logger.error(error, 'Error collecting CSV stream data:')
         reject(error)
       })
     })

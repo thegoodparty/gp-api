@@ -17,7 +17,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -52,6 +51,7 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
+import { PinoLogger } from 'nestjs-pino'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -63,8 +63,6 @@ class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) {}
 @UsePipes(ZodValidationPipe)
 @UseInterceptors(ZodResponseInterceptor)
 export class CampaignsController {
-  private readonly logger = new Logger(CampaignsController.name)
-
   constructor(
     private readonly campaigns: CampaignsService,
     private readonly planVersions: CampaignPlanVersionsService,
@@ -73,7 +71,10 @@ export class CampaignsController {
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
     private readonly analytics: AnalyticsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(CampaignsController.name)
+  }
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
   @Post('mine/path-to-victory')
@@ -250,7 +251,7 @@ export class CampaignsController {
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign', campaign, { slug, body })
+    this.logger.debug({ campaign, ...{ slug, body } }, 'Updating campaign')
 
     return this.campaigns.updateJsonFields(campaign.id, body)
   }
@@ -296,7 +297,7 @@ export class CampaignsController {
       const launchResult = await this.campaigns.launch(user, campaign)
       return launchResult
     } catch (e) {
-      this.logger.error('Error at campaign launch', e)
+      this.logger.error({ e }, 'Error at campaign launch')
       await this.slack.errorMessage({
         message: 'Error at campaign launch',
         error: e,
@@ -324,11 +325,17 @@ export class CampaignsController {
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign with district', campaign, {
-      slug,
-      L2DistrictType,
-      L2DistrictName,
-    })
+    this.logger.debug(
+      {
+        campaign,
+        ...{
+          slug,
+          L2DistrictType,
+          L2DistrictName,
+        },
+      },
+      'Updating campaign with district',
+    )
 
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
       L2DistrictType,

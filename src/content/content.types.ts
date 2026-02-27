@@ -2,6 +2,7 @@ import { Block, Inline } from '@contentful/rich-text-types'
 import { EntrySys, FieldsType } from 'contentful'
 import { BlogArticleMeta, Content, ContentType, Prisma } from '@prisma/client'
 import { InferredContentTypes } from './CONTENT_TYPE_MAP.const'
+import { PinoLogger } from 'nestjs-pino'
 
 export const TYPE_FAQ_ARTICLE = 'faqArticle'
 export const TYPE_ARTICLE_CATEGORY = 'articleCategory'
@@ -428,6 +429,7 @@ export type FaqArticleContentAugmented = ContentAugmented<
 
 export type Transformer<I = Content, O = ContentAugmented> = (
   content: I[],
+  logger: PinoLogger,
 ) => O[] | O
 
 type GlossaryItemRawData = {

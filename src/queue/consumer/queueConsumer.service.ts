@@ -4,7 +4,6 @@ import {
   BadGatewayException,
   Injectable,
   InternalServerErrorException,
-  Logger,
 } from '@nestjs/common'
 import {
   Campaign,
@@ -68,6 +67,7 @@ import {
 } from '../queue.types'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
+import { PinoLogger } from 'nestjs-pino'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -95,8 +95,6 @@ const buildIssueProperties = (
 
 @Injectable()
 export class QueueConsumerService {
-  private readonly logger = new Logger(QueueConsumerService.name)
-
   constructor(
     private readonly aiContentService: AiContentService,
     private readonly slackService: SlackService,
@@ -112,7 +110,10 @@ export class QueueConsumerService {
     private readonly contactsService: ContactsService,
     private readonly s3Service: S3Service,
     private readonly usersService: UsersService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(QueueConsumerService.name)
+  }
 
   @SqsMessageHandler(process.env.SQS_QUEUE || '', false)
   async handleMessage(message: Message) {
@@ -127,17 +128,15 @@ export class QueueConsumerService {
   // Function to process message and decide if requeue is necessary
   async handleMessageAndMaybeRequeue(message: Message): Promise<boolean> {
     try {
-      this.logger.debug('Processing queue message: ', message)
+      this.logger.debug(message, 'Processing queue message: ')
       const success = await this.processMessage(message)
       return !success // Invert: true (success) becomes false (don't requeue)
     } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          message,
-          error: serializeError(error),
-          msg: 'Message processing failed, will requeue',
-        }),
-      )
+      this.logger.error({
+        message,
+        error: serializeError(error),
+        msg: 'Message processing failed, will requeue',
+      })
       return true // Indicate that we should requeue
     }
   }
@@ -180,8 +179,8 @@ export class QueueConsumerService {
       }
 
       this.logger.error(
+        { error },
         `Message processing failed with non-retryable error, discarding message: ${JSON.stringify(message)}`,
-        error,
       )
 
       // Send error notification to Slack for non-retryable errors
@@ -194,7 +193,7 @@ export class QueueConsumerService {
           },
         })
       } catch (slackError) {
-        this.logger.error('Failed to send Slack notification:', slackError)
+        this.logger.error({ slackError }, 'Failed to send Slack notification:')
       }
 
       return true // Don't requeue, delete the message
@@ -222,12 +221,12 @@ export class QueueConsumerService {
 
     const parsedBody = JSON.parse(message.Body) as QueueMessage
     const queueMessage: QueueMessage = parsedBody
-    this.logger.log(`processing queue message type ${queueMessage.type}`)
+    this.logger.info(`processing queue message type ${queueMessage.type}`)
 
     switch (queueMessage.type) {
       case QueueType.GENERATE_AI_CONTENT:
         return await this.withLegacyErrorSwallowing(message, async () => {
-          this.logger.log('received generateAiContent message')
+          this.logger.info('received generateAiContent message')
           const generateAiContentMessage =
             queueMessage.data as GenerateAiContentMessageData
 
@@ -248,54 +247,54 @@ export class QueueConsumerService {
               })
             } catch (analyticsError) {
               this.logger.error(
+                { analyticsError },
                 'Failed to track analytics for AI content:',
-                analyticsError,
               )
             }
           } catch (error) {
             this.logger.error(
+              { error },
               `Error processing AI content generation for slug: ${generateAiContentMessage.slug}`,
-              error,
             )
             throw error
           }
           return true
         })
       case QueueType.PATH_TO_VICTORY:
-        this.logger.log('received pathToVictory message')
+        this.logger.info('received pathToVictory message')
         const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         return await this.withLegacyErrorSwallowing(message, async () => {
           await this.handlePathToVictoryMessage(pathToVictoryMessage)
           return true
         })
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
-        this.logger.log('received tcrComplianceStatusCheck message')
+        this.logger.info('received tcrComplianceStatusCheck message')
         return await this.withLegacyErrorSwallowing(message, () =>
           this.handleTcrComplianceCheckMessage(
             queueMessage.data as TcrComplianceStatusCheckMessage,
           ),
         )
       case QueueType.DOMAIN_EMAIL_FORWARDING:
-        this.logger.log('received domainEmailForwarding message')
+        this.logger.info('received domainEmailForwarding message')
         return await this.withLegacyErrorSwallowing(message, () =>
           this.handleDomainEmailForwardingMessage(
             queueMessage.data as DomainEmailForwardingMessage,
           ),
         )
       case QueueType.POLL_ANALYSIS_COMPLETE:
-        this.logger.log('received pollAnalysisComplete message')
+        this.logger.info('received pollAnalysisComplete message')
         const pollAnalysisCompleteEvent =
           PollAnalysisCompleteEventSchema.parse(queueMessage)
         return await this.handlePollAnalysisComplete(pollAnalysisCompleteEvent)
       case QueueType.POLL_CREATION:
-        this.logger.log('received pollCreation message')
+        this.logger.info('received pollCreation message')
         const pollCreationEvent = PollCreationEventSchema.parse(queueMessage)
         return await this.handlePollCreation(
           pollCreationEvent,
           message.MessageId!,
         )
       case QueueType.POLL_EXPANSION:
-        this.logger.log('received pollExpansion message')
+        this.logger.info('received pollExpansion message')
         const pollExpansionEvent = PollExpansionEventSchema.parse(queueMessage)
         return await this.handlePollExpansion(
           pollExpansionEvent,
@@ -325,8 +324,8 @@ export class QueueConsumerService {
         const requestError = e.cause
         const status = requestError.response?.status
         this.logger.warn(
-          `HTTP exception occurred while fetching CV token status: ${status} - ${e.message}`,
           { peerlyIdentityId, status, response: e.getResponse() },
+          `HTTP exception occurred while fetching CV token status: ${status} - ${e.message}`,
         )
         if (status && status === 404) {
           this.logger.debug(
@@ -335,8 +334,8 @@ export class QueueConsumerService {
         } else {
           // Something else went wrong
           this.logger.error(
-            `HTTP exception occurred while fetching CV token status: ${status} - ${e.message}`,
             { peerlyIdentityId, status, response: e.getResponse() },
+            `HTTP exception occurred while fetching CV token status: ${status} - ${e.message}`,
           )
           throw e.cause
         }
@@ -357,7 +356,8 @@ export class QueueConsumerService {
     const { peerlyIdentityId } = tcrCompliance
     if (!peerlyIdentityId) {
       this.logger.error(
-        `No peerlyIdentityId found on TcrCompliance provided, skipping: ${JSON.stringify(tcrCompliance)}`,
+        { tcrCompliance },
+        'No peerlyIdentityId found on TcrCompliance provided, skipping:',
       )
       return true // remove message from the queue
     }
@@ -388,7 +388,8 @@ export class QueueConsumerService {
 
     if (!registrationStatus) {
       this.logger.debug(
-        `TCR Registration is not active at this time: ${JSON.stringify(tcrCompliance)}`,
+        { tcrCompliance },
+        'TCR Registration is not active at this time:',
       )
       return true // delete from the queue
     }
@@ -411,8 +412,8 @@ export class QueueConsumerService {
       })
     } catch (analyticsError) {
       this.logger.error(
+        { analyticsError },
         `Failed to track analytics for TCR compliance: ${JSON.stringify(tcrCompliance)}`,
-        analyticsError,
       )
     }
 
@@ -483,7 +484,7 @@ export class QueueConsumerService {
         await this.pathToVictoryService.handlePathToVictory({
           ...message,
         })
-      this.logger.debug('p2vResponse', p2vResponse)
+      this.logger.debug(p2vResponse, 'p2vResponse')
 
       campaign = await this.campaignsService.findUnique({
         where: { id: Number(message.campaignId) },
@@ -517,19 +518,22 @@ export class QueueConsumerService {
       )
     } catch (e) {
       this.logger.error(
+        { e },
         `error in consumer/handlePathToVictoryMessage for slug=${message.slug}, office="${message.officeName}"`,
-        e,
       )
       // Extra structured context for visibility in logs
-      this.logger.error('P2V context', {
-        slug,
-        officeName,
-        electionLevel,
-        electionState,
-        subAreaName,
-        subAreaValue,
-        electionDate,
-      })
+      this.logger.error(
+        {
+          slug,
+          officeName,
+          electionLevel,
+          electionState,
+          subAreaName,
+          subAreaValue,
+          electionDate,
+        },
+        'P2V context',
+      )
       await this.slackService.errorMessage({
         message: 'error in consumer/handlePathToVictoryMessage',
         error: {
@@ -586,7 +590,7 @@ export class QueueConsumerService {
     const markAsFailed = exhaustedRetries && !isAlreadyMatched
 
     if (exhaustedRetries && isAlreadyMatched) {
-      this.logger.log(
+      this.logger.info(
         `P2V silver flow exhausted retries for ${campaign.slug}, but gold flow already set status=${existingStatus}. Keeping existing status.`,
       )
     }
@@ -626,10 +630,10 @@ export class QueueConsumerService {
 
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
     const { pollId, totalResponses, responsesLocation, issues } = event.data
-    this.logger.log(`Handling poll analysis complete event for poll ${pollId}`)
+    this.logger.info(`Handling poll analysis complete event for poll ${pollId}`)
     const data = await this.getPollAndCampaign(pollId)
     if (!data) {
-      this.logger.log('Poll not found, ignoring event')
+      this.logger.info('Poll not found, ignoring event')
       return
     }
     const { poll, campaign } = data
@@ -649,9 +653,12 @@ export class QueueConsumerService {
         derivePollStatus(poll),
       )
     ) {
-      this.logger.log('Poll is not in expected state, ignoring event', {
-        poll,
-      })
+      this.logger.info(
+        {
+          poll,
+        },
+        'Poll is not in expected state, ignoring event',
+      )
       return
     }
 
@@ -674,7 +681,7 @@ export class QueueConsumerService {
     await this.pollIssuesService.model.deleteMany({
       where: { pollId },
     })
-    this.logger.log('Successfully deleted existing poll issues')
+    this.logger.info('Successfully deleted existing poll issues')
 
     const issuesToWrite = issues.map((issue) => ({
       id: `${pollId}-${issue.rank}`,
@@ -692,7 +699,7 @@ export class QueueConsumerService {
     await this.pollIssuesService.client.pollIssue.createMany({
       data: issuesToWrite,
     })
-    this.logger.log('Successfully created new poll issues')
+    this.logger.info('Successfully created new poll issues')
     const bucket = process.env.SERVE_ANALYSIS_BUCKET_NAME
     if (!bucket) {
       throw new Error('Please set SERVE_ANALYSIS_BUCKET_NAME in your .env')
@@ -800,7 +807,7 @@ export class QueueConsumerService {
       { timeout: 20000 },
     )
 
-    this.logger.log(
+    this.logger.info(
       `Created individual messages for poll ${pollId} (linked issues: ${joinValues.length})`,
     )
 
@@ -892,7 +899,7 @@ export class QueueConsumerService {
   }) {
     const data = await this.getPollAndCampaign(params.pollId)
     if (!data) {
-      this.logger.log(`${params.pollId} Poll not found, ignoring event`)
+      this.logger.info(`${params.pollId} Poll not found, ignoring event`)
       return
     }
     const { poll, campaign } = data
@@ -900,10 +907,10 @@ export class QueueConsumerService {
     const user = await this.usersService.findUnique({
       where: { id: campaign.userId },
     })
-    this.logger.log(`${params.pollId} Fetched sample and user`)
+    this.logger.info(`${params.pollId} Fetched sample and user`)
 
     if (!user) {
-      this.logger.log(`${params.pollId} User not found, ignoring event`)
+      this.logger.info(`${params.pollId} User not found, ignoring event`)
       return
     }
 
@@ -925,18 +932,19 @@ export class QueueConsumerService {
     let csv = await this.s3Service.getFile(bucket, key)
 
     if (!csv) {
-      this.logger.log(
+      this.logger.info(
         `${params.pollId} No existing CSV found, generating new one`,
       )
       const sampleParams = await params.sampleParams(poll)
-      this.logger.log(
-        `${poll.id} Sampling contacts with params: ${JSON.stringify(sampleParams)}`,
+      this.logger.info(
+        { sampleParams },
+        `${poll.id} Sampling contacts with params: `,
       )
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
         campaign,
       )
-      this.logger.log(
+      this.logger.info(
         `${params.pollId} Generated sample of ${sample.length} contacts`,
       )
       csv = buildCsvFromContacts(sample)
@@ -972,7 +980,7 @@ export class QueueConsumerService {
       { timeout: 10000 },
     )
 
-    this.logger.log(`${params.pollId} Created individual poll messages`)
+    this.logger.info(`${params.pollId} Created individual poll messages`)
 
     // 3. Send CSV file to Slack for Tevyn
     await sendTevynAPIPollMessage(this.slackService.client, {
@@ -994,7 +1002,7 @@ export class QueueConsumerService {
       },
       isExpansion: params.isExpansion,
     })
-    this.logger.log(`${params.pollId} Slack message sent`)
+    this.logger.info(`${params.pollId} Slack message sent`)
 
     return true
   }
@@ -1004,12 +1012,12 @@ export class QueueConsumerService {
       where: { id: pollId },
     })
     if (!poll) {
-      this.logger.log('Poll not found, ignoring event')
+      this.logger.info('Poll not found, ignoring event')
       return
     }
 
     if (!poll.electedOfficeId) {
-      this.logger.log('Poll has no elected office, ignoring event')
+      this.logger.info('Poll has no elected office, ignoring event')
       return
     }
 
@@ -1018,7 +1026,7 @@ export class QueueConsumerService {
     })
 
     if (!office) {
-      this.logger.log('Elected office not found, ignoring event')
+      this.logger.info('Elected office not found, ignoring event')
       return
     }
 
@@ -1028,7 +1036,7 @@ export class QueueConsumerService {
     })
 
     if (!campaign) {
-      this.logger.log('No campaign found, ignoring event')
+      this.logger.info('No campaign found, ignoring event')
       return
     }
     return { poll, office, campaign }
