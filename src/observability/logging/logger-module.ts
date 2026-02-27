@@ -35,6 +35,7 @@ export const loggerModule = LoggerModule.forRoot({
       request: {
         method: req.method,
         // @ts-expect-error - req.originalUrl is not typed
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         url: req.originalUrl,
       },
     }),
