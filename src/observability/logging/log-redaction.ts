@@ -1,10 +1,13 @@
 import { isNotNil } from 'es-toolkit'
 
+const MIN_SECRET_LENGTH = 8
+
 const buildSecretPattern = (): RegExp => {
   const escaped = (process.env.SECRET_NAMES ?? '')
     .split(',')
     .map((name) => process.env[name])
     .filter(isNotNil)
+    .filter((s) => s.length >= MIN_SECRET_LENGTH)
     .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 
   escaped.push('(?<=Authorization: Bearer )[^"\\\\]+')

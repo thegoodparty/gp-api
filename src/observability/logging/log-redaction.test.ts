@@ -140,6 +140,24 @@ describe('log-redaction', () => {
       })
     })
 
+    it('skips secret values shorter than 8 characters', async () => {
+      const redactLine = await loadRedactLine('SHORT_SECRET,LONG_SECRET', {
+        SHORT_SECRET: 'abc',
+        LONG_SECRET: 'long-enough-secret',
+      })
+
+      const result = redactLine(
+        jsonLine({
+          a: 'abc',
+          b: 'long-enough-secret',
+        }),
+      )
+      expect(JSON.parse(result)).toEqual({
+        a: 'abc',
+        b: '[REDACTED]',
+      })
+    })
+
     it('redacts values in arrays', async () => {
       const redactLine = await loadRedactLine('TOKEN', {
         TOKEN: 'my-token-value',
@@ -400,6 +418,47 @@ describe('log-redaction', () => {
         header: 'Authorization: Bearer [REDACTED]',
         safe: 'no secrets',
       })
+    })
+  })
+
+  describe('over-redaction prevention', () => {
+    it('does not redact UUIDs, timestamps, routes, or trace IDs', async () => {
+      const redactLine = await loadRedactLine('SHORT_KEY', {
+        SHORT_KEY: 'e4',
+      })
+
+      const line = jsonLine({
+        level: 30,
+        time: 1727225308515,
+        requestId: 'fa3dc8cf-bc5f-4e3f-a040-b39a67123422',
+        request: { method: 'GET', url: '/v1/health' },
+        trace_id: 'b8fe0061bea92c5002bc01095ef263c5',
+        span_id: 'a60de0e72e16d90',
+        trace_flags: '01',
+        response: { statusCode: 200, bytes: 2 },
+        responseTimeMs: 8,
+      })
+
+      expect(redactLine(line)).toBe(line)
+    })
+
+    it('preserves a realistic pino log line with no secrets', async () => {
+      const redactLine = await loadRedactLine()
+
+      const line = jsonLine({
+        level: 30,
+        time: 1727225308515,
+        requestId: 'fa3dc8cf-bc5f-4e3f-a040-b39a67123422',
+        request: { method: 'GET', url: '/v1/health' },
+        trace_id: 'b8fe0061bea92c5002bc01095ef263c5',
+        span_id: 'a60de0e72e16d90',
+        trace_flags: '01',
+        response: { statusCode: 200, bytes: 2 },
+        responseTimeMs: 8,
+        msg: 'Request completed NR-LINKING|NzEyODMzNXxBUE18QVBQTElDQVRJT058OTg3NzM5NjI2|ip-10-0-8-96.us-west-2.compute.internal|||',
+      })
+
+      expect(redactLine(line)).toBe(line)
     })
   })
 })
