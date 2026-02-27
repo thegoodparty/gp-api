@@ -98,6 +98,36 @@ describe('PollResponsesDownloadService', () => {
       expect(output.startsWith('\uFEFFPoll With Newlines\n')).toBe(true)
     })
 
+    it('uses fallback when poll name is empty or whitespace', async () => {
+      const result = await service.streamPollResponses(
+        VALID_UUID,
+        '   ',
+        FILE_NAME,
+      )
+      copyStream.end()
+
+      const output = await drainStream(result.getStream())
+      expect(output.startsWith('\uFEFFPoll responses\n')).toBe(true)
+    })
+
+    it('strips leading newlines from COPY stream to avoid empty rows', async () => {
+      const result = await service.streamPollResponses(
+        VALID_UUID,
+        POLL_NAME,
+        FILE_NAME,
+      )
+
+      copyStream.write('\n\n\nmessage_content,associated_clusters\n')
+      copyStream.write('"Hello world","Issue A"\n')
+      copyStream.end()
+
+      const output = await drainStream(result.getStream())
+      const lines = output.split('\n')
+      expect(lines[0]).toBe('\uFEFF' + POLL_NAME)
+      expect(lines[1]).toBe('message_content,associated_clusters')
+      expect(lines[2]).toBe('"Hello world","Issue A"')
+    })
+
     it('builds COPY SQL with the poll ID', async () => {
       const { to: copyTo } = await import('pg-copy-streams')
 
