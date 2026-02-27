@@ -167,6 +167,8 @@ export {
   type UpdateCampaignM2MInput,
 } from './campaigns/UpdateCampaignM2M.schema'
 
+export type { Ecanvasser, EcanvasserSummary } from './ecanvasser/types'
+
 export {
   SURVEY_STATUS_VALUES,
   type SurveyStatus,
