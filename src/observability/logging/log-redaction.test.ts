@@ -316,11 +316,13 @@ describe('log-redaction', () => {
 
       const result = redactLine(
         jsonLine({
-          message: 'Connecting to postgres://dbuser:s3cretPass@db.example.com:5432/mydb',
+          message:
+            'Connecting to postgres://dbuser:s3cretPass@db.example.com:5432/mydb',
         }),
       )
       expect(JSON.parse(result)).toEqual({
-        message: 'Connecting to postgres://dbuser:[REDACTED]@db.example.com:5432/mydb',
+        message:
+          'Connecting to postgres://dbuser:[REDACTED]@db.example.com:5432/mydb',
       })
     })
 
