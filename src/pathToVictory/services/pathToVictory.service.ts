@@ -6,6 +6,7 @@ import { CampaignCreatedBy, ElectionLevel } from '@goodparty_org/contracts'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
 import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
+import { recordBlockedStateEvent } from 'src/observability/grafana/otel.client'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
@@ -482,17 +483,19 @@ export class PathToVictoryService extends createPrismaBase(
         message: candidateSlackMessage + debugMessage,
         channel: SlackChannel.botPathToVictoryIssues,
       })
-      recordCustomEvent(CustomEventType.BlockedState, {
-        service: 'gp-api',
+      const blockedStateAttributes = {
+        service: 'gp-api' as const,
         environment: process.env.NODE_ENV,
         userId: campaign.userId,
         campaignId: campaign.id,
         slug: campaign.slug,
         feature: 'path_to_victory',
-        rootCause: 'p2v_failed',
+        rootCause: 'p2v_failed' as const,
         isBackground: true,
         reason: 'no_district_match',
-      })
+      }
+      recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
+      recordBlockedStateEvent(blockedStateAttributes)
     }
 
     // Push status to CRM for partial/failed outcomes (not for full success —

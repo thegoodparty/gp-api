@@ -19,15 +19,16 @@ const determineUserId = (req: IncomingMessage): string | undefined => {
   }
 }
 
+const isLocal = process.env.NODE_ENV !== 'production'
+
 export const loggerModule = LoggerModule.forRoot({
   assignResponse: true,
   pinoHttp: {
     base: null,
     level: process.env.LOG_LEVEL,
-    transport:
-      process.env.NODE_ENV !== 'production'
-        ? { target: 'pino-pretty', options: { colorize: true } }
-        : undefined,
+    transport: isLocal
+      ? { target: 'pino-pretty', options: { colorize: true } }
+      : undefined,
     genReqId: (req) => req.id ?? randomUUID(),
     customProps: (req) => ({
       requestId: req.id,
