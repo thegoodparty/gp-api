@@ -9,6 +9,18 @@ import {
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
 import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
+import { v7 as uuidv7 } from 'uuid'
+
+export type CreateElectedOfficeArgs = {
+  electedDate?: Date | null
+  swornInDate?: Date | null
+  termStartDate?: Date | null
+  termEndDate?: Date | null
+  termLengthDays?: number | null
+  isActive?: boolean
+  userId: number
+  campaignId: number
+}
 
 @Injectable()
 export class ElectedOfficeService extends createPrismaBase(
@@ -35,15 +47,41 @@ export class ElectedOfficeService extends createPrismaBase(
     }
   }
 
-  async create(args: Prisma.ElectedOfficeCreateArgs) {
-    const data = args.data as Prisma.ElectedOfficeCreateInput
-
-    // if isActive is not false, then we need to validate that the user does not already have an active elected office
-    if (data.isActive !== false && data.user?.connect?.id) {
-      await this.validateActiveElectedOffice(data.user.connect.id)
+  async create(args: CreateElectedOfficeArgs) {
+    // if isActive is not false, then we need to validate that the user does not
+    // already have an active elected office
+    if (args.isActive !== false) {
+      await this.validateActiveElectedOffice(args.userId)
     }
 
-    return this.model.create(args)
+    // TODO: collect a position id and validate it via election-api
+
+    return this.client.$transaction(async (tx) => {
+      const id = uuidv7()
+
+      await tx.organization.create({
+        data: {
+          slug: `eo-${id}`,
+          ownerId: args.userId,
+          positionId: 'TODO SWAIN',
+        },
+      })
+
+      return await tx.electedOffice.create({
+        data: {
+          id,
+          electedDate: args.electedDate,
+          swornInDate: args.swornInDate,
+          termStartDate: args.termStartDate,
+          termEndDate: args.termEndDate,
+          termLengthDays: args.termLengthDays,
+          isActive: args.isActive,
+          userId: args.userId,
+          campaignId: args.campaignId,
+          organizationSlug: `eo-${id}`,
+        },
+      })
+    })
   }
 
   async update(args: Prisma.ElectedOfficeUpdateArgs) {

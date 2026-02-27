@@ -82,17 +82,12 @@ export class ElectedOfficeController {
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
     }
-    const data: Prisma.ElectedOfficeCreateInput = {
-      electedDate: body.electedDate,
-      swornInDate: body.swornInDate,
-      termStartDate: body.termStartDate,
-      termEndDate: body.termEndDate,
-      termLengthDays: body.termLengthDays,
-      isActive: body.isActive,
-      user: { connect: { id: user.id } },
-      campaign: { connect: { id: campaign.id } },
-    }
-    const created = await this.electedOfficeService.create({ data })
+
+    const created = await this.electedOfficeService.create({
+      ...body,
+      userId: user.id,
+      campaignId: campaign.id,
+    })
     return this.toApi(created)
   }
 
