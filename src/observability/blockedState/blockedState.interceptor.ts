@@ -13,6 +13,7 @@ import {
   recordCustomEvent,
 } from '@/observability/newrelic/newrelic.client'
 import { CustomEventType } from '@/observability/newrelic/newrelic.events'
+import { recordBlockedStateEvent } from '@/observability/grafana/otel.client'
 import { deriveRootCause, shouldRecordBlockedState } from './blockedState.rules'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -131,8 +132,8 @@ export class BlockedStateInterceptor implements NestInterceptor {
           errorCode,
         })
 
-        recordCustomEvent(CustomEventType.BlockedState, {
-          service: 'gp-api',
+        const blockedStateAttributes = {
+          service: 'gp-api' as const,
           environment: process.env.NODE_ENV,
           userId,
           endpoint,
@@ -145,7 +146,10 @@ export class BlockedStateInterceptor implements NestInterceptor {
             : {}),
           rootCause,
           isBackground: false,
-        })
+        }
+
+        recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
+        recordBlockedStateEvent(blockedStateAttributes)
 
         return throwError(() => err)
       }),

@@ -36,6 +36,14 @@ export const bootstrap = async (
     },
   )
   app.useLogger(app.get(Logger))
+
+  if (global.__fastifyOtelInstrumentation) {
+    await app
+      .getHttpAdapter()
+      .getInstance()
+      .register(global.__fastifyOtelInstrumentation.plugin())
+  }
+
   app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()

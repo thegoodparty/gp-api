@@ -3,6 +3,7 @@ import { LoggerModule } from 'nestjs-pino'
 import pino from 'pino'
 import jwt from 'jsonwebtoken'
 import { IncomingMessage } from 'http'
+import { redactLine } from './log-redaction'
 
 const determineUserId = (req: IncomingMessage): string | undefined => {
   if (!req.headers.authorization) {
@@ -19,15 +20,16 @@ const determineUserId = (req: IncomingMessage): string | undefined => {
   }
 }
 
+const isLocal = process.env.NODE_ENV !== 'production'
+
 export const loggerModule = LoggerModule.forRoot({
   assignResponse: true,
   pinoHttp: {
     base: null,
     level: process.env.LOG_LEVEL,
-    transport:
-      process.env.NODE_ENV !== 'production'
-        ? { target: 'pino-pretty', options: { colorize: true } }
-        : undefined,
+    transport: isLocal
+      ? { target: 'pino-pretty', options: { colorize: true } }
+      : undefined,
     genReqId: (req) => req.id ?? randomUUID(),
     customProps: (req) => ({
       requestId: req.id,
@@ -43,6 +45,9 @@ export const loggerModule = LoggerModule.forRoot({
     customSuccessMessage: () => 'Request completed',
     customErrorMessage: () => 'Request completed',
     customAttributeKeys: { res: 'response', responseTime: 'responseTimeMs' },
+    hooks: {
+      streamWrite: redactLine,
+    },
     // By default, pino only does proper Error serialization on the `err` argument.
     // This changes that to serialize any Error object on the top-level keys.
     formatters: {
