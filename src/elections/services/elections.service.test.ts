@@ -14,6 +14,8 @@ const makePosition = (
   positionId: 'pos-1',
   brPositionId: 'br-pos-1',
   brDatabaseId: 'br-db-1',
+  state: 'TX',
+  name: 'State House 005',
   district: {
     id: 'district-1',
     L2DistrictType: 'State_House',
@@ -113,6 +115,8 @@ describe('ElectionsService', () => {
         positionId: 'pos-1',
         brPositionId: 'br-pos-1',
         brDatabaseId: 'br-db-1',
+        state: 'TX',
+        name: 'State House 005',
       }
       mockHttpGet.mockReturnValue(of({ data: positionNoDistrict, status: 200 }))
 
