@@ -42,8 +42,8 @@ describe('AdminOrM2MGuard', () => {
     expect(result).toBe(false)
   })
 
-  it('rejects requests with user but no roles', () => {
-    const result = guard.canActivate(mockContext({ user: {} }))
+  it('rejects requests with user but empty roles', () => {
+    const result = guard.canActivate(mockContext({ user: { roles: [] } }))
     expect(result).toBe(false)
   })
 })

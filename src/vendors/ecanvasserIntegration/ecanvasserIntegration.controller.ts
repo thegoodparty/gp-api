@@ -14,7 +14,6 @@ import { EcanvasserIntegrationService } from './services/ecanvasserIntegration.s
 import { SurveyService } from './services/survey.service'
 import { CreateEcanvasserSchema } from './schemas/createEcanvasser.schema'
 import { UpdateEcanvasserSchema } from './schemas/updateEcanvasser.schema'
-import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { CampaignOwnerOrAdminGuard } from 'src/campaigns/guards/CampaignOwnerOrAdmin.guard'
 import { AdminOrM2MGuard } from 'src/authentication/guards/AdminOrM2M.guard'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
@@ -50,6 +49,18 @@ export class EcanvasserIntegrationController {
     return this.ecanvasserService.summary(campaign.id)
   }
 
+  @Get('list')
+  @UseGuards(AdminOrM2MGuard)
+  findAll() {
+    return this.ecanvasserService.findAll()
+  }
+
+  @Get('sync-all')
+  @UseGuards(AdminOrM2MGuard)
+  syncAll() {
+    return this.ecanvasserService.syncAll()
+  }
+
   @Get(':campaignId')
   @UseGuards(CampaignOwnerOrAdminGuard)
   findOne(@Param('campaignId', ParseIntPipe) campaignId: number) {
@@ -79,18 +90,6 @@ export class EcanvasserIntegrationController {
   ) {
     const force = body.force === true
     return this.ecanvasserService.sync(campaignId, force)
-  }
-
-  @Get('list')
-  @UseGuards(AdminOrM2MGuard)
-  findAll() {
-    return this.ecanvasserService.findAll()
-  }
-
-  @Get('sync-all')
-  @PublicAccess()
-  syncAll() {
-    return this.ecanvasserService.syncAll()
   }
 
   @Post('survey')
