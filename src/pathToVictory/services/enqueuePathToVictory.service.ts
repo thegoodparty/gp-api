@@ -131,7 +131,10 @@ export class EnqueuePathToVictoryService {
           electionDate: queueMessage.data.electionDate,
         }),
       )
-      await this.queueService.sendMessage(queueMessage!, MessageGroup.p2v)
+      await this.queueService.sendMessage(
+        queueMessage!,
+        `${MessageGroup.p2v}-${campaignId}`,
+      )
       return { message: 'ok' }
     } catch (e) {
       this.logger.error('error at enqueue', e)
