@@ -4,18 +4,22 @@ export interface GrafanaConfig {
   environment: 'dev' | 'qa' | 'prod'
 }
 
+const envLabel = (environment: string) =>
+  `service_name="gp-api", deployment_environment_name="${environment}"`
+
 export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
   const folder = new grafana.oss.Folder('alerts-folder', {
     title: `gp-api-${environment}`,
   })
 
   const promDatasourceUid = 'grafanacloud-prom'
+  const labels = envLabel(environment)
 
   new grafana.oss.Dashboard('service-dashboard', {
     folder: folder.uid,
     overwrite: true,
     configJson: JSON.stringify({
-      title: `gp-api-${environment} - CPU & Memory`,
+      title: `gp-api ${environment} - CPU & Memory`,
       uid: `gp-api-${environment}-resources`,
       editable: true,
       timezone: 'browser',
@@ -24,15 +28,20 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
       panels: [
         {
           id: 1,
-          title: 'CPU Usage',
+          title: 'Process CPU Utilization',
           type: 'timeseries',
           gridPos: { h: 10, w: 12, x: 0, y: 0 },
           datasource: { type: 'prometheus', uid: promDatasourceUid },
           targets: [
             {
-              expr: `avg(rate(container_cpu_usage_seconds_total{container=~"gp-api-.*"}[5m])) * 100`,
-              legendFormat: 'CPU %',
+              expr: `avg(process_cpu_utilization{${labels}}) * 100`,
+              legendFormat: 'Process CPU %',
               refId: 'A',
+            },
+            {
+              expr: `avg(system_cpu_utilization{${labels}}) * 100`,
+              legendFormat: 'System CPU %',
+              refId: 'B',
             },
           ],
           fieldConfig: {
@@ -46,14 +55,14 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
         },
         {
           id: 2,
-          title: 'Memory Usage',
+          title: 'Process Memory Usage',
           type: 'timeseries',
           gridPos: { h: 10, w: 12, x: 12, y: 0 },
           datasource: { type: 'prometheus', uid: promDatasourceUid },
           targets: [
             {
-              expr: `avg(container_memory_usage_bytes{container=~"gp-api-.*"})`,
-              legendFormat: 'Memory Used',
+              expr: `process_memory_usage{${labels}}`,
+              legendFormat: 'Process Memory',
               refId: 'A',
             },
           ],
@@ -68,13 +77,13 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
         },
         {
           id: 3,
-          title: 'Memory Utilization %',
+          title: 'System Memory Utilization',
           type: 'gauge',
           gridPos: { h: 8, w: 6, x: 0, y: 10 },
           datasource: { type: 'prometheus', uid: promDatasourceUid },
           targets: [
             {
-              expr: `avg(container_memory_usage_bytes{container=~"gp-api-.*"}) / avg(container_spec_memory_limit_bytes{container=~"gp-api-.*"}) * 100`,
+              expr: `avg(system_memory_utilization{${labels}, system_memory_state="used"}) * 100`,
               legendFormat: 'Memory %',
               refId: 'A',
             },
@@ -97,13 +106,13 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
         },
         {
           id: 4,
-          title: 'CPU Utilization %',
+          title: 'System CPU Utilization',
           type: 'gauge',
           gridPos: { h: 8, w: 6, x: 6, y: 10 },
           datasource: { type: 'prometheus', uid: promDatasourceUid },
           targets: [
             {
-              expr: `avg(rate(container_cpu_usage_seconds_total{container=~"gp-api-.*"}[5m])) / avg(container_spec_cpu_quota{container=~"gp-api-.*"} / container_spec_cpu_period{container=~"gp-api-.*"}) * 100`,
+              expr: `avg(system_cpu_utilization{${labels}}) * 100`,
               legendFormat: 'CPU %',
               refId: 'A',
             },
