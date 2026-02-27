@@ -123,6 +123,7 @@ export type PositionWithOptionalDistrict = {
   brPositionId: string
   brDatabaseId: string
   state: string
+  name: string
   district?: {
     id: string
     L2DistrictType: string
