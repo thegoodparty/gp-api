@@ -16,7 +16,7 @@ import { CreateEcanvasserSchema } from './schemas/createEcanvasser.schema'
 import { UpdateEcanvasserSchema } from './schemas/updateEcanvasser.schema'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { CampaignOwnerOrAdminGuard } from 'src/campaigns/guards/CampaignOwnerOrAdmin.guard'
-import { Roles } from 'src/authentication/decorators/Roles.decorator'
+import { AdminOrM2MGuard } from 'src/authentication/guards/AdminOrM2M.guard'
 import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { Campaign } from '@prisma/client'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
@@ -33,7 +33,7 @@ export class EcanvasserIntegrationController {
   ) {}
 
   @Post()
-  @Roles('admin')
+  @UseGuards(AdminOrM2MGuard)
   create(@Body() createEcanvasserDto: CreateEcanvasserSchema) {
     return this.ecanvasserService.create(createEcanvasserDto)
   }
@@ -66,7 +66,7 @@ export class EcanvasserIntegrationController {
   }
 
   @Delete(':campaignId')
-  @Roles('admin')
+  @UseGuards(AdminOrM2MGuard)
   remove(@Param('campaignId', ParseIntPipe) campaignId: number) {
     return this.ecanvasserService.remove(campaignId)
   }
@@ -82,7 +82,7 @@ export class EcanvasserIntegrationController {
   }
 
   @Get('list')
-  @Roles('admin')
+  @UseGuards(AdminOrM2MGuard)
   findAll() {
     return this.ecanvasserService.findAll()
   }
