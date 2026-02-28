@@ -23,7 +23,7 @@ const DEFAULT_PAGE_SIZE = 1000
 
 @Injectable()
 export class EcanvasserService {
-  private readonly apiBaseUrl = 'https://public-api.ecanvasser.com'
+  private readonly apiBaseUrl = 'https://public-api-usa.ecanvasser.com'
 
   constructor(
     private readonly httpService: HttpService,
