@@ -407,7 +407,15 @@ export = async () => {
   })
 
   if (environment !== 'preview') {
-    createGrafanaResources({ environment })
+    const grafanaSlackBotToken = await aws.ssm.getParameter({
+      name: 'grafana-slack-bot-token',
+      withDecryption: true,
+    })
+
+    createGrafanaResources({
+      environment,
+      slackBotToken: grafanaSlackBotToken.value,
+    })
 
     createNewRelicLogForwarder({
       environment,
