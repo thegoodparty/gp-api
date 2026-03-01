@@ -44,6 +44,18 @@ export const bootstrap = async (
       .register(global.__fastifyOtelInstrumentation.plugin())
   }
 
+  /**
+   * This hook copies the de-parameterized route path onto the raw request object.
+   * This is used to populate the request.route property in the logger module.
+   */
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onRequest', (req, _, done) => {
+      req.raw.route = req.routeOptions?.url
+      done()
+    })
+
   app.setGlobalPrefix('v1')
 
   const swaggerConfig = new DocumentBuilder()
