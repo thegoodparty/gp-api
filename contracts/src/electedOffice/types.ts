@@ -1,5 +1,6 @@
 export type ElectedOffice = {
   id: string
+  organizationSlug: string | null
   electedDate: string | null
   swornInDate: string | null
   termStartDate: string | null
