@@ -42,10 +42,8 @@ const PathToVictoryDataSchema = z.object({
   officeContextFingerprint: z.string().optional(),
 })
 
-export const UpdatePathToVictoryInputSchema = z
-  .object({
-    data: PathToVictoryDataSchema,
-  })
-  .strict()
+export const UpdatePathToVictoryInputSchema = z.object({
+  data: PathToVictoryDataSchema.strict(),
+})
 
 export type UpdatePathToVictoryInput = z.infer<typeof UpdatePathToVictoryInputSchema>

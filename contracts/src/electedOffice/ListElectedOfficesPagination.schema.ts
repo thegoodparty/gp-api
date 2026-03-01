@@ -1,8 +1,5 @@
 import { z } from 'zod'
-import {
-  FilterablePaginationSchema,
-  paginationFilter,
-} from '../shared/Pagination.schema'
+import { FilterablePaginationSchema } from '../shared/Pagination.schema'
 
 const ELECTED_OFFICE_SORT_KEYS = [
   'id',
@@ -20,7 +17,7 @@ const ELECTED_OFFICE_SORT_KEYS = [
 export const ListElectedOfficesPaginationSchema = FilterablePaginationSchema({
   sortKeys: ELECTED_OFFICE_SORT_KEYS,
   filterFields: {
-    userId: paginationFilter,
+    userId: z.coerce.number().optional(),
   },
 })
 

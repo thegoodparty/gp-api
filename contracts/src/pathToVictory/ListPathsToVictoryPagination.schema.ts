@@ -1,8 +1,5 @@
 import { z } from 'zod'
-import {
-  FilterablePaginationSchema,
-  paginationFilter,
-} from '../shared/Pagination.schema'
+import { FilterablePaginationSchema } from '../shared/Pagination.schema'
 
 const PATH_TO_VICTORY_SORT_KEYS = [
   'id',
@@ -14,7 +11,7 @@ const PATH_TO_VICTORY_SORT_KEYS = [
 export const ListPathsToVictoryPaginationSchema = FilterablePaginationSchema({
   sortKeys: PATH_TO_VICTORY_SORT_KEYS,
   filterFields: {
-    userId: paginationFilter,
+    userId: z.coerce.number().optional(),
   },
 })
 
