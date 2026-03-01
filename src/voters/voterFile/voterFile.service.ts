@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, OutreachType, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
@@ -16,17 +16,19 @@ import {
   TASK_TO_TYPE_MAP,
   VoterFileType,
 } from './voterFile.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class VoterFileService {
-  private readonly logger = new Logger(VoterFileService.name)
-
   constructor(
     private readonly voterDb: VoterDatabaseService,
     private readonly slack: SlackService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: CrmCampaignsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(VoterFileService.name)
+  }
 
   async getCsvOrCount(
     campaign: CampaignWith<'pathToVictory'>,
@@ -68,13 +70,14 @@ export class VoterFileService {
   ): Promise<number> {
     // Try regular count first
     const countQuery = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
       true,
       false,
     )
-    this.logger.debug('Count Query:', countQuery)
+    this.logger.debug({ countQuery }, 'Count Query:')
 
     const sqlResponse = await this.voterDb.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
@@ -82,13 +85,14 @@ export class VoterFileService {
     // If count is 0, try with fix columns as fallback
     if (count === 0) {
       const countQueryWithFix = typeToQuery(
+        this.logger,
         resolvedType,
         campaign,
         customFilters,
         true,
         true,
       )
-      this.logger.debug('Count Query with Fix Columns:', countQueryWithFix)
+      this.logger.debug({ countQueryWithFix }, 'Count Query with Fix Columns:')
       const sqlResponseWithFix = await this.voterDb.query(countQueryWithFix)
       return parseInt(sqlResponseWithFix.rows[0].count)
     }
@@ -105,22 +109,24 @@ export class VoterFileService {
   ) {
     // Check if we need to use fixColumns by doing a quick count check
     const countQuery = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
       true,
       false,
     )
-    this.logger.debug('Count Query:', countQuery)
+    this.logger.debug({ countQuery }, 'Count Query:')
 
     const sqlResponse = await this.voterDb.query(countQuery)
     const count = parseInt(sqlResponse.rows[0].count)
     const withFixColumns = count === 0
 
-    this.logger.debug('count', count)
+    this.logger.debug({ count }, 'count')
 
     // Generate CSV with appropriate fixColumns setting
     const query = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
@@ -129,7 +135,7 @@ export class VoterFileService {
       selectedColumns,
       limit,
     )
-    this.logger.debug('Constructed Query:', query)
+    this.logger.debug({ query }, 'Constructed Query:')
     return this.voterDb.csvStream(query, 'voters', selectedColumns)
   }
 

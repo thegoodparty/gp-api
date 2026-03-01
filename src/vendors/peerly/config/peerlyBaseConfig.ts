@@ -1,4 +1,5 @@
-import { BadGatewayException, Logger } from '@nestjs/common'
+import { BadGatewayException } from '@nestjs/common'
+import { PinoLogger } from 'nestjs-pino'
 
 const {
   PEERLY_MD5_EMAIL,
@@ -36,8 +37,6 @@ export class PeerlyBaseConfig {
   readonly isTestEnvironment = Boolean(PEERLY_TEST_ENVIRONMENT === 'true')
   readonly scheduleId = parseInt(PEERLY_SCHEDULE_ID!, 10)
 
-  protected readonly logger = new Logger(this.constructor.name)
-
   protected validateData<T>(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     data: unknown,
@@ -48,10 +47,14 @@ export class PeerlyBaseConfig {
     try {
       return dto.create(data)
     } catch (error) {
-      this.logger.error(`${context} response validation failed:`, error)
+      this.logger.error({ error }, `${context} response validation failed:`)
       throw new BadGatewayException(
         `Invalid ${context} response from Peerly API`,
       )
     }
+  }
+
+  constructor(protected readonly logger: PinoLogger) {
+    this.logger.setContext(this.constructor.name)
   }
 }

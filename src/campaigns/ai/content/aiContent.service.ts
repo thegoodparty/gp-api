@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
@@ -11,18 +11,20 @@ import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { MessageGroup, QueueType } from '../../../queue/queue.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class AiContentService {
-  private readonly logger = new Logger(AiContentService.name)
-
   constructor(
     private readonly campaignsService: CampaignsService,
     private readonly contentService: ContentService,
     private readonly aiService: AiService,
     private readonly slack: SlackService,
     private readonly queue: QueueProducerService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiContentService.name)
+  }
 
   /** function to kickoff ai content generation and enqueue a message to run later */
   async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
@@ -121,7 +123,7 @@ export class AiContentService {
     )
 
     try {
-      this.logger.log(aiContent)
+      this.logger.info(aiContent)
       await this.campaignsService.update({
         where: { id: campaign.id },
         data: { aiContent },
@@ -251,9 +253,9 @@ export class AiContentService {
           content: chatResponse as string,
         }
 
-        this.logger.log('saving campaign version', key)
-        this.logger.log('inputValues', inputValues)
-        this.logger.log('oldVersion', oldVersion)
+        this.logger.info({ key }, 'saving campaign version')
+        this.logger.info({ inputValues }, 'inputValues')
+        this.logger.info({ oldVersion }, 'oldVersion')
 
         await this.campaignsService.saveCampaignPlanVersion({
           aiContent,
@@ -293,8 +295,8 @@ export class AiContentService {
       const e = error as Error & {
         data?: { error?: string }
       }
-      this.logger.error('error at consumer', e)
-      this.logger.error('messages', messages)
+      this.logger.error({ e }, 'error at consumer')
+      this.logger.error({ messages }, 'messages')
       generateError = true
 
       if (e.data?.error) {
@@ -306,7 +308,7 @@ export class AiContentService {
           message: 'error at AI queue consumer (with msg): ',
           error: e.data.error,
         })
-        this.logger.error('error', e.data.error)
+        this.logger.error({ error: e.data.error }, 'error')
       } else {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer. Queue Message: ',
@@ -368,7 +370,7 @@ export class AiContentService {
           message: `Error at consumer updating campaign with ai. key: ${key}`,
           error: e,
         })
-        this.logger.error('error at consumer', e)
+        this.logger.error({ e }, 'error at consumer')
       }
       // throw an Error so that the message goes back to the queue or the DLQ.
       throw new Error(`error generating ai content. slug: ${slug}, key: ${key}`)

@@ -21,6 +21,7 @@ import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { createMockLogger } from '../../../shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 
 function createMockUser(overrides: Partial<User> = {}): User {
   return {
@@ -144,6 +145,7 @@ describe('PeerlyIdentityService', () => {
     module = await Test.createTestingModule({
       providers: [
         PeerlyIdentityService,
+        { provide: PinoLogger, useValue: createMockLogger() },
         {
           provide: HttpService,
           useValue: {

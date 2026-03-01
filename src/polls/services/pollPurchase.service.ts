@@ -1,5 +1,4 @@
-import { PaymentsService } from '@/payments/services/payments.service'
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { PurchaseHandler } from 'src/payments/purchase.types'
 import { UsersService } from 'src/users/services/users.service'
@@ -7,6 +6,7 @@ import { version as uuidVersion } from 'uuid'
 import z from 'zod'
 import { PollsService } from './polls.service'
 import { MAX_POLL_MESSAGE_LENGTH } from '../schemas/poll.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 const MAX_CONSTITUENTS_PER_RUN = 10000
 
@@ -58,14 +58,14 @@ function calcAmountInCents(textCount: number): number {
 
 @Injectable()
 export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
-  private readonly logger = new Logger(PollPurchaseHandlerService.name)
-
   constructor(
     private readonly pollsService: PollsService,
     private readonly electedOfficeService: ElectedOfficeService,
-    private readonly paymentsService: PaymentsService,
     private readonly usersService: UsersService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PollPurchaseHandlerService.name)
+  }
 
   async validatePurchase(rawMetadata: unknown): Promise<void> {
     const result = PollPurchaseMetadataSchema.safeParse(rawMetadata)
@@ -82,34 +82,15 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
       : calcAmountInCents(metadata.audienceSize)
   }
 
-  async executePostPurchase(
-    paymentIntentId: string,
-    rawMetadata: unknown,
-  ): Promise<void> {
-    const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
-
-    this.logger.log(
-      `Poll purchase completed: paymentIntentId=${paymentIntentId} metadata=${JSON.stringify(metadata)}`,
-    )
-
-    if (metadata.pollPurchaseType === PollPurchaseType.expansion) {
-      return this.processExpansion(metadata)
-    }
-
-    const { user } =
-      await this.paymentsService.getValidatedPaymentUser(paymentIntentId)
-
-    return this.processNewPoll(metadata, user.id)
-  }
-
   async handlePollPostPurchase(
     sessionId: string,
     rawMetadata: unknown,
   ): Promise<void> {
     const metadata = PollPurchaseMetadataSchema.parse(rawMetadata)
 
-    this.logger.log(
-      `Poll checkout session completed: sessionId=${sessionId} metadata=${JSON.stringify(metadata)}`,
+    this.logger.info(
+      { metadata },
+      `Poll checkout session completed: sessionId=${sessionId} metadata=`,
     )
 
     if (metadata.pollPurchaseType === PollPurchaseType.expansion) {

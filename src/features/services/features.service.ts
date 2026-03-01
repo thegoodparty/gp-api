@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { UsersService } from '../../users/services/users.service'
 import { Experiment } from '@amplitude/experiment-node-server'
 import { User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 const AMPLITUDE_PROJECT_API_KEY = process.env.AMPLITUDE_PROJECT_API_KEY
 if (!AMPLITUDE_PROJECT_API_KEY) {
@@ -12,9 +13,12 @@ const amplitude = Experiment.initializeRemote(AMPLITUDE_PROJECT_API_KEY)
 
 @Injectable()
 export class FeaturesService {
-  private readonly logger = new Logger(FeaturesService.name)
-
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(FeaturesService.name)
+  }
 
   /**
    * Determines if the specified feature is enabled for the given user.
@@ -41,14 +45,12 @@ export class FeaturesService {
 
     const value = variants[params.feature]?.value === 'on'
 
-    this.logger.log(
-      JSON.stringify({
-        userId: user.id,
-        feature: params.feature,
-        value,
-        msg: 'Calculated feature toggle for user',
-      }),
-    )
+    this.logger.info({
+      userId: user.id,
+      feature: params.feature,
+      value,
+      msg: 'Calculated feature toggle for user',
+    })
 
     return value
   }

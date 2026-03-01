@@ -2,19 +2,22 @@ import {
   CallHandler,
   ExecutionContext,
   Injectable,
-  Logger,
   NestInterceptor,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { User, UserRole } from '@prisma/client'
 import { ROLES_KEY } from '../decorators/Roles.decorator'
 import { FastifyRequest } from 'fastify'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class AdminAuditInterceptor implements NestInterceptor {
-  private readonly logger = new Logger('AdminAudit')
-
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext('AdminAudit')
+  }
 
   intercept(context: ExecutionContext, next: CallHandler) {
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
@@ -44,9 +47,7 @@ export class AdminAuditInterceptor implements NestInterceptor {
       body,
     }
 
-    this.logger.log(
-      JSON.stringify({ ...auditInfo, msg: 'Admin route accessed' }),
-    )
+    this.logger.info({ ...auditInfo, msg: 'Admin route accessed' })
 
     return next.handle()
   }

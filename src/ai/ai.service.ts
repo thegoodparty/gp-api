@@ -2,7 +2,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { BaseMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Prisma, User } from '@prisma/client'
 import { OpenAI } from 'openai'
 import {
@@ -15,6 +15,7 @@ import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
 import { SlackChannel } from '../vendors/slack/slackService.types'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
+import { PinoLogger } from 'nestjs-pino'
 
 const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 if (!TOGETHER_AI_KEY) {
@@ -66,9 +67,12 @@ type GetAssistantCompletionArgs = {
  */
 @Injectable()
 export class AiService {
-  private readonly logger = new Logger(AiService.name)
-
-  constructor(private slack: SlackService) {}
+  constructor(
+    private slack: SlackService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiService.name)
+  }
 
   async llmChatCompletion(
     messages: AiChatMessage[],
@@ -156,8 +160,8 @@ export class AiService {
       const err = error as Error & {
         response?: Record<string, string | number | boolean>
       }
-      this.logger.error('Error in utils/ai/llmChatCompletion', err)
-      this.logger.error('error response', err?.response)
+      this.logger.error({ err }, 'Error in utils/ai/llmChatCompletion')
+      this.logger.error({ response: err?.response }, 'error response')
 
       await this.slack.errorMessage({
         message: 'Error in AI completion (raw)',
@@ -197,7 +201,7 @@ export class AiService {
     for (const model of models) {
       // Lama 3.3 supports native function calling
       // so we can modify the OpenAI base url to use the together.ai api
-      this.logger.debug('model', model)
+      this.logger.debug({ model }, 'model')
       const togetherAi = model.includes('meta-llama') || model.includes('Qwen')
       const client = new OpenAI({
         apiKey: togetherAi ? TOGETHER_AI_KEY : OPEN_AI_KEY,
@@ -270,13 +274,13 @@ export class AiService {
           content = match?.length ? match[1] : content
         }
         content = content.replace('/n', '<br/><br/>')
-        this.logger.debug('completion success', content)
+        this.logger.debug({ content }, 'completion success')
         return {
           content,
           tokens: completion?.usage?.total_tokens || 0,
         }
       } catch (error) {
-        this.logger.error('error', error)
+        this.logger.error({ error }, 'error')
         await this.slack.formattedMessage({
           message: `Error in getChatToolCompletion. model: ${model}`,
           error,
@@ -329,18 +333,18 @@ export class AiService {
   }: GetAssistantCompletionArgs) {
     try {
       if (!assistantId || !systemPrompt) {
-        this.logger.log('missing assistantId or systemPrompt')
-        this.logger.log('assistantId', assistantId)
-        this.logger.log('systemPrompt', systemPrompt)
+        this.logger.info('missing assistantId or systemPrompt')
+        this.logger.info({ assistantId }, 'assistantId')
+        this.logger.info({ systemPrompt }, 'systemPrompt')
         return
       }
 
       if (!threadId) {
-        this.logger.log('missing threadId')
+        this.logger.info('missing threadId')
         return
       }
 
-      this.logger.log(`running assistant ${assistantId} on thread ${threadId}`)
+      this.logger.info(`running assistant ${assistantId} on thread ${threadId}`)
 
       let messages: AiChatMessage[] = []
       messages.push({
@@ -355,7 +359,7 @@ export class AiService {
       }
 
       if (messageId) {
-        this.logger.log('deleting message', messageId)
+        this.logger.info({ messageId }, 'deleting message')
         messages = messages.filter((m) => m.id !== messageId)
       } else {
         messages.push({
@@ -366,7 +370,7 @@ export class AiService {
         })
       }
 
-      this.logger.log('messages', messages)
+      this.logger.info({ messages }, 'messages')
 
       const result = await this.llmChatCompletion(
         messages,
@@ -384,7 +388,7 @@ export class AiService {
         usage: result?.tokens,
       }
     } catch (error) {
-      this.logger.log('error', error)
+      this.logger.info({ error }, 'error')
       await this.slack.message(
         {
           body: `Error in getAssistantCompletion. Error: ${error}`,
@@ -714,7 +718,7 @@ export class AiService {
             item.replace ? item.replace.toString().trim() : '',
           )
         } catch (e) {
-          this.logger.error('error at prompt replace', e)
+          this.logger.error({ e }, 'error at prompt replace')
         }
       })
 
@@ -724,7 +728,7 @@ export class AiService {
 
       return newPrompt
     } catch (e) {
-      this.logger.error('Error in helpers/ai/promptReplace', e)
+      this.logger.error({ e }, 'Error in helpers/ai/promptReplace')
       return ''
     }
   }

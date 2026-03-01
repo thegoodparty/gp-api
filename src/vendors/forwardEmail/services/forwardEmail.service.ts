@@ -1,10 +1,5 @@
 import { HttpService } from '@nestjs/axios'
-import {
-  BadGatewayException,
-  HttpStatus,
-  Injectable,
-  Logger,
-} from '@nestjs/common'
+import { BadGatewayException, HttpStatus, Injectable } from '@nestjs/common'
 import { AxiosResponse, isAxiosError } from 'axios'
 import { lastValueFrom } from 'rxjs'
 import { format } from '@redtea/format-axios-error'
@@ -14,6 +9,7 @@ import {
   ForwardEmailAliasResponse,
   ForwardEmailDomainResponse,
 } from '../forwardEmail.types'
+import { PinoLogger } from 'nestjs-pino'
 
 const FORWARDEMAIL_TIMEOUT_MS = 10000
 enum FORWARDEMAIL_PLAN {
@@ -38,16 +34,20 @@ const forwardEmailApiTokenBase64Encoded: string = Buffer.from(
 
 @Injectable()
 export class ForwardEmailService {
-  private readonly logger = new Logger(ForwardEmailService.name)
   private readonly baseUrl = FORWARDEMAIL_BASE_URL!
   private readonly httpTimeoutMs = FORWARDEMAIL_TIMEOUT_MS
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(ForwardEmailService.name)
+  }
 
   private handleApiError(error: Error | AxiosResponse | string): never {
     this.logger.error(
+      { data: isAxiosResponse(error) ? format(error) : error },
       'Failed to communicate with Forward Email API',
-      isAxiosResponse(error) ? format(error) : error,
     )
     throw new BadGatewayException(
       'Failed to communicate with Forward Email API',
@@ -159,7 +159,7 @@ export class ForwardEmailService {
           ),
         )
       const { data } = response
-      this.logger.debug('Successfully created Forward Email domain', data)
+      this.logger.debug(data, 'Successfully created Forward Email domain')
       return data
     } catch (error) {
       this.handleApiError(error as Error)
@@ -188,8 +188,8 @@ export class ForwardEmailService {
         ),
     )
     this.logger.debug(
+      { aliases },
       'Successfully retrieved Forward Email catch-all aliases',
-      aliases,
     )
     return aliases
   }
@@ -209,7 +209,8 @@ export class ForwardEmailService {
         )
       const { data } = response
       this.logger.debug(
-        `Successfully created Forward Email catch-all alias: ${JSON.stringify(data)}`,
+        { data },
+        'Successfully created Forward Email catch-all alias:',
       )
       return data
     } catch (error) {
@@ -234,7 +235,8 @@ export class ForwardEmailService {
 
       const { data } = response
       this.logger.debug(
-        `Successfully updated Forward Email catch-all alias: ${JSON.stringify(data)}`,
+        { data },
+        'Successfully updated Forward Email catch-all alias:',
       )
       return data
     } catch (error) {

@@ -24,12 +24,7 @@ describe('LlmService', () => {
   let originalEnv: NodeJS.ProcessEnv
 
   const createServiceWithMockLogger = (): LlmService => {
-    const service = new LlmService()
-    const mockLogger = createMockLogger()
-    Object.defineProperty(service, 'logger', {
-      get: () => mockLogger,
-      configurable: true,
-    })
+    const service = new LlmService(createMockLogger())
     return service
   }
 

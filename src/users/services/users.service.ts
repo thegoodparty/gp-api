@@ -209,16 +209,18 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     const updatedUser = await this.optimisticLockingUpdate(
       { where: { id: userId } },
       (user) => {
-        this.logger.log(
-          `User ${user.id} metadata pre-update: ${JSON.stringify(user.metaData ?? {})}`,
+        this.logger.info(
+          { data: user.metaData ?? {} },
+          `User ${user.id} metadata pre-update: `,
         )
         return {
           metaData: { ...(user.metaData ?? {}), ...(newMetaData ?? {}) },
         }
       },
     )
-    this.logger.log(
-      `User ${updatedUser.id} metadata post-update: ${JSON.stringify(updatedUser.metaData ?? {})}`,
+    this.logger.info(
+      { data: updatedUser.metaData ?? {} },
+      `User ${updatedUser.id} metadata post-update: `,
     )
 
     return updatedUser
@@ -244,18 +246,19 @@ export class UsersService extends createPrismaBase(MODELS.User) {
         ) {
           const stripeError = error.cause
           this.logger.error(
-            `Failed to cancel subscription ${subscriptionId}: ${stripeError.message} ${JSON.stringify(
-              {
+            {
+              data: {
                 code: stripeError.code,
                 type: stripeError.type,
                 statusCode: stripeError.statusCode,
               },
-            )}`,
+            },
+            `Failed to cancel subscription ${subscriptionId}: ${stripeError.message} `,
           )
         } else {
           this.logger.error(
+            { error },
             `Unexpected error canceling subscription ${subscriptionId}`,
-            error,
           )
         }
         throw new BadGatewayException(
@@ -363,7 +366,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
       },
     })
 
-    this.logger.log(`Found ${testUsers.length} test users to delete`)
+    this.logger.info(`Found ${testUsers.length} test users to delete`)
 
     const deleteUsers = throttle({ limit: 1, interval: 1000 })(
       async (userIds: number[]) =>
@@ -372,12 +375,10 @@ export class UsersService extends createPrismaBase(MODELS.User) {
 
     for (const users of chunk(testUsers, 10)) {
       await deleteUsers(users.map((user) => user.id))
-      this.logger.log(
-        JSON.stringify({
-          ids: users.map((user) => user.id),
-          msg: 'Deleted users',
-        }),
-      )
+      this.logger.info({
+        ids: users.map((user) => user.id),
+        msg: 'Deleted users',
+      })
     }
   }
 }

@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  Logger,
-} from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common'
 import { CommunityIssuesService } from '../services/communityIssues.service'
 import { CommunityIssueStatusLogService } from '../services/communityIssueStatusLog.service'
 import { Campaign, IssueStatus } from '@prisma/client'
@@ -16,15 +7,17 @@ import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CreateCommunityIssueSchema } from '../schemas/CreateCommunityIssue.schema'
 import { UpdateCommunityIssueSchema } from '../schemas/UpdateCommunityIssue.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('community-issues')
 export class CommunityIssuesController {
-  private readonly logger = new Logger(CommunityIssuesController.name)
-
   constructor(
     private readonly communityIssuesService: CommunityIssuesService,
     private readonly statusLogService: CommunityIssueStatusLogService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(CommunityIssuesController.name)
+  }
 
   @Post()
   @UseCampaign()

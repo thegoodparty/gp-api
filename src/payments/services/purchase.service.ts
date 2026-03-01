@@ -3,34 +3,24 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
-  Logger,
 } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import {
   CheckoutSessionPostPurchaseHandler,
-  CompletePurchaseDto,
   CompleteCheckoutSessionDto,
   CompleteFreePurchaseDto,
   CreateCheckoutSessionDto,
-  CreatePurchaseIntentDto,
-  PostPurchaseHandler,
   PurchaseHandler,
   PurchaseType,
 } from '../purchase.types'
-import { PaymentsService } from './payments.service'
-import {
-  CustomCheckoutSessionPayload,
-  PaymentIntentPayload,
-  PaymentType,
-} from '../payments.types'
-import Stripe from 'stripe'
+import { CustomCheckoutSessionPayload, PaymentType } from '../payments.types'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const { WEBAPP_ROOT_URL } = process.env
 
 @Injectable()
 export class PurchaseService {
-  private readonly logger = new Logger('PurchaseService')
   // TODO: Refactor to remove the "handlers" anti-pattern here along w/
   //  implementors of the anti-pattern elsewhere.
   //  It's absolutely over-engineered, causes confusion and obfuscation in the
@@ -40,32 +30,23 @@ export class PurchaseService {
   //  _what_ is being purchased and _how_ it is being purchased:
   //  https://app.clickup.com/t/90132012119/ENG-4065
   private handlers: Map<PurchaseType, PurchaseHandler<unknown>> = new Map()
-  private postPurchaseHandlers: Map<
-    PurchaseType,
-    PostPurchaseHandler<unknown>
-  > = new Map()
   private checkoutSessionPostPurchaseHandlers: Map<
     PurchaseType,
     CheckoutSessionPostPurchaseHandler<unknown>
   > = new Map()
 
   constructor(
-    private readonly paymentsService: PaymentsService,
     private readonly stripeService: StripeService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext('PurchaseService')
+  }
 
   registerPurchaseHandler(
     type: PurchaseType,
     handler: PurchaseHandler<unknown>,
   ): void {
     this.handlers.set(type, handler)
-  }
-
-  registerPostPurchaseHandler(
-    type: PurchaseType,
-    handler: PostPurchaseHandler<unknown>,
-  ): void {
-    this.postPurchaseHandlers.set(type, handler)
   }
 
   registerCheckoutSessionPostPurchaseHandler(
@@ -94,14 +75,12 @@ export class PurchaseService {
     clientSecret: string
     amount: number
   }> {
-    this.logger.log(
-      JSON.stringify({
-        user: user.id,
-        dto,
-        campaign,
-        msg: 'Attempting checkout session creation for user',
-      }),
-    )
+    this.logger.info({
+      user: user.id,
+      dto,
+      campaign,
+      msg: 'Attempting checkout session creation for user',
+    })
 
     if (!Object.values(PurchaseType).includes(dto.type)) {
       throw new Error(`Invalid purchase type: ${dto.type}`)
@@ -146,7 +125,7 @@ export class PurchaseService {
     if (amount === 0) {
       const freeSessionId = `free_${Date.now()}_${user.id}`
 
-      this.logger.log(
+      this.logger.info(
         `Zero-amount checkout for user ${user.id}, type ${dto.type} - skipping Stripe, deferring post-purchase until user confirmation`,
       )
 
@@ -222,14 +201,12 @@ export class PurchaseService {
       const paymentIntent =
         await this.stripeService.retrievePaymentIntent(paymentIntentId)
       if (paymentIntent.metadata?.postPurchaseCompletedAt) {
-        this.logger.log(
-          JSON.stringify({
-            sessionId: dto.checkoutSessionId,
-            paymentIntentId,
-            completedAt: paymentIntent.metadata.postPurchaseCompletedAt,
-            msg: 'Post-purchase already processed, skipping (idempotent)',
-          }),
-        )
+        this.logger.info({
+          sessionId: dto.checkoutSessionId,
+          paymentIntentId,
+          completedAt: paymentIntent.metadata.postPurchaseCompletedAt,
+          msg: 'Post-purchase already processed, skipping (idempotent)',
+        })
         return { alreadyProcessed: true }
       }
     }
@@ -268,110 +245,6 @@ export class PurchaseService {
       default:
         return 'Purchase'
     }
-  }
-
-  async createPurchaseIntent({
-    user,
-    dto,
-    campaign,
-  }: {
-    user: User
-    dto: CreatePurchaseIntentDto<unknown>
-    campaign?: Campaign
-  }): Promise<{
-    id: string
-    clientSecret: string
-    amount: number
-    status: Stripe.PaymentIntent.Status
-  }> {
-    if (!Object.values(PurchaseType).includes(dto.type)) {
-      throw new Error(`Invalid purchase type: ${dto.type}`)
-    }
-
-    const handler = this.handlers.get(dto.type)
-    if (!handler) {
-      throw new Error(`No handler found for purchase type: ${dto.type}`)
-    }
-
-    const existingPaymentIntent: void | Stripe.PaymentIntent =
-      await handler.validatePurchase({
-        // TODO: Remove this cast once `unknown` is removed from `PurchaseMetadata`
-        //  https://app.clickup.com/t/90132012119/ENG-6107
-        ...(dto.metadata as Record<string, unknown>),
-        ...(campaign?.id ? { campaignId: campaign?.id } : {}),
-      })
-
-    // Merge server-side campaignId into metadata for calculateAmount.
-    // Handlers like outreach need campaignId to check free texts eligibility.
-    const mergedMetadata = {
-      ...(dto.metadata as Record<string, unknown>),
-      ...(campaign?.id ? { campaignId: campaign.id } : {}),
-    }
-    const amount = await handler.calculateAmount(mergedMetadata)
-
-    // Handle zero-amount purchases (e.g., free texts offer covers entire purchase)
-    // Stripe rejects PaymentIntents with $0 so we return our own response.
-    // Do NOT execute post-purchase handlers here — the user hasn't confirmed yet.
-    // Post-purchase (e.g., redeeming free texts) is deferred to completeFreePurchase(),
-    // which the frontend calls when the user explicitly confirms.
-    if (amount === 0) {
-      const freePaymentId = `free_${Date.now()}_${user.id}`
-
-      this.logger.log(
-        `Zero-amount purchase for user ${user.id}, type ${dto.type} - skipping Stripe, deferring post-purchase until user confirmation`,
-      )
-
-      return {
-        id: freePaymentId,
-        clientSecret: '',
-        amount: 0,
-        status: 'succeeded' as Stripe.PaymentIntent.Status,
-      }
-    }
-
-    const paymentMetadata = {
-      type: this.getPaymentType(dto.type),
-      amount,
-      ...(dto.metadata as Record<string, unknown>),
-      purchaseType: dto.type,
-    } as PaymentIntentPayload<PaymentType>
-
-    const paymentIntent =
-      existingPaymentIntent ||
-      (await this.paymentsService.createPayment(user, paymentMetadata))
-
-    return {
-      id: paymentIntent.id,
-      clientSecret: paymentIntent.client_secret!,
-      amount: paymentIntent.amount / 100,
-      status: paymentIntent.status,
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async completePurchase(dto: CompletePurchaseDto): Promise<any> {
-    const paymentIntent = await this.paymentsService.retrievePayment(
-      dto.paymentIntentId,
-    )
-
-    if (paymentIntent.status !== 'succeeded') {
-      throw new Error(`Payment not completed: ${paymentIntent.status}`)
-    }
-
-    const purchaseType = paymentIntent.metadata?.purchaseType as PurchaseType
-    if (!purchaseType) {
-      throw new Error('No purchase type found in payment metadata')
-    }
-
-    const postPurchaseHandler = this.postPurchaseHandlers.get(purchaseType)
-    if (!postPurchaseHandler) {
-      throw new Error('No post-purchase handler found for this purchase type')
-    }
-
-    return await postPurchaseHandler(
-      dto.paymentIntentId,
-      paymentIntent.metadata,
-    )
   }
 
   /**
@@ -441,7 +314,7 @@ export class PurchaseService {
       purchaseType,
     })
 
-    this.logger.log(
+    this.logger.info(
       `Free purchase completed for type ${purchaseType}, campaign ${campaign?.id}`,
     )
 

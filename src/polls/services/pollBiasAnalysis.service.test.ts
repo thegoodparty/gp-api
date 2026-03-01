@@ -44,13 +44,8 @@ describe('PollBiasAnalysisService', () => {
     service = new PollBiasAnalysisService(
       llmService as unknown as LlmService,
       braintrustService as unknown as BraintrustService,
+      createMockLogger(),
     )
-
-    const mockLogger = createMockLogger()
-    Object.defineProperty(service, 'logger', {
-      get: () => mockLogger,
-      configurable: true,
-    })
 
     vi.mocked(createPollBiasAnalysisPrompt).mockReturnValue([
       { role: 'system', content: 'You are a helpful assistant.' },

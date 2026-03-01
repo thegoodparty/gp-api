@@ -1,5 +1,5 @@
 import { ElectionLevel } from '@goodparty_org/contracts'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { getYear, parseISO } from 'date-fns'
 import {
   ChatCompletionNamedToolChoice,
@@ -13,6 +13,7 @@ import { AiService } from '../../ai/ai.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { SlackService } from '../../vendors/slack/services/slack.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
+import { PinoLogger } from 'nestjs-pino'
 
 interface SearchColumnResult {
   column: string
@@ -184,14 +185,15 @@ const MatchLabelResponseSchema = z.object({
 
 @Injectable()
 export class OfficeMatchService {
-  private readonly logger = new Logger(OfficeMatchService.name)
-
   constructor(
     private prisma: PrismaService,
     private slack: SlackService,
     private aiService: AiService,
     private elections: ElectionsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(OfficeMatchService.name)
+  }
 
   async searchDistrictTypes(
     slug: string,
@@ -224,7 +226,8 @@ export class OfficeMatchService {
     )
 
     this.logger.debug(
-      `searchDistrictTypes: returning ${foundDistrictTypes.length} matched district types: ${JSON.stringify(foundDistrictTypes)}`,
+      { foundDistrictTypes },
+      `searchDistrictTypes: returning ${foundDistrictTypes.length} matched district types: `,
     )
     return foundDistrictTypes
   }
@@ -303,7 +306,8 @@ export class OfficeMatchService {
     )
     const heuristicLevelTypes = base.filter((t) => districtTypes.includes(t))
     this.logger.debug(
-      `searchDistrictTypes: heuristicLevelTypes=${JSON.stringify(heuristicLevelTypes)}`,
+      { heuristicLevelTypes },
+      'searchDistrictTypes: heuristicLevelTypes=',
     )
 
     let subColumns: string[] = []
@@ -327,7 +331,8 @@ export class OfficeMatchService {
       subColumns = subs.filter((t) => districtTypes.includes(t))
     }
     this.logger.debug(
-      `searchDistrictTypes: subColumns=${JSON.stringify(subColumns)} (districtValue=${districtValue})`,
+      { subColumns },
+      `searchDistrictTypes: subColumns= (districtValue=${districtValue})`,
     )
 
     let filteredDistrictTypes: string[] = districtTypes
@@ -533,7 +538,7 @@ export class OfficeMatchService {
     if (subColumns.length > 0) {
       // if we have subColumns, we want to prioritize them at the top.
       // since they are more specific.
-      this.logger.debug('adding to searchColumns', subColumns)
+      this.logger.debug({ subColumns }, 'adding to searchColumns')
       searchColumns = subColumns.concat(searchColumns)
     }
 
@@ -575,13 +580,16 @@ export class OfficeMatchService {
     }
 
     for (const column of searchColumns) {
-      this.logger.debug('searching for sub columns', column)
+      this.logger.debug({ column }, 'searching for sub columns')
       if (districtMap[column]) {
-        this.logger.debug('adding to searchColumns', districtMap[column])
+        this.logger.debug(
+          { data: districtMap[column] },
+          'adding to searchColumns',
+        )
         subColumns.push(...districtMap[column])
       }
     }
-    this.logger.debug('electionDistricts', subColumns)
+    this.logger.debug({ subColumns }, 'electionDistricts')
     return subColumns
   }
 
@@ -762,7 +770,7 @@ export class OfficeMatchService {
           searchValues.join('\n'),
           search,
         )
-        this.logger.debug('match', match)
+        this.logger.debug({ match }, 'match')
 
         if (
           match &&
@@ -777,7 +785,7 @@ export class OfficeMatchService {
         }
       }
 
-      this.logger.debug('getSearchColumn foundColumn', foundColumn)
+      this.logger.debug({ foundColumn }, 'getSearchColumn foundColumn')
     } catch (error) {
       const msg = `Error in getSearchColumn: ${error instanceof Error ? error.message : String(error)}`
       this.logger.error(msg)
@@ -862,8 +870,8 @@ export class OfficeMatchService {
     const content = completion?.content
     const tokens = completion?.tokens
 
-    this.logger.debug('content', content)
-    this.logger.debug('tokens', tokens)
+    this.logger.debug({ content }, 'content')
+    this.logger.debug({ tokens }, 'tokens')
 
     if (!tokens || tokens === 0) {
       await this.slack.message(

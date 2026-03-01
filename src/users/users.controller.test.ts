@@ -14,6 +14,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 const userId = 1
 
@@ -70,7 +71,12 @@ describe('UsersController', () => {
     }
     authService = authServiceMock as AuthenticationService
 
-    controller = new UsersController(usersService, filesService, authService)
+    controller = new UsersController(
+      usersService,
+      filesService,
+      authService,
+      createMockLogger(),
+    )
   })
 
   describe('guards', () => {

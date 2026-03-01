@@ -1,5 +1,13 @@
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
+import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+import {
+  ListCampaignsPaginationSchema,
+  ReadCampaignOutputSchema,
+  UpdateCampaignM2MSchema,
+} from '@goodparty_org/contracts'
 import {
   BadRequestException,
   Body,
@@ -9,7 +17,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -37,20 +44,14 @@ import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTarget
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
-  ListCampaignsPaginationSchema,
-  ReadCampaignOutputSchema,
-  UpdateCampaignM2MSchema,
-} from '@goodparty_org/contracts'
-import {
+  CreateCampaignSchema,
   SetDistrictDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
-import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
-import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
-import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -62,8 +63,6 @@ class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) {}
 @UsePipes(ZodValidationPipe)
 @UseInterceptors(ZodResponseInterceptor)
 export class CampaignsController {
-  private readonly logger = new Logger(CampaignsController.name)
-
   constructor(
     private readonly campaigns: CampaignsService,
     private readonly planVersions: CampaignPlanVersionsService,
@@ -72,7 +71,10 @@ export class CampaignsController {
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
     private readonly analytics: AnalyticsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(CampaignsController.name)
+  }
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
   @Post('mine/path-to-victory')
@@ -197,13 +199,12 @@ export class CampaignsController {
   }
 
   @Post()
-  async create(@ReqUser() user: User) {
-    // see if the user already has campaign
+  async create(@ReqUser() user: User, @Body() body: CreateCampaignSchema) {
     const existing = await this.campaigns.findByUserId(user.id)
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return await this.campaigns.createForUser(user)
+    return this.campaigns.createForUser(user, body)
   }
 
   @Put('mine')
@@ -250,7 +251,7 @@ export class CampaignsController {
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign', campaign, { slug, body })
+    this.logger.debug({ campaign, ...{ slug, body } }, 'Updating campaign')
 
     return this.campaigns.updateJsonFields(campaign.id, body)
   }
@@ -296,7 +297,7 @@ export class CampaignsController {
       const launchResult = await this.campaigns.launch(user, campaign)
       return launchResult
     } catch (e) {
-      this.logger.error('Error at campaign launch', e)
+      this.logger.error({ e }, 'Error at campaign launch')
       await this.slack.errorMessage({
         message: 'Error at campaign launch',
         error: e,
@@ -324,11 +325,17 @@ export class CampaignsController {
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign with district', campaign, {
-      slug,
-      L2DistrictType,
-      L2DistrictName,
-    })
+    this.logger.debug(
+      {
+        campaign,
+        ...{
+          slug,
+          L2DistrictType,
+          L2DistrictName,
+        },
+      },
+      'Updating campaign with district',
+    )
 
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
       L2DistrictType,
@@ -421,13 +428,6 @@ export class CampaignsController {
       },
     })
 
-    // When gold matched a district but found no turnout, enqueue silver
-    // to try finding turnout via LLM-based matching (non-deterministic,
-    // may find a different district that has turnout data).
-    if (!hasTurnout) {
-      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-    }
-
     return result
   }
 
@@ -498,13 +498,6 @@ export class CampaignsController {
         officeContextFingerprint: null,
       },
     })
-
-    // When gold matched a district but found no turnout, enqueue silver
-    // to try finding turnout via LLM-based matching (non-deterministic,
-    // may find a different district that has turnout data).
-    if (!hasTurnout) {
-      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
-    }
 
     return result
   }

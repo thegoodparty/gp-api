@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { User } from '@prisma/client'
 import {
   CustomCheckoutSessionPayload,
@@ -8,6 +8,7 @@ import {
 } from 'src/payments/payments.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import Stripe from 'stripe'
+import { PinoLogger } from 'nestjs-pino'
 
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
   process.env
@@ -26,9 +27,13 @@ const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 @Injectable()
 export class StripeService {
   private stripe = new Stripe(STRIPE_SECRET_KEY as string)
-  private readonly logger = new Logger(StripeService.name)
 
-  constructor(private readonly slack: SlackService) {}
+  constructor(
+    private readonly slack: SlackService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(StripeService.name)
+  }
 
   private getPrice = async () => {
     const { default_price: price } = await this.stripe.products.retrieve(
@@ -211,8 +216,8 @@ export class StripeService {
         await this.stripe.checkout.sessions.retrieve(checkoutSessionId)
     } catch (error) {
       this.logger.error(
+        { error },
         `Failed to retrieve checkout session ${checkoutSessionId}`,
-        error,
       )
       throw new BadGatewayException(
         'Failed to retrieve checkout session from Stripe',
@@ -246,7 +251,7 @@ export class StripeService {
       return first ? first.id : null
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error(`Failed to list customers by email ${email}`, e)
+        this.logger.error(e, `Failed to list customers by email ${email}`)
         throw new BadGatewayException(
           `Failed to query Stripe customers by email ${email}`,
           e.message,
@@ -285,7 +290,7 @@ export class StripeService {
       } while (startingAfter)
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error('Failed to list active subscriptions', e)
+        this.logger.error(e, 'Failed to list active subscriptions')
         throw new BadGatewayException(
           'Failed to list active subscriptions from Stripe',
           e.message,
@@ -302,8 +307,8 @@ export class StripeService {
     } catch (e) {
       if (e instanceof Error) {
         this.logger.error(
-          `Failed to retrieve subscription ${subscriptionId}`,
           e,
+          `Failed to retrieve subscription ${subscriptionId}`,
         )
         throw new BadGatewayException(
           `Failed to retrieve subscription ${subscriptionId}`,
@@ -319,7 +324,7 @@ export class StripeService {
       return await this.stripe.subscriptions.cancel(subscriptionId)
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.error(`Failed to cancel subscription ${subscriptionId}`, e)
+        this.logger.error(e, `Failed to cancel subscription ${subscriptionId}`)
         await this.slack.errorMessage({
           message: 'Error canceling subscription',
           error: { subscriptionId, error: e },

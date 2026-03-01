@@ -130,25 +130,34 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-  async createForUser(user: User) {
-    this.logger.debug('Creating campaign for user', user)
+  async createForUser(
+    user: User,
+    initialData: {
+      details: Record<string, unknown>
+      data?: Record<string, unknown>
+    },
+  ) {
+    this.logger.debug(user, 'Creating campaign for user')
     const slug = await this.findSlug(user)
+
+    const baseDetails: PrismaJson.CampaignDetails = { zip: user.zip }
+    const baseData: PrismaJson.CampaignData = {
+      slug,
+    }
 
     const newCampaign = await this.create({
       data: {
         slug,
         isActive: false,
         userId: user.id,
-        details: {
-          zip: user.zip,
-        },
-        data: {
-          slug,
-          currentStep: OnboardingStep.registration,
-        },
+        // @ts-expect-error - TODO: fix this
+        details: deepMerge(baseDetails, initialData.details),
+        data: initialData.data
+          ? deepMerge(baseData, initialData.data)
+          : baseData,
       },
     })
-    this.logger.debug('Created campaign', newCampaign)
+    this.logger.debug(newCampaign, 'Created campaign')
     await this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
@@ -182,7 +191,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     const updatedCampaign = await this.client.$transaction(
       async (tx) => {
-        this.logger.debug('Updating campaign json fields', { id, body })
+        this.logger.debug({ id, body }, 'Updating campaign json fields')
         // TODO: This should be .findUniqueOrThrow which would remove the need
         //  for the null check below and subsequently simplify the return
         //  signature of this method
@@ -491,7 +500,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       campaign.isActive ||
       campaignData.launchStatus === CampaignLaunchStatus.launched
     ) {
-      this.logger.log('Campaign already launched, skipping launch')
+      this.logger.info('Campaign already launched, skipping launch')
       return true
     }
 
@@ -577,7 +586,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const existingVersions =
       await this.planVersionService.findByCampaignId(campaignId)
 
-    this.logger.log('existingVersions', existingVersions)
+    this.logger.info({ existingVersions }, 'existingVersions')
 
     let versions = {}
     if (existingVersions) {
@@ -623,7 +632,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
 
     if (!foundKey && oldVersion) {
-      this.logger.log(`no key found for ${key} yet we have oldVersion`)
+      this.logger.info(`no key found for ${key} yet we have oldVersion`)
       // here, we determine if we need to save an older version of the content.
       // because in the past we didn't create a Content version for every new generation.
       // otherwise if they translate they won't have the old version to go back to.
@@ -631,7 +640,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
 
     if (updateExistingVersion === false) {
-      this.logger.log('adding new version')
+      this.logger.info('adding new version')
       // add new version to the top of the list.
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const length = versions[key].unshift(newVersion)

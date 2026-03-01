@@ -1,3 +1,4 @@
+import { CampaignStatus } from '@goodparty_org/contracts'
 import {
   BadRequestException,
   ConflictException,
@@ -14,9 +15,10 @@ import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignsController } from './campaigns.controller'
-import { CampaignStatus } from '@goodparty_org/contracts'
+import { CreateCampaignSchema } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 const CREATED_AT = '2025-01-01'
 
@@ -200,6 +202,7 @@ describe('CampaignsController', () => {
       enqueueP2VService,
       electionsService,
       analyticsService,
+      createMockLogger(),
     )
   })
 
@@ -506,10 +509,14 @@ describe('CampaignsController', () => {
   })
 
   describe('create', () => {
+    const mockCreateBody = {
+      details: { state: 'CA', office: 'Mayor' },
+    } as CreateCampaignSchema
+
     it('throws ConflictException when campaign already exists', async () => {
       vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
-      await expect(controller.create(mockUser)).rejects.toThrow(
+      await expect(controller.create(mockUser, mockCreateBody)).rejects.toThrow(
         ConflictException,
       )
     })
@@ -520,9 +527,12 @@ describe('CampaignsController', () => {
         mockCampaign,
       )
 
-      const result = await controller.create(mockUser)
+      const result = await controller.create(mockUser, mockCreateBody)
 
-      expect(campaignsService.createForUser).toHaveBeenCalledWith(mockUser)
+      expect(campaignsService.createForUser).toHaveBeenCalledWith(
+        mockUser,
+        mockCreateBody,
+      )
       expect(result).toEqual(mockCampaign)
     })
   })
@@ -1068,7 +1078,7 @@ describe('CampaignsController', () => {
       expect(callArgs.pathToVictory?.p2vStatus).toBe(P2VStatus.districtMatched)
     })
 
-    it('enqueues silver when no turnout', async () => {
+    it('does not enqueue silver when district matched but no turnout', async () => {
       const noTurnout = { ...mockRaceTargetDetails, projectedTurnout: 0 }
       vi.spyOn(
         electionsService,
@@ -1080,9 +1090,7 @@ describe('CampaignsController', () => {
 
       await controller.updateRaceTargetDetails(mockCampaign)
 
-      expect(enqueueP2VService.enqueuePathToVictory).toHaveBeenCalledWith(
-        mockCampaign.id,
-      )
+      expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
     })
 
     it('does not enqueue when hasTurnout', async () => {
@@ -1223,7 +1231,7 @@ describe('CampaignsController', () => {
       expect(callArgs.pathToVictory?.source).toBe(P2VSource.ElectionApi)
     })
 
-    it('sets districtMatched status and enqueues when no turnout', async () => {
+    it('sets districtMatched status and does not enqueue when no turnout', async () => {
       setupSlugMocks({ ...mockRaceTargetDetails, projectedTurnout: 0 })
 
       await controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {})
@@ -1231,9 +1239,7 @@ describe('CampaignsController', () => {
       const callArgs = vi.mocked(campaignsService.updateJsonFields).mock
         .calls[0][1]
       expect(callArgs.pathToVictory?.p2vStatus).toBe(P2VStatus.districtMatched)
-      expect(enqueueP2VService.enqueuePathToVictory).toHaveBeenCalledWith(
-        mockCampaign.id,
-      )
+      expect(enqueueP2VService.enqueuePathToVictory).not.toHaveBeenCalled()
     })
 
     it('does not enqueue when hasTurnout', async () => {

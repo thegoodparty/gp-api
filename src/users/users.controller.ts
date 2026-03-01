@@ -6,7 +6,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -45,6 +44,7 @@ import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 class ListUsersPaginationDto extends createZodDto(ListUsersPaginationSchema) {}
 
@@ -54,13 +54,14 @@ class UpdatePasswordDto extends createZodDto(UpdatePasswordSchema) {}
 @UsePipes(ZodValidationPipe)
 @UseInterceptors(ZodResponseInterceptor)
 export class UsersController {
-  private readonly logger = new Logger(UsersController.name)
-
   constructor(
     private usersService: UsersService,
     private readonly filesService: FilesService,
     private readonly authenticationService: AuthenticationService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(UsersController.name)
+  }
 
   @UseGuards(M2MOnly)
   @Get()

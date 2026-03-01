@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
-  Logger,
   NotImplementedException,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -20,6 +19,7 @@ import {
   SocialTokenValidator,
 } from './authentication.types'
 import { OAuth2Client, TokenInfo } from 'google-auth-library'
+import { PinoLogger } from 'nestjs-pino'
 
 export const GP_API_ISSUER = 'gp-api'
 
@@ -29,8 +29,6 @@ const PASSWORD_RESET_TOKEN_TTL = '1h'
 
 @Injectable()
 export class AuthenticationService {
-  logger = new Logger(AuthenticationService.name)
-
   // TODO: Move social token validators to separate SocialTokenValidationService
   private googleTokenValidator: SocialTokenValidator = async (
     socialToken: string,
@@ -43,7 +41,7 @@ export class AuthenticationService {
       tokenInfo = await googleOAuthClient.getTokenInfo(socialToken)
     } catch (e) {
       const msg = 'Failed to validate social token'
-      this.logger.warn(msg, e)
+      this.logger.warn({ e }, msg)
       throw new UnauthorizedException(msg)
     }
 
@@ -76,7 +74,10 @@ export class AuthenticationService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AuthenticationService.name)
+  }
 
   generateAuthToken(payload: { email: string; sub: number }) {
     return this.jwtService.sign({ ...payload, iss: GP_API_ISSUER })
@@ -122,11 +123,14 @@ export class AuthenticationService {
     if (!this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider]) {
       throw new BadRequestException('Invalid social provider')
     }
-    this.logger.debug(`Validating user with ${socialProvider} token:`, {
-      socialToken,
-      socialPic,
-      email,
-    })
+    this.logger.debug(
+      {
+        socialToken,
+        socialPic,
+        email,
+      },
+      `Validating user with ${socialProvider} token:`,
+    )
     const user = await this.usersService.findUser({
       email: await this.SOCIAL_MEDIA_VALIDATORS_MAP[socialProvider](
         socialToken,
@@ -138,7 +142,7 @@ export class AuthenticationService {
       const msg = 'User not found by email'
       throw new UnauthorizedException(msg)
     }
-    this.logger.debug(`User found by email:`, user)
+    this.logger.debug(user, `User found by email:`)
     return this.usersService.updateUser(
       {
         id: user.id,

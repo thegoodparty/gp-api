@@ -2,7 +2,6 @@ import {
   ConflictException,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common'
@@ -10,6 +9,7 @@ import { PrismaService } from '../prisma.service'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { lowerFirst } from 'lodash'
 import { retryIf } from '@/shared/util/retry-if'
+import { PinoLogger } from 'nestjs-pino'
 
 export const MODELS = Prisma.ModelName
 
@@ -58,8 +58,8 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
     @Inject()
     // NOTE: TS won't let me make this private when returning a class def from a function
     readonly _prisma!: PrismaService
-
-    readonly logger = new Logger(this.constructor.name)
+    @Inject()
+    readonly logger!: PinoLogger
 
     get model(): PrismaClient[Uncapitalize<T>] {
       return this._prisma[lowerModelName]
@@ -70,6 +70,7 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
     }
 
     onModuleInit() {
+      this.logger.setContext(this.constructor.name)
       // Have to do these in onModuleInit, client is not available at constructor
       for (const method of PASSTHROUGH_MODEL_METHODS) {
         const thisWithMethod: Record<string, (...args: unknown[]) => unknown> =
@@ -122,7 +123,7 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
 
           if (!existing) {
             const msg = `[optimistic locking update] Existing ${modelName} record not found for where clause: ${JSON.stringify(params.where)}`
-            this.logger.log(msg)
+            this.logger.info(msg)
             throw new NotFoundException(msg)
           }
 
@@ -147,7 +148,7 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
 
           if (result.length === 0) {
             const msg = `[optimistic locking update] Record has been modified since it was fetched for where clause: ${JSON.stringify(params.where)} attempt ${attempt}`
-            this.logger.log(msg)
+            this.logger.info(msg)
             throw new ConflictException(msg)
           }
 

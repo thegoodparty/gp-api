@@ -1,6 +1,7 @@
-import { Injectable, Logger as NestLogger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import * as braintrust from 'braintrust'
 import { CURRENT_ENVIRONMENT } from 'src/shared/util/appEnvironment.util'
+import { PinoLogger } from 'nestjs-pino'
 
 export const VALID_CHAT_ROLES = ['system', 'user', 'assistant'] as const
 export type ValidChatRole = (typeof VALID_CHAT_ROLES)[number]
@@ -16,12 +17,12 @@ class LlmExecutionError extends Error {
 
 @Injectable()
 export class BraintrustService {
-  private readonly logger = new NestLogger(BraintrustService.name)
   private readonly projectName = 'gp-api'
   private braintrustLogger: braintrust.Logger<boolean> | null = null
   private _enabled: boolean = false
 
-  constructor() {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(BraintrustService.name)
     const braintrustApiKey = process.env.BRAINTRUST_API_KEY
     if (!braintrustApiKey) {
       this.logger.warn(
@@ -36,11 +37,11 @@ export class BraintrustService {
         apiKey: braintrustApiKey,
       })
       this._enabled = true
-      this.logger.log('Braintrust tracing enabled')
+      this.logger.info('Braintrust tracing enabled')
     } catch (error) {
       this.logger.error(
+        { data: error instanceof Error ? error.stack : String(error) },
         'Failed to initialize Braintrust',
-        error instanceof Error ? error.stack : String(error),
       )
     }
   }
