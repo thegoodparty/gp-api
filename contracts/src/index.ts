@@ -204,3 +204,40 @@ export {
   UpdateSurveyQuestionInputSchema,
   type UpdateSurveyQuestionInput,
 } from './ecanvasser/UpdateSurveyQuestionInput.schema'
+
+export type { ElectedOffice } from './electedOffice/types'
+
+export {
+  UpdateElectedOfficeInputSchema,
+  type UpdateElectedOfficeInput,
+} from './electedOffice/UpdateElectedOfficeInput.schema'
+
+export {
+  ListElectedOfficesPaginationSchema,
+  type ListElectedOfficesPagination,
+} from './electedOffice/ListElectedOfficesPagination.schema'
+
+export {
+  P2V_STATUS_VALUES,
+  type P2VStatus,
+  P2VStatusSchema,
+  P2V_SOURCE_VALUES,
+  type P2VSource,
+  P2VSourceSchema,
+} from './pathToVictory/enums'
+
+export type {
+  PathToVictory,
+  PathToVictoryData,
+  ViabilityScore,
+} from './pathToVictory/types'
+
+export {
+  UpdatePathToVictoryInputSchema,
+  type UpdatePathToVictoryInput,
+} from './pathToVictory/UpdatePathToVictoryInput.schema'
+
+export {
+  ListPathsToVictoryPaginationSchema,
+  type ListPathsToVictoryPagination,
+} from './pathToVictory/ListPathsToVictoryPagination.schema'
