@@ -24,7 +24,7 @@ import { chunk } from 'es-toolkit'
 // --- CLI args ---
 const limitArg = process.argv.find((a) => a.startsWith('--limit='))
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : 0
-if (LIMIT && isNaN(LIMIT)) {
+if (limitArg && isNaN(LIMIT)) {
   throw new Error('--limit must be a number')
 }
 
