@@ -23,9 +23,26 @@ type BootstrapParams = {
 export const bootstrap = async (
   params: BootstrapParams,
 ): Promise<NestFastifyApplication> => {
+  const adapter = new FastifyAdapter({
+    logger: false,
+    genReqId: () => randomUUID(),
+  })
+
+  /**
+   * This hook copies the de-parameterized route path onto the raw request object.
+   * This is used to populate the request.route property in the logger module.
+   *
+   * It must be registered before NestFactory.create() so that it fires
+   * before the pino-http middleware that nestjs-pino sets up during init.
+   */
+  adapter.getInstance().addHook('onRequest', (req, _, done) => {
+    req.raw.route = req.routeOptions?.url
+    done()
+  })
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ logger: false, genReqId: () => randomUUID() }),
+    adapter,
     {
       rawBody: true,
       bufferLogs: true,

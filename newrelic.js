@@ -37,7 +37,7 @@ if (!process.env.NEW_RELIC_APP_NAME || !process.env.NEW_RELIC_LICENSE_KEY) {
         enabled: true,
       },
       local_decorating: {
-        enabled: true,
+        enabled: false,
       },
     },
     error_collector: {

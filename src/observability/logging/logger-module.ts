@@ -22,6 +22,12 @@ const determineUserId = (req: IncomingMessage): string | undefined => {
 
 const isLocal = process.env.NODE_ENV !== 'production'
 
+declare module 'http' {
+  interface IncomingMessage {
+    route?: string
+  }
+}
+
 export const loggerModule = LoggerModule.forRoot({
   assignResponse: true,
   pinoHttp: {
@@ -31,16 +37,19 @@ export const loggerModule = LoggerModule.forRoot({
       ? { target: 'pino-pretty', options: { colorize: true } }
       : undefined,
     genReqId: (req) => req.id ?? randomUUID(),
-    customProps: (req) => ({
-      requestId: req.id,
-      user: determineUserId(req),
-      request: {
-        method: req.method,
-        // @ts-expect-error - req.originalUrl is not typed
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        url: req.originalUrl,
-      },
-    }),
+    customProps: (req) => {
+      return {
+        requestId: req.id,
+        user: determineUserId(req),
+        request: {
+          method: req.method,
+          route: req.route,
+          // @ts-expect-error - req.originalUrl is not typed
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          url: req.originalUrl,
+        },
+      }
+    },
     customReceivedMessage: () => 'Request received',
     customSuccessMessage: () => 'Request completed',
     customErrorMessage: () => 'Request completed',
