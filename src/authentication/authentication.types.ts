@@ -4,7 +4,7 @@ import { M2MToken } from '@clerk/backend'
 
 export type LoginResult = {
   user: ReadUserOutput
-  campaign: Campaign
+  campaign: Campaign | null
   token: string
 }
 

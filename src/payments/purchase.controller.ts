@@ -1,12 +1,6 @@
 import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Logger,
-  Post,
-} from '@nestjs/common'
+import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
@@ -15,20 +9,21 @@ import { StripeService } from '../vendors/stripe/services/stripe.service'
 import {
   CompleteCheckoutSessionDto,
   CompleteFreePurchaseDto,
-  CompletePurchaseDto,
   CreateCheckoutSessionDto,
-  CreatePurchaseIntentDto,
 } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('payments/purchase')
 export class PurchaseController {
-  private readonly logger = new Logger(PurchaseController.name)
   constructor(
     private readonly stripeService: StripeService,
     private readonly usersService: UsersService,
     private readonly purchaseService: PurchaseService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PurchaseController.name)
+  }
 
   @Post('checkout-session')
   async createProCheckoutSession(@ReqUser() user: User) {
@@ -55,34 +50,6 @@ export class PurchaseController {
     return { redirectUrl }
   }
 
-  @Post('create-intent')
-  @UseCampaign()
-  async createPurchaseIntent(
-    @ReqUser() user: User,
-    @Body() dto: CreatePurchaseIntentDto<unknown>,
-    @ReqCampaign() campaign: Campaign,
-  ) {
-    try {
-      const result = await this.purchaseService.createPurchaseIntent({
-        user,
-        dto,
-        campaign,
-      })
-      return result
-    } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          err: serializeError(error),
-          user: user.id,
-          campaign,
-          dto,
-          msg: 'Error creating purchase intent',
-        }),
-      )
-      throw error
-    }
-  }
-
   /**
    * Creates a Custom Checkout Session for one-time payments with promo code support.
    * This is the new preferred method for purchases that should support promo codes.
@@ -104,22 +71,15 @@ export class PurchaseController {
       })
       return result
     } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          err: serializeError(error),
-          user: user.id,
-          campaign,
-          dto,
-          msg: 'Error creating checkout session',
-        }),
-      )
+      this.logger.error({
+        err: serializeError(error),
+        user: user.id,
+        campaign,
+        dto,
+        msg: 'Error creating checkout session',
+      })
       throw error
     }
-  }
-
-  @Post('complete')
-  async completePurchase(@Body() dto: CompletePurchaseDto) {
-    return this.purchaseService.completePurchase(dto)
   }
 
   /**
@@ -151,14 +111,12 @@ export class PurchaseController {
         user,
       })
     } catch (error) {
-      this.logger.error(
-        JSON.stringify({
-          err: serializeError(error),
-          campaign: campaign?.id,
-          dto,
-          msg: 'Error completing free purchase',
-        }),
-      )
+      this.logger.error({
+        err: serializeError(error),
+        campaign: campaign?.id,
+        dto,
+        msg: 'Error completing free purchase',
+      })
       throw error
     }
   }

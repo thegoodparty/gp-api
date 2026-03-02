@@ -10,6 +10,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Injectable } from '@nestjs/common'
 import slugify from 'slugify'
 import { AwsService } from './aws.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const { AWS_REGION: region = 'us-west-2' } = process.env
 const EXPIRES_IN_DEFAULT = 3600 // 1 hour
@@ -34,8 +35,8 @@ export type BuildKeyOptions = {
 export class S3Service extends AwsService {
   private readonly s3Client: S3Client
 
-  constructor() {
-    super()
+  constructor(protected readonly logger: PinoLogger) {
+    super(logger)
     this.s3Client = new S3Client({ region })
   }
 

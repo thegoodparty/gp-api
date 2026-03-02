@@ -41,9 +41,11 @@ import { WebsitesModule } from '@/websites/websites.module'
 import { Module } from '@nestjs/common'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
+import { loggerModule } from './observability/logging/logger-module'
 
 @Module({
   imports: [
+    loggerModule,
     ScheduleModule.forRoot(),
     BraintrustModule,
     AnalyticsModule,

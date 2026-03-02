@@ -20,6 +20,7 @@ import {
   P2P_DNC_SUPPRESS_INITIALS,
   P2P_PHONE_LIST_MAP,
 } from '../constants/p2pJob.constants'
+import { PinoLogger } from 'nestjs-pino'
 
 const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
 const MAX_FILE_SIZE = 104857600 // 100MB
@@ -34,17 +35,18 @@ interface UploadPhoneListParams {
 @Injectable()
 export class PeerlyPhoneListService extends PeerlyBaseConfig {
   constructor(
+    protected readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
   ) {
-    super()
+    super(logger)
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private handleApiError(error: unknown): never {
     this.logger.error(
+      { data: isAxiosResponse(error) ? format(error) : error },
       'Failed to communicate with Peerly API',
-      isAxiosResponse(error) ? format(error) : error,
     )
     throw new BadGatewayException('Failed to communicate with Peerly API')
   }

@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { differenceInYears, formatISO } from 'date-fns'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { z } from 'zod'
 import { AiService } from '../ai.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const ZIP_TO_AREA_CODE_FILE = 'zip-to-area-code-mappings.json'
 const CACHE_EXPIRY_YEARS = 1
@@ -25,12 +26,13 @@ type ZipToAreaCodeMapping = Record<string, ZipToAreaCodeEntry>
 
 @Injectable()
 export class AreaCodeFromZipService {
-  private readonly logger = new Logger(AreaCodeFromZipService.name)
-
   constructor(
     private readonly s3Service: S3Service,
     private readonly aiService: AiService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AreaCodeFromZipService.name)
+  }
 
   /**
    * Gets area codes for a given zip code.
@@ -50,8 +52,8 @@ export class AreaCodeFromZipService {
       const isExpired = this.isCacheExpired(cachedEntry.lastFetchedAt)
       if (!isExpired) {
         this.logger.debug(
+          { areaCodes: cachedEntry.areaCodes },
           `Found valid cached area codes for ${normalizedZipCode}`,
-          cachedEntry.areaCodes,
         )
         return cachedEntry.areaCodes
       }
@@ -90,9 +92,8 @@ export class AreaCodeFromZipService {
       json = await this.s3Service.getFile(ZIP_TO_AREA_CODE_BUCKET, key)
     } catch (error) {
       this.logger.error(
+        { key, ZIP_TO_AREA_CODE_BUCKET },
         `Error fetching area code mappings file from S3: ${error}`,
-        key,
-        ZIP_TO_AREA_CODE_BUCKET,
       )
       return null
     }
@@ -106,8 +107,8 @@ export class AreaCodeFromZipService {
       return mappings[zipCode] || null
     } catch (error) {
       this.logger.error(
+        { json },
         `Error parsing area code mappings JSON from S3: ${error}`,
-        json,
       )
       return null
     }
@@ -158,10 +159,11 @@ export class AreaCodeFromZipService {
 
       if (!validationResult.success) {
         this.logger.error(
+          {
+            errors: validationResult.error.errors,
+            jsonContent,
+          },
           `Invalid area codes response format from OpenAI for zip ${zipCode}:`,
-          validationResult.error.errors,
-          'Raw response:',
-          jsonContent,
         )
         return null
       }
@@ -169,9 +171,8 @@ export class AreaCodeFromZipService {
       return validationResult.data
     } catch (error) {
       this.logger.error(
+        { jsonContent },
         `Error parsing JSON response from OpenAI for zip ${zipCode}: ${error}`,
-        'Raw response:',
-        jsonContent,
       )
       return null
     }
@@ -190,9 +191,8 @@ export class AreaCodeFromZipService {
       existingfile = await this.s3Service.getFile(ZIP_TO_AREA_CODE_BUCKET, key)
     } catch (error) {
       this.logger.error(
+        { key, ZIP_TO_AREA_CODE_BUCKET },
         `Error fetching existing area code mappings from S3: ${error}`,
-        key,
-        ZIP_TO_AREA_CODE_BUCKET,
       )
     }
 
@@ -201,8 +201,8 @@ export class AreaCodeFromZipService {
         mappings = JSON.parse(existingfile) as ZipToAreaCodeMapping
       } catch (error) {
         this.logger.error(
+          { existingfile },
           `Error parsing existing area code mappings JSON from S3: ${error}`,
-          existingfile,
         )
       }
     }
@@ -220,9 +220,8 @@ export class AreaCodeFromZipService {
       this.logger.debug(`Saved area codes for ${zipCode} to S3`)
     } catch (error) {
       this.logger.error(
+        { key, ZIP_TO_AREA_CODE_BUCKET },
         `Error uploading area codes to S3 for ${zipCode}: ${error}`,
-        key,
-        ZIP_TO_AREA_CODE_BUCKET,
       )
     }
   }

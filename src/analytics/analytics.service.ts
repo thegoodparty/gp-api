@@ -1,5 +1,5 @@
 import { SegmentService } from 'src/vendors/segment/segment.service'
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import Stripe from 'stripe'
 import {
   EVENTS,
@@ -8,16 +8,18 @@ import {
   UserContext,
 } from 'src/vendors/segment/segment.types'
 import { UsersService } from '../users/services/users.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class AnalyticsService {
-  private readonly logger = new Logger(AnalyticsService.name)
-
   constructor(
     private readonly segment: SegmentService,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AnalyticsService.name)
+  }
 
   private async getUserContext(
     userId: number,
@@ -42,8 +44,8 @@ export class AnalyticsService {
       return userContext
     } catch (e) {
       this.logger.error(
+        { e },
         `[ANALYTICS] Error fetching user context for analytics - User: ${userId}`,
-        e,
       )
       return undefined
     }
@@ -77,8 +79,8 @@ export class AnalyticsService {
       return result
     } catch (e) {
       this.logger.error(
+        { e },
         `[ANALYTICS] Failed to track event: ${eventName} for user: ${userId}`,
-        e,
       )
       throw e
     }
@@ -96,7 +98,7 @@ export class AnalyticsService {
       await this.segment.identify(userId, traits, userContext)
       this.logger.debug(`[ANALYTICS] Successfully identified user ${userId}`)
     } catch (e) {
-      this.logger.error(`[ANALYTICS] Failed to identify user: ${userId}`, e)
+      this.logger.error({ e }, `[ANALYTICS] Failed to identify user: ${userId}`)
       throw e
     }
   }
@@ -227,7 +229,8 @@ export class AnalyticsService {
         renewalDate,
       }
       this.logger.debug(
-        `[ANALYTICS] Tracking pro payment with properties: ${JSON.stringify(eventProperties)} for user ${userId}`,
+        { eventProperties },
+        `[ANALYTICS] Tracking pro payment with properties:  for user ${userId}`,
       )
 
       await this.track(
@@ -240,8 +243,8 @@ export class AnalyticsService {
       )
     } catch (e) {
       this.logger.error(
+        { e },
         `[ANALYTICS] Error tracking pro payment for user ${userId}, session ${session.id}`,
-        e,
       )
       throw e // Re-throw to propagate the error
     }

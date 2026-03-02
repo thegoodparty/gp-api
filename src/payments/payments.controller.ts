@@ -5,7 +5,6 @@ import {
   HttpCode,
   HttpException,
   HttpStatus,
-  Logger,
   Patch,
   Post,
   RawBodyRequest,
@@ -19,17 +18,19 @@ import { CampaignsService } from '../campaigns/services/campaigns.service'
 import { StripeService } from '../vendors/stripe/services/stripe.service'
 import { PaymentEventsService } from './services/paymentEventsService'
 import { PaymentsService } from './services/payments.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('payments')
 export class PaymentsController {
-  private logger = new Logger(PaymentsController.name)
-
   constructor(
     private readonly stripeService: StripeService,
     private readonly stripeEvents: PaymentEventsService,
     private readonly campaignsService: CampaignsService,
     private readonly paymentsService: PaymentsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PaymentsController.name)
+  }
 
   @Post('events')
   @PublicAccess()
@@ -50,15 +51,15 @@ export class PaymentsController {
         stripeSignature,
       )
     } catch (e) {
-      this.logger.warn('Failed to parse Stripe event', e)
+      this.logger.warn({ e }, 'Failed to parse Stripe event')
       throw new BadRequestException('Failed to parse Stripe event')
     }
 
-    this.logger.debug(`processing event.type => ${event.type}`, event)
+    this.logger.debug({ event }, `processing event.type => ${event.type}`)
     try {
       await this.stripeEvents.handleEvent(event)
     } catch (e) {
-      this.logger.error('Failed to process Stripe event', e)
+      this.logger.error({ e }, 'Failed to process Stripe event')
       throw e instanceof HttpException
         ? e
         : new BadRequestException('Failed to process Stripe event')

@@ -54,13 +54,6 @@ export class PollsModule {
       this.pollPurchaseHandler,
     )
 
-    this.purchaseService.registerPostPurchaseHandler(
-      PurchaseType.POLL,
-      this.pollPurchaseHandler.executePostPurchase.bind(
-        this.pollPurchaseHandler,
-      ),
-    )
-
     this.purchaseService.registerCheckoutSessionPostPurchaseHandler(
       PurchaseType.POLL,
       this.pollPurchaseHandler.handlePollPostPurchase.bind(

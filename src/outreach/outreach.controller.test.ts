@@ -2,6 +2,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common'
 import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OutreachController } from './outreach.controller'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 describe('OutreachController', () => {
   let controller: OutreachController
@@ -59,6 +60,7 @@ describe('OutreachController', () => {
       mockOutreachService as never,
       mockFilesService as never,
       mockPeerlyP2pJobService as never,
+      createMockLogger(),
     )
     vi.clearAllMocks()
   })

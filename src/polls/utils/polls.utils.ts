@@ -1,5 +1,6 @@
 import { SLACK_CHANNEL_IDS } from '@/vendors/slack/slackService.config'
 import { WebClient } from '@slack/web-api'
+import { Transform } from 'stream'
 
 export const pollMessageGroup = (pollId: string) => `polls-${pollId}`
 
@@ -211,5 +212,25 @@ export const sendTevynAPIPollMessage = async (
         },
       },
     ],
+  })
+}
+
+export function stripLeadingNewlines(): Transform {
+  let skipped = false
+  return new Transform({
+    transform(chunk: Buffer, _enc, cb) {
+      if (skipped) {
+        cb(null, chunk)
+        return
+      }
+      const s = chunk.toString('utf8')
+      const firstNonBlank = s.search(/[^\r\n]/)
+      if (firstNonBlank === -1) {
+        cb()
+        return
+      }
+      skipped = true
+      cb(null, s.slice(firstNonBlank))
+    },
   })
 }

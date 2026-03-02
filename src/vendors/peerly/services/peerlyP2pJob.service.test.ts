@@ -1,6 +1,7 @@
 import { BadGatewayException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { createMockLogger } from 'src/shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { PeerlyMediaService } from './peerlyMedia.service'
@@ -48,6 +49,7 @@ describe('PeerlyP2pJobService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PeerlyP2pJobService,
+        { provide: PinoLogger, useValue: createMockLogger() },
         { provide: PeerlyMediaService, useValue: mockMediaService },
         { provide: PeerlyP2pSmsService, useValue: mockSmsService },
       ],

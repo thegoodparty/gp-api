@@ -2,13 +2,14 @@ import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignWith } from '@/campaigns/campaigns.types'
 import { VoterFileDownloadAccessService } from '@/shared/services/voterFileDownloadAccess.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
-import { Logger } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PinoLogger } from 'nestjs-pino'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 describe('VoterFileDownloadAccessService - canDownload', () => {
   let service: VoterFileDownloadAccessService
-  let loggerSpy: ReturnType<typeof vi.spyOn>
+  let mockLogger: PinoLogger
 
   beforeEach(async () => {
     const mockSlackService = {
@@ -16,9 +17,12 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
       errorMessage: vi.fn(),
     }
 
+    mockLogger = createMockLogger()
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VoterFileDownloadAccessService,
+        { provide: PinoLogger, useValue: mockLogger },
         {
           provide: SlackService,
           useValue: mockSlackService,
@@ -29,7 +33,6 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
     service = module.get<VoterFileDownloadAccessService>(
       VoterFileDownloadAccessService,
     )
-    loggerSpy = vi.spyOn(Logger.prototype, 'log')
     vi.clearAllMocks()
   })
 
@@ -40,7 +43,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
   describe('Edge cases - null/undefined campaign', () => {
     it('should return false when campaign is undefined', () => {
       expect(service.canDownload(undefined)).toBe(false)
-      expect(loggerSpy).not.toHaveBeenCalled()
+      expect(mockLogger.info).not.toHaveBeenCalled()
     })
   })
 
@@ -51,7 +54,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(true)
-      expect(loggerSpy).not.toHaveBeenCalled()
+      expect(mockLogger.info).not.toHaveBeenCalled()
     })
 
     it('should return true for TOWNSHIP campaigns immediately, even without pathToVictory', () => {
@@ -108,7 +111,7 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         canDownloadFederal: true,
       })
       expect(service.canDownload(campaign)).toBe(true)
-      expect(loggerSpy).not.toHaveBeenCalled()
+      expect(mockLogger.info).not.toHaveBeenCalled()
     })
 
     it('should return true for STATE with canDownloadFederal flag', () => {
@@ -170,9 +173,9 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         },
       })
       expect(service.canDownload(campaign)).toBe(false)
-      expect(loggerSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        { id: campaign.id },
         'Campaign is not eligible for download.',
-        campaign.id,
       )
     })
 
@@ -217,9 +220,9 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         pathToVictory: null,
       })
       expect(service.canDownload(campaign)).toBe(false)
-      expect(loggerSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        { id: campaign.id },
         'Campaign is not eligible for download.',
-        campaign.id,
       )
     })
 
@@ -326,9 +329,9 @@ describe('VoterFileDownloadAccessService - canDownload', () => {
         pathToVictory: { data: {} },
       })
       expect(service.canDownload(campaign)).toBe(false)
-      expect(loggerSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        { id: campaign.id },
         'Campaign is not eligible for download.',
-        campaign.id,
       )
     })
   })

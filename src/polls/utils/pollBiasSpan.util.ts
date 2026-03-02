@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common'
+import { PinoLogger } from 'nestjs-pino'
 import { Span, SpanInput } from '../types/pollBias.types'
 
 /**
@@ -139,7 +139,7 @@ export function validateSpanBounds(
   end: number,
   textLength: number,
   substring: string,
-  logger: Logger,
+  logger: PinoLogger,
 ): boolean {
   if (start < 0 || end > textLength) {
     logger.warn(
@@ -230,7 +230,7 @@ export function convertSpanToIndices(
   spanInput: SpanInput,
   originalText: string,
   existingSpans: Span[],
-  logger: Logger,
+  logger: PinoLogger,
 ): Span | null {
   const substring = spanInput.substring.trim()
 
@@ -307,7 +307,7 @@ export function convertSubstringsToIndices(
   spans: SpanInput[],
   originalText: string,
   existingSpans: Span[] = [],
-  logger: Logger,
+  logger: PinoLogger,
 ): Span[] {
   const result: Span[] = []
   const allUsedSpans: Span[] = [...existingSpans]

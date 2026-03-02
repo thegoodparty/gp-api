@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Logger,
   Param,
   Put,
   Query,
@@ -19,14 +18,18 @@ import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
 import { ListPathToVictoryPaginationSchema } from './schemas/ListPathToVictoryPagination.schema'
 import { PathToVictorySchema } from './schemas/PathToVictory.schema'
 import { UpdatePathToVictoryM2MSchema } from './schemas/UpdatePathToVictoryM2M.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('path-to-victory')
 @UseGuards(M2MOnly)
 @UsePipes(ZodValidationPipe)
 export class PathToVictoryController {
-  private readonly logger = new Logger(PathToVictoryController.name)
-
-  constructor(private readonly pathToVictoryService: PathToVictoryService) {}
+  constructor(
+    private readonly pathToVictoryService: PathToVictoryService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PathToVictoryController.name)
+  }
 
   @Get('list')
   async list(@Query() query: ListPathToVictoryPaginationSchema) {

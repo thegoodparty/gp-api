@@ -54,8 +54,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
     if (pendingTcrCompliances.length) {
       this.logger.debug(
+        { pendingTcrCompliances },
         `Queuing up pendingTcrCompliances =>`,
-        pendingTcrCompliances,
       )
       await Promise.allSettled(
         pendingTcrCompliances.map((tcrCompliance) =>
@@ -102,7 +102,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     const userFullName = getUserFullName(user!)
     const { ballotLevel } = campaign.details as { ballotLevel?: string }
 
-    this.logger.log(
+    this.logger.info(
       `[TCR Compliance] Starting registration flow for ` +
         `campaignId=${campaign.id}, userId=${user.id}, userName="${userFullName}", ` +
         `ein=${ein}, ballotLevel=${ballotLevel || 'NOT_SET'}`,
@@ -140,7 +140,8 @@ export class CampaignTcrComplianceService extends createPrismaBase(
 
     if (existingIdentity) {
       this.logger.debug(
-        `[TCR Compliance] Step 1: Existing Identity found, skipping creation: ${JSON.stringify(existingIdentity)}`,
+        { existingIdentity },
+        '[TCR Compliance] Step 1: Existing Identity found, skipping creation:',
       )
     } else {
       this.logger.debug(
@@ -244,7 +245,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         campaign,
         domain!,
       )
-      this.logger.log(
+      this.logger.info(
         `[TCR Compliance] Step 4 SUCCESS: Campaign Verify Request submitted for campaignId=${campaign.id}`,
       )
     }
@@ -259,14 +260,15 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     }
 
     this.logger.debug(
-      `[TCR Compliance] Step 5: Creating TCR Compliance record: ${JSON.stringify(newTcrCompliance)}`,
+      { newTcrCompliance },
+      '[TCR Compliance] Step 5: Creating TCR Compliance record:',
     )
 
     const createdTcrCompliance = await this.model.create({
       data: newTcrCompliance,
     })
 
-    this.logger.log(
+    this.logger.info(
       `[TCR Compliance] Flow completed for campaignId=${campaign.id}, ` +
         `tcrComplianceId=${createdTcrCompliance.id}, peerlyIdentityId=${createdTcrCompliance.peerlyIdentityId}`,
     )

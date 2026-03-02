@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Get,
-  Logger,
   Param,
   Post,
   UsePipes,
@@ -18,16 +17,18 @@ import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
 import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
 import { CampaignWith } from '../../campaigns/campaigns.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('p2p')
 @UsePipes(ZodValidationPipe)
 export class P2pController {
-  private readonly logger = new Logger(P2pController.name)
-
   constructor(
     private readonly peerlyPhoneListService: PeerlyPhoneListService,
     private readonly p2pPhoneListUploadService: P2pPhoneListUploadService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(P2pController.name)
+  }
 
   @Get('phone-list/:token/status')
   @UseCampaign()
@@ -66,7 +67,7 @@ export class P2pController {
         throw error
       }
 
-      this.logger.error('Failed to check phone list status', error)
+      this.logger.error({ error }, 'Failed to check phone list status')
       throw new BadGatewayException('Failed to check phone list status.')
     }
   }
@@ -85,7 +86,7 @@ export class P2pController {
 
       return { token }
     } catch (error) {
-      this.logger.error('Failed to upload phone list', error)
+      this.logger.error({ error }, 'Failed to upload phone list')
       throw new BadGatewayException('Failed to upload phone list.')
     }
   }

@@ -4,7 +4,6 @@ import {
   BadRequestException,
   HttpException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { isAxiosError } from 'axios'
@@ -29,6 +28,7 @@ import {
   convertVoterFileFilterToFilters,
   type FilterObject,
 } from '../utils/voterFileFilter.utils'
+import { PinoLogger } from 'nestjs-pino'
 
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
@@ -44,7 +44,6 @@ if (!PEOPLE_API_S2S_SECRET) {
 
 @Injectable()
 export class ContactsService {
-  private readonly logger = new Logger(ContactsService.name)
   private cachedToken: string | null = null
 
   constructor(
@@ -53,7 +52,10 @@ export class ContactsService {
     private readonly elections: ElectionsService,
     private readonly campaigns: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(ContactsService.name)
+  }
 
   async withFallbackDistrictName<Result>(
     campaign: CampaignWithPathToVictory,
@@ -125,9 +127,12 @@ export class ContactsService {
           )
           return response.data as PeopleListResponse
         } catch (error) {
-          this.logger.error(`Failed to fetch from people API`, {
-            error,
-          })
+          this.logger.error(
+            {
+              error,
+            },
+            `Failed to fetch from people API`,
+          )
           throw new BadGatewayException(`Failed to fetch from people API`)
         }
       },
@@ -165,7 +170,10 @@ export class ContactsService {
           )
           return response.data
         } catch (error) {
-          this.logger.error('Failed to sample contacts from people API', error)
+          this.logger.error(
+            { error },
+            'Failed to sample contacts from people API',
+          )
           throw new BadGatewayException(
             'Failed to sample contacts from people API',
           )
@@ -206,8 +214,8 @@ export class ContactsService {
             throw error
           }
           this.logger.error(
+            { data: JSON.stringify(error) },
             'Failed to fetch person from people API',
-            JSON.stringify(error),
           )
 
           if (isAxiosError(error) && error.response?.status === 404) {
@@ -257,9 +265,12 @@ export class ContactsService {
             response.data.on('error', reject)
           })
         } catch (error) {
-          this.logger.error('Failed to download contacts from people API', {
-            error,
-          })
+          this.logger.error(
+            {
+              error,
+            },
+            'Failed to download contacts from people API',
+          )
 
           throw new BadGatewayException(
             'Failed to download contacts from people API',
@@ -276,15 +287,13 @@ export class ContactsService {
         if (!state || !districtType || !districtName) {
           const msg =
             'Could not resolve state, district type, and district name'
-          this.logger.error(
-            JSON.stringify({
-              campaign,
-              msg,
-              state,
-              districtType,
-              districtName,
-            }),
-          )
+          this.logger.error({
+            campaign,
+            msg,
+            state,
+            districtType,
+            districtName,
+          })
           throw new BadRequestException(msg)
         }
 

@@ -1,7 +1,7 @@
 // documentation https://public-api.ecanvasser.com/
 
 import { HttpService } from '@nestjs/axios'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import {
   ApiEcanvasserContact,
@@ -17,15 +17,20 @@ import { Methods } from 'http-constants-ts'
 import { UpdateSurveySchema } from '../schemas/updateSurvey.schema'
 import { UpdateSurveyQuestionSchema } from '../schemas/updateSurveyQuestion.schema'
 import { AxiosResponse } from 'axios'
+import { PinoLogger } from 'nestjs-pino'
 
 const DEFAULT_PAGE_SIZE = 1000
 
 @Injectable()
 export class EcanvasserService {
-  private readonly apiBaseUrl = 'https://public-api.ecanvasser.com'
-  private readonly logger = new Logger(EcanvasserService.name)
+  private readonly apiBaseUrl = 'https://public-api-usa.ecanvasser.com'
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(EcanvasserService.name)
+  }
 
   async createSurvey(apiKey: string, survey: ApiEcanvasserSurvey) {
     try {
@@ -40,7 +45,7 @@ export class EcanvasserService {
 
       return response.data
     } catch (error) {
-      this.logger.error('Failed to create survey', error)
+      this.logger.error({ error }, 'Failed to create survey')
       throw new BadGatewayException('Failed to create survey in Ecanvasser')
     }
   }
@@ -242,8 +247,8 @@ export class EcanvasserService {
       return response.data as ApiResponse<T>
     } catch (error) {
       this.logger.error(
+        { error },
         `Failed to ${options.method || Methods.GET} ${endpoint}`,
-        error,
       )
       throw new BadGatewayException('Failed to communicate with Ecanvasser API')
     }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, VoterFileFilter } from '@prisma/client'
 import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
@@ -7,8 +7,6 @@ import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSch
 export class VoterFileFilterService extends createPrismaBase(
   MODELS.VoterFileFilter,
 ) {
-  readonly logger = new Logger(VoterFileFilterService.name)
-
   async create(
     campaignId: number,
     data: Omit<Prisma.VoterFileFilterCreateInput, 'campaign' | 'outreach'>,

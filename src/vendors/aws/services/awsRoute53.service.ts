@@ -7,6 +7,7 @@ import {
   Route53DomainsServiceException,
 } from '@aws-sdk/client-route-53-domains'
 import { AwsService } from './aws.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const AWS_ROUTE_53_REGION = 'us-east-1'
 
@@ -14,8 +15,8 @@ const AWS_ROUTE_53_REGION = 'us-east-1'
 export class AwsRoute53Service extends AwsService {
   private readonly domainsClient: Route53DomainsClient
 
-  constructor() {
-    super()
+  constructor(protected readonly logger: PinoLogger) {
+    super(logger)
     this.domainsClient = new Route53DomainsClient({
       region: AWS_ROUTE_53_REGION,
     })

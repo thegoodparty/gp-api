@@ -1,12 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { CreatePositionSchema } from './schemas/CreatePosition.schema'
 import { UpdatePositionSchema } from './schemas/UpdatePosition.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class PositionsService {
-  private readonly logger = new Logger(PositionsService.name)
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PositionsService.name)
+  }
 
   async findAll() {
     const positions = await this.prisma.position.findMany({

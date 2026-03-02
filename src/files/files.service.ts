@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common'
+import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { CacheControls } from 'http-constants-ts'
 import { AwsS3Service } from 'src/vendors/aws/services/awsS3.service'
 import { FileUpload, GenerateSignedUploadUrlArgs } from './files.types'
+import { PinoLogger } from 'nestjs-pino'
 
 /**
  * @deprecated This service is being gradually migrated to use S3Service directly.
@@ -14,9 +11,12 @@ import { FileUpload, GenerateSignedUploadUrlArgs } from './files.types'
  */
 @Injectable()
 export class FilesService {
-  private readonly logger = new Logger(FilesService.name)
-
-  constructor(private readonly aws: AwsS3Service) {}
+  constructor(
+    private readonly aws: AwsS3Service,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(FilesService.name)
+  }
 
   generateSignedUploadUrl({
     bucket,

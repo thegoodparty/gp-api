@@ -1,16 +1,20 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { PurchaseHandler } from 'src/payments/purchase.types'
 import { FREE_TEXTS_OFFER } from 'src/shared/constants/freeTextsOffer'
 import { OutreachPurchaseMetadata } from '../types/outreach.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class OutreachPurchaseHandlerService
   implements PurchaseHandler<OutreachPurchaseMetadata>
 {
-  private readonly logger = new Logger(OutreachPurchaseHandlerService.name)
-
-  constructor(private readonly campaignsService: CampaignsService) {}
+  constructor(
+    private readonly campaignsService: CampaignsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(OutreachPurchaseHandlerService.name)
+  }
 
   async validatePurchase({
     contactCount,
@@ -45,7 +49,7 @@ export class OutreachPurchaseHandlerService
       )
       const finalAmount = discountedContactCount * pricePerContact
 
-      this.logger.log(
+      this.logger.info(
         `Campaign ${campaignId}: applying free texts discount (${contactCount} contacts, ${discountedContactCount} billable, amount: ${finalAmount})`,
       )
 
@@ -95,14 +99,14 @@ export class OutreachPurchaseHandlerService
         await this.campaignsService.checkFreeTextsEligibility(campaignId)
       if (hasOffer) {
         await this.campaignsService.redeemFreeTexts(campaignId)
-        this.logger.log(
+        this.logger.info(
           `Free texts offer redeemed for campaign ${campaignId} after payment ${paymentIntentId}`,
         )
       }
     } catch (error) {
       this.logger.error(
+        { error },
         `Failed to redeem free texts offer for campaign ${campaignId} after payment ${paymentIntentId}:`,
-        error,
       )
     }
   }

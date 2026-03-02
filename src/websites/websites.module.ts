@@ -50,11 +50,6 @@ export class WebsitesModule {
       this.domainsService,
     )
 
-    this.purchaseService.registerPostPurchaseHandler(
-      PurchaseType.DOMAIN_REGISTRATION,
-      this.domainsService.executePostPurchase.bind(this.domainsService),
-    )
-
     // Also register for Custom Checkout Sessions (used for promo code support)
     this.purchaseService.registerCheckoutSessionPostPurchaseHandler(
       PurchaseType.DOMAIN_REGISTRATION,

@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { Campaign, VoterFileFilter } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { VoterFileController } from './voterFile.controller'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 describe('VoterFileController', () => {
   let controller: VoterFileController
@@ -58,6 +59,7 @@ describe('VoterFileController', () => {
       mockVoterFileFilterService as never,
       mockOutreachService as never,
       mockElectedOfficeService as never,
+      createMockLogger(),
     )
     vi.clearAllMocks()
   })

@@ -5,7 +5,6 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
-  Logger,
 } from '@nestjs/common'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { CheckoutSessionMode, WebhookEventType } from '../payments.types'
@@ -25,6 +24,7 @@ import { VoterFileDownloadAccessService } from '../../shared/services/voterFileD
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { PurchaseService } from './purchase.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -33,8 +33,6 @@ if (!STRIPE_WEBSOCKET_SECRET) {
 
 @Injectable()
 export class PaymentEventsService {
-  private readonly logger = new Logger(PaymentEventsService.name)
-
   constructor(
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
@@ -46,7 +44,10 @@ export class PaymentEventsService {
     private readonly analytics: AnalyticsService,
     @Inject(forwardRef(() => PurchaseService))
     private readonly purchaseService: PurchaseService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PaymentEventsService.name)
+  }
 
   async handleEvent(event: Stripe.Event) {
     switch (event.type) {
@@ -244,8 +245,8 @@ export class PaymentEventsService {
       await this.analytics.trackProPayment(user.id, session)
     } catch (error) {
       this.logger.error(
+        { error },
         `[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`,
-        error,
       )
       // Don't throw - we don't want to fail the webhook for analytics issues
     }
@@ -272,8 +273,9 @@ export class PaymentEventsService {
           'send voter file alert',
         ][index]
         this.logger.error(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          { reason: result.reason },
           `[WEBHOOK] Failed to ${action} - User: ${user.id}, CustomerId: ${customerId}`,
-          result.reason,
         )
       }
     })
@@ -303,14 +305,12 @@ export class PaymentEventsService {
       )
     }
 
-    this.logger.log(
-      JSON.stringify({
-        sessionId,
-        purchaseType: metadata.purchaseType,
-        userId: metadata.userId,
-        msg: 'Processing one-time payment checkout session completion',
-      }),
-    )
+    this.logger.info({
+      sessionId,
+      purchaseType: metadata.purchaseType,
+      userId: metadata.userId,
+      msg: 'Processing one-time payment checkout session completion',
+    })
 
     // Delegate to purchase service for post-purchase processing
     try {
@@ -319,8 +319,8 @@ export class PaymentEventsService {
       })
     } catch (error) {
       this.logger.error(
+        { error },
         `[WEBHOOK] Failed to complete checkout session - Session: ${sessionId}, PurchaseType: ${metadata.purchaseType}`,
-        error,
       )
       throw error
     }
@@ -380,7 +380,7 @@ export class PaymentEventsService {
     }
     const { metaData } = user
     if (metaData?.isDeleted) {
-      this.logger.log('User is already deleted')
+      this.logger.info('User is already deleted')
       return
     }
 
@@ -469,7 +469,7 @@ export class PaymentEventsService {
         variables: emailVars,
       })
     } catch (e) {
-      this.logger.error('Error sending pro confirmation email', e)
+      this.logger.error({ e }, 'Error sending pro confirmation email')
       throw e
     }
   }

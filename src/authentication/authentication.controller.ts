@@ -56,15 +56,13 @@ export class AuthenticationController {
   ) {
     const { token, user } = await this.authenticationService.register(userData)
     setTokenCookie(response, token)
-    const campaign = await this.campaignsService.createForUser(user)
-    return { user: ReadUserOutputSchema.parse(user), token, campaign }
+    return { user: ReadUserOutputSchema.parse(user), token }
   }
 
-  private async reconcileCampaignForUser(
+  private async findCampaignForUser(
     user: User,
   ): Promise<LoginResult['campaign']> {
-    const existingCampaign = await this.campaignsService.findByUserId(user.id)
-    return existingCampaign || (await this.campaignsService.createForUser(user))
+    return (await this.campaignsService.findByUserId(user.id)) ?? null
   }
 
   @UseGuards(AuthGuard('local'))
@@ -84,7 +82,7 @@ export class AuthenticationController {
 
     return {
       user: ReadUserOutputSchema.parse(user),
-      campaign: await this.reconcileCampaignForUser(user),
+      campaign: await this.findCampaignForUser(user),
       token,
     }
   }
@@ -103,7 +101,7 @@ export class AuthenticationController {
     setTokenCookie(response, token)
     return {
       user: ReadUserOutputSchema.parse(user),
-      campaign: await this.reconcileCampaignForUser(user),
+      campaign: await this.findCampaignForUser(user),
       token,
     }
   }

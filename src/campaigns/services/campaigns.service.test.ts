@@ -1,6 +1,7 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
 import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
 import { SegmentService } from '@/vendors/segment/segment.service'
@@ -138,6 +139,7 @@ describe('CampaignsService - redeemFreeTexts', () => {
           useValue: {},
         },
         // Provide CampaignsService LAST - all dependencies are now available
+        { provide: PinoLogger, useValue: createMockLogger() },
         CampaignsService,
       ],
     }).compile()

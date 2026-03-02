@@ -2,22 +2,23 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
-  Logger,
 } from '@nestjs/common'
 import { Timeout } from '@nestjs/schedule'
 import { Prisma, User } from '@prisma/client'
 import { StripeService } from 'src/vendors/stripe/services/stripe.service'
 import { UsersService } from '../../users/services/users.service'
 import { PaymentIntentPayload, PaymentType } from '../payments.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class PaymentsService {
-  private readonly logger = new Logger(PaymentsService.name)
-
   constructor(
     private readonly stripe: StripeService,
     private readonly usersService: UsersService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PaymentsService.name)
+  }
 
   async createPayment<T extends PaymentType>(
     user: User,
@@ -92,7 +93,7 @@ export class PaymentsService {
       return null
     }
 
-    this.logger.log(`userId: ${user.id} missing customerId`)
+    this.logger.info(`userId: ${user.id} missing customerId`)
 
     const checkoutSessionId = user.metaData?.checkoutSessionId as string
     const customerId = checkoutSessionId
@@ -101,7 +102,7 @@ export class PaymentsService {
     if (!customerId) {
       return null
     }
-    this.logger.log(
+    this.logger.info(
       `Successfully retrieved customerId ${customerId} for user ${user.id}`,
     )
 
@@ -126,7 +127,7 @@ export class PaymentsService {
         }
         await this.updateMissingCustomerId(email)
       } catch (e) {
-        this.logger.error(`Failed backfill for ${email}`, e)
+        this.logger.error({ e }, `Failed backfill for ${email}`)
       }
     }
   }
@@ -179,7 +180,7 @@ export class PaymentsService {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error'
         results.failed.push({ email, error: errorMessage })
-        this.logger.error(`Failed for ${email}:`, error)
+        this.logger.error({ error }, `Failed for ${email}:`)
       }
     }
 

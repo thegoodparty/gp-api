@@ -2,7 +2,6 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
@@ -13,6 +12,7 @@ import {
   RequireCamapaignMetadata,
 } from '../decorators/UseCampaign.decorator'
 import { CampaignWith } from '../campaigns.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 /**
@@ -20,12 +20,13 @@ import { CampaignWith } from '../campaigns.types'
  * Do not need to apply this directly, use the "@UseCampaign" decorator
  * */
 export class UseCampaignGuard implements CanActivate {
-  private readonly logger = new Logger(UseCampaignGuard.name)
-
   constructor(
     private campaignsService: CampaignsService,
     private reflector: Reflector,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(UseCampaignGuard.name)
+  }
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
@@ -55,7 +56,7 @@ export class UseCampaignGuard implements CanActivate {
       return true
     }
 
-    this.logger.log('User has no campaign')
+    this.logger.info('User has no campaign')
     throw new NotFoundException()
   }
 }

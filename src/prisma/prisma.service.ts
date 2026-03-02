@@ -1,10 +1,6 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common'
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 const PRISMA_LOG_LEVELS = [
   'info',
@@ -20,9 +16,7 @@ export class PrismaService
   extends PrismaClient<Prisma.PrismaClientOptions, 'query'>
   implements OnModuleInit, OnModuleDestroy
 {
-  private logger = new Logger(PrismaService.name)
-
-  constructor() {
+  constructor(private readonly logger: PinoLogger) {
     super({
       log: PRISMA_LOG_LEVELS.map((level) => ({
         emit: 'event',
@@ -30,6 +24,7 @@ export class PrismaService
       })),
       errorFormat: 'pretty',
     })
+    this.logger.setContext(PrismaService.name)
   }
 
   async onModuleInit() {

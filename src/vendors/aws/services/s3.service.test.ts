@@ -52,13 +52,7 @@ describe('S3Service', () => {
     originalEnv = { ...process.env }
     process.env.AWS_REGION = 'us-west-2'
     s3Mock.reset()
-    service = new S3Service()
-
-    const mockLogger = createMockLogger()
-    Object.defineProperty(service, 'logger', {
-      get: () => mockLogger,
-      configurable: true,
-    })
+    service = new S3Service(createMockLogger())
   })
 
   afterEach(() => {

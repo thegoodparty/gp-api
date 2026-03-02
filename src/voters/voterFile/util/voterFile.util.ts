@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
@@ -6,8 +5,7 @@ import {
   CustomVoterFile,
   VoterFileType,
 } from '../voterFile.types'
-
-const logger = new Logger('Voter File Utils')
+import { PinoLogger } from 'nestjs-pino'
 
 const VOTER_FILE_LATEST_EVEN_YEAR = Number(
   process.env.VOTER_FILE_LATEST_EVEN_YEAR,
@@ -34,6 +32,7 @@ if (
 //  the PeopleAPI to fetch the segment of voters we want. Rip this out and replace
 //  it with a call to the PeopleAPI: https://goodparty.clickup.com/t/90132012119/ENG-5032
 export function typeToQuery(
+  logger: PinoLogger,
   type: VoterFileType,
   campaign: CampaignWith<'pathToVictory'>,
   customFilters?: Pick<CustomVoterFile, 'channel' | 'filters' | 'purpose'>,
@@ -74,11 +73,11 @@ export function typeToQuery(
 
   if (l2ColumnName && l2ColumnValue && !isStatewideOffice) {
     // value is like "IN##CLARK##CLARK CNTY COMM DIST 1" we need just CLARK CNTY COMM DIST 1
-    const cleanValue = extractLocation(l2ColumnValue, fixColumns)
+    const cleanValue = extractLocation(logger, l2ColumnValue, fixColumns)
     if (fixColumns) {
-      logger.debug('before fix columns:', l2ColumnName)
+      logger.debug({ l2ColumnName }, 'before fix columns:')
       l2ColumnName = fixCityCountyColumns(l2ColumnName)
-      logger.debug('after fix columns:', l2ColumnName)
+      logger.debug({ l2ColumnName }, 'after fix columns:')
     }
     if (cleanValue) {
       whereClause += `("${l2ColumnName}" = '${cleanValue}'
@@ -260,7 +259,11 @@ export function typeToQuery(
   }`
 }
 
-function extractLocation(input: string, fixColumns?: boolean) {
+function extractLocation(
+  logger: PinoLogger,
+  input: string,
+  fixColumns?: boolean,
+) {
   logger.debug(
     `Extracting location from: ${input} ${
       fixColumns ? '- with fixColumns' : ''
@@ -282,7 +285,7 @@ function extractLocation(input: string, fixColumns?: boolean) {
     ?.split('##')
     ?.at(fixColumns ? 1 : -1)
     ?.replace(' (EST.)', '')
-  logger.debug('Extracted:', res)
+  logger.debug({ res }, 'Extracted:')
   return res
 }
 

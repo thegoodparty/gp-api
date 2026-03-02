@@ -1,24 +1,23 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  StreamableFile,
-} from '@nestjs/common'
+import { Injectable, OnModuleDestroy, StreamableFile } from '@nestjs/common'
 import { Pool } from 'pg'
 import { to as copyTo } from 'pg-copy-streams'
 import { Transform } from 'stream'
 import { HEADER_MAPPING } from '../constants/headerMapping.const'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { GetVoterFileSchema } from '../voterFile/schemas/GetVoterFile.schema'
+import { PinoLogger } from 'nestjs-pino'
 
 const VOTER_DATASTORE = process.env.VOTER_DATASTORE as string
 
 @Injectable()
 export class VoterDatabaseService implements OnModuleDestroy {
-  private readonly logger = new Logger(VoterDatabaseService.name)
   private readonly pool: Pool
 
-  constructor(private readonly slack: SlackService) {
+  constructor(
+    private readonly slack: SlackService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(VoterDatabaseService.name)
     this.pool = new Pool({
       connectionString: VOTER_DATASTORE,
     })
@@ -70,7 +69,7 @@ export class VoterDatabaseService implements OnModuleDestroy {
       .query(copyTo(`COPY(${queryString}) TO STDOUT WITH CSV HEADER`))
       .pipe(transformHeaders)
       .on('error', async (err) => {
-        this.logger.error('Error in stream:', err)
+        this.logger.error(err, 'Error in stream:')
         await this.slack.errorMessage({
           message: 'Error in stream:',
           error: err,
@@ -123,7 +122,7 @@ export class VoterDatabaseService implements OnModuleDestroy {
       .query(copyTo(`COPY(${queryString}) TO STDOUT WITH CSV HEADER`))
       .pipe(transformHeaders)
       .on('error', async (err) => {
-        this.logger.error('Error in stream:', err)
+        this.logger.error(err, 'Error in stream:')
         await this.slack.errorMessage({
           message: 'Error in stream:',
           error: err,

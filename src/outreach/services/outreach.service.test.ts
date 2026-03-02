@@ -1,4 +1,5 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import { PinoLogger } from 'nestjs-pino'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { Campaign, OutreachStatus, OutreachType } from '@prisma/client'
@@ -82,6 +83,7 @@ describe('OutreachService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: PinoLogger, useValue: createMockLogger() },
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: GooglePlacesService, useValue: {} },
         { provide: AreaCodeFromZipService, useValue: {} },

@@ -1,6 +1,6 @@
-import { isMobilePhone } from 'validator'
+import validator from 'validator'
 import { z } from 'zod'
 
 export const PhoneSchema = z
   .string()
-  .refine((val) => isMobilePhone(val), 'Must be valid phone number')
+  .refine((val) => validator.isMobilePhone(val), 'Must be valid phone number')

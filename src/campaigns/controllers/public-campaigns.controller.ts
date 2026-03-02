@@ -1,23 +1,19 @@
-import {
-  Controller,
-  Get,
-  Query,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common'
+import { Controller, Get, Query, NotFoundException } from '@nestjs/common'
 import { PublicAccess } from 'src/authentication/decorators/PublicAccess.decorator'
 import { FindByRaceIdDto } from '../schemas/public/FindByRaceId.schema'
 import { FindByRaceIdResponseDto } from '../schemas/public/FindByRaceIdResponse.schema'
 import { PublicCampaignsService } from '../services/public-campaigns.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('public-campaigns')
 @PublicAccess()
 export class PublicCampaignsController {
-  private readonly logger = new Logger(PublicCampaignsController.name)
-
   constructor(
     private readonly publicCampaignsService: PublicCampaignsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PublicCampaignsController.name)
+  }
 
   @Get()
   async findByRaceId(

@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, Param, Query, UsePipes } from '@nestjs/common'
+import { Controller, Get, Param, Query, UsePipes } from '@nestjs/common'
 import { CrmCampaignsService } from '../campaigns/services/crmCampaigns.service'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { UserRole } from '@prisma/client'
@@ -8,13 +8,17 @@ import {
   RefreshCompanySchema,
 } from './schemas/RefreshSync.schema'
 import { HubSpot } from './crm.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('crm')
 @UsePipes(ZodValidationPipe)
 export class CrmController {
-  logger = new Logger(this.constructor.name)
-
-  constructor(private readonly crmCampaignsService: CrmCampaignsService) {}
+  constructor(
+    private readonly crmCampaignsService: CrmCampaignsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(this.constructor.name)
+  }
 
   @Get('companies/:companyId')
   async getCompany(@Param('companyId') companyId: string) {

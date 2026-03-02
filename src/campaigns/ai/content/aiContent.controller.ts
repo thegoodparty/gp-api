@@ -7,7 +7,6 @@ import {
   HttpCode,
   HttpStatus,
   InternalServerErrorException,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -32,20 +31,22 @@ import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from '../../../vendors/segment/segment.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/ai')
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class AiContentController {
-  private readonly logger = new Logger(AiContentController.name)
-
   constructor(
     private readonly aiContent: AiContentService,
     private readonly ai: AiService,
     private readonly campaigns: CampaignsService,
     private readonly content: ContentService,
     private readonly analytics: AnalyticsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiContentController.name)
+  }
 
   @Post()
   async create(

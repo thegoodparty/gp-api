@@ -6,6 +6,7 @@ import { Reflector } from '@nestjs/core'
 import { InternalServerErrorException } from '@nestjs/common'
 import { of, lastValueFrom } from 'rxjs'
 import { z } from 'zod'
+import { createMockLogger } from '../test-utils/mockLogger.util'
 
 const UserSchema = z.object({
   id: z.number(),
@@ -36,7 +37,7 @@ describe('ZodResponseInterceptor', () => {
   const setup = (schema: z.ZodSchema | undefined) => {
     reflector = new Reflector()
     vi.spyOn(reflector, 'get').mockReturnValue(schema)
-    interceptor = new ZodResponseInterceptor(reflector)
+    interceptor = new ZodResponseInterceptor(reflector, createMockLogger())
   }
 
   it('strips fields not defined in the schema', async () => {

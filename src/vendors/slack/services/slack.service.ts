@@ -1,9 +1,5 @@
 import { HttpService } from '@nestjs/axios'
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common'
+import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { lastValueFrom } from 'rxjs'
 import { SLACK_CHANNEL_IDS } from '../slackService.config'
@@ -16,6 +12,7 @@ import {
 } from '../slackService.types'
 import { WebClient } from '@slack/web-api'
 import { serializeError } from 'serialize-error'
+import { PinoLogger } from 'nestjs-pino'
 
 const { WEBAPP_ROOT_URL, SLACK_APP_ID } = process.env
 
@@ -27,11 +24,13 @@ if (!SLACK_APP_ID) {
 //  or better yet, this: https://www.npmjs.com/package/nestjs-slack
 @Injectable()
 export class SlackService {
-  private readonly logger = new Logger(SlackService.name)
-
   public client: WebClient
 
-  constructor(private readonly httpService: HttpService) {
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(SlackService.name)
     const slackBotToken = process.env.SLACK_APP_BOT_TOKEN
     if (!slackBotToken) {
       throw new Error('Missing SLACK_APP_BOT_TOKEN environment variable')
@@ -72,13 +71,11 @@ export class SlackService {
       )) as { data: string }
       return data
     } catch (e: unknown) {
-      this.logger.error(
-        JSON.stringify({
-          msg: 'Failed to send slack message',
-          slackMessage: message,
-          err: serializeError(e),
-        }),
-      )
+      this.logger.error({
+        msg: 'Failed to send slack message',
+        slackMessage: message,
+        err: serializeError(e),
+      })
     }
   }
 

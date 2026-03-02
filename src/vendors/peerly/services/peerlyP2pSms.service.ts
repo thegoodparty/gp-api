@@ -9,6 +9,7 @@ import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials.util'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import { PinoLogger } from 'nestjs-pino'
 
 interface Template {
   is_default: boolean
@@ -152,25 +153,26 @@ type PeerlyAxiosError = {
 @Injectable()
 export class PeerlyP2pSmsService extends PeerlyBaseConfig {
   constructor(
+    protected readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly crmCampaigns: CrmCampaignsService,
     private readonly peerlyAuth: PeerlyAuthenticationService,
   ) {
-    super()
+    super(logger)
   }
 
   private handleApiError(error: unknown): never {
     this.logger.error(
+      { data: isAxiosResponse(error) ? format(error) : error },
       'Failed to communicate with Peerly API',
-      isAxiosResponse(error) ? format(error) : error,
     )
 
     if (isAxiosResponse(error)) {
       const axiosError = error as PeerlyAxiosError
       if (axiosError.response?.data) {
         this.logger.error(
+          { data: JSON.stringify(axiosError.response.data, null, 2) },
           'Peerly API error response:',
-          JSON.stringify(axiosError.response.data, null, 2),
         )
 
         const apiError = axiosError.response.data
@@ -220,14 +222,14 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
         : null
       if (agentId) {
         agentIds.push(agentId)
-        this.logger.log(`Successfully assigned agent ${agentId} to job`)
+        this.logger.info(`Successfully assigned agent ${agentId} to job`)
       } else if (owner?.email) {
         this.logger.warn(`No Peerly agent found for PA email: ${owner.email}`)
       }
     } catch (error) {
       this.logger.error(
+        { error },
         'Failed to assign PA as agent, creating job without agent assignment',
-        error,
       )
       // Job creation continues without agent assignment - graceful degradation
     }
@@ -250,9 +252,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
     try {
       const config = await this.getBaseHttpHeaders()
-      this.logger.debug(
-        `Creating Peerly job with body: ${JSON.stringify(body)}`,
-      )
+      this.logger.debug({ body }, 'Creating Peerly job with body:')
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/1to1/jobs`, body, config),
       )
@@ -279,16 +279,19 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       }
 
       if (!jobId) {
-        this.logger.error('Job created but no job ID found in response', {
-          headers,
-          data: data as Record<string, string | number | boolean>,
-        })
+        this.logger.error(
+          {
+            headers,
+            data: data as Record<string, string | number | boolean>,
+          },
+          'Job created but no job ID found in response',
+        )
         throw new BadGatewayException(
           'Job creation succeeded but job ID not found in response body or headers. Please verify API response format.',
         )
       }
 
-      this.logger.log(`Created job with ID: ${jobId}`)
+      this.logger.info(`Created job with ID: ${jobId}`)
       return jobId
     } catch (error) {
       this.handleApiError(error)
@@ -306,7 +309,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
 
       // Validate and return the job details
       const { data: jobs } = response
-      this.logger.debug(`Retrieved P2P jobs: ${JSON.stringify(jobs)}`)
+      this.logger.debug({ jobs }, 'Retrieved P2P jobs:')
       return jobs
     } catch (error) {
       this.handleApiError(error)
@@ -323,7 +326,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
       // Validate and return the job details
       const { data } = response as { data: PeerlyJob }
       const jobDetails = data
-      this.logger.debug(`Retrieved job details: ${JSON.stringify(jobDetails)}`)
+      this.logger.debug({ jobDetails }, 'Retrieved job details:')
       return jobDetails
     } catch (error) {
       this.handleApiError(error)
@@ -370,7 +373,7 @@ export class PeerlyP2pSmsService extends PeerlyBaseConfig {
           config,
         ),
       )
-      this.logger.log(`Requested canvassers for job ID: ${jobId}`)
+      this.logger.info(`Requested canvassers for job ID: ${jobId}`)
     } catch (error) {
       this.handleApiError(error)
     }

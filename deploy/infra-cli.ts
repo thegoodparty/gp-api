@@ -13,13 +13,32 @@ const AWS_REGION = 'us-west-2'
 const ssm = new SSM({ region: AWS_REGION })
 
 let PULUMI_CONFIG_PASSPHRASE: string | undefined
+let GRAFANA_AUTH: string | undefined
+
+const getSSMParameter = async (name: string) => {
+  const { Parameter } = await ssm.getParameter({
+    Name: name,
+    WithDecryption: true,
+  })
+
+  if (!Parameter?.Value) {
+    console.error(`Error: Failed to pull ${name} from SSM`)
+    process.exit(1)
+  }
+  return Parameter.Value
+}
 
 const run = (cmd: string, opts?: ExecSyncOptions) => {
   try {
     execSync(cmd, {
       stdio: 'inherit',
       cwd: __dirname,
-      env: { ...process.env, AWS_REGION, PULUMI_CONFIG_PASSPHRASE },
+      env: {
+        ...process.env,
+        AWS_REGION,
+        PULUMI_CONFIG_PASSPHRASE,
+        GRAFANA_AUTH,
+      },
       ...opts,
     })
   } catch (e) {
@@ -77,18 +96,11 @@ const setupStack = async (env: string) => {
     console.log('✅  Built and pushed image to ECR')
   }
 
-  const { Parameter } = await ssm.getParameter({
-    Name: 'pulumi-state-config-passphrase',
-    WithDecryption: true,
-  })
-  if (!Parameter?.Value) {
-    console.error(
-      'Error: Failed to pull pulumi state config passphrase from SSM',
-    )
-    process.exit(1)
-  }
+  PULUMI_CONFIG_PASSPHRASE = await getSSMParameter(
+    'pulumi-state-config-passphrase',
+  )
 
-  PULUMI_CONFIG_PASSPHRASE = Parameter.Value
+  GRAFANA_AUTH = await getSSMParameter('grafana-shared-service-account-token')
 
   run('pulumi login s3://goodparty-iac-state', {
     // Ignore stdio -- we need the output to be pure JSON for diffs in CI
@@ -98,6 +110,7 @@ const setupStack = async (env: string) => {
   run(`pulumi config set aws:region ${AWS_REGION}`)
   run(`pulumi config set environment ${env}`)
   run(`pulumi config set imageUri ${imageUri}`)
+  run('pulumi config set grafana:url https://goodparty.grafana.net')
   if (env === 'preview') {
     run(`pulumi config set prNumber ${process.env.GITHUB_PR_NUMBER}`)
   }

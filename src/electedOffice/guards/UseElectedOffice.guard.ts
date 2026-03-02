@@ -2,7 +2,6 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
@@ -12,15 +11,17 @@ import {
   RequireElectedOfficeMetadata,
 } from '../decorators/UseElectedOffice.decorator'
 import { ElectedOffice } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class UseElectedOfficeGuard implements CanActivate {
-  private readonly logger = new Logger(UseElectedOfficeGuard.name)
-
   constructor(
     private electedOfficeService: ElectedOfficeService,
     private reflector: Reflector,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(UseElectedOfficeGuard.name)
+  }
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
@@ -55,7 +56,7 @@ export class UseElectedOfficeGuard implements CanActivate {
       return true
     }
 
-    this.logger.log('Elected office not found')
+    this.logger.info('Elected office not found')
     throw new NotFoundException()
   }
 }

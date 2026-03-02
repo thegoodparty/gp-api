@@ -99,6 +99,13 @@ export class UpdateCampaignSchema extends createZodDto(
     .strict(),
 ) {}
 
+export class CreateCampaignSchema extends createZodDto(
+  z.object({
+    details: CampaignDetailsSchema,
+    data: z.record(z.string(), z.unknown()).optional(),
+  }),
+) {}
+
 export class SetDistrictDTO extends createZodDto(
   z.object({
     slug: z.string().optional(),

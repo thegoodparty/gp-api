@@ -4,6 +4,7 @@ import { P2VStatus } from '@/elections/types/pathToVictory.types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PathToVictoryController } from './pathToVictory.controller'
 import { PathToVictoryService } from './services/pathToVictory.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 const CREATED_AT = '2025-01-01'
 
@@ -44,7 +45,10 @@ describe('PathToVictoryController', () => {
     }
     pathToVictoryService = pathToVictoryServiceMock as PathToVictoryService
 
-    controller = new PathToVictoryController(pathToVictoryService)
+    controller = new PathToVictoryController(
+      pathToVictoryService,
+      createMockLogger(),
+    )
   })
 
   describe('list', () => {

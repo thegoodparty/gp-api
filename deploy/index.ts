@@ -2,6 +2,7 @@ import * as aws from '@pulumi/aws'
 import * as pulumi from '@pulumi/pulumi'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
+import { createGrafanaResources } from './components/grafana'
 import { createNewRelicLogForwarder } from './components/newrelic-log-forwarder'
 import { createService } from './components/service'
 import { createVpc } from './components/vpc'
@@ -336,6 +337,7 @@ export = async () => {
       PORT: '80',
       HOST: '0.0.0.0',
       LOG_LEVEL: 'debug',
+      OTEL_SERVICE_ENVIRONMENT: environment,
       CORS_ORIGIN: productDomain,
       AWS_REGION: 'us-west-2',
       ASSET_DOMAIN: select({
@@ -359,14 +361,15 @@ export = async () => {
       VOTER_DB_HOST: voterCluster.endpoint,
       VOTER_DB_USER: voterCluster.masterUsername,
       VOTER_DB_NAME: voterCluster.databaseName,
+      SECRET_NAMES: Object.keys(secret).join(','),
       ...(environment === 'preview'
         ? {
-          IS_PREVIEW: 'true',
-          ADMIN_EMAIL: process.env.ADMIN_EMAIL,
-          ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
-          CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
-          CANDIDATE_PASSWORD: process.env.CANDIDATE_PASSWORD,
-        }
+            IS_PREVIEW: 'true',
+            ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+            ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+            CANDIDATE_EMAIL: process.env.CANDIDATE_EMAIL,
+            CANDIDATE_PASSWORD: process.env.CANDIDATE_PASSWORD,
+          }
         : {}),
     },
     permissions: [
@@ -404,6 +407,8 @@ export = async () => {
   })
 
   if (environment !== 'preview') {
+    createGrafanaResources({ environment })
+
     createNewRelicLogForwarder({
       environment,
       secretArn: secretInfo.arn,

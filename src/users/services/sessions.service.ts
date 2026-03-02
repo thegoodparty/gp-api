@@ -1,7 +1,8 @@
-import { forwardRef, Inject, Logger } from '@nestjs/common'
+import { forwardRef, Inject } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
 import { User } from '@prisma/client'
 import { UsersService } from 'src/users/services/users.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const SESSION_TIMEOUT = 1000 * 60 * 30 // 30 minutes (fullstory's inactivity timeout)
 
@@ -10,12 +11,14 @@ const SESSIONS_FLUSH_INTERVAL_MS = Number(
 )
 
 export class SessionsService {
-  private readonly logger = new Logger(SessionsService.name)
   private readonly pendingLastVisited = new Map<number, number>()
   constructor(
     @Inject(forwardRef(() => UsersService))
     private readonly users: UsersService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(SessionsService.name)
+  }
 
   async trackSession(user: User) {
     // We try catch to prevent crashes since trackSession isn't await'd when called

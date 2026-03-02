@@ -52,13 +52,13 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     let messageId: string | undefined
 
     if (!threadId) {
-      this.logger.log('creating thread')
+      this.logger.info('creating thread')
       threadId = crypto.randomUUID()
-      this.logger.log('threadId', threadId)
+      this.logger.info({ threadId }, 'threadId')
     }
 
-    this.logger.log('candidateContext', candidateContext)
-    this.logger.log('systemPrompt', systemPrompt)
+    this.logger.info({ candidateContext }, 'candidateContext')
+    this.logger.info({ systemPrompt }, 'systemPrompt')
 
     const completion = (await this.aiService.getAssistantCompletion({
       systemPrompt,
@@ -78,7 +78,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         }
       | undefined
 
-    this.logger.log('completion', completion)
+    this.logger.info({ completion }, 'completion')
 
     if (completion && completion?.content) {
       const chatResponse: AiChatMessage = {
@@ -171,7 +171,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         }
       | undefined
 
-    this.logger.log('completion', completion)
+    this.logger.info({ completion }, 'completion')
 
     let chatResponse: AiChatMessage | undefined
     if (completion && completion.content) {

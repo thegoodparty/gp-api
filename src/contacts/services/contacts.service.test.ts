@@ -3,6 +3,7 @@ import { of } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignWithPathToVictory } from '../contacts.types'
 import { ContactsService } from './contacts.service'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 vi.mock('@nestjs/axios', () => ({
   HttpService: vi.fn(),
@@ -60,6 +61,7 @@ describe('ContactsService', () => {
         mockElectionsService as never,
         mockCampaignsService as never,
         mockElectedOfficeService as never,
+        createMockLogger(),
       )
       vi.clearAllMocks()
     })

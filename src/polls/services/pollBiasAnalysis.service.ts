@@ -2,7 +2,6 @@ import {
   BadGatewayException,
   BadRequestException,
   Injectable,
-  Logger,
 } from '@nestjs/common'
 import retry from 'async-retry'
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
@@ -18,16 +17,19 @@ import {
 } from '../types/pollBias.types'
 import { createPollBiasAnalysisPrompt } from '../utils/pollBiasPrompt.util'
 import { convertSubstringsToIndices } from '../utils/pollBiasSpan.util'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class PollBiasAnalysisService {
-  private readonly logger = new Logger(PollBiasAnalysisService.name)
   private readonly maxRetries = 3
 
   constructor(
     private readonly llmService: LlmService,
     private readonly braintrust: BraintrustService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PollBiasAnalysisService.name)
+  }
 
   /**
    * Analyzes poll text for bias and returns identified bias spans with character positions
@@ -95,9 +97,12 @@ export class PollBiasAnalysisService {
             throw error
           }
 
-          this.logger.error('Error analyzing poll text for bias', {
-            error: errorMessage,
-          })
+          this.logger.error(
+            {
+              error: errorMessage,
+            },
+            'Error analyzing poll text for bias',
+          )
           bail(new BadGatewayException('Failed to analyze poll text for bias'))
           return {
             bias_spans: [],
@@ -110,12 +115,12 @@ export class PollBiasAnalysisService {
         retries: this.maxRetries,
         onRetry: (error, attempt) => {
           this.logger.warn(
-            `Bias analysis attempt ${attempt} failed validation, retrying...`,
             {
               error: error instanceof Error ? error.message : String(error),
               attempt,
               maxRetries: this.maxRetries,
             },
+            `Bias analysis attempt ${attempt} failed validation, retrying...`,
           )
         },
       },

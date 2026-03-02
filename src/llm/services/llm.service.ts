@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import retry from 'async-retry'
 import { OpenAI } from 'openai'
 import {
@@ -8,6 +8,7 @@ import {
   ChatCompletionToolChoiceOption,
 } from 'openai/resources/chat/completions'
 import { z } from 'zod'
+import { PinoLogger } from 'nestjs-pino'
 
 export interface LlmChatCompletionOptions {
   messages: ChatCompletionMessageParam[]
@@ -47,13 +48,13 @@ export interface LlmCompletionResult {
 
 @Injectable()
 export class LlmService {
-  private readonly logger = new Logger(LlmService.name)
   private readonly defaultModels: string[]
   private readonly defaultRetries = 3
   private readonly defaultTimeout = 300000
   private readonly client: OpenAI
 
-  constructor() {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(LlmService.name)
     const { TOGETHER_AI_KEY, AI_MODELS = '' } = process.env
 
     if (!TOGETHER_AI_KEY) {
@@ -239,17 +240,17 @@ export class LlmService {
 
             if (this.isPermanentClientError(error)) {
               this.logger.error(
-                `Permanent client error for ${operationLabel} with model ${currentModel}, not retrying`,
                 lastError,
+                `Permanent client error for ${operationLabel} with model ${currentModel}, not retrying`,
               )
               bail(lastError)
             }
 
             this.logger.warn(
+              lastError,
               `Model ${currentModel} failed for ${operationLabel}, ${
                 i < models.length - 1 ? 'trying fallback' : 'no more fallbacks'
               }`,
-              lastError,
             )
 
             if (i === models.length - 1) {
@@ -264,8 +265,8 @@ export class LlmService {
         retries,
         onRetry: (error, attempt) => {
           this.logger.warn(
+            { error },
             `${operationLabel} attempt ${attempt} failed, retrying...`,
-            error,
           )
         },
       },
@@ -395,12 +396,15 @@ export class LlmService {
       stream: false,
     }
 
-    this.logger.debug('Making TogetherAI API request', {
-      model,
-      baseURL: this.client.baseURL,
-      messageCount: messages.length,
-      hasUserId: !!userId,
-    })
+    this.logger.debug(
+      {
+        model,
+        baseURL: this.client.baseURL,
+        messageCount: messages.length,
+        hasUserId: !!userId,
+      },
+      'Making TogetherAI API request',
+    )
 
     try {
       const completion = (await this.client.chat.completions.create(
@@ -419,12 +423,15 @@ export class LlmService {
         ...(toolCalls && { toolCalls }),
       }
     } catch (error) {
-      this.logger.error('TogetherAI API request failed', {
-        model,
-        baseURL: this.client.baseURL,
-        error: error instanceof Error ? error.message : String(error),
-        status: (error as { status?: number })?.status,
-      })
+      this.logger.error(
+        {
+          model,
+          baseURL: this.client.baseURL,
+          error: error instanceof Error ? error.message : String(error),
+          status: (error as { status?: number })?.status,
+        },
+        'TogetherAI API request failed',
+      )
       throw error
     }
   }
@@ -466,12 +473,15 @@ export class LlmService {
       response_format: { type: 'json_object' },
     }
 
-    this.logger.debug('Making TogetherAI JSON-mode API request', {
-      model,
-      baseURL: this.client.baseURL,
-      messageCount: messages.length,
-      hasUserId: !!userId,
-    })
+    this.logger.debug(
+      {
+        model,
+        baseURL: this.client.baseURL,
+        messageCount: messages.length,
+        hasUserId: !!userId,
+      },
+      'Making TogetherAI JSON-mode API request',
+    )
 
     const completion = (await this.client.chat.completions.create(
       requestParams,
@@ -496,11 +506,14 @@ export class LlmService {
     try {
       parsed = JSON.parse(cleanJson(content))
     } catch (err) {
-      this.logger.error('Invalid JSON from model', {
-        model,
-        contentPreview: content.slice(0, 200),
-        error: err instanceof Error ? err.message : String(err),
-      })
+      this.logger.error(
+        {
+          model,
+          contentPreview: content.slice(0, 200),
+          error: err instanceof Error ? err.message : String(err),
+        },
+        'Invalid JSON from model',
+      )
       throw new Error(`Model returned invalid JSON for ${model}`)
     }
 
