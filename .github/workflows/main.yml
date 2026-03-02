@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
   pull-requests: write
 
 env:
@@ -47,7 +47,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - run: npm ci
 
@@ -67,8 +67,8 @@ jobs:
       - name: Setup Node 24 for npm publish
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: RC version contracts
         if: >-
@@ -131,7 +131,7 @@ jobs:
         uses: changesets/action@v1
         with:
           publish: npx changeset publish
-          title: 'chore: release @goodparty_org/contracts'
+          title: "chore: release @goodparty_org/contracts"
           cwd: contracts
           createGithubReleases: false
         env:
