@@ -204,6 +204,10 @@ jobs:
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
           GITHUB_PR_NUMBER: ${{ github.event.number }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
+          CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
         run: |
           npm run infra deploy ${{ steps.context.outputs.environment }}
           cd deploy && SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
