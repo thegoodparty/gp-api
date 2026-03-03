@@ -9,11 +9,28 @@ import {
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
 import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
+import { v7 as uuidv7 } from 'uuid'
+import { ElectionsService } from '@/elections/services/elections.service'
+
+export type CreateElectedOfficeArgs = {
+  ballotreadyPositionId: string
+  electedDate?: Date | null
+  swornInDate?: Date | null
+  termStartDate?: Date | null
+  termEndDate?: Date | null
+  termLengthDays?: number | null
+  isActive?: boolean
+  userId: number
+  campaignId: number
+}
 
 @Injectable()
 export class ElectedOfficeService extends createPrismaBase(
   MODELS.ElectedOffice,
 ) {
+  constructor(private readonly elections: ElectionsService) {
+    super()
+  }
   // This is for validating that there is only one active elected office per user
   // prisma at the time of writing does not support partial unique indexes, so we have to do this manually
   //    eg. Unique UserId with where: { isActive: true } is not supported.
@@ -35,15 +52,43 @@ export class ElectedOfficeService extends createPrismaBase(
     }
   }
 
-  async create(args: Prisma.ElectedOfficeCreateArgs) {
-    const data = args.data as Prisma.ElectedOfficeCreateInput
-
-    // if isActive is not false, then we need to validate that the user does not already have an active elected office
-    if (data.isActive !== false && data.user?.connect?.id) {
-      await this.validateActiveElectedOffice(data.user.connect.id)
+  async create(args: CreateElectedOfficeArgs) {
+    // if isActive is not false, then we need to validate that the user does not
+    // already have an active elected office
+    if (args.isActive !== false) {
+      await this.validateActiveElectedOffice(args.userId)
     }
 
-    return this.model.create(args)
+    const position = await this.elections.getPositionByBallotReadyId(
+      args.ballotreadyPositionId,
+    )
+
+    return this.client.$transaction(async (tx) => {
+      const id = uuidv7()
+
+      await tx.organization.create({
+        data: {
+          slug: `eo-${id}`,
+          ownerId: args.userId,
+          positionId: position?.id ?? null,
+        },
+      })
+
+      return await tx.electedOffice.create({
+        data: {
+          id,
+          electedDate: args.electedDate,
+          swornInDate: args.swornInDate,
+          termStartDate: args.termStartDate,
+          termEndDate: args.termEndDate,
+          termLengthDays: args.termLengthDays,
+          isActive: args.isActive,
+          userId: args.userId,
+          campaignId: args.campaignId,
+          organizationSlug: `eo-${id}`,
+        },
+      })
+    })
   }
 
   async update(args: Prisma.ElectedOfficeUpdateArgs) {

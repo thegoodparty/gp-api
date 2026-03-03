@@ -81,10 +81,9 @@ test.describe('Users - User Metadata', () => {
     }
 
     const metaData = {
-      someString: faker.lorem.sentence(),
-      someBoolean: faker.datatype.boolean(),
-      someNumber: faker.number.int({ min: 1, max: 1000 }),
-      someNull: null,
+      lastVisited: faker.number.int({ min: 1, max: 1000000 }),
+      sessionCount: faker.number.int({ min: 1, max: 100 }),
+      textNotifications: faker.datatype.boolean(),
     }
 
     const response = await request.put('/v1/users/me/metadata', {
@@ -101,10 +100,9 @@ test.describe('Users - User Metadata', () => {
     const body = (await response.json()) as ReadUserOutput
     expect(body.metaData).toBeTruthy()
     const metadata = body.metaData as MetadataResponse
-    expect(metadata?.someString).toBe(metaData.someString)
-    expect(metadata?.someBoolean).toBe(metaData.someBoolean)
-    expect(metadata?.someNumber).toBe(metaData.someNumber)
-    expect(metadata?.someNull).toBe(metaData.someNull)
+    expect(metadata?.lastVisited).toBe(metaData.lastVisited)
+    expect(metadata?.sessionCount).toBe(metaData.sessionCount)
+    expect(metadata?.textNotifications).toBe(metaData.textNotifications)
   })
 
   test('should return 401 when getting metadata without authentication', async ({
