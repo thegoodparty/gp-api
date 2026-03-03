@@ -145,6 +145,15 @@ export class ElectionsService {
       { includeDistrict: false, includeTurnout: false },
     )
   }
+  async getPositionById(positionId: string) {
+    return this.electionApiGet<
+      PositionWithOptionalDistrict,
+      { includeDistrict: boolean; includeTurnout: boolean }
+    >(`positions/${positionId}`, {
+      includeDistrict: false,
+      includeTurnout: false,
+    })
+  }
   // Gold flow: match a district via BallotReady position ID.
   // Returns district data even when projected turnout is unavailable,
   // using sentinel values (-1) so callers can distinguish partial matches.
