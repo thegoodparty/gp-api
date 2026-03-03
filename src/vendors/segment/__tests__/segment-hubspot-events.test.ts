@@ -18,10 +18,32 @@ import { EVENTS } from '../segment.types'
  * @see ../HUBSPOT_INTEGRATION.md for full event → workflow mappings
  */
 describe('Segment → HubSpot Event Names', () => {
-  describe('10DLC Compliance Flow Events (Backend)', () => {
+  describe('10DLC Compliance Flow Events', () => {
+    it('should have the correct Published event name for HubSpot', () => {
+      expect(EVENTS.CandidateWebsite.Published).toBe(
+        'Candidate Website - Published',
+      )
+    })
+
+    it('should have the correct PurchasedDomain event name for HubSpot', () => {
+      expect(EVENTS.CandidateWebsite.PurchasedDomain).toBe(
+        'Candidate Website - Purchased domain',
+      )
+    })
+
+    it('should have the correct ComplianceFormSubmitted event name for HubSpot', () => {
+      expect(EVENTS.Outreach.ComplianceFormSubmitted).toBe(
+        'Voter Outreach - 10DLC Compliance Form Submitted',
+      )
+    })
+
+    it('should have the correct CompliancePinSubmitted event name for HubSpot', () => {
+      expect(EVENTS.Outreach.CompliancePinSubmitted).toBe(
+        'Voter Outreach - 10DLC Compliance PIN Submitted',
+      )
+    })
+
     it('should have the correct ComplianceCompleted event name for HubSpot', () => {
-      // This event triggers the "Ops - Set 10 DLC Compliance Status to 10 DLC Compliance Complete" workflow
-      // which sets the status to "Compliant"
       expect(EVENTS.Outreach.ComplianceCompleted).toBe(
         'Voter Outreach - 10DLC Compliance Completed',
       )

@@ -34,6 +34,8 @@ import { QueueProducerService } from '../../queue/producer/queueProducer.service
 import { MessageGroup, QueueType } from '../../queue/queue.types'
 import { ForwardEmailDomainResponse } from '../../vendors/forwardEmail/forwardEmail.types'
 import { ForwardEmailService } from '../../vendors/forwardEmail/services/forwardEmail.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { DomainPurchaseMetadata, DomainSearchResult } from '../domains.types'
 import { RegisterDomainSchema } from '../schemas/RegisterDomain.schema'
 
@@ -51,6 +53,7 @@ export class DomainsService
     private readonly stripe: StripeService,
     private readonly forwardEmailService: ForwardEmailService,
     private queueService: QueueProducerService,
+    private readonly analytics: AnalyticsService,
   ) {
     super()
   }
@@ -303,6 +306,22 @@ export class DomainsService
         validWebsiteId,
         contactInfo,
       )
+
+      try {
+        await this.analytics.track(
+          user.id,
+          EVENTS.CandidateWebsite.PurchasedDomain,
+          {
+            domainSelected: domainName,
+            priceOfSelectedDomain: domain.price?.toNumber() ?? null,
+          },
+        )
+      } catch (analyticsError) {
+        this.logger.error(
+          { analyticsError },
+          `Failed to track domain purchased event for user ${user.id}`,
+        )
+      }
 
       return {
         domain,

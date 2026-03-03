@@ -17,6 +17,7 @@ import { StripeModule } from 'src/vendors/stripe/stripe.module'
 import { CampaignsModule } from 'src/campaigns/campaigns.module'
 import { ForwardEmailModule } from '../vendors/forwardEmail/forwardEmail.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
+import { AnalyticsModule } from 'src/analytics/analytics.module'
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { QueueProducerModule } from '../queue/producer/queueProducer.module'
     StripeModule,
     forwardRef(() => CampaignsModule),
     QueueProducerModule,
+    AnalyticsModule,
   ],
   controllers: [DomainsController, WebsitesController],
   providers: [
