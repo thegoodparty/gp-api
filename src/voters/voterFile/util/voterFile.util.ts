@@ -281,12 +281,12 @@ function extractLocation(
   //  It just returns "CLARK": https://codesandbox.io/p/sandbox/4rs4vq
   const extracted = input.replace(/##$/, '')
 
-  const res = extracted
+  const location = extracted
     ?.split('##')
     ?.at(fixColumns ? 1 : -1)
     ?.replace(' (EST.)', '')
-  logger.debug({ res }, 'Extracted:')
-  return res
+  logger.debug({ location }, 'Extracted:')
+  return location
 }
 
 function fixCityCountyColumns(value: string) {
