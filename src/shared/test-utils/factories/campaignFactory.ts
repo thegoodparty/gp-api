@@ -1,7 +1,17 @@
 import { Campaign, CampaignTier } from '@prisma/client'
-import { CampaignLaunchStatus, OnboardingStep } from '@goodparty_org/contracts'
+import {
+  BallotReadyPositionLevel,
+  CampaignLaunchStatus,
+  OnboardingStep,
+} from '@goodparty_org/contracts'
 import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
 import { generateFactory } from './generate'
+
+/**
+ * Fixed timestamp used for aiContent fields — avoids non-determinism from Date.now()
+ * which would cause deep equality assertions to fail between factory calls.
+ */
+const FIXED_AI_CONTENT_TIMESTAMP = new Date('2024-01-01T00:00:00Z').getTime()
 
 /**
  * Counter for generating unique campaign data in tests
@@ -26,8 +36,11 @@ export function resetCampaignCounter() {
  * // Create a pro campaign
  * const proCampaign = campaignFactory({ userId: 1, isPro: true })
  */
-export const campaignFactory = generateFactory<Campaign>(() => {
-  const id = campaignCounter++
+export const campaignFactory = generateFactory<Campaign>((args) => {
+  // Only advance the counter when id is not being overridden, so that
+  // campaignFactory({ id: 99 }) produces a consistent { id: 99, slug: 'test-campaign-99' }
+  // without consuming a counter slot.
+  const id = 'id' in args ? (args.id as number) : campaignCounter++
   // NOTE: putting generationStatus in the object literal below gives a TS error
   // due to the `& Record<string, AiContentData>` intersection in CampaignAiContent.
   // Assign it via bracket notation after creation instead (same pattern as seed factory).
@@ -35,7 +48,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     launchSocialMediaCopy: {
       name: 'Launch Social Media Copy',
       content: '<p>Test campaign announcement</p>',
-      updatedAt: Date.now(),
+      updatedAt: FIXED_AI_CONTENT_TIMESTAMP,
       inputValues: {},
     },
   }
@@ -43,7 +56,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     launchSocialMediaCopy: {
       prompt: 'Generate launch social media copy',
       status: GenerationStatus.completed,
-      createdAt: Date.now(),
+      createdAt: FIXED_AI_CONTENT_TIMESTAMP,
     },
   }
   return {
@@ -69,7 +82,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     details: {
       state: 'CA',
       zip: '90210',
-      ballotLevel: 'CITY',
+      ballotLevel: BallotReadyPositionLevel.CITY,
       electionDate: '2024-11-05',
       primaryElectionDate: '2024-06-05',
       geoLocation: {},

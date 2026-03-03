@@ -24,6 +24,7 @@ import {
   createMockLogger,
   userFactory,
   campaignFactory,
+  resetAllCounters,
 } from '@/shared/test-utils'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -120,6 +121,8 @@ describe('PeerlyIdentityService', () => {
   const baseDomain = createMockDomain()
 
   beforeEach(async () => {
+    resetAllCounters()
+
     const mockPostFn = vi
       .fn()
       .mockImplementation((_url: string, data: Record<string, unknown>) => {

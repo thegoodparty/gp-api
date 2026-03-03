@@ -5,10 +5,16 @@ import {
   campaignFactory,
   createProCampaign,
   createAdminUser,
+  createCandidateUser,
+  createCampaignManagerUser,
   createCampaignWithUser,
   createProCampaignWithUser,
+  createVerifiedCampaign,
+  createDemoCampaign,
+  createCampaignWithFreeTexts,
   resetUserCounter,
   resetCampaignCounter,
+  resetAllCounters,
 } from '../index'
 
 describe('Test Factories', () => {
@@ -71,6 +77,36 @@ describe('Test Factories', () => {
     })
   })
 
+  describe('createCandidateUser', () => {
+    it('should create a user with candidate role', () => {
+      const candidate = createCandidateUser()
+
+      expect(candidate.roles).toEqual([UserRole.candidate])
+    })
+
+    it('should allow overriding candidate user properties', () => {
+      const candidate = createCandidateUser({ email: 'candidate@example.com' })
+
+      expect(candidate.roles).toEqual([UserRole.candidate])
+      expect(candidate.email).toBe('candidate@example.com')
+    })
+  })
+
+  describe('createCampaignManagerUser', () => {
+    it('should create a user with campaignManager role', () => {
+      const manager = createCampaignManagerUser()
+
+      expect(manager.roles).toEqual([UserRole.campaignManager])
+    })
+
+    it('should allow overriding campaign manager properties', () => {
+      const manager = createCampaignManagerUser({ email: 'mgr@example.com' })
+
+      expect(manager.roles).toEqual([UserRole.campaignManager])
+      expect(manager.email).toBe('mgr@example.com')
+    })
+  })
+
   describe('campaignFactory', () => {
     it('should create a campaign with default values', () => {
       const campaign = campaignFactory()
@@ -107,6 +143,52 @@ describe('Test Factories', () => {
       expect(campaign1.slug).toBe('test-campaign-1')
       expect(campaign2.slug).toBe('test-campaign-2')
       expect(campaign3.slug).toBe('test-campaign-3')
+    })
+  })
+
+  describe('createVerifiedCampaign', () => {
+    it('should create a verified campaign with a verification date', () => {
+      const campaign = createVerifiedCampaign()
+
+      expect(campaign.isVerified).toBe(true)
+      expect(campaign.dateVerified).toEqual(new Date('2024-01-15T00:00:00Z'))
+    })
+
+    it('should allow overriding verified campaign properties', () => {
+      const campaign = createVerifiedCampaign({ userId: 7 })
+
+      expect(campaign.isVerified).toBe(true)
+      expect(campaign.userId).toBe(7)
+    })
+  })
+
+  describe('createDemoCampaign', () => {
+    it('should create a demo campaign', () => {
+      const campaign = createDemoCampaign()
+
+      expect(campaign.isDemo).toBe(true)
+    })
+
+    it('should allow overriding demo campaign properties', () => {
+      const campaign = createDemoCampaign({ userId: 8 })
+
+      expect(campaign.isDemo).toBe(true)
+      expect(campaign.userId).toBe(8)
+    })
+  })
+
+  describe('createCampaignWithFreeTexts', () => {
+    it('should create a campaign with free texts offer', () => {
+      const campaign = createCampaignWithFreeTexts()
+
+      expect(campaign.hasFreeTextsOffer).toBe(true)
+    })
+
+    it('should allow overriding free texts campaign properties', () => {
+      const campaign = createCampaignWithFreeTexts({ userId: 9 })
+
+      expect(campaign.hasFreeTextsOffer).toBe(true)
+      expect(campaign.userId).toBe(9)
     })
   })
 
@@ -185,6 +267,66 @@ describe('Test Factories', () => {
 
       const campaign3 = campaignFactory()
       expect(campaign3.id).toBe(1) // Counter reset
+    })
+
+    it('resetAllCounters should reset both counters at once', () => {
+      userFactory() // id: 1
+      userFactory() // id: 2
+      campaignFactory() // id: 1
+      campaignFactory() // id: 2
+
+      resetAllCounters()
+
+      expect(userFactory().id).toBe(1)
+      expect(campaignFactory().id).toBe(1)
+    })
+  })
+
+  describe('id override does not advance counter', () => {
+    it('user counter should not advance when id is overridden', () => {
+      const user = userFactory({ id: 99 })
+
+      expect(user.id).toBe(99)
+      // Counter was not consumed, so next auto-id is still 1
+      expect(userFactory().id).toBe(1)
+    })
+
+    it('user email should be consistent with the overridden id', () => {
+      const user = userFactory({ id: 5 })
+
+      // Email should reflect the provided id, not the counter value
+      expect(user.email).toBe('testuser5@goodparty.org')
+    })
+
+    it('campaign counter should not advance when id is overridden', () => {
+      const campaign = campaignFactory({ id: 99 })
+
+      expect(campaign.id).toBe(99)
+      // Counter was not consumed, so next auto-id is still 1
+      expect(campaignFactory().id).toBe(1)
+    })
+
+    it('campaign slug should be consistent with the overridden id', () => {
+      const campaign = campaignFactory({ id: 7 })
+
+      // Slug should reflect the provided id, not the counter value
+      expect(campaign.slug).toBe('test-campaign-7')
+    })
+  })
+
+  describe('shallow merge behaviour', () => {
+    it('roles array is fully replaced, not merged, when overridden', () => {
+      const user = userFactory({ roles: [UserRole.admin, UserRole.candidate] })
+
+      // The entire roles array is replaced, not appended to the default [UserRole.candidate]
+      expect(user.roles).toEqual([UserRole.admin, UserRole.candidate])
+      expect(user.roles).toHaveLength(2)
+    })
+
+    it('completedTaskIds array is fully replaced when overridden', () => {
+      const campaign = campaignFactory({ completedTaskIds: [10, 20] })
+
+      expect(campaign.completedTaskIds).toEqual([10, 20])
     })
   })
 

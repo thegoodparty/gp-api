@@ -24,8 +24,11 @@ export function resetUserCounter() {
  * // Create a user with specific properties
  * const admin = userFactory({ roles: [UserRole.admin], email: 'admin@test.com' })
  */
-export const userFactory = generateFactory<User>(() => {
-  const id = userCounter++
+export const userFactory = generateFactory<User>((args) => {
+  // Only advance the counter when id is not being overridden, so that
+  // userFactory({ id: 99 }) produces a consistent { id: 99, email: 'testuser99@...' }
+  // without consuming a counter slot.
+  const id = 'id' in args ? (args.id as number) : userCounter++
   return {
     id,
     createdAt: new Date('2024-01-01T00:00:00Z'),

@@ -33,3 +33,16 @@ export {
   createCampaignWithFreeTexts,
   createProCampaignWithUser,
 } from './campaignFactory'
+
+import { resetUserCounter } from './userFactory'
+import { resetCampaignCounter } from './campaignFactory'
+
+/**
+ * Resets all factory counters to 1.
+ * Call this in beforeEach for complete test isolation without needing to
+ * know which individual reset functions exist.
+ */
+export function resetAllCounters() {
+  resetUserCounter()
+  resetCampaignCounter()
+}
