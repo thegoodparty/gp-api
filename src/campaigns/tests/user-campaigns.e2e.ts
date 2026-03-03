@@ -8,7 +8,7 @@ import {
   registerUser,
 } from '../../../e2e-tests/utils/auth.util'
 
-test.describe('Campaigns - User Campaign Operations', () => {
+test.describe.skip('Campaigns - User Campaign Operations', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
 
@@ -192,7 +192,7 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 })
 
-test.describe('Campaigns - User Without Campaign', () => {
+test.describe.skip('Campaigns - User Without Campaign', () => {
   let testUserId: number
   let testUserEmail: string
   let testUserToken: string

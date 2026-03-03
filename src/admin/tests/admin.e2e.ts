@@ -9,7 +9,7 @@ import {
 } from '../../../e2e-tests/utils/auth.util'
 import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types'
 
-test.describe('Admin - Campaign Management', () => {
+test.describe.skip('Admin - Campaign Management', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
 

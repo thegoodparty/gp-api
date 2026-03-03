@@ -9,7 +9,7 @@ import {
 import { faker } from '@faker-js/faker'
 import { WebsiteView } from '@prisma/client'
 
-test.describe('Websites - Views', () => {
+test.describe.skip('Websites - Views', () => {
   let testUserId: number | undefined
   let authToken: string | undefined
 

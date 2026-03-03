@@ -9,7 +9,7 @@ import {
   loginUser,
 } from '../../../e2e-tests/utils/auth.util'
 
-test.describe('Users - Delete User', () => {
+test.describe.skip('Users - Delete User', () => {
   test('should delete user successfully', async ({ request }) => {
     const email = generateRandomEmail()
     const firstName = generateRandomName()

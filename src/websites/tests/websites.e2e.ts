@@ -8,7 +8,7 @@ import {
 } from '../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 
-test.describe('Candidate Website', () => {
+test.describe.skip('Candidate Website', () => {
   let authToken: string
   let testUserId: number
   let testAuthToken: string

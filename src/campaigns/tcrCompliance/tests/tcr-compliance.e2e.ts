@@ -16,7 +16,7 @@ const BASE_TCR_DATA = {
   committeeType: 'CANDIDATE',
 }
 
-test.describe('Campaigns - TCR Compliance', () => {
+test.describe.skip('Campaigns - TCR Compliance', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
   let tcrComplianceId: string

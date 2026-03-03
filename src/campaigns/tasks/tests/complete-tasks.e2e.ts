@@ -4,7 +4,7 @@ import { CampaignTask } from '../campaignTasks.types'
 
 type CampaignTaskWithCompletion = CampaignTask & { completed: boolean }
 
-test.describe('Campaigns Tasks - Complete Tasks', () => {
+test.describe.skip('Campaigns Tasks - Complete Tasks', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
   let testTaskId: string

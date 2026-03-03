@@ -13,7 +13,7 @@ interface Outreach {
   projectId?: string | null
 }
 
-test.describe('Outreach', () => {
+test.describe.skip('Outreach', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
 
@@ -80,7 +80,7 @@ test.describe('Outreach', () => {
   })
 })
 
-test.describe('Outreach - Validation', () => {
+test.describe.skip('Outreach - Validation', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
 

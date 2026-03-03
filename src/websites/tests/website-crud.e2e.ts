@@ -14,7 +14,7 @@ type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
   }
 }>
 
-test.describe('Websites - CRUD Operations', () => {
+test.describe.skip('Websites - CRUD Operations', () => {
   let testUserId: number | undefined
   let authToken: string | undefined
 

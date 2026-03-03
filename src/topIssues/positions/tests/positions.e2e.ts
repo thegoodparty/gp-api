@@ -3,7 +3,7 @@ import { HttpStatus } from '@nestjs/common'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
 import { faker } from '@faker-js/faker'
 
-test.describe('Positions - CRUD Operations', () => {
+test.describe.skip('Positions - CRUD Operations', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
 

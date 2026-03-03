@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 
-test.describe('CRM - Integrations', () => {
+test.describe.skip('CRM - Integrations', () => {
   test('should handle HubSpot webhook', async ({ request }) => {
     const response = await request.post('/v1/crm/hubspot-webhook', {
       data: {

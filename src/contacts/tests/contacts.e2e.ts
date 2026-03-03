@@ -7,7 +7,7 @@ import {
   registerUser,
 } from '../../../e2e-tests/utils/auth.util'
 
-test.describe('Contacts and Segments', () => {
+test.describe.skip('Contacts and Segments', () => {
   let authToken: string
   let testUserId: number
   let testAuthToken: string

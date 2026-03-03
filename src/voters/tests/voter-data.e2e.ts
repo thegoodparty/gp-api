@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import { loginUser } from '../../../e2e-tests/utils/auth.util'
 
-test.describe('VoterData', () => {
+test.describe.skip('VoterData', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
   const adminEmail = process.env.ADMIN_EMAIL

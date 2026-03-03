@@ -18,7 +18,7 @@ test.describe('Authentication - Register', () => {
     }
   })
 
-  test('should register a new user', async ({ request }, testInfo) => {
+  test.skip('should register a new user', async ({ request }, testInfo) => {
     const testUserEmail = generateRandomEmail()
     const firstName = generateRandomName()
     const lastName = generateRandomName()

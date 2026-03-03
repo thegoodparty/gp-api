@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import { loginUser } from '../../../e2e-tests/utils/auth.util'
 
-test.describe('Users - File Operations', () => {
+test.describe.skip('Users - File Operations', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
 

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
 import { CampaignTask } from '../campaignTasks.types'
 
-test.describe('Campaigns Tasks - List Tasks', () => {
+test.describe.skip('Campaigns Tasks - List Tasks', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
 

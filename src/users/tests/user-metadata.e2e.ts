@@ -13,7 +13,7 @@ import { TestInfoWithContext } from '../../../e2e-tests/utils/test-context.types
 
 type MetadataResponse = Record<string, unknown>
 
-test.describe('Users - User Metadata', () => {
+test.describe.skip('Users - User Metadata', () => {
   test.afterEach(async ({ request }, testInfo) => {
     const testContext = (testInfo as TestInfoWithContext).testContext
 

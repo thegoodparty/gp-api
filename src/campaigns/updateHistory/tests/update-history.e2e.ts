@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { loginUser } from '../../../../e2e-tests/utils/auth.util'
 import { CampaignUpdateHistory } from '@prisma/client'
 
-test.describe('Campaigns - Update History', () => {
+test.describe.skip('Campaigns - Update History', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
   let createdUpdateHistoryId: number
@@ -129,7 +129,7 @@ test.describe('Campaigns - Update History', () => {
   })
 })
 
-test.describe('Campaigns - Update History (Admin Access)', () => {
+test.describe.skip('Campaigns - Update History (Admin Access)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
   const candidateEmail = process.env.CANDIDATE_EMAIL

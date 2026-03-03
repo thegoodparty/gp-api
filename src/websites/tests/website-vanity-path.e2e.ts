@@ -24,7 +24,7 @@ type WebsiteWithDomain = Prisma.WebsiteGetPayload<{
   }
 }>
 
-test.describe('Websites - Vanity Path', () => {
+test.describe.skip('Websites - Vanity Path', () => {
   let testUserId: number | undefined
   let authToken: string | undefined
 

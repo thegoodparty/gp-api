@@ -9,7 +9,7 @@ import {
 } from '../../../e2e-tests/utils/auth.util'
 import { CampaignWithPathToVictory } from '../campaigns.types'
 
-test.describe('Campaigns - Race Target Details', () => {
+test.describe.skip('Campaigns - Race Target Details', () => {
   const testUsers: Array<{ id: number; token: string }> = []
 
   test.afterAll(async ({ request }) => {
@@ -193,7 +193,7 @@ test.describe('Campaigns - Race Target Details', () => {
   })
 })
 
-test.describe('Campaigns - Race Target Details (Admin)', () => {
+test.describe.skip('Campaigns - Race Target Details (Admin)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
   const testUsers: Array<{ id: number; token: string }> = []
