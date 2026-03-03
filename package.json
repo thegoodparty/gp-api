@@ -9,6 +9,7 @@
     "contracts"
   ],
   "scripts": {
+    "ai-rules:update": "git submodule update --remote ai-rules",
     "build:contracts": "tsx scripts/build-contracts.ts",
     "build": "npm run build:contracts && nest build",
     "format": "prettier --write \"src/**/*.ts\"",
