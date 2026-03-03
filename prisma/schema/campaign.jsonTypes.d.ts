@@ -61,7 +61,7 @@ declare global {
       filingPeriodsStart?: string | null
       filingPeriodsEnd?: string | null
       officeTermLength?: string
-      partisanType?: string
+      partisanType?: string | null
       priorElectionDates?: string[]
       positionId?: string | null
       electionId?: string | null
