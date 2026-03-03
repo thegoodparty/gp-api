@@ -13,8 +13,7 @@ describe('ElectedOfficeController', () => {
         userId: service.user.id,
         slug: `test-campaign-${Date.now()}`,
         details: {
-          positionId:
-            'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
+          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
         },
       },
     })

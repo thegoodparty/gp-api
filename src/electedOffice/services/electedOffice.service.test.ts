@@ -1,6 +1,13 @@
 import { ConflictException } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
-import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
+} from 'vitest'
 import { ElectionsService } from '@/elections/services/elections.service'
 import {
   CreateElectedOfficeArgs,
@@ -20,7 +27,9 @@ const mockPositionResponse = {
 
 describe('ElectedOfficeService', () => {
   let service: ElectedOfficeService
-  let mockGetPosition: MockedFunction<ElectionsService['getPositionByBallotReadyId']>
+  let mockGetPosition: MockedFunction<
+    ElectionsService['getPositionByBallotReadyId']
+  >
   let mockOrgCreate: ReturnType<typeof vi.fn>
   let mockEoCreate: ReturnType<typeof vi.fn>
   let mockModel: {
@@ -33,7 +42,9 @@ describe('ElectedOfficeService', () => {
   }
 
   beforeEach(() => {
-    mockGetPosition = vi.fn().mockResolvedValue(mockPositionResponse) as MockedFunction<
+    mockGetPosition = vi
+      .fn()
+      .mockResolvedValue(mockPositionResponse) as MockedFunction<
       ElectionsService['getPositionByBallotReadyId']
     >
     mockOrgCreate = vi.fn().mockResolvedValue({})
@@ -67,9 +78,9 @@ describe('ElectedOfficeService', () => {
       count: vi.fn(),
     }
 
-    service = new ElectedOfficeService(
-      { getPositionByBallotReadyId: mockGetPosition } as unknown as ElectionsService,
-    )
+    service = new ElectedOfficeService({
+      getPositionByBallotReadyId: mockGetPosition,
+    } as unknown as ElectionsService)
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
       configurable: true,
@@ -222,7 +233,8 @@ describe('ElectedOfficeService', () => {
       await service.create(createArgs)
 
       const orgSlug = mockOrgCreate.mock.calls[0][0].data.slug as string
-      const eoOrgSlug = mockEoCreate.mock.calls[0][0].data.organizationSlug as string
+      const eoOrgSlug = mockEoCreate.mock.calls[0][0].data
+        .organizationSlug as string
       expect(orgSlug).toBe(eoOrgSlug)
     })
   })
