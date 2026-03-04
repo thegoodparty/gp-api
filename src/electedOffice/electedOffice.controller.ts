@@ -1,3 +1,5 @@
+import { IncomingRequest } from '@/authentication/authentication.types'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import {
   BadRequestException,
   Body,
@@ -13,20 +15,17 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { ElectedOfficeService } from './services/electedOffice.service'
+import { Prisma, User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
-import { Prisma } from '@prisma/client'
 import { toDateOnlyString } from 'src/shared/util/date.util'
+import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import {
   CreateElectedOfficeDto,
   UpdateElectedOfficeDto,
 } from './schemas/electedOffice.schema'
-import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
-import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import { ListElectedOfficePaginationSchema } from './schemas/ListElectedOfficePagination.schema'
-import { IncomingRequest } from '@/authentication/authentication.types'
+import { ElectedOfficeService } from './services/electedOffice.service'
 
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)
@@ -92,6 +91,8 @@ export class ElectedOfficeController {
       userId: user.id,
       campaignId: campaign.id,
       ballotreadyPositionId: campaign.details.positionId,
+      office: campaign.details.office,
+      otherOffice: campaign.details.otherOffice,
     })
     return this.toApi(created)
   }

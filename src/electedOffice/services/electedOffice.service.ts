@@ -1,3 +1,5 @@
+import { ElectionsService } from '@/elections/services/elections.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ConflictException, Injectable } from '@nestjs/common'
 import { ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -8,9 +10,8 @@ import {
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
-import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 import { v7 as uuidv7 } from 'uuid'
-import { ElectionsService } from '@/elections/services/elections.service'
+import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 
 export type CreateElectedOfficeArgs = {
   ballotreadyPositionId: string
@@ -22,6 +23,8 @@ export type CreateElectedOfficeArgs = {
   isActive?: boolean
   userId: number
   campaignId: number
+  office?: string
+  otherOffice?: string
 }
 
 @Injectable()
@@ -63,6 +66,13 @@ export class ElectedOfficeService extends createPrismaBase(
       args.ballotreadyPositionId,
     )
 
+    const customPositionName = !position
+      ? OrganizationsService.resolveCustomPositionName(
+          args.office,
+          args.otherOffice,
+        )
+      : null
+
     return this.client.$transaction(async (tx) => {
       const id = uuidv7()
 
@@ -71,6 +81,7 @@ export class ElectedOfficeService extends createPrismaBase(
           slug: `eo-${id}`,
           ownerId: args.userId,
           positionId: position?.id ?? null,
+          customPositionName,
         },
       })
 

@@ -19,6 +19,22 @@ export class OrganizationsService extends createPrismaBase(
     super()
   }
 
+  static campaignOrgSlug(campaignId: number): string {
+    return `campaign-${campaignId}`
+  }
+
+  static electedOfficeOrgSlug(electedOfficeId: string): string {
+    return `eo-${electedOfficeId}`
+  }
+
+  static resolveCustomPositionName(
+    office?: string,
+    otherOffice?: string,
+  ): string | null {
+    const resolved = office === 'Other' ? otherOffice : office
+    return resolved || null
+  }
+
   async listOrganizations(userId: number) {
     const orgs = await this.model.findMany({ where: { ownerId: userId } })
     return await Promise.all(orgs.map((org) => this.withPosition(org)))
@@ -33,6 +49,15 @@ export class OrganizationsService extends createPrismaBase(
     }
 
     return this.withPosition(org)
+  }
+
+  async setOverrideDistrictId(slug: string, districtId: string | null) {
+    const existing = await this.model.findUnique({ where: { slug } })
+    if (!existing) return null
+    return this.model.update({
+      where: { slug },
+      data: { overrideDistrictId: districtId },
+    })
   }
 
   private async withPosition(org: Organization) {

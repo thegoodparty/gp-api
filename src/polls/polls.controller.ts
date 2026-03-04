@@ -1,3 +1,7 @@
+import { CampaignWithPathToVictory } from '@/campaigns/campaigns.types'
+import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
+import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
+import { ContactsService } from '@/contacts/services/contacts.service'
 import {
   BadRequestException,
   Body,
@@ -12,8 +16,8 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { ElectedOffice, Poll, PollIssue, User } from '@prisma/client'
-import { v7 as uuidv7 } from 'uuid'
 import { orderBy } from 'lodash'
+import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -22,20 +26,16 @@ import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
+import { v7 as uuidv7 } from 'uuid'
 import z from 'zod'
 import { APIPoll, APIPollIssue, derivePollStatus } from './polls.types'
 import { AnalyzePollBiasDto } from './schemas/analyzePollBias.schema'
 import { CreatePollDto } from './schemas/poll.schema'
 import { PollBiasAnalysisService } from './services/pollBiasAnalysis.service'
 import { PollIssuesService } from './services/pollIssues.service'
+import { PollResponsesDownloadService } from './services/pollResponsesDownload.service'
 import { PollsService } from './services/polls.service'
 import { BiasAnalysisResponse } from './types/pollBias.types'
-import { PollResponsesDownloadService } from './services/pollResponsesDownload.service'
-import { ContactsService } from '@/contacts/services/contacts.service'
-import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
-import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
-import { CampaignWithPathToVictory } from '@/campaigns/campaigns.types'
-import { PinoLogger } from 'nestjs-pino'
 
 class ListPollsQueryDTO extends createZodDto(
   z.object({
@@ -164,6 +164,8 @@ export class PollsController {
         swornInDate,
         electedDate: null,
         ballotreadyPositionId: campaign.details.positionId,
+        office: campaign.details.office,
+        otherOffice: campaign.details.otherOffice,
       })
       // END OF TEMPORARY FIX
     } else {
