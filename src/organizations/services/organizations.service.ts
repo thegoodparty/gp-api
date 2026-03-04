@@ -35,6 +35,26 @@ export class OrganizationsService extends createPrismaBase(
     return resolved || null
   }
 
+  // Used by UseOrganizationGuard to resolve the campaign slug from the user id
+  async resolveCampaignSlug(userId: number): Promise<string | null> {
+    // this is a client call to simplify dependency injection
+    const campaign = await this.client.campaign.findFirst({
+      where: { userId },
+      select: { id: true },
+    })
+    return campaign ? OrganizationsService.campaignOrgSlug(campaign.id) : null
+  }
+
+  // Used by UseOrganizationGuard to resolve the elected office slug from the user id
+  async resolveElectedOfficeSlug(userId: number): Promise<string | null> {
+    // this is a client call to simplify dependency injection
+    const eo = await this.client.electedOffice.findFirst({
+      where: { userId, isActive: true },
+      select: { id: true },
+    })
+    return eo ? OrganizationsService.electedOfficeOrgSlug(eo.id) : null
+  }
+
   async listOrganizations(userId: number) {
     const orgs = await this.model.findMany({ where: { ownerId: userId } })
     return await Promise.all(orgs.map((org) => this.withPosition(org)))

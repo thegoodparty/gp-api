@@ -7,8 +7,6 @@ import {
 import { Reflector } from '@nestjs/core'
 import { Organization } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import {
   REQUIRE_ORGANIZATION_META_KEY,
   RequireOrganizationMetadata,
@@ -36,8 +34,6 @@ import { OrganizationsService } from '../services/organizations.service'
 export class UseOrganizationGuard implements CanActivate {
   constructor(
     private readonly organizationsService: OrganizationsService,
-    private readonly campaignsService: CampaignsService,
-    private readonly electedOfficeService: ElectedOfficeService,
     private readonly reflector: Reflector,
     private readonly logger: PinoLogger,
   ) {
@@ -68,18 +64,14 @@ export class UseOrganizationGuard implements CanActivate {
     // The header always wins — fallback is only used when the header is absent.
     if (!slug && fallback === 'campaign') {
       // Derive slug from the user's campaign (e.g. "campaign-100").
-      const campaign = await this.campaignsService.findByUserId(userId)
-      if (campaign) {
-        slug = OrganizationsService.campaignOrgSlug(campaign.id)
-      }
+      slug =
+        (await this.organizationsService.resolveCampaignSlug(userId)) ??
+        undefined
     } else if (!slug && fallback === 'elected-office') {
       // Derive slug from the user's active elected office (e.g. "eo-abc-123").
-      const electedOffice = await this.electedOfficeService.findFirst({
-        where: { userId, isActive: true },
-      })
-      if (electedOffice) {
-        slug = OrganizationsService.electedOfficeOrgSlug(electedOffice.id)
-      }
+      slug =
+        (await this.organizationsService.resolveElectedOfficeSlug(userId)) ??
+        undefined
     }
 
     // Step 3: If we still don't have a slug (no header + no fallback match),

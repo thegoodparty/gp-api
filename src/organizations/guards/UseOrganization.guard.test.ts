@@ -2,8 +2,6 @@ import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { ExecutionContext, NotFoundException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { Organization } from '@prisma/client'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RequireOrganizationMetadata } from '../decorators/UseOrganization.decorator'
 import { OrganizationsService } from '../services/organizations.service'
@@ -20,8 +18,6 @@ const mockOrg: Organization = {
 describe('UseOrganizationGuard', () => {
   let guard: UseOrganizationGuard
   let organizationsService: OrganizationsService
-  let campaignsService: CampaignsService
-  let electedOfficeService: ElectedOfficeService
   let reflector: Reflector
 
   function buildContext(
@@ -43,15 +39,9 @@ describe('UseOrganizationGuard', () => {
   beforeEach(() => {
     organizationsService = {
       findFirst: vi.fn(),
+      resolveCampaignSlug: vi.fn(),
+      resolveElectedOfficeSlug: vi.fn(),
     } as unknown as OrganizationsService
-
-    campaignsService = {
-      findByUserId: vi.fn(),
-    } as unknown as CampaignsService
-
-    electedOfficeService = {
-      findFirst: vi.fn(),
-    } as unknown as ElectedOfficeService
 
     reflector = {
       getAllAndOverride: vi.fn().mockReturnValue({}),
@@ -59,8 +49,6 @@ describe('UseOrganizationGuard', () => {
 
     guard = new UseOrganizationGuard(
       organizationsService,
-      campaignsService,
-      electedOfficeService,
       reflector,
       createMockLogger(),
     )
@@ -128,23 +116,23 @@ describe('UseOrganizationGuard', () => {
       const ctx = buildContext({ 'x-organization-slug': 'campaign-100' })
       await guard.canActivate(ctx)
 
-      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
+      expect(organizationsService.resolveCampaignSlug).not.toHaveBeenCalled()
     })
   })
 
   describe('fallback: campaign', () => {
     it('derives slug from campaign and attaches org', async () => {
       mockMetadata({ fallback: 'campaign' })
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue({
-        id: 100,
-      } as never)
+      vi.spyOn(organizationsService, 'resolveCampaignSlug').mockResolvedValue(
+        'campaign-100',
+      )
       vi.spyOn(organizationsService, 'findFirst').mockResolvedValue(mockOrg)
 
       const ctx = buildContext()
       const result = await guard.canActivate(ctx)
 
       expect(result).toBe(true)
-      expect(campaignsService.findByUserId).toHaveBeenCalledWith(1)
+      expect(organizationsService.resolveCampaignSlug).toHaveBeenCalledWith(1)
       expect(organizationsService.findFirst).toHaveBeenCalledWith({
         where: { slug: 'campaign-100', ownerId: 1 },
         include: undefined,
@@ -157,8 +145,8 @@ describe('UseOrganizationGuard', () => {
 
     it('throws NotFoundException when no campaign found', async () => {
       mockMetadata({ fallback: 'campaign' })
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(
-        null as never,
+      vi.spyOn(organizationsService, 'resolveCampaignSlug').mockResolvedValue(
+        null,
       )
 
       const ctx = buildContext()
@@ -168,8 +156,8 @@ describe('UseOrganizationGuard', () => {
 
     it('returns true without org when no campaign and continueIfNotFound', async () => {
       mockMetadata({ fallback: 'campaign', continueIfNotFound: true })
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(
-        null as never,
+      vi.spyOn(organizationsService, 'resolveCampaignSlug').mockResolvedValue(
+        null,
       )
 
       const ctx = buildContext()
@@ -183,18 +171,19 @@ describe('UseOrganizationGuard', () => {
     it('derives slug from elected office and attaches org', async () => {
       const eoOrg: Organization = { ...mockOrg, slug: 'eo-abc-123' }
       mockMetadata({ fallback: 'elected-office' })
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue({
-        id: 'abc-123',
-      } as never)
+      vi.spyOn(
+        organizationsService,
+        'resolveElectedOfficeSlug',
+      ).mockResolvedValue('eo-abc-123')
       vi.spyOn(organizationsService, 'findFirst').mockResolvedValue(eoOrg)
 
       const ctx = buildContext()
       const result = await guard.canActivate(ctx)
 
       expect(result).toBe(true)
-      expect(electedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { userId: 1, isActive: true },
-      })
+      expect(
+        organizationsService.resolveElectedOfficeSlug,
+      ).toHaveBeenCalledWith(1)
       expect(organizationsService.findFirst).toHaveBeenCalledWith({
         where: { slug: 'eo-abc-123', ownerId: 1 },
         include: undefined,
@@ -207,7 +196,10 @@ describe('UseOrganizationGuard', () => {
 
     it('throws NotFoundException when no elected office found', async () => {
       mockMetadata({ fallback: 'elected-office' })
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(null)
+      vi.spyOn(
+        organizationsService,
+        'resolveElectedOfficeSlug',
+      ).mockResolvedValue(null)
 
       const ctx = buildContext()
 
