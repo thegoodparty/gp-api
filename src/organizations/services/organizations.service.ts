@@ -52,6 +52,82 @@ export class OrganizationsService extends createPrismaBase(
   }
 
   /**
+   * Resolves positionId, customPositionName, and overrideDistrictId for an
+   * elected office organization. If the campaign already has an organization,
+   * copies its resolved fields instead of re-resolving from the election API.
+   */
+  async resolveOrgData(params: {
+    campaignId: number
+    ballotReadyPositionId: string
+    office?: string
+    otherOffice?: string
+    state?: string
+    L2DistrictType?: string
+    L2DistrictName?: string
+  }): Promise<{
+    positionId: string | null
+    customPositionName: string | null
+    overrideDistrictId: string | null
+  }> {
+    const {
+      campaignId,
+      ballotReadyPositionId,
+      office,
+      otherOffice,
+      state,
+      L2DistrictType,
+      L2DistrictName,
+    } = params
+
+    // If the campaign already has an organization, copy its resolved fields
+    // instead of re-resolving from the election API.
+    const campaignOrgSlug = OrganizationsService.campaignOrgSlug(campaignId)
+    const campaignOrg = (await this.model.findUnique({
+      where: { slug: campaignOrgSlug },
+    })) as Organization | null
+
+    if (campaignOrg) {
+      return {
+        positionId: campaignOrg.positionId,
+        customPositionName: campaignOrg.customPositionName,
+        overrideDistrictId: campaignOrg.overrideDistrictId,
+      }
+    }
+
+    // No campaign org exists — resolve from the election API.
+    const positionId = await this.resolvePositionId(ballotReadyPositionId)
+    const customPositionName = OrganizationsService.resolveCustomPositionName(
+      office,
+      otherOffice,
+    )
+
+    let overrideDistrictId: string | null = null
+    if (state && L2DistrictType && L2DistrictName) {
+      overrideDistrictId = await this.resolveOverrideDistrictId({
+        positionId: ballotReadyPositionId,
+        state,
+        L2DistrictType,
+        L2DistrictName,
+      })
+    }
+
+    return { positionId, customPositionName, overrideDistrictId }
+  }
+
+  /**
+   * Resolves the election-api position ID from a BallotReady position ID.
+   * Returns null if the position cannot be found.
+   */
+  async resolvePositionId(
+    ballotReadyPositionId: string,
+  ): Promise<string | null> {
+    const position = await this.electionsService
+      .getPositionByBallotReadyId(ballotReadyPositionId)
+      .catch(() => null)
+    return position?.id ?? null
+  }
+
+  /**
    * Resolves the override district ID for a given position and district selection.
    * Returns null if the selected district exactly matches the position's natural
    * district (no override needed), or the district UUID if it differs.
