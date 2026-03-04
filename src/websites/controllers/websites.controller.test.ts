@@ -99,23 +99,6 @@ describe('WebsitesController', () => {
       expect(mockAnalytics.track).not.toHaveBeenCalled()
     })
 
-    it('should track Published event when hasEverBeenPublished is null (treats as never published)', async () => {
-      mockWebsitesService.findUniqueOrThrow.mockResolvedValue({
-        content: {},
-        hasEverBeenPublished: null,
-      })
-
-      const body = new UpdateWebsiteSchema()
-      body.status = WebsiteStatus.published
-
-      await controller.updateWebsite(mockUser, mockCampaign, body)
-
-      expect(mockAnalytics.track).toHaveBeenCalledWith(
-        mockUser.id,
-        EVENTS.CandidateWebsite.Published,
-      )
-    })
-
     it('should not track Published event when status is not provided', async () => {
       const body = new UpdateWebsiteSchema()
 

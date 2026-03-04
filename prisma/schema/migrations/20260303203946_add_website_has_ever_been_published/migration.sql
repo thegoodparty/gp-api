@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "website" ADD COLUMN     "has_ever_been_published" BOOLEAN DEFAULT false;
+ALTER TABLE "website" ADD COLUMN     "has_ever_been_published" BOOLEAN NOT NULL DEFAULT false;
 
 -- Backfill: websites currently published
 UPDATE "website" SET "has_ever_been_published" = true
