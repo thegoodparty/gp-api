@@ -138,7 +138,10 @@ export class OrganizationsService extends createPrismaBase(
     L2DistrictType: string
     L2DistrictName: string
   }): Promise<string | null> {
-    const { positionId, state, L2DistrictType, L2DistrictName } = params
+    const { positionId, state, L2DistrictType } = params
+    const L2DistrictName = this.electionsService.cleanDistrictName(
+      params.L2DistrictName,
+    )
 
     if (positionId) {
       // Position lookup is best-effort — if it fails, fall through to override.
