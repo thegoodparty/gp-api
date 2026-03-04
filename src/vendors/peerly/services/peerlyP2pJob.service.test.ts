@@ -99,7 +99,7 @@ describe('PeerlyP2pJobService', () => {
       )
     })
 
-    it('calls media, createJob, assignList, requestCanvassers in order', async () => {
+    it('calls media, createJob, assignList in order', async () => {
       const callOrder: string[] = []
       mockMediaService.createMedia.mockImplementation(async () => {
         callOrder.push('createMedia')
@@ -112,9 +112,6 @@ describe('PeerlyP2pJobService', () => {
       mockSmsService.assignListToJob.mockImplementation(async () => {
         callOrder.push('assignListToJob')
       })
-      mockSmsService.requestCanvassers.mockImplementation(async () => {
-        callOrder.push('requestCanvassers')
-      })
 
       await service.createPeerlyP2pJob({
         ...baseJobParams,
@@ -126,8 +123,8 @@ describe('PeerlyP2pJobService', () => {
         'createMedia',
         'createJob',
         'assignListToJob',
-        'requestCanvassers',
       ])
+      expect(mockSmsService.requestCanvassers).not.toHaveBeenCalled()
     })
 
     it('passes media ID from createMedia to createJob templates', async () => {

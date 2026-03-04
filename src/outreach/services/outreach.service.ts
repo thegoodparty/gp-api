@@ -98,7 +98,7 @@ export class OutreachService extends createPrismaBase(MODELS.Outreach) {
           ...createOutreachDto,
           script: resolvedScriptText,
           projectId: jobId,
-          status: OutreachStatus.in_progress,
+          status: OutreachStatus.pending,
           didState,
           didNpaSubset,
         },
