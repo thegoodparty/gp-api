@@ -1,4 +1,3 @@
-import { ElectionsService } from '@/elections/services/elections.service'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ConflictException, Injectable } from '@nestjs/common'
 import { ElectedOffice, Prisma } from '@prisma/client'
@@ -25,13 +24,16 @@ export type CreateElectedOfficeArgs = {
   campaignId: number
   office?: string
   otherOffice?: string
+  state?: string
+  L2DistrictType?: string
+  L2DistrictName?: string
 }
 
 @Injectable()
 export class ElectedOfficeService extends createPrismaBase(
   MODELS.ElectedOffice,
 ) {
-  constructor(private readonly elections: ElectionsService) {
+  constructor(private readonly organizationsService: OrganizationsService) {
     super()
   }
   // This is for validating that there is only one active elected office per user
@@ -62,16 +64,15 @@ export class ElectedOfficeService extends createPrismaBase(
       await this.validateActiveElectedOffice(args.userId)
     }
 
-    const position = await this.elections.getPositionByBallotReadyId(
-      args.ballotreadyPositionId,
-    )
-
-    const customPositionName = !position
-      ? OrganizationsService.resolveCustomPositionName(
-          args.office,
-          args.otherOffice,
-        )
-      : null
+    const orgData = await this.organizationsService.resolveOrgData({
+      campaignId: args.campaignId,
+      ballotReadyPositionId: args.ballotreadyPositionId,
+      office: args.office,
+      otherOffice: args.otherOffice,
+      state: args.state,
+      L2DistrictType: args.L2DistrictType,
+      L2DistrictName: args.L2DistrictName,
+    })
 
     return this.client.$transaction(async (tx) => {
       const id = uuidv7()
@@ -80,8 +81,7 @@ export class ElectedOfficeService extends createPrismaBase(
         data: {
           slug: OrganizationsService.electedOfficeOrgSlug(id),
           ownerId: args.userId,
-          positionId: position?.id ?? null,
-          customPositionName,
+          ...orgData,
         },
       })
 

@@ -162,6 +162,7 @@ export class PollsController {
       const campaign =
         await this.electedOfficeService.client.campaign.findFirst({
           where: { userId: user.id },
+          include: { pathToVictory: true },
         })
       if (!campaign) {
         throw new ForbiddenException(
@@ -173,6 +174,7 @@ export class PollsController {
         throw new BadRequestException('No position found on campaign')
       }
 
+      const p2v = campaign.pathToVictory?.data
       electedOffice = await this.electedOfficeService.create({
         isActive: true,
         userId: user.id,
@@ -182,6 +184,9 @@ export class PollsController {
         ballotreadyPositionId: campaign.details.positionId,
         office: campaign.details.office,
         otherOffice: campaign.details.otherOffice,
+        state: campaign.details.state,
+        L2DistrictType: p2v?.electionType,
+        L2DistrictName: p2v?.electionLocation,
       })
       // END OF TEMPORARY FIX
     } else {
