@@ -23,6 +23,7 @@ import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.servi
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { WrapperType } from 'src/shared/types/utility.types'
 import { PurchaseService } from './purchase.service'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -43,7 +44,7 @@ export class PaymentEventsService {
     private readonly stripeService: StripeService,
     private readonly analytics: AnalyticsService,
     @Inject(forwardRef(() => PurchaseService))
-    private readonly purchaseService: PurchaseService,
+    private readonly purchaseService: WrapperType<PurchaseService>,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(PaymentEventsService.name)
