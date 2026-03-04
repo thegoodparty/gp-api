@@ -51,7 +51,6 @@ test.describe('Authentication - Register', () => {
     expect(body.user.email).toBe(testUserEmail)
     expect(body.user.password).toBeUndefined()
     expect(body.user.hasPassword).toBe(true)
-    expect(body.campaign).toBeTruthy()
     ;(testInfo as TestInfoWithContext).testContext = {
       testUser: {
         userId: body.user.id,

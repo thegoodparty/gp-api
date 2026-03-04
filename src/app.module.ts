@@ -15,6 +15,7 @@ import { CrmModule } from '@/crm/crmModule'
 import { DeclareModule } from '@/declare/declare.module'
 import { ElectedOfficeModule } from '@/electedOffice/electedOffice.module'
 import { ElectionsModule } from '@/elections/elections.module'
+import { OrganizationsModule } from '@/organizations/organizations.module'
 import { ErrorLoggerModule } from '@/errorLogger/errorLogger.module'
 import { FeaturesModule } from '@/features/features.module'
 import { HealthModule } from '@/health/health.module'
@@ -79,6 +80,7 @@ import { loggerModule } from './observability/logging/logger-module'
     ContactEngagementModule,
     PollsModule,
     ElectedOfficeModule,
+    OrganizationsModule,
   ]
     // Today, the QueueConsumerModule can't really work in the unit test environment,
     // because it needs a real SQS queue to work.

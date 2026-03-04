@@ -12,7 +12,7 @@ import {
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
-import { PaginatedResults } from 'src/shared/types/utility.types'
+import { PaginatedResults, WrapperType } from 'src/shared/types/utility.types'
 import { type ListCampaignsPagination } from '@goodparty_org/contracts'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -45,13 +45,15 @@ enum CandidateVerification {
   no = 'NO',
 }
 
+const organizationSlug = (campaignId: number) => `campaign-${campaignId}`
+
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
     @Inject(forwardRef(() => UsersService))
-    private usersService: UsersService,
+    private usersService: WrapperType<UsersService>,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private readonly crm: CrmCampaignsService,
+    private readonly crm: WrapperType<CrmCampaignsService>,
     private readonly analytics: AnalyticsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
@@ -133,7 +135,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   async createForUser(
     user: User,
     initialData: {
-      details: Record<string, unknown>
+      details: PrismaJson.CampaignDetails
       data?: Record<string, unknown>
     },
   ) {
@@ -145,26 +147,98 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       slug,
     }
 
-    const newCampaign = await this.create({
-      data: {
-        slug,
-        isActive: false,
-        userId: user.id,
-        // @ts-expect-error - TODO: fix this
-        details: deepMerge(baseDetails, initialData.details),
-        data: initialData.data
-          ? deepMerge(baseData, initialData.data)
-          : baseData,
-      },
+    const position = initialData.details.positionId
+      ? await this.elections.getPositionByBallotReadyId(
+          initialData.details.positionId,
+        )
+      : null
+
+    const newCampaign = await this.client.$transaction(async (tx) => {
+      const [{ nextval: id }] = await tx.$queryRaw<[{ nextval: bigint }]>`
+        SELECT nextval('campaign_id_seq')`
+
+      const campaignId = Number(id)
+      const orgSlug = organizationSlug(campaignId)
+
+      this.logger.info(
+        {
+          ballotReadyPositionId: initialData.details.positionId,
+          position,
+          campaignId,
+          orgSlug,
+        },
+        'Creating organization',
+      )
+
+      await tx.organization.create({
+        data: {
+          slug: orgSlug,
+          ownerId: user.id,
+          positionId: position?.id ?? null,
+        },
+      })
+
+      return tx.campaign.create({
+        data: {
+          id: campaignId,
+          slug,
+          organizationSlug: orgSlug,
+          isActive: false,
+          userId: user.id,
+          // @ts-expect-error TS isn't smart enough to know that deepMerge will return
+          // a valid CampaignDetails
+          details: deepMerge(baseDetails, initialData.details),
+          data: initialData.data
+            ? deepMerge(baseData, initialData.data)
+            : baseData,
+        },
+      })
     })
-    this.logger.debug(newCampaign, 'Created campaign')
+    this.logger.debug({ newCampaign }, 'Created campaign')
     await this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
 
-  async update(args: Prisma.CampaignUpdateArgs) {
-    const campaign = await this.model.update(args)
+  async update(args: Prisma.CampaignUpdateArgs & { where: { id: number } }) {
+    const hasDetailsUpdate = !!args.data.details
+
+    const existing = hasDetailsUpdate
+      ? await this.model.findUnique({ where: args.where })
+      : null
+
+    const incomingPositionId = args.data.details?.positionId
+    const ballotReadyPositionId = hasDetailsUpdate
+      ? incomingPositionId !== undefined
+        ? (incomingPositionId as string | null)
+        : (existing?.details?.positionId ?? null)
+      : null
+
+    const position = ballotReadyPositionId
+      ? await this.elections.getPositionByBallotReadyId(ballotReadyPositionId)
+      : null
+
+    const campaign = await this.client.$transaction(async (tx) => {
+      if (hasDetailsUpdate && existing) {
+        const orgSlug = organizationSlug(args.where.id)
+
+        this.logger.info(
+          { ballotReadyPositionId, position, orgSlug },
+          'Updating organization',
+        )
+        await tx.organization.upsert({
+          where: { slug: orgSlug },
+          update: { positionId: position?.id ?? null },
+          create: {
+            slug: orgSlug,
+            ownerId: existing.userId,
+            positionId: position?.id ?? null,
+          },
+        })
+      }
+
+      return tx.campaign.update(args)
+    })
     const isPro = args?.data?.isPro
     if (isPro) {
       await this.analytics.identify(campaign?.userId, { isPro })
@@ -188,6 +262,26 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       placeId,
       canDownloadFederal,
     } = body
+
+    let position: Awaited<
+      ReturnType<ElectionsService['getPositionByBallotReadyId']>
+    > = null
+
+    if (details) {
+      const existing = await this.model.findFirst({
+        where: { id },
+        select: { details: true },
+      })
+      const incomingPositionId = details.positionId
+      const ballotReadyPositionId =
+        incomingPositionId !== undefined
+          ? (incomingPositionId as string | null)
+          : (existing?.details?.positionId ?? null)
+
+      position = ballotReadyPositionId
+        ? await this.elections.getPositionByBallotReadyId(ballotReadyPositionId)
+        : null
+    }
 
     const updatedCampaign = await this.client.$transaction(
       async (tx) => {
@@ -249,7 +343,19 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           ) as PrismaJson.CampaignAiContent
         }
 
-        // Update the campaign with JSON fields
+        if (details) {
+          const orgSlug = organizationSlug(campaign.id)
+          await tx.organization.upsert({
+            where: { slug: orgSlug },
+            update: { positionId: position?.id ?? null },
+            create: {
+              slug: orgSlug,
+              ownerId: campaign.userId,
+              positionId: position?.id ?? null,
+            },
+          })
+        }
+
         await tx.campaign.update({
           where: { id: campaign.id },
           data: campaignUpdateData,

@@ -12,7 +12,7 @@ import { ElectionsService } from './elections.service'
 const makePosition = (
   turnoutValue: number | null,
 ): PositionWithOptionalDistrict => ({
-  positionId: 'pos-1',
+  id: 'pos-1',
   brPositionId: 'br-pos-1',
   brDatabaseId: 'br-db-1',
   state: 'TX',
@@ -114,7 +114,7 @@ describe('ElectionsService', () => {
 
     it('throws NotFoundException when API returns position without district', async () => {
       const positionNoDistrict: PositionWithOptionalDistrict = {
-        positionId: 'pos-1',
+        id: 'pos-1',
         brPositionId: 'br-pos-1',
         brDatabaseId: 'br-db-1',
         state: 'TX',

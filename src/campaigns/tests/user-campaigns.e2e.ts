@@ -228,6 +228,9 @@ test.describe('Campaigns - User Without Campaign', () => {
       headers: {
         Authorization: `Bearer ${testUserToken}`,
       },
+      data: {
+        details: { zip: '12345-1234' },
+      },
     })
 
     expect(response.status()).toBe(409)

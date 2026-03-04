@@ -146,20 +146,24 @@ export class PollsController {
       const campaign =
         await this.electedOfficeService.client.campaign.findFirst({
           where: { userId: user.id },
-          select: { id: true },
         })
       if (!campaign) {
         throw new ForbiddenException(
           'Not allowed to create poll. No campaign found.',
         )
       }
+
+      if (!campaign.details.positionId) {
+        throw new BadRequestException('No position found on campaign')
+      }
+
       electedOffice = await this.electedOfficeService.create({
-        data: {
-          isActive: true,
-          user: { connect: { id: user.id } },
-          campaign: { connect: { id: campaign.id } },
-          swornInDate,
-        },
+        isActive: true,
+        userId: user.id,
+        campaignId: campaign.id,
+        swornInDate,
+        electedDate: null,
+        ballotreadyPositionId: campaign.details.positionId,
       })
       // END OF TEMPORARY FIX
     } else {

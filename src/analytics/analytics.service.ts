@@ -7,6 +7,7 @@ import {
   SegmentTrackEventProperties,
   UserContext,
 } from 'src/vendors/segment/segment.types'
+import { WrapperType } from '../shared/types/utility.types'
 import { UsersService } from '../users/services/users.service'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -15,7 +16,7 @@ export class AnalyticsService {
   constructor(
     private readonly segment: SegmentService,
     @Inject(forwardRef(() => UsersService))
-    private readonly usersService: UsersService,
+    private readonly usersService: WrapperType<UsersService>,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AnalyticsService.name)

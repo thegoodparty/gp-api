@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
   pull-requests: write
 
 env:
@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Check contracts changes
         id: contracts-changed
@@ -47,7 +48,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - run: npm ci
 
@@ -67,8 +68,8 @@ jobs:
       - name: Setup Node 24 for npm publish
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: RC version contracts
         if: >-
@@ -125,7 +126,7 @@ jobs:
         uses: changesets/action@v1
         with:
           publish: npx changeset publish
-          title: 'chore: release @goodparty_org/contracts'
+          title: "chore: release @goodparty_org/contracts"
           cwd: contracts
           createGithubReleases: false
         env:
@@ -204,6 +205,10 @@ jobs:
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
           GITHUB_PR_NUMBER: ${{ github.event.number }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
+          CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
         run: |
           npm run infra deploy ${{ steps.context.outputs.environment }}
           cd deploy && SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
