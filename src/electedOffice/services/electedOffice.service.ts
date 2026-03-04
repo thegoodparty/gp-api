@@ -78,7 +78,7 @@ export class ElectedOfficeService extends createPrismaBase(
 
       await tx.organization.create({
         data: {
-          slug: `eo-${id}`,
+          slug: OrganizationsService.electedOfficeOrgSlug(id),
           ownerId: args.userId,
           positionId: position?.id ?? null,
           customPositionName,
@@ -96,7 +96,7 @@ export class ElectedOfficeService extends createPrismaBase(
           isActive: args.isActive,
           userId: args.userId,
           campaignId: args.campaignId,
-          organizationSlug: `eo-${id}`,
+          organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
         },
       })
     })

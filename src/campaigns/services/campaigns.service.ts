@@ -46,8 +46,6 @@ enum CandidateVerification {
   no = 'NO',
 }
 
-const organizationSlug = (campaignId: number) => `campaign-${campaignId}`
-
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
@@ -166,7 +164,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         SELECT nextval('campaign_id_seq')`
 
       const campaignId = Number(id)
-      const orgSlug = organizationSlug(campaignId)
+      const orgSlug = OrganizationsService.campaignOrgSlug(campaignId)
 
       this.logger.info(
         {
@@ -229,7 +227,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     const campaign = await this.client.$transaction(async (tx) => {
       if (hasDetailsUpdate && existing) {
-        const orgSlug = organizationSlug(args.where.id)
+        const orgSlug = OrganizationsService.campaignOrgSlug(args.where.id)
         const mergedDetails = {
           ...existing.details,
           ...(typeof args.data.details === 'object' ? args.data.details : {}),
@@ -367,7 +365,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         }
 
         if (details) {
-          const orgSlug = organizationSlug(campaign.id)
+          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
           const merged =
             campaignUpdateData.details as PrismaJson.CampaignDetails
           const customPositionName = !position
