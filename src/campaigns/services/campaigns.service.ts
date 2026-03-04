@@ -282,6 +282,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       formattedAddress,
       placeId,
       canDownloadFederal,
+      overrideDistrictId,
     } = body
 
     let position: Awaited<
@@ -385,6 +386,20 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
               ownerId: campaign.userId,
               positionId: position?.id ?? null,
               customPositionName,
+            },
+          })
+        }
+
+        if (overrideDistrictId !== undefined) {
+          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+          const districtId = overrideDistrictId ?? null
+          await tx.organization.upsert({
+            where: { slug: orgSlug },
+            update: { overrideDistrictId: districtId },
+            create: {
+              slug: orgSlug,
+              ownerId: campaign.userId,
+              overrideDistrictId: districtId,
             },
           })
         }

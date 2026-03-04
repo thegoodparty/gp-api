@@ -51,6 +51,39 @@ export class OrganizationsService extends createPrismaBase(
     return this.withPosition(org)
   }
 
+  /**
+   * Resolves the override district ID for a given position and district selection.
+   * Returns null if the selected district exactly matches the position's natural
+   * district (no override needed), or the district UUID if it differs.
+   */
+  async resolveOverrideDistrictId(params: {
+    positionId?: string
+    state: string
+    L2DistrictType: string
+    L2DistrictName: string
+  }): Promise<string | null> {
+    const { positionId, state, L2DistrictType, L2DistrictName } = params
+
+    if (positionId) {
+      // Position lookup is best-effort — if it fails, fall through to override.
+      const position = await this.electionsService
+        .getPositionByBallotReadyId(positionId, { includeDistrict: true })
+        .catch(() => null)
+
+      const isExactMatch =
+        position?.district?.L2DistrictType === L2DistrictType &&
+        position?.district?.L2DistrictName === L2DistrictName
+
+      if (isExactMatch) return null
+    }
+
+    return this.electionsService.getDistrictId(
+      state,
+      L2DistrictType,
+      L2DistrictName,
+    )
+  }
+
   private async withPosition(org: Organization) {
     if (!org.positionId) {
       return { ...org, position: null }
