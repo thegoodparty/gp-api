@@ -119,11 +119,7 @@ describe('PeerlyP2pJobService', () => {
         didNpaSubset: ['212'],
       })
 
-      expect(callOrder).toEqual([
-        'createMedia',
-        'createJob',
-        'assignListToJob',
-      ])
+      expect(callOrder).toEqual(['createMedia', 'createJob', 'assignListToJob'])
       expect(mockSmsService.requestCanvassers).not.toHaveBeenCalled()
     })
 
