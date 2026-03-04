@@ -51,15 +51,6 @@ export class OrganizationsService extends createPrismaBase(
     return this.withPosition(org)
   }
 
-  async setOverrideDistrictId(slug: string, districtId: string | null) {
-    const existing = await this.model.findUnique({ where: { slug } })
-    if (!existing) return null
-    return this.model.update({
-      where: { slug },
-      data: { overrideDistrictId: districtId },
-    })
-  }
-
   private async withPosition(org: Organization) {
     if (!org.positionId) {
       return { ...org, position: null }
