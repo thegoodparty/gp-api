@@ -15,15 +15,21 @@ import {
   Query,
   UsePipes,
 } from '@nestjs/common'
-import { ElectedOffice, Poll, PollIssue, User } from '@prisma/client'
+import {
+  ElectedOffice,
+  Organization,
+  Poll,
+  PollIssue,
+  User,
+} from '@prisma/client'
 import { orderBy } from 'lodash'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
-import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
+import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { v7 as uuidv7 } from 'uuid'
@@ -100,10 +106,14 @@ export class PollsController {
   }
 
   @Get('/')
-  @UseElectedOffice()
+  @UseOrganization({
+    fallback: 'elected-office',
+    include: { electedOffice: true },
+  })
   async listPolls(
     @Query() query: ListPollsQueryDTO,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
   ) {
     const polls = await this.pollsService.findMany({
       cursor: query.cursor ? { id: query.cursor } : undefined,
@@ -119,8 +129,14 @@ export class PollsController {
   }
 
   @Get('has-polls')
-  @UseElectedOffice()
-  async hasPolls(@ReqElectedOffice() electedOffice: ElectedOffice) {
+  @UseOrganization({
+    fallback: 'elected-office',
+    include: { electedOffice: true },
+  })
+  async hasPolls(
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
+  ) {
     const userHasPolls: boolean = await this.pollsService.hasPolls(
       electedOffice.id,
     )
@@ -207,10 +223,14 @@ export class PollsController {
   }
 
   @Get('/:pollId/download-responses')
-  @UseElectedOffice()
+  @UseOrganization({
+    fallback: 'elected-office',
+    include: { electedOffice: true },
+  })
   async downloadPollResponses(
     @Param() { pollId }: PollParamsDto,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
   ) {
     const poll = await this.ensurePollAccess(pollId, electedOffice)
     const sanitizedName =
@@ -224,20 +244,28 @@ export class PollsController {
   }
 
   @Get('/:pollId')
-  @UseElectedOffice()
+  @UseOrganization({
+    fallback: 'elected-office',
+    include: { electedOffice: true },
+  })
   async getPoll(
     @Param('pollId') pollId: string,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
   ) {
     const poll = await this.ensurePollAccess(pollId, electedOffice)
     return toAPIPoll(poll)
   }
 
   @Get('/:pollId/top-issues')
-  @UseElectedOffice()
+  @UseOrganization({
+    fallback: 'elected-office',
+    include: { electedOffice: true },
+  })
   async getTopIssues(
     @Param('pollId') pollId: string,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
   ) {
     await this.ensurePollAccess(pollId, electedOffice)
 
@@ -269,10 +297,14 @@ export class PollsController {
   }
 
   @Post('image-upload-url')
-  @UseElectedOffice()
+  @UseOrganization({
+    fallback: 'elected-office',
+    include: { electedOffice: true },
+  })
   async getPollImageUploadUrl(
     @ReqUser() user: User,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
     @Body() dto: PollImageUploadUrlDto,
   ) {
     const campaign = await this.campaignService.findUnique({

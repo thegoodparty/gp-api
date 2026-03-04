@@ -1,12 +1,14 @@
-import { Module } from '@nestjs/common'
-import { OrganizationsService } from './services/organizations.service'
+import { ElectedOfficeModule } from '@/electedOffice/electedOffice.module'
 import { ElectionsModule } from '@/elections/elections.module'
+import { Module } from '@nestjs/common'
+import { UseOrganizationGuard } from './guards/UseOrganization.guard'
 import { OrganizationsController } from './organizations.controller'
+import { OrganizationsService } from './services/organizations.service'
 
 @Module({
-  imports: [ElectionsModule],
-  providers: [OrganizationsService],
+  imports: [ElectionsModule, ElectedOfficeModule],
+  providers: [OrganizationsService, UseOrganizationGuard],
   controllers: [OrganizationsController],
-  exports: [OrganizationsService],
+  exports: [OrganizationsService, UseOrganizationGuard, ElectedOfficeModule],
 })
 export class OrganizationsModule {}
