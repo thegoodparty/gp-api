@@ -40,7 +40,10 @@ describe('DomainsService', () => {
     retrievePayment: ReturnType<typeof vi.fn>
   }
   let mockPrisma: {
-    domain: { findMany: ReturnType<typeof vi.fn> }
+    domain: {
+      findMany: ReturnType<typeof vi.fn>
+      update: ReturnType<typeof vi.fn>
+    }
     website: { findUniqueOrThrow: ReturnType<typeof vi.fn> }
   }
 
@@ -63,6 +66,7 @@ describe('DomainsService', () => {
     mockPrisma = {
       domain: {
         findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn().mockResolvedValue(mockDomain),
       },
       website: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
@@ -126,9 +130,13 @@ describe('DomainsService', () => {
 
       await expect(
         service.handleDomainPostPurchase(sessionId, metadata),
-      ).rejects.toThrow()
+      ).rejects.toThrow('Failed to register domain with Vercel')
 
       expect(mockAnalytics.track).not.toHaveBeenCalled()
+      expect(mockPrisma.domain.update).toHaveBeenCalledWith({
+        where: { id: mockDomain.id },
+        data: { status: DomainStatus.inactive },
+      })
     })
 
     it('should send null priceOfSelectedDomain when domain has no price', async () => {
