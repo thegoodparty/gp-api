@@ -26,8 +26,11 @@ const toAPIOrganization = (org: OrganizationWithPosition): APIOrganization => {
 
   if (org.slug.startsWith('eo-')) {
     result.electedOfficeId = org.slug.replace('eo-', '')
-  } else {
-    result.campaignId = parseInt(org.slug.replace('campaign-', ''))
+  } else if (org.slug.startsWith('campaign-')) {
+    const campaignId = parseInt(org.slug.replace('campaign-', ''), 10)
+    if (!Number.isNaN(campaignId)) {
+      result.campaignId = campaignId
+    }
   }
   return result
 }

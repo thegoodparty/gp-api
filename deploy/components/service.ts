@@ -297,7 +297,7 @@ export function createService({
       healthCheckGracePeriodSeconds: 120,
       deploymentCircuitBreaker: {
         enable: true,
-        rollback: false,
+        rollback: true,
       },
       enableExecuteCommand: true,
       waitForSteadyState: true,
