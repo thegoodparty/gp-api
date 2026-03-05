@@ -248,6 +248,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           update: {
             positionId: position?.id ?? null,
             customPositionName,
+            // Clear stale override — it was computed against the previous position.
+            overrideDistrictId: null,
           },
           create: {
             slug: orgSlug,
@@ -380,6 +382,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
             update: {
               positionId: position?.id ?? null,
               customPositionName,
+              // Clear stale override — it was computed against the previous position.
+              overrideDistrictId: null,
             },
             create: {
               slug: orgSlug,

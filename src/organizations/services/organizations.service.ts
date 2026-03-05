@@ -138,14 +138,15 @@ export class OrganizationsService extends createPrismaBase(
 
   /**
    * Resolves the election-api position ID from a BallotReady position ID.
-   * Returns null if the position cannot be found.
+   * Returns null if the position is not found in the election-api.
+   * Throws if the election-api call fails (e.g. API down).
    */
   async resolvePositionId(
     ballotReadyPositionId: string,
   ): Promise<string | null> {
-    const position = await this.electionsService
-      .getPositionByBallotReadyId(ballotReadyPositionId)
-      .catch(() => null)
+    const position = await this.electionsService.getPositionByBallotReadyId(
+      ballotReadyPositionId,
+    )
     return position?.id ?? null
   }
 
