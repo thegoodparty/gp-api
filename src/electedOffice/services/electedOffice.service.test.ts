@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common'
-import { Prisma, PrismaClient } from '@prisma/client'
+import { Campaign, Prisma, PrismaClient } from '@prisma/client'
 import {
   beforeEach,
   describe,
@@ -24,6 +24,16 @@ const mockPositionResponse = {
   state: 'CA',
   name: 'State Senate District 1',
 }
+
+const mockCampaign = {
+  id: 1,
+  details: { positionId: BR_POSITION_ID },
+} as unknown as Campaign
+
+const mockCampaignNoPosition = {
+  id: 1,
+  details: {},
+} as unknown as Campaign
 
 describe('ElectedOfficeService', () => {
   let service: ElectedOfficeService
@@ -95,11 +105,10 @@ describe('ElectedOfficeService', () => {
   describe('create', () => {
     it('throws ConflictException when creating active office and user already has one', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: true,
         userId: 1,
-        campaignId: 1,
+        campaign: mockCampaign,
       }
 
       mockModel.count.mockResolvedValue(1)
@@ -123,10 +132,9 @@ describe('ElectedOfficeService', () => {
 
     it('throws ConflictException when creating office with isActive not specified and user already has one', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         userId: 1,
-        campaignId: 1,
+        campaign: mockCampaign,
       }
 
       mockModel.count.mockResolvedValue(1)
@@ -150,11 +158,10 @@ describe('ElectedOfficeService', () => {
 
     it('creates organization with resolved GP positionId and elected office in transaction', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: true,
         userId: 1,
-        campaignId: 1,
+        campaign: mockCampaign,
       }
 
       mockModel.count.mockResolvedValue(0)
@@ -184,11 +191,10 @@ describe('ElectedOfficeService', () => {
       mockGetPosition.mockResolvedValue(null)
 
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: true,
         userId: 1,
-        campaignId: 1,
+        campaign: mockCampaign,
       }
 
       mockModel.count.mockResolvedValue(0)
@@ -203,13 +209,32 @@ describe('ElectedOfficeService', () => {
       })
     })
 
+    it('creates organization with null positionId when campaign has no positionId', async () => {
+      const createArgs: CreateElectedOfficeArgs = {
+        electedDate: new Date('2024-01-01'),
+        isActive: true,
+        userId: 1,
+        campaign: mockCampaignNoPosition,
+      }
+
+      mockModel.count.mockResolvedValue(0)
+
+      await service.create(createArgs)
+
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          positionId: null,
+        }),
+      })
+    })
+
     it('skips active validation when isActive is false', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: false,
         userId: 1,
-        campaignId: 1,
+        campaign: mockCampaign,
       }
 
       await service.create(createArgs)
@@ -222,10 +247,9 @@ describe('ElectedOfficeService', () => {
 
     it('links elected office to organization via matching slug', async () => {
       const createArgs: CreateElectedOfficeArgs = {
-        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         userId: 1,
-        campaignId: 1,
+        campaign: mockCampaign,
       }
 
       mockModel.count.mockResolvedValue(0)

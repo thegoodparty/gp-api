@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -83,15 +82,10 @@ export class ElectedOfficeController {
       throw new ForbiddenException('Not allowed to link campaign')
     }
 
-    if (!campaign.details.positionId) {
-      throw new BadRequestException('Campaign does not have a position')
-    }
-
     const created = await this.electedOfficeService.create({
       ...body,
       userId: user.id,
-      campaignId: campaign.id,
-      ballotreadyPositionId: campaign.details.positionId,
+      campaign,
     })
     return this.toApi(created)
   }
