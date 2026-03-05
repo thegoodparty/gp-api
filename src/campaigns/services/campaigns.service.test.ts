@@ -208,7 +208,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -240,7 +244,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -272,7 +280,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: 'Mayor' },
+        update: {
+          positionId: null,
+          customPositionName: 'Mayor',
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -304,7 +316,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: null },
+        update: {
+          positionId: null,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -359,7 +375,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -385,7 +405,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -411,7 +435,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: 'Mayor' },
+        update: {
+          positionId: null,
+          customPositionName: 'Mayor',
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -437,7 +465,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: null },
+        update: {
+          positionId: null,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
