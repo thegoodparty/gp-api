@@ -1,4 +1,4 @@
-import { ControllerName, Endpoint } from '@/generated/route-types'
+import { ControllerName, Endpoint } from '../../src/generated/route-types'
 import { Alert, EndpointOverride, SlackGroup } from './alerting/alerts.types'
 
 /** The default threshold for the error rate alert */

@@ -1,4 +1,4 @@
-import { ControllerName, ROUTE_MAP } from '@/generated/route-types'
+import { ControllerName, ROUTE_MAP } from '../../../src/generated/route-types'
 import { Alert, SlackGroup } from './alerts.types'
 import {
   ALERT_OWNERSHIP,
