@@ -1,5 +1,5 @@
 import './configrc'
-import { NestFactory } from '@nestjs/core'
+import { HttpAdapterHost, NestFactory } from '@nestjs/core'
 import {
   FastifyAdapter,
   NestFastifyApplication,
@@ -13,6 +13,7 @@ import { Logger, PinoLogger } from 'nestjs-pino'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
+import { HttpExceptionFilter } from './exceptions/http-exception.filter'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
 import { randomUUID } from 'crypto'
 
@@ -23,9 +24,26 @@ type BootstrapParams = {
 export const bootstrap = async (
   params: BootstrapParams,
 ): Promise<NestFastifyApplication> => {
+  const adapter = new FastifyAdapter({
+    logger: false,
+    genReqId: () => randomUUID(),
+  })
+
+  /**
+   * This hook copies the de-parameterized route path onto the raw request object.
+   * This is used to populate the request.route property in the logger module.
+   *
+   * It must be registered before NestFactory.create() so that it fires
+   * before the pino-http middleware that nestjs-pino sets up during init.
+   */
+  adapter.getInstance().addHook('onRequest', (req, _, done) => {
+    req.raw.route = req.routeOptions?.url
+    done()
+  })
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ logger: false, genReqId: () => randomUUID() }),
+    adapter,
     {
       rawBody: true,
       bufferLogs: true,
@@ -43,18 +61,6 @@ export const bootstrap = async (
       .getInstance()
       .register(global.__fastifyOtelInstrumentation.plugin())
   }
-
-  /**
-   * This hook copies the de-parameterized route path onto the raw request object.
-   * This is used to populate the request.route property in the logger module.
-   */
-  app
-    .getHttpAdapter()
-    .getInstance()
-    .addHook('onRequest', (req, _, done) => {
-      req.raw.route = req.routeOptions?.url
-      done()
-    })
 
   app.setGlobalPrefix('v1')
 
@@ -93,9 +99,14 @@ export const bootstrap = async (
     },
   })
 
-  const logger = await app.resolve(PinoLogger)
+  const httpExceptionLogger = await app.resolve(PinoLogger)
+  const prismaExceptionLogger = await app.resolve(PinoLogger)
+  const httpAdapterHost = app.get(HttpAdapterHost)
 
-  app.useGlobalFilters(new PrismaExceptionFilter(logger))
+  app.useGlobalFilters(
+    new HttpExceptionFilter(httpExceptionLogger, httpAdapterHost),
+    new PrismaExceptionFilter(prismaExceptionLogger),
+  )
   app.enableShutdownHooks()
 
   return app

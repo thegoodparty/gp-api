@@ -4,6 +4,7 @@ import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { WrapperType } from 'src/shared/types/utility.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { VoterDatabaseService } from '../services/voterDatabase.service'
@@ -24,7 +25,7 @@ export class VoterFileService {
     private readonly voterDb: VoterDatabaseService,
     private readonly slack: SlackService,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private readonly crm: CrmCampaignsService,
+    private readonly crm: WrapperType<CrmCampaignsService>,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(VoterFileService.name)

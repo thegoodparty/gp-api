@@ -119,7 +119,7 @@ export type BuildRaceTargetDetailsInput = DistrictInfo &
   (ByDate | ByYearAndCode)
 
 export type PositionWithOptionalDistrict = {
-  positionId: string
+  id: string
   brPositionId: string
   brDatabaseId: string
   state: string

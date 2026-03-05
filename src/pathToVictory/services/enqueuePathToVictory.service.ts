@@ -83,21 +83,7 @@ export class EnqueuePathToVictoryService {
           } as PathToVictoryInput,
         }
 
-        // Update Campaign details
-        if (details) {
-          await this.prisma.campaign.update({
-            where: { id: campaign.id },
-            data: {
-              details: {
-                ...details,
-                ...(raceData as Record<
-                  string,
-                  string | number | boolean | string[]
-                >),
-              } as PrismaJson.CampaignDetails,
-            },
-          })
-        }
+        // raceData is used only to build the queue payload for P2V processing.
       } else {
         const user = await this.prisma.user.findUnique({
           where: { id: campaign.userId },

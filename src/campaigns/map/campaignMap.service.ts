@@ -111,7 +111,8 @@ export class CampaignMapService {
       },
     })) as BasicCampaignWithUser[]
 
-    const updates: Prisma.CampaignUpdateArgs[] = []
+    const updates: (Prisma.CampaignUpdateArgs & { where: { id: number } })[] =
+      []
 
     const mapCampaigns: MapCampaign[] = []
     for (const campaign of campaigns) {
@@ -146,7 +147,7 @@ export class CampaignMapService {
         }
 
         updates.push({
-          where: { slug },
+          where: { id: campaign.id },
           data: updateData,
         })
       }
@@ -170,7 +171,7 @@ export class CampaignMapService {
       }
 
       const globalPosition = await this.geocodingService.handleGeoLocation(
-        slug,
+        campaign.id,
         details,
         forceReCalc,
       )

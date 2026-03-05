@@ -12,6 +12,7 @@ import { Ecanvasser, EcanvasserInteraction } from '@prisma/client'
 import slugify from 'slugify'
 import { EcanvasserSummary } from '../ecanvasserIntegration.types'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
+import { WrapperType } from 'src/shared/types/utility.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { EcanvasserService } from './ecanvasser.service'
 
@@ -23,10 +24,10 @@ export class EcanvasserIntegrationService extends createPrismaBase(
 ) {
   constructor(
     @Inject(forwardRef(() => CampaignsService))
-    private readonly campaignsService: CampaignsService,
+    private readonly campaignsService: WrapperType<CampaignsService>,
     private readonly ecanvasser: EcanvasserService,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private readonly crm: CrmCampaignsService,
+    private readonly crm: WrapperType<CrmCampaignsService>,
     private slack: SlackService,
   ) {
     super()

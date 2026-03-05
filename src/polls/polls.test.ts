@@ -16,6 +16,7 @@ beforeEach(async () => {
       slug: 'test-campaign',
       details: {
         state: 'WY',
+        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
       },
     },
   })

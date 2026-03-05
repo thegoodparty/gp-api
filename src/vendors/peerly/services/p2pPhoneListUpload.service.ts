@@ -1,22 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { VoterDatabaseService } from '../../../voters/services/voterDatabase.service'
-import { PeerlyPhoneListService } from './peerlyPhoneList.service'
+import { PinoLogger } from 'nestjs-pino'
+import { Readable } from 'stream'
+import { CampaignWith } from '../../../campaigns/campaigns.types'
 import { CampaignTcrComplianceService } from '../../../campaigns/tcrCompliance/services/campaignTcrCompliance.service'
-import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
-import { VoterFileType } from '../../../voters/voterFile/voterFile.types'
 import {
   CHANNELS,
   CustomFilter,
   PURPOSES,
 } from '../../../shared/types/voter.types'
+import { VoterDatabaseService } from '../../../voters/services/voterDatabase.service'
 import { typeToQuery } from '../../../voters/voterFile/util/voterFile.util'
+import { VoterFileType } from '../../../voters/voterFile/voterFile.types'
+import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
 import {
   mapAudienceFieldsToCustomFilters,
   P2P_CSV_COLUMN_MAPPINGS,
 } from '../utils/audienceMapping.util'
-import { Readable } from 'stream'
-import { CampaignWith } from '../../../campaigns/campaigns.types'
-import { PinoLogger } from 'nestjs-pino'
+import { PeerlyPhoneListService } from './peerlyPhoneList.service'
 
 @Injectable()
 export class P2pPhoneListUploadService {
@@ -100,13 +100,40 @@ export class P2pPhoneListUploadService {
       purpose: PURPOSES.GOTV,
     }
 
+    const countQuery = typeToQuery(
+      this.logger,
+      VoterFileType.sms,
+      campaign,
+      customFilters,
+      true, // count only
+      false,
+    )
+    let withFixColumns = false
+    try {
+      const sqlResponse = await this.voterDatabaseService.query(countQuery)
+      const count = parseInt(sqlResponse.rows[0].count)
+      withFixColumns = count === 0
+      this.logger.debug({ count, withFixColumns }, 'P2P voter count check:')
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42703') {
+        // Column does not exist — fall back to fixColumns mode
+        withFixColumns = true
+        this.logger.debug(
+          { withFixColumns },
+          'P2P voter count query failed (column not found), falling back to fixColumns:',
+        )
+      } else {
+        throw error
+      }
+    }
+
     const query = typeToQuery(
       this.logger,
       VoterFileType.sms,
       campaign,
       customFilters,
       false, // not count only
-      false, // not fix columns
+      withFixColumns,
       P2P_CSV_COLUMN_MAPPINGS,
     )
 
