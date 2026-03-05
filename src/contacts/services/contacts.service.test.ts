@@ -190,5 +190,26 @@ describe('ContactsService', () => {
         ).toHaveBeenCalledWith(campaign.userId)
       })
     })
+
+    describe('getDistrictStats', () => {
+      it('returns DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING when election context is missing', async () => {
+        const campaignWithoutP2V = {
+          ...baseCampaign,
+          pathToVictory: { data: {} },
+        } as unknown as CampaignWithPathToVictory
+
+        await expect(
+          service.getDistrictStats(campaignWithoutP2V),
+        ).rejects.toThrow(BadRequestException)
+
+        await expect(
+          service.getDistrictStats(campaignWithoutP2V),
+        ).rejects.toMatchObject({
+          response: expect.objectContaining({
+            errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
+          }),
+        })
+      })
+    })
   })
 })

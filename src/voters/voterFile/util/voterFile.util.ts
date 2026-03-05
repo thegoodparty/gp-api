@@ -1,4 +1,5 @@
 import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { BadRequestException } from '@nestjs/common'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
   CustomFilter,
@@ -6,6 +7,11 @@ import {
   VoterFileType,
 } from '../voterFile.types'
 import { PinoLogger } from 'nestjs-pino'
+
+const P2V_ELECTION_INFO_MISSING_MESSAGE =
+  'Campaign path to victory data is missing required election information'
+const P2V_ELECTION_INFO_MISSING_ERROR_CODE =
+  'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING'
 
 const VOTER_FILE_LATEST_EVEN_YEAR = Number(
   process.env.VOTER_FILE_LATEST_EVEN_YEAR,
@@ -52,6 +58,7 @@ export function typeToQuery(
   let nestedWhereClause = ''
   let l2ColumnName = campaign.pathToVictory?.data.electionType
   const l2ColumnValue = campaign.pathToVictory?.data.electionLocation
+  const districtId = campaign.pathToVictory?.data.districtId
 
   logger.debug(
     `Building query: state=${state}, electionType=${l2ColumnName}, electionLocation=${l2ColumnValue}`,
@@ -62,13 +69,14 @@ export function typeToQuery(
   // table already targets voters in that state and we don't need to filter by district
   const isStatewideOffice = l2ColumnName === 'State'
 
-  if (!isStatewideOffice && (!l2ColumnName || !l2ColumnValue)) {
+  if (!isStatewideOffice && (!districtId || !l2ColumnName || !l2ColumnValue)) {
     logger.warn(
-      `Missing L2 data for campaign ${campaign.id}. l2ColumnName: ${l2ColumnName}, l2ColumnValue: ${l2ColumnValue}`,
+      `Missing district context for campaign ${campaign.id}. districtId: ${districtId}, l2ColumnName: ${l2ColumnName}, l2ColumnValue: ${l2ColumnValue}`,
     )
-    throw new Error(
-      'L2 data is required to generate voter file. Please ensure the campaign has been processed by PathToVictory and contains electionType and electionLocation data.',
-    )
+    throw new BadRequestException({
+      message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+      errorCode: P2V_ELECTION_INFO_MISSING_ERROR_CODE,
+    })
   }
 
   if (l2ColumnName && l2ColumnValue && !isStatewideOffice) {

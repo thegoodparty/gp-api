@@ -47,6 +47,16 @@ describe('shouldRecordBlockedState', () => {
 })
 
 describe('deriveRootCause', () => {
+  it('prioritizes allowlisted data-integrity errorCode over dependency message', () => {
+    expect(
+      deriveRootCause({
+        statusCode: 400,
+        errorMessage: 'Transaction API error: missing district metadata',
+        errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
+      }),
+    ).toBe('data_integrity_campaign')
+  })
+
   it('maps Transaction API failures to dependency_transaction_api', () => {
     expect(
       deriveRootCause({
