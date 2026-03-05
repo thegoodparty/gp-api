@@ -616,6 +616,16 @@ export class QueueConsumerService {
       }
       recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
       recordBlockedStateEvent(blockedStateAttributes)
+      this.logger.info({
+        msg: 'blocked_state_detected',
+        source: 'background',
+        userId: campaign.userId,
+        rootCause: 'p2v_failed',
+        feature: 'path_to_victory',
+        campaignId: campaign.id,
+        slug: campaign.slug,
+        p2vAttempts,
+      })
     }
 
     const updateData = {

@@ -37,6 +37,17 @@ Attributes recorded on `BlockedState`:
 - `isBackground`: boolean
 - optional: `campaignId`, `slug`, `feature`
 
+### Structured log event: `blocked_state_detected`
+
+In addition to `BlockedState`, gp-api emits a structured application log for Loki:
+
+- `msg`: `blocked_state_detected`
+- `source`: `http` | `background`
+- `userId`: number
+- `rootCause`: string bucket
+- HTTP context (when available): `endpoint`, `statusCode`, `errorCode`
+- Background context (when available): `feature`, `campaignId`, `slug`, `p2vAttempts`, `reason`
+
 ## Denominator support (active users)
 
 Transactions are tagged with `userId` for authenticated requests so we can query unique active users in New Relic.

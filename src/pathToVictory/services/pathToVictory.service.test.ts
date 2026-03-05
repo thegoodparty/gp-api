@@ -80,6 +80,7 @@ const makeP2VInput = (
 
 describe('PathToVictoryService', () => {
   let service: PathToVictoryService
+  let mockLogger: ReturnType<typeof createMockLogger>
   let mockPrisma: {
     campaign: { findUnique: ReturnType<typeof vi.fn> }
     pathToVictory: {
@@ -162,7 +163,7 @@ describe('PathToVictoryService', () => {
 
     service = module.get<PathToVictoryService>(PathToVictoryService)
 
-    const mockLogger = createMockLogger()
+    mockLogger = createMockLogger()
     Object.defineProperty(service, 'logger', {
       get: () => mockLogger,
       configurable: true,
@@ -252,6 +253,18 @@ describe('PathToVictoryService', () => {
         CustomEventType.BlockedState,
         expect.objectContaining({
           rootCause: 'p2v_failed',
+          reason: 'no_district_match',
+        }),
+      )
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: 'blocked_state_detected',
+          source: 'background',
+          userId: 10,
+          rootCause: 'p2v_failed',
+          feature: 'path_to_victory',
+          campaignId: 1,
+          slug: 'test-slug',
           reason: 'no_district_match',
         }),
       )
