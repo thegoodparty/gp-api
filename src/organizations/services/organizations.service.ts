@@ -78,7 +78,7 @@ export class OrganizationsService extends createPrismaBase(
    */
   async resolveOrgData(params: {
     campaignId: number
-    ballotReadyPositionId: string
+    ballotReadyPositionId?: string | null
     office?: string
     otherOffice?: string
     state?: string
@@ -115,7 +115,9 @@ export class OrganizationsService extends createPrismaBase(
     }
 
     // No campaign org exists — resolve from the election API.
-    const positionId = await this.resolvePositionId(ballotReadyPositionId)
+    const positionId = ballotReadyPositionId
+      ? await this.resolvePositionId(ballotReadyPositionId)
+      : null
     const customPositionName = OrganizationsService.resolveCustomPositionName(
       office,
       otherOffice,
@@ -153,12 +155,15 @@ export class OrganizationsService extends createPrismaBase(
    * district (no override needed), or the district UUID if it differs.
    */
   async resolveOverrideDistrictId(params: {
-    positionId?: string
+    positionId?: string | null
     state: string
     L2DistrictType: string
     L2DistrictName: string
   }): Promise<string | null> {
-    const { positionId, state, L2DistrictType, L2DistrictName } = params
+    const { positionId, state, L2DistrictType } = params
+    const L2DistrictName = this.electionsService.cleanDistrictName(
+      params.L2DistrictName,
+    )
 
     if (positionId) {
       // Position lookup is best-effort — if it fails, fall through to override.
