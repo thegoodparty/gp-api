@@ -13,6 +13,8 @@
  *
  * const testUser = userFactory({ firstName: 'Jane'})
  */
-export function generateFactory<T>(generateFn: (args: Partial<T>) => Partial<T>) {
+export function generateFactory<T>(
+  generateFn: (args: Partial<T>) => Partial<T>,
+) {
   return (args: Partial<T> = {}) => ({ ...generateFn(args), ...args }) as T
 }
