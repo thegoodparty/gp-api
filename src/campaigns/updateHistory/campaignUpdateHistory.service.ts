@@ -3,6 +3,7 @@ import { CampaignsService } from '../services/campaigns.service'
 import { CreateUpdateHistorySchema } from './schemas/createUpdateHistory.schema'
 import { Campaign } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { WrapperType } from 'src/shared/types/utility.types'
 
 @Injectable()
 export class CampaignUpdateHistoryService extends createPrismaBase(
@@ -10,7 +11,7 @@ export class CampaignUpdateHistoryService extends createPrismaBase(
 ) {
   constructor(
     @Inject(forwardRef(() => CampaignsService))
-    private readonly campaigns: CampaignsService,
+    private readonly campaigns: WrapperType<CampaignsService>,
   ) {
     super()
   }

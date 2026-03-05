@@ -12,7 +12,7 @@ import {
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
-import { PaginatedResults } from 'src/shared/types/utility.types'
+import { PaginatedResults, WrapperType } from 'src/shared/types/utility.types'
 import { type ListCampaignsPagination } from '@goodparty_org/contracts'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -51,9 +51,9 @@ const organizationSlug = (campaignId: number) => `campaign-${campaignId}`
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
     @Inject(forwardRef(() => UsersService))
-    private usersService: UsersService,
+    private usersService: WrapperType<UsersService>,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private readonly crm: CrmCampaignsService,
+    private readonly crm: WrapperType<CrmCampaignsService>,
     private readonly analytics: AnalyticsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,

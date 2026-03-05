@@ -1,6 +1,7 @@
 import { forwardRef, Inject } from '@nestjs/common'
 import { Interval } from '@nestjs/schedule'
 import { User } from '@prisma/client'
+import { WrapperType } from 'src/shared/types/utility.types'
 import { UsersService } from 'src/users/services/users.service'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -14,7 +15,7 @@ export class SessionsService {
   private readonly pendingLastVisited = new Map<number, number>()
   constructor(
     @Inject(forwardRef(() => UsersService))
-    private readonly users: UsersService,
+    private readonly users: WrapperType<UsersService>,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(SessionsService.name)

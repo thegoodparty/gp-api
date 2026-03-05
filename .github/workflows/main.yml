@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Check contracts changes
         id: contracts-changed
