@@ -14,7 +14,19 @@ const routeMap: Record<
 for (const filePath of controllerFiles) {
   const content = readFileSync(filePath, 'utf8')
   const controllerMatch = content.match(/@Controller\('([^']+)'\)/)
-  if (!controllerMatch) continue
+  const relativePath = filePath.replace(`${__dirname}/../`, '')
+  if (!controllerMatch) {
+    const hasDecorator = content.match(/@Controller\(/)
+    if (hasDecorator) {
+      throw new Error(
+        `${relativePath}: @Controller() must use a string literal (e.g. @Controller('my-route')). Variable references are not supported.`,
+      )
+    }
+
+    throw new Error(
+      `${relativePath}: Did not find a @Controller decorator in this file. Either add one, or rename the file to not match the .controller convention.`,
+    )
+  }
   const controller = controllerMatch[1]
 
   const routes: { method: string; path: string; endpoint: string }[] = []
