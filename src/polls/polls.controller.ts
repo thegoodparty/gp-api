@@ -89,6 +89,10 @@ const toAPIIssue = (issue: PollIssue): APIPollIssue => ({
 })
 
 @Controller('polls')
+@UseOrganization({
+  fallback: 'elected-office',
+  include: { electedOffice: true },
+})
 @UsePipes(ZodValidationPipe)
 export class PollsController {
   constructor(
@@ -106,10 +110,6 @@ export class PollsController {
   }
 
   @Get('/')
-  @UseOrganization({
-    fallback: 'elected-office',
-    include: { electedOffice: true },
-  })
   async listPolls(
     @Query() query: ListPollsQueryDTO,
     @ReqOrganization()
@@ -129,10 +129,6 @@ export class PollsController {
   }
 
   @Get('has-polls')
-  @UseOrganization({
-    fallback: 'elected-office',
-    include: { electedOffice: true },
-  })
   async hasPolls(
     @ReqOrganization()
     { electedOffice }: Organization & { electedOffice: ElectedOffice },
@@ -144,35 +140,32 @@ export class PollsController {
   }
 
   @Post('initial-poll')
+  @UseOrganization({
+    fallback: 'elected-office',
+    include: { electedOffice: true },
+    continueIfNotFound: true,
+  })
   @UseCampaign()
   async createInitialPoll(
     @ReqUser() user: User,
     @Body()
     { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
+    @ReqOrganization()
+    organization: (Organization & { electedOffice: ElectedOffice }) | undefined,
   ) {
-    // TEMPORARY FIX START
-    // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
-    //     This will be removed once we lock it down. If this is still here after 12/1/25, please remove it.
-    //     If you don't have an active elected office, temporary let's create
-    let electedOffice = await this.electedOfficeService.getCurrentElectedOffice(
-      user.id,
-    )
-    if (!electedOffice) {
-      const campaign =
-        await this.electedOfficeService.client.campaign.findFirst({
-          where: { userId: user.id },
-          include: { pathToVictory: true },
-        })
-      if (!campaign) {
-        throw new ForbiddenException(
-          'Not allowed to create poll. No campaign found.',
-        )
-      }
+    let electedOffice: ElectedOffice
 
-      if (!campaign.details.positionId) {
-        throw new BadRequestException('No position found on campaign')
-      }
+    if (organization?.electedOffice) {
+      electedOffice = await this.electedOfficeService.update({
+        where: { id: organization.electedOffice.id },
+        data: { swornInDate },
+      })
+    } else {
+      // this is a temporary flow, because we allow users to onboard to polls without an elected office
+      // we will remove this once we have a proper elected office onboarding flow
+
+      // No elected office yet — create one (along with its organization).
 
       const p2v = campaign.pathToVictory?.data
       electedOffice = await this.electedOfficeService.create({
@@ -187,14 +180,6 @@ export class PollsController {
         state: campaign.details.state,
         L2DistrictType: p2v?.electionType,
         L2DistrictName: p2v?.electionLocation,
-      })
-      // END OF TEMPORARY FIX
-    } else {
-      electedOffice = await this.electedOfficeService.update({
-        where: { id: electedOffice.id },
-        data: {
-          swornInDate,
-        },
       })
     }
 
@@ -228,10 +213,6 @@ export class PollsController {
   }
 
   @Get('/:pollId/download-responses')
-  @UseOrganization({
-    fallback: 'elected-office',
-    include: { electedOffice: true },
-  })
   async downloadPollResponses(
     @Param() { pollId }: PollParamsDto,
     @ReqOrganization()
@@ -249,10 +230,6 @@ export class PollsController {
   }
 
   @Get('/:pollId')
-  @UseOrganization({
-    fallback: 'elected-office',
-    include: { electedOffice: true },
-  })
   async getPoll(
     @Param('pollId') pollId: string,
     @ReqOrganization()
@@ -263,10 +240,6 @@ export class PollsController {
   }
 
   @Get('/:pollId/top-issues')
-  @UseOrganization({
-    fallback: 'elected-office',
-    include: { electedOffice: true },
-  })
   async getTopIssues(
     @Param('pollId') pollId: string,
     @ReqOrganization()
@@ -302,10 +275,6 @@ export class PollsController {
   }
 
   @Post('image-upload-url')
-  @UseOrganization({
-    fallback: 'elected-office',
-    include: { electedOffice: true },
-  })
   async getPollImageUploadUrl(
     @ReqUser() user: User,
     @ReqOrganization()
@@ -340,6 +309,7 @@ export class PollsController {
   }
 
   @Post('analyze-bias')
+  @UseOrganization({ fallback: 'elected-office' })
   async analyzePollBias(
     @ReqUser() user: User,
     @Body() dto: AnalyzePollBiasDto,
