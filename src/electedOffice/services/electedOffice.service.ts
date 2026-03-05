@@ -61,7 +61,7 @@ export class ElectedOfficeService extends createPrismaBase(
     const positionId = args.campaign.details.positionId
       ? await this.elections
           .getPositionByBallotReadyId(args.campaign.details.positionId)
-          .then((res) => res?.id)
+          .then((res) => res?.id ?? null)
       : null
 
     return this.client.$transaction(async (tx) => {

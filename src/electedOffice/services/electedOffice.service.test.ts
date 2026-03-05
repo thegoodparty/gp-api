@@ -187,7 +187,7 @@ describe('ElectedOfficeService', () => {
       })
     })
 
-    it('creates organization with undefined positionId when position resolution returns null', async () => {
+    it('creates organization with null positionId when position resolution returns null', async () => {
       mockGetPosition.mockResolvedValue(null)
 
       const createArgs: CreateElectedOfficeArgs = {
@@ -204,7 +204,7 @@ describe('ElectedOfficeService', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          positionId: undefined,
+          positionId: null,
         }),
       })
     })
