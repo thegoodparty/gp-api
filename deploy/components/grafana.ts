@@ -1,5 +1,6 @@
 import * as grafana from '@pulumiverse/grafana'
-import { ALERTS, SlackGroup } from './alerts'
+import { SlackGroup } from './alerting/alerts.types'
+import { GLOBAL_ALERTS } from './alerts'
 
 export interface GrafanaConfig {
   environment: 'dev' | 'qa' | 'prod'
@@ -156,11 +157,11 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
     title: `Alerts (provisioned via gp-api)`,
   })
 
-  new grafana.alerting.RuleGroup('rules', {
-    name: 'All Rules',
+  new grafana.alerting.RuleGroup('global-rules', {
+    name: 'Global Rules',
     folderUid: alertFolder.uid,
     intervalSeconds: 60,
-    rules: ALERTS.map((alert) => ({
+    rules: GLOBAL_ALERTS.map((alert) => ({
       name: alert.name,
       condition: 'C',
       for: alert.for,
