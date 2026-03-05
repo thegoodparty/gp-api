@@ -46,6 +46,8 @@ export function deriveRootCause(params: {
     return 'dependency_stripe'
   if (message.includes('peerly')) return 'dependency_peerly'
   if (message.includes('vercel')) return 'dependency_vercel'
+  if (message.includes('transaction api') || code.includes('transaction_api'))
+    return 'dependency_transaction_api'
 
   if (
     params.errorCode === 'BILLING_CUSTOMER_ID_MISSING' ||

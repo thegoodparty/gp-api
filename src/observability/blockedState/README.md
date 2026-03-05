@@ -16,6 +16,11 @@ Emitted when an **authenticated** user hits a known “blocked state” proxy in
   - `BILLING_CUSTOMER_ID_MISSING`
   - `BILLING_DOMAIN_PAYMENT_ID_MISSING`
 
+#### Explicit exclusions
+
+- Unauthenticated/auth-failure traffic is excluded from `BlockedState` (for example `498 Invalid or expired token`).
+- Expected/public not-found paths are excluded (for example public website/public-campaign lookups, `tcr-compliance/mine` missing record, and `elected-office/current` when no active office exists).
+
 #### Background failures (no HTTP request)
 
 We also emit `BlockedState` for known background hard failures, starting with **P2V marked failed**.
@@ -67,3 +72,14 @@ Transactions are tagged with `userId` for authenticated requests so we can query
 - `SELECT count(*) FROM BlockedState FACET endpoint SINCE 1 week ago`
 - `SELECT count(*) FROM BlockedState FACET rootCause SINCE 1 week ago`
 - `SELECT count(*) FROM BlockedState FACET statusCode SINCE 1 week ago`
+
+## Root-cause buckets (HTTP)
+
+- `dependency_people_api`
+- `dependency_stripe`
+- `dependency_peerly`
+- `dependency_vercel`
+- `dependency_transaction_api`
+- `data_integrity_campaign`
+- `data_integrity_billing`
+- `internal_unknown`
