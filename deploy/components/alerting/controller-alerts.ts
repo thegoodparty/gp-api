@@ -33,7 +33,7 @@ export const controllerAlerts = (controller: ControllerName): Alert[] => {
         slug: `${slug}-error-rate`,
         name: `[${controller}] ${route.endpoint} - High error rate`,
         type: 'log' as const,
-        expr: `sum(count_over_time(${routeBase} | response_statusCode >= 500 [5m])) / sum(count_over_time(${routeBase} [5m])) * 100`,
+        expr: `sum(count_over_time(${routeBase} | response_statusCode >= 500 [5m])) / (sum(count_over_time(${routeBase} [5m])) > 0) * 100`,
         threshold: errorRatePercentage,
         for: '3m',
         message: `\`${route.endpoint}\` is returning more than ${errorRatePercentage}% 5xx responses.`,
