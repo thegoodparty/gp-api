@@ -160,10 +160,9 @@ export class PollsController {
       electedOffice = await this.electedOfficeService.create({
         isActive: true,
         userId: user.id,
-        campaignId: campaign.id,
+        campaign,
         swornInDate,
         electedDate: null,
-        ballotreadyPositionId: campaign.details.positionId,
       })
       // END OF TEMPORARY FIX
     } else {
