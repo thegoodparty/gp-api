@@ -58,7 +58,7 @@ export class OrganizationsService extends createPrismaBase(
    */
   async resolveOrgData(params: {
     campaignId: number
-    ballotReadyPositionId: string
+    ballotReadyPositionId?: string | null
     office?: string
     otherOffice?: string
     state?: string
@@ -95,7 +95,9 @@ export class OrganizationsService extends createPrismaBase(
     }
 
     // No campaign org exists — resolve from the election API.
-    const positionId = await this.resolvePositionId(ballotReadyPositionId)
+    const positionId = ballotReadyPositionId
+      ? await this.resolvePositionId(ballotReadyPositionId)
+      : null
     const customPositionName = OrganizationsService.resolveCustomPositionName(
       office,
       otherOffice,
@@ -133,7 +135,7 @@ export class OrganizationsService extends createPrismaBase(
    * district (no override needed), or the district UUID if it differs.
    */
   async resolveOverrideDistrictId(params: {
-    positionId?: string
+    positionId?: string | null
     state: string
     L2DistrictType: string
     L2DistrictName: string
