@@ -187,6 +187,68 @@ describe('ElectedOfficeController', () => {
 
       expect(result.status).toBe(403)
     })
+
+    it('returns 400 when electedDate is missing', async () => {
+      const result = await createElectedOffice({ isActive: true })
+
+      expect(result.status).toBe(400)
+    })
+
+    it('returns 400 when electedDate is not YYYY-MM-DD format', async () => {
+      const result = await createElectedOffice({
+        electedDate: '01/01/2024',
+      })
+
+      expect(result.status).toBe(400)
+    })
+
+    it('returns 400 when electedDate is an empty string', async () => {
+      const result = await createElectedOffice({ electedDate: '' })
+
+      expect(result.status).toBe(400)
+    })
+
+    it('returns 400 when termLengthDays is negative', async () => {
+      const result = await createElectedOffice({
+        electedDate: '2024-01-01',
+        termLengthDays: -5,
+      })
+
+      expect(result.status).toBe(400)
+    })
+
+    it('returns 400 when termLengthDays is not an integer', async () => {
+      const result = await createElectedOffice({
+        electedDate: '2024-01-01',
+        termLengthDays: 3.5,
+      })
+
+      expect(result.status).toBe(400)
+    })
+
+    it('returns 400 when isActive is not a boolean', async () => {
+      const result = await createElectedOffice({
+        electedDate: '2024-01-01',
+        isActive: 'yes',
+      })
+
+      expect(result.status).toBe(400)
+    })
+
+    it('returns 400 when date fields have invalid format', async () => {
+      const result = await createElectedOffice({
+        electedDate: '2024-01-01',
+        swornInDate: 'not-a-date',
+      })
+
+      expect(result.status).toBe(400)
+    })
+
+    it('returns 400 when body is empty', async () => {
+      const result = await createElectedOffice({})
+
+      expect(result.status).toBe(400)
+    })
   })
 
   describe('PUT /elected-office/:id', () => {
