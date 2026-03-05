@@ -1,5 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common'
-import { ElectedOffice, Prisma } from '@prisma/client'
+import { Campaign, ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   DEFAULT_PAGINATION_LIMIT,
@@ -13,7 +13,6 @@ import { v7 as uuidv7 } from 'uuid'
 import { ElectionsService } from '@/elections/services/elections.service'
 
 export type CreateElectedOfficeArgs = {
-  ballotreadyPositionId: string
   electedDate?: Date | null
   swornInDate?: Date | null
   termStartDate?: Date | null
@@ -21,7 +20,7 @@ export type CreateElectedOfficeArgs = {
   termLengthDays?: number | null
   isActive?: boolean
   userId: number
-  campaignId: number
+  campaign: Campaign
 }
 
 @Injectable()
@@ -59,9 +58,11 @@ export class ElectedOfficeService extends createPrismaBase(
       await this.validateActiveElectedOffice(args.userId)
     }
 
-    const position = await this.elections.getPositionByBallotReadyId(
-      args.ballotreadyPositionId,
-    )
+    const positionId = args.campaign.details.positionId
+      ? await this.elections
+          .getPositionByBallotReadyId(args.campaign.details.positionId)
+          .then((res) => res?.id)
+      : null
 
     return this.client.$transaction(async (tx) => {
       const id = uuidv7()
@@ -70,7 +71,7 @@ export class ElectedOfficeService extends createPrismaBase(
         data: {
           slug: `eo-${id}`,
           ownerId: args.userId,
-          positionId: position?.id ?? null,
+          positionId,
         },
       })
 
@@ -84,7 +85,7 @@ export class ElectedOfficeService extends createPrismaBase(
           termLengthDays: args.termLengthDays,
           isActive: args.isActive,
           userId: args.userId,
-          campaignId: args.campaignId,
+          campaignId: args.campaign.id,
           organizationSlug: `eo-${id}`,
         },
       })
