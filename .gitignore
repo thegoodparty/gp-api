@@ -82,3 +82,4 @@ ztestfile
 .ai
 CLAUDE.md
 repomix.config.json
+src/generated/route-types.ts

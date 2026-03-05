@@ -1,19 +1,32 @@
 import * as grafana from '@pulumiverse/grafana'
+import { Alert, SlackGroup } from './alerting/alerts.types'
+import { GLOBAL_ALERTS } from './alerts'
+import { controllerAlerts } from './alerting/controller-alerts'
+import { CONTROLLER_NAMES } from '../../src/generated/route-types'
 
 export interface GrafanaConfig {
   environment: 'dev' | 'qa' | 'prod'
 }
 
-const envLabel = (environment: string) =>
-  `service_name="gp-api", deployment_environment_name="${environment}"`
+const LOKI_DATASOURCE_UID = 'grafanacloud-logs'
+const PROM_DATASOURCE_UID = 'grafanacloud-prom'
+
+const SLACK_GROUP_IDS: Record<SlackGroup, string> = {
+  'serve-bugs': 'S0AD54G9D3K',
+  'win-bugs': 'S0AE3NTCXM3',
+}
+
+const datasourceConfig = {
+  log: { uid: LOKI_DATASOURCE_UID, queryType: 'range' },
+  metric: { uid: PROM_DATASOURCE_UID, queryType: 'instant' },
+} as const
 
 export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
-  const folder = new grafana.oss.Folder('alerts-folder', {
+  const folder = new grafana.oss.Folder('gp-api-folder', {
     title: `gp-api-${environment}`,
   })
 
-  const promDatasourceUid = 'grafanacloud-prom'
-  const labels = envLabel(environment)
+  const labels = `service_name="gp-api", deployment_environment_name="${environment}"`
 
   new grafana.oss.Dashboard('service-dashboard', {
     folder: folder.uid,
@@ -31,7 +44,7 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
           title: 'Process CPU Utilization',
           type: 'timeseries',
           gridPos: { h: 10, w: 12, x: 0, y: 0 },
-          datasource: { type: 'prometheus', uid: promDatasourceUid },
+          datasource: { type: 'prometheus', uid: PROM_DATASOURCE_UID },
           targets: [
             {
               expr: `avg(process_cpu_utilization{${labels}}) * 100`,
@@ -58,7 +71,7 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
           title: 'Process Memory Usage',
           type: 'timeseries',
           gridPos: { h: 10, w: 12, x: 12, y: 0 },
-          datasource: { type: 'prometheus', uid: promDatasourceUid },
+          datasource: { type: 'prometheus', uid: PROM_DATASOURCE_UID },
           targets: [
             {
               expr: `process_memory_usage{${labels}}`,
@@ -80,7 +93,7 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
           title: 'System Memory Utilization',
           type: 'gauge',
           gridPos: { h: 8, w: 6, x: 0, y: 10 },
-          datasource: { type: 'prometheus', uid: promDatasourceUid },
+          datasource: { type: 'prometheus', uid: PROM_DATASOURCE_UID },
           targets: [
             {
               expr: `avg(system_memory_utilization{${labels}, system_memory_state="used"}) * 100`,
@@ -109,7 +122,7 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
           title: 'System CPU Utilization',
           type: 'gauge',
           gridPos: { h: 8, w: 6, x: 6, y: 10 },
-          datasource: { type: 'prometheus', uid: promDatasourceUid },
+          datasource: { type: 'prometheus', uid: PROM_DATASOURCE_UID },
           targets: [
             {
               expr: `avg(system_cpu_utilization{${labels}}) * 100`,
@@ -136,4 +149,100 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
       ],
     }),
   })
+
+  // Alerts are only enabled in prod for now
+  if (environment !== 'prod') {
+    return
+  }
+
+  const alertFolder = new grafana.oss.Folder('alerts-folder', {
+    title: `Alerts (provisioned via gp-api)`,
+  })
+
+  const alertToRule = (
+    alert: Alert,
+  ): grafana.types.input.alerting.RuleGroupRule => ({
+    name: alert.name,
+    condition: 'C',
+    for: alert.for,
+    isPaused: alert.disabled ?? false,
+    noDataState: 'OK',
+    execErrState: 'Alerting',
+    annotations: {
+      summary: alert.name,
+      description: [
+        alert.message,
+        alert.notify ? `<!subteam^${SLACK_GROUP_IDS[alert.notify]}>` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    },
+    labels: {
+      environment,
+      alert_slug: alert.slug,
+    },
+    datas: [
+      {
+        refId: 'A',
+        queryType: datasourceConfig[alert.type].queryType,
+        relativeTimeRange: { from: 600, to: 0 },
+        datasourceUid: datasourceConfig[alert.type].uid,
+        model: JSON.stringify({
+          expr: alert.expr.replace(/\$ENV/g, environment),
+          refId: 'A',
+        }),
+      },
+      {
+        refId: 'B',
+        queryType: '',
+        relativeTimeRange: { from: 0, to: 0 },
+        datasourceUid: '-100',
+        model: JSON.stringify({
+          type: 'reduce',
+          refId: 'B',
+          expression: 'A',
+          reducer: 'last',
+          settings: { mode: '' },
+          datasource: { type: '__expr__', uid: '-100' },
+        }),
+      },
+      {
+        refId: 'C',
+        queryType: '',
+        relativeTimeRange: { from: 0, to: 0 },
+        datasourceUid: '-100',
+        model: JSON.stringify({
+          type: 'threshold',
+          refId: 'C',
+          expression: 'B',
+          conditions: [
+            {
+              evaluator: { type: 'gt', params: [alert.threshold] },
+              operator: { type: 'and' },
+              query: { params: ['B'] },
+              reducer: { type: 'last', params: [] },
+              type: 'query',
+            },
+          ],
+          datasource: { type: '__expr__', uid: '-100' },
+        }),
+      },
+    ],
+  })
+
+  new grafana.alerting.RuleGroup('global-rules', {
+    name: 'Global Rules',
+    folderUid: alertFolder.uid,
+    intervalSeconds: 60,
+    rules: GLOBAL_ALERTS.map(alertToRule),
+  })
+
+  for (const controller of CONTROLLER_NAMES) {
+    new grafana.alerting.RuleGroup(`${controller}-rules`, {
+      name: `${controller} routes`,
+      folderUid: alertFolder.uid,
+      intervalSeconds: 60,
+      rules: controllerAlerts(controller).map(alertToRule),
+    })
+  }
 }
