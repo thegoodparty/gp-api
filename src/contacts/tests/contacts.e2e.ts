@@ -259,6 +259,49 @@ test.describe('Contacts and Segments', () => {
     }
   })
 
+  test('should return statewide stats when district picker is set to State and campaign is approved', async ({
+    request,
+  }) => {
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: {
+        canDownloadFederal: true,
+        details: {
+          state: 'WY',
+          ballotLevel: 'STATE',
+          office: 'Other',
+          otherOffice: 'Wyoming Governor',
+          electionDate: '2026-11-03',
+        },
+      },
+    })
+    await prisma.pathToVictory.update({
+      where: { campaignId },
+      data: {
+        data: {
+          source: P2VSource.ElectionApi,
+          p2vStatus: P2VStatus.complete,
+          electionType: 'State',
+          electionLocation: 'WY',
+        },
+      },
+    })
+
+    const response = await request.get(`/v1/contacts/stats`, {
+      headers: AUTH_HEADER(authToken),
+    })
+
+    expect(response.status()).toBe(HttpStatus.OK)
+    const stats = (await response.json()) as {
+      districtId: string
+      totalConstituents: number
+      buckets: Record<string, unknown>
+    }
+    expect(typeof stats.districtId).toBe('string')
+    expect(stats.totalConstituents).toBeGreaterThan(0)
+    expect(stats).toHaveProperty('buckets')
+  })
+
   test('should download non-empty contacts CSV for seeded district', async ({
     request,
   }) => {
