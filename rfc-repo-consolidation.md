@@ -10,23 +10,36 @@ This doc proposes three options, evaluates each against concrete data, and recom
 
 ## The Cost We're Paying Today
 
+At a high level, the multi-repo structure is costing us in four ways:
+
+- **Developer time** — 30+ duplicative PRs in 6 months, with more coming (alerting, Grafana dashboards, future tooling changes). Every infra improvement must be implemented, reviewed, and deployed N times.
+- **Reliability** — bugs in shared infrastructure propagate manually and unevenly. Repos run different versions of critical dependencies, meaning fixes that work in one repo may not work in another.
+- **Velocity** — cross-service changes require sequential PRs across repos instead of atomic commits. Tooling adoptions that should take a day (Grafana, alerting) take weeks to fully propagate.
+- **Focus** — engineering effort spent on packaging, coordination, and cross-repo maintenance is effort not spent on the product. This overhead scales linearly with each new service.
+
+The sections below quantify each of these with specific data.
+
 ### Duplicated infrastructure work: ~30 PRs in 6 months
 
 Between September 2025 and March 2026, at least 30 merged PRs across our repos were duplicative cross-repo infrastructure work:
 
-| Work Item                      | gp-api PRs       | people-api PRs | election-api PRs | Total  |
-| ------------------------------ | ---------------- | -------------- | ---------------- | ------ |
-| Pulumi migration               | ~15              | 4              | 2                | **21** |
-| Dependabot config              | 1                | 1              | 1                | **3**  |
-| Deployment circuit breaker fix | 1                | 1              | 1                | **3**  |
-| Vitest setup                   | (already had it) | 1              | 1                | **2**  |
-| Prod deploy coordination       | 4                | 3              | 1                | **8**  |
+| Work Item                      | gp-api PRs | people-api PRs | election-api PRs | Total  |
+| ------------------------------ | ---------- | -------------- | ---------------- | ------ |
+| Pulumi migration               | ~15        | 4              | 2                | **21** |
+| Grafana/Pino adoption          | 2          | 1              | 1                | **4**  |
+| Dependabot config              | 1          | 1              | 1                | **3**  |
+| Deployment circuit breaker fix | 1          | 1              | 1                | **3**  |
+| Vitest setup                   | 1          | 1              | 1                | **3**  |
+| Prod deploy coordination       | 4          | 3              | 1                | **8**  |
+| **Pending: Alerting**          | **3**      | **0**          | **0**            | **—**  |
 
 The Pulumi migration illustrates the structural problem clearly: because our infrastructure code is ~70% identical across repos but lives in three separate places, migrating from SST to Pulumi required ~21 PRs across three repos. The work was done sequentially — gp-api first (Jan 15–29), then election-api (Feb 4), then people-api (Mar 2) — creating a 6-week window where our repos were running different IaC systems. In a shared codebase, the core migration would have been done once with per-service configuration layered on top.
 
 The Dependabot configuration is the simplest example: 3 identical PRs, same author, same day (Feb 10), with the PR description copy-pasted verbatim across all three repos.
 
 The deployment circuit breaker fix is the most concerning example: a production-impacting deployment bug required 3 separate PRs on the same day. The people-api and election-api PRs literally just say "See gp-api #1230." A bug that should have been a one-line fix in one place required three PRs, three reviews, and three deployments.
+
+This pattern is ongoing. Grafana and Pino logging were adopted across all three repos on the same day (Feb 27) via separate PRs. Alerting has landed in gp-api (3 PRs) but has not yet been ported to people-api or election-api — that work is still ahead of us, and will require duplicating the same Pulumi alerting components and configuration into each repo independently.
 
 ### Version drift is already happening
 
@@ -67,21 +80,22 @@ We currently lack the ops tooling (release trains, cross-repo CI, service mesh, 
 
 ## Options
 
-### Option A: Shared npm packages
+### Option A: Shared npm packages + reusable GitHub Actions
 
-Invest in extracting duplicated backend code into npm packages that all repos consume.
+Invest in extracting duplicated backend code into npm packages that all repos consume. Pair this with [reusable GitHub Actions workflows](https://docs.github.com/en/actions/sharing-automations/reusing-workflows) to reduce CI/CD duplication across repos.
 
 **What it solves:**
 
-- Type/schema sharing between frontend and backend
-- Could extend to shared infra code (OTel config, exception filters, Prisma base classes)
+- Shared code between backend repos — infra code (OTel, exception filters), Prisma base classes, NestJS boilerplate, types/schemas
+- CI/CD duplication — reusable workflows allow repos to call shared workflow definitions from a central repo, reducing copy-paste across CI pipelines
+- Could extend to shared Pulumi components and Docker base images
 
 **What it doesn't solve:**
 
-- CI/CD duplication — each repo still needs its own workflows, Dockerfiles, and deploy scripts
-- IaC duplication — Pulumi components would need their own package, versioning, and release cycle
-- Coordination overhead — releases still happen independently per repo
+- IaC duplication — Pulumi components would still need their own package, versioning, and release cycle. Reusable workflows help with the CI pipeline that _runs_ Pulumi, but not with the Pulumi code itself.
+- Coordination overhead — releases still happen independently per repo, and cross-service changes still require sequential PRs
 - Dependabot multiplier — still N repos x M dependency updates
+- Version drift — each repo still controls its own dependency versions independently
 
 **What it costs:**
 
@@ -89,10 +103,14 @@ Scaling npm-based code sharing to cover all our duplicated infrastructure would 
 
 - **Version propagation overhead.** Every change to a shared package requires a publish cycle, then a version bump in every consuming repo, then verification that nothing broke. For tightly-coupled infrastructure code (e.g., a Pulumi component used by all services), this creates a slow feedback loop: change the package, publish, update 3+ consumers, and hope the integration works. The alternative — pinning shared packages to `latest` — sacrifices reproducibility.
 - **Transitive dependency management.** Shared packages that depend on NestJS, Prisma, or Pulumi must keep their peer dependency ranges aligned with every consumer. When gp-api upgrades NestJS, the shared packages must be updated and republished before the upgrade can land. This creates coupling without co-location — the worst of both worlds.
-- **Packaging infrastructure.** Each shared package needs its own build system, release automation, and CI pipeline. We've already seen the cost of this: setting up npm publishing with OIDC, changeset automation, and CJS/ESM compatibility is non-trivial work that serves the packaging system rather than the product.
+- **Packaging infrastructure.** Each shared package needs its own build system, release automation, and CI pipeline. Setting up npm publishing with OIDC, changeset automation, and CJS/ESM compatibility is non-trivial work that serves the packaging system rather than the product.
 - **Where do you pin shared dependencies?** If NestJS, Prisma, and TypeScript versions should be consistent across services (and they should — see the version drift table above), someone has to decide where the canonical version lives. With npm packages, this is an unsolved governance problem. Each repo can still drift independently.
+- **Reusable workflow constraints.** Reusable GitHub Actions workflows have [real limitations](https://docs.github.com/en/actions/sharing-automations/reusing-workflows#limitations): they can't call other reusable workflows (max 1 level of nesting), the calling workflow can only use up to 20 reusable workflows total, and `env` context variables from the caller are not available inside the reusable workflow. Secrets must be passed explicitly or via `secrets: inherit`. For our use case, this means the shared workflows would need to be fairly coarse-grained, and per-service customizations (different deploy targets, different environment variables) would still require boilerplate in each repo's calling workflow.
+- **New shared repo to maintain.** The reusable workflows need to live somewhere — typically a dedicated `.github` or `shared-workflows` repo. This is another repo to manage, version, and keep in sync. Changes to shared workflows affect all consumers immediately (unless pinned to a SHA/tag), which can break CI across repos simultaneously.
 
-**Assessment:** npm packages are the right solution for sharing types and schemas with **external consumers** (the frontend, third-party integrations). They are a high-overhead solution for sharing code between backends that we control and deploy ourselves. The existing `@goodparty_org/contracts` package and `gp-sdk` are great examples of npm publishing done right — they serve external consumers who need a stable, versioned API. This proposal does not replace that work; it addresses a different problem (internal infrastructure duplication) that npm publishing is not well-suited to solve.
+**Assessment:** This option addresses code sharing well and makes a meaningful dent in CI/CD duplication. It's a real improvement over the status quo. However, it introduces significant new infrastructure (package publishing, workflow repo, version governance) and leaves several core problems unsolved: Dependabot multiplier, version drift, release coordination, and IaC duplication. It trades one kind of operational overhead for another — arguably more manageable, but still scaling linearly with repo count.
+
+The existing `@goodparty_org/contracts` package and `gp-sdk` are great examples of npm publishing done right — they serve external consumers who need a stable, versioned API. This proposal does not replace that work; it addresses a different problem (internal infrastructure duplication) where the publish-consume cycle adds friction without proportional benefit.
 
 ### Option B: Monorepo
 
@@ -160,16 +178,16 @@ Keep the current multi-repo structure and accept the operational overhead.
 
 **Option B: Monorepo.** It directly addresses every measured problem:
 
-| Problem                               | npm packages     | Monorepo                           | Status quo        |
-| ------------------------------------- | ---------------- | ---------------------------------- | ----------------- |
-| Duplicated IaC (21 Pulumi PRs)        | Does not solve   | Solves                             | Continues         |
-| Duplicated CI/CD                      | Does not solve   | Solves                             | Continues         |
-| Version drift (3 TS versions)         | Partially solves | Solves                             | Worsens           |
-| Dependabot multiplier                 | Does not solve   | Solves                             | Worsens (4x soon) |
-| Bug fix propagation (circuit breaker) | Does not solve   | Solves                             | Continues         |
-| Cross-service release coordination    | Does not solve   | Solves                             | Continues         |
-| Type sharing with frontend            | Solves           | Solves (contracts still publishes) | Does not solve    |
-| Package versioning overhead           | Introduces it    | Eliminates for internal code       | N/A               |
+| Problem                               | npm + shared workflows              | Monorepo                           | Status quo        |
+| ------------------------------------- | ----------------------------------- | ---------------------------------- | ----------------- |
+| Duplicated IaC (21 Pulumi PRs)        | Partially solves (shared components)| Solves                             | Continues         |
+| Duplicated CI/CD                      | Partially solves (reusable workflows)| Solves                            | Continues         |
+| Version drift (3 TS versions)         | Does not solve                      | Solves                             | Worsens           |
+| Dependabot multiplier                 | Does not solve                      | Solves                             | Worsens (4x soon) |
+| Bug fix propagation (circuit breaker) | Partially solves                    | Solves                             | Continues         |
+| Cross-service release coordination    | Does not solve                      | Solves                             | Continues         |
+| Type sharing with frontend            | Solves                              | Solves (contracts still publishes) | Does not solve    |
+| Package versioning overhead           | Introduces it                       | Eliminates for internal code       | N/A               |
 
 npm packages solve the type-sharing problem well and should continue to exist for that purpose. But they don't address the majority of our operational overhead, which is in infrastructure, CI/CD, and deployment duplication. A monorepo solves all of these while also being the natural home for the contracts package.
 
