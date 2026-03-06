@@ -64,15 +64,29 @@ export class ElectedOfficeService extends createPrismaBase(
       await this.validateActiveElectedOffice(args.userId)
     }
 
-    const orgData = await this.organizationsService.resolveOrgData({
-      campaignId: args.campaignId,
-      ballotReadyPositionId: args.ballotreadyPositionId,
-      office: args.office,
-      otherOffice: args.otherOffice,
-      state: args.state,
-      L2DistrictType: args.L2DistrictType,
-      L2DistrictName: args.L2DistrictName,
+    // If the campaign already has an organization, copy its resolved fields
+    // instead of re-resolving from the election API.
+    const campaignOrgSlug = OrganizationsService.campaignOrgSlug(
+      args.campaignId,
+    )
+    const campaignOrg = await this.organizationsService.findUnique({
+      where: { slug: campaignOrgSlug },
     })
+
+    const orgData = campaignOrg
+      ? {
+          positionId: campaignOrg.positionId,
+          customPositionName: campaignOrg.customPositionName,
+          overrideDistrictId: campaignOrg.overrideDistrictId,
+        }
+      : await this.organizationsService.resolveOrgData({
+          ballotReadyPositionId: args.ballotreadyPositionId,
+          office: args.office,
+          otherOffice: args.otherOffice,
+          state: args.state,
+          L2DistrictType: args.L2DistrictType,
+          L2DistrictName: args.L2DistrictName,
+        })
 
     return this.client.$transaction(async (tx) => {
       const id = uuidv7()

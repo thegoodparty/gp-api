@@ -52,12 +52,10 @@ export class OrganizationsService extends createPrismaBase(
   }
 
   /**
-   * Resolves positionId, customPositionName, and overrideDistrictId for an
-   * elected office organization. If the campaign already has an organization,
-   * copies its resolved fields instead of re-resolving from the election API.
+   * Resolves positionId, customPositionName, and overrideDistrictId from
+   * campaign data by calling the election API.
    */
   async resolveOrgData(params: {
-    campaignId: number
     ballotReadyPositionId?: string | null
     office?: string
     otherOffice?: string
@@ -70,7 +68,6 @@ export class OrganizationsService extends createPrismaBase(
     overrideDistrictId: string | null
   }> {
     const {
-      campaignId,
       ballotReadyPositionId,
       office,
       otherOffice,
@@ -79,22 +76,6 @@ export class OrganizationsService extends createPrismaBase(
       L2DistrictName,
     } = params
 
-    // If the campaign already has an organization, copy its resolved fields
-    // instead of re-resolving from the election API.
-    const campaignOrgSlug = OrganizationsService.campaignOrgSlug(campaignId)
-    const campaignOrg = (await this.model.findUnique({
-      where: { slug: campaignOrgSlug },
-    })) as Organization | null
-
-    if (campaignOrg) {
-      return {
-        positionId: campaignOrg.positionId,
-        customPositionName: campaignOrg.customPositionName,
-        overrideDistrictId: campaignOrg.overrideDistrictId,
-      }
-    }
-
-    // No campaign org exists — resolve from the election API.
     const positionId = ballotReadyPositionId
       ? await this.resolvePositionId(ballotReadyPositionId)
       : null
