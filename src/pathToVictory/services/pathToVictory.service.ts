@@ -702,32 +702,25 @@ export class PathToVictoryService extends createPrismaBase(
       // Wrapped in its own try/catch so a failure doesn't prevent
       // email/analytics/CRM updates from running.
       if (shouldOverwriteDistrict && campaign.details?.state) {
-        try {
-          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
-          const orgData = await this.organizationsService.resolveOrgData({
-            ballotReadyPositionId: campaign.details?.positionId,
-            office: campaign.details?.office,
-            otherOffice: campaign.details?.otherOffice,
-            state: campaign.details.state,
-            L2DistrictType: pathToVictoryResponse.electionType,
-            L2DistrictName: pathToVictoryResponse.electionLocation,
-          })
+        const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+        const orgData = await this.organizationsService.resolveOrgData({
+          ballotReadyPositionId: campaign.details?.positionId,
+          office: campaign.details?.office,
+          otherOffice: campaign.details?.otherOffice,
+          state: campaign.details.state,
+          L2DistrictType: pathToVictoryResponse.electionType,
+          L2DistrictName: pathToVictoryResponse.electionLocation,
+        })
 
-          await this.prisma.organization.upsert({
-            where: { slug: orgSlug },
-            update: orgData,
-            create: {
-              slug: orgSlug,
-              ownerId: campaign.userId,
-              ...orgData,
-            },
-          })
-        } catch (orgError) {
-          this.logger.error(
-            orgError,
-            'failed to update organization during P2V completion',
-          )
-        }
+        await this.prisma.organization.upsert({
+          where: { slug: orgSlug },
+          update: orgData,
+          create: {
+            slug: orgSlug,
+            ownerId: campaign.userId,
+            ...orgData,
+          },
+        })
       }
 
       await this.analytics.identify(campaign.userId, {
