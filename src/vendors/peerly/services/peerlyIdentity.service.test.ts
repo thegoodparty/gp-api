@@ -20,67 +20,57 @@ import { SlackService } from '../../slack/services/slack.service'
 import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
 import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
-import { createMockLogger } from '../../../shared/test-utils/mockLogger.util'
+import {
+  createMockLogger,
+  userFactory,
+  campaignFactory,
+  resetAllCounters,
+} from '@/shared/test-utils'
 import { PinoLogger } from 'nestjs-pino'
 
+/**
+ * Create a mock user for peerly identity tests
+ * Uses the shared userFactory with peerly-specific defaults
+ */
 function createMockUser(overrides: Partial<User> = {}): User {
-  return {
+  return userFactory({
     id: 1,
     email: 'candidate@example.com',
     phone: '+15551234567',
     firstName: 'Jane',
     lastName: 'Doe',
     name: 'Jane Doe',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    metaData: null,
-    avatar: null,
     zip: '62701',
     password: null,
     hasPassword: false,
     roles: [],
-    passwordResetToken: null,
     ...overrides,
-  }
+  })
 }
 
+/**
+ * Create a mock campaign for peerly identity tests
+ * Uses the shared campaignFactory with peerly-specific defaults
+ */
 function createMockCampaign(
   overrides: Omit<Partial<Campaign>, 'details'> & {
     details?: PrismaJson.CampaignDetails
   } = {},
 ): Campaign {
   const { details, ...rest } = overrides
-  const campaign: Campaign = {
+  return campaignFactory({
     id: 1,
-    organizationSlug: null,
     slug: 'test-campaign',
-    isVerified: false,
-    isActive: true,
-    isPro: false,
-    isDemo: false,
-    didWin: null,
-    dateVerified: null,
-    tier: null,
     formattedAddress: '123 Main St, Springfield, IL 62701',
+    placeId: 'test-place-id',
     details: {
       electionDate: '2024-11-05',
       ballotLevel: BallotReadyPositionLevel.FEDERAL,
       ...details,
     },
-    placeId: 'test-place-id',
-    aiContent: {},
-    data: {},
-    vendorTsData: {},
     userId: 1,
-    canDownloadFederal: false,
-    completedTaskIds: [],
-    hasFreeTextsOffer: false,
-    freeTextsOfferRedeemedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
     ...rest,
-  }
-  return campaign
+  })
 }
 
 function createMockDomain(overrides: Partial<Domain> = {}): Domain {
@@ -131,6 +121,8 @@ describe('PeerlyIdentityService', () => {
   const baseDomain = createMockDomain()
 
   beforeEach(async () => {
+    resetAllCounters()
+
     const mockPostFn = vi
       .fn()
       .mockImplementation((_url: string, data: Record<string, unknown>) => {
