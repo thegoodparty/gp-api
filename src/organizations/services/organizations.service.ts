@@ -147,10 +147,10 @@ export class OrganizationsService extends createPrismaBase(
     )
 
     if (positionId) {
-      // Position lookup is best-effort — if it fails, fall through to override.
-      const position = await this.electionsService
-        .getPositionByBallotReadyId(positionId, { includeDistrict: true })
-        .catch(() => null)
+      const position = await this.electionsService.getPositionByBallotReadyId(
+        positionId,
+        { includeDistrict: true },
+      )
 
       const isExactMatch =
         position?.district?.L2DistrictType === L2DistrictType &&
