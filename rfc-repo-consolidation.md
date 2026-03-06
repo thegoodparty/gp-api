@@ -12,14 +12,14 @@ This doc proposes three options, evaluates each against concrete data, and recom
 
 At a high level, the multi-repo structure is costing us in four ways:
 
-- **Developer time** — 30+ duplicative PRs in 6 months, with more coming (alerting, Grafana dashboards, future tooling changes). Every infra improvement must be implemented, reviewed, and deployed N times.
-- **Reliability** — bugs in shared infrastructure propagate manually and unevenly. Repos run different versions of critical dependencies, meaning fixes that work in one repo may not work in another.
-- **Velocity** — cross-service changes require sequential PRs across repos instead of atomic commits. Tooling adoptions that should take a day (Grafana, alerting) take weeks to fully propagate.
-- **Focus** — engineering effort spent on packaging, coordination, and cross-repo maintenance is effort not spent on the product. This overhead scales linearly with each new service.
+- **Slower delivery** — every infrastructure improvement must be implemented, reviewed, and deployed N times. In the best case, a change ships to each repo on the same day — but often there is a propagation delay of days or weeks, or the change never propagates at all.
+- **Higher defect risk** — bugs in shared infrastructure propagate manually and unevenly. Version drift across repos means a fix that works in one repo may not work in another.
+- **Growing maintenance burden** — thousands of lines of nearly identical boilerplate must be maintained independently per repo. Dependabot alone will generate hundreds of redundant PRs per year.
+- **Compounding cost** — each new service multiplies all of the above. We lack the ops tooling to manage this well, and building it is a significant investment that works against our goal of shipping product.
 
-The sections below quantify each of these with specific data.
+Each of these costs works directly against the goals we've already aligned on in the VOTES framework — particularly Velocity (cycle time) and Operations (automated daily releases). The sections below quantify each with specific data.
 
-### Duplicated infrastructure work: ~30 PRs in 6 months
+### Slower delivery: ~30 duplicative PRs in 6 months
 
 Between September 2025 and March 2026, at least 30 merged PRs across our repos were duplicative cross-repo infrastructure work:
 
@@ -33,15 +33,13 @@ Between September 2025 and March 2026, at least 30 merged PRs across our repos w
 | Prod deploy coordination       | 4          | 3              | 1                | **8**  |
 | **Pending: Alerting**          | **3**      | **0**          | **0**            | **—**  |
 
-The Pulumi migration illustrates the structural problem clearly: because our infrastructure code is ~70% identical across repos but lives in three separate places, migrating from SST to Pulumi required ~21 PRs across three repos. The work was done sequentially — gp-api first (Jan 15–29), then election-api (Feb 4), then people-api (Mar 2) — creating a 6-week window where our repos were running different IaC systems. In a shared codebase, the core migration would have been done once with per-service configuration layered on top.
+The Pulumi migration illustrates the structural problem clearly: because our infrastructure code is ~70% identical across repos but lives in three separate places, migrating from SST to Pulumi required ~21 PRs across three repos. In the best case, each repo would have been migrated on the same day — but in practice, gp-api was migrated Jan 15–29, election-api on Feb 4, and people-api not until Mar 2, creating a 6-week window where our repos were running different IaC systems. In a shared codebase, the core migration would have been done once with per-service configuration layered on top.
 
 The Dependabot configuration is the simplest example: 3 identical PRs, same author, same day (Feb 10), with the PR description copy-pasted verbatim across all three repos.
 
-The deployment circuit breaker fix is the most concerning example: a production-impacting deployment bug required 3 separate PRs on the same day. The people-api and election-api PRs literally just say "See gp-api #1230." A bug that should have been a one-line fix in one place required three PRs, three reviews, and three deployments.
+Grafana and Pino logging were adopted across all three repos on the same day (Feb 27) via separate PRs — the best case. Alerting is the other end of the spectrum: 3 PRs have landed in gp-api, but the work has not yet propagated to people-api or election-api.
 
-This pattern is ongoing. Grafana and Pino logging were adopted across all three repos on the same day (Feb 27) via separate PRs. Alerting has landed in gp-api (3 PRs) but has not yet been ported to people-api or election-api — that work is still ahead of us, and will require duplicating the same Pulumi alerting components and configuration into each repo independently.
-
-### Version drift is already happening
+### Higher defect risk: version drift and uneven bug propagation
 
 Despite these repos being created within months of each other, dependency versions have already diverged:
 
@@ -52,11 +50,11 @@ Despite these repos being created within months of each other, dependency versio
 | Pulumi AWS    | ~6.67.0 | ^7.17.0    | ^7.17.0      |
 | Pino (nestjs) | 4.6.0   | 4.4.1      | 4.6.0        |
 
-This drift has real consequences: a security patch or breaking change in any of these dependencies must now be evaluated and applied independently in each repo. With Dependabot now active in all three repos, every dependency update generates 3 separate PRs to review and merge. Over the course of a year, this will add up to hundreds of redundant Dependabot PRs.
-
 The Pulumi AWS version split (6.x vs 7.x) is especially notable — our primary infrastructure tool is on different major versions across repos, meaning infrastructure code that works in one repo may not work in another.
 
-### Duplicated boilerplate: 95% identical in key areas
+Bug fixes are also affected. The deployment circuit breaker fix is the clearest example: a production-impacting deployment bug required 3 separate PRs on the same day. The people-api and election-api PRs literally just say "See gp-api #1230." A bug that should have been a one-line fix in one place required three PRs, three reviews, and three deployments — with three chances to miss one.
+
+### Growing maintenance burden: thousands of duplicated lines
 
 A code-level audit found massive duplication in non-application code:
 
@@ -70,9 +68,9 @@ A code-level audit found massive duplication in non-application code:
 | Prisma configuration             | **80%**     | Same generators, datasource config, migration patterns                                                                                           |
 | Exception filters                | **50%**     | Similar patterns, slightly different implementations                                                                                             |
 
-Each of these represents a surface area where a bug fix, improvement, or config change must be applied N times.
+Each of these represents a surface area where a bug fix, improvement, or config change must be applied N times. With Dependabot now active in all three repos, every dependency update generates 3 separate PRs to review and merge. Over the course of a year, this will add up to hundreds of redundant Dependabot PRs.
 
-### Coordination overhead compounds with each new service
+### Compounding cost: each new service multiplies the problem
 
 Releases that span services must be coordinated manually. On Feb 2 and Feb 12, we had "prod deploy" PRs merged on the same day across multiple repos — suggesting releases that required touching multiple repos in sequence. Each new service multiplies this coordination cost linearly.
 
@@ -178,16 +176,16 @@ Keep the current multi-repo structure and accept the operational overhead.
 
 **Option B: Monorepo.** It directly addresses every measured problem:
 
-| Problem                               | npm + shared workflows              | Monorepo                           | Status quo        |
-| ------------------------------------- | ----------------------------------- | ---------------------------------- | ----------------- |
-| Duplicated IaC (21 Pulumi PRs)        | Partially solves (shared components)| Solves                             | Continues         |
-| Duplicated CI/CD                      | Partially solves (reusable workflows)| Solves                            | Continues         |
-| Version drift (3 TS versions)         | Does not solve                      | Solves                             | Worsens           |
-| Dependabot multiplier                 | Does not solve                      | Solves                             | Worsens (4x soon) |
-| Bug fix propagation (circuit breaker) | Partially solves                    | Solves                             | Continues         |
-| Cross-service release coordination    | Does not solve                      | Solves                             | Continues         |
-| Type sharing with frontend            | Solves                              | Solves (contracts still publishes) | Does not solve    |
-| Package versioning overhead           | Introduces it                       | Eliminates for internal code       | N/A               |
+| Problem                               | npm + shared workflows                | Monorepo                           | Status quo        |
+| ------------------------------------- | ------------------------------------- | ---------------------------------- | ----------------- |
+| Duplicated IaC (21 Pulumi PRs)        | Partially solves (shared components)  | Solves                             | Continues         |
+| Duplicated CI/CD                      | Partially solves (reusable workflows) | Solves                             | Continues         |
+| Version drift (3 TS versions)         | Does not solve                        | Solves                             | Worsens           |
+| Dependabot multiplier                 | Does not solve                        | Solves                             | Worsens (4x soon) |
+| Bug fix propagation (circuit breaker) | Partially solves                      | Solves                             | Continues         |
+| Cross-service release coordination    | Does not solve                        | Solves                             | Continues         |
+| Type sharing with frontend            | Solves                                | Solves (contracts still publishes) | Does not solve    |
+| Package versioning overhead           | Introduces it                         | Eliminates for internal code       | N/A               |
 
 npm packages solve the type-sharing problem well and should continue to exist for that purpose. But they don't address the majority of our operational overhead, which is in infrastructure, CI/CD, and deployment duplication. A monorepo solves all of these while also being the natural home for the contracts package.
 
