@@ -22,6 +22,22 @@ export class OrganizationsService extends createPrismaBase(
     super()
   }
 
+  static campaignOrgSlug(campaignId: number): string {
+    return `campaign-${campaignId}`
+  }
+
+  static electedOfficeOrgSlug(electedOfficeId: string): string {
+    return `eo-${electedOfficeId}`
+  }
+
+  static resolveCustomPositionName(
+    office?: string,
+    otherOffice?: string,
+  ): string | null {
+    const resolved = office === 'Other' ? otherOffice : office
+    return resolved || null
+  }
+
   async listOrganizations(userId: number) {
     const orgs = await this.model.findMany({
       where: { ownerId: userId },

@@ -1,3 +1,5 @@
+import { ElectionsService } from '@/elections/services/elections.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ConflictException, Injectable } from '@nestjs/common'
 import { Campaign, ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -8,9 +10,8 @@ import {
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
-import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 import { v7 as uuidv7 } from 'uuid'
-import { ElectionsService } from '@/elections/services/elections.service'
+import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 
 export type CreateElectedOfficeArgs = {
   electedDate?: Date | null
@@ -64,14 +65,22 @@ export class ElectedOfficeService extends createPrismaBase(
           .then((res) => res?.id ?? null)
       : null
 
+    const customPositionName = !positionId
+      ? OrganizationsService.resolveCustomPositionName(
+          args.campaign.details.office,
+          args.campaign.details.otherOffice,
+        )
+      : null
+
     return this.client.$transaction(async (tx) => {
       const id = uuidv7()
 
       await tx.organization.create({
         data: {
-          slug: `eo-${id}`,
+          slug: OrganizationsService.electedOfficeOrgSlug(id),
           ownerId: args.userId,
           positionId,
+          customPositionName,
         },
       })
 
@@ -86,7 +95,7 @@ export class ElectedOfficeService extends createPrismaBase(
           isActive: args.isActive,
           userId: args.userId,
           campaignId: args.campaign.id,
-          organizationSlug: `eo-${id}`,
+          organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
         },
       })
     })

@@ -1,7 +1,6 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
 import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
 import { SegmentService } from '@/vendors/segment/segment.service'
@@ -11,6 +10,7 @@ import { StripeService } from '@/vendors/stripe/services/stripe.service'
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { Prisma, PrismaClient, User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import {
   beforeEach,
@@ -208,11 +208,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID },
+        update: { positionId: GP_POSITION_ID, customPositionName: null },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: GP_POSITION_ID,
+          customPositionName: null,
         },
       })
     })
@@ -239,11 +240,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID },
+        update: { positionId: GP_POSITION_ID, customPositionName: null },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: GP_POSITION_ID,
+          customPositionName: null,
         },
       })
     })
@@ -270,11 +272,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null },
+        update: { positionId: null, customPositionName: 'Mayor' },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: null,
+          customPositionName: 'Mayor',
         },
       })
     })
@@ -301,11 +304,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null },
+        update: { positionId: null, customPositionName: null },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: null,
+          customPositionName: null,
         },
       })
     })
@@ -355,11 +359,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID },
+        update: { positionId: GP_POSITION_ID, customPositionName: null },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: GP_POSITION_ID,
+          customPositionName: null,
         },
       })
     })
@@ -380,11 +385,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID },
+        update: { positionId: GP_POSITION_ID, customPositionName: null },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: GP_POSITION_ID,
+          customPositionName: null,
         },
       })
     })
@@ -405,11 +411,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null },
+        update: { positionId: null, customPositionName: 'Mayor' },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: null,
+          customPositionName: 'Mayor',
         },
       })
     })
@@ -430,11 +437,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null },
+        update: { positionId: null, customPositionName: null },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
           positionId: null,
+          customPositionName: null,
         },
       })
     })
