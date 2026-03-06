@@ -23,7 +23,7 @@ import {
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
-import { PaginatedResults } from 'src/shared/types/utility.types'
+import { PaginatedResults, WrapperType } from 'src/shared/types/utility.types'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
@@ -50,9 +50,9 @@ enum CandidateVerification {
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
     @Inject(forwardRef(() => UsersService))
-    private usersService: UsersService,
+    private usersService: WrapperType<UsersService>,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private readonly crm: CrmCampaignsService,
+    private readonly crm: WrapperType<CrmCampaignsService>,
     private readonly analytics: AnalyticsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,

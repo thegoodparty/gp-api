@@ -5,7 +5,10 @@ import { ATTR_DEPLOYMENT_ENVIRONMENT_NAME } from '@opentelemetry/semantic-conven
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
+import {
+  AggregationType,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics'
 import {
   BatchLogRecordProcessor,
   type LogRecordProcessor,
@@ -101,6 +104,16 @@ if (!headers) {
       }),
       exportIntervalMillis: 60_000,
     }),
+    views: [
+      {
+        instrumentName: 'http.server.*',
+        aggregation: { type: AggregationType.DROP },
+      },
+      {
+        instrumentName: 'http.client.*',
+        aggregation: { type: AggregationType.DROP },
+      },
+    ],
     logRecordProcessor: new JsonBodyLogRecordProcessor(
       new BatchLogRecordProcessor(
         new OTLPLogExporter({

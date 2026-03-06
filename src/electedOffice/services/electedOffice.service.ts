@@ -13,7 +13,6 @@ import { v7 as uuidv7 } from 'uuid'
 import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 
 export type CreateElectedOfficeArgs = {
-  ballotreadyPositionId: string
   electedDate?: Date | null
   swornInDate?: Date | null
   termStartDate?: Date | null
@@ -22,6 +21,7 @@ export type CreateElectedOfficeArgs = {
   isActive?: boolean
   userId: number
   campaignId: number
+  ballotreadyPositionId?: string | null
   office?: string
   otherOffice?: string
   state?: string
