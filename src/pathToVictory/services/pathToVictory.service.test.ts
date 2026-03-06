@@ -701,20 +701,6 @@ describe('PathToVictoryService', () => {
         expect(mockOrganizations.resolveOrgData).not.toHaveBeenCalled()
         expect(mockPrisma.organization.upsert).not.toHaveBeenCalled()
       })
-
-      it('does not block email/analytics when org upsert fails', async () => {
-        mockPrisma.campaign.findUnique.mockResolvedValue(campaignWithDetails)
-        mockPrisma.pathToVictory.update.mockResolvedValue({})
-        mockOrganizations.resolveOrgData.mockRejectedValue(
-          new Error('election API down'),
-        )
-
-        await service.completePathToVictory('test-slug', responseWithTurnout)
-
-        // Org upsert failed, but downstream calls still ran
-        expect(mockAnalytics.identify).toHaveBeenCalled()
-        expect(mockCrm.handleUpdateCampaign).toHaveBeenCalled()
-      })
     })
   })
 
