@@ -1,15 +1,18 @@
 import { ElectionsService } from '@/elections/services/elections.service'
+import { PositionWithOptionalDistrict } from '@/elections/types/elections.types'
 import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
-import { Organization } from '@prisma/client'
+import { Campaign, ElectedOffice, Organization } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
-export type OrganizationWithPosition = Awaited<
-  ReturnType<OrganizationsService['withPosition']>
->
+export type OrganizationWithPosition = Organization & {
+  position: PositionWithOptionalDistrict | null
+  campaign: Campaign | null
+  electedOffice: ElectedOffice | null
+}
 
 @Injectable()
 export class OrganizationsService extends createPrismaBase(
@@ -56,13 +59,17 @@ export class OrganizationsService extends createPrismaBase(
   }
 
   async listOrganizations(userId: number) {
-    const orgs = await this.model.findMany({ where: { ownerId: userId } })
+    const orgs = await this.model.findMany({
+      where: { ownerId: userId },
+      include: { campaign: true, electedOffice: true },
+    })
     return await Promise.all(orgs.map((org) => this.withPosition(org)))
   }
 
   async getOrganization(userId: number, slug: string) {
     const org = await this.model.findUnique({
       where: { slug, ownerId: userId },
+      include: { campaign: true, electedOffice: true },
     })
     if (!org) {
       throw new NotFoundException('Organization not found')
@@ -72,12 +79,10 @@ export class OrganizationsService extends createPrismaBase(
   }
 
   /**
-   * Resolves positionId, customPositionName, and overrideDistrictId for an
-   * elected office organization. If the campaign already has an organization,
-   * copies its resolved fields instead of re-resolving from the election API.
+   * Resolves positionId, customPositionName, and overrideDistrictId from
+   * campaign data by calling the election API.
    */
   async resolveOrgData(params: {
-    campaignId: number
     ballotReadyPositionId?: string | null
     office?: string
     otherOffice?: string
@@ -90,7 +95,6 @@ export class OrganizationsService extends createPrismaBase(
     overrideDistrictId: string | null
   }> {
     const {
-      campaignId,
       ballotReadyPositionId,
       office,
       otherOffice,
@@ -99,22 +103,6 @@ export class OrganizationsService extends createPrismaBase(
       L2DistrictName,
     } = params
 
-    // If the campaign already has an organization, copy its resolved fields
-    // instead of re-resolving from the election API.
-    const campaignOrgSlug = OrganizationsService.campaignOrgSlug(campaignId)
-    const campaignOrg = (await this.model.findUnique({
-      where: { slug: campaignOrgSlug },
-    })) as Organization | null
-
-    if (campaignOrg) {
-      return {
-        positionId: campaignOrg.positionId,
-        customPositionName: campaignOrg.customPositionName,
-        overrideDistrictId: campaignOrg.overrideDistrictId,
-      }
-    }
-
-    // No campaign org exists — resolve from the election API.
     const positionId = ballotReadyPositionId
       ? await this.resolvePositionId(ballotReadyPositionId)
       : null
@@ -186,7 +174,12 @@ export class OrganizationsService extends createPrismaBase(
     )
   }
 
-  private async withPosition(org: Organization) {
+  private async withPosition(
+    org: Organization & {
+      campaign: Campaign | null
+      electedOffice: ElectedOffice | null
+    },
+  ) {
     if (!org.positionId) {
       return { ...org, position: null }
     }

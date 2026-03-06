@@ -17,15 +17,16 @@ import { Headers, MimeTypes } from 'http-constants-ts'
 import { AxiosError, isAxiosError } from 'axios'
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts'
 import { PinoLogger } from 'nestjs-pino'
+import { WrapperType } from 'src/shared/types/utility.types'
 
 @Injectable()
 export class CrmUsersService {
   constructor(
     private readonly hubspot: HubspotService,
     @Inject(forwardRef(() => UsersService))
-    private readonly users: UsersService,
+    private readonly users: WrapperType<UsersService>,
     @Inject(forwardRef(() => CampaignsService))
-    private readonly campaigns: CampaignsService,
+    private readonly campaigns: WrapperType<CampaignsService>,
     private readonly httpService: HttpService,
     private readonly slack: SlackService,
     private readonly logger: PinoLogger,

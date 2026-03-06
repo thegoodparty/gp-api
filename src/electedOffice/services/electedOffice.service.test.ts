@@ -70,6 +70,7 @@ describe('ElectedOfficeService', () => {
 
     service = new ElectedOfficeService({
       resolveOrgData: mockResolveOrgData,
+      findUnique: vi.fn().mockResolvedValue(null),
     } as unknown as OrganizationsService)
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
@@ -152,7 +153,6 @@ describe('ElectedOfficeService', () => {
       await service.create(createArgs)
 
       expect(mockResolveOrgData).toHaveBeenCalledWith({
-        campaignId: 1,
         ballotReadyPositionId: BR_POSITION_ID,
         office: undefined,
         otherOffice: undefined,
