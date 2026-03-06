@@ -24,6 +24,7 @@ import {
   CRMCompanyProperties,
   CRMCompanyPropertiesSchema,
 } from 'src/crm/schemas/CRMCompanyProperties.schema'
+import { WrapperType } from 'src/shared/types/utility.types'
 import {
   P2V_LOCKED_STATUS,
   P2VStatus,
@@ -37,14 +38,15 @@ const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 export class CrmCampaignsService {
   constructor(
     @Inject(forwardRef(() => CampaignsService))
-    private readonly campaigns: CampaignsService,
+    private readonly campaigns: WrapperType<CampaignsService>,
     @Inject(forwardRef(() => UsersService))
-    private readonly users: UsersService,
+    private readonly users: WrapperType<UsersService>,
     private readonly hubspot: HubspotService,
     @Inject(forwardRef(() => CrmUsersService))
-    private readonly crmUsers: CrmUsersService,
+    private readonly crmUsers: WrapperType<CrmUsersService>,
     private readonly aiChat: AiChatService,
-    private readonly pathToVictory: PathToVictoryService,
+    @Inject(forwardRef(() => PathToVictoryService))
+    private readonly pathToVictory: WrapperType<PathToVictoryService>,
     private readonly voterFile: VoterFileDownloadAccessService,
     private readonly slack: SlackService,
     private readonly ecanvasser: EcanvasserIntegrationService,

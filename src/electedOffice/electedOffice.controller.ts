@@ -1,7 +1,6 @@
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import {
-  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -80,10 +79,6 @@ export class ElectedOfficeController {
     })
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
-    }
-
-    if (!campaign.details.positionId) {
-      throw new BadRequestException('Campaign does not have a position')
     }
 
     const created = await this.electedOfficeService.create({

@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { PaginatedResults, WithOptional } from 'src/shared/types/utility.types'
+import {
+  PaginatedResults,
+  WithOptional,
+  WrapperType,
+} from 'src/shared/types/utility.types'
 import { AnalyticsService } from '../../analytics/analytics.service'
 import { trimMany } from '../../shared/util/strings.util'
 import {
@@ -37,11 +41,11 @@ const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 export class UsersService extends createPrismaBase(MODELS.User) {
   constructor(
     @Inject(forwardRef(() => AnalyticsService))
-    private readonly analytics: AnalyticsService,
+    private readonly analytics: WrapperType<AnalyticsService>,
     @Inject(forwardRef(() => CrmUsersService))
-    private readonly crm: CrmUsersService,
+    private readonly crm: WrapperType<CrmUsersService>,
     @Inject(forwardRef(() => StripeService))
-    private readonly stripeService: StripeService,
+    private readonly stripeService: WrapperType<StripeService>,
   ) {
     super()
   }

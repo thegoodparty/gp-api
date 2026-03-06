@@ -34,6 +34,7 @@ import { setTokenCookie } from './util/setTokenCookie.util'
 import { CampaignCreatedBy } from '@goodparty_org/contracts'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { WrapperType } from 'src/shared/types/utility.types'
 
 @PublicAccess()
 @Controller('authentication')
@@ -42,7 +43,7 @@ export class AuthenticationController {
   constructor(
     private authenticationService: AuthenticationService,
     @Inject(forwardRef(() => UsersService))
-    private usersService: UsersService,
+    private usersService: WrapperType<UsersService>,
     private campaignsService: CampaignsService,
     private emailService: EmailService,
     private readonly crmUsers: CrmUsersService,

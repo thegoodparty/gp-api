@@ -14,7 +14,7 @@ describe('GET /v1/organizations', () => {
     })
   })
 
-  it('returns organizations with position data from linked campaigns', async () => {
+  it('returns organizations with name from campaign electionDate', async () => {
     const electionsService = service.app.get(ElectionsService)
     vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
       id: 'pos-123',
@@ -36,7 +36,7 @@ describe('GET /v1/organizations', () => {
       data: {
         userId: service.user.id,
         slug: 'test-campaign',
-        details: {},
+        details: { electionDate: '2026-11-03' },
         organizationSlug: 'campaign-1',
       },
     })
@@ -49,7 +49,7 @@ describe('GET /v1/organizations', () => {
         organizations: [
           {
             slug: 'campaign-1',
-            position: { id: 'pos-123', name: 'Mayor' },
+            name: '2026 Campaign',
             campaignId: 1,
             electedOfficeId: null,
           },
@@ -58,7 +58,7 @@ describe('GET /v1/organizations', () => {
     })
   })
 
-  it('returns null position for campaigns without a positionId', async () => {
+  it('returns "Campaign" as name when no electionDate', async () => {
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-2',
@@ -83,8 +83,43 @@ describe('GET /v1/organizations', () => {
         organizations: [
           {
             slug: 'campaign-2',
-            position: null,
+            name: 'Campaign',
             campaignId: 2,
+            electedOfficeId: null,
+          },
+        ],
+      },
+    })
+  })
+
+  it('returns customPositionName as name when set', async () => {
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-3',
+        ownerId: service.user.id,
+        customPositionName: 'Custom Office Name',
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-custom',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-3',
+      },
+    })
+
+    const result = await service.client.get('/v1/organizations')
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        organizations: [
+          {
+            slug: 'campaign-3',
+            name: 'Custom Office Name',
+            campaignId: 3,
             electedOfficeId: null,
           },
         ],
@@ -186,14 +221,14 @@ describe('GET /v1/organizations', () => {
 
     expect(campaignOrg).toMatchObject({
       slug: 'campaign-10',
-      position: { id: 'pos-456', name: 'City Council' },
+      name: 'Campaign',
       campaignId: 10,
       electedOfficeId: null,
     })
 
     expect(eoOrg).toMatchObject({
       slug: 'eo-abc-123',
-      position: { id: 'pos-456', name: 'City Council' },
+      name: 'City Council',
       electedOfficeId: 'abc-123',
       campaignId: null,
     })
@@ -201,21 +236,21 @@ describe('GET /v1/organizations', () => {
 })
 
 describe('GET /v1/organizations/:slug', () => {
-  it('returns an organization by slug with position', async () => {
-    const electionsService = service.app.get(ElectionsService)
-    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
-      id: 'pos-789',
-      brPositionId: 'br-pos-789',
-      brDatabaseId: 'br-db-789',
-      state: 'TX',
-      name: 'Governor',
-    })
-
+  it('returns an organization by slug with name', async () => {
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-99',
         ownerId: service.user.id,
         positionId: 'br-pos-789',
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-99',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-99',
       },
     })
 
@@ -225,14 +260,14 @@ describe('GET /v1/organizations/:slug', () => {
       status: 200,
       data: {
         slug: 'campaign-99',
-        position: { id: 'pos-789', name: 'Governor' },
+        name: '2026 Campaign',
         campaignId: 99,
         electedOfficeId: null,
       },
     })
   })
 
-  it('returns a campaign organization with null position', async () => {
+  it('returns a campaign organization with "Campaign" name when no electionDate', async () => {
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-50',
@@ -246,14 +281,14 @@ describe('GET /v1/organizations/:slug', () => {
       status: 200,
       data: {
         slug: 'campaign-50',
-        position: null,
+        name: 'Campaign',
         campaignId: 50,
         electedOfficeId: null,
       },
     })
   })
 
-  it('returns an elected office organization by slug', async () => {
+  it('returns an elected office organization with name from position', async () => {
     const electionsService = service.app.get(ElectionsService)
     vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
       id: 'pos-eo',
@@ -277,9 +312,40 @@ describe('GET /v1/organizations/:slug', () => {
       status: 200,
       data: {
         slug: 'eo-def-456',
-        position: { id: 'pos-eo', name: 'School Board' },
+        name: 'School Board',
         electedOfficeId: 'def-456',
         campaignId: null,
+      },
+    })
+  })
+
+  it('returns customPositionName as name when set', async () => {
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-100',
+        ownerId: service.user.id,
+        customPositionName: 'Custom Office Name',
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-100',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-100',
+      },
+    })
+
+    const result = await service.client.get('/v1/organizations/campaign-100')
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        slug: 'campaign-100',
+        name: 'Custom Office Name',
+        campaignId: 100,
+        electedOfficeId: null,
       },
     })
   })
