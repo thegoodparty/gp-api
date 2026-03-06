@@ -1,8 +1,6 @@
 import { ControllerName, Endpoint } from '../../src/generated/route-types'
 import { Alert, EndpointOverride, SlackGroup } from './alerting/alerts.types'
 
-/** The default threshold for the error rate alert */
-export const DEFAULT_ERROR_ALERT_THRESHOLD_PERCENTAGE = 1
 export const DEFAULT_P95_READ_LATENCY_MS = 1000
 export const DEFAULT_P95_WRITE_LATENCY_MS = 3000
 
@@ -34,7 +32,10 @@ export const GLOBAL_ALERTS: Alert[] = [
     expr: 'avg(process_cpu_utilization{service_name="gp-api", deployment_environment_name="$ENV"}) * 100',
     threshold: 80,
     for: '5m',
-    message: 'Process CPU utilization has exceeded 80% for 5 minutes.',
+    message: [
+      'Process CPU utilization has exceeded 80% for 5 minutes.',
+      'Click *View in Grafana* to check the CPU & Memory dashboard, and look for recent deployments or traffic spikes that may be driving the increase. If sustained, consider scaling up the service or profiling for hot code paths.',
+    ].join('\n\n'),
   },
   {
     slug: 'high-memory',
@@ -43,7 +44,10 @@ export const GLOBAL_ALERTS: Alert[] = [
     expr: 'avg(system_memory_utilization{service_name="gp-api", deployment_environment_name="$ENV", system_memory_state="used"}) * 100',
     threshold: 90,
     for: '5m',
-    message: 'System memory utilization has exceeded 90% for 5 minutes.',
+    message: [
+      'System memory utilization has exceeded 90% for 5 minutes.',
+      'Click *View in Grafana* to check memory trends on the CPU & Memory dashboard. Look for memory leaks (steadily climbing usage) or a recent deployment that increased baseline consumption. If the service is at risk of OOM, consider restarting it and then investigating the root cause.',
+    ].join('\n\n'),
   },
   {
     slug: 'missing-health-check',
@@ -52,8 +56,10 @@ export const GLOBAL_ALERTS: Alert[] = [
     expr: 'absent_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Request completed" |= "/v1/health" [2m])',
     threshold: 0,
     for: '2m',
-    message:
+    message: [
       'No health check requests logged in the last 2 minutes — the service may be down.',
+      'Check the ECS console for task status and recent events. If the task is crashing, click *View in Grafana* to check recent logs for crash output. If the task is running but not logging, investigate network or load balancer connectivity.',
+    ].join('\n\n'),
   },
   // ------ Serve Alerts ------ //
   {
@@ -63,8 +69,10 @@ export const GLOBAL_ALERTS: Alert[] = [
     expr: 'sum(count_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "Message processing failed" |= "poll" [5m]))',
     threshold: 1,
     for: '5m',
-    message:
+    message: [
       'A Serve-related background SQS job has failed in the last 5 minutes.',
+      'Click *View in Grafana* to find the failing log lines, then check the associated error message and stack trace to understand what went wrong. Look at the SQS message payload to identify which job failed and whether it can be safely retried.',
+    ].join('\n\n'),
   },
 
   // Add more alerts here as you like!
