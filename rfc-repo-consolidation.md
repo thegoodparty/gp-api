@@ -17,7 +17,15 @@ At a high level, the multi-repo structure is costing us in four ways:
 - **Growing maintenance burden** — thousands of lines of nearly identical boilerplate must be maintained independently per repo. Dependabot alone will generate hundreds of redundant PRs per year.
 - **Compounding cost** — each new service multiplies all of the above. We lack the ops tooling to manage this well, and building it is a significant investment that works against our goal of shipping product.
 
-Each of these costs works directly against the goals we've already aligned on in the VOTES framework — particularly Velocity (cycle time) and Operations (automated daily releases). The sections below quantify each with specific data.
+Each of these costs works directly against goals we've already aligned on in the VOTES framework:
+
+- **Velocity** — duplicated PRs and propagation delays inflate cycle time with zero product value
+- **Operations** — multi-repo coordination is a structural pain point in automating releases
+- **Testing** — each repo independently maintains its own test framework, coverage gates, and CI pipelines
+- **Experience** — bugs in shared boilerplate that introduce debugging pain must be fixes in each repo independently, slowing resolution of blocked states
+- **Security** — every additional repo multiplies our dependency security surface; version drift means a vulnerability patched in one repo may remain unpatched in another
+
+The sections below quantify each of these costs with specific data.
 
 ### Slower delivery: ~30 duplicative PRs in 6 months
 
