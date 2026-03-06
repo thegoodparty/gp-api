@@ -43,7 +43,7 @@ export const loggerModule = LoggerModule.forRoot({
         user: determineUserId(req),
         request: {
           method: req.method,
-          route: req.route,
+          endpoint: `${req.method} ${req.route}`,
           // @ts-expect-error - req.originalUrl is not typed
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           url: req.originalUrl,
