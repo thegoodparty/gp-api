@@ -84,7 +84,10 @@ export class ElectedOfficeController {
     const created = await this.electedOfficeService.create({
       ...body,
       userId: user.id,
-      campaign,
+      campaignId: campaign.id,
+      ballotreadyPositionId: campaign.details.positionId,
+      office: campaign.details.office,
+      otherOffice: campaign.details.otherOffice,
     })
     return this.toApi(created)
   }

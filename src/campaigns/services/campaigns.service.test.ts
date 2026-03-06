@@ -208,7 +208,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -240,7 +244,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -272,7 +280,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: 'Mayor' },
+        update: {
+          positionId: null,
+          customPositionName: 'Mayor',
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -304,7 +316,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: null },
+        update: {
+          positionId: null,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -359,7 +375,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -385,7 +405,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: GP_POSITION_ID, customPositionName: null },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -411,7 +435,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: 'Mayor' },
+        update: {
+          positionId: null,
+          customPositionName: 'Mayor',
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -437,7 +465,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       expect(mockGetPosition).not.toHaveBeenCalled()
       expect(mockOrgUpsert).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { positionId: null, customPositionName: null },
+        update: {
+          positionId: null,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
         create: {
           slug: 'campaign-10',
           ownerId: 1,
@@ -460,6 +492,69 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgUpsert).not.toHaveBeenCalled()
+    })
+
+    it('should upsert organization overrideDistrictId when provided', async () => {
+      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        pathToVictory: { electionType: 'State Senate' },
+        overrideDistrictId: 'district-uuid-123',
+      })
+
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: { overrideDistrictId: 'district-uuid-123' },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          overrideDistrictId: 'district-uuid-123',
+        },
+      })
+    })
+
+    it('should upsert organization with null overrideDistrictId', async () => {
+      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        pathToVictory: { electionType: 'State Senate' },
+        overrideDistrictId: null,
+      })
+
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: { overrideDistrictId: null },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          overrideDistrictId: null,
+        },
+      })
+    })
+
+    it('should not upsert organization when overrideDistrictId is not in body', async () => {
+      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        pathToVictory: { electionType: 'State Senate' },
+      })
+
       expect(mockOrgUpsert).not.toHaveBeenCalled()
     })
   })
