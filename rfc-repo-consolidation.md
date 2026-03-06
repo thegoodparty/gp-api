@@ -4,7 +4,7 @@
 
 ## Problem Statement
 
-Our backend is split across 4+ repositories (gp-api, people-api, election-api, gp-sdk, with campaign-plan-service incoming). This structure is costing us measurable engineering time through duplicated work, version drift, and coordination overhead — without providing meaningful architectural benefits in return.
+Our backend is split across multiple repositories (gp-api, people-api, election-api, with more on the way). This structure is costing us measurable engineering time through duplicated work, version drift, and coordination overhead — without providing meaningful architectural benefits in return.
 
 This doc proposes three options, evaluates each against concrete data, and recommends one.
 
@@ -12,7 +12,7 @@ This doc proposes three options, evaluates each against concrete data, and recom
 
 ### Duplicated infrastructure work: ~30 PRs in 6 months
 
-Between September 2025 and March 2026, at least 30 merged PRs across our repos were duplicative cross-repo infrastructure work. Highlights:
+Between September 2025 and March 2026, at least 30 merged PRs across our repos were duplicative cross-repo infrastructure work:
 
 | Work Item                      | gp-api PRs       | people-api PRs | election-api PRs | Total  |
 | ------------------------------ | ---------------- | -------------- | ---------------- | ------ |
@@ -22,7 +22,7 @@ Between September 2025 and March 2026, at least 30 merged PRs across our repos w
 | Vitest setup                   | (already had it) | 1              | 1                | **2**  |
 | Prod deploy coordination       | 4                | 3              | 1                | **8**  |
 
-The Pulumi migration is the starkest example: one engineer authored 21 PRs across three repos to achieve the same outcome (migrate from SST to Pulumi). The core deployment logic is ~70% identical between repos. In a single repo, this would have been ~8 PRs.
+The Pulumi migration illustrates the structural problem clearly: because our infrastructure code is ~70% identical across repos but lives in three separate places, migrating from SST to Pulumi required ~21 PRs across three repos. The work was done sequentially — gp-api first (Jan 15–29), then election-api (Feb 4), then people-api (Mar 2) — creating a 6-week window where our repos were running different IaC systems. In a shared codebase, the core migration would have been done once with per-service configuration layered on top.
 
 The Dependabot configuration is the simplest example: 3 identical PRs, same author, same day (Feb 10), with the PR description copy-pasted verbatim across all three repos.
 
@@ -47,20 +47,21 @@ The Pulumi AWS version split (6.x vs 7.x) is especially notable — our primary 
 
 A code-level audit found massive duplication in non-application code:
 
-| Component                     | Duplication | Details                                                                                                                                          |
-| ----------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| OpenTelemetry setup (otel.ts) | **95%**     | Identical file in all three repos, including the same custom `JsonBodyLogRecordProcessor` and the same comment about Grafana cardinality pricing |
-| Fastify configuration         | **85%**     | Same plugins, same versions, same setup patterns                                                                                                 |
-| Dockerfiles                   | **90%**     | people-api and election-api Dockerfiles are near-identical multi-stage builds                                                                    |
-| CI/CD workflows               | **75%**     | Node setup, Docker build, ECR push, Pulumi deploy, Slack notifications — all copied                                                              |
-| Prisma configuration          | **80%**     | Same generators, datasource config, migration patterns                                                                                           |
-| Exception filters             | **50%**     | Similar patterns, slightly different implementations                                                                                             |
+| Component                        | Duplication | Details                                                                                                                                          |
+| -------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OpenTelemetry setup (otel.ts)    | **95%**     | Identical file in all three repos, including the same custom `JsonBodyLogRecordProcessor` and the same comment about Grafana cardinality pricing |
+| Fastify configuration            | **85%**     | Same plugins, same versions, same setup patterns                                                                                                 |
+| Dockerfiles                      | **90%**     | people-api and election-api Dockerfiles are near-identical multi-stage builds                                                                    |
+| CI/CD workflows                  | **75%**     | Node setup, Docker build, ECR push, Pulumi deploy, Slack notifications — all copied                                                              |
+| Pulumi IaC (`deploy/` directory) | **70%**     | Core ECS service component is structurally identical; ~1,300 lines duplicated across repos (663 in people-api + 655 in election-api)             |
+| Prisma configuration             | **80%**     | Same generators, datasource config, migration patterns                                                                                           |
+| Exception filters                | **50%**     | Similar patterns, slightly different implementations                                                                                             |
 
 Each of these represents a surface area where a bug fix, improvement, or config change must be applied N times.
 
 ### Coordination overhead compounds with each new service
 
-Releases that span services must be coordinated manually. On Feb 2 and Feb 12, we had "prod deploy" PRs merged on the same day across multiple repos — suggesting releases that required touching multiple repos in sequence. Each new service (campaign-plan-service is incoming) multiplies this coordination cost linearly.
+Releases that span services must be coordinated manually. On Feb 2 and Feb 12, we had "prod deploy" PRs merged on the same day across multiple repos — suggesting releases that required touching multiple repos in sequence. Each new service multiplies this coordination cost linearly.
 
 We currently lack the ops tooling (release trains, cross-repo CI, service mesh, contract testing) that organizations typically use to manage multi-service deployments safely. This isn't a criticism — building that tooling is a significant investment that we should only make if the multi-service architecture is providing commensurate value.
 
@@ -68,13 +69,11 @@ We currently lack the ops tooling (release trains, cross-repo CI, service mesh, 
 
 ### Option A: Shared npm packages
 
-Invest in extracting shared code into npm packages that all repos consume.
-
-**We've already started down this path.** The `@goodparty_org/contracts` package exists in gp-api's `contracts/` directory, published via changesets with RC versioning on PRs. The `gp-sdk` repo was created Jan 29, 2026 and already has 53 PRs — roughly half of which are automated `chore: release` changesets PRs.
+Invest in extracting duplicated backend code into npm packages that all repos consume.
 
 **What it solves:**
 
-- Type/schema sharing between frontend and backend (contracts package)
+- Type/schema sharing between frontend and backend
 - Could extend to shared infra code (OTel config, exception filters, Prisma base classes)
 
 **What it doesn't solve:**
@@ -86,41 +85,44 @@ Invest in extracting shared code into npm packages that all repos consume.
 
 **What it costs:**
 
-- Package versioning overhead. The gp-sdk repo demonstrates this concretely: in its first month, it accumulated 53 PRs, 26 of which were automated `chore: release` version bumps. On Feb 26 alone, there were **5 release PRs** as the team iterated on a CJS compatibility fix for the contracts package. Each change to shared code requires: update the package -> publish -> bump the version in each consumer -> verify nothing broke.
-- New infrastructure to maintain. The contracts package required setting up tsup bundling, changeset automation, npm OIDC trusted publishing (which took 4 PRs to get working — PRs #7-#11 in gp-sdk), and CI gating logic in gp-api's workflow.
-- CJS/ESM compatibility issues. PR #46-#49 in gp-sdk show a CJS compatibility fix that required 4 PRs across 2 days to resolve — the kind of packaging problem that doesn't exist when code is co-located.
-- Learning curve. The team must understand changesets, semantic versioning, npm publishing, and the RC/snapshot workflow. This is tooling knowledge that serves the packaging system, not the product.
+Scaling npm-based code sharing to cover all our duplicated infrastructure would require creating and maintaining several internal packages (OTel config, Pulumi components, exception filters, Prisma base classes, Docker templates). Each package introduces ongoing costs:
 
-**Assessment:** npm packages are the right solution for sharing types and schemas with **external consumers** (the frontend, third-party integrations). They are a high-overhead solution for sharing code between backends that we control and deploy ourselves.
+- **Version propagation overhead.** Every change to a shared package requires a publish cycle, then a version bump in every consuming repo, then verification that nothing broke. For tightly-coupled infrastructure code (e.g., a Pulumi component used by all services), this creates a slow feedback loop: change the package, publish, update 3+ consumers, and hope the integration works. The alternative — pinning shared packages to `latest` — sacrifices reproducibility.
+- **Transitive dependency management.** Shared packages that depend on NestJS, Prisma, or Pulumi must keep their peer dependency ranges aligned with every consumer. When gp-api upgrades NestJS, the shared packages must be updated and republished before the upgrade can land. This creates coupling without co-location — the worst of both worlds.
+- **Packaging infrastructure.** Each shared package needs its own build system, release automation, and CI pipeline. We've already seen the cost of this: setting up npm publishing with OIDC, changeset automation, and CJS/ESM compatibility is non-trivial work that serves the packaging system rather than the product.
+- **Where do you pin shared dependencies?** If NestJS, Prisma, and TypeScript versions should be consistent across services (and they should — see the version drift table above), someone has to decide where the canonical version lives. With npm packages, this is an unsolved governance problem. Each repo can still drift independently.
 
-### Option B: Monorepo (recommended)
+**Assessment:** npm packages are the right solution for sharing types and schemas with **external consumers** (the frontend, third-party integrations). They are a high-overhead solution for sharing code between backends that we control and deploy ourselves. The existing `@goodparty_org/contracts` package and `gp-sdk` are great examples of npm publishing done right — they serve external consumers who need a stable, versioned API. This proposal does not replace that work; it addresses a different problem (internal infrastructure duplication) that npm publishing is not well-suited to solve.
 
-Consolidate all backend repos into a single repository, using a workspace tool (e.g., nx, turborepo, or npm workspaces) to manage multiple packages/services.
+### Option B: Monorepo
+
+Consolidate all backend repos into a single repository using npm workspaces.
+
+**To be clear: this does not mean merging services into a single application.** Each service (gp-api, people-api, election-api) remains its own NestJS application, its own Prisma schema, its own Docker image, and its own ECS deployment. The services continue to be deployed separately. What changes is that they share a single repository, a single CI/CD pipeline, and a single set of infrastructure code. This is a code organization change, not an architecture change.
 
 **What it solves:**
 
 - **All duplicated infrastructure becomes shared.** OTel config, Dockerfiles, CI/CD, Pulumi components, exception filters, Prisma configuration — all exist once and are consumed by each service as workspace dependencies.
-- **Version drift becomes impossible.** One package.json (or coordinated workspace package.jsons) means one version of TypeScript, one version of Prisma, one version of Pulumi. Dependabot generates one PR, not three.
+- **Version drift becomes impossible.** A single root package.json controls shared dependency versions. Dependabot generates one PR, not three.
 - **Bug fixes land once.** The circuit breaker fix would have been one PR touching one file, reviewed once, deployed everywhere.
-- **CI/CD is unified.** One workflow that builds and deploys affected services. No cross-repo coordination for releases.
+- **CI/CD is unified.** One workflow builds and deploys all affected services. No cross-repo coordination for releases.
 - **Atomic changes across services.** A schema change that affects both gp-api and election-api can land in a single PR with a single review, rather than requiring coordinated changes across repos.
 
 **What it costs:**
 
-- Migration effort. Moving repos into a monorepo requires careful git history preservation, CI/CD rework, and team coordination. This is a one-time cost.
-- Repo complexity. The repository will be larger, and developers working on one service will see code for other services. Workspace tooling (nx, turborepo) and CODEOWNERS can manage this, but it's a real tradeoff.
-- Build/CI time. Without caching and affected-service detection, CI runs could get slower. Workspace tools solve this well, but it's configuration that must be set up and maintained.
+- **Migration effort.** Moving repos into a monorepo requires git history preservation, CI/CD rework, and team coordination. This is a one-time cost, and the scope is bounded: estimated at roughly 1 week of focused effort given the similarity of the existing infrastructure.
+- **Repo size.** The combined codebase is not as large as it might seem. gp-api is ~48K lines of application code. people-api and election-api add ~6K lines combined. After eliminating duplicated boilerplate (~2,500 lines of deploy code, ~900 lines of CI/CD, and ~1,200 lines of shared infra like OTel/filters), the net new code introduced by consolidation is approximately **4,000 lines of unique application logic** from people-api and election-api. The repo gets bigger, but not dramatically so — and GitHub CODEOWNERS can maintain clear ownership boundaries by path.
+- **CI run time.** Individual CI runs will take longer, since a single pipeline now builds and tests multiple services. However, the **overall time from code change to production** gets faster: today, a cross-service change requires sequential PRs across repos, each with its own CI run, review, and merge cycle. In a monorepo, that's one PR, one CI run, one review.
 
 **What it preserves:**
 
-- **Service boundaries.** Each service remains its own deployable unit with its own Prisma schema, its own NestJS application, and its own ECS service. Teams can still own specific services. A monorepo is a code organization strategy, not an architecture change.
-- **Independent deployability.** With workspace tooling, changes to election-api don't trigger a gp-api deployment. Services deploy independently based on what changed.
-- **The contracts package.** `@goodparty_org/contracts` continues to exist and publish to npm for external consumers (gp-webapp, gp-sdk). It just lives in the monorepo workspace alongside the services that produce its types.
+- **Service boundaries.** Each service remains its own deployable unit with its own Prisma schema, its own NestJS application, and its own ECS service. A monorepo is a code organization strategy, not an architecture change.
+- **The contracts package.** `@goodparty_org/contracts` continues to exist and publish to npm for external consumers (gp-webapp, gp-sdk). It just lives in the monorepo workspace alongside the services that produce its types — which actually makes it easier to keep in sync.
 
 **Proposed structure:**
 
 ```
-goodparty-backend/
+<repo>/
   packages/
     shared/              # OTel, exception filters, Prisma base, logging
     infra/               # Pulumi components, Dockerfile templates
@@ -129,7 +131,6 @@ goodparty-backend/
     gp-api/              # Existing gp-api application
     people-api/          # Existing people-api application
     election-api/        # Existing election-api application
-    campaign-plan-service/  # New service, starts here from day one
   deploy/
     shared/              # Shared CI/CD, deploy scripts
 ```
@@ -170,22 +171,22 @@ Keep the current multi-repo structure and accept the operational overhead.
 | Type sharing with frontend            | Solves           | Solves (contracts still publishes) | Does not solve    |
 | Package versioning overhead           | Introduces it    | Eliminates for internal code       | N/A               |
 
-npm packages solve the type-sharing problem well. They should continue to exist for that purpose. But they don't address the majority of our operational overhead, which is in infrastructure, CI/CD, and deployment duplication. A monorepo solves all of these while also being the natural home for the contracts package.
+npm packages solve the type-sharing problem well and should continue to exist for that purpose. But they don't address the majority of our operational overhead, which is in infrastructure, CI/CD, and deployment duplication. A monorepo solves all of these while also being the natural home for the contracts package.
+
+Beyond the direct problem-solving, a monorepo aligns with our team's capabilities. We are a small team without deep infrastructure or ops specialization — and that's fine. But multi-repo microservices require exactly that specialization: cross-repo CI orchestration, shared library versioning strategies, coordinated release management. Every hour we spend building and maintaining that tooling is an hour not spent on the product. A monorepo dramatically reduces the surface area of ops knowledge our team needs to maintain, letting us focus engineering effort where it has the most product impact.
 
 ## Migration Approach (High-Level)
 
-If this is accepted, a detailed migration plan would follow. At a high level:
+If this is accepted, a detailed migration plan would follow. The estimated effort is **~1 week** given the high structural similarity between repos. At a high level:
 
-1. **Set up the monorepo workspace** with nx or turborepo. Establish the shared package structure.
+1. **Set up the monorepo workspace** using npm workspaces. Establish the shared package structure.
 2. **Move election-api first** (smallest repo, 51 PRs in 6 months, lowest risk). Validate the workflow.
 3. **Move people-api second.** At this point, shared infra packages prove their value.
 4. **Move gp-api last** (largest repo, most active). By now the patterns are established.
-5. **campaign-plan-service starts in the monorepo from day one**, avoiding another round of boilerplate duplication.
 
 Each step is independently valuable — even if we only move 2 of 3 repos, we've reduced duplication.
 
 ## Open Questions
 
-- **Workspace tooling preference?** nx, turborepo, and plain npm workspaces all work. Turborepo is lightest-weight; nx has the most features. Worth a spike.
 - **Git history preservation?** We can merge repos preserving full git history with `git subtree` or similar. Worth confirming the approach.
 - **CODEOWNERS / review boundaries?** If teams want to maintain ownership boundaries within the monorepo, GitHub CODEOWNERS supports path-based rules.
