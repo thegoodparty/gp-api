@@ -4,6 +4,7 @@ model Organization {
   ownerId            Int            @map("owner_id")
   positionId         String?        @map("position_id")
   overrideDistrictId String?        @map("override_district_id")
+  customPositionName String?        @map("custom_position_name")
   campaign           Campaign?
   electedOffice      ElectedOffice?
 
