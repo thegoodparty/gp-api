@@ -478,28 +478,36 @@ export class OrganizationsBackfillService extends createPrismaBase(
           }
         }
 
-        // 1a-b: Use shared resolution — returns null on exact match,
-        // or the override district UUID when the district differs.
-        const overrideDistrictId =
-          await this.organizationsService.resolveOverrideDistrictId({
-            positionId: ballotReadyPositionId,
-            state,
-            L2DistrictType,
-            L2DistrictName,
-          })
+        // 1a: Check if the district matches exactly (no override needed).
+        const cleanedName =
+          this.electionsService.cleanDistrictName(L2DistrictName)
+        const isExactMatch =
+          position.district.L2DistrictType === L2DistrictType &&
+          position.district.L2DistrictName === cleanedName
 
-        if (!overrideDistrictId) {
-          this.logger.warn(
-            { campaignId: campaign.id, state, L2DistrictType, L2DistrictName },
-            '[organization backfill] District lookup returned null for override',
-          )
+        if (isExactMatch) {
+          return {
+            positionId: position.id,
+            overrideDistrictId: null,
+            customPositionName: null,
+            category: C.EXACT_MATCH,
+          }
         }
+
+        // 1b: District differs — look up the override district.
+        const overrideDistrictId = await this.electionsService.getDistrictId(
+          state,
+          L2DistrictType,
+          L2DistrictName,
+        )
 
         return {
           positionId: position.id,
           overrideDistrictId,
           customPositionName: null,
-          category: overrideDistrictId ? C.OVERRIDE_DISTRICT : C.EXACT_MATCH,
+          category: overrideDistrictId
+            ? C.OVERRIDE_DISTRICT
+            : C.DISTRICT_NOT_FOUND,
         }
       }
 

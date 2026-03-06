@@ -111,6 +111,60 @@ describe('OrganizationsBackfillService', () => {
     })
   })
 
+  it('categorises as district_not_found when district differs but getDistrictId returns null', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionByBallotReadyId').mockResolvedValue({
+      id: 'election-api-pos-id-3',
+      brPositionId: 'br-pos-3',
+      brDatabaseId: 'br-db-3',
+      state: 'CA',
+      name: 'City Council',
+      district: {
+        id: 'district-uuid-original',
+        L2DistrictType: 'City Council',
+        L2DistrictName: 'District 1',
+        projectedTurnout: null,
+      },
+    })
+    vi.spyOn(electionsService, 'getDistrictId').mockResolvedValue(null)
+
+    const campaign = await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-district-not-found',
+        details: { positionId: 'br-pos-3', state: 'CA' },
+      },
+    })
+
+    await service.prisma.pathToVictory.create({
+      data: {
+        campaignId: campaign.id,
+        data: {
+          electionType: 'City Council',
+          electionLocation: 'District 99',
+        },
+      },
+    })
+
+    const backfillService = service.app.get(OrganizationsBackfillService)
+    const stats = await backfillService['backfillCampaignOrganizations']()
+
+    // Verify the category is district_not_found, NOT exact_match
+    expect(stats.district_not_found).toBe(1)
+    expect(stats.exact_match).toBe(0)
+
+    const org = await service.prisma.organization.findUnique({
+      where: { slug: `campaign-${campaign.id}` },
+    })
+
+    expect(org).toMatchObject({
+      positionId: 'election-api-pos-id-3',
+      overrideDistrictId: null,
+      customPositionName: null,
+      ownerId: service.user.id,
+    })
+  })
+
   it('creates organization with district only when no position found', async () => {
     const electionsService = service.app.get(ElectionsService)
     vi.spyOn(electionsService, 'getPositionByBallotReadyId').mockResolvedValue(
