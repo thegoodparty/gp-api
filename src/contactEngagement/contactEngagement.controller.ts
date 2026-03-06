@@ -1,7 +1,7 @@
-import { ReqElectedOffice } from '@/electedOffice/decorators/ReqElectedOffice.decorator'
-import { UseElectedOffice } from '@/electedOffice/decorators/UseElectedOffice.decorator'
+import { ReqOrganization } from '@/organizations/decorators/ReqOrganization.decorator'
+import { UseOrganization } from '@/organizations/decorators/UseOrganization.decorator'
 import { Controller, Get, Param, Query, UsePipes } from '@nestjs/common'
-import { ElectedOffice } from '@prisma/client'
+import { ElectedOffice, Organization } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import {
   ConstituentIssuesParamsDTO,
@@ -14,7 +14,10 @@ import { GetIndividualActivitiesResponse } from './contactEngagement.types'
 
 @Controller('contact-engagement')
 @UsePipes(ZodValidationPipe)
-@UseElectedOffice({ param: 'electedOfficeId' })
+@UseOrganization({
+  fallback: 'elected-office',
+  include: { electedOffice: true },
+})
 export class ContactEngagementController {
   constructor(
     private readonly contactEngagementService: ContactEngagementService,
@@ -24,7 +27,8 @@ export class ContactEngagementController {
   async getIndividualActivities(
     @Param() params: IndividualActivityParamsDTO,
     @Query() query: IndividualActivityQueryDTO,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
   ): Promise<GetIndividualActivitiesResponse> {
     return this.contactEngagementService.getIndividualActivities({
       personId: params.id,
@@ -37,7 +41,8 @@ export class ContactEngagementController {
   async getConstituentIssues(
     @Param() params: ConstituentIssuesParamsDTO,
     @Query() query: ConstituentIssuesQueryDTO,
-    @ReqElectedOffice() electedOffice: ElectedOffice,
+    @ReqOrganization()
+    { electedOffice }: Organization & { electedOffice: ElectedOffice },
   ) {
     return this.contactEngagementService.getConstituentIssues(
       params.id,
