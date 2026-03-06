@@ -1,1 +1,21 @@
-export { generateFactory } from '../../src/shared/test-utils/factories/generate'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
+
+/**
+ * Helper to make a factory function that deep-merges a default generator with a custom props object.
+ * Uses deepmerge-ts so partial nested overrides (e.g. { data: { hubSpotUpdates: {...} } }) are
+ * merged into the factory defaults rather than replacing them wholesale.
+ * @param generateFn Function to generate a default mock entity
+ * @returns Factory function that accepts args to override default generated values
+ * @example
+ * const userFactory = generateFactory<User>(() => ({
+ *   id: faker.number.int(),
+ *   firstName: faker.person.firstName(),
+ *   lastName: faker.person.lastName()
+ * }))
+ *
+ * const fakeUser = userFactory({ firstName: 'Jerry'})
+ */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+export function generateFactory<T>(generateFn: (args?: unknown) => Partial<T>) {
+  return (args: Partial<T> = {}) => deepMerge(generateFn(), args) as T
+}
