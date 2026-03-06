@@ -6,6 +6,7 @@ import { AiModule } from '../ai/ai.module'
 import { ElectionsModule } from '../elections/elections.module'
 import { EmailModule } from '../email/email.module'
 import { PrismaModule } from '../prisma/prisma.module'
+import { OrganizationsModule } from '../organizations/organizations.module'
 import { QueueProducerModule } from '../queue/producer/queueProducer.module'
 import { VotersModule } from '../voters/voters.module'
 import { PathToVictoryController } from './pathToVictory.controller'
@@ -19,6 +20,7 @@ import { ClerkClientProvider } from '@/authentication/providers/clerk-client.pro
     PrismaModule,
     AiModule,
     ElectionsModule,
+    OrganizationsModule,
     VotersModule,
     EmailModule,
     QueueProducerModule,

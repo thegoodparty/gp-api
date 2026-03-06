@@ -1,20 +1,21 @@
-import { CampaignCreatedBy } from '@goodparty_org/contracts'
 import { CrmCampaignsService } from '@/campaigns/services/crmCampaigns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
 import { EmailService } from '@/email/email.service'
 import { EmailTemplateName } from '@/email/email.types'
 import { CustomEventType } from '@/observability/newrelic/newrelic.events'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { PinoLogger } from 'nestjs-pino'
 import { SegmentService } from '@/vendors/segment/segment.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
+import { CampaignCreatedBy } from '@goodparty_org/contracts'
 import { Test, TestingModule } from '@nestjs/testing'
+import { PinoLogger } from 'nestjs-pino'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { PathToVictoryInput } from '../types/pathToVictory.types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PathToVictoryInput } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 import { PathToVictoryService } from './pathToVictory.service'
 
@@ -90,6 +91,9 @@ describe('PathToVictoryService', () => {
       findMany: ReturnType<typeof vi.fn>
       count: ReturnType<typeof vi.fn>
     }
+    organization: {
+      upsert: ReturnType<typeof vi.fn>
+    }
   }
   let mockSlack: {
     formattedMessage: ReturnType<typeof vi.fn>
@@ -111,6 +115,9 @@ describe('PathToVictoryService', () => {
   let mockEmail: {
     sendTemplateEmail: ReturnType<typeof vi.fn>
   }
+  let mockOrganizations: {
+    resolveOrgData: ReturnType<typeof vi.fn>
+  }
 
   beforeEach(async () => {
     mockPrisma = {
@@ -122,6 +129,9 @@ describe('PathToVictoryService', () => {
         findUniqueOrThrow: vi.fn(),
         findMany: vi.fn(),
         count: vi.fn(),
+      },
+      organization: {
+        upsert: vi.fn().mockResolvedValue({}),
       },
     }
     mockSlack = {
@@ -144,6 +154,13 @@ describe('PathToVictoryService', () => {
     mockEmail = {
       sendTemplateEmail: vi.fn().mockResolvedValue(undefined),
     }
+    mockOrganizations = {
+      resolveOrgData: vi.fn().mockResolvedValue({
+        positionId: null,
+        customPositionName: null,
+        overrideDistrictId: null,
+      }),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -157,6 +174,7 @@ describe('PathToVictoryService', () => {
         { provide: CrmCampaignsService, useValue: mockCrm },
         { provide: AnalyticsService, useValue: mockAnalytics },
         { provide: ElectionsService, useValue: mockElections },
+        { provide: OrganizationsService, useValue: mockOrganizations },
       ],
     }).compile()
 
@@ -612,6 +630,91 @@ describe('PathToVictoryService', () => {
           message: 'error updating campaign with path to victory',
         }),
       )
+    })
+
+    describe('organization upsert', () => {
+      const campaignWithDetails = {
+        ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
+        details: {
+          state: 'CA',
+          positionId: 'br-pos-1',
+          office: 'City Council',
+          otherOffice: null,
+        },
+      }
+
+      it('upserts organization when silver resolves a district', async () => {
+        mockPrisma.campaign.findUnique.mockResolvedValue(campaignWithDetails)
+        mockPrisma.pathToVictory.update.mockResolvedValue({})
+        mockOrganizations.resolveOrgData.mockResolvedValue({
+          positionId: 'pos-uuid',
+          customPositionName: null,
+          overrideDistrictId: 'override-uuid',
+        })
+
+        await service.completePathToVictory('test-slug', responseWithTurnout)
+
+        expect(mockOrganizations.resolveOrgData).toHaveBeenCalledWith({
+          ballotReadyPositionId: 'br-pos-1',
+          office: 'City Council',
+          otherOffice: null,
+          state: 'CA',
+          L2DistrictType: 'State_House',
+          L2DistrictName: 'STATE HOUSE 005',
+        })
+        expect(mockPrisma.organization.upsert).toHaveBeenCalledWith({
+          where: { slug: 'campaign-1' },
+          update: {
+            positionId: 'pos-uuid',
+            customPositionName: null,
+            overrideDistrictId: 'override-uuid',
+          },
+          create: {
+            slug: 'campaign-1',
+            ownerId: 10,
+            positionId: 'pos-uuid',
+            customPositionName: null,
+            overrideDistrictId: 'override-uuid',
+          },
+        })
+      })
+
+      it('skips org upsert when response has no district', async () => {
+        mockPrisma.campaign.findUnique.mockResolvedValue(campaignWithDetails)
+        mockPrisma.pathToVictory.update.mockResolvedValue({})
+
+        await service.completePathToVictory('test-slug', emptyResponse)
+
+        expect(mockOrganizations.resolveOrgData).not.toHaveBeenCalled()
+        expect(mockPrisma.organization.upsert).not.toHaveBeenCalled()
+      })
+
+      it('skips org upsert when campaign has no state', async () => {
+        mockPrisma.campaign.findUnique.mockResolvedValue({
+          ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
+          details: { positionId: 'br-pos-1' },
+        })
+        mockPrisma.pathToVictory.update.mockResolvedValue({})
+
+        await service.completePathToVictory('test-slug', responseWithTurnout)
+
+        expect(mockOrganizations.resolveOrgData).not.toHaveBeenCalled()
+        expect(mockPrisma.organization.upsert).not.toHaveBeenCalled()
+      })
+
+      it('does not block email/analytics when org upsert fails', async () => {
+        mockPrisma.campaign.findUnique.mockResolvedValue(campaignWithDetails)
+        mockPrisma.pathToVictory.update.mockResolvedValue({})
+        mockOrganizations.resolveOrgData.mockRejectedValue(
+          new Error('election API down'),
+        )
+
+        await service.completePathToVictory('test-slug', responseWithTurnout)
+
+        // Org upsert failed, but downstream calls still ran
+        expect(mockAnalytics.identify).toHaveBeenCalled()
+        expect(mockCrm.handleUpdateCampaign).toHaveBeenCalled()
+      })
     })
   })
 
