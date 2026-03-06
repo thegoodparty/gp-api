@@ -1,6 +1,8 @@
+import { deepmerge as deepMerge } from 'deepmerge-ts'
+
 /**
  * Helper to make a factory function that merges a default generator with a custom props object
- * Uses shallow merge with object spread - arrays and objects in overrides completely replace defaults
+ * Uses deep merge to recursively merge nested objects and arrays
  * @param generateFn Function called with the incoming overrides so the generator can inspect them
  *   (e.g. to skip incrementing a counter when `id` is already provided).
  * @returns Factory function that accepts args to override default generated values
@@ -16,5 +18,5 @@
 export function generateFactory<T>(
   generateFn: (args: Partial<T>) => Partial<T>,
 ) {
-  return (args: Partial<T> = {}) => ({ ...generateFn(args), ...args }) as T
+  return (args: Partial<T> = {}) => deepMerge(generateFn(args), args) as T
 }
