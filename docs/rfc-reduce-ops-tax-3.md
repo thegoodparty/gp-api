@@ -12,14 +12,22 @@ This doc proposes three options, evaluates each against concrete data, and recom
 
 At a high level, the multi-repo structure is costing us in four ways:
 
-- **Slower delivery** — every infrastructure improvement must be implemented, reviewed, and deployed N times. In the best case, a change ships to each repo on the same day — but often there is a propagation delay of days or weeks, or the change never propagates at all.
-- **Higher defect risk** — bugs in shared infrastructure propagate manually and unevenly. Version drift across repos means a fix that works in one repo may not work in another.
-- **Growing maintenance burden** — thousands of lines of nearly identical boilerplate must be maintained independently per repo. Dependabot alone will generate hundreds of redundant PRs per year.
-- **Compounding cost** — each new service multiplies all of the above. We lack the ops tooling to manage this well, and building it is a significant investment that works against our goal of shipping product.
+- **Developer time** — 30+ duplicative PRs in 6 months, with more coming (alerting, Grafana dashboards, future tooling changes). Every infra improvement must be implemented, reviewed, and deployed N times.
+- **Reliability** — repos run different versions of critical dependencies (TypeScript, Prisma, Pulumi). Bugs in shared infrastructure propagate manually and unevenly — in the best case, a fix ships to each repo on the same day, but often there is a propagation delay of days or weeks, or the fix never propagates at all.
+- **Velocity** — cross-service changes require sequential PRs across repos instead of atomic commits. Every extra PR is an extra review cycle, merge cycle, and deployment cycle that adds zero product value.
+- **Focus** — engineering effort spent on packaging, coordination, and cross-repo maintenance is effort not spent on the product. This overhead scales linearly with each new service, and we lack the ops tooling to manage it well.
 
-Each of these costs works directly against the goals we've already aligned on in the VOTES framework — particularly Velocity (cycle time) and Operations (automated daily releases). The sections below quantify each with specific data.
+Each of these costs works directly against goals we've already aligned on in the VOTES framework:
 
-### Slower delivery: ~30 duplicative PRs in 6 months
+- **Velocity** — duplicated PRs and propagation delays inflate cycle time with zero product value
+- **Operations** — multi-repo coordination is a structural pain point in automating releases
+- **Testing** — each repo independently maintains its own test framework, coverage gates, and CI pipelines
+- **Experience** — bugs in shared boilerplate that introduce debugging pain must be fixes in each repo independently, slowing resolution of blocked states
+- **Security** — every additional repo multiplies our dependency security surface; version drift means a vulnerability patched in one repo may remain unpatched in another
+
+The sections below quantify each of these costs with specific data.
+
+### Developer time: ~30 duplicative PRs in 6 months
 
 Between September 2025 and March 2026, at least 30 merged PRs across our repos were duplicative cross-repo infrastructure work:
 
@@ -39,7 +47,7 @@ The Dependabot configuration is the simplest example: 3 identical PRs, same auth
 
 Grafana and Pino logging were adopted across all three repos on the same day (Feb 27) via separate PRs — the best case. Alerting is the other end of the spectrum: 3 PRs have landed in gp-api, but the work has not yet propagated to people-api or election-api.
 
-### Higher defect risk: version drift and uneven bug propagation
+### Reliability: version drift and uneven bug propagation
 
 Despite these repos being created within months of each other, dependency versions have already diverged:
 
@@ -54,7 +62,9 @@ The Pulumi AWS version split (6.x vs 7.x) is especially notable — our primary 
 
 Bug fixes are also affected. The deployment circuit breaker fix is the clearest example: a production-impacting deployment bug required 3 separate PRs on the same day. The people-api and election-api PRs literally just say "See gp-api #1230." A bug that should have been a one-line fix in one place required three PRs, three reviews, and three deployments — with three chances to miss one.
 
-### Growing maintenance burden: thousands of duplicated lines
+A security patch or breaking change in any shared dependency must now be evaluated and applied independently in each repo. The longer we wait, the more divergent the repos become and the harder it is to bring them back in line.
+
+### Velocity: thousands of duplicated lines slow every change
 
 A code-level audit found massive duplication in non-application code:
 
@@ -70,7 +80,7 @@ A code-level audit found massive duplication in non-application code:
 
 Each of these represents a surface area where a bug fix, improvement, or config change must be applied N times. With Dependabot now active in all three repos, every dependency update generates 3 separate PRs to review and merge. Over the course of a year, this will add up to hundreds of redundant Dependabot PRs.
 
-### Compounding cost: each new service multiplies the problem
+### Focus: each new service multiplies the problem
 
 Releases that span services must be coordinated manually. On Feb 2 and Feb 12, we had "prod deploy" PRs merged on the same day across multiple repos — suggesting releases that required touching multiple repos in sequence. Each new service multiplies this coordination cost linearly.
 
