@@ -50,6 +50,6 @@ export type Alert = {
 }
 
 export type EndpointOverride = {
-  errorRatePercentage?: number
+  /** Override for p95 latency threshold (ms). */
   p95LatencyMs?: number
 }
