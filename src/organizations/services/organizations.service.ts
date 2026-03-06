@@ -1,15 +1,18 @@
 import { ElectionsService } from '@/elections/services/elections.service'
+import { PositionWithOptionalDistrict } from '@/elections/types/elections.types'
 import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
-import { Organization } from '@prisma/client'
+import { Campaign, ElectedOffice, Organization } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
-export type OrganizationWithPosition = Awaited<
-  ReturnType<OrganizationsService['withPosition']>
->
+export type OrganizationWithPosition = Organization & {
+  position: PositionWithOptionalDistrict | null
+  campaign: Campaign | null
+  electedOffice: ElectedOffice | null
+}
 
 @Injectable()
 export class OrganizationsService extends createPrismaBase(
@@ -36,13 +39,17 @@ export class OrganizationsService extends createPrismaBase(
   }
 
   async listOrganizations(userId: number) {
-    const orgs = await this.model.findMany({ where: { ownerId: userId } })
+    const orgs = await this.model.findMany({
+      where: { ownerId: userId },
+      include: { campaign: true, electedOffice: true },
+    })
     return await Promise.all(orgs.map((org) => this.withPosition(org)))
   }
 
   async getOrganization(userId: number, slug: string) {
     const org = await this.model.findUnique({
       where: { slug, ownerId: userId },
+      include: { campaign: true, electedOffice: true },
     })
     if (!org) {
       throw new NotFoundException('Organization not found')
@@ -51,7 +58,12 @@ export class OrganizationsService extends createPrismaBase(
     return this.withPosition(org)
   }
 
-  private async withPosition(org: Organization) {
+  private async withPosition(
+    org: Organization & {
+      campaign: Campaign | null
+      electedOffice: ElectedOffice | null
+    },
+  ) {
     if (!org.positionId) {
       return { ...org, position: null }
     }

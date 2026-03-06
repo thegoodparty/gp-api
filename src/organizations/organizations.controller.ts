@@ -9,7 +9,7 @@ import { User } from '@prisma/client'
 
 type APIOrganization = {
   slug: string
-  position: { id: string; name: string } | null
+  name: string | null
   electedOfficeId: string | null
   campaignId: number | null
 }
@@ -17,17 +17,21 @@ type APIOrganization = {
 const toAPIOrganization = (org: OrganizationWithPosition): APIOrganization => {
   const result: APIOrganization = {
     slug: org.slug,
-    position: org.position
-      ? { id: org.position.id, name: org.position.name }
-      : null,
+    name: null,
     electedOfficeId: null,
     campaignId: null,
   }
 
   if (org.slug.startsWith('eo-')) {
     result.electedOfficeId = org.slug.replace('eo-', '')
+    result.name = org.position?.name ?? null
   } else {
     result.campaignId = parseInt(org.slug.replace('campaign-', ''))
+    const electionYear = org.campaign?.details.electionDate?.split('-').at(0)
+    result.name = [electionYear, 'Campaign'].filter(Boolean).join(' ')
+  }
+  if (org.customPositionName) {
+    result.name = org.customPositionName
   }
   return result
 }

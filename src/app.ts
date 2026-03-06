@@ -1,5 +1,5 @@
 import './configrc'
-import { NestFactory } from '@nestjs/core'
+import { HttpAdapterHost, NestFactory } from '@nestjs/core'
 import {
   FastifyAdapter,
   NestFastifyApplication,
@@ -13,6 +13,7 @@ import { Logger, PinoLogger } from 'nestjs-pino'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import cookie from '@fastify/cookie'
+import { HttpExceptionFilter } from './exceptions/http-exception.filter'
 import { PrismaExceptionFilter } from './exceptions/prisma-exception.filter'
 import { randomUUID } from 'crypto'
 
@@ -98,9 +99,14 @@ export const bootstrap = async (
     },
   })
 
-  const logger = await app.resolve(PinoLogger)
+  const httpExceptionLogger = await app.resolve(PinoLogger)
+  const prismaExceptionLogger = await app.resolve(PinoLogger)
+  const httpAdapterHost = app.get(HttpAdapterHost)
 
-  app.useGlobalFilters(new PrismaExceptionFilter(logger))
+  app.useGlobalFilters(
+    new HttpExceptionFilter(httpExceptionLogger, httpAdapterHost),
+    new PrismaExceptionFilter(prismaExceptionLogger),
+  )
   app.enableShutdownHooks()
 
   return app

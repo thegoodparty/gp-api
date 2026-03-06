@@ -13,7 +13,7 @@ import {
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
-import { PaginatedResults } from 'src/shared/types/utility.types'
+import { PaginatedResults, WrapperType } from 'src/shared/types/utility.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -88,9 +88,9 @@ export class PathToVictoryService extends createPrismaBase(
     private slackService: SlackService,
     private emailService: EmailService,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private crmService: CrmCampaignsService,
+    private crmService: WrapperType<CrmCampaignsService>,
     @Inject(forwardRef(() => AnalyticsService))
-    private analytics: AnalyticsService,
+    private analytics: WrapperType<AnalyticsService>,
     private elections: ElectionsService,
   ) {
     super()

@@ -178,6 +178,24 @@ describe('ElectedOfficeController', () => {
       expect(electedOffice?.organizationSlug).toBe(organization?.slug)
     })
 
+    it('creates elected office when campaign has no positionId', async () => {
+      await service.prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { details: {} },
+      })
+
+      const result = await createElectedOffice({
+        electedDate: '2024-01-01',
+        isActive: true,
+      })
+
+      expect(result.status).toBe(201)
+      expect(result.data).toMatchObject({
+        id: expect.any(String),
+        electedDate: '2024-01-01',
+      })
+    })
+
     it('returns 403 when user has no campaign', async () => {
       await service.prisma.campaign.deleteMany({
         where: { userId: service.user.id },

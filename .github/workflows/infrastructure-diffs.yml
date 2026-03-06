@@ -26,6 +26,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run generate
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5
