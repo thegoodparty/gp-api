@@ -6,10 +6,21 @@ const NUM_USERS = 20
 
 const ADMIN_STRIPE_CUSTOMER_ID = 'cus_RWKP2JnywRA590'
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@test.local'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'testPassword123'
-const CANDIDATE_EMAIL = process.env.CANDIDATE_EMAIL || 'candidate@test.local'
-const CANDIDATE_PASSWORD = process.env.CANDIDATE_PASSWORD || 'testPassword123'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
+const CANDIDATE_EMAIL = process.env.CANDIDATE_EMAIL
+const CANDIDATE_PASSWORD = process.env.CANDIDATE_PASSWORD
+
+if (
+  !ADMIN_EMAIL ||
+  !ADMIN_PASSWORD ||
+  !CANDIDATE_EMAIL ||
+  !CANDIDATE_PASSWORD
+) {
+  throw new Error(
+    'ADMIN_EMAIL, ADMIN_PASSWORD, CANDIDATE_EMAIL, and CANDIDATE_PASSWORD must be set in the environment variables',
+  )
+}
 
 const ADMIN_FIRST_NAME = 'Test'
 const ADMIN_LAST_NAME = 'Admin'
