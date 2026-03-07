@@ -190,5 +190,36 @@ describe('ContactsService', () => {
         ).toHaveBeenCalledWith(campaign.userId)
       })
     })
+
+    describe('getDistrictStats', () => {
+      it('allows statewide fallback (state only) when campaign is approved for statewide contacts', async () => {
+        const campaign = {
+          ...baseCampaign,
+          canDownloadFederal: true,
+          details: { state: 'WY', ballotLevel: 'STATE' },
+          pathToVictory: {
+            data: { electionType: 'State', electionLocation: 'WY' },
+          },
+        } as unknown as CampaignWithPathToVictory
+
+        mockHttpService.get.mockReturnValue(
+          of({
+            data: {
+              districtId: 'statewide-wy',
+              totalConstituents: 1000,
+              buckets: {},
+            },
+          }),
+        )
+
+        await expect(service.getDistrictStats(campaign)).resolves.toBeDefined()
+        expect(mockHttpService.get).toHaveBeenCalledWith(
+          expect.stringContaining('/v1/people/stats'),
+          expect.objectContaining({
+            params: { state: 'WY' },
+          }),
+        )
+      })
+    })
   })
 })
