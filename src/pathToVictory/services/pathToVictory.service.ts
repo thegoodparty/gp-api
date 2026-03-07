@@ -498,6 +498,16 @@ export class PathToVictoryService extends createPrismaBase(
       }
       recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
       recordBlockedStateEvent(blockedStateAttributes)
+      this.logger.info({
+        msg: 'blocked_state_detected',
+        source: 'background',
+        userId: campaign.userId,
+        rootCause: 'p2v_failed',
+        feature: 'path_to_victory',
+        campaignId: campaign.id,
+        slug: campaign.slug,
+        reason: 'no_district_match',
+      })
     }
 
     // Push status to CRM for partial/failed outcomes (not for full success —

@@ -3,6 +3,7 @@ export type BlockedStateRootCause =
   | 'dependency_stripe'
   | 'dependency_peerly'
   | 'dependency_vercel'
+  | 'dependency_transaction_api'
   | 'data_integrity_campaign'
   | 'data_integrity_billing'
   | 'p2v_failed'

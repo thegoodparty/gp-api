@@ -12,6 +12,7 @@ import { BlockedStateInterceptor } from './blockedState.interceptor'
 
 const recordCustomEventMock = vi.fn()
 const addCustomAttributesMock = vi.fn()
+const logInfoMock = vi.fn()
 
 vi.mock('../newrelic/newrelic.client', () => ({
   recordCustomEvent: (...args: unknown[]) => recordCustomEventMock(...args),
@@ -27,6 +28,7 @@ function makeContext(params: {
     user: params.userId ? { id: params.userId } : undefined,
     method: params.method ?? 'GET',
     url: params.url ?? '/v1/somewhere',
+    log: { info: (...args: unknown[]) => logInfoMock(...args) },
   }
 
   class Controller {}
@@ -39,6 +41,7 @@ describe('BlockedStateInterceptor', () => {
   beforeEach(() => {
     recordCustomEventMock.mockClear()
     addCustomAttributesMock.mockClear()
+    logInfoMock.mockClear()
   })
 
   it('does not record BlockedState when user is not authenticated', async () => {
@@ -56,6 +59,7 @@ describe('BlockedStateInterceptor', () => {
     })
 
     expect(recordCustomEventMock).not.toHaveBeenCalled()
+    expect(logInfoMock).not.toHaveBeenCalled()
   })
 
   it('records BlockedState for authenticated 5xx errors', async () => {
@@ -81,6 +85,17 @@ describe('BlockedStateInterceptor', () => {
       statusCode: 500,
       isBackground: false,
     })
+    expect(logInfoMock).toHaveBeenCalledTimes(1)
+    expect(logInfoMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg: 'blocked_state_detected',
+        source: 'http',
+        userId: 123,
+        rootCause: 'internal_unknown',
+        endpoint: expect.any(String),
+        statusCode: 500,
+      }),
+    )
   })
 
   it('records BlockedState for authenticated allowlisted 4xx errorCode', async () => {
@@ -100,6 +115,17 @@ describe('BlockedStateInterceptor', () => {
     })
 
     expect(recordCustomEventMock).toHaveBeenCalledTimes(1)
+    expect(logInfoMock).toHaveBeenCalledTimes(1)
+    expect(logInfoMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg: 'blocked_state_detected',
+        source: 'http',
+        userId: 123,
+        rootCause: 'data_integrity_campaign',
+        statusCode: 400,
+        errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
+      }),
+    )
   })
 
   it('does not record BlockedState for authenticated non-allowlisted 4xx', async () => {
@@ -119,6 +145,7 @@ describe('BlockedStateInterceptor', () => {
     })
 
     expect(recordCustomEventMock).not.toHaveBeenCalled()
+    expect(logInfoMock).not.toHaveBeenCalled()
   })
 
   it('does not record BlockedState on success', async () => {
@@ -133,5 +160,6 @@ describe('BlockedStateInterceptor', () => {
     })
 
     expect(recordCustomEventMock).not.toHaveBeenCalled()
+    expect(logInfoMock).not.toHaveBeenCalled()
   })
 })

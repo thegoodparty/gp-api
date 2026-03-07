@@ -150,6 +150,17 @@ export class BlockedStateInterceptor implements NestInterceptor {
 
         recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
         recordBlockedStateEvent(blockedStateAttributes)
+        request.log.info({
+          msg: 'blocked_state_detected',
+          source: 'http',
+          userId,
+          rootCause,
+          endpoint,
+          statusCode,
+          ...(errorCode !== null && errorCode !== undefined
+            ? { errorCode }
+            : {}),
+        })
 
         return throwError(() => err)
       }),

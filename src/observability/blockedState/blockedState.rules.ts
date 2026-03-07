@@ -41,12 +41,6 @@ export function deriveRootCause(params: {
   const message = (params.errorMessage || '').toLowerCase()
   const code = String(params.errorCode ?? '').toLowerCase()
 
-  if (message.includes('people api')) return 'dependency_people_api'
-  if (message.includes('stripe') || code.includes('stripe'))
-    return 'dependency_stripe'
-  if (message.includes('peerly')) return 'dependency_peerly'
-  if (message.includes('vercel')) return 'dependency_vercel'
-
   if (
     params.errorCode === 'BILLING_CUSTOMER_ID_MISSING' ||
     params.errorCode === 'BILLING_DOMAIN_PAYMENT_ID_MISSING'
@@ -60,6 +54,14 @@ export function deriveRootCause(params: {
   ) {
     return 'data_integrity_campaign'
   }
+
+  if (message.includes('people api')) return 'dependency_people_api'
+  if (message.includes('stripe') || code.includes('stripe'))
+    return 'dependency_stripe'
+  if (message.includes('peerly')) return 'dependency_peerly'
+  if (message.includes('vercel')) return 'dependency_vercel'
+  if (message.includes('transaction api') || code.includes('transaction_api'))
+    return 'dependency_transaction_api'
 
   return params.statusCode >= 500 ? 'internal_unknown' : 'internal_unknown'
 }

@@ -32,8 +32,74 @@ import { PinoLogger } from 'nestjs-pino'
 
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
+const P2V_ELECTION_INFO_MISSING_ERROR_CODE =
+  'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING'
+const P2V_ELECTION_INFO_MISSING_HINTS = [
+  'districtid',
+  'district id',
+  'districttype',
+  'district type',
+  'districtname',
+  'district name',
+  'electiontype',
+  'election type',
+  'electionname',
+  'election name',
+  'electionlocation',
+  'election location',
+]
+
+function hasP2VElectionInfoHint(input: unknown): boolean {
+  if (typeof input !== 'string') return false
+  const normalized = input.toLowerCase()
+  return P2V_ELECTION_INFO_MISSING_HINTS.some((hint) =>
+    normalized.includes(hint),
+  )
+}
+
+function isMissingP2VElectionInfoError(error: unknown): boolean {
+  if (error instanceof HttpException) {
+    const response = error.getResponse()
+    if (typeof response === 'string' && hasP2VElectionInfoHint(response))
+      return true
+    if (isRecord(response)) {
+      if (response.errorCode === P2V_ELECTION_INFO_MISSING_ERROR_CODE)
+        return true
+      if (hasP2VElectionInfoHint(response.message)) return true
+      if (
+        Array.isArray(response.message) &&
+        response.message.some((msg) => hasP2VElectionInfoHint(msg))
+      ) {
+        return true
+      }
+    }
+    if (hasP2VElectionInfoHint(error.message)) return true
+  }
+
+  if (isAxiosError(error)) {
+    const data: unknown = error.response?.data
+    if (isRecord(data)) {
+      if (data.errorCode === P2V_ELECTION_INFO_MISSING_ERROR_CODE) return true
+      if (hasP2VElectionInfoHint(data.message)) return true
+      if (
+        Array.isArray(data.message) &&
+        data.message.some((msg) => hasP2VElectionInfoHint(msg))
+      ) {
+        return true
+      }
+    }
+    if (typeof data === 'string' && hasP2VElectionInfoHint(data)) return true
+    if (hasP2VElectionInfoHint(error.message)) return true
+  }
+
+  return false
+}
 
 const { PEOPLE_API_URL, PEOPLE_API_S2S_SECRET } = process.env
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
 
 if (!PEOPLE_API_URL) {
   throw new Error('Please set PEOPLE_API_URL in your .env')
@@ -127,6 +193,12 @@ export class ContactsService {
           )
           return response.data as PeopleListResponse
         } catch (error) {
+          if (isMissingP2VElectionInfoError(error)) {
+            throw new BadRequestException({
+              message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+              errorCode: P2V_ELECTION_INFO_MISSING_ERROR_CODE,
+            })
+          }
           this.logger.error(
             {
               error,
@@ -170,6 +242,12 @@ export class ContactsService {
           )
           return response.data
         } catch (error) {
+          if (isMissingP2VElectionInfoError(error)) {
+            throw new BadRequestException({
+              message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+              errorCode: P2V_ELECTION_INFO_MISSING_ERROR_CODE,
+            })
+          }
           this.logger.error(
             { error },
             'Failed to sample contacts from people API',
@@ -210,6 +288,12 @@ export class ContactsService {
 
           return response.data
         } catch (error) {
+          if (isMissingP2VElectionInfoError(error)) {
+            throw new BadRequestException({
+              message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+              errorCode: P2V_ELECTION_INFO_MISSING_ERROR_CODE,
+            })
+          }
           if (error instanceof HttpException) {
             throw error
           }
@@ -265,6 +349,12 @@ export class ContactsService {
             response.data.on('error', reject)
           })
         } catch (error) {
+          if (isMissingP2VElectionInfoError(error)) {
+            throw new BadRequestException({
+              message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+              errorCode: P2V_ELECTION_INFO_MISSING_ERROR_CODE,
+            })
+          }
           this.logger.error(
             {
               error,
@@ -285,16 +375,10 @@ export class ContactsService {
       campaign,
       async ({ state, districtType, districtName }) => {
         if (!state || !districtType || !districtName) {
-          const msg =
-            'Could not resolve state, district type, and district name'
-          this.logger.error({
-            campaign,
-            msg,
-            state,
-            districtType,
-            districtName,
+          throw new BadRequestException({
+            message: P2V_ELECTION_INFO_MISSING_MESSAGE,
+            errorCode: P2V_ELECTION_INFO_MISSING_ERROR_CODE,
           })
-          throw new BadRequestException(msg)
         }
 
         const token = this.getValidS2SToken()

@@ -731,6 +731,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
 
   describe('QueueConsumerService - P2V handling', () => {
     let service: QueueConsumerService
+    let mockLogger: ReturnType<typeof createMockLogger>
     let mockP2vService: {
       handlePathToVictory: ReturnType<typeof vi.fn>
       analyzePathToVictoryResponse: ReturnType<typeof vi.fn>
@@ -793,7 +794,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
 
       service = module.get<QueueConsumerService>(QueueConsumerService)
 
-      const mockLogger = createMockLogger()
+      mockLogger = createMockLogger()
       Object.defineProperty(service, 'logger', {
         get: () => mockLogger,
         configurable: true,
@@ -843,6 +844,18 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
         expect(updateData.p2vStatus).toBe(P2VStatus.failed)
         expect(mockSlack.message).toHaveBeenCalled()
         expect(mockRecordCustomEvent).toHaveBeenCalled()
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.objectContaining({
+            msg: 'blocked_state_detected',
+            source: 'background',
+            userId: 10,
+            rootCause: 'p2v_failed',
+            feature: 'path_to_victory',
+            campaignId: 1,
+            slug: 'test-slug',
+            p2vAttempts: 3,
+          }),
+        )
       })
 
       it('returns false and preserves DistrictMatched when exhausted retries', async () => {

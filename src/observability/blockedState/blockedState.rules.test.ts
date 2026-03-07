@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldRecordBlockedState } from './blockedState.rules'
+import { deriveRootCause, shouldRecordBlockedState } from './blockedState.rules'
 
 describe('shouldRecordBlockedState', () => {
   it('records any 5xx', () => {
@@ -43,5 +43,35 @@ describe('shouldRecordBlockedState', () => {
         errorMessage: 'x',
       }),
     ).toBe(false)
+  })
+})
+
+describe('deriveRootCause', () => {
+  it('prioritizes allowlisted data-integrity errorCode over dependency message', () => {
+    expect(
+      deriveRootCause({
+        statusCode: 400,
+        errorMessage: 'Transaction API error: missing district metadata',
+        errorCode: 'DATA_INTEGRITY_P2V_ELECTION_INFO_MISSING',
+      }),
+    ).toBe('data_integrity_campaign')
+  })
+
+  it('maps Transaction API failures to dependency_transaction_api', () => {
+    expect(
+      deriveRootCause({
+        statusCode: 500,
+        errorMessage: 'Transaction API error: upstream returned 400',
+      }),
+    ).toBe('dependency_transaction_api')
+  })
+
+  it('falls back to internal_unknown for unknown errors', () => {
+    expect(
+      deriveRootCause({
+        statusCode: 500,
+        errorMessage: 'something else failed',
+      }),
+    ).toBe('internal_unknown')
   })
 })
