@@ -75,5 +75,17 @@ export const GLOBAL_ALERTS: Alert[] = [
     ].join('\n\n'),
   },
 
-  // Add more alerts here as you like!
+  // ------ Trace Alerts ------ //
+  {
+    slug: 'slow-prisma-connections',
+    name: 'Slow Prisma connection acquisitions',
+    type: 'trace',
+    expr: '{ name = "prisma:engine:connection" && resource.service.name = "gp-api" && resource.deployment.environment.name = "$ENV" && duration > 250ms } | count_over_time()',
+    threshold: 0,
+    for: '5m',
+    message: [
+      'Prisma connection acquisitions exceeding 250ms have been detected.',
+      'This may indicate database connection pool exhaustion or elevated database latency. Requests are fighting for Postgres connections. Click *View in Grafana* to inspect the traces, then check database metrics (active connections, query latency) and recent deployment changes. We should either increase the connection limit, or reduce the number of concurrent requests.',
+    ].join('\n\n'),
+  },
 ]

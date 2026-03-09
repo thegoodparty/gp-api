@@ -22,6 +22,7 @@ These cover system-wide concerns that aren't tied to a specific endpoint:
 - **High CPU utilization** (>80% for 5 min)
 - **High memory utilization** (>90% for 5 min)
 - **Missing health check logs** (no `/v1/health` requests logged for 2 min)
+- **Slow Prisma connection acquisitions** (connection spans exceeding 250ms)
 
 ## Where do alerts show up?
 
@@ -95,7 +96,7 @@ Add an entry to `GLOBAL_ALERTS` in `deploy/components/alerts.ts`:
 {
   slug: 'my-new-alert',                    // unique identifier
   name: 'Something bad happened',          // shown in Grafana and Slack
-  type: 'log',                             // 'log' for LogQL (Loki), 'metric' for PromQL (Prometheus)
+  type: 'log',                             // 'log' | 'metric' | 'trace' (Loki / Prometheus / Tempo)
   expr: 'count_over_time({service_name="gp-api", deployment_environment_name="$ENV"} |= "something bad" [5m])',
   threshold: 1,                            // fires when expr result exceeds this value
   for: '5m',                               // must exceed threshold for this long before firing
@@ -109,7 +110,7 @@ See the inline documentation on alert entries for more details and references to
 Key things to know:
 
 - Use `$ENV` in your expression -- it gets replaced with the environment name (`prod`) at deploy time.
-- `type: 'log'` queries go to Loki (structured logs). `type: 'metric'` queries go to Prometheus.
+- `type: 'log'` queries go to Loki (structured logs). `type: 'metric'` queries go to Prometheus. `type: 'trace'` queries go to Tempo (TraceQL metrics).
 - `notify` is optional. If omitted, the alert still fires but won't mention a Slack group.
 
 - The `for` field is a grace period -- the threshold must be continuously exceeded for that duration before the alert actually fires.
