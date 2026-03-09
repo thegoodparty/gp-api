@@ -14,7 +14,7 @@ import { M2M_TOKEN_PREFIX } from '../authentication.consts'
 import { UsersService } from '@/users/services/users.service'
 import { SessionsService } from '@/users/services/sessions.service'
 
-const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY
+const { CLERK_SECRET_KEY } = process.env
 
 if (!CLERK_SECRET_KEY) {
   throw new Error('CLERK_SECRET_KEY is required for application startup')
