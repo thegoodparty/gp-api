@@ -1,14 +1,10 @@
 import { Logger, Module } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
-import { PassportModule } from '@nestjs/passport'
 import { JwtModule } from '@nestjs/jwt'
 import { AuthenticationController } from './authentication.controller'
-import { JwtAuthStrategy } from './auth-strategies/JwtAuth.strategy'
 import { APP_GUARD } from '@nestjs/core'
 import { RolesGuard } from './guards/Roles.guard'
-import { LocalStrategy } from './auth-strategies/Local.strategy'
 import { EmailModule } from 'src/email/email.module'
-import { SocialLoginStrategy } from './auth-strategies/SocialLogin.strategy'
 import { ClerkWebhookController } from './webhooks/clerk-webhook.controller'
 import { ClerkWebhookService } from './services/clerk-webhook.service'
 
@@ -24,9 +20,6 @@ if (!process.env.AUTH_SECRET) {
 @Module({
   providers: [
     AuthenticationService,
-    LocalStrategy,
-    SocialLoginStrategy,
-    JwtAuthStrategy,
     ClerkWebhookService,
     {
       provide: APP_GUARD,
@@ -34,7 +27,6 @@ if (!process.env.AUTH_SECRET) {
     },
   ],
   imports: [
-    PassportModule,
     JwtModule.register({
       global: true,
       secret: process.env.AUTH_SECRET,

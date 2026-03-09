@@ -7,7 +7,6 @@ import {
   Inject,
   Post,
   Res,
-  UseGuards,
   UsePipes,
 } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
@@ -18,20 +17,12 @@ import { SetPasswordEmailSchema } from './schemas/SetPasswordEmail.schema'
 import { UsersService } from 'src/users/services/users.service'
 import { EmailService } from 'src/email/email.service'
 import { ResetPasswordSchema } from './schemas/ResetPassword.schema'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { AuthGuard } from '@nestjs/passport'
-import { LoginResult } from './authentication.types'
 import { PublicAccess } from './decorators/PublicAccess.decorator'
-import { RegisterUserInputDto } from './schemas/RegisterUserInput.schema'
 import { Roles } from './decorators/Roles.decorator'
 import { User, UserRole } from '@prisma/client'
 import { ReqUser } from './decorators/ReqUser.decorator'
 import { userHasRole } from 'src/users/util/users.util'
 import { FastifyReply } from 'fastify'
-import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
-import { CrmUsersService } from '../users/services/crmUsers.service'
-import { setTokenCookie } from './util/setTokenCookie.util'
-import { CampaignCreatedBy } from '@goodparty_org/contracts'
 import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 
@@ -43,68 +34,9 @@ export class AuthenticationController {
     private authenticationService: AuthenticationService,
     @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
-    private campaignsService: CampaignsService,
     private emailService: EmailService,
-    private readonly crmUsers: CrmUsersService,
     private readonly analytics: AnalyticsService,
   ) {}
-
-  @Post('register')
-  async register(
-    @Res({ passthrough: true }) response: FastifyReply,
-    @Body() userData: RegisterUserInputDto,
-  ) {
-    const { token, user } = await this.authenticationService.register(userData)
-    setTokenCookie(response, token)
-    return { user: ReadUserOutputSchema.parse(user), token }
-  }
-
-  private async findCampaignForUser(
-    user: User,
-  ): Promise<LoginResult['campaign']> {
-    return (await this.campaignsService.findByUserId(user.id)) ?? null
-  }
-
-  @UseGuards(AuthGuard('local'))
-  @Post('login')
-  async login(
-    @Res({ passthrough: true }) response: FastifyReply,
-    @ReqUser() user: User,
-  ): Promise<LoginResult> {
-    const token = this.authenticationService.generateAuthToken({
-      email: user.email,
-      sub: user.id,
-    })
-
-    setTokenCookie(response, token)
-
-    this.crmUsers.trackUserLogin(user)
-
-    return {
-      user: ReadUserOutputSchema.parse(user),
-      campaign: await this.findCampaignForUser(user),
-      token,
-    }
-  }
-
-  @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
-  @Post('social-login/:socialProvider')
-  async socialLogin(
-    @Res({ passthrough: true }) response,
-    @ReqUser() user: User,
-  ): Promise<LoginResult> {
-    const token = this.authenticationService.generateAuthToken({
-      email: user.email,
-      sub: user.id,
-    })
-
-    setTokenCookie(response, token)
-    return {
-      user: ReadUserOutputSchema.parse(user),
-      campaign: await this.findCampaignForUser(user),
-      token,
-    }
-  }
 
   @Post('send-recover-password-email')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -143,37 +75,14 @@ export class AuthenticationController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() body: ResetPasswordSchema) {
-    const { email, token, password, adminCreate } = body
+    const { email, token, password } = body
 
     const user = await this.authenticationService.updatePasswordWithToken(
       email,
       token,
       password,
     )
-    const userOut = ReadUserOutputSchema.parse(user)
 
-    // TODO: "adminCreate" should probably be "loginAfterReset" or something more descriptive
-    // leaving as is for now compatibility with existing frontend
-    if (adminCreate) {
-      // check if the campaign attached to this user is marked as created by admin
-      // to automatically login after the password change
-      const campaign = await this.campaignsService.findByUserId(user.id)
-
-      if (campaign?.data.createdBy !== CampaignCreatedBy.ADMIN) {
-        // don't login just return
-        return userOut
-      }
-
-      // otherwise log in for user
-      return {
-        user: userOut,
-        token: this.authenticationService.generateAuthToken({
-          email: user.email,
-          sub: user.id,
-        }),
-      }
-    }
-
-    return userOut
+    return ReadUserOutputSchema.parse(user)
   }
 }

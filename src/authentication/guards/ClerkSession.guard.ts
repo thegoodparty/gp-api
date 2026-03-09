@@ -3,7 +3,9 @@ import {
   ExecutionContext,
   Inject,
   Injectable,
+  UnauthorizedException,
 } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
 import { verifyToken, ClerkClient } from '@clerk/backend'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { User } from '@prisma/client'
@@ -11,6 +13,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/authentication/providers/clerk-client.provider'
 import { IncomingRequest } from '@/authentication/authentication.types'
 import { verifyM2MToken } from '@/authentication/util/VerifyM2MToken.util'
+import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
 import { M2M_TOKEN_PREFIX } from '../authentication.consts'
 import { UsersService } from '@/users/services/users.service'
 import { SessionsService } from '@/users/services/sessions.service'
@@ -29,6 +32,7 @@ export class ClerkSessionGuard implements CanActivate {
     private usersService: UsersService,
     private sessions: SessionsService,
     private readonly logger: PinoLogger,
+    private readonly reflector: Reflector,
   ) {
     this.logger.setContext(ClerkSessionGuard.name)
   }
@@ -38,16 +42,23 @@ export class ClerkSessionGuard implements CanActivate {
     const token = request.headers.authorization?.replace('Bearer ', '')
 
     if (!token) {
-      return true
+      if (routeIsPublicAndNoRoles(context, this.reflector)) {
+        return true
+      }
+      throw new UnauthorizedException()
     }
 
     if (token.startsWith(M2M_TOKEN_PREFIX)) {
       try {
         request.m2mToken = await verifyM2MToken(token, this.clerkClient)
+        return true
       } catch {
         this.logger.debug('M2M token verification failed in ClerkSessionGuard')
+        if (routeIsPublicAndNoRoles(context, this.reflector)) {
+          return true
+        }
+        throw new UnauthorizedException()
       }
-      return true
     }
 
     try {
@@ -58,7 +69,10 @@ export class ClerkSessionGuard implements CanActivate {
       const clerkId = payload.sub
       if (!clerkId) {
         this.logger.debug('Clerk token missing sub claim')
-        return true
+        if (routeIsPublicAndNoRoles(context, this.reflector)) {
+          return true
+        }
+        throw new UnauthorizedException()
       }
 
       const user =
@@ -69,15 +83,23 @@ export class ClerkSessionGuard implements CanActivate {
         this.logger.warn(
           `Could not find or provision user for clerkId: ${clerkId}`,
         )
-        return true
+        if (routeIsPublicAndNoRoles(context, this.reflector)) {
+          return true
+        }
+        throw new UnauthorizedException()
       }
 
       request.user = user
       this.sessions.trackSession(user)
-    } catch {
-      this.logger.debug(
-        'Clerk session token verification failed, deferring to JwtAuthGuard',
-      )
+    } catch (err) {
+      if (err instanceof UnauthorizedException) {
+        throw err
+      }
+      this.logger.debug('Clerk session token verification failed')
+      if (routeIsPublicAndNoRoles(context, this.reflector)) {
+        return true
+      }
+      throw new UnauthorizedException()
     }
 
     return true

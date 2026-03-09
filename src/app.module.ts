@@ -1,9 +1,7 @@
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
-import { JwtAuthStrategy } from '@/authentication/auth-strategies/JwtAuth.strategy'
 import { AuthenticationModule } from '@/authentication/authentication.module'
 import { ClerkSessionGuard } from '@/authentication/guards/ClerkSession.guard'
-import { JwtAuthGuard } from '@/authentication/guards/JwtAuth.guard'
 import { AdminAuditInterceptor } from '@/authentication/interceptors/AdminAudit.interceptor'
 import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { CampaignsModule } from '@/campaigns/campaigns.module'
@@ -94,10 +92,6 @@ import { loggerModule } from './observability/logging/logger-module'
       useClass: ClerkSessionGuard,
     },
     {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-    {
       provide: APP_INTERCEPTOR,
       useClass: AdminAuditInterceptor,
     },
@@ -105,7 +99,6 @@ import { loggerModule } from './observability/logging/logger-module'
       provide: APP_INTERCEPTOR,
       useClass: BlockedStateInterceptor,
     },
-    JwtAuthStrategy,
     ClerkClientProvider,
   ],
 })
