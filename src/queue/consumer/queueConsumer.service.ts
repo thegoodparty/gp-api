@@ -12,6 +12,7 @@ import {
   PollIndividualMessageSender,
   Prisma,
   TcrComplianceStatus,
+  User,
 } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { SqsMessageHandler } from '@ssut/nestjs-sqs'
@@ -306,12 +307,15 @@ export class QueueConsumerService {
 
   private async getCvTokenStatus(
     peerlyIdentityId: string,
+    user: User,
   ): Promise<PeerlyCvVerificationStatus | null> {
     let cvTokenStatus: PeerlyCvVerificationStatus | null = null
     try {
       cvTokenStatus =
-        (await this.tcrComplianceService.getCvTokenStatus(peerlyIdentityId)) ||
-        null
+        (await this.tcrComplianceService.getCvTokenStatus(
+          peerlyIdentityId,
+          user,
+        )) || null
     } catch (e) {
       // TODO: We have to do all this error handling because of how Peerly is
       //  throwing `BadGatewayException` instead of just throwing the
@@ -370,8 +374,11 @@ export class QueueConsumerService {
       where: { peerlyIdentityId },
     })
     const { userId } = campaign
+    const user = await this.usersService.findUniqueOrThrow({
+      where: { id: userId },
+    })
 
-    const cvTokenStatus = await this.getCvTokenStatus(peerlyIdentityId)
+    const cvTokenStatus = await this.getCvTokenStatus(peerlyIdentityId, user)
 
     cvTokenStatus &&
       (await this.analytics.track(
@@ -385,6 +392,7 @@ export class QueueConsumerService {
     const registrationStatus =
       await this.tcrComplianceService.checkTcrRegistrationStatus(
         peerlyIdentityId,
+        user,
       )
 
     if (!registrationStatus) {

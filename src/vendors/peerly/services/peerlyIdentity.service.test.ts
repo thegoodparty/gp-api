@@ -413,6 +413,7 @@ describe('PeerlyIdentityService', () => {
         baseTcrPayload as never,
         campaign,
         baseDomain,
+        baseUser,
       )
 
       expect(lastSubmittedData.jobAreas).toEqual([
@@ -436,6 +437,7 @@ describe('PeerlyIdentityService', () => {
         baseTcrPayload as never,
         campaign,
         baseDomain,
+        baseUser,
       )
 
       // jobAreas is present with didState even when no area codes resolved
@@ -455,6 +457,7 @@ describe('PeerlyIdentityService', () => {
         baseTcrPayload as never,
         campaign,
         baseDomain,
+        baseUser,
       )
 
       expect(lastSubmittedData.jobAreas).toEqual([{ didState: 'IL' }])
@@ -473,6 +476,7 @@ describe('PeerlyIdentityService', () => {
         baseTcrPayload as never,
         campaign,
         baseDomain,
+        baseUser,
       )
 
       // state at top level from extractAddressComponents
@@ -501,6 +505,7 @@ describe('PeerlyIdentityService', () => {
         baseTcrPayload as never,
         campaign,
         baseDomain,
+        baseUser,
       )
 
       expect(lastSubmittedData).not.toHaveProperty('jobAreas')
@@ -517,6 +522,7 @@ describe('PeerlyIdentityService', () => {
           baseTcrPayload as never,
           campaign,
           baseDomain,
+          baseUser,
         ),
       ).rejects.toThrow(BadRequestException)
     })
@@ -534,6 +540,7 @@ describe('PeerlyIdentityService', () => {
         baseTcrPayload as never,
         campaign,
         baseDomain,
+        baseUser,
       )
 
       expect(lastSubmittedData.ein).toBe('12-3456789')
