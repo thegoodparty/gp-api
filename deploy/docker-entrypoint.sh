@@ -11,7 +11,7 @@ if [ -z "$VOTER_DB_HOST" ] || [ -z "$VOTER_DB_PASSWORD" ] || [ -z "$VOTER_DB_USE
   exit 1
 fi
 
-export DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME"
+export DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME?connection_limit=20"
 export VOTER_DATASTORE="postgresql://$VOTER_DB_USER:$VOTER_DB_PASSWORD@$VOTER_DB_HOST:5432/$VOTER_DB_NAME"
 
 # Run migrations on startup if DATABASE_URL is set and not a placeholder
