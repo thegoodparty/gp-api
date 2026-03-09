@@ -4,21 +4,26 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
 import { Reflector } from '@nestjs/core'
-import { CampaignsService } from '../services/campaigns.service'
+import { Campaign } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
+import { CampaignWith } from '../campaigns.types'
 import {
   REQUIRE_CAMPAIGN_META_KEY,
   RequireCamapaignMetadata,
 } from '../decorators/UseCampaign.decorator'
-import { CampaignWith } from '../campaigns.types'
-import { PinoLogger } from 'nestjs-pino'
+import { CampaignsService } from '../services/campaigns.service'
 
-@Injectable()
 /**
- * Restrict an endpoint to require user to have a campaign
- * Do not need to apply this directly, use the "@UseCampaign" decorator
- * */
+ * Guard that resolves a Campaign and attaches it to the request.
+ *
+ * Resolution order:
+ * 1. `X-Organization-Slug` header — look up Organization, get its campaign.
+ * 2. Legacy fallback — find campaign by userId.
+ *
+ * Once all requests include the organization header, the legacy fallback can be removed.
+ */
+@Injectable()
 export class UseCampaignGuard implements CanActivate {
   constructor(
     private campaignsService: CampaignsService,
@@ -30,6 +35,7 @@ export class UseCampaignGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
+      headers: Record<string, string | undefined>
       params: { slug: string }
       campaign?: Campaign
       user: { id: number }
@@ -41,18 +47,29 @@ export class UseCampaignGuard implements CanActivate {
         [context.getHandler(), context.getClass()],
       )
 
-    // load campaign for current user
-    const campaign = await this.campaignsService.findByUserId(
-      request.user.id,
-      campaignInclude ?? { pathToVictory: true }, // default to include path to victory
-    )
+    const userId = request.user.id
+    const include = campaignInclude ?? { pathToVictory: true }
+    let campaign: Campaign | null = null
+
+    // Step 1: Try x-organization-slug header
+    const slug = request.headers['x-organization-slug']
+    if (typeof slug === 'string') {
+      const org = await this.campaignsService.client.organization.findFirst({
+        where: { slug, ownerId: userId },
+        include: { campaign: { include } },
+      })
+      campaign = org?.campaign ?? null
+    }
+
+    // Step 2: Legacy fallback — find by userId
+    if (!campaign) {
+      campaign = await this.campaignsService.findByUserId(userId, include)
+    }
 
     if (campaign) {
-      // store on request to access with @UserCampaign decorator
       request.campaign = campaign as CampaignWith<'pathToVictory'>
       return true
     } else if (continueIfNotFound === true) {
-      // if continueIfNotFound, allow request handler to continue
       return true
     }
 

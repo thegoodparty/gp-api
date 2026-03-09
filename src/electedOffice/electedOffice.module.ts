@@ -9,6 +9,6 @@ import { ElectedOfficeService } from './services/electedOffice.service'
   imports: [OrganizationsModule],
   controllers: [ElectedOfficeController],
   providers: [ElectedOfficeService, UseElectedOfficeGuard, UserOrM2MGuard],
-  exports: [ElectedOfficeService],
+  exports: [ElectedOfficeService, UseElectedOfficeGuard],
 })
 export class ElectedOfficeModule {}
