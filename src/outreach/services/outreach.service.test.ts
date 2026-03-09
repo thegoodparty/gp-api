@@ -93,7 +93,9 @@ describe('OutreachService', () => {
         },
         {
           provide: PeerlyP2pJobService,
-          useValue: { createPeerlyP2pJob: mockPeerlyCreateJob },
+          useValue: {
+            createPeerlyP2pJob: mockPeerlyCreateJob,
+          },
         },
         OutreachService,
       ],
@@ -160,7 +162,7 @@ describe('OutreachService', () => {
         ...p2pCreateDto,
         projectId: 'job-id-456',
         script: 'Resolved script text',
-        status: OutreachStatus.in_progress,
+        status: OutreachStatus.pending,
         didState: 'CA',
         didNpaSubset: ['415', '510'],
         imageUrl: 'https://cdn.example.com/p2p.png',
@@ -204,7 +206,7 @@ describe('OutreachService', () => {
         data: expect.objectContaining({
           ...p2pCreateDto,
           projectId: 'job-id-456',
-          status: OutreachStatus.in_progress,
+          status: OutreachStatus.pending,
           didState: 'CA',
           didNpaSubset: ['415', '510'],
           imageUrl: 'https://cdn.example.com/p2p.png',

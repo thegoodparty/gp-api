@@ -35,11 +35,10 @@ import { CanDownloadVoterFileGuard } from './guards/CanDownloadVoterFile.guard'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
-import { VOTER_FILE_ROUTE } from './voterFile.constants'
 import { VoterFileService } from './voterFile.service'
 import { PinoLogger } from 'nestjs-pino'
 
-@Controller(VOTER_FILE_ROUTE)
+@Controller('voters/voter-file')
 @UsePipes(ZodValidationPipe)
 export class VoterFileController {
   constructor(

@@ -133,7 +133,7 @@ describe('PeerlyP2pJobService', () => {
       expect(jobPostCall![1]).not.toHaveProperty('did_npa_subset')
     })
 
-    it('calls media, createJob, assignList, requestCanvassers in order', async () => {
+    it('calls media, createJob, assignList in order', async () => {
       const callOrder: string[] = []
       mockMediaService.createMedia.mockImplementation(async () => {
         callOrder.push('createMedia')
@@ -165,12 +165,7 @@ describe('PeerlyP2pJobService', () => {
         didNpaSubset: ['212'],
       })
 
-      expect(callOrder).toEqual([
-        'createMedia',
-        'createJob',
-        'assignListToJob',
-        'requestCanvassers',
-      ])
+      expect(callOrder).toEqual(['createMedia', 'createJob', 'assignListToJob'])
     })
 
     it('passes media ID from createMedia to createJob templates', async () => {

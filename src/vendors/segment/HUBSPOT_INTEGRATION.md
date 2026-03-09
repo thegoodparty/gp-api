@@ -1,13 +1,13 @@
 # Segment → HubSpot Integration
 
-This document describes how Segment events flow to HubSpot and trigger workflows that update user compliance status.
+This document describes how Segment events flow from the API to HubSpot and trigger workflows that update user compliance status.
 
 ## Overview
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  gp-webapp  │────▶│   Segment   │────▶│   HubSpot   │────▶│  Workflows  │
-│  gp-api     │     │             │     │   Events    │     │             │
+│   gp-api    │────▶│   Segment   │────▶│   HubSpot   │────▶│  Workflows  │
+│             │     │             │     │   Events    │     │             │
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
      Track()         Firehose V2        Custom Event       Update Status
                      Mapping            pe21589597_        on Contact &
@@ -27,38 +27,30 @@ The compliance flow tracks user progress through these stages:
 
 ## Event → HubSpot Workflow Mappings
 
-| Source | Event Name | HubSpot Workflow | Sets Status To |
-|--------|-----------|------------------|----------------|
-| Frontend | `Candidate Website - Published` | Ops - Set 10 DLC Compliance Status to Website Published | Website Created |
-| Frontend | `Candidate Website - Purchased domain` | Ops - Set 10 DLC Compliance Status to Purchase domain | Domain Purchased |
-| Frontend | `Voter Outreach - 10DLC Compliance Form Submitted` | Ops - Set 10 DLC Compliance Status to Compliance form Submitted | Registration Submitted |
-| Frontend | `Voter Outreach - 10DLC Compliance PIN Submitted` | Ops - Set 10 DLC Compliance Status to Compliance PIN Submitted | Compliance Pending |
-| Backend | `Voter Outreach - 10DLC Compliance Completed` | Ops - Set 10 DLC Compliance Status to 10 DLC Compliance Complete | Compliant |
+| Event Name | HubSpot Workflow | Sets Status To | Fired From |
+|-----------|------------------|----------------|------------|
+| `Candidate Website - Published` | Ops - Set 10 DLC Compliance Status to Website Published | Website Created | `WebsitesController.updateWebsite()` |
+| `Candidate Website - Purchased domain` | Ops - Set 10 DLC Compliance Status to Purchase domain | Domain Purchased | `DomainsService.processDomainRegistration()` |
+| `Voter Outreach - 10DLC Compliance Form Submitted` | Ops - Set 10 DLC Compliance Status to Compliance form Submitted | Registration Submitted | `CampaignTcrComplianceController.createTcrCompliance()` |
+| `Voter Outreach - 10DLC Compliance PIN Submitted` | Ops - Set 10 DLC Compliance Status to Compliance PIN Submitted | Compliance Pending | `CampaignTcrComplianceController.submitCampaignVerifyPIN()` |
+| `Voter Outreach - 10DLC Compliance Completed` | Ops - Set 10 DLC Compliance Status to 10 DLC Compliance Complete | Compliant | `QueueConsumerService.handleTcrComplianceCheckMessage()` |
 
 ## Event Definitions
 
-### Frontend (gp-webapp)
-File: `helpers/analyticsHelper.ts`
-
-```typescript
-EVENTS.CandidateWebsite.Published    // 'Candidate Website - Published'
-EVENTS.CandidateWebsite.PurchasedDomain  // 'Candidate Website - Purchased domain'
-EVENTS.Outreach.P2PCompliance.ComplianceFormSubmitted  // 'Voter Outreach - 10DLC Compliance Form Submitted'
-EVENTS.Outreach.P2PCompliance.CvPinFormSubmitted  // 'Voter Outreach - 10DLC Compliance PIN Submitted'
-```
-
-### Backend (gp-api)
 File: `src/vendors/segment/segment.types.ts`
 
 ```typescript
-EVENTS.Outreach.ComplianceCompleted  // 'Voter Outreach - 10DLC Compliance Completed'
+EVENTS.CandidateWebsite.Published           // 'Candidate Website - Published'
+EVENTS.CandidateWebsite.PurchasedDomain     // 'Candidate Website - Purchased domain'
+EVENTS.Outreach.ComplianceFormSubmitted      // 'Voter Outreach - 10DLC Compliance Form Submitted'
+EVENTS.Outreach.CompliancePinSubmitted       // 'Voter Outreach - 10DLC Compliance PIN Submitted'
+EVENTS.Outreach.ComplianceCompleted          // 'Voter Outreach - 10DLC Compliance Completed'
 ```
 
 ## Segment Configuration
 
 ### Sources
-- **Web App** - Frontend events from gp-webapp
-- **API** - Backend events from gp-api
+- **API** - All events from gp-api
 
 ### Destination: HubSpot Cloud Mode (Actions)
 

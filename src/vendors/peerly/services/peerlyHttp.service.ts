@@ -8,7 +8,7 @@ import axiosRetry from 'axios-retry'
 import { Methods } from 'http-constants-ts'
 import { PinoLogger } from 'nestjs-pino'
 import { lastValueFrom } from 'rxjs'
-import { isAxiosResponse } from '../../../shared/util/http.util'
+import { isAxiosResponse } from '@/shared/util/http.util'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { PeerlyApiErrorContext, PeerlyAuthenticatedUser } from '../peerly.types'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
@@ -30,7 +30,6 @@ interface PeerlyAuthenticationResponseBody {
 
 @Injectable()
 export class PeerlyHttpService extends PeerlyBaseConfig {
-  private authenticatedUser: PeerlyAuthenticatedUser | null = null
   private token: string | null = null
   private tokenExpiry: number | null = null
   private readonly tokenRenewalThreshold = 5 * 60
@@ -56,10 +55,6 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
   @Timeout(0)
   async authenticate() {
     await this.renewToken()
-  }
-
-  getAuthenticatedUser(): PeerlyAuthenticatedUser | null {
-    return this.authenticatedUser
   }
 
   async get<T>(
@@ -169,7 +164,6 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
       }
 
       const { token, user } = data
-      this.authenticatedUser = user
 
       if (token) {
         const decodedToken: DecodedPeerlyToken = this.jwtService.decode(token)

@@ -12,7 +12,6 @@ import { PeerlyHttpService } from './peerlyHttp.service'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { CreateJobParams, PeerlyAgent, PeerlyJob } from '../peerly.types'
-import { getAuthenticatedUserInitials } from '../utils/getAuthenticatedUserInitials.util'
 
 interface CreateP2pJobParams {
   campaignId: number
@@ -99,10 +98,6 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.info(`Assigning list ${listId} to job ${jobId}`)
       await this.assignListToJob(jobId, listId)
       this.logger.info('List assigned successfully')
-
-      this.logger.info(`Requesting canvassers for job ${jobId}`)
-      await this.requestCanvassers(jobId)
-      this.logger.info('Canvassers requested successfully')
 
       this.logger.info(
         `P2P job creation completed successfully for campaign ${campaignId}`,
@@ -238,14 +233,6 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
   private async assignListToJob(jobId: string, listId: number): Promise<void> {
     await this.peerlyHttpService.post(`/1to1/jobs/${jobId}/assignlist`, {
       list_id: listId,
-    })
-  }
-
-  private async requestCanvassers(jobId: string): Promise<void> {
-    const user = this.peerlyHttpService.getAuthenticatedUser()
-    const requestedInitials = user ? getAuthenticatedUserInitials(user) : ''
-    await this.peerlyHttpService.post(`/v2/p2p/${jobId}/request_canvassers`, {
-      requested_initials: requestedInitials,
     })
   }
 
