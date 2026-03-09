@@ -1,9 +1,9 @@
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { PinoLogger } from 'nestjs-pino'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { HttpService } from '@nestjs/axios'
 import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
+import { PinoLogger } from 'nestjs-pino'
 import { of } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PositionWithOptionalDistrict } from '../types/elections.types'
@@ -141,6 +141,162 @@ describe('ElectionsService', () => {
           'No position and/or associated district was found',
         ),
       )
+    })
+  })
+
+  describe('getPositionByBallotReadyId', () => {
+    it('returns position with district when includeDistrict is true', async () => {
+      const position = makePosition(1000)
+      mockHttpGet.mockReturnValue(of({ data: position, status: 200 }))
+
+      const result = await service.getPositionByBallotReadyId('br-pos-1', {
+        includeDistrict: true,
+      })
+
+      expect(result).toEqual(position)
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('positions/by-ballotready-id/br-pos-1'),
+        expect.objectContaining({
+          params: { includeDistrict: true, includeTurnout: false },
+        }),
+      )
+    })
+
+    it('returns position without district by default', async () => {
+      const position: PositionWithOptionalDistrict = {
+        id: 'pos-1',
+        brPositionId: 'br-pos-1',
+        brDatabaseId: 'br-db-1',
+        state: 'TX',
+        name: 'State House 005',
+      }
+      mockHttpGet.mockReturnValue(of({ data: position, status: 200 }))
+
+      const result = await service.getPositionByBallotReadyId('br-pos-1')
+
+      expect(result).toEqual(position)
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('positions/by-ballotready-id/br-pos-1'),
+        expect.objectContaining({
+          params: { includeDistrict: false, includeTurnout: false },
+        }),
+      )
+    })
+
+    it('returns null when API returns null', async () => {
+      mockHttpGet.mockReturnValue(of({ data: null, status: 200 }))
+
+      const result = await service.getPositionByBallotReadyId('br-nonexistent')
+
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('getDistrictId', () => {
+    it('returns district id when API returns results', async () => {
+      mockHttpGet.mockReturnValue(
+        of({ data: [{ id: 'district-uuid-1' }], status: 200 }),
+      )
+
+      const result = await service.getDistrictId('CA', 'City', 'Los Angeles')
+
+      expect(result).toBe('district-uuid-1')
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('districts/list'),
+        expect.objectContaining({
+          params: {
+            state: 'CA',
+            L2DistrictType: 'City',
+            L2DistrictName: 'Los Angeles',
+            districtColumns: 'id',
+          },
+        }),
+      )
+    })
+
+    it('returns null when API returns empty array', async () => {
+      mockHttpGet.mockReturnValue(of({ data: [], status: 200 }))
+
+      const result = await service.getDistrictId(
+        'CA',
+        'City',
+        'Nonexistent City',
+      )
+
+      expect(result).toBeNull()
+    })
+
+    it('returns null when API returns null', async () => {
+      mockHttpGet.mockReturnValue(of({ data: null, status: 200 }))
+
+      const result = await service.getDistrictId('CA', 'City', 'Test')
+
+      expect(result).toBeNull()
+    })
+
+    it('throws when API throws', async () => {
+      mockHttpGet.mockImplementation(() => {
+        throw new Error('Network error')
+      })
+
+      await expect(
+        service.getDistrictId('CA', 'City', 'Test'),
+      ).rejects.toThrow()
+    })
+
+    it('cleans district name with ## separators', async () => {
+      mockHttpGet.mockReturnValue(
+        of({ data: [{ id: 'district-cleaned' }], status: 200 }),
+      )
+
+      await service.getDistrictId(
+        'CA',
+        'State Senate',
+        'Short ## Much Longer District Name',
+      )
+
+      expect(mockHttpGet).toHaveBeenCalledWith(
+        expect.stringContaining('districts/list'),
+        expect.objectContaining({
+          params: expect.objectContaining({
+            L2DistrictName: 'Much Longer District Name',
+          }),
+        }),
+      )
+    })
+  })
+
+  describe('cleanDistrictName', () => {
+    it('returns original name when no ## separator', () => {
+      expect(service.cleanDistrictName('Los Angeles')).toBe('Los Angeles')
+    })
+
+    it('returns longest segment when ## separator present', () => {
+      expect(service.cleanDistrictName('Short ## Much Longer Name')).toBe(
+        'Much Longer Name',
+      )
+    })
+
+    it('handles multiple ## segments', () => {
+      expect(
+        service.cleanDistrictName(
+          'A ## Medium Len ## The Longest Segment Here',
+        ),
+      ).toBe('The Longest Segment Here')
+    })
+
+    it('trims whitespace from segments', () => {
+      expect(service.cleanDistrictName('  Short  ##  Longer Name  ')).toBe(
+        'Longer Name',
+      )
+    })
+
+    it('filters out empty segments', () => {
+      expect(service.cleanDistrictName('## ## Valid Name')).toBe('Valid Name')
+    })
+
+    it('returns original when all segments are empty', () => {
+      expect(service.cleanDistrictName('## ##')).toBe('## ##')
     })
   })
 })

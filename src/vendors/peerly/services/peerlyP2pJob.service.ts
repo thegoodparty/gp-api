@@ -94,10 +94,6 @@ export class PeerlyP2pJobService {
       await this.peerlyP2pSmsService.assignListToJob(jobId, listId)
       this.logger.info('List assigned successfully')
 
-      this.logger.info(`Requesting canvassers for job ${jobId}`)
-      await this.peerlyP2pSmsService.requestCanvassers(jobId)
-      this.logger.info('Canvassers requested successfully')
-
       this.logger.info(
         `P2P job creation completed successfully for campaign ${campaignId}`,
       )
