@@ -54,7 +54,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
 
   findUserByEmail(email: string) {
     return this.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
+      where: { email: { equals: email, mode: Prisma.QueryMode.insensitive } },
     })
   }
 
@@ -76,7 +76,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   findUserByResetToken(email: string, token: string) {
     return this.findFirstOrThrow({
       where: {
-        email: { equals: email, mode: 'insensitive' },
+        email: { equals: email, mode: Prisma.QueryMode.insensitive },
         passwordResetToken: token,
       },
     })
@@ -192,6 +192,11 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     firstName: string
     lastName: string
   }) {
+    const existingUser = await this.findUser({ email: data.email })
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists')
+    }
+
     return this.model.create({
       data: {
         clerkId: data.clerkId,

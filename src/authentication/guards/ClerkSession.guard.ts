@@ -5,6 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 import { verifyToken, ClerkClient } from '@clerk/backend'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/authentication/providers/clerk-client.provider'
@@ -65,7 +66,7 @@ export class ClerkSessionGuard implements CanActivate {
         (await this.provisionUserFromClerk(clerkId))
 
       if (!user) {
-        this.logger.debug(
+        this.logger.warn(
           `Could not find or provision user for clerkId: ${clerkId}`,
         )
         return true
@@ -82,12 +83,6 @@ export class ClerkSessionGuard implements CanActivate {
     return true
   }
 
-  /**
-   * JIT (Just-In-Time) user provisioning: when a valid Clerk session token
-   * is presented but no local user exists yet, fetch the user from Clerk
-   * and create them in the database. This eliminates the race condition
-   * between Clerk's post-signup redirect and the webhook delivery.
-   */
   private async provisionUserFromClerk(clerkId: string): Promise<User | null> {
     try {
       const clerkUser = await this.clerkClient.users.getUser(clerkId)
@@ -124,9 +119,6 @@ export class ClerkSessionGuard implements CanActivate {
       )
       return user
     } catch (err) {
-      // Handle race condition: if two concurrent requests both try to
-      // provision the same user, one will hit a unique constraint violation.
-      // In that case, just look up the now-existing user.
       if (this.isPrismaUniqueConstraintError(err)) {
         this.logger.debug(
           { clerkId },
@@ -140,11 +132,6 @@ export class ClerkSessionGuard implements CanActivate {
   }
 
   private isPrismaUniqueConstraintError(err: unknown): boolean {
-    return (
-      typeof err === 'object' &&
-      err !== null &&
-      'code' in err &&
-      (err as { code: string }).code === 'P2002'
-    )
+    return err instanceof PrismaClientKnownRequestError && err.code === 'P2002'
   }
 }

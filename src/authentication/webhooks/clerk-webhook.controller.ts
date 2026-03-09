@@ -4,7 +4,6 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
-  InternalServerErrorException,
   Post,
   RawBodyRequest,
   Req,
@@ -13,24 +12,14 @@ import {
 import { PinoLogger } from 'nestjs-pino'
 import { Webhook } from 'svix'
 import { PublicAccess } from '@/authentication/decorators/PublicAccess.decorator'
-import { ClerkWebhookService } from './clerk-webhook.service'
+import { ClerkWebhookService } from '../services/clerk-webhook.service'
+import { ClerkWebhookPayload } from './clerk-webhook.types'
 
-interface ClerkEmailAddress {
-  email_address: string
-  id: string
+if (!process.env.CLERK_WEBHOOK_SECRET) {
+  throw new Error('CLERK_WEBHOOK_SECRET is required for application startup')
 }
 
-interface ClerkWebhookEventData {
-  id: string
-  email_addresses?: ClerkEmailAddress[]
-  first_name?: string | null
-  last_name?: string | null
-}
-
-interface ClerkWebhookPayload {
-  type: string
-  data: ClerkWebhookEventData
-}
+const CLERK_WEBHOOK_SECRET: string = process.env.CLERK_WEBHOOK_SECRET
 
 @Controller('webhooks')
 export class ClerkWebhookController {
@@ -48,12 +37,6 @@ export class ClerkWebhookController {
     @Req() { rawBody }: RawBodyRequest<Request>,
     @Headers() headers: Record<string, string>,
   ) {
-    const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
-    if (!webhookSecret) {
-      this.logger.error('CLERK_WEBHOOK_SECRET is not configured')
-      throw new InternalServerErrorException('Webhook secret not configured')
-    }
-
     if (!rawBody) {
       throw new BadRequestException('Missing request body')
     }
@@ -68,7 +51,7 @@ export class ClerkWebhookController {
 
     let event: ClerkWebhookPayload
     try {
-      const wh = new Webhook(webhookSecret)
+      const wh = new Webhook(CLERK_WEBHOOK_SECRET)
       event = wh.verify(rawBody.toString(), {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,

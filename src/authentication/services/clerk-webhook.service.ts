@@ -1,18 +1,7 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
-
-interface ClerkEmailAddress {
-  email_address: string
-  id: string
-}
-
-interface ClerkUserEventData {
-  id: string
-  email_addresses?: ClerkEmailAddress[]
-  first_name?: string | null
-  last_name?: string | null
-}
+import { ClerkWebhookEventData } from '../webhooks/clerk-webhook.types'
 
 @Injectable()
 export class ClerkWebhookService {
@@ -24,7 +13,7 @@ export class ClerkWebhookService {
     this.logger.setContext(ClerkWebhookService.name)
   }
 
-  async handleUserCreated(data: ClerkUserEventData) {
+  async handleUserCreated(data: ClerkWebhookEventData) {
     const email = data.email_addresses?.[0]?.email_address
     if (!email) {
       this.logger.warn(
@@ -72,7 +61,7 @@ export class ClerkWebhookService {
     )
   }
 
-  async handleUserUpdated(data: ClerkUserEventData) {
+  async handleUserUpdated(data: ClerkWebhookEventData) {
     const user = await this.usersService.findUser({ clerkId: data.id })
     if (!user) {
       this.logger.warn(
@@ -88,9 +77,13 @@ export class ClerkWebhookService {
       { id: user.id },
       {
         ...(email ? { email } : {}),
-        ...(data.first_name !== null ? { firstName: data.first_name } : {}),
-        ...(data.last_name !== null ? { lastName: data.last_name } : {}),
-        ...(data.first_name !== null && data.last_name !== null
+        ...(data.first_name !== undefined
+          ? { firstName: data.first_name ?? '' }
+          : {}),
+        ...(data.last_name !== undefined
+          ? { lastName: data.last_name ?? '' }
+          : {}),
+        ...(data.first_name !== undefined && data.last_name !== undefined
           ? { name: `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() }
           : {}),
       },
@@ -101,7 +94,7 @@ export class ClerkWebhookService {
     )
   }
 
-  async handleUserDeleted(data: Pick<ClerkUserEventData, 'id'>) {
+  async handleUserDeleted(data: Pick<ClerkWebhookEventData, 'id'>) {
     const user = await this.usersService.findUser({ clerkId: data.id })
     if (!user) {
       this.logger.warn(
