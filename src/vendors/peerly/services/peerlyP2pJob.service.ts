@@ -1,4 +1,4 @@
-import { BadGatewayException, HttpException, Injectable } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { Headers } from 'http-constants-ts'
 import { Readable } from 'stream'
 import { PinoLogger } from 'nestjs-pino'
@@ -230,9 +230,6 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.info(`Created job with ID: ${jobId}`)
       return jobId
     } catch (error) {
-      if (error instanceof HttpException) {
-        throw error
-      }
       return this.peerlyErrorHandling.handleApiError(
         error,
         undefined,

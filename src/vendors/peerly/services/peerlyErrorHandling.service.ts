@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable } from '@nestjs/common'
+import { BadGatewayException, HttpException, Injectable } from '@nestjs/common'
 import { User } from '@prisma/client'
 import { format } from '@redtea/format-axios-error'
 import { isAxiosError } from 'axios'
@@ -25,6 +25,9 @@ export class PeerlyErrorHandlingService {
     context?: PeerlyApiErrorContext,
     logger?: PinoLogger,
   ): Promise<never> {
+    if (error instanceof HttpException) {
+      throw error
+    }
     const formattedError = (isAxiosError(error) && format(error)) || error
     const genericMessage = 'Peerly API ERROR'
     const recoverySuffix = this.formatRecoverySuffix(context?.recoveryInfo)

@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   BadRequestException,
-  HttpException,
   Injectable,
 } from '@nestjs/common'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
@@ -94,9 +93,6 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       this.logger.debug(validatedData, 'Successfully created media')
       return validatedData.media_id
     } catch (error) {
-      if (error instanceof HttpException) {
-        throw error
-      }
       return this.peerlyErrorHandling.handleApiError(
         error,
         undefined,
