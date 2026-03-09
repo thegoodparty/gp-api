@@ -98,7 +98,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.info(`Job created with ID: ${jobId}`)
 
       this.logger.info(`Assigning list ${listId} to job ${jobId}`)
-      await this.assignListToJob(jobId, listId)
+      await this.assignListToJob(jobId, listId, { campaignId })
       this.logger.info('List assigned successfully')
 
       this.logger.info(
@@ -107,11 +107,13 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
 
       return jobId
     } catch (error) {
+      const isListAssignmentFailure =
+        error instanceof BadGatewayException &&
+        error.message.includes(P2P_ERROR_MESSAGES.LIST_ASSIGNMENT_FAILED)
+      if (isListAssignmentFailure) {
+        throw error
+      }
       this.logger.error({ error }, P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
-
-      // If we have a job ID, we could attempt cleanup here
-      // For now, we'll let the error propagate and rely on manual cleanup if needed
-
       throw new BadGatewayException(P2P_ERROR_MESSAGES.JOB_CREATION_FAILED)
     }
   }
@@ -236,10 +238,25 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     }
   }
 
-  private async assignListToJob(jobId: string, listId: number): Promise<void> {
-    await this.peerlyHttpService.post(`/1to1/jobs/${jobId}/assignlist`, {
-      list_id: listId,
-    })
+  private async assignListToJob(
+    jobId: string,
+    listId: number,
+    context?: { campaignId?: number },
+  ): Promise<void> {
+    try {
+      await this.peerlyHttpService.post(`/1to1/jobs/${jobId}/assignlist`, {
+        list_id: listId,
+      })
+    } catch (error) {
+      return this.peerlyErrorHandling.handleApiError(error, {
+        customMessage: P2P_ERROR_MESSAGES.LIST_ASSIGNMENT_FAILED,
+        recoveryInfo: {
+          jobId,
+          listId,
+          ...(context?.campaignId != null && { campaignId: context.campaignId }),
+        },
+      }, this.logger)
+    }
   }
 
   private async listAgents(): Promise<PeerlyAgent[]> {

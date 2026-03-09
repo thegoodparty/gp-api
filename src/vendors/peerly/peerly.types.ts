@@ -421,9 +421,13 @@ export interface CreateJobParams {
   scheduledDate?: string
 }
 
+export type PeerlyRecoveryInfo = Record<string, string | number | undefined>
+
 export interface PeerlyApiErrorContext {
   campaign?: Campaign
   user?: User
   peerlyIdentityId?: string
   httpExceptionClass?: HttpExceptionConstructor
+  customMessage?: string
+  recoveryInfo?: PeerlyRecoveryInfo
 }

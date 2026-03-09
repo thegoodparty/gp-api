@@ -27,10 +27,14 @@ export class PeerlyErrorHandlingService {
   ): Promise<never> {
     const formattedError = (isAxiosError(error) && format(error)) || error
     const genericMessage = 'Peerly API ERROR'
+    const recoverySuffix = this.formatRecoverySuffix(context?.recoveryInfo)
 
     logger?.error(
-      { data: !formattedError ? error : '' },
-      `${genericMessage}: ${formattedError ? JSON.stringify(formattedError) : ''}`,
+      {
+        data: !formattedError ? error : '',
+        ...context?.recoveryInfo,
+      },
+      `${genericMessage}: ${formattedError ? JSON.stringify(formattedError) : ''}${recoverySuffix}`,
     )
 
     if (
@@ -57,9 +61,9 @@ export class PeerlyErrorHandlingService {
       }
 
       const ExceptionClass = context?.httpExceptionClass ?? BadGatewayException
-      throw new ExceptionClass(`Peerly API error: ${parsedMessage}`, {
-        cause: error,
-      })
+      const baseMessage =
+        context?.customMessage ?? `Peerly API error: ${parsedMessage}`
+      throw new ExceptionClass(baseMessage + recoverySuffix, { cause: error })
     }
 
     if (context?.user) {
@@ -71,7 +75,20 @@ export class PeerlyErrorHandlingService {
     }
 
     const ExceptionClass = context?.httpExceptionClass ?? BadGatewayException
-    throw new ExceptionClass(genericMessage, { cause: error })
+    const baseMessage = context?.customMessage ?? genericMessage
+    throw new ExceptionClass(baseMessage + recoverySuffix, { cause: error })
+  }
+
+  private formatRecoverySuffix(
+    recoveryInfo?: PeerlyApiErrorContext['recoveryInfo'],
+  ): string {
+    if (!recoveryInfo || Object.keys(recoveryInfo).length === 0) {
+      return ''
+    }
+    const parts = Object.entries(recoveryInfo)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => `${k}=${v}`)
+    return parts.length === 0 ? '' : ` ${parts.join(' ')}`
   }
 
   private async sendSlackErrorNotification(
