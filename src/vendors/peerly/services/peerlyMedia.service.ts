@@ -3,20 +3,16 @@ import {
   BadRequestException,
   Injectable,
 } from '@nestjs/common'
-import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../../shared/util/http.util'
-import { format } from '@redtea/format-axios-error'
 import { Readable } from 'stream'
 import FormData from 'form-data'
 import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
 import { MediaStatus } from '../peerly.types'
 import { MimeTypes } from 'http-constants-ts'
 import { PinoLogger } from 'nestjs-pino'
+import { PeerlyHttpService } from './peerlyHttp.service'
 
-const MAX_FILE_SIZE = 512000 // 500KB
+const MAX_FILE_SIZE = 512000
 
 const ALLOWED_MEDIA_TYPES = [
   MimeTypes.IMAGE_JPEG,
@@ -37,24 +33,9 @@ interface CreateMediaParams {
 export class PeerlyMediaService extends PeerlyBaseConfig {
   constructor(
     protected readonly logger: PinoLogger,
-    private readonly httpService: HttpService,
-    private readonly peerlyAuth: PeerlyAuthenticationService,
+    private readonly peerlyHttpService: PeerlyHttpService,
   ) {
     super(logger)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  private handleApiError(error: unknown): never {
-    this.logger.error(
-      { data: isAxiosResponse(error) ? format(error) : error },
-      'Failed to communicate with Peerly API',
-    )
-    throw new BadGatewayException('Failed to communicate with Peerly API')
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  private validateCreateResponse(data: unknown): CreateMediaResponseDto {
-    return this.validateData(data, CreateMediaResponseDto, 'create media')
   }
 
   async createMedia(params: CreateMediaParams): Promise<string> {
@@ -86,22 +67,20 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
     })
 
     try {
-      const headers = {
-        ...(await this.peerlyAuth.getAuthorizationHeader()),
-        ...form.getHeaders(),
-      }
-      const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/v2/media`, form, {
-          headers,
-          timeout: this.httpTimeoutMs,
-          maxBodyLength: MAX_FILE_SIZE,
-          maxContentLength: MAX_FILE_SIZE,
-        }),
-      )
+      const response = await this.peerlyHttpService.post('/v2/media', form, {
+        headers: form.getHeaders(),
+        timeout: this.httpTimeoutMs,
+        maxBodyLength: MAX_FILE_SIZE,
+        maxContentLength: MAX_FILE_SIZE,
+      })
       const { data } = response as {
         data: Record<string, string | number | boolean>
       }
-      const validatedData = this.validateCreateResponse(data)
+      const validatedData = this.peerlyHttpService.validateResponse(
+        data,
+        CreateMediaResponseDto,
+        'create media',
+      )
 
       if (validatedData.status === MediaStatus.ERROR) {
         const errorMessage = validatedData.error || 'Media creation failed'
@@ -112,7 +91,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       this.logger.debug(validatedData, 'Successfully created media')
       return validatedData.media_id
     } catch (error) {
-      this.handleApiError(error)
+      return this.peerlyHttpService.handleApiError(error)
     }
   }
 }

@@ -1,4 +1,4 @@
-import { PeerlyAuthenticatedUser } from '../services/peerlyAuthentication.service'
+import { PeerlyAuthenticatedUser } from '../peerly.types'
 
 export const getAuthenticatedUserInitials = (user: PeerlyAuthenticatedUser) => {
   const firstInitial = user.first_name ? user.first_name.charAt(0) : ''

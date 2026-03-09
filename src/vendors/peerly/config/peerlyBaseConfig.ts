@@ -1,4 +1,3 @@
-import { BadGatewayException } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 
 const {
@@ -36,23 +35,6 @@ export class PeerlyBaseConfig {
   readonly uploadTimeoutMs = parseInt(PEERLY_UPLOAD_TIMEOUT_MS!, 10)
   readonly isTestEnvironment = Boolean(PEERLY_TEST_ENVIRONMENT === 'true')
   readonly scheduleId = parseInt(PEERLY_SCHEDULE_ID!, 10)
-
-  protected validateData<T>(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    data: unknown,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    dto: { create: (data: unknown) => T },
-    context: string,
-  ): T {
-    try {
-      return dto.create(data)
-    } catch (error) {
-      this.logger.error({ error }, `${context} response validation failed:`)
-      throw new BadGatewayException(
-        `Invalid ${context} response from Peerly API`,
-      )
-    }
-  }
 
   constructor(protected readonly logger: PinoLogger) {
     this.logger.setContext(this.constructor.name)

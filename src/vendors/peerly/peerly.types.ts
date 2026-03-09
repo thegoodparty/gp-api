@@ -1,7 +1,6 @@
 import { HttpException, HttpExceptionOptions } from '@nestjs/common'
-import { Campaign } from '@prisma/client'
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
-import { Observable } from 'rxjs'
+import { Campaign, User } from '@prisma/client'
+
 export type PeerlyIdentity = {
   identity_id: string
   identity_name: string
@@ -286,41 +285,145 @@ export type PeerlyIdentityUseCase = {
 
 export type PeerlyIdentityUseCaseResponseBody = PeerlyIdentityUseCase[]
 
-type HttpServiceMethod = {
-  <T = Record<string, unknown>, D = Record<string, unknown>>(
-    url: string,
-    data?: D,
-    config?: AxiosRequestConfig<D>,
-  ): Observable<AxiosResponse<T, D>>
-  <T = Record<string, unknown>, D = Record<string, unknown>>(
-    url: string,
-    config?: AxiosRequestConfig<D>,
-  ): Observable<AxiosResponse<T, D>>
-}
-
-export interface PeerlyHttpRequestConfig {
-  url: string
-  method: HttpServiceMethod
-  data?: unknown
-  config?: AxiosRequestConfig
-}
-
-type HttpExceptionConstructor<T = Record<string, never>> = new (
+export type HttpExceptionConstructor = new (
   message: string,
   options?: HttpExceptionOptions,
-) => T
+) => HttpException
 
-export interface HandleApiErrorParams {
-  error: unknown
-  requestConfig: PeerlyHttpRequestConfig
-  httpExceptionMethod?: HttpExceptionConstructor<HttpException>
-  peerlyIdentityId?: string
-  campaign: Campaign
+export interface PeerlyAuthenticatedUser {
+  user_id: number
+  last_name: string
+  email: string
+  user_type: string
+  identities: PeerlyIdentity[]
+  first_name: string
+  local_timezone: string
 }
 
-export interface BuildPeerlyErrorSlackMessageBlocksParams {
-  requestConfig: PeerlyHttpRequestConfig
-  formattedError: string
+export enum PeerlyJobStatus {
+  ACTIVE = 'active',
+  PAUSED = 'paused',
+  DELETED = 'deleted',
+  PENDING = 'pending',
+  ERROR = 'error',
+}
+
+export interface PeerlyJob {
+  id: string
+  account_id: string
+  identity_id: string
+  name: string
+  internal_name: string
+  status: PeerlyJobStatus
+  job_type: string
+  created_date: string
+  created_by: string
+  last_touched_date: string
+  start_date: string
+  end_date: string
+  schedule_id: number
+  did_state: string
+  did_npa_subset: string[]
+  disable_did_purchase: boolean
+  can_use_mms: boolean
+  ai_enabled: boolean
+  ai_auto_opt_out_threshold: string
+  deliverability_check: boolean
+  deliverability_check_error?: string
+  dynamic_reassignment: boolean
+  can_add_new_lead: boolean
+  has_canvassers_scheduled: boolean
+  leads_remaining: number
+  agent_ids: string[]
+  agents: Record<string, never>
+  phone_lists: number[]
+  phone_list_assignments: Array<{
+    list_id: number
+    deduplicate: boolean
+  }>
+  suppression_list_assignments: string[]
+  templates: Array<{
+    id: string
+    title: string
+    text: string
+    is_default: boolean
+    has_dynamic_media: boolean
+    has_dynamic_media_rendered: boolean
+    media?: {
+      media_id: string
+      media_type: string
+      title: string
+    }
+    advanced?: {
+      show_stop: boolean
+      organization?: string
+      bodies?: string[]
+      minimized?: boolean
+      call_to_actions?: Array<{
+        text: string
+        url?: string
+      }>
+    }
+  }>
+  canvassers_schedule?: {
+    requested_initials: string
+    requested_date: string
+    requested_at: string
+    requested_start_time: string
+    requested_end_time: string
+    requested_timezone: string
+    requested_timeframe: string
+    requested_by: string
+    start_time: string
+    end_time: string
+    approved: boolean
+  }
+  questions: string[]
+  tracked_links: string[]
+  integrations: string[]
+}
+
+export interface PeerlyAgent {
+  id: string
+  display_email: string
+  status?: string
+}
+
+export interface PeerlyJobTemplate {
+  is_default: boolean
+  title: string
+  text: string
+  advanced?: {
+    show_stop: boolean
+    organization?: string
+    bodies?: Array<{
+      text: string
+    }>
+    call_to_actions?: Array<{
+      text: string
+      url?: string
+    }>
+  }
+  media?: {
+    media_type: string
+    media_id: string
+    title: string
+  }
+}
+
+export interface CreateJobParams {
+  crmCompanyId: string
+  name: string
+  templates: PeerlyJobTemplate[]
+  didState: string
+  didNpaSubset?: string[]
+  identityId?: string
+  scheduledDate?: string
+}
+
+export interface PeerlyApiErrorContext {
+  campaign?: Campaign
+  user?: User
   peerlyIdentityId?: string
-  campaign: Campaign
+  httpExceptionClass?: HttpExceptionConstructor
 }

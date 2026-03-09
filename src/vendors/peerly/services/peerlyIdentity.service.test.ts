@@ -1,4 +1,3 @@
-import { HttpService } from '@nestjs/axios'
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import {
@@ -9,21 +8,18 @@ import {
   OfficeLevel,
   User,
 } from '@prisma/client'
-import { of } from 'rxjs'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AreaCodeFromZipService } from '../../../ai/util/areaCodeFromZip.util'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
-import { UsersService } from '../../../users/services/users.service'
 import { GooglePlacesService } from '../../google/services/google-places.service'
-import { SlackService } from '../../slack/services/slack.service'
 import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import { PeerlyHttpService } from './peerlyHttp.service'
 import { createMockLogger } from '../../../shared/test-utils/mockLogger.util'
 import { PinoLogger } from 'nestjs-pino'
 
-function createMockUser(overrides: Partial<User> = {}): User {
+const createMockUser = (overrides: Partial<User> = {}): User => {
   return {
     id: 1,
     email: 'candidate@example.com',
@@ -44,11 +40,11 @@ function createMockUser(overrides: Partial<User> = {}): User {
   }
 }
 
-function createMockCampaign(
+const createMockCampaign = (
   overrides: Omit<Partial<Campaign>, 'details'> & {
     details?: PrismaJson.CampaignDetails
   } = {},
-): Campaign {
+): Campaign => {
   const { details, ...rest } = overrides
   const campaign: Campaign = {
     id: 1,
@@ -83,7 +79,7 @@ function createMockCampaign(
   return campaign
 }
 
-function createMockDomain(overrides: Partial<Domain> = {}): Domain {
+const createMockDomain = (overrides: Partial<Domain> = {}): Domain => {
   return {
     id: 1,
     name: 'candidate.com',
@@ -131,33 +127,25 @@ describe('PeerlyIdentityService', () => {
   const baseDomain = createMockDomain()
 
   beforeEach(async () => {
-    const mockPostFn = vi
-      .fn()
-      .mockImplementation((_url: string, data: Record<string, unknown>) => {
-        lastSubmittedData = data
-        return of({
-          data: { message: 'success', verification_id: 'v123' },
-        })
-      })
-    // The service accesses httpService[method.name], so the function needs a proper name
-    Object.defineProperty(mockPostFn, 'name', { value: 'post' })
-
     module = await Test.createTestingModule({
       providers: [
         PeerlyIdentityService,
         { provide: PinoLogger, useValue: createMockLogger() },
         {
-          provide: HttpService,
+          provide: PeerlyHttpService,
           useValue: {
-            post: mockPostFn,
-          },
-        },
-        {
-          provide: PeerlyAuthenticationService,
-          useValue: {
-            getAuthorizationHeader: vi.fn().mockResolvedValue({
-              Authorization: 'Bearer test-token',
-            }),
+            post: vi
+              .fn()
+              .mockImplementation(
+                (_path: string, data: Record<string, unknown>) => {
+                  lastSubmittedData = data
+                  return Promise.resolve({
+                    data: { message: 'success', verification_id: 'v123' },
+                  })
+                },
+              ),
+            handleApiError: vi.fn(),
+            validateResponse: vi.fn(),
           },
         },
         {
@@ -165,14 +153,6 @@ describe('PeerlyIdentityService', () => {
           useValue: {
             getAddressByPlaceId: vi.fn().mockResolvedValue(mockPlacesResponse),
           },
-        },
-        {
-          provide: SlackService,
-          useValue: { message: vi.fn() },
-        },
-        {
-          provide: UsersService,
-          useValue: { findByCampaign: vi.fn().mockResolvedValue(baseUser) },
         },
         {
           provide: CampaignsService,
