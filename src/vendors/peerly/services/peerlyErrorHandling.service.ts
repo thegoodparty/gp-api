@@ -47,12 +47,10 @@ export class PeerlyErrorHandlingService {
 
     if (error instanceof HttpException) {
       if (context?.customMessage) {
-        const ExceptionClass =
-          context.httpExceptionClass ?? BadGatewayException
-        throw new ExceptionClass(
-          context.customMessage + recoverySuffix,
-          { cause: error },
-        )
+        const ExceptionClass = context.httpExceptionClass ?? BadGatewayException
+        throw new ExceptionClass(context.customMessage + recoverySuffix, {
+          cause: error,
+        })
       }
       throw error
     }
