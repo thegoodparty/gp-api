@@ -215,20 +215,12 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
   ): Promise<AxiosRequestConfig> {
     const authHeaders = await this.getAuthorizationHeader()
     return {
+      timeout: this.httpTimeoutMs,
+      ...overrides,
       headers: {
         ...authHeaders,
         ...overrides?.headers,
       },
-      timeout: this.httpTimeoutMs,
-      ...overrides,
-      ...(overrides?.headers
-        ? {
-            headers: {
-              ...authHeaders,
-              ...overrides.headers,
-            },
-          }
-        : {}),
     }
   }
 
