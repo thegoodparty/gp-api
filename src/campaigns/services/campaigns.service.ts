@@ -1,4 +1,10 @@
 import {
+  CampaignLaunchStatus,
+  CampaignStatus,
+  OnboardingStep,
+  type ListCampaignsPagination,
+} from '@goodparty_org/contracts'
+import {
   BadRequestException,
   forwardRef,
   Inject,
@@ -6,6 +12,11 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
+import { deepmerge as deepMerge } from 'deepmerge-ts'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { ElectionsService } from 'src/elections/services/elections.service'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
@@ -13,11 +24,6 @@ import {
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults, WrapperType } from 'src/shared/types/utility.types'
-import { type ListCampaignsPagination } from '@goodparty_org/contracts'
-import { deepmerge as deepMerge } from 'deepmerge-ts'
-import { AnalyticsService } from 'src/analytics/analytics.service'
-import { ElectionsService } from 'src/elections/services/elections.service'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
@@ -27,11 +33,6 @@ import { EVENTS } from 'src/vendors/segment/segment.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
-import {
-  CampaignLaunchStatus,
-  CampaignStatus,
-  OnboardingStep,
-} from '@goodparty_org/contracts'
 import {
   CampaignPlanVersionData,
   PlanVersion,
@@ -44,8 +45,6 @@ enum CandidateVerification {
   yes = 'YES',
   no = 'NO',
 }
-
-const organizationSlug = (campaignId: number) => `campaign-${campaignId}`
 
 @Injectable()
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
@@ -153,12 +152,19 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         )
       : null
 
+    const customPositionName = !position
+      ? OrganizationsService.resolveCustomPositionName(
+          initialData.details.office,
+          initialData.details.otherOffice,
+        )
+      : null
+
     const newCampaign = await this.client.$transaction(async (tx) => {
       const [{ nextval: id }] = await tx.$queryRaw<[{ nextval: bigint }]>`
         SELECT nextval('campaign_id_seq')`
 
       const campaignId = Number(id)
-      const orgSlug = organizationSlug(campaignId)
+      const orgSlug = OrganizationsService.campaignOrgSlug(campaignId)
 
       this.logger.info(
         {
@@ -175,6 +181,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           slug: orgSlug,
           ownerId: user.id,
           positionId: position?.id ?? null,
+          customPositionName,
         },
       })
 
@@ -220,7 +227,17 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     const campaign = await this.client.$transaction(async (tx) => {
       if (hasDetailsUpdate && existing) {
-        const orgSlug = organizationSlug(args.where.id)
+        const orgSlug = OrganizationsService.campaignOrgSlug(args.where.id)
+        const mergedDetails = {
+          ...existing.details,
+          ...(typeof args.data.details === 'object' ? args.data.details : {}),
+        } as PrismaJson.CampaignDetails
+        const customPositionName = !position
+          ? OrganizationsService.resolveCustomPositionName(
+              mergedDetails.office,
+              mergedDetails.otherOffice,
+            )
+          : null
 
         this.logger.info(
           { ballotReadyPositionId, position, orgSlug },
@@ -228,11 +245,17 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         )
         await tx.organization.upsert({
           where: { slug: orgSlug },
-          update: { positionId: position?.id ?? null },
+          update: {
+            positionId: position?.id ?? null,
+            customPositionName,
+            // Clear stale override — it was computed against the previous position.
+            overrideDistrictId: null,
+          },
           create: {
             slug: orgSlug,
             ownerId: existing.userId,
             positionId: position?.id ?? null,
+            customPositionName,
           },
         })
       }
@@ -261,6 +284,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       formattedAddress,
       placeId,
       canDownloadFederal,
+      overrideDistrictId,
     } = body
 
     let position: Awaited<
@@ -344,14 +368,42 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         }
 
         if (details) {
-          const orgSlug = organizationSlug(campaign.id)
+          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+          const merged =
+            campaignUpdateData.details as PrismaJson.CampaignDetails
+          const customPositionName = !position
+            ? OrganizationsService.resolveCustomPositionName(
+                merged.office,
+                merged.otherOffice,
+              )
+            : null
           await tx.organization.upsert({
             where: { slug: orgSlug },
-            update: { positionId: position?.id ?? null },
+            update: {
+              positionId: position?.id ?? null,
+              customPositionName,
+              // Clear stale override — it was computed against the previous position.
+              overrideDistrictId: null,
+            },
             create: {
               slug: orgSlug,
               ownerId: campaign.userId,
               positionId: position?.id ?? null,
+              customPositionName,
+            },
+          })
+        }
+
+        if (overrideDistrictId !== undefined) {
+          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+          const districtId = overrideDistrictId ?? null
+          await tx.organization.upsert({
+            where: { slug: orgSlug },
+            update: { overrideDistrictId: districtId },
+            create: {
+              slug: orgSlug,
+              ownerId: campaign.userId,
+              overrideDistrictId: districtId,
             },
           })
         }

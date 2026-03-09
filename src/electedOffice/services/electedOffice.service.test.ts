@@ -1,5 +1,6 @@
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ConflictException } from '@nestjs/common'
-import { Campaign, Prisma, PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import {
   beforeEach,
   describe,
@@ -8,7 +9,6 @@ import {
   vi,
   type MockedFunction,
 } from 'vitest'
-import { ElectionsService } from '@/elections/services/elections.service'
 import {
   CreateElectedOfficeArgs,
   ElectedOfficeService,
@@ -17,29 +17,9 @@ import {
 const GP_POSITION_ID = 'gp-position-uuid-123'
 const BR_POSITION_ID = 'br-position-456'
 
-const mockPositionResponse = {
-  id: GP_POSITION_ID,
-  brPositionId: BR_POSITION_ID,
-  brDatabaseId: 'br-db-1',
-  state: 'CA',
-  name: 'State Senate District 1',
-}
-
-const mockCampaign = {
-  id: 1,
-  details: { positionId: BR_POSITION_ID },
-} as unknown as Campaign
-
-const mockCampaignNoPosition = {
-  id: 1,
-  details: {},
-} as unknown as Campaign
-
 describe('ElectedOfficeService', () => {
   let service: ElectedOfficeService
-  let mockGetPosition: MockedFunction<
-    ElectionsService['getPositionByBallotReadyId']
-  >
+  let mockResolveOrgData: ReturnType<typeof vi.fn>
   let mockOrgCreate: ReturnType<typeof vi.fn>
   let mockEoCreate: ReturnType<typeof vi.fn>
   let mockModel: {
@@ -52,11 +32,11 @@ describe('ElectedOfficeService', () => {
   }
 
   beforeEach(() => {
-    mockGetPosition = vi
-      .fn()
-      .mockResolvedValue(mockPositionResponse) as MockedFunction<
-      ElectionsService['getPositionByBallotReadyId']
-    >
+    mockResolveOrgData = vi.fn().mockResolvedValue({
+      positionId: GP_POSITION_ID,
+      customPositionName: null,
+      overrideDistrictId: null,
+    })
     mockOrgCreate = vi.fn().mockResolvedValue({})
     mockEoCreate = vi.fn().mockResolvedValue({
       id: 'mock-uuid',
@@ -89,8 +69,9 @@ describe('ElectedOfficeService', () => {
     }
 
     service = new ElectedOfficeService({
-      getPositionByBallotReadyId: mockGetPosition,
-    } as unknown as ElectionsService)
+      resolveOrgData: mockResolveOrgData,
+      findUnique: vi.fn().mockResolvedValue(null),
+    } as unknown as OrganizationsService)
     Object.defineProperty(service, 'model', {
       get: () => mockModel,
       configurable: true,
@@ -105,10 +86,11 @@ describe('ElectedOfficeService', () => {
   describe('create', () => {
     it('throws ConflictException when creating active office and user already has one', async () => {
       const createArgs: CreateElectedOfficeArgs = {
+        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: true,
         userId: 1,
-        campaign: mockCampaign,
+        campaignId: 1,
       }
 
       mockModel.count.mockResolvedValue(1)
@@ -132,9 +114,10 @@ describe('ElectedOfficeService', () => {
 
     it('throws ConflictException when creating office with isActive not specified and user already has one', async () => {
       const createArgs: CreateElectedOfficeArgs = {
+        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         userId: 1,
-        campaign: mockCampaign,
+        campaignId: 1,
       }
 
       mockModel.count.mockResolvedValue(1)
@@ -156,24 +139,34 @@ describe('ElectedOfficeService', () => {
       expect(mockEoCreate).not.toHaveBeenCalled()
     })
 
-    it('creates organization with resolved GP positionId and elected office in transaction', async () => {
+    it('creates organization with resolved org data and elected office in transaction', async () => {
       const createArgs: CreateElectedOfficeArgs = {
+        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: true,
         userId: 1,
-        campaign: mockCampaign,
+        campaignId: 1,
       }
 
       mockModel.count.mockResolvedValue(0)
 
       await service.create(createArgs)
 
-      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
+      expect(mockResolveOrgData).toHaveBeenCalledWith({
+        ballotReadyPositionId: BR_POSITION_ID,
+        office: undefined,
+        otherOffice: undefined,
+        state: undefined,
+        L2DistrictType: undefined,
+        L2DistrictName: undefined,
+      })
       expect(mockOrgCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           slug: expect.stringMatching(/^eo-/),
           ownerId: 1,
           positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
         }),
       })
       expect(mockEoCreate).toHaveBeenCalledWith({
@@ -187,41 +180,30 @@ describe('ElectedOfficeService', () => {
       })
     })
 
-    it('creates organization with null positionId when position resolution returns null', async () => {
-      mockGetPosition.mockResolvedValue(null)
-
-      const createArgs: CreateElectedOfficeArgs = {
-        electedDate: new Date('2024-01-01'),
-        isActive: true,
-        userId: 1,
-        campaign: mockCampaign,
-      }
-
-      mockModel.count.mockResolvedValue(0)
-
-      await service.create(createArgs)
-
-      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
-      expect(mockOrgCreate).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          positionId: null,
-        }),
+    it('creates organization with null positionId when resolveOrgData returns null', async () => {
+      mockResolveOrgData.mockResolvedValue({
+        positionId: null,
+        customPositionName: null,
+        overrideDistrictId: null,
       })
-    })
 
-    it('creates organization with null positionId when campaign has no positionId', async () => {
       const createArgs: CreateElectedOfficeArgs = {
+        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: true,
         userId: 1,
-        campaign: mockCampaignNoPosition,
+        campaignId: 1,
       }
 
       mockModel.count.mockResolvedValue(0)
 
       await service.create(createArgs)
 
-      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockResolveOrgData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ballotReadyPositionId: BR_POSITION_ID,
+        }),
+      )
       expect(mockOrgCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           positionId: null,
@@ -231,25 +213,51 @@ describe('ElectedOfficeService', () => {
 
     it('skips active validation when isActive is false', async () => {
       const createArgs: CreateElectedOfficeArgs = {
+        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         isActive: false,
         userId: 1,
-        campaign: mockCampaign,
+        campaignId: 1,
       }
 
       await service.create(createArgs)
 
       expect(mockModel.count).not.toHaveBeenCalled()
-      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
+      expect(mockResolveOrgData).toHaveBeenCalled()
       expect(mockOrgCreate).toHaveBeenCalled()
       expect(mockEoCreate).toHaveBeenCalled()
     })
 
-    it('links elected office to organization via matching slug', async () => {
+    it('passes district data to resolveOrgData', async () => {
       const createArgs: CreateElectedOfficeArgs = {
+        ballotreadyPositionId: BR_POSITION_ID,
         electedDate: new Date('2024-01-01'),
         userId: 1,
-        campaign: mockCampaign,
+        campaignId: 1,
+        state: 'CA',
+        L2DistrictType: 'State Senate',
+        L2DistrictName: 'District 1',
+      }
+
+      mockModel.count.mockResolvedValue(0)
+
+      await service.create(createArgs)
+
+      expect(mockResolveOrgData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'CA',
+          L2DistrictType: 'State Senate',
+          L2DistrictName: 'District 1',
+        }),
+      )
+    })
+
+    it('links elected office to organization via matching slug', async () => {
+      const createArgs: CreateElectedOfficeArgs = {
+        ballotreadyPositionId: BR_POSITION_ID,
+        electedDate: new Date('2024-01-01'),
+        userId: 1,
+        campaignId: 1,
       }
 
       mockModel.count.mockResolvedValue(0)

@@ -1,4 +1,5 @@
 import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
 import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
 import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
@@ -27,6 +28,7 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { Campaign, Prisma, User, UserRole } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -51,7 +53,6 @@ import {
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
-import { PinoLogger } from 'nestjs-pino'
 
 class ListCampaignsPaginationDto extends createZodDto(
   ListCampaignsPaginationSchema,
@@ -70,6 +71,7 @@ export class CampaignsController {
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
+    private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
     private readonly logger: PinoLogger,
   ) {
@@ -347,6 +349,15 @@ export class CampaignsController {
     const hasTurnout =
       !!raceTargetDetails?.projectedTurnout &&
       raceTargetDetails.projectedTurnout > 0
+
+    const overrideDistrictId =
+      await this.organizations.resolveOverrideDistrictId({
+        positionId: campaign.details?.positionId ?? undefined,
+        state: campaign.details?.state || '',
+        L2DistrictType,
+        L2DistrictName,
+      })
+
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         ...(raceTargetDetails || {}),
@@ -365,6 +376,7 @@ export class CampaignsController {
         p2vAttempts: 0,
         officeContextFingerprint: null,
       },
+      overrideDistrictId,
     })
   }
 

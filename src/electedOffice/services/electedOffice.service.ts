@@ -1,5 +1,6 @@
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { ConflictException, Injectable } from '@nestjs/common'
-import { Campaign, ElectedOffice, Prisma } from '@prisma/client'
+import { ElectedOffice, Prisma } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
   DEFAULT_PAGINATION_LIMIT,
@@ -8,9 +9,8 @@ import {
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
 import { PaginatedResults } from 'src/shared/types/utility.types'
-import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 import { v7 as uuidv7 } from 'uuid'
-import { ElectionsService } from '@/elections/services/elections.service'
+import { ListElectedOfficePaginationSchema } from '../schemas/ListElectedOfficePagination.schema'
 
 export type CreateElectedOfficeArgs = {
   electedDate?: Date | null
@@ -20,14 +20,20 @@ export type CreateElectedOfficeArgs = {
   termLengthDays?: number | null
   isActive?: boolean
   userId: number
-  campaign: Campaign
+  campaignId: number
+  ballotreadyPositionId?: string | null
+  office?: string
+  otherOffice?: string
+  state?: string
+  L2DistrictType?: string
+  L2DistrictName?: string
 }
 
 @Injectable()
 export class ElectedOfficeService extends createPrismaBase(
   MODELS.ElectedOffice,
 ) {
-  constructor(private readonly elections: ElectionsService) {
+  constructor(private readonly organizationsService: OrganizationsService) {
     super()
   }
   // This is for validating that there is only one active elected office per user
@@ -58,20 +64,38 @@ export class ElectedOfficeService extends createPrismaBase(
       await this.validateActiveElectedOffice(args.userId)
     }
 
-    const positionId = args.campaign.details.positionId
-      ? await this.elections
-          .getPositionByBallotReadyId(args.campaign.details.positionId)
-          .then((res) => res?.id ?? null)
-      : null
+    // If the campaign already has an organization, copy its resolved fields
+    // instead of re-resolving from the election API.
+    const campaignOrgSlug = OrganizationsService.campaignOrgSlug(
+      args.campaignId,
+    )
+    const campaignOrg = await this.organizationsService.findUnique({
+      where: { slug: campaignOrgSlug },
+    })
+
+    const orgData = campaignOrg
+      ? {
+          positionId: campaignOrg.positionId,
+          customPositionName: campaignOrg.customPositionName,
+          overrideDistrictId: campaignOrg.overrideDistrictId,
+        }
+      : await this.organizationsService.resolveOrgData({
+          ballotReadyPositionId: args.ballotreadyPositionId,
+          office: args.office,
+          otherOffice: args.otherOffice,
+          state: args.state,
+          L2DistrictType: args.L2DistrictType,
+          L2DistrictName: args.L2DistrictName,
+        })
 
     return this.client.$transaction(async (tx) => {
       const id = uuidv7()
 
       await tx.organization.create({
         data: {
-          slug: `eo-${id}`,
+          slug: OrganizationsService.electedOfficeOrgSlug(id),
           ownerId: args.userId,
-          positionId,
+          ...orgData,
         },
       })
 
@@ -85,8 +109,8 @@ export class ElectedOfficeService extends createPrismaBase(
           termLengthDays: args.termLengthDays,
           isActive: args.isActive,
           userId: args.userId,
-          campaignId: args.campaign.id,
-          organizationSlug: `eo-${id}`,
+          campaignId: args.campaignId,
+          organizationSlug: OrganizationsService.electedOfficeOrgSlug(id),
         },
       })
     })
