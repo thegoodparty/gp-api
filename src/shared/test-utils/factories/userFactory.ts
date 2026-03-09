@@ -1,33 +1,14 @@
 import { User, UserRole } from '@prisma/client'
 import { generateFactory } from './generate'
 
-/**
- * Counter for generating unique user data in tests
- */
 let userCounter = 1
 
-/**
- * Reset the user counter (useful for test isolation)
- */
 export function resetUserCounter() {
   userCounter = 1
 }
 
-/**
- * Factory for creating test User entities
- * Provides predictable defaults suitable for testing
- *
- * @example
- * // Create a basic user
- * const user = userFactory()
- *
- * // Create a user with specific properties
- * const admin = userFactory({ roles: [UserRole.admin], email: 'admin@test.com' })
- */
 export const userFactory = generateFactory<User>((args) => {
-  // Only advance the counter when id is not being overridden, so that
-  // userFactory({ id: 99 }) produces a consistent { id: 99, email: 'testuser99@...' }
-  // without consuming a counter slot.
+  // skip incrementing when id is provided so email stays consistent with the given id
   const id = 'id' in args ? (args.id as number) : userCounter++
   return {
     id,
@@ -37,7 +18,7 @@ export const userFactory = generateFactory<User>((args) => {
     lastName: 'User',
     name: 'Test User',
     email: `testuser${id}@goodparty.org`,
-    password: '$2b$10$hashedpassword', // Mock bcrypt hash
+    password: '$2b$10$hashedpassword',
     hasPassword: true,
     phone: '5551234567',
     zip: '90210',
@@ -48,32 +29,14 @@ export const userFactory = generateFactory<User>((args) => {
   }
 })
 
-/**
- * Create a user with admin role
- */
 export function createAdminUser(overrides: Partial<User> = {}): User {
-  return userFactory({
-    roles: [UserRole.admin],
-    ...overrides,
-  })
+  return userFactory({ roles: [UserRole.admin], ...overrides })
 }
 
-/**
- * Create a user with candidate role (default)
- */
 export function createCandidateUser(overrides: Partial<User> = {}): User {
-  return userFactory({
-    roles: [UserRole.candidate],
-    ...overrides,
-  })
+  return userFactory({ roles: [UserRole.candidate], ...overrides })
 }
 
-/**
- * Create a user with campaign manager role
- */
 export function createCampaignManagerUser(overrides: Partial<User> = {}): User {
-  return userFactory({
-    roles: [UserRole.campaignManager],
-    ...overrides,
-  })
+  return userFactory({ roles: [UserRole.campaignManager], ...overrides })
 }
