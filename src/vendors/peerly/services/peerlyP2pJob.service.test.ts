@@ -17,7 +17,6 @@ describe('PeerlyP2pJobService', () => {
     post: ReturnType<typeof vi.fn>
     get: ReturnType<typeof vi.fn>
     validateResponse: ReturnType<typeof vi.fn>
-    getAuthenticatedUser: ReturnType<typeof vi.fn>
   }
   let mockErrorHandling: {
     handleApiError: ReturnType<typeof vi.fn>
@@ -51,9 +50,6 @@ describe('PeerlyP2pJobService', () => {
       validateResponse: vi
         .fn()
         .mockImplementation((_data, _dto, _ctx) => _data),
-      getAuthenticatedUser: vi
-        .fn()
-        .mockReturnValue({ first_name: 'Test', last_name: 'User' }),
     }
     mockErrorHandling = {
       handleApiError: vi.fn().mockImplementation(() => {
