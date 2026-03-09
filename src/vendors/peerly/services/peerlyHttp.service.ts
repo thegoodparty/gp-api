@@ -3,14 +3,15 @@ import { BadGatewayException, Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Timeout } from '@nestjs/schedule'
 import { format } from '@redtea/format-axios-error'
-import { AxiosRequestConfig, AxiosResponse } from 'axios'
-import axiosRetry from 'axios-retry'
+import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { Methods } from 'http-constants-ts'
 import { PinoLogger } from 'nestjs-pino'
-import { lastValueFrom } from 'rxjs'
+import { lastValueFrom, retry, timer } from 'rxjs'
 import { isAxiosResponse } from '@/shared/util/http.util'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import { PeerlyAuthenticatedUser } from '../peerly.types'
+
+const RETRY_MAX = 3
 
 const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
 
@@ -39,15 +40,16 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
     private readonly jwtService: JwtService,
   ) {
     super(logger)
-    axiosRetry(this.httpService.axiosRef, {
-      retries: 3,
-      retryDelay: axiosRetry.exponentialDelay,
-      shouldResetTimeout: true,
-      retryCondition: (error) =>
-        axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-        error.code === 'ECONNABORTED' ||
-        error.response?.status === 429,
-    })
+  }
+
+  private isRetryableError(error: AxiosError): boolean {
+    return error.code === 'ECONNABORTED'
+      ? true
+      : error.response?.status === 429
+        ? true
+        : !error.response
+          ? error.code !== 'ERR_CANCELED'
+          : error.response.status >= 500
   }
 
   @Timeout(0)
@@ -87,16 +89,11 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
     const url = `${this.baseUrl}${path}`
     this.logRequest(method, url, data, mergedConfig)
     return lastValueFrom(
-      this.httpService.request<T>({
-        ...mergedConfig,
-        method,
-        url,
-        data,
-        'axios-retry': {
-          onRetry: (
-            retryCount: number,
-            error: Error & { code?: string; response?: { status?: number } },
-          ) => {
+      this.httpService.request<T>({ ...mergedConfig, method, url, data }).pipe(
+        retry({
+          count: RETRY_MAX,
+          delay: (error: AxiosError, retryCount: number) => {
+            if (!this.isRetryableError(error)) throw error
             this.logger.warn(
               {
                 retryCount,
@@ -105,9 +102,10 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
               },
               `Peerly API request retry attempt ${retryCount}`,
             )
+            return timer(Math.pow(2, retryCount) * 100)
           },
-        },
-      }),
+        }),
+      ),
     )
   }
 
