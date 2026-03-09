@@ -20,7 +20,7 @@ const SLACK_GROUP_IDS: Record<SlackGroup, string> = {
 const datasourceConfig = {
   log: { uid: LOKI_DATASOURCE_UID, queryType: 'range' },
   metric: { uid: PROM_DATASOURCE_UID, queryType: 'instant' },
-  trace: { uid: TEMPO_DATASOURCE_UID, queryType: 'traceql' },
+  trace: { uid: TEMPO_DATASOURCE_UID, queryType: 'traceqlmetrics' },
 } as const
 
 export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
@@ -193,7 +193,7 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
           alert.type === 'trace'
             ? {
                 query: alert.expr.replace(/\$ENV/g, environment),
-                queryType: 'traceql',
+                queryType: 'traceqlmetrics',
                 refId: 'A',
               }
             : {

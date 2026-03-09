@@ -61,6 +61,18 @@ export const GLOBAL_ALERTS: Alert[] = [
       'Check the ECS console for task status and recent events. If the task is crashing, click *View in Grafana* to check recent logs for crash output. If the task is running but not logging, investigate network or load balancer connectivity.',
     ].join('\n\n'),
   },
+  {
+    slug: 'slow-prisma-connections',
+    name: 'Slow Prisma connection acquisitions',
+    type: 'trace',
+    expr: '{ name = "prisma:engine:connection" && resource.service.name = "gp-api" && resource.deployment.environment.name = "$ENV" && duration > 250ms } | count_over_time()',
+    threshold: 0,
+    for: '5m',
+    message: [
+      'Prisma connection acquisitions exceeding 250ms have been detected.',
+      'This may indicate database connection pool exhaustion or elevated database latency. Requests are fighting for Postgres connections. Click *View in Grafana* to inspect the traces, then check database metrics (active connections, query latency) and recent deployment changes. We should either increase the connection limit, or reduce the number of concurrent requests.',
+    ].join('\n\n'),
+  },
   // ------ Serve Alerts ------ //
   {
     slug: 'serve-background-job-failed',
@@ -72,20 +84,6 @@ export const GLOBAL_ALERTS: Alert[] = [
     message: [
       'A Serve-related background SQS job has failed in the last 5 minutes.',
       'Click *View in Grafana* to find the failing log lines, then check the associated error message and stack trace to understand what went wrong. Look at the SQS message payload to identify which job failed and whether it can be safely retried.',
-    ].join('\n\n'),
-  },
-
-  // ------ Trace Alerts ------ //
-  {
-    slug: 'slow-prisma-connections',
-    name: 'Slow Prisma connection acquisitions',
-    type: 'trace',
-    expr: '{ name = "prisma:engine:connection" && resource.service.name = "gp-api" && resource.deployment.environment.name = "$ENV" && duration > 250ms } | count_over_time()',
-    threshold: 0,
-    for: '5m',
-    message: [
-      'Prisma connection acquisitions exceeding 250ms have been detected.',
-      'This may indicate database connection pool exhaustion or elevated database latency. Requests are fighting for Postgres connections. Click *View in Grafana* to inspect the traces, then check database metrics (active connections, query latency) and recent deployment changes. We should either increase the connection limit, or reduce the number of concurrent requests.',
     ].join('\n\n'),
   },
 ]
