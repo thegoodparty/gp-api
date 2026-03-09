@@ -150,7 +150,7 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
         throw new Error('Peerly token renewal failed: No data received')
       }
 
-      const { token, user } = data
+      const { token } = data
 
       if (token) {
         const decodedToken: DecodedPeerlyToken = this.jwtService.decode(token)
