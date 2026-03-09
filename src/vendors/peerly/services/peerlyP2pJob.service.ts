@@ -1,8 +1,4 @@
-import {
-  BadGatewayException,
-  HttpException,
-  Injectable,
-} from '@nestjs/common'
+import { BadGatewayException, HttpException, Injectable } from '@nestjs/common'
 import { Headers } from 'http-constants-ts'
 import { Readable } from 'stream'
 import { PinoLogger } from 'nestjs-pino'
@@ -255,14 +251,20 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
         list_id: listId,
       })
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(error, {
-        customMessage: P2P_ERROR_MESSAGES.LIST_ASSIGNMENT_FAILED,
-        recoveryInfo: {
-          jobId,
-          listId,
-          ...(context?.campaignId != null && { campaignId: context.campaignId }),
+      return this.peerlyErrorHandling.handleApiError(
+        error,
+        {
+          customMessage: P2P_ERROR_MESSAGES.LIST_ASSIGNMENT_FAILED,
+          recoveryInfo: {
+            jobId,
+            listId,
+            ...(context?.campaignId != null && {
+              campaignId: context.campaignId,
+            }),
+          },
         },
-      }, this.logger)
+        this.logger,
+      )
     }
   }
 
