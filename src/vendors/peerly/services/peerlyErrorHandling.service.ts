@@ -25,9 +25,6 @@ export class PeerlyErrorHandlingService {
     context?: PeerlyApiErrorContext,
     logger?: PinoLogger,
   ): Promise<never> {
-    if (error instanceof HttpException) {
-      throw error
-    }
     const formattedError = (isAxiosError(error) && format(error)) || error
     const genericMessage = 'Peerly API ERROR'
     const recoverySuffix = this.formatRecoverySuffix(context?.recoveryInfo)
@@ -39,6 +36,18 @@ export class PeerlyErrorHandlingService {
       },
       `${genericMessage}: ${formattedError ? JSON.stringify(formattedError) : ''}${recoverySuffix}`,
     )
+
+    if (context?.user) {
+      await this.sendSlackErrorNotification(
+        formattedError,
+        context.user,
+        context.peerlyIdentityId,
+      )
+    }
+
+    if (error instanceof HttpException) {
+      throw error
+    }
 
     if (
       isAxiosError<PeerlyApiErrorResponseData>(error) &&
@@ -55,26 +64,10 @@ export class PeerlyErrorHandlingService {
       const parsedMessage =
         errorField || message || errorCapital || 'Unknown API error'
 
-      if (context?.user) {
-        await this.sendSlackErrorNotification(
-          formattedError,
-          context.user,
-          context.peerlyIdentityId,
-        )
-      }
-
       const ExceptionClass = context?.httpExceptionClass ?? BadGatewayException
       const baseMessage =
         context?.customMessage ?? `Peerly API error: ${parsedMessage}`
       throw new ExceptionClass(baseMessage + recoverySuffix, { cause: error })
-    }
-
-    if (context?.user) {
-      await this.sendSlackErrorNotification(
-        formattedError,
-        context.user,
-        context.peerlyIdentityId,
-      )
     }
 
     const ExceptionClass = context?.httpExceptionClass ?? BadGatewayException
