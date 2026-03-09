@@ -194,7 +194,6 @@ describe('CampaignsController', () => {
 
     const organizationsServiceMock: Partial<OrganizationsService> = {
       resolveOverrideDistrictId: vi.fn().mockResolvedValue(null),
-      getCampaignPositionName: vi.fn().mockResolvedValue('Mayor'),
       findUnique: vi.fn().mockResolvedValue({ positionId: 'pos-1' }),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
@@ -430,9 +429,9 @@ describe('CampaignsController', () => {
   })
 
   describe('findMine', () => {
-    it('returns the campaign with resolved positionName', async () => {
+    it('returns the campaign directly', async () => {
       const result = await controller.findMine(mockCampaign)
-      expect(result).toEqual({ ...mockCampaign, positionName: 'Mayor' })
+      expect(result).toBe(mockCampaign)
     })
   })
 

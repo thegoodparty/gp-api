@@ -38,13 +38,6 @@ export class OrganizationsService extends createPrismaBase(
     return resolved || null
   }
 
-  static resolveOrganizationPositionName(params: {
-    customPositionName?: string | null
-    positionName?: string | null
-  }): string | null {
-    return params.customPositionName ?? params.positionName ?? null
-  }
-
   async listOrganizations(userId: number) {
     const orgs = await this.model.findMany({
       where: { ownerId: userId },
@@ -158,37 +151,6 @@ export class OrganizationsService extends createPrismaBase(
       L2DistrictType,
       L2DistrictName,
     )
-  }
-
-  async resolvePositionName(params: {
-    positionId?: string | null
-    customPositionName?: string | null
-  }): Promise<string | null> {
-    const { customPositionName, positionId } = params
-    if (customPositionName) {
-      return customPositionName
-    }
-    if (!positionId) {
-      return null
-    }
-
-    const position = await this.electionsService.getPositionById(positionId)
-    return position?.name ?? null
-  }
-
-  async getCampaignPositionName(campaignId: number): Promise<string | null> {
-    const org = await this.findUnique({
-      where: { slug: OrganizationsService.campaignOrgSlug(campaignId) },
-    })
-
-    if (!org) {
-      return null
-    }
-
-    return this.resolvePositionName({
-      positionId: org.positionId,
-      customPositionName: org.customPositionName,
-    })
   }
 
   private async withPosition(

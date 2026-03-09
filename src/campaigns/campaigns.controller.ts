@@ -160,10 +160,7 @@ export class CampaignsController {
   @Get('mine')
   @UseCampaign()
   async findMine(@ReqCampaign() campaign: Campaign) {
-    const positionName = await this.organizations.getCampaignPositionName(
-      campaign.id,
-    )
-    return { ...campaign, positionName }
+    return campaign
   }
 
   @UseGuards(M2MOnly)
@@ -396,10 +393,6 @@ export class CampaignsController {
       )
     }
 
-    const officeName = await this.organizations.getCampaignPositionName(
-      campaign.id,
-    )
-
     // Gold flow: look up district + turnout from election-api.
     // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
@@ -408,7 +401,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
-        officeName: officeName ?? undefined,
+        officeName: campaign.details.otherOffice,
       })
       .catch(() => null)
 
@@ -471,9 +464,6 @@ export class CampaignsController {
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
     }
-    const officeName = await this.organizations.getCampaignPositionName(
-      campaign.id,
-    )
     // Gold flow: look up district + turnout from election-api.
     // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
@@ -482,7 +472,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
-        officeName: officeName ?? undefined,
+        officeName: campaign.details.otherOffice,
       })
       .catch(() => null)
 
