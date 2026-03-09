@@ -17,6 +17,7 @@ model User {
   password              String?
   hasPassword           Boolean                 @default(false) @map("has_password")
   email                 String                  @unique
+  clerkId               String?                 @unique @map("clerk_id")
   phone                 String?
   zip                   String?
   roles                 UserRole[]              @default([])

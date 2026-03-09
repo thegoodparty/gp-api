@@ -186,6 +186,23 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     return user
   }
 
+  async createUserFromClerk(data: {
+    clerkId: string
+    email: string
+    firstName: string
+    lastName: string
+  }) {
+    return this.model.create({
+      data: {
+        clerkId: data.clerkId,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        name: `${data.firstName} ${data.lastName}`.trim(),
+      },
+    })
+  }
+
   async updateUser(where: Prisma.UserWhereUniqueInput, data: Partial<User>) {
     return this.optimisticLockingUpdate({ where }, (existing) => {
       const { metaData: incomingMetaData, ...fields } = data

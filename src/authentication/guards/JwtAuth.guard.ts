@@ -24,6 +24,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<IncomingRequest>()
 
+    if (request.user) {
+      return true
+    }
+
     // Skip JWT authentication if the route is public and does not have role restrictions
     if (routeIsPublicAndNoRoles(context, this.reflector) || request.m2mToken) {
       return true

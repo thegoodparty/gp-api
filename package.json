@@ -142,6 +142,7 @@
     "slugify": "^1.6.6",
     "states-us": "^1.1.1",
     "stripe": "^20.2.0",
+    "svix": "^1.86.0",
     "tsx": "^4.20.6",
     "turndown": "^7.2.1",
     "unplugin-swc": "^1.5.9",

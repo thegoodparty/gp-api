@@ -40,6 +40,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     hasPassword: false,
     roles: [],
     passwordResetToken: null,
+    clerkId: null,
     ...overrides,
   }
 }

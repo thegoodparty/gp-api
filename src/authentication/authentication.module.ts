@@ -9,6 +9,8 @@ import { RolesGuard } from './guards/Roles.guard'
 import { LocalStrategy } from './auth-strategies/Local.strategy'
 import { EmailModule } from 'src/email/email.module'
 import { SocialLoginStrategy } from './auth-strategies/SocialLogin.strategy'
+import { ClerkWebhookController } from './webhooks/clerk-webhook.controller'
+import { ClerkWebhookService } from './webhooks/clerk-webhook.service'
 
 const JWT_EXPIRATION = '1y'
 
@@ -25,6 +27,7 @@ if (!process.env.AUTH_SECRET) {
     LocalStrategy,
     SocialLoginStrategy,
     JwtAuthStrategy,
+    ClerkWebhookService,
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
@@ -40,6 +43,6 @@ if (!process.env.AUTH_SECRET) {
     EmailModule,
   ],
   exports: [AuthenticationService, JwtModule],
-  controllers: [AuthenticationController],
+  controllers: [AuthenticationController, ClerkWebhookController],
 })
 export class AuthenticationModule {}
