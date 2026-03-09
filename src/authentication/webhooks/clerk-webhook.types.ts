@@ -6,6 +6,7 @@ export interface ClerkEmailAddress {
 export interface ClerkWebhookEventData {
   id: string
   email_addresses?: ClerkEmailAddress[]
+  primary_email_address_id?: string | null
   first_name?: string | null
   last_name?: string | null
 }

@@ -3,6 +3,18 @@ import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
 import { ClerkWebhookEventData } from '../webhooks/clerk-webhook.types'
 
+function getPrimaryEmail(data: ClerkWebhookEventData): string | undefined {
+  const addresses = data.email_addresses
+  if (!addresses?.length) return undefined
+  if (data.primary_email_address_id) {
+    const primary = addresses.find(
+      (e) => e.id === data.primary_email_address_id,
+    )
+    if (primary) return primary.email_address
+  }
+  return addresses[0].email_address
+}
+
 @Injectable()
 export class ClerkWebhookService {
   constructor(
@@ -14,7 +26,7 @@ export class ClerkWebhookService {
   }
 
   async handleUserCreated(data: ClerkWebhookEventData) {
-    const email = data.email_addresses?.[0]?.email_address
+    const email = getPrimaryEmail(data)
     if (!email) {
       this.logger.warn(
         { clerkId: data.id },
@@ -71,7 +83,7 @@ export class ClerkWebhookService {
       return
     }
 
-    const email = data.email_addresses?.[0]?.email_address
+    const email = getPrimaryEmail(data)
 
     await this.usersService.updateUser(
       { id: user.id },

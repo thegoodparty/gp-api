@@ -86,7 +86,9 @@ export class ClerkSessionGuard implements CanActivate {
   private async provisionUserFromClerk(clerkId: string): Promise<User | null> {
     try {
       const clerkUser = await this.clerkClient.users.getUser(clerkId)
-      const email = clerkUser.emailAddresses?.[0]?.emailAddress
+      const email =
+        clerkUser.primaryEmailAddress?.emailAddress ??
+        clerkUser.emailAddresses?.[0]?.emailAddress
       if (!email) {
         this.logger.warn(
           { clerkId },
