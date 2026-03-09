@@ -11,6 +11,7 @@ import { CreateMediaResponseDto } from '../schemas/peerlyMedia.schema'
 import { MediaStatus } from '../peerly.types'
 import { MimeTypes } from 'http-constants-ts'
 import { PinoLogger } from 'nestjs-pino'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 
 const MAX_FILE_SIZE = 512000
@@ -35,6 +36,7 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
   constructor(
     protected readonly logger: PinoLogger,
     private readonly peerlyHttpService: PeerlyHttpService,
+    private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
   ) {
     super(logger)
   }
@@ -95,7 +97,11 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       if (error instanceof HttpException) {
         throw error
       }
-      return this.peerlyHttpService.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError(
+        error,
+        undefined,
+        this.logger,
+      )
     }
   }
 }

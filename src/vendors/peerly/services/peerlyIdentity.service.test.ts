@@ -14,8 +14,9 @@ import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { GooglePlacesService } from '../../google/services/google-places.service'
 import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
-import { PeerlyIdentityService } from './peerlyIdentity.service'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
+import { PeerlyIdentityService } from './peerlyIdentity.service'
 import { createMockLogger } from '../../../shared/test-utils/mockLogger.util'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -144,9 +145,12 @@ describe('PeerlyIdentityService', () => {
                   })
                 },
               ),
-            handleApiError: vi.fn(),
             validateResponse: vi.fn(),
           },
+        },
+        {
+          provide: PeerlyErrorHandlingService,
+          useValue: { handleApiError: vi.fn() },
         },
         {
           provide: GooglePlacesService,

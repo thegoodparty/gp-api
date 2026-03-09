@@ -12,6 +12,7 @@ import {
   P2P_PHONE_LIST_MAP,
 } from '../constants/p2pJob.constants'
 import { PinoLogger } from 'nestjs-pino'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 
 const P2P_SUPPRESS_CELL_PHONES = '4'
@@ -29,6 +30,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   constructor(
     protected readonly logger: PinoLogger,
     private readonly peerlyHttpService: PeerlyHttpService,
+    private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
   ) {
     super(logger)
   }
@@ -78,7 +80,11 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       )
       return validated.Data.token
     } catch (error) {
-      return this.peerlyHttpService.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError(
+        error,
+        undefined,
+        this.logger,
+      )
     }
   }
 
@@ -96,7 +102,11 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
         'status',
       )
     } catch (error) {
-      return this.peerlyHttpService.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError(
+        error,
+        undefined,
+        this.logger,
+      )
     }
   }
 
@@ -112,7 +122,11 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
         'details',
       )
     } catch (error) {
-      return this.peerlyHttpService.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError(
+        error,
+        undefined,
+        this.logger,
+      )
     }
   }
 }

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pJobService } from './peerlyP2pJob.service'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 
@@ -15,9 +16,11 @@ describe('PeerlyP2pJobService', () => {
   let mockHttpService: {
     post: ReturnType<typeof vi.fn>
     get: ReturnType<typeof vi.fn>
-    handleApiError: ReturnType<typeof vi.fn>
     validateResponse: ReturnType<typeof vi.fn>
     getAuthenticatedUser: ReturnType<typeof vi.fn>
+  }
+  let mockErrorHandling: {
+    handleApiError: ReturnType<typeof vi.fn>
   }
   let mockCrmCampaigns: {
     getCrmCompanyOwner: ReturnType<typeof vi.fn>
@@ -45,15 +48,17 @@ describe('PeerlyP2pJobService', () => {
     mockHttpService = {
       post: vi.fn(),
       get: vi.fn(),
-      handleApiError: vi.fn().mockImplementation(() => {
-        throw new BadGatewayException('mock error')
-      }),
       validateResponse: vi
         .fn()
         .mockImplementation((_data, _dto, _ctx) => _data),
       getAuthenticatedUser: vi
         .fn()
         .mockReturnValue({ first_name: 'Test', last_name: 'User' }),
+    }
+    mockErrorHandling = {
+      handleApiError: vi.fn().mockImplementation(() => {
+        throw new BadGatewayException('mock error')
+      }),
     }
     mockCrmCampaigns = {
       getCrmCompanyOwner: vi.fn().mockResolvedValue(null),
@@ -77,6 +82,10 @@ describe('PeerlyP2pJobService', () => {
         { provide: PinoLogger, useValue: createMockLogger() },
         { provide: PeerlyMediaService, useValue: mockMediaService },
         { provide: PeerlyHttpService, useValue: mockHttpService },
+        {
+          provide: PeerlyErrorHandlingService,
+          useValue: mockErrorHandling,
+        },
         { provide: CrmCampaignsService, useValue: mockCrmCampaigns },
       ],
     }).compile()

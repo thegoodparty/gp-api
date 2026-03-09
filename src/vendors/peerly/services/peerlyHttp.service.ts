@@ -10,8 +10,7 @@ import { PinoLogger } from 'nestjs-pino'
 import { lastValueFrom } from 'rxjs'
 import { isAxiosResponse } from '@/shared/util/http.util'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { PeerlyApiErrorContext, PeerlyAuthenticatedUser } from '../peerly.types'
-import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
+import { PeerlyAuthenticatedUser } from '../peerly.types'
 
 const { EXPLICITLY_LOG_PEERLY_TOKEN } = process.env
 
@@ -38,7 +37,6 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
     protected readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly jwtService: JwtService,
-    private readonly peerlyErrorHandlingService: PeerlyErrorHandlingService,
   ) {
     super(logger)
     axiosRetry(this.httpService.axiosRef, {
@@ -110,17 +108,6 @@ export class PeerlyHttpService extends PeerlyBaseConfig {
           },
         },
       }),
-    )
-  }
-
-  async handleApiError(
-    error: unknown,
-    context?: PeerlyApiErrorContext,
-  ): Promise<never> {
-    return this.peerlyErrorHandlingService.handleApiError(
-      error,
-      context,
-      this.logger,
     )
   }
 

@@ -7,8 +7,9 @@ import {
   P2P_JOB_DEFAULTS,
 } from '../constants/p2pJob.constants'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { PeerlyMediaService } from './peerlyMedia.service'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
+import { PeerlyMediaService } from './peerlyMedia.service'
 import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 import { CreateJobResponseDto } from '../schemas/peerlyP2pSms.schema'
 import { CreateJobParams, PeerlyAgent, PeerlyJob } from '../peerly.types'
@@ -38,6 +39,7 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
     protected readonly logger: PinoLogger,
     private readonly peerlyMediaService: PeerlyMediaService,
     private readonly peerlyHttpService: PeerlyHttpService,
+    private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
     private readonly crmCampaigns: CrmCampaignsService,
   ) {
     super(logger)
@@ -226,7 +228,11 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.info(`Created job with ID: ${jobId}`)
       return jobId
     } catch (error) {
-      return this.peerlyHttpService.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError(
+        error,
+        undefined,
+        this.logger,
+      )
     }
   }
 
@@ -243,7 +249,11 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.debug(`Fetched ${response.data.length} Peerly agents`)
       return response.data
     } catch (error) {
-      return this.peerlyHttpService.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError(
+        error,
+        undefined,
+        this.logger,
+      )
     }
   }
 
