@@ -16,9 +16,22 @@ beforeEach(async () => {
       slug: 'test-campaign',
       details: {
         state: 'WY',
-        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
       },
     },
+  })
+
+  const organizationSlug = `campaign-${campaign.id}`
+  await service.prisma.organization.create({
+    data: {
+      slug: organizationSlug,
+      ownerId: service.user.id,
+      positionId: 'gp-position-1',
+    },
+  })
+
+  await service.prisma.campaign.update({
+    where: { id: campaign.id },
+    data: { organizationSlug },
   })
 
   await service.prisma.pathToVictory.create({

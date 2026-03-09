@@ -160,7 +160,10 @@ export class CampaignsController {
   @Get('mine')
   @UseCampaign()
   async findMine(@ReqCampaign() campaign: Campaign) {
-    return campaign
+    const positionName = await this.organizations.getCampaignPositionName(
+      campaign.id,
+    )
+    return { ...campaign, positionName }
   }
 
   @UseGuards(M2MOnly)
@@ -350,9 +353,13 @@ export class CampaignsController {
       !!raceTargetDetails?.projectedTurnout &&
       raceTargetDetails.projectedTurnout > 0
 
+    const campaignOrg = await this.organizations.findUnique({
+      where: { slug: OrganizationsService.campaignOrgSlug(campaign.id) },
+    })
+
     const overrideDistrictId =
       await this.organizations.resolveOverrideDistrictId({
-        positionId: campaign.details?.positionId ?? undefined,
+        positionId: campaignOrg?.positionId ?? undefined,
         state: campaign.details?.state || '',
         L2DistrictType,
         L2DistrictName,
@@ -389,6 +396,10 @@ export class CampaignsController {
       )
     }
 
+    const officeName = await this.organizations.getCampaignPositionName(
+      campaign.id,
+    )
+
     // Gold flow: look up district + turnout from election-api.
     // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
@@ -397,7 +408,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
-        officeName: campaign.details.otherOffice,
+        officeName: officeName ?? undefined,
       })
       .catch(() => null)
 
@@ -460,6 +471,9 @@ export class CampaignsController {
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
     }
+    const officeName = await this.organizations.getCampaignPositionName(
+      campaign.id,
+    )
     // Gold flow: look up district + turnout from election-api.
     // If this fails, fall back to silver (LLM-based matching).
     const raceTargetDetails = await this.elections
@@ -468,7 +482,7 @@ export class CampaignsController {
         ballotreadyPositionId: campaign.details.positionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
-        officeName: campaign.details.otherOffice,
+        officeName: officeName ?? undefined,
       })
       .catch(() => null)
 

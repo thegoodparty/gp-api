@@ -85,9 +85,6 @@ export class ElectedOfficeController {
       ...body,
       userId: user.id,
       campaignId: campaign.id,
-      ballotreadyPositionId: campaign.details.positionId,
-      office: campaign.details.office,
-      otherOffice: campaign.details.otherOffice,
     })
     return this.toApi(created)
   }

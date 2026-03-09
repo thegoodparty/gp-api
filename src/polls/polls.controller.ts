@@ -24,6 +24,7 @@ import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ReqElectedOffice } from 'src/electedOffice/decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from 'src/electedOffice/decorators/UseElectedOffice.decorator'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { ASSET_DOMAIN } from 'src/shared/util/appEnvironment.util'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { v7 as uuidv7 } from 'uuid'
@@ -91,6 +92,7 @@ export class PollsController {
     private readonly pollBiasAnalysisService: PollBiasAnalysisService,
     private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
+    private readonly organizationsService: OrganizationsService,
     private readonly s3Service: S3Service,
     private readonly contactService: ContactsService,
     private readonly pollResponsesDownloadService: PollResponsesDownloadService,
@@ -143,21 +145,21 @@ export class PollsController {
       user.id,
     )
     if (!electedOffice) {
-      const campaign =
-        await this.electedOfficeService.client.campaign.findFirst({
-          where: { userId: user.id },
-          include: { pathToVictory: true },
-        })
-      if (!campaign) {
-        throw new ForbiddenException(
-          'Not allowed to create poll. No campaign found.',
+      const organization = campaign.organizationSlug
+        ? await this.organizationsService.findUnique({
+            where: { slug: campaign.organizationSlug },
+          })
+        : null
+      const hasOrgPositionId = Boolean(organization?.positionId)
+      const hasLegacyBallotreadyPositionId = Boolean(
+        campaign.details.positionId,
+      )
+
+      if (!hasOrgPositionId && !hasLegacyBallotreadyPositionId) {
+        throw new BadRequestException(
+          'No position found on organization or campaign',
         )
       }
-
-      if (!campaign.details.positionId) {
-        throw new BadRequestException('No position found on campaign')
-      }
-
       const p2v = campaign.pathToVictory?.data
       electedOffice = await this.electedOfficeService.create({
         isActive: true,

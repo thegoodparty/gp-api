@@ -194,6 +194,8 @@ describe('CampaignsController', () => {
 
     const organizationsServiceMock: Partial<OrganizationsService> = {
       resolveOverrideDistrictId: vi.fn().mockResolvedValue(null),
+      getCampaignPositionName: vi.fn().mockResolvedValue('Mayor'),
+      findUnique: vi.fn().mockResolvedValue({ positionId: 'pos-1' }),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
 
@@ -428,9 +430,9 @@ describe('CampaignsController', () => {
   })
 
   describe('findMine', () => {
-    it('returns the campaign directly', async () => {
+    it('returns the campaign with resolved positionName', async () => {
       const result = await controller.findMine(mockCampaign)
-      expect(result).toBe(mockCampaign)
+      expect(result).toEqual({ ...mockCampaign, positionName: 'Mayor' })
     })
   })
 
@@ -1069,6 +1071,7 @@ describe('CampaignsController', () => {
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
+      vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
 
       await controller.setDistrict(campaignNoPosition, mockUser, districtBody)
 

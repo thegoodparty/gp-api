@@ -15,6 +15,13 @@ type APIOrganization = {
 }
 
 const toAPIOrganization = (org: OrganizationWithPosition): APIOrganization => {
+  const positionName =
+    typeof org.position?.name === 'string' ? org.position.name : null
+  const resolvedPositionName: string | null =
+    OrganizationsService.resolveOrganizationPositionName({
+      customPositionName: org.customPositionName,
+      positionName,
+    }) as string | null
   const result: APIOrganization = {
     slug: org.slug,
     name: null,
@@ -24,14 +31,20 @@ const toAPIOrganization = (org: OrganizationWithPosition): APIOrganization => {
 
   if (org.slug.startsWith('eo-')) {
     result.electedOfficeId = org.slug.replace('eo-', '')
-    result.name = org.position?.name ?? null
+    result.name = resolvedPositionName
   } else {
     result.campaignId = parseInt(org.slug.replace('campaign-', ''))
-    const electionYear = org.campaign?.details.electionDate?.split('-').at(0)
-    result.name = [electionYear, 'Campaign'].filter(Boolean).join(' ')
-  }
-  if (org.customPositionName) {
-    result.name = org.customPositionName
+    const electionDate =
+      org.campaign?.details &&
+      typeof org.campaign.details === 'object' &&
+      'electionDate' in org.campaign.details &&
+      typeof org.campaign.details.electionDate === 'string'
+        ? org.campaign.details.electionDate
+        : null
+    const electionYear = electionDate?.split('-').at(0)
+    result.name =
+      resolvedPositionName ??
+      [electionYear, 'Campaign'].filter(Boolean).join(' ')
   }
   return result
 }

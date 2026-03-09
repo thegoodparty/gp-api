@@ -14,7 +14,7 @@ describe('GET /v1/organizations', () => {
     })
   })
 
-  it('returns organizations with name from campaign electionDate', async () => {
+  it('returns organizations with name resolved from organization position', async () => {
     const electionsService = service.app.get(ElectionsService)
     vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
       id: 'pos-123',
@@ -49,7 +49,7 @@ describe('GET /v1/organizations', () => {
         organizations: [
           {
             slug: 'campaign-1',
-            name: '2026 Campaign',
+            name: 'Mayor',
             campaignId: 1,
             electedOfficeId: null,
           },
@@ -221,7 +221,7 @@ describe('GET /v1/organizations', () => {
 
     expect(campaignOrg).toMatchObject({
       slug: 'campaign-10',
-      name: 'Campaign',
+      name: 'City Council',
       campaignId: 10,
       electedOfficeId: null,
     })
@@ -237,6 +237,15 @@ describe('GET /v1/organizations', () => {
 
 describe('GET /v1/organizations/:slug', () => {
   it('returns an organization by slug with name', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-789',
+      brPositionId: 'br-pos-789',
+      brDatabaseId: 'br-db-789',
+      state: 'TX',
+      name: 'Governor',
+    })
+
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-99',
@@ -260,7 +269,7 @@ describe('GET /v1/organizations/:slug', () => {
       status: 200,
       data: {
         slug: 'campaign-99',
-        name: '2026 Campaign',
+        name: 'Governor',
         campaignId: 99,
         electedOfficeId: null,
       },

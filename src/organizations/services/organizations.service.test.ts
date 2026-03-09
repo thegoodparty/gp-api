@@ -5,16 +5,19 @@ import { OrganizationsService } from './organizations.service'
 describe('OrganizationsService', () => {
   let service: OrganizationsService
   let mockGetPositionByBallotReadyId: ReturnType<typeof vi.fn>
+  let mockGetPositionById: ReturnType<typeof vi.fn>
   let mockGetDistrictId: ReturnType<typeof vi.fn>
   let mockCleanDistrictName: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     mockGetPositionByBallotReadyId = vi.fn().mockResolvedValue(null)
+    mockGetPositionById = vi.fn().mockResolvedValue(null)
     mockGetDistrictId = vi.fn().mockResolvedValue(null)
     mockCleanDistrictName = vi.fn((name: string) => name)
 
     service = new OrganizationsService({
       getPositionByBallotReadyId: mockGetPositionByBallotReadyId,
+      getPositionById: mockGetPositionById,
       getDistrictId: mockGetDistrictId,
       cleanDistrictName: mockCleanDistrictName,
     } as unknown as ElectionsService)
@@ -100,6 +103,9 @@ describe('OrganizationsService', () => {
     it('returns null overrideDistrictId when district is exact match', async () => {
       mockGetPositionByBallotReadyId.mockResolvedValue({
         id: 'pos-id',
+      })
+      mockGetPositionById.mockResolvedValue({
+        id: 'pos-id',
         district: {
           L2DistrictType: 'City Council',
           L2DistrictName: 'District 5',
@@ -153,7 +159,7 @@ describe('OrganizationsService', () => {
 
   describe('resolveOverrideDistrictId', () => {
     it('returns null when district exactly matches position', async () => {
-      mockGetPositionByBallotReadyId.mockResolvedValue({
+      mockGetPositionById.mockResolvedValue({
         id: 'pos-id',
         district: {
           L2DistrictType: 'State Senate',
@@ -173,7 +179,7 @@ describe('OrganizationsService', () => {
     })
 
     it('looks up district when it differs from position', async () => {
-      mockGetPositionByBallotReadyId.mockResolvedValue({
+      mockGetPositionById.mockResolvedValue({
         id: 'pos-id',
         district: {
           L2DistrictType: 'State Senate',
@@ -207,7 +213,7 @@ describe('OrganizationsService', () => {
       })
 
       expect(result).toBe('district-uuid')
-      expect(mockGetPositionByBallotReadyId).not.toHaveBeenCalled()
+      expect(mockGetPositionById).not.toHaveBeenCalled()
     })
 
     it('returns null when district not found and no position match', async () => {
@@ -224,7 +230,7 @@ describe('OrganizationsService', () => {
 
     it('cleans district name before comparison', async () => {
       mockCleanDistrictName.mockReturnValue('District 10')
-      mockGetPositionByBallotReadyId.mockResolvedValue({
+      mockGetPositionById.mockResolvedValue({
         id: 'pos-id',
         district: {
           L2DistrictType: 'State Senate',
@@ -246,7 +252,7 @@ describe('OrganizationsService', () => {
     })
 
     it('looks up district when position has no district', async () => {
-      mockGetPositionByBallotReadyId.mockResolvedValue({
+      mockGetPositionById.mockResolvedValue({
         id: 'pos-id',
         district: null,
       })
