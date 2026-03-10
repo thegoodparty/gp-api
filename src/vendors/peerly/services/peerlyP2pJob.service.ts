@@ -230,11 +230,10 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.info(`Created job with ID: ${jobId}`)
       return jobId
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(
+      return this.peerlyErrorHandling.handleApiError({
         error,
-        undefined,
-        this.logger,
-      )
+        logger: this.logger,
+      })
     }
   }
 
@@ -248,9 +247,9 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
         list_id: listId,
       })
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(
+      return this.peerlyErrorHandling.handleApiError({
         error,
-        {
+        context: {
           customMessage: P2P_ERROR_MESSAGES.LIST_ASSIGNMENT_FAILED,
           recoveryInfo: {
             jobId,
@@ -260,8 +259,8 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
             }),
           },
         },
-        this.logger,
-      )
+        logger: this.logger,
+      })
     }
   }
 
@@ -272,11 +271,10 @@ export class PeerlyP2pJobService extends PeerlyBaseConfig {
       this.logger.debug(`Fetched ${response.data.length} Peerly agents`)
       return response.data
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(
+      return this.peerlyErrorHandling.handleApiError({
         error,
-        undefined,
-        this.logger,
-      )
+        logger: this.logger,
+      })
     }
   }
 

@@ -1,12 +1,8 @@
 import { BadGatewayException, HttpException, Injectable } from '@nestjs/common'
-import { User } from '@prisma/client'
 import { format } from '@redtea/format-axios-error'
 import { isAxiosError } from 'axios'
 import { PinoLogger } from 'nestjs-pino'
-import { SlackService } from '../../slack/services/slack.service'
-import { SlackChannel } from '../../slack/slackService.types'
 import { PeerlyApiErrorContext } from '../peerly.types'
-import { buildPeerlySlackErrorMessage } from '../utils/buildPeerlySlackErrorMessage.util'
 
 interface PeerlyApiErrorResponseData {
   error?: string
@@ -16,15 +12,16 @@ interface PeerlyApiErrorResponseData {
   [key: string]: unknown
 }
 
+type PeerlyApiErrorInfo = {
+  error: unknown
+  context?: PeerlyApiErrorContext
+  logger?: PinoLogger
+}
+
 @Injectable()
 export class PeerlyErrorHandlingService {
-  constructor(private readonly slackService: SlackService) {}
-
-  async handleApiError(
-    error: unknown,
-    context?: PeerlyApiErrorContext,
-    logger?: PinoLogger,
-  ): Promise<never> {
+  async handleApiError(apiErrorInfo: PeerlyApiErrorInfo): Promise<never> {
+    const { error, context, logger } = apiErrorInfo
     const formattedError = (isAxiosError(error) && format(error)) || error
     const genericMessage = 'Peerly API ERROR'
     const recoverySuffix = this.formatRecoverySuffix(context?.recoveryInfo)
@@ -36,14 +33,6 @@ export class PeerlyErrorHandlingService {
       },
       `${genericMessage}: ${formattedError ? JSON.stringify(formattedError) : ''}${recoverySuffix}`,
     )
-
-    if (context?.user) {
-      await this.sendSlackErrorNotification(
-        formattedError,
-        context.user,
-        context.peerlyIdentityId,
-      )
-    }
 
     if (error instanceof HttpException) {
       if (context?.customMessage) {
@@ -91,24 +80,5 @@ export class PeerlyErrorHandlingService {
       .filter(([, v]) => v !== undefined)
       .map(([k, v]) => `${k}=${v}`)
     return parts.length === 0 ? '' : ` ${parts.join(' ')}`
-  }
-
-  private async sendSlackErrorNotification(
-    formattedError: unknown,
-    user: User,
-    peerlyIdentityId?: string,
-  ) {
-    const errorString =
-      typeof formattedError === 'string'
-        ? formattedError
-        : JSON.stringify(formattedError)
-
-    const blocks = buildPeerlySlackErrorMessage({
-      user,
-      formattedError: errorString,
-      peerlyIdentityId,
-    })
-
-    await this.slackService.message({ blocks }, SlackChannel.bot10DlcCompliance)
   }
 }

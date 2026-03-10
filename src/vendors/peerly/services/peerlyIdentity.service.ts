@@ -27,6 +27,7 @@ import {
   Peerly10DlcBrandData,
   Peerly10DLCBrandSubmitResponseBody,
   PEERLY_CV_VERIFICATION_TYPE,
+  PeerlyApiErrorContext,
   PeerlyCreateCVTokenResponse,
   PeerlyGetCvRequestResponseBody,
   PeerlyGetIdentitiesResponseBody,
@@ -45,8 +46,12 @@ import {
   PEERLY_LOCALITIES,
   PEERLY_USECASE,
 } from './peerly.const'
+import { SlackService } from '../../slack/services/slack.service'
+import { SlackChannel } from '../../slack/slackService.types'
+import { UsersService } from '../../../users/services/users.service'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
+import { buildPeerlySlackErrorMessage } from '../utils/buildPeerlySlackErrorMessage.util'
 import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
@@ -58,6 +63,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     private readonly placesService: GooglePlacesService,
     private readonly campaignsService: CampaignsService,
     private readonly areaCodeFromZipService: AreaCodeFromZipService,
+    private readonly slackService: SlackService,
+    private readonly usersService: UsersService,
   ) {
     super(logger)
   }
@@ -71,7 +78,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async createIdentity(
     identityName: string,
     campaign: Campaign,
-    user: User,
   ): Promise<PeerlyIdentity | undefined> {
     this.logger.debug(`Creating identity with name: '${identityName}'`)
     try {
@@ -89,18 +95,11 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug({ identity }, 'Successfully created identity:')
       return identity
     } catch (error) {
-      await this.peerlyErrorHandling.handleApiError(
-        error,
-        { campaign, user },
-        this.logger,
-      )
+      await this.handleApiError(error, { campaign })
     }
   }
 
-  async getIdentities(
-    campaign: Campaign,
-    user: User,
-  ): Promise<PeerlyIdentity[]> {
+  async getIdentities(campaign: Campaign): Promise<PeerlyIdentity[]> {
     this.logger.debug('Fetching list of identities from Peerly')
     let result: PeerlyIdentity[] = []
     try {
@@ -117,20 +116,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
       result = identities
     } catch (error) {
-      await this.peerlyErrorHandling.handleApiError(
-        error,
-        { campaign, user },
-        this.logger,
-      )
+      await this.handleApiError(error, { campaign })
     }
     return result
   }
 
-  async getIdentityUseCases(
-    peerlyIdentityId: string,
-    campaign: Campaign,
-    user: User,
-  ) {
+  async getIdentityUseCases(peerlyIdentityId: string, campaign: Campaign) {
     try {
       const response =
         await this.peerlyHttpService.get<PeerlyIdentityUseCaseResponseBody>(
@@ -152,18 +143,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           'Use cases for given identity ID could not be found',
         )
       }
-      await this.peerlyErrorHandling.handleApiError(
-        e,
-        { campaign, peerlyIdentityId, user },
-        this.logger,
-      )
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
   }
 
   async submitIdentityProfile(
     peerlyIdentityId: string,
     campaign: Campaign,
-    user: User,
   ): Promise<PeerlyIdentityProfileResponseBody | null> {
     let result: PeerlyIdentityProfileResponseBody | null = null
     try {
@@ -179,15 +165,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug({ data }, 'Successfully submitted identity profile:')
       result = data
     } catch (error) {
-      await this.peerlyErrorHandling.handleApiError(
-        error,
-        {
-          campaign,
-          peerlyIdentityId,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(error, { campaign, peerlyIdentityId })
     }
     return result
   }
@@ -195,7 +173,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async getIdentityProfile(
     peerlyIdentityId: string,
     campaign: Campaign,
-    user: User,
   ): Promise<PeerlyIdentityProfileResponseBody | null> {
     this.logger.debug(
       `Fetching identity profile for identityId: ${peerlyIdentityId}`,
@@ -222,15 +199,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           'Identity profile for given identity ID could not be found',
         )
       }
-      await this.peerlyErrorHandling.handleApiError(
-        e,
-        {
-          campaign,
-          peerlyIdentityId,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
     return result
   }
@@ -240,7 +209,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     tcrCompliancePayload: CreateTcrCompliancePayload,
     campaign: Campaign,
     domain: Domain,
-    user: User,
   ) {
     const { details: campaignDetails, placeId } = campaign
     const { phone, websiteDomain, ein } = tcrCompliancePayload
@@ -306,22 +274,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug({ data }, 'Successfully submitted 10DLC brand:')
       return submissionKey
     } catch (error) {
-      await this.peerlyErrorHandling.handleApiError(
-        error,
-        {
-          campaign,
-          peerlyIdentityId,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(error, { campaign, peerlyIdentityId })
     }
   }
 
   async approve10DLCBrand(
     { committeeName, peerlyIdentityId, campaignId }: TcrCompliance,
     campaignVerifyToken: string = '',
-    user?: User,
   ): Promise<BrandApprovalResult | undefined> {
     const campaign = await this.campaignsService.findFirstOrThrow({
       where: {
@@ -353,22 +312,16 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
 
       return identityBrand
     } catch (error) {
-      await this.peerlyErrorHandling.handleApiError(
-        error,
-        {
-          campaign,
-          peerlyIdentityId: peerlyIdentityId ?? undefined,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(error, {
+        campaign,
+        ...(peerlyIdentityId ? { peerlyIdentityId } : {}),
+      })
     }
   }
 
   async getCampaignVerifyRequest(
     peerlyIdentityId: string,
     campaign: Campaign,
-    user: User,
   ): Promise<PeerlyGetCvRequestResponseBody | null> {
     this.logger.debug(
       `Fetching Campaign Verify status for identityId: ${peerlyIdentityId}`,
@@ -399,15 +352,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           return null
         }
       }
-      await this.peerlyErrorHandling.handleApiError(
-        e,
-        {
-          campaign,
-          peerlyIdentityId,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
     return result
   }
@@ -545,15 +490,10 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       this.logger.debug(`Successfully submitted CV request: ${data}`)
       result = data
     } catch (error) {
-      await this.peerlyErrorHandling.handleApiError(
-        error,
-        {
-          campaign,
-          peerlyIdentityId: peerlyIdentityId ?? undefined,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(error, {
+        campaign,
+        ...(peerlyIdentityId ? { peerlyIdentityId } : {}),
+      })
     }
     return result
   }
@@ -561,7 +501,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
   async retrieveCampaignVerifyStatus(
     peerlyIdentityId: string,
     campaign: Campaign,
-    user: User,
   ) {
     try {
       this.logger.debug(
@@ -579,15 +518,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
       return verification_status
     } catch (e) {
-      await this.peerlyErrorHandling.handleApiError(
-        e,
-        {
-          campaign,
-          peerlyIdentityId,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
   }
 
@@ -595,7 +526,6 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     peerlyIdentityId: string,
     pin: string,
     campaign: Campaign,
-    user: User,
   ) {
     try {
       const response =
@@ -613,33 +543,19 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           'Peerly API returned 400 Bad Request when verifying CV PIN. This is likely due to an invalid PIN. ',
         )
         // throw new UnprocessableEntityException('PIN could not be validated')
-        await this.peerlyErrorHandling.handleApiError(
-          e,
-          {
-            campaign,
-            peerlyIdentityId,
-            user,
-            httpExceptionClass: UnprocessableEntityException,
-          },
-          this.logger,
-        )
-      }
-      await this.peerlyErrorHandling.handleApiError(
-        e,
-        {
+        await this.handleApiError(e, {
           campaign,
           peerlyIdentityId,
-          user,
-        },
-        this.logger,
-      )
+          httpExceptionClass: UnprocessableEntityException,
+        })
+      }
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
   }
 
   async createCampaignVerifyToken(
     peerlyIdentityId: string,
     campaign: Campaign,
-    user: User,
   ) {
     try {
       this.logger.debug(
@@ -653,15 +569,48 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       const { campaign_verify_token } = data
       return campaign_verify_token
     } catch (e) {
-      await this.peerlyErrorHandling.handleApiError(
-        e,
-        {
-          campaign,
-          peerlyIdentityId,
-          user,
-        },
-        this.logger,
-      )
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
+  }
+
+  private async handleApiError(
+    error: unknown,
+    context: PeerlyApiErrorContext,
+  ): Promise<never> {
+    if (context.campaign) {
+      const user = await this.usersService.findByCampaign(context.campaign)
+      if (user) {
+        const formattedError = (isAxiosError(error) && format(error)) || error
+        await this.sendSlackErrorNotification(
+          formattedError,
+          user,
+          context.peerlyIdentityId,
+        )
+      }
+    }
+    return this.peerlyErrorHandling.handleApiError({
+      error,
+      context,
+      logger: this.logger,
+    })
+  }
+
+  private async sendSlackErrorNotification(
+    formattedError: unknown,
+    user: User,
+    peerlyIdentityId?: string,
+  ) {
+    const errorString =
+      typeof formattedError === 'string'
+        ? formattedError
+        : JSON.stringify(formattedError)
+
+    const blocks = buildPeerlySlackErrorMessage({
+      user,
+      formattedError: errorString,
+      peerlyIdentityId,
+    })
+
+    await this.slackService.message({ blocks }, SlackChannel.bot10DlcCompliance)
   }
 }

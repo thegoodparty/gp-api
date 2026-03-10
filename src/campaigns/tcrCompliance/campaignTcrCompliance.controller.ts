@@ -155,7 +155,6 @@ export class CampaignTcrComplianceController {
       await this.tcrComplianceService.retrieveCampaignVerifyToken(
         pin,
         tcrCompliance,
-        user,
       )
 
     if (!campaignVerifyToken) {
@@ -166,7 +165,6 @@ export class CampaignTcrComplianceController {
 
     const campaignVerifyBrand =
       await this.tcrComplianceService.submitCampaignVerifyToken(
-        user,
         tcrCompliance,
         campaignVerifyToken,
       )
@@ -199,7 +197,6 @@ export class CampaignTcrComplianceController {
   @UseCampaign()
   async getTcrComplianceStatus(
     @Param('id') tcrComplianceId: string,
-    @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
   ) {
     const { peerlyIdentityId } = await this.retrieveTcrCompliance(
@@ -211,7 +208,6 @@ export class CampaignTcrComplianceController {
         ? false
         : await this.tcrComplianceService.checkTcrRegistrationStatus(
             peerlyIdentityId!,
-            user,
           ),
     }
   }

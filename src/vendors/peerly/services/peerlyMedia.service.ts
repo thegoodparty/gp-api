@@ -93,11 +93,10 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
       this.logger.debug(validatedData, 'Successfully created media')
       return validatedData.media_id
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(
+      return this.peerlyErrorHandling.handleApiError({
         error,
-        undefined,
-        this.logger,
-      )
+        logger: this.logger,
+      })
     }
   }
 }

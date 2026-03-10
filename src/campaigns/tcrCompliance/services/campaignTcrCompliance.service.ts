@@ -133,10 +133,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       `[TCR Compliance] Step 1: tcrIdentityName => ${tcrIdentityName}`,
     )
 
-    const identities = await this.peerlyIdentityService.getIdentities(
-      campaign,
-      user,
-    )
+    const identities = await this.peerlyIdentityService.getIdentities(campaign)
     const existingIdentity = identities.find(
       (identity) => identity.identity_name === tcrIdentityName,
     )
@@ -157,7 +154,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       (await this.peerlyIdentityService.createIdentity(
         tcrIdentityName,
         campaign,
-        user,
       )) ||
       null
 
@@ -168,7 +164,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         await this.peerlyIdentityService.getIdentityProfile(
           tcrComplianceIdentity!.identity_id,
           campaign,
-          user,
         )
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -191,7 +186,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       (await this.peerlyIdentityService.submitIdentityProfile(
         tcrComplianceIdentity!.identity_id,
         campaign,
-        user,
       )) ||
       null
 
@@ -218,7 +212,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
           tcrComplianceCreatePayload,
           campaign,
           domain,
-          user,
         )) || null
     }
 
@@ -226,7 +219,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       await this.peerlyIdentityService.getCampaignVerifyRequest(
         tcrComplianceIdentity!.identity_id,
         campaign,
-        user,
       )
 
     if (existingCampaignVerifyRequest?.verification_status) {
@@ -290,7 +282,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
   }
 
-  async checkTcrRegistrationStatus(peerlyIdentityId: string, user: User) {
+  async checkTcrRegistrationStatus(peerlyIdentityId: string) {
     const { campaign } = await this.model.findFirstOrThrow({
       where: { peerlyIdentityId },
       include: {
@@ -303,7 +295,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
         (await this.peerlyIdentityService.getIdentityUseCases(
           peerlyIdentityId,
           campaign,
-          user,
         )) || []
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -316,7 +307,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     return Boolean(useCase?.activated)
   }
 
-  async getCvTokenStatus(peerlyIdentityId: string, user: User) {
+  async getCvTokenStatus(peerlyIdentityId: string) {
     const { campaign } = await this.model.findFirstOrThrow({
       where: { peerlyIdentityId },
       include: {
@@ -326,14 +317,12 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     return await this.peerlyIdentityService.retrieveCampaignVerifyStatus(
       peerlyIdentityId,
       campaign,
-      user,
     )
   }
 
   async retrieveCampaignVerifyToken(
     pin: string,
     { peerlyIdentityId }: TcrCompliance,
-    user: User,
   ) {
     if (!peerlyIdentityId) {
       throw new BadRequestException(
@@ -350,7 +339,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
       peerlyIdentityId,
       pin,
       campaign,
-      user,
     )
     if (!pinIsValid) {
       throw new UnprocessableEntityException('Invalid PIN')
@@ -359,19 +347,16 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     return await this.peerlyIdentityService.createCampaignVerifyToken(
       peerlyIdentityId,
       campaign,
-      user,
     )
   }
 
   async submitCampaignVerifyToken(
-    user: User,
     tcrCompliance: TcrCompliance,
     campaignVerifyToken: string,
   ) {
     return this.peerlyIdentityService.approve10DLCBrand(
       tcrCompliance,
       campaignVerifyToken,
-      user,
     )
   }
 }

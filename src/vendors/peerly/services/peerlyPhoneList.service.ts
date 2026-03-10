@@ -80,11 +80,10 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
       )
       return validated.Data.token
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(
+      return this.peerlyErrorHandling.handleApiError({
         error,
-        undefined,
-        this.logger,
-      )
+        logger: this.logger,
+      })
     }
   }
 
@@ -102,11 +101,10 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
         'status',
       )
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(
+      return this.peerlyErrorHandling.handleApiError({
         error,
-        undefined,
-        this.logger,
-      )
+        logger: this.logger,
+      })
     }
   }
 
@@ -122,11 +120,10 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
         'details',
       )
     } catch (error) {
-      return this.peerlyErrorHandling.handleApiError(
+      return this.peerlyErrorHandling.handleApiError({
         error,
-        undefined,
-        this.logger,
-      )
+        logger: this.logger,
+      })
     }
   }
 }

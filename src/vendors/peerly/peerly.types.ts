@@ -1,5 +1,5 @@
 import { HttpException, HttpExceptionOptions } from '@nestjs/common'
-import { Campaign, User } from '@prisma/client'
+import { Campaign } from '@prisma/client'
 
 export type PeerlyIdentity = {
   identity_id: string
@@ -425,7 +425,6 @@ export type PeerlyRecoveryInfo = Record<string, string | number | undefined>
 
 export interface PeerlyApiErrorContext {
   campaign?: Campaign
-  user?: User
   peerlyIdentityId?: string
   httpExceptionClass?: HttpExceptionConstructor
   customMessage?: string
