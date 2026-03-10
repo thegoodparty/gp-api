@@ -197,7 +197,6 @@ export class CampaignTcrComplianceController {
   @UseCampaign()
   async getTcrComplianceStatus(
     @Param('id') tcrComplianceId: string,
-    @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
   ) {
     const { peerlyIdentityId } = await this.retrieveTcrCompliance(
@@ -209,7 +208,6 @@ export class CampaignTcrComplianceController {
         ? false
         : await this.tcrComplianceService.checkTcrRegistrationStatus(
             peerlyIdentityId!,
-            user,
           ),
     }
   }
