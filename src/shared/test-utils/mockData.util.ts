@@ -14,6 +14,7 @@ export const createMockUser = (overrides?: Partial<User>): User => ({
   phone: '5555555555',
   zip: '12345',
   metaData: null,
+  clerkId: null,
   passwordResetToken: null,
   roles: [UserRole.candidate],
   ...overrides,
