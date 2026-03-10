@@ -36,6 +36,11 @@ export interface RegisterResponse {
   }
 }
 
+interface CampaignResponse {
+  id: number
+  slug: string
+}
+
 export async function loginUser(
   request: APIRequestContext,
   email: string,
@@ -84,7 +89,26 @@ export async function registerUser(
     )
   }
 
-  return await response.json()
+  const body = (await response.json()) as Omit<RegisterResponse, 'campaign'>
+
+  const campaignResponse = await request.post('/v1/campaigns', {
+    headers: {
+      Authorization: `Bearer ${body.token}`,
+    },
+    data: {
+      details: { zip: userData.zip },
+    },
+  })
+
+  if (!campaignResponse.ok()) {
+    throw new Error(
+      `Campaign creation failed: ${campaignResponse.status()} ${await campaignResponse.text()}`,
+    )
+  }
+
+  const campaign = (await campaignResponse.json()) as CampaignResponse
+
+  return { ...body, campaign }
 }
 
 export async function deleteUser(

@@ -1,3 +1,5 @@
+import { IncomingRequest } from '@/authentication/authentication.types'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
 import {
   Body,
   Controller,
@@ -12,20 +14,17 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { ElectedOfficeService } from './services/electedOffice.service'
+import { Prisma, User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { User } from '@prisma/client'
-import { Prisma } from '@prisma/client'
 import { toDateOnlyString } from 'src/shared/util/date.util'
+import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import {
   CreateElectedOfficeDto,
   UpdateElectedOfficeDto,
 } from './schemas/electedOffice.schema'
-import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
-import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import { ListElectedOfficePaginationSchema } from './schemas/ListElectedOfficePagination.schema'
-import { IncomingRequest } from '@/authentication/authentication.types'
+import { ElectedOfficeService } from './services/electedOffice.service'
 
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)
@@ -77,22 +76,19 @@ export class ElectedOfficeController {
     // Do this without guard to hopefully slowly move away from the hard link to campaign
     const campaign = await this.electedOfficeService.client.campaign.findFirst({
       where: { userId: user.id },
-      select: { id: true },
     })
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
     }
-    const data: Prisma.ElectedOfficeCreateInput = {
-      electedDate: body.electedDate,
-      swornInDate: body.swornInDate,
-      termStartDate: body.termStartDate,
-      termEndDate: body.termEndDate,
-      termLengthDays: body.termLengthDays,
-      isActive: body.isActive,
-      user: { connect: { id: user.id } },
-      campaign: { connect: { id: campaign.id } },
-    }
-    const created = await this.electedOfficeService.create({ data })
+
+    const created = await this.electedOfficeService.create({
+      ...body,
+      userId: user.id,
+      campaignId: campaign.id,
+      ballotreadyPositionId: campaign.details.positionId,
+      office: campaign.details.office,
+      otherOffice: campaign.details.otherOffice,
+    })
     return this.toApi(created)
   }
 

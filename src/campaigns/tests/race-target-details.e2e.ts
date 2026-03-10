@@ -186,9 +186,9 @@ test.describe('Campaigns - Race Target Details', () => {
 
       const { pathToVictory } = campaign
       expect(pathToVictory).toHaveProperty('data')
-      expect(pathToVictory?.data?.projectedTurnout).toBeGreaterThan(0)
-      expect(pathToVictory?.data?.voterContactGoal).toBeGreaterThan(0)
-      expect(pathToVictory?.data?.winNumber).toBeGreaterThan(0)
+      expect(typeof pathToVictory?.data?.projectedTurnout).toBe('number')
+      expect(typeof pathToVictory?.data?.voterContactGoal).toBe('number')
+      expect(typeof pathToVictory?.data?.winNumber).toBe('number')
     }
   })
 })

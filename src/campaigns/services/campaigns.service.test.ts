@@ -1,7 +1,6 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
-import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
 import { GooglePlacesService } from '@/vendors/google/services/google-places.service'
 import { SegmentService } from '@/vendors/segment/segment.service'
@@ -10,7 +9,8 @@ import { SlackService } from '@/vendors/slack/services/slack.service'
 import { StripeService } from '@/vendors/stripe/services/stripe.service'
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { Prisma, PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient, User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import {
   beforeEach,
@@ -23,6 +23,542 @@ import {
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CampaignsService } from './campaigns.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
+
+const GP_POSITION_ID = 'gp-position-uuid-123'
+const BR_POSITION_ID = 'br-position-456'
+
+const mockPositionResponse = {
+  id: GP_POSITION_ID,
+  brPositionId: BR_POSITION_ID,
+  brDatabaseId: 'br-db-1',
+  state: 'CA',
+  name: 'State Senate District 1',
+}
+
+const buildOrgSyncModule = async (overrides?: {
+  getPositionByBallotReadyId?: MockedFunction<
+    ElectionsService['getPositionByBallotReadyId']
+  >
+}) => {
+  const mockGetPosition =
+    overrides?.getPositionByBallotReadyId ??
+    (vi.fn().mockResolvedValue(mockPositionResponse) as MockedFunction<
+      ElectionsService['getPositionByBallotReadyId']
+    >)
+
+  const mockOrgCreate = vi.fn().mockResolvedValue({})
+  const mockOrgUpdate = vi.fn().mockResolvedValue({})
+  const mockOrgUpsert = vi.fn().mockResolvedValue({})
+  const mockCampaignCreate = vi.fn().mockResolvedValue({ id: 1 })
+  const mockCampaignUpdate = vi.fn().mockResolvedValue({ id: 1, userId: 1 })
+  const mockCampaignFindFirst = vi.fn()
+  const mockCampaignFindUnique = vi.fn()
+  const mockQueryRaw = vi.fn().mockResolvedValue([{ nextval: BigInt(42) }])
+  const mockTransaction = vi.fn(
+    async (
+      callback: Parameters<PrismaClient['$transaction']>[0],
+      _options?: Parameters<PrismaClient['$transaction']>[1],
+    ) => {
+      const tx = {
+        $queryRaw: mockQueryRaw,
+        organization: {
+          create: mockOrgCreate,
+          update: mockOrgUpdate,
+          upsert: mockOrgUpsert,
+        },
+        campaign: {
+          create: mockCampaignCreate,
+          update: mockCampaignUpdate,
+          findFirst: mockCampaignFindFirst,
+        },
+        pathToVictory: { update: vi.fn(), create: vi.fn() },
+      }
+      return callback(
+        tx as unknown as Parameters<
+          Parameters<PrismaClient['$transaction']>[0]
+        >[0],
+      )
+    },
+  ) as MockedFunction<PrismaClient['$transaction']>
+
+  const mockTrackCampaign = vi.fn()
+
+  const mockPrismaService = {
+    $transaction: mockTransaction,
+    campaign: {
+      findFirst: mockCampaignFindFirst,
+      findUnique: mockCampaignFindUnique,
+    },
+  }
+
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [
+      { provide: PrismaService, useValue: mockPrismaService },
+      { provide: UsersService, useValue: {} },
+      {
+        provide: CrmCampaignsService,
+        useValue: { trackCampaign: mockTrackCampaign },
+      },
+      { provide: SegmentService, useValue: {} },
+      {
+        provide: AnalyticsService,
+        useValue: { track: vi.fn(), identify: vi.fn() },
+      },
+      { provide: CampaignPlanVersionsService, useValue: {} },
+      { provide: StripeService, useValue: {} },
+      { provide: GooglePlacesService, useValue: {} },
+      {
+        provide: ElectionsService,
+        useValue: { getPositionByBallotReadyId: mockGetPosition },
+      },
+      { provide: SlackService, useValue: {} },
+      { provide: PinoLogger, useValue: createMockLogger() },
+      CampaignsService,
+    ],
+  }).compile()
+
+  const service = module.get<CampaignsService>(CampaignsService)
+
+  Object.defineProperty(service, '_prisma', {
+    get: () => mockPrismaService,
+    configurable: true,
+  })
+  Object.defineProperty(service, 'logger', {
+    get: () => createMockLogger(),
+    configurable: true,
+  })
+
+  return {
+    service,
+    mockGetPosition,
+    mockOrgCreate,
+    mockOrgUpdate,
+    mockOrgUpsert,
+    mockCampaignFindFirst,
+    mockCampaignFindUnique,
+    mockCampaignUpdate,
+  }
+}
+
+describe('CampaignsService - Organization positionId sync', () => {
+  describe('createForUser', () => {
+    it('should create organization with resolved GP positionId when positionId is provided', async () => {
+      const { service, mockGetPosition, mockOrgCreate } =
+        await buildOrgSyncModule()
+
+      vi.spyOn(service, 'findSlug').mockResolvedValue('test-slug')
+
+      const user = { id: 1, zip: '90210' } as User
+
+      await service.createForUser(user, {
+        details: { positionId: BR_POSITION_ID },
+      })
+
+      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
+      expect(mockOrgCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            positionId: GP_POSITION_ID,
+          }),
+        }),
+      )
+    })
+
+    it('should create organization with null positionId when no positionId is provided', async () => {
+      const { service, mockGetPosition, mockOrgCreate } =
+        await buildOrgSyncModule()
+
+      vi.spyOn(service, 'findSlug').mockResolvedValue('test-slug')
+
+      const user = { id: 1, zip: '90210' } as User
+
+      await service.createForUser(user, { details: {} })
+
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            positionId: null,
+          }),
+        }),
+      )
+    })
+  })
+
+  describe('update', () => {
+    it('should upsert organization with resolved GP positionId when positionId is in update data', async () => {
+      const {
+        service,
+        mockGetPosition,
+        mockOrgUpsert,
+        mockCampaignFindUnique,
+      } = await buildOrgSyncModule()
+
+      mockCampaignFindUnique.mockResolvedValue({
+        id: 10,
+        userId: 1,
+        details: {},
+      })
+
+      await service.update({
+        where: { id: 10 },
+        data: { details: { positionId: BR_POSITION_ID } },
+      })
+
+      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+        },
+      })
+    })
+
+    it('should upsert organization positionId from existing campaign when not in update data', async () => {
+      const {
+        service,
+        mockGetPosition,
+        mockOrgUpsert,
+        mockCampaignFindUnique,
+      } = await buildOrgSyncModule()
+
+      mockCampaignFindUnique.mockResolvedValue({
+        id: 10,
+        userId: 1,
+        details: { positionId: BR_POSITION_ID },
+      })
+
+      await service.update({
+        where: { id: 10 },
+        data: { details: { office: 'Mayor' } },
+      })
+
+      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+        },
+      })
+    })
+
+    it('should upsert organization with null positionId when no positionId exists', async () => {
+      const {
+        service,
+        mockGetPosition,
+        mockOrgUpsert,
+        mockCampaignFindUnique,
+      } = await buildOrgSyncModule()
+
+      mockCampaignFindUnique.mockResolvedValue({
+        id: 10,
+        userId: 1,
+        details: {},
+      })
+
+      await service.update({
+        where: { id: 10 },
+        data: { details: { office: 'Mayor' } },
+      })
+
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: null,
+          customPositionName: 'Mayor',
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: null,
+          customPositionName: 'Mayor',
+        },
+      })
+    })
+
+    it('should clear positionId when explicitly set to null', async () => {
+      const {
+        service,
+        mockGetPosition,
+        mockOrgUpsert,
+        mockCampaignFindUnique,
+      } = await buildOrgSyncModule()
+
+      mockCampaignFindUnique.mockResolvedValue({
+        id: 10,
+        userId: 1,
+        details: { positionId: BR_POSITION_ID },
+      })
+
+      await service.update({
+        where: { id: 10 },
+        data: { details: { positionId: null } },
+      })
+
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: null,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: null,
+          customPositionName: null,
+        },
+      })
+    })
+
+    it('should skip org sync when details is not in update data', async () => {
+      const {
+        service,
+        mockGetPosition,
+        mockOrgUpsert,
+        mockCampaignFindUnique,
+      } = await buildOrgSyncModule()
+
+      await service.update({
+        where: { id: 10 },
+        data: { isPro: true },
+      })
+
+      expect(mockCampaignFindUnique).not.toHaveBeenCalled()
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgUpsert).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('updateJsonFields', () => {
+    const baseCampaign = {
+      id: 10,
+      userId: 1,
+      data: {},
+      details: {},
+      aiContent: {},
+      pathToVictory: null,
+    }
+
+    it('should upsert organization with resolved GP positionId when positionId is in body details', async () => {
+      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ details: {} })
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        details: { positionId: BR_POSITION_ID },
+      })
+
+      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+        },
+      })
+    })
+
+    it('should upsert organization positionId from existing campaign when not in body', async () => {
+      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ details: { positionId: BR_POSITION_ID } })
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        details: { office: 'Mayor' },
+      })
+
+      expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: GP_POSITION_ID,
+          customPositionName: null,
+        },
+      })
+    })
+
+    it('should upsert organization with null positionId when no positionId exists', async () => {
+      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ details: {} })
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        details: { office: 'Mayor' },
+      })
+
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: null,
+          customPositionName: 'Mayor',
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: null,
+          customPositionName: 'Mayor',
+        },
+      })
+    })
+
+    it('should clear positionId when explicitly set to null', async () => {
+      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ details: { positionId: BR_POSITION_ID } })
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        details: { positionId: null },
+      })
+
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: {
+          positionId: null,
+          customPositionName: null,
+          overrideDistrictId: null,
+        },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          positionId: null,
+          customPositionName: null,
+        },
+      })
+    })
+
+    it('should skip org sync when details is not in body', async () => {
+      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        data: { someField: 'value' },
+      })
+
+      expect(mockGetPosition).not.toHaveBeenCalled()
+      expect(mockOrgUpsert).not.toHaveBeenCalled()
+    })
+
+    it('should upsert organization overrideDistrictId when provided', async () => {
+      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        pathToVictory: { electionType: 'State Senate' },
+        overrideDistrictId: 'district-uuid-123',
+      })
+
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: { overrideDistrictId: 'district-uuid-123' },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          overrideDistrictId: 'district-uuid-123',
+        },
+      })
+    })
+
+    it('should upsert organization with null overrideDistrictId', async () => {
+      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        pathToVictory: { electionType: 'State Senate' },
+        overrideDistrictId: null,
+      })
+
+      expect(mockOrgUpsert).toHaveBeenCalledWith({
+        where: { slug: 'campaign-10' },
+        update: { overrideDistrictId: null },
+        create: {
+          slug: 'campaign-10',
+          ownerId: 1,
+          overrideDistrictId: null,
+        },
+      })
+    })
+
+    it('should not upsert organization when overrideDistrictId is not in body', async () => {
+      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+        await buildOrgSyncModule()
+
+      mockCampaignFindFirst
+        .mockResolvedValueOnce({ ...baseCampaign })
+        .mockResolvedValueOnce({ ...baseCampaign })
+
+      await service.updateJsonFields(10, {
+        pathToVictory: { electionType: 'State Senate' },
+      })
+
+      expect(mockOrgUpsert).not.toHaveBeenCalled()
+    })
+  })
+})
 
 describe('CampaignsService - redeemFreeTexts', () => {
   let service: CampaignsService

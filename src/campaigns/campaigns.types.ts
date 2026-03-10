@@ -44,4 +44,5 @@ export interface UpdateCampaignFieldsInput {
   formattedAddress?: string | null
   placeId?: string | null
   canDownloadFederal?: boolean
+  overrideDistrictId?: string | null
 }

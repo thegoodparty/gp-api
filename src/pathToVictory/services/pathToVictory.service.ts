@@ -1,35 +1,36 @@
+import { CampaignCreatedBy, ElectionLevel } from '@goodparty_org/contracts'
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { CampaignCreatedBy, ElectionLevel } from '@goodparty_org/contracts'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { recordBlockedStateEvent } from 'src/observability/grafana/otel.client'
 import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
 import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
-import { recordBlockedStateEvent } from 'src/observability/grafana/otel.client'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
 } from 'src/shared/constants/paginationOptions.consts'
-import { PaginatedResults } from 'src/shared/types/utility.types'
+import { PaginatedResults, WrapperType } from 'src/shared/types/utility.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
 import { EmailService } from '../../email/email.service'
 import { EmailTemplateName } from '../../email/email.types'
+import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
 import { SlackService } from '../../vendors/slack/services/slack.service'
+import { ListPathToVictoryPaginationSchema } from '../schemas/ListPathToVictoryPagination.schema'
 import {
   P2VCounts,
   P2VSource,
   PathToVictoryInput,
   PathToVictoryResponse,
 } from '../types/pathToVictory.types'
-import { ListPathToVictoryPaginationSchema } from '../schemas/ListPathToVictoryPagination.schema'
 import { OfficeMatchService } from './officeMatch.service'
 
 enum SpecialOfficePhrase {
@@ -88,10 +89,11 @@ export class PathToVictoryService extends createPrismaBase(
     private slackService: SlackService,
     private emailService: EmailService,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private crmService: CrmCampaignsService,
+    private crmService: WrapperType<CrmCampaignsService>,
     @Inject(forwardRef(() => AnalyticsService))
-    private analytics: AnalyticsService,
+    private analytics: WrapperType<AnalyticsService>,
     private elections: ElectionsService,
+    private organizationsService: OrganizationsService,
   ) {
     super()
   }
@@ -693,6 +695,33 @@ export class PathToVictoryService extends createPrismaBase(
         where: { id: p2v.id },
         data: { data: p2vUpdateData },
       })
+
+      // Update the organization when silver resolves a district.
+      // resolveOrgData freshly resolves all three fields (positionId,
+      // customPositionName, overrideDistrictId) from the election API.
+      // Wrapped in its own try/catch so a failure doesn't prevent
+      // email/analytics/CRM updates from running.
+      if (shouldOverwriteDistrict && campaign.details?.state) {
+        const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+        const orgData = await this.organizationsService.resolveOrgData({
+          ballotReadyPositionId: campaign.details?.positionId,
+          office: campaign.details?.office,
+          otherOffice: campaign.details?.otherOffice,
+          state: campaign.details.state,
+          L2DistrictType: pathToVictoryResponse.electionType,
+          L2DistrictName: pathToVictoryResponse.electionLocation,
+        })
+
+        await this.prisma.organization.upsert({
+          where: { slug: orgSlug },
+          update: orgData,
+          create: {
+            slug: orgSlug,
+            ownerId: campaign.userId,
+            ...orgData,
+          },
+        })
+      }
 
       await this.analytics.identify(campaign.userId, {
         winNumber: pathToVictoryResponse.counts.winNumber,

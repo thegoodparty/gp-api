@@ -24,6 +24,9 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
 import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -32,7 +35,11 @@ export class CampaignTcrComplianceController {
     private readonly userService: UsersService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly campaignsService: CampaignsService,
-  ) {}
+    private readonly analytics: AnalyticsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(CampaignTcrComplianceController.name)
+  }
 
   @Get('mine')
   @UseCampaign()
@@ -65,6 +72,11 @@ export class CampaignTcrComplianceController {
       tcrComplianceDto
     const { ein, committeeName } = tcrComplianceCreatePayload
     const user = await this.userService.findByCampaign(campaign)
+
+    if (!user) {
+      throw new NotFoundException('User not found for this campaign')
+    }
+
     const updatedCampaign = await this.campaignsService.updateJsonFields(
       campaign.id,
       {
@@ -83,11 +95,26 @@ export class CampaignTcrComplianceController {
       )
     }
 
-    return this.tcrComplianceService.create(
-      user!,
+    const result = await this.tcrComplianceService.create(
+      user,
       updatedCampaign,
       tcrComplianceCreatePayload,
     )
+
+    try {
+      await this.analytics.track(
+        user.id,
+        EVENTS.Outreach.ComplianceFormSubmitted,
+        { source: 'compliance_flow' },
+      )
+    } catch (e) {
+      this.logger.error(
+        { e },
+        `Failed to track compliance form submitted event for user ${user.id}`,
+      )
+    }
+
+    return result
   }
 
   private readonly retrieveTcrCompliance = async (
@@ -149,6 +176,20 @@ export class CampaignTcrComplianceController {
         status: TcrComplianceStatus.pending,
       },
     })
+
+    try {
+      await this.analytics.track(
+        user.id,
+        EVENTS.Outreach.CompliancePinSubmitted,
+        { source: 'compliance_flow' },
+      )
+    } catch (e) {
+      // TODO: Alert on this.
+      this.logger.error(
+        { e },
+        `Failed to track compliance PIN submitted event for user ${user.id}`,
+      )
+    }
 
     return campaignVerifyBrand
   }

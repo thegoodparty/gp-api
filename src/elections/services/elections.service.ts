@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { isAxiosError } from 'axios'
+import { PinoLogger } from 'nestjs-pino'
 import { lastValueFrom } from 'rxjs'
 import { serializeError } from 'serialize-error'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
@@ -21,7 +22,6 @@ import {
   RaceTargetMetrics,
 } from '../types/elections.types'
 import { P2VStatus } from '../types/pathToVictory.types'
-import { PinoLogger } from 'nestjs-pino'
 
 // TODO: Revisit this file after the stakeholders decide on the direction we're going...
 // ...for the win number / p2v solution. Remove any unneeded code at that time.
@@ -134,6 +134,53 @@ export class ElectionsService {
       voterContactGoal: winNumber * ElectionsService.VOTER_CONTACT_MULTIPLIER,
       projectedTurnout,
     }
+  }
+
+  async getPositionByBallotReadyId(
+    ballotreadyPositionId: string,
+    options?: { includeDistrict?: boolean },
+  ) {
+    return this.electionApiGet<
+      PositionWithOptionalDistrict,
+      { includeDistrict: boolean; includeTurnout: boolean }
+    >(
+      ElectionApiRoutes.positions.findByBrId.path + `/${ballotreadyPositionId}`,
+      {
+        includeDistrict: options?.includeDistrict ?? false,
+        includeTurnout: false,
+      },
+    )
+  }
+  async getPositionById(positionId: string) {
+    return this.electionApiGet<
+      PositionWithOptionalDistrict,
+      { includeDistrict: boolean; includeTurnout: boolean }
+    >(`positions/${positionId}`, {
+      includeDistrict: false,
+      includeTurnout: false,
+    })
+  }
+
+  async getDistrictId(
+    state: string,
+    L2DistrictType: string,
+    L2DistrictName: string,
+  ): Promise<string | null> {
+    const districts = await this.electionApiGet<
+      { id: string }[],
+      {
+        state: string
+        L2DistrictType: string
+        L2DistrictName: string
+        districtColumns: string
+      }
+    >(ElectionApiRoutes.districts.list.path, {
+      state,
+      L2DistrictType,
+      L2DistrictName: this.cleanDistrictName(L2DistrictName),
+      districtColumns: 'id',
+    })
+    return districts?.[0]?.id ?? null
   }
 
   // Gold flow: match a district via BallotReady position ID.

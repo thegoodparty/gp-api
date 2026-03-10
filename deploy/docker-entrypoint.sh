@@ -11,7 +11,7 @@ if [ -z "$VOTER_DB_HOST" ] || [ -z "$VOTER_DB_PASSWORD" ] || [ -z "$VOTER_DB_USE
   exit 1
 fi
 
-export DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME"
+export DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME?connection_limit=20"
 export VOTER_DATASTORE="postgresql://$VOTER_DB_USER:$VOTER_DB_PASSWORD@$VOTER_DB_HOST:5432/$VOTER_DB_NAME"
 
 # Run migrations on startup if DATABASE_URL is set and not a placeholder
@@ -56,7 +56,7 @@ fi
 # For preview environments, start app in background, sync content, then wait
 if [ "$IS_PREVIEW" = "true" ]; then
   echo "Starting application in background for content sync..."
-  node -r ./newrelic.js -r ./dist/src/otel.js dist/src/main &
+  node -r ./newrelic.js -r ./dist/otel.js dist/main &
   APP_PID=$!
   
   echo "Waiting for app to be healthy..."
@@ -78,6 +78,6 @@ if [ "$IS_PREVIEW" = "true" ]; then
   wait $APP_PID
 else
   # For non-preview environments, start normally
-  exec node -r ./newrelic.js -r ./dist/src/otel.js dist/src/main
+  exec node -r ./newrelic.js -r ./dist/otel.js dist/main
 fi
 

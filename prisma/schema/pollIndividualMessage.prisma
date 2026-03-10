@@ -5,6 +5,8 @@ enum PollIndividualMessageSender {
 
 model PollIndividualMessage {
   id              String                      @id
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  updatedAt       DateTime                    @default(now()) @updatedAt @map("updated_at")
   personId        String                      @map("person_id")
   personCellPhone String?                     @map("person_cell_phone")
   sentAt          DateTime                    @map("sent_at")

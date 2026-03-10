@@ -16,6 +16,7 @@ beforeEach(async () => {
       slug: 'test-campaign',
       details: {
         state: 'WY',
+        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
       },
     },
   })
@@ -70,6 +71,26 @@ describe('POST /polls/initial-poll', () => {
       },
     })
   })
+
+  it('creates a poll when campaign has no positionId', async () => {
+    await service.prisma.campaign.updateMany({
+      where: { userId: service.user.id },
+      data: { details: {} },
+    })
+
+    const result = await service.client.post('/v1/polls/initial-poll', {
+      message: 'This is a test message',
+      swornInDate: '2025-01-01',
+    })
+
+    expect(result).toMatchObject({
+      status: 201,
+      data: {
+        id: expect.any(String),
+      },
+    })
+  })
+
   it('creates a poll', async () => {
     const result = await service.client.post('/v1/polls/initial-poll', {
       message: 'This is a test message',

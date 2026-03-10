@@ -25,7 +25,7 @@ export class GeocodingService {
   constructor(private readonly campaignsService: CampaignsService) {}
 
   async handleGeoLocation(
-    slug: string,
+    id: number,
     details: PrismaJson.CampaignDetails,
     forceReCalc: boolean | undefined,
   ): Promise<{ lat: number; lng: number } | null> {
@@ -36,12 +36,10 @@ export class GeocodingService {
     }
 
     if (forceReCalc || !geoLocation?.lng) {
-      const geoLocation = await this.calculateGeoLocation(slug, details)
+      const geoLocation = await this.calculateGeoLocation(id, details)
       if (!geoLocation) {
         await this.campaignsService.update({
-          where: {
-            slug,
-          },
+          where: { id },
           data: {
             details: {
               ...details,
@@ -61,7 +59,7 @@ export class GeocodingService {
   }
 
   async calculateGeoLocation(
-    slug: string,
+    id: number,
     details: PrismaJson.CampaignDetails,
   ): Promise<{ lat: number; lng: number; geoHash: string } | null> {
     if (!details?.zip || !details?.state) return null
@@ -71,9 +69,7 @@ export class GeocodingService {
 
     const { lat, lng, geoHash } = globalCoords
     await this.campaignsService.update({
-      where: {
-        slug: slug,
-      },
+      where: { id },
       data: {
         details: {
           ...details,
