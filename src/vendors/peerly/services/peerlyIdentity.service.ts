@@ -548,8 +548,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           peerlyIdentityId,
           httpExceptionClass: UnprocessableEntityException,
         })
+      } else {
+        await this.handleApiError(e, { campaign, peerlyIdentityId })
       }
-      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
   }
 
