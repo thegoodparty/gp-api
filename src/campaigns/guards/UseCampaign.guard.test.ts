@@ -48,6 +48,7 @@ describe('UseCampaignGuard', () => {
     mockOrgFindFirst = vi.fn()
 
     campaignsService = {
+      findFirst: vi.fn(),
       findByUserId: vi.fn(),
       client: {
         organization: {
@@ -70,7 +71,8 @@ describe('UseCampaignGuard', () => {
   describe('step 1: organization header', () => {
     it('resolves campaign via org header', async () => {
       mockMetadata()
-      mockOrgFindFirst.mockResolvedValue({ campaign: mockCampaign })
+      mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'campaign-100' },
@@ -80,7 +82,10 @@ describe('UseCampaignGuard', () => {
       expect(result).toBe(true)
       expect(mockOrgFindFirst).toHaveBeenCalledWith({
         where: { slug: 'campaign-100', ownerId: 1 },
-        include: { campaign: { include: { pathToVictory: true } } },
+      })
+      expect(campaignsService.findFirst).toHaveBeenCalledWith({
+        where: { organizationSlug: 'campaign-100', userId: 1 },
+        include: { pathToVictory: true },
       })
       const req = ctx.switchToHttp().getRequest() as {
         campaign?: Campaign
@@ -91,24 +96,24 @@ describe('UseCampaignGuard', () => {
     it('uses custom include when specified', async () => {
       const include = { pathToVictory: true, user: true }
       mockMetadata({ include })
-      mockOrgFindFirst.mockResolvedValue({ campaign: mockCampaign })
+      mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'campaign-100' },
       })
       await guard.canActivate(ctx)
 
-      expect(mockOrgFindFirst).toHaveBeenCalledWith({
-        where: { slug: 'campaign-100', ownerId: 1 },
-        include: {
-          campaign: { include: { pathToVictory: true, user: true } },
-        },
+      expect(campaignsService.findFirst).toHaveBeenCalledWith({
+        where: { organizationSlug: 'campaign-100', userId: 1 },
+        include: { pathToVictory: true, user: true },
       })
     })
 
     it('falls back to userId when org has no campaign', async () => {
       mockMetadata()
-      mockOrgFindFirst.mockResolvedValue({ campaign: null })
+      mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(null)
       vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
@@ -125,6 +130,7 @@ describe('UseCampaignGuard', () => {
     it('falls back to userId when org not found', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue(null)
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(null)
       vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
@@ -141,6 +147,7 @@ describe('UseCampaignGuard', () => {
     it('falls back when ownerId does not match', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue(null)
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(null)
       vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
@@ -152,7 +159,6 @@ describe('UseCampaignGuard', () => {
       expect(result).toBe(true)
       expect(mockOrgFindFirst).toHaveBeenCalledWith({
         where: { slug: 'campaign-100', ownerId: 999 },
-        include: { campaign: { include: { pathToVictory: true } } },
       })
       expect(campaignsService.findByUserId).toHaveBeenCalledWith(999, {
         pathToVictory: true,
@@ -161,7 +167,8 @@ describe('UseCampaignGuard', () => {
 
     it('does not call findByUserId when org header resolves campaign', async () => {
       mockMetadata()
-      mockOrgFindFirst.mockResolvedValue({ campaign: mockCampaign })
+      mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'campaign-100' },

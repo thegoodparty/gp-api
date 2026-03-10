@@ -63,12 +63,18 @@ export class UseElectedOfficeGuard implements CanActivate {
       // Step 2: Try x-organization-slug header
       const slug = request.headers['x-organization-slug']
       if (typeof slug === 'string') {
-        const org =
-          await this.electedOfficeService.client.organization.findFirst({
+        const [org, eo] = await Promise.all([
+          this.electedOfficeService.client.organization.findFirst({
             where: { slug, ownerId: userId },
-            include: { electedOffice: include ? { include } : true },
-          })
-        electedOffice = org?.electedOffice ?? null
+          }),
+          this.electedOfficeService.findFirst({
+            where: { organizationSlug: slug, userId },
+            include,
+          }),
+        ])
+        if (org && eo) {
+          electedOffice = eo
+        }
       }
 
       // Step 3: Legacy fallback — user's active elected office

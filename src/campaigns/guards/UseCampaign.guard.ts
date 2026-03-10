@@ -54,11 +54,18 @@ export class UseCampaignGuard implements CanActivate {
     // Step 1: Try x-organization-slug header
     const slug = request.headers['x-organization-slug']
     if (typeof slug === 'string') {
-      const org = await this.campaignsService.client.organization.findFirst({
-        where: { slug, ownerId: userId },
-        include: { campaign: { include } },
-      })
-      campaign = org?.campaign ?? null
+      const [org, cam] = await Promise.all([
+        this.campaignsService.client.organization.findFirst({
+          where: { slug, ownerId: userId },
+        }),
+        this.campaignsService.findFirst({
+          where: { organizationSlug: slug, userId },
+          include,
+        }),
+      ])
+      if (org && cam) {
+        campaign = cam
+      }
     }
 
     // Step 2: Legacy fallback — find by userId
