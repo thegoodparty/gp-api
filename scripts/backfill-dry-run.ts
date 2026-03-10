@@ -6,8 +6,7 @@
  * Results are streamed to a JSONL file so you can `tail -f` while it runs.
  *
  * Usage:
- *   DATABASE_URL="postgres://..." ELECTION_API_URL="https://election-api.goodparty.org" \
- *     npx tsx scripts/backfill-dry-run.ts
+ *   npx nest build && npx tsx scripts/backfill-dry-run.ts
  *
  * Required env vars:
  *   DATABASE_URL          — Postgres connection string
@@ -36,17 +35,17 @@
  *   # Records that would change
  *   cat scripts/output/backfill-dry-run-detail.jsonl | jq 'select(.wouldWrite == true)' | wc -l
  */
-import '../src/configrc'
+import '../dist/configrc'
 
 import { NestFactory } from '@nestjs/core'
 import { createWriteStream, mkdirSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { AppModule } from '../src/app.module'
+import { BackfillModule } from './backfill.module'
 import {
   BackfillDryRunRecord,
   OrganizationsBackfillService,
-} from '../src/organizations/services/organizations-backfill.service'
+} from '../dist/organizations/services/organizations-backfill.service'
 
 const OUTPUT_DIR = join(__dirname, 'output')
 const DETAIL_PATH = join(OUTPUT_DIR, 'backfill-dry-run-detail.jsonl')
@@ -56,7 +55,7 @@ async function main() {
   mkdirSync(OUTPUT_DIR, { recursive: true })
 
   console.log('Bootstrapping NestJS application context...')
-  const app = await NestFactory.createApplicationContext(AppModule, {
+  const app = await NestFactory.createApplicationContext(BackfillModule, {
     logger: ['error', 'warn'],
   })
 
