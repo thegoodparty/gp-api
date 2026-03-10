@@ -1,7 +1,10 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { useTestService } from '@/test-service'
 import { describe, expect, it, vi } from 'vitest'
-import { OrganizationsBackfillService } from './organizations-backfill.service'
+import {
+  BackfillDryRunRecord,
+  OrganizationsBackfillService,
+} from './organizations-backfill.service'
 
 const service = useTestService()
 
@@ -592,6 +595,123 @@ describe('OrganizationsBackfillService', () => {
       positionId: null,
       customPositionName: 'City Assessor',
       ownerId: service.user.id,
+    })
+  })
+
+  describe('dryRun', () => {
+    it('never writes to the database', async () => {
+      const electionsService = service.app.get(ElectionsService)
+      vi.spyOn(
+        electionsService,
+        'getPositionByBallotReadyId',
+      ).mockResolvedValue({
+        id: 'dry-run-pos',
+        brPositionId: 'br-dry',
+        brDatabaseId: 'br-db-dry',
+        state: 'CA',
+        name: 'Mayor',
+        district: {
+          id: 'dry-district',
+          L2DistrictType: 'City',
+          L2DistrictName: 'Test City',
+          projectedTurnout: null,
+        },
+      })
+
+      const campaign = await service.prisma.campaign.create({
+        data: {
+          userId: service.user.id,
+          slug: 'test-dry-run',
+          details: { positionId: 'br-dry', state: 'CA' },
+        },
+      })
+
+      await service.prisma.pathToVictory.create({
+        data: {
+          campaignId: campaign.id,
+          data: { electionType: 'City', electionLocation: 'Test City' },
+        },
+      })
+
+      // Also create an elected office to test both code paths
+      const eo = await service.prisma.electedOffice.create({
+        data: {
+          userId: service.user.id,
+          campaignId: campaign.id,
+        },
+      })
+
+      // Snapshot database state before dry run
+      const orgCountBefore = await service.prisma.organization.count()
+      const campaignBefore = await service.prisma.campaign.findUnique({
+        where: { id: campaign.id },
+      })
+      const eoBefore = await service.prisma.electedOffice.findUnique({
+        where: { id: eo.id },
+      })
+
+      const backfillService = service.app.get(OrganizationsBackfillService)
+
+      const records: BackfillDryRunRecord[] = []
+      const { campaignStats, eoStats } = await backfillService.dryRun(
+        (record) => {
+          records.push(record)
+        },
+      )
+
+      // --- Verify NO database writes occurred ---
+
+      // No organizations were created
+      const orgCountAfter = await service.prisma.organization.count()
+      expect(orgCountAfter).toBe(orgCountBefore)
+
+      // No org exists for the test campaign or elected office
+      const campaignOrg = await service.prisma.organization.findUnique({
+        where: { slug: `campaign-${campaign.id}` },
+      })
+      expect(campaignOrg).toBeNull()
+
+      const eoOrg = await service.prisma.organization.findUnique({
+        where: { slug: `eo-${eo.id}` },
+      })
+      expect(eoOrg).toBeNull()
+
+      // Campaign and EO organizationSlug were not updated
+      const campaignAfter = await service.prisma.campaign.findUnique({
+        where: { id: campaign.id },
+      })
+      expect(campaignAfter!.organizationSlug).toBe(
+        campaignBefore!.organizationSlug,
+      )
+
+      const eoAfter = await service.prisma.electedOffice.findUnique({
+        where: { id: eo.id },
+      })
+      expect(eoAfter!.organizationSlug).toBe(eoBefore!.organizationSlug)
+
+      // --- Verify records were emitted with correct resolution ---
+      expect(records.length).toBeGreaterThan(0)
+
+      const campaignRecord = records.find(
+        (r) => r.type === 'campaign' && r.id === campaign.id,
+      )
+      expect(campaignRecord).toBeDefined()
+      expect(campaignRecord!.resolved?.category).toBe('exact_match')
+      expect(campaignRecord!.wouldWrite).toBe(true)
+      expect(campaignRecord!.wouldCreate).toBe(true)
+
+      const eoRecord = records.find(
+        (r) => r.type === 'elected-office' && r.id === eo.id,
+      )
+      expect(eoRecord).toBeDefined()
+      expect(eoRecord!.wouldWrite).toBe(true)
+      expect(eoRecord!.wouldCreate).toBe(true)
+
+      // Stats should reflect the processed records
+      expect(campaignStats.exact_match).toBeGreaterThanOrEqual(1)
+      expect(
+        Object.values(eoStats).reduce((a, b) => a + b, 0),
+      ).toBeGreaterThanOrEqual(1)
     })
   })
 

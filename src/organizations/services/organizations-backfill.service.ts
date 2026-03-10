@@ -1,10 +1,40 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { Injectable } from '@nestjs/common'
-import { Timeout } from '@nestjs/schedule'
 import { ElectedOffice } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { OrganizationsService } from './organizations.service'
+
+export type BackfillDryRunRecord = {
+  type: 'campaign' | 'elected-office'
+  id: number | string
+  slug: string
+  userId: number
+  existingOrg: {
+    positionId: string | null
+    overrideDistrictId: string | null
+    customPositionName: string | null
+  } | null
+  resolved: {
+    positionId: string | null
+    overrideDistrictId: string | null
+    customPositionName: string | null
+    category: string
+  } | null
+  wouldWrite: boolean
+  wouldCreate: boolean
+  wouldLinkRecord: boolean
+  inputFields: {
+    error: string | null
+    state: string
+    ballotReadyPositionId: string | null
+    L2DistrictType: string
+    L2DistrictName: string
+    office: string
+    otherOffice: string
+  }
+  error?: string
+}
 
 /** Categories describing the outcome of resolving an organization's position/district. */
 export const BackfillCategory = {
@@ -32,9 +62,10 @@ export const BackfillCategory = {
 } as const
 
 /**
- * Runs at boot time to ensure every Campaign and ElectedOffice has a
- * corresponding Organization row populated with the best available
- * position and district data from the election-api.
+ * Ensures every Campaign and ElectedOffice has a corresponding Organization
+ * row populated with the best available position and district data from the
+ * election-api. Call `backfillOrganizations()` to run the real backfill, or
+ * `dryRun()` to preview what would happen without writing.
  *
  * ## Why this exists
  * Organizations were introduced after Campaigns and ElectedOffices already
@@ -74,9 +105,8 @@ export class OrganizationsBackfillService extends createPrismaBase(
     return counts
   }
 
-  /** Entry point — runs once at boot via @Timeout(0). */
-  @Timeout(0)
-  private async backfillOrganizations() {
+  /** Entry point — call manually from a script or ECS task. */
+  async backfillOrganizations() {
     this.logger.info('[organization backfill] Starting organization backfill')
     const campaignStats = await this.backfillCampaignOrganizations()
     const eoStats = await this.backfillElectedOfficeOrganizations()
@@ -84,6 +114,226 @@ export class OrganizationsBackfillService extends createPrismaBase(
       { campaignStats, electedOfficeStats: eoStats },
       '[organization backfill] Organization backfill complete',
     )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dry run
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Runs the full resolution pipeline without writing anything.
+   * Calls `onRecord` for each campaign/elected-office so the caller can
+   * stream results to a file in real time.
+   */
+  async dryRun(onRecord: (record: BackfillDryRunRecord) => void): Promise<{
+    campaignStats: Record<string, number>
+    eoStats: Record<string, number>
+  }> {
+    this.logger.info('[organization backfill] Starting dry run')
+
+    const campaignStats = OrganizationsBackfillService.newCategoryCounts()
+    let campaignCursor: number | undefined
+    let campaignsProcessed = 0
+
+    while (true) {
+      const campaigns = await this.client.campaign.findMany({
+        take: OrganizationsBackfillService.BATCH_SIZE,
+        ...(campaignCursor ? { skip: 1, cursor: { id: campaignCursor } } : {}),
+        orderBy: { id: 'asc' },
+        include: { pathToVictory: true },
+      })
+
+      if (campaigns.length === 0) break
+
+      for (const campaign of campaigns) {
+        const record = await this.dryRunCampaign(campaign)
+        campaignStats[record.resolved?.category ?? 'error']++
+        onRecord(record)
+      }
+
+      campaignsProcessed += campaigns.length
+      campaignCursor = campaigns[campaigns.length - 1].id
+      this.logger.info(
+        { processed: campaignsProcessed },
+        '[organization backfill] Dry run campaign progress',
+      )
+    }
+
+    const eoStats = OrganizationsBackfillService.newCategoryCounts()
+    let eoCursor: string | undefined
+    let eosProcessed = 0
+
+    while (true) {
+      const electedOffices = await this.client.electedOffice.findMany({
+        take: OrganizationsBackfillService.BATCH_SIZE,
+        ...(eoCursor ? { skip: 1, cursor: { id: eoCursor } } : {}),
+        orderBy: { id: 'asc' },
+        include: { campaign: { include: { pathToVictory: true } } },
+      })
+
+      if (electedOffices.length === 0) break
+
+      for (const eo of electedOffices) {
+        const record = await this.dryRunElectedOffice(eo)
+        eoStats[record.resolved?.category ?? 'error']++
+        onRecord(record)
+      }
+
+      eosProcessed += electedOffices.length
+      eoCursor = electedOffices[electedOffices.length - 1].id
+      this.logger.info(
+        { processed: eosProcessed },
+        '[organization backfill] Dry run elected office progress',
+      )
+    }
+
+    this.logger.info(
+      { campaignStats, eoStats },
+      '[organization backfill] Dry run complete',
+    )
+    return { campaignStats, eoStats }
+  }
+
+  private async dryRunCampaign(
+    campaign: CampaignWith<'pathToVictory'>,
+  ): Promise<BackfillDryRunRecord> {
+    const slug = OrganizationsService.campaignOrgSlug(campaign.id)
+    const fields = this.extractCampaignFields(campaign)
+
+    try {
+      const existing = await this.model.findUnique({ where: { slug } })
+      if (existing?.positionId || existing?.overrideDistrictId) {
+        return {
+          type: 'campaign',
+          id: campaign.id,
+          slug,
+          userId: campaign.userId,
+          existingOrg: {
+            positionId: existing.positionId,
+            overrideDistrictId: existing.overrideDistrictId,
+            customPositionName: existing.customPositionName,
+          },
+          resolved: {
+            positionId: null,
+            overrideDistrictId: null,
+            customPositionName: null,
+            category: BackfillCategory.SKIPPED_ALREADY_POPULATED,
+          },
+          wouldWrite: false,
+          wouldCreate: false,
+          wouldLinkRecord: false,
+          inputFields: fields,
+        }
+      }
+
+      const result = await this.resolvePositionAndDistrict(campaign)
+      const wouldCreate = !existing
+      const wouldLinkRecord = campaign.organizationSlug !== slug
+
+      return {
+        type: 'campaign',
+        id: campaign.id,
+        slug,
+        userId: campaign.userId,
+        existingOrg: existing
+          ? {
+              positionId: existing.positionId,
+              overrideDistrictId: existing.overrideDistrictId,
+              customPositionName: existing.customPositionName,
+            }
+          : null,
+        resolved: result,
+        wouldWrite: true,
+        wouldCreate,
+        wouldLinkRecord,
+        inputFields: fields,
+      }
+    } catch (e) {
+      return {
+        type: 'campaign',
+        id: campaign.id,
+        slug,
+        userId: campaign.userId,
+        existingOrg: null,
+        resolved: null,
+        wouldWrite: false,
+        wouldCreate: false,
+        wouldLinkRecord: false,
+        inputFields: fields,
+        error: e instanceof Error ? e.message : String(e),
+      }
+    }
+  }
+
+  private async dryRunElectedOffice(
+    eo: ElectedOffice & { campaign: CampaignWith<'pathToVictory'> },
+  ): Promise<BackfillDryRunRecord> {
+    const slug = OrganizationsService.electedOfficeOrgSlug(eo.id)
+    const fields = this.extractCampaignFields(eo.campaign)
+
+    try {
+      const existing = await this.model.findUnique({ where: { slug } })
+      if (existing?.positionId || existing?.overrideDistrictId) {
+        return {
+          type: 'elected-office',
+          id: eo.id,
+          slug,
+          userId: eo.userId,
+          existingOrg: {
+            positionId: existing.positionId,
+            overrideDistrictId: existing.overrideDistrictId,
+            customPositionName: existing.customPositionName,
+          },
+          resolved: {
+            positionId: null,
+            overrideDistrictId: null,
+            customPositionName: null,
+            category: BackfillCategory.SKIPPED_ALREADY_POPULATED,
+          },
+          wouldWrite: false,
+          wouldCreate: false,
+          wouldLinkRecord: false,
+          inputFields: fields,
+        }
+      }
+
+      const result = await this.resolvePositionAndDistrict(eo.campaign)
+      const wouldCreate = !existing
+      const wouldLinkRecord = eo.organizationSlug !== slug
+
+      return {
+        type: 'elected-office',
+        id: eo.id,
+        slug,
+        userId: eo.userId,
+        existingOrg: existing
+          ? {
+              positionId: existing.positionId,
+              overrideDistrictId: existing.overrideDistrictId,
+              customPositionName: existing.customPositionName,
+            }
+          : null,
+        resolved: result,
+        wouldWrite: true,
+        wouldCreate,
+        wouldLinkRecord,
+        inputFields: fields,
+      }
+    } catch (e) {
+      return {
+        type: 'elected-office',
+        id: eo.id,
+        slug,
+        userId: eo.userId,
+        existingOrg: null,
+        resolved: null,
+        wouldWrite: false,
+        wouldCreate: false,
+        wouldLinkRecord: false,
+        inputFields: fields,
+        error: e instanceof Error ? e.message : String(e),
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
