@@ -18,9 +18,14 @@ export const ALERT_OWNERSHIP: Record<SlackGroup, ControllerName[]> = {
 
 export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
   'GET /v1/contacts': {
-    p95LatencyMs: 3000,
+    p95LatencyMs: 5000,
   },
-  // Add more per-endpoint overrides here.
+  'GET /v1/contacts/download': {
+    p95LatencyMs: 8000,
+  },
+  'POST /v1/polls/analyze-bias': {
+    p95LatencyMs: 6000,
+  },
 }
 
 const tempoExploreLink = (query: string) => {
