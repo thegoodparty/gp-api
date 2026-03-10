@@ -26,6 +26,7 @@
     "seed": "npx prisma db seed",
     "seed:all": "npx prisma db seed -- --type all",
     "seed:csv": "npx prisma db seed -- --type csv",
+    "seed:scenario": "tsx ./seed/scenarios.ts",
     "generate": "npx prisma generate && tsx scripts/generate-route-types.ts",
     "codegen": "graphql-codegen",
     "test:e2e": "playwright test --config=e2e-tests/playwright.config.ts",

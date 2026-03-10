@@ -23,8 +23,17 @@ export const EVENTS = {
   },
   //  ⚠️  DO NOT MODIFY - Used by HubSpot workflows for 10DLC compliance tracking
   // Used in: https://app.hubspot.com/workflows/21589597/platform/flow/1739287110/edit
+  CandidateWebsite: {
+    Published: 'Candidate Website - Published',
+    PurchasedDomain: 'Candidate Website - Purchased domain',
+  },
   Outreach: {
+    //  ⚠️  DO NOT MODIFY - Used by HubSpot workflows for 10DLC compliance tracking
     ComplianceCompleted: 'Voter Outreach - 10DLC Compliance Completed',
+    //  ⚠️  DO NOT MODIFY - Used by HubSpot workflows for 10DLC compliance tracking
+    ComplianceFormSubmitted: 'Voter Outreach - 10DLC Compliance Form Submitted',
+    //  ⚠️  DO NOT MODIFY - Used by HubSpot workflows for 10DLC compliance tracking
+    CompliancePinSubmitted: 'Voter Outreach - 10DLC Compliance PIN Submitted',
     FreeTextsOfferRedeemed: 'Voter Outreach - Free Texts Offer Redeemed',
     CampaignVerifyTokenStatusUpdate: 'Campaign Verify Token Status Update',
   },

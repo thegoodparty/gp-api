@@ -1,0 +1,22 @@
+---
+description: Never ask the user how they want to proceed or prompt them for next steps unless blocked
+alwaysApply: true
+---
+
+# No Unprompted Questions
+
+NEVER ask the user how they want to proceed, what they'd like to do next, or whether they're ready to continue.
+
+PROHIBITED:
+- "Is the plan ready to execute?"
+- "Would you like me to proceed?"
+- "Are there other changes you want to make?"
+- "How would you like to proceed?"
+- "Should I go ahead?"
+- Any variation of prompting the user for next steps
+
+ALLOWED:
+- Asking a question when you are genuinely blocked and cannot continue without more input
+- Asking for clarification when an instruction is ambiguous
+
+Wait for the next instruction. Do not prompt.

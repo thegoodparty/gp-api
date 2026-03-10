@@ -154,10 +154,6 @@ export class PollsController {
         )
       }
 
-      if (!campaign.details.positionId) {
-        throw new BadRequestException('No position found on campaign')
-      }
-
       const p2v = campaign.pathToVictory?.data
       electedOffice = await this.electedOfficeService.create({
         isActive: true,

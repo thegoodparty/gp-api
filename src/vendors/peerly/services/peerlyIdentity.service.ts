@@ -1,17 +1,13 @@
-import { HttpService } from '@nestjs/axios'
 import {
-  BadGatewayException,
   BadRequestException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { method as HttpMethod } from '@poppanator/http-constants'
 import { Campaign, Domain, TcrCompliance, User } from '@prisma/client'
 import { format } from '@redtea/format-axios-error'
-import { AxiosRequestConfig, AxiosResponse, isAxiosError } from 'axios'
+import { isAxiosError } from 'axios'
 import { parsePhoneNumberWithError } from 'libphonenumber-js'
-import { lastValueFrom } from 'rxjs'
 import { AreaCodeFromZipService } from 'src/ai/util/areaCodeFromZip.util'
 import { resolveJobGeographyFromAddress } from 'src/outreach/util/campaignGeography.util'
 import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
@@ -20,26 +16,21 @@ import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { CreateTcrCompliancePayload } from '../../../campaigns/tcrCompliance/campaignTcrCompliance.types'
 import { DateFormats, formatDate } from '../../../shared/util/date.util'
 import { ensureUrlHasProtocol } from '../../../shared/util/strings.util'
-import { UsersService } from '../../../users/services/users.service'
 import { getUserFullName } from '../../../users/util/users.util'
 import { GooglePlacesService } from '../../google/services/google-places.service'
 import { extractAddressComponents } from '../../google/util/GooglePlaces.util'
-import { SlackService } from '../../slack/services/slack.service'
-import { SlackChannel, SlackMessageType } from '../../slack/slackService.types'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import {
   Approve10DLCBrandResponseBody,
   BrandApprovalResult,
-  BuildPeerlyErrorSlackMessageBlocksParams,
   CampaignVerificationStatus,
-  HandleApiErrorParams,
   Peerly10DlcBrandData,
   Peerly10DLCBrandSubmitResponseBody,
   PEERLY_CV_VERIFICATION_TYPE,
+  PeerlyApiErrorContext,
   PeerlyCreateCVTokenResponse,
   PeerlyGetCvRequestResponseBody,
   PeerlyGetIdentitiesResponseBody,
-  PeerlyHttpRequestConfig,
   PeerlyIdentity,
   PeerlyIdentityCreateResponseBody,
   PeerlyIdentityProfileResponseBody,
@@ -55,20 +46,25 @@ import {
   PEERLY_LOCALITIES,
   PEERLY_USECASE,
 } from './peerly.const'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import { SlackService } from '../../slack/services/slack.service'
+import { SlackChannel } from '../../slack/slackService.types'
+import { UsersService } from '../../../users/services/users.service'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
+import { PeerlyHttpService } from './peerlyHttp.service'
+import { buildPeerlySlackErrorMessage } from '../utils/buildPeerlySlackErrorMessage.util'
 import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class PeerlyIdentityService extends PeerlyBaseConfig {
   constructor(
     protected readonly logger: PinoLogger,
-    private readonly httpService: HttpService,
-    private readonly peerlyAuth: PeerlyAuthenticationService,
+    private readonly peerlyHttpService: PeerlyHttpService,
+    private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
     private readonly placesService: GooglePlacesService,
-    private readonly slackService: SlackService,
-    private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
     private readonly areaCodeFromZipService: AreaCodeFromZipService,
+    private readonly slackService: SlackService,
+    private readonly usersService: UsersService,
   ) {
     super(logger)
   }
@@ -79,135 +75,39 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       : `${userFullName} - ${campaignEIN}`
   }
 
-  private async handleApiError({
-    error,
-    requestConfig,
-    httpExceptionMethod,
-    peerlyIdentityId,
-    campaign,
-  }: HandleApiErrorParams): Promise<never> {
-    const formattedError = (isAxiosError(error) && format(error)) || error
-    const genericPeerlyErrorMessage = 'Peerly API ERROR'
-    const errorMessage = `${genericPeerlyErrorMessage}: ${formattedError ? JSON.stringify(formattedError) : ''}`
-
-    this.logger.error({ data: !formattedError ? error : '' }, errorMessage)
-
-    await this.slackService.message(
-      {
-        blocks: await this.buildPeerlyErrorSlackMessageBlocks({
-          requestConfig,
-          formattedError:
-            typeof formattedError === 'string'
-              ? formattedError
-              : JSON.stringify(formattedError),
-          peerlyIdentityId,
-          campaign,
-        }),
-      },
-      SlackChannel.bot10DlcCompliance,
-    )
-
-    if (httpExceptionMethod) {
-      throw new httpExceptionMethod(genericPeerlyErrorMessage)
-    }
-    // TODO: vendor services should just throw the exception that caused the problem
-    //  instead of determining the Http response w/ `BadGatewayException`.
-    //  That should happen in the consumer services of vendor services:
-    //  https://goodparty.clickup.com/t/86ac8y227
-
-    throw new BadGatewayException(genericPeerlyErrorMessage, {
-      cause: error,
-    })
-  }
-
-  // TODO: move this out to a base service or utility once we have more than one
-  //  service that needs it
-  private async getAxiosRequestConfig(): Promise<AxiosRequestConfig> {
-    return {
-      headers: await this.peerlyAuth.getAuthorizationHeader(),
-      timeout: this.httpTimeoutMs,
-    }
-  }
-
-  // TODO: Figure out how to get this abstracted out to log requests via axios interceptors
-  //  once this package updates their dependency:
-  //  https://github.com/narando/nest-axios-interceptor/pull/655
-  private async makeHttpRequest({
-    url,
-    method,
-    data,
-    config,
-  }: PeerlyHttpRequestConfig): Promise<AxiosResponse> {
-    this.logger.debug(
-      {
-        data: {
-          url,
-          method: method.name,
-          data,
-          config,
-        },
-      },
-      'Initializing HTTP request:',
-    )
-    const twoArgMethods = [HttpMethod.Get, HttpMethod.Delete, HttpMethod.Head]
-    return lastValueFrom(
-      twoArgMethods.includes(method.name.toUpperCase())
-        ? this.httpService[method.name](url, config)
-        : data
-          ? this.httpService[method.name](url, data, config)
-          : this.httpService[method.name](url, null, config),
-    )
-  }
-
   async createIdentity(
     identityName: string,
     campaign: Campaign,
   ): Promise<PeerlyIdentity | undefined> {
     this.logger.debug(`Creating identity with name: '${identityName}'`)
-    const requestConfig = {
-      url: `${this.baseUrl}/identities`,
-      method: this.httpService.post,
-      data: {
-        account_id: this.accountNumber,
-        identity_name: identityName,
-        usecases: [PEERLY_USECASE],
-      },
-      config: await this.getAxiosRequestConfig(),
-    }
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyIdentityCreateResponseBody>
+      const response =
+        await this.peerlyHttpService.post<PeerlyIdentityCreateResponseBody>(
+          '/identities',
+          {
+            account_id: this.accountNumber,
+            identity_name: identityName,
+            usecases: [PEERLY_USECASE],
+          },
+        )
       const { data } = response
       const { Data: identity } = data
       this.logger.debug({ identity }, 'Successfully created identity:')
       return identity
     } catch (error) {
-      await this.handleApiError({
-        error,
-        requestConfig,
-        campaign,
-      })
+      await this.handleApiError(error, { campaign })
     }
   }
 
-  async getIdentities(campaign?: Campaign): Promise<PeerlyIdentity[]> {
+  async getIdentities(campaign: Campaign): Promise<PeerlyIdentity[]> {
     this.logger.debug('Fetching list of identities from Peerly')
-    const requestConfig = {
-      url: `${this.baseUrl}/identities/listByAccount`,
-      method: this.httpService.get,
-      config: {
-        ...(await this.getAxiosRequestConfig()),
-        params: {
-          account_id: this.accountNumber,
-        },
-      } as AxiosRequestConfig,
-    }
     let result: PeerlyIdentity[] = []
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyGetIdentitiesResponseBody>
+      const response =
+        await this.peerlyHttpService.get<PeerlyGetIdentitiesResponseBody>(
+          '/identities/listByAccount',
+          { params: { account_id: this.accountNumber } },
+        )
       const { data } = response
       const { identities } = data
       this.logger.debug(
@@ -216,25 +116,17 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
       result = identities
     } catch (error) {
-      await this.handleApiError({
-        error,
-        requestConfig,
-        campaign: campaign!,
-      })
+      await this.handleApiError(error, { campaign })
     }
     return result
   }
 
   async getIdentityUseCases(peerlyIdentityId: string, campaign: Campaign) {
-    const requestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/get_usecases`,
-      method: this.httpService.get,
-      config: (await this.getAxiosRequestConfig()) as AxiosRequestConfig,
-    }
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyIdentityUseCaseResponseBody>
+      const response =
+        await this.peerlyHttpService.get<PeerlyIdentityUseCaseResponseBody>(
+          `/v2/tdlc/${peerlyIdentityId}/get_usecases`,
+        )
       const { data: useCases } = response
       this.logger.debug(
         { useCases },
@@ -251,12 +143,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           'Use cases for given identity ID could not be found',
         )
       }
-      await this.handleApiError({
-        error: e,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
   }
 
@@ -264,30 +151,21 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     peerlyIdentityId: string,
     campaign: Campaign,
   ): Promise<PeerlyIdentityProfileResponseBody | null> {
-    const requestConfig = {
-      url: `${this.baseUrl}/identities/${peerlyIdentityId}/submitProfile`,
-      method: this.httpService.post,
-      data: {
-        entityType: PEERLY_ENTITY_TYPE,
-        is_political: true,
-      },
-      config: await this.getAxiosRequestConfig(),
-    }
     let result: PeerlyIdentityProfileResponseBody | null = null
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyIdentityProfileResponseBody>
+      const response =
+        await this.peerlyHttpService.post<PeerlyIdentityProfileResponseBody>(
+          `/identities/${peerlyIdentityId}/submitProfile`,
+          {
+            entityType: PEERLY_ENTITY_TYPE,
+            is_political: true,
+          },
+        )
       const { data } = response
       this.logger.debug({ data }, 'Successfully submitted identity profile:')
       result = data
     } catch (error) {
-      await this.handleApiError({
-        error,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
+      await this.handleApiError(error, { campaign, peerlyIdentityId })
     }
     return result
   }
@@ -299,16 +177,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     this.logger.debug(
       `Fetching identity profile for identityId: ${peerlyIdentityId}`,
     )
-    const requestConfig = {
-      url: `${this.baseUrl}/identities/${peerlyIdentityId}/getProfile`,
-      method: this.httpService.get,
-      config: (await this.getAxiosRequestConfig()) as AxiosRequestConfig,
-    }
     let result: PeerlyIdentityProfileResponseBody | null = null
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyIdentityProfileResponseBody>
+      const response =
+        await this.peerlyHttpService.get<PeerlyIdentityProfileResponseBody>(
+          `/identities/${peerlyIdentityId}/getProfile`,
+        )
       const { data } = response
       this.logger.debug(
         { data },
@@ -325,12 +199,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           'Identity profile for given identity ID could not be found',
         )
       }
-      await this.handleApiError({
-        error: e,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
     return result
   }
@@ -394,27 +263,18 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
 
     this.logger.debug({ submitBrandData }, 'Submitting 10DLC brand with data:')
-    const requestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit`,
-      method: this.httpService.post,
-      data: submitBrandData,
-      config: await this.getAxiosRequestConfig(),
-    }
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<Peerly10DLCBrandSubmitResponseBody>
+      const response =
+        await this.peerlyHttpService.post<Peerly10DLCBrandSubmitResponseBody>(
+          `/v2/tdlc/${peerlyIdentityId}/submit`,
+          submitBrandData,
+        )
       const { data } = response
       const { submission_key: submissionKey } = data
       this.logger.debug({ data }, 'Successfully submitted 10DLC brand:')
       return submissionKey
     } catch (error) {
-      await this.handleApiError({
-        error,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
+      await this.handleApiError(error, { campaign, peerlyIdentityId })
     }
   }
 
@@ -434,17 +294,13 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       sample1: `Hello {first_name}, this is Jack, a volunteer from ${committeeName}. We need your support in the upcoming election. Every vote will count, please reply and let me know if you will need any help. Reply STOP to opt-out`,
       sample2: `Hello {first_name}, this is Jill, a volunteer from ${committeeName}. We're looking for volunteers for some canvassing this coming weekend and I was wondering if you may be interested? Reply STOP to opt-out`,
     }
-    const requestConfig: PeerlyHttpRequestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/approve`,
-      method: this.httpService.post,
-      data,
-      config: await this.getAxiosRequestConfig(),
-    }
     try {
       this.logger.debug({ data }, 'Approving 10DLC brand with data:')
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<Approve10DLCBrandResponseBody>
+      const response =
+        await this.peerlyHttpService.post<Approve10DLCBrandResponseBody>(
+          `/v2/tdlc/${peerlyIdentityId}/approve`,
+          data,
+        )
 
       const {
         data: {
@@ -456,11 +312,9 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
 
       return identityBrand
     } catch (error) {
-      await this.handleApiError({
-        error,
-        requestConfig,
+      await this.handleApiError(error, {
         campaign,
-        peerlyIdentityId: peerlyIdentityId!,
+        ...(peerlyIdentityId ? { peerlyIdentityId } : {}),
       })
     }
   }
@@ -472,16 +326,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     this.logger.debug(
       `Fetching Campaign Verify status for identityId: ${peerlyIdentityId}`,
     )
-    const requestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/retrieve_cv`,
-      method: this.httpService.get,
-      config: (await this.getAxiosRequestConfig()) as AxiosRequestConfig,
-    }
     let result: PeerlyGetCvRequestResponseBody | null = null
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyGetCvRequestResponseBody>
+      const response =
+        await this.peerlyHttpService.get<PeerlyGetCvRequestResponseBody>(
+          `/v2/tdlc/${peerlyIdentityId}/retrieve_cv`,
+        )
       const { data } = response
       this.logger.debug(
         { data },
@@ -502,12 +352,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           return null
         }
       }
-      await this.handleApiError({
-        error: e,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
     return result
   }
@@ -610,7 +455,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       filing_url_instructions:
         "Deliver the PIN using the first contact information that matches the candidate's election filing, in the following order: email, text, phone call, then postal mail. If the filing is not publicly available, contact the election authority.",
       locality: peerlyLocale,
-      // Peerly/CV can actually tell themselves if it’s a landline or a cell message.
+      // Peerly/CV can actually tell themselves if it's a landline or a cell message.
       // James from Peerly recommended we send this to cell to have a chance of text messages going through.
       filing_phone_type: 'cell',
       filing_phone_number: phone,
@@ -633,27 +478,21 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         : {}),
     }
 
-    const requestConfig: PeerlyHttpRequestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/submit_cv`,
-      method: this.httpService.post,
-      data: submitCVData,
-      config: await this.getAxiosRequestConfig(),
-    }
     let result: PeerlySubmitCVResponseBody | null = null
     try {
       this.logger.debug({ submitCVData }, 'Submitting CV request with data:')
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlySubmitCVResponseBody>
+      const response =
+        await this.peerlyHttpService.post<PeerlySubmitCVResponseBody>(
+          `/v2/tdlc/${peerlyIdentityId}/submit_cv`,
+          submitCVData,
+        )
       const { data } = response
       this.logger.debug(`Successfully submitted CV request: ${data}`)
       result = data
     } catch (error) {
-      await this.handleApiError({
-        error,
-        requestConfig,
+      await this.handleApiError(error, {
         campaign,
-        peerlyIdentityId: peerlyIdentityId!,
+        ...(peerlyIdentityId ? { peerlyIdentityId } : {}),
       })
     }
     return result
@@ -663,18 +502,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     peerlyIdentityId: string,
     campaign: Campaign,
   ) {
-    const requestConfig: PeerlyHttpRequestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/retrieve_cv`,
-      method: this.httpService.get,
-      config: await this.getAxiosRequestConfig(),
-    }
     try {
       this.logger.debug(
         `Retrieving campaign verify status for identityId: ${peerlyIdentityId}`,
       )
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyRetrieveCampaignVerifyStatusResponseBody>
+      const response =
+        await this.peerlyHttpService.get<PeerlyRetrieveCampaignVerifyStatusResponseBody>(
+          `/v2/tdlc/${peerlyIdentityId}/retrieve_cv`,
+        )
       const { data } = response
       const { verification_status } = data
       this.logger.debug(
@@ -683,12 +518,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
       return verification_status
     } catch (e) {
-      await this.handleApiError({
-        error: e,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
   }
 
@@ -697,18 +527,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     pin: string,
     campaign: Campaign,
   ) {
-    const requestConfig: PeerlyHttpRequestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/verify_pin`,
-      method: this.httpService.post,
-      data: {
-        code: pin,
-      },
-      config: await this.getAxiosRequestConfig(),
-    }
     try {
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyVerifyCVPinResponse>
+      const response =
+        await this.peerlyHttpService.post<PeerlyVerifyCVPinResponse>(
+          `/v2/tdlc/${peerlyIdentityId}/verify_pin`,
+          { code: pin },
+        )
       const { data } = response
       const { cv_verification_status } = data
       return cv_verification_status === CampaignVerificationStatus.VERIFIED
@@ -719,20 +543,14 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           'Peerly API returned 400 Bad Request when verifying CV PIN. This is likely due to an invalid PIN. ',
         )
         // throw new UnprocessableEntityException('PIN could not be validated')
-        await this.handleApiError({
-          error: e,
-          requestConfig,
-          httpExceptionMethod: UnprocessableEntityException,
+        await this.handleApiError(e, {
           campaign,
           peerlyIdentityId,
+          httpExceptionClass: UnprocessableEntityException,
         })
+      } else {
+        await this.handleApiError(e, { campaign, peerlyIdentityId })
       }
-      await this.handleApiError({
-        error: e,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
     }
   }
 
@@ -740,217 +558,60 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     peerlyIdentityId: string,
     campaign: Campaign,
   ) {
-    const requestConfig: PeerlyHttpRequestConfig = {
-      url: `${this.baseUrl}/v2/tdlc/${peerlyIdentityId}/create_cv_token`,
-      method: this.httpService.post,
-      config: await this.getAxiosRequestConfig(),
-    }
     try {
       this.logger.debug(
         `Creating campaign verify token for identityId: ${peerlyIdentityId}`,
       )
-      const response = (await this.makeHttpRequest(
-        requestConfig,
-      )) as AxiosResponse<PeerlyCreateCVTokenResponse>
+      const response =
+        await this.peerlyHttpService.post<PeerlyCreateCVTokenResponse>(
+          `/v2/tdlc/${peerlyIdentityId}/create_cv_token`,
+        )
       const { data } = response
       const { campaign_verify_token } = data
       return campaign_verify_token
     } catch (e) {
-      await this.handleApiError({
-        error: e,
-        requestConfig,
-        campaign,
-        peerlyIdentityId,
-      })
+      await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
   }
 
-  private async buildPeerlyErrorSlackMessageBlocks({
-    requestConfig,
-    formattedError,
-    peerlyIdentityId,
-    campaign,
-  }: BuildPeerlyErrorSlackMessageBlocksParams) {
-    const user = await this.usersService.findByCampaign(campaign)
-    const blocks = [
-      {
-        type: SlackMessageType.HEADER,
-        text: {
-          type: SlackMessageType.PLAIN_TEXT,
-          text: '🚨 TCR/10DLC Compliance Flow Error 🚨',
-          emoji: true,
-        },
-      },
-      {
-        type: SlackMessageType.RICH_TEXT,
-        elements: [
-          {
-            type: SlackMessageType.RICH_TEXT_SECTION,
-            elements: [
-              {
-                type: SlackMessageType.EMOJI,
-                name: 'gp',
-              },
-              {
-                type: SlackMessageType.TEXT,
-                text: ` User:`,
-                style: {
-                  bold: true,
-                },
-              },
-            ],
-          },
-          {
-            type: SlackMessageType.RICH_TEXT_LIST,
-            style: 'bullet',
-            elements: [
-              {
-                type: SlackMessageType.RICH_TEXT_SECTION,
-                elements: [
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: ' Name: ',
-                    style: {
-                      bold: true,
-                    },
-                  },
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: String(getUserFullName(user!)),
-                  },
-                ],
-              },
-              {
-                type: SlackMessageType.RICH_TEXT_SECTION,
-                elements: [
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: ' Email: ',
-                    style: {
-                      bold: true,
-                    },
-                  },
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: String(user!.email),
-                  },
-                ],
-              },
-              {
-                type: SlackMessageType.RICH_TEXT_SECTION,
-                elements: [
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: ' Phone: ',
-                    style: {
-                      bold: true,
-                    },
-                  },
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: String(user!.phone),
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            type: SlackMessageType.RICH_TEXT_SECTION,
-            elements: [
-              {
-                type: SlackMessageType.EMOJI,
-                name: 'eyeglasses',
-              },
-              {
-                type: SlackMessageType.TEXT,
-                text: ` Candidate Peerly Identity ID: ${peerlyIdentityId || 'N/A'}`,
-                style: {
-                  bold: true,
-                },
-              },
-            ],
-          },
-        ],
-      },
-      {
-        type: SlackMessageType.DIVIDER,
-      },
-      {
-        type: SlackMessageType.RICH_TEXT,
-        elements: [
-          {
-            type: SlackMessageType.RICH_TEXT_SECTION,
-            elements: [
-              {
-                type: SlackMessageType.EMOJI,
-                name: 'phone',
-              },
-              {
-                type: SlackMessageType.TEXT,
-                text: ' Request Config:',
-                style: {
-                  bold: true,
-                },
-              },
-            ],
-          },
-          {
-            type: SlackMessageType.RICH_TEXT_LIST,
-            style: 'bullet',
-            elements: [
-              {
-                type: SlackMessageType.RICH_TEXT_SECTION,
-                elements: [
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: String(JSON.stringify(requestConfig)),
-                  },
-                ],
-              },
-            ].filter((elem) => elem !== undefined),
-          },
-        ],
-      },
-      {
-        type: SlackMessageType.DIVIDER,
-      },
-      {
-        type: SlackMessageType.RICH_TEXT,
-        elements: [
-          {
-            type: SlackMessageType.RICH_TEXT_SECTION,
-            elements: [
-              {
-                type: SlackMessageType.EMOJI,
-                name: 'zap',
-              },
-              {
-                type: SlackMessageType.TEXT,
-                text: ' Response Error:',
-                style: {
-                  bold: true,
-                },
-              },
-            ],
-          },
-          {
-            type: SlackMessageType.RICH_TEXT_LIST,
-            style: 'bullet',
-            elements: [
-              {
-                type: SlackMessageType.RICH_TEXT_SECTION,
-                elements: [
-                  {
-                    type: SlackMessageType.TEXT,
-                    text: String(formattedError),
-                  },
-                ],
-              },
-            ].filter((elem) => elem !== undefined),
-          },
-        ],
-      },
-    ]
-    return blocks
+  private async handleApiError(
+    error: unknown,
+    context: PeerlyApiErrorContext,
+  ): Promise<never> {
+    if (context.campaign) {
+      const user = await this.usersService.findByCampaign(context.campaign)
+      if (user) {
+        const formattedError = (isAxiosError(error) && format(error)) || error
+        await this.sendSlackErrorNotification(
+          formattedError,
+          user,
+          context.peerlyIdentityId,
+        )
+      }
+    }
+    return this.peerlyErrorHandling.handleApiError({
+      error,
+      context,
+      logger: this.logger,
+    })
+  }
+
+  private async sendSlackErrorNotification(
+    formattedError: unknown,
+    user: User,
+    peerlyIdentityId?: string,
+  ) {
+    const errorString =
+      typeof formattedError === 'string'
+        ? formattedError
+        : JSON.stringify(formattedError)
+
+    const blocks = buildPeerlySlackErrorMessage({
+      user,
+      formattedError: errorString,
+      peerlyIdentityId,
+    })
+
+    await this.slackService.message({ blocks }, SlackChannel.bot10DlcCompliance)
   }
 }

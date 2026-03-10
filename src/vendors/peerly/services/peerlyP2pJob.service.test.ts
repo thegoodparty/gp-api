@@ -6,17 +6,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { P2P_JOB_DEFAULTS } from '../constants/p2pJob.constants'
 import { PeerlyMediaService } from './peerlyMedia.service'
 import { PeerlyP2pJobService } from './peerlyP2pJob.service'
-import { PeerlyP2pSmsService } from './peerlyP2pSms.service'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
+import { PeerlyHttpService } from './peerlyHttp.service'
+import { CrmCampaignsService } from 'src/campaigns/services/crmCampaigns.service'
 
 describe('PeerlyP2pJobService', () => {
   let service: PeerlyP2pJobService
   let mockMediaService: { createMedia: ReturnType<typeof vi.fn> }
-  let mockSmsService: {
-    createJob: ReturnType<typeof vi.fn>
-    assignListToJob: ReturnType<typeof vi.fn>
-    requestCanvassers: ReturnType<typeof vi.fn>
-    retrieveJobsListByIdentityId: ReturnType<typeof vi.fn>
-    retrieveJob: ReturnType<typeof vi.fn>
+  let mockHttpService: {
+    post: ReturnType<typeof vi.fn>
+    get: ReturnType<typeof vi.fn>
+    validateResponse: ReturnType<typeof vi.fn>
+  }
+  let mockErrorHandling: {
+    handleApiError: ReturnType<typeof vi.fn>
+  }
+  let mockCrmCampaigns: {
+    getCrmCompanyOwner: ReturnType<typeof vi.fn>
   }
 
   const baseJobParams = {
@@ -38,20 +44,45 @@ describe('PeerlyP2pJobService', () => {
     mockMediaService = {
       createMedia: vi.fn().mockResolvedValue('media-456'),
     }
-    mockSmsService = {
-      createJob: vi.fn().mockResolvedValue('job-789'),
-      assignListToJob: vi.fn().mockResolvedValue(undefined),
-      requestCanvassers: vi.fn().mockResolvedValue(undefined),
-      retrieveJobsListByIdentityId: vi.fn(),
-      retrieveJob: vi.fn(),
+    mockHttpService = {
+      post: vi.fn(),
+      get: vi.fn(),
+      validateResponse: vi
+        .fn()
+        .mockImplementation((_data, _dto, _ctx) => _data),
     }
+    mockErrorHandling = {
+      handleApiError: vi.fn().mockImplementation(() => {
+        throw new BadGatewayException('mock error')
+      }),
+    }
+    mockCrmCampaigns = {
+      getCrmCompanyOwner: vi.fn().mockResolvedValue(null),
+    }
+
+    mockHttpService.post.mockImplementation((path: string) => {
+      if (
+        path.includes('/1to1/jobs') &&
+        !path.includes('assignlist') &&
+        !path.includes('request_canvassers')
+      ) {
+        return Promise.resolve({ data: { id: 'job-789' }, headers: {} })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    mockHttpService.get.mockResolvedValue({ data: [] })
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PeerlyP2pJobService,
         { provide: PinoLogger, useValue: createMockLogger() },
         { provide: PeerlyMediaService, useValue: mockMediaService },
-        { provide: PeerlyP2pSmsService, useValue: mockSmsService },
+        { provide: PeerlyHttpService, useValue: mockHttpService },
+        {
+          provide: PeerlyErrorHandlingService,
+          useValue: mockErrorHandling,
+        },
+        { provide: CrmCampaignsService, useValue: mockCrmCampaigns },
       ],
     }).compile()
 
@@ -63,7 +94,7 @@ describe('PeerlyP2pJobService', () => {
   })
 
   describe('createPeerlyP2pJob', () => {
-    it('passes didState and didNpaSubset through to SMS service createJob', async () => {
+    it('passes didState and didNpaSubset through to the job creation POST', async () => {
       const jobId = await service.createPeerlyP2pJob({
         ...baseJobParams,
         didState: 'CA',
@@ -71,10 +102,14 @@ describe('PeerlyP2pJobService', () => {
       })
 
       expect(jobId).toBe('job-789')
-      expect(mockSmsService.createJob).toHaveBeenCalledWith(
+      const jobPostCall = mockHttpService.post.mock.calls.find(
+        (c) => c[0] === '/1to1/jobs',
+      )
+      expect(jobPostCall).toBeDefined()
+      expect(jobPostCall![1]).toEqual(
         expect.objectContaining({
-          didState: 'CA',
-          didNpaSubset: ['619', '858'],
+          did_state: 'CA',
+          did_npa_subset: ['619', '858'],
         }),
       )
     })
@@ -82,9 +117,13 @@ describe('PeerlyP2pJobService', () => {
     it('defaults didState to P2P_JOB_DEFAULTS.DID_STATE when not provided', async () => {
       await service.createPeerlyP2pJob(baseJobParams)
 
-      expect(mockSmsService.createJob).toHaveBeenCalledWith(
+      const jobPostCall = mockHttpService.post.mock.calls.find(
+        (c) => c[0] === '/1to1/jobs',
+      )
+      expect(jobPostCall).toBeDefined()
+      expect(jobPostCall![1]).toEqual(
         expect.objectContaining({
-          didState: P2P_JOB_DEFAULTS.DID_STATE,
+          did_state: P2P_JOB_DEFAULTS.DID_STATE,
         }),
       )
     })
@@ -92,11 +131,11 @@ describe('PeerlyP2pJobService', () => {
     it('defaults didNpaSubset to empty array when not provided', async () => {
       await service.createPeerlyP2pJob(baseJobParams)
 
-      expect(mockSmsService.createJob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          didNpaSubset: [],
-        }),
+      const jobPostCall = mockHttpService.post.mock.calls.find(
+        (c) => c[0] === '/1to1/jobs',
       )
+      expect(jobPostCall).toBeDefined()
+      expect(jobPostCall![1]).not.toHaveProperty('did_npa_subset')
     })
 
     it('calls media, createJob, assignList in order', async () => {
@@ -105,12 +144,24 @@ describe('PeerlyP2pJobService', () => {
         callOrder.push('createMedia')
         return 'media-456'
       })
-      mockSmsService.createJob.mockImplementation(async () => {
-        callOrder.push('createJob')
-        return 'job-789'
-      })
-      mockSmsService.assignListToJob.mockImplementation(async () => {
-        callOrder.push('assignListToJob')
+      mockHttpService.post.mockImplementation(async (path: string) => {
+        if (
+          path.includes('/1to1/jobs') &&
+          !path.includes('assignlist') &&
+          !path.includes('request_canvassers')
+        ) {
+          callOrder.push('createJob')
+          return { data: { id: 'job-789' }, headers: {} }
+        }
+        if (path.includes('assignlist')) {
+          callOrder.push('assignListToJob')
+          return { data: {} }
+        }
+        if (path.includes('request_canvassers')) {
+          callOrder.push('requestCanvassers')
+          return { data: {} }
+        }
+        return { data: {} }
       })
 
       await service.createPeerlyP2pJob({
@@ -120,7 +171,6 @@ describe('PeerlyP2pJobService', () => {
       })
 
       expect(callOrder).toEqual(['createMedia', 'createJob', 'assignListToJob'])
-      expect(mockSmsService.requestCanvassers).not.toHaveBeenCalled()
     })
 
     it('passes media ID from createMedia to createJob templates', async () => {
@@ -128,8 +178,13 @@ describe('PeerlyP2pJobService', () => {
 
       await service.createPeerlyP2pJob(baseJobParams)
 
-      const createJobCall = mockSmsService.createJob.mock.calls[0][0]
-      expect(createJobCall.templates[0].media.media_id).toBe('media-custom-id')
+      const jobPostCall = mockHttpService.post.mock.calls.find(
+        (c) => c[0] === '/1to1/jobs',
+      )
+      expect(jobPostCall).toBeDefined()
+      expect(jobPostCall![1].templates[0].media.media_id).toBe(
+        'media-custom-id',
+      )
     })
 
     it('extracts date-only from ISO scheduledDate', async () => {
@@ -138,9 +193,14 @@ describe('PeerlyP2pJobService', () => {
         scheduledDate: '2025-03-15T14:30:00.000Z',
       })
 
-      expect(mockSmsService.createJob).toHaveBeenCalledWith(
+      const jobPostCall = mockHttpService.post.mock.calls.find(
+        (c) => c[0] === '/1to1/jobs',
+      )
+      expect(jobPostCall).toBeDefined()
+      expect(jobPostCall![1]).toEqual(
         expect.objectContaining({
-          scheduledDate: '2025-03-15',
+          start_date: '2025-03-15',
+          end_date: '2025-03-15',
         }),
       )
     })
@@ -154,54 +214,69 @@ describe('PeerlyP2pJobService', () => {
         BadGatewayException,
       )
 
-      expect(mockSmsService.createJob).not.toHaveBeenCalled()
-      expect(mockSmsService.assignListToJob).not.toHaveBeenCalled()
+      expect(mockHttpService.post).not.toHaveBeenCalled()
     })
 
     it('throws BadGatewayException when job creation fails (media already created)', async () => {
-      mockSmsService.createJob.mockRejectedValue(
-        new Error('Job creation failed'),
-      )
+      mockHttpService.post.mockRejectedValue(new Error('Job creation failed'))
 
       await expect(service.createPeerlyP2pJob(baseJobParams)).rejects.toThrow(
         BadGatewayException,
       )
 
       expect(mockMediaService.createMedia).toHaveBeenCalled()
-      expect(mockSmsService.assignListToJob).not.toHaveBeenCalled()
+      expect(
+        mockHttpService.post.mock.calls.some(
+          (c) => typeof c[0] === 'string' && c[0].includes('assignlist'),
+        ),
+      ).toBe(false)
     })
 
     it('throws BadGatewayException when list assignment fails (job already created)', async () => {
-      mockSmsService.assignListToJob.mockRejectedValue(
-        new Error('List assignment failed'),
-      )
+      mockHttpService.post.mockImplementation((path: string) => {
+        if (path.includes('assignlist')) {
+          return Promise.reject(new Error('List assignment failed'))
+        }
+        if (
+          path.includes('/1to1/jobs') &&
+          !path.includes('request_canvassers')
+        ) {
+          return Promise.resolve({ data: { id: 'job-789' }, headers: {} })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       await expect(service.createPeerlyP2pJob(baseJobParams)).rejects.toThrow(
         BadGatewayException,
       )
 
-      expect(mockSmsService.createJob).toHaveBeenCalled()
-      expect(mockSmsService.requestCanvassers).not.toHaveBeenCalled()
+      expect(
+        mockHttpService.post.mock.calls.some((c) => c[0] === '/1to1/jobs'),
+      ).toBe(true)
+      expect(
+        mockHttpService.post.mock.calls.some(
+          (c) =>
+            typeof c[0] === 'string' && c[0].includes('request_canvassers'),
+        ),
+      ).toBe(false)
     })
   })
 
   describe('getJobsByIdentityId', () => {
-    it('returns jobs from SMS service', async () => {
+    it('returns jobs from HTTP service', async () => {
       const mockJobs = [{ id: 'job-1' }, { id: 'job-2' }]
-      mockSmsService.retrieveJobsListByIdentityId.mockResolvedValue(mockJobs)
+      mockHttpService.get.mockResolvedValue({ data: mockJobs })
 
       const result = await service.getJobsByIdentityId('identity-123')
 
       expect(result).toEqual(mockJobs)
-      expect(mockSmsService.retrieveJobsListByIdentityId).toHaveBeenCalledWith(
-        'identity-123',
+      expect(mockHttpService.get).toHaveBeenCalledWith(
+        expect.stringContaining('identity-123'),
       )
     })
 
     it('throws BadGatewayException when retrieval fails', async () => {
-      mockSmsService.retrieveJobsListByIdentityId.mockRejectedValue(
-        new Error('API error'),
-      )
+      mockHttpService.get.mockRejectedValue(new Error('API error'))
 
       await expect(service.getJobsByIdentityId('identity-123')).rejects.toThrow(
         BadGatewayException,
@@ -210,18 +285,18 @@ describe('PeerlyP2pJobService', () => {
   })
 
   describe('getJob', () => {
-    it('returns job from SMS service', async () => {
+    it('returns job from HTTP service', async () => {
       const mockJob = { id: 'job-1', status: 'active' }
-      mockSmsService.retrieveJob.mockResolvedValue(mockJob)
+      mockHttpService.get.mockResolvedValue({ data: mockJob })
 
       const result = await service.getJob('job-1')
 
       expect(result).toEqual(mockJob)
-      expect(mockSmsService.retrieveJob).toHaveBeenCalledWith('job-1')
+      expect(mockHttpService.get).toHaveBeenCalledWith('/1to1/jobs/job-1')
     })
 
     it('throws BadGatewayException when retrieval fails', async () => {
-      mockSmsService.retrieveJob.mockRejectedValue(new Error('API error'))
+      mockHttpService.get.mockRejectedValue(new Error('API error'))
 
       await expect(service.getJob('job-1')).rejects.toThrow(BadGatewayException)
     })
