@@ -10,8 +10,6 @@ export interface GrafanaConfig {
 
 const LOKI_DATASOURCE_UID = 'grafanacloud-logs'
 const PROM_DATASOURCE_UID = 'grafanacloud-prom'
-const TEMPO_DATASOURCE_UID = 'grafanacloud-traces'
-
 const SLACK_GROUP_IDS: Record<SlackGroup, string> = {
   'serve-bugs': 'S0AD54G9D3K',
   'win-bugs': 'S0AE3NTCXM3',
@@ -20,7 +18,6 @@ const SLACK_GROUP_IDS: Record<SlackGroup, string> = {
 const datasourceConfig = {
   log: { uid: LOKI_DATASOURCE_UID, queryType: 'range' },
   metric: { uid: PROM_DATASOURCE_UID, queryType: 'instant' },
-  trace: { uid: TEMPO_DATASOURCE_UID, queryType: 'traceqlmetrics' },
 } as const
 
 export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
@@ -152,13 +149,8 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
     }),
   })
 
-  // Alerts are only enabled in prod for now
-  if (environment !== 'prod') {
-    return
-  }
-
   const alertFolder = new grafana.oss.Folder('alerts-folder', {
-    title: `Alerts (provisioned via gp-api)`,
+    title: `${environment.toUpperCase()} Alerts (provisioned via gp-api)`,
   })
 
   const alertToRule = (
@@ -173,7 +165,7 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
     annotations: {
       summary: alert.name,
       description: [
-        alert.message,
+        alert.message.replace(/\$ENV/g, environment),
         alert.notify ? `<!subteam^${SLACK_GROUP_IDS[alert.notify]}>` : '',
       ]
         .filter(Boolean)
@@ -189,18 +181,10 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
         queryType: datasourceConfig[alert.type].queryType,
         relativeTimeRange: { from: 600, to: 0 },
         datasourceUid: datasourceConfig[alert.type].uid,
-        model: JSON.stringify(
-          alert.type === 'trace'
-            ? {
-                query: alert.expr.replace(/\$ENV/g, environment),
-                queryType: 'traceqlmetrics',
-                refId: 'A',
-              }
-            : {
-                expr: alert.expr.replace(/\$ENV/g, environment),
-                refId: 'A',
-              },
-        ),
+        model: JSON.stringify({
+          expr: alert.expr.replace(/\$ENV/g, environment),
+          refId: 'A',
+        }),
       },
       {
         refId: 'B',

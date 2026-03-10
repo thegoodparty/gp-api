@@ -1,7 +1,9 @@
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 
 /**
- * Helper to make a factory function that merges a default generator with a custom props object
+ * Helper to make a factory function that deep-merges a default generator with a custom props object.
+ * Uses deepmerge-ts so partial nested overrides (e.g. { data: { hubSpotUpdates: {...} } }) are
+ * merged into the factory defaults rather than replacing them wholesale.
  * @param generateFn Function to generate a default mock entity
  * @returns Factory function that accepts args to override default generated values
  * @example
