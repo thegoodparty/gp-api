@@ -324,9 +324,11 @@ describe('Test Factories', () => {
     })
 
     it('completedTaskIds array is fully replaced when overridden', () => {
-      const campaign = campaignFactory({ completedTaskIds: [10, 20] })
+      const taskId1 = '41b8b290-7e50-4d5a-8c9f-b8e17b253cde'
+      const taskId2 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      const campaign = campaignFactory({ completedTaskIds: [taskId1, taskId2] })
 
-      expect(campaign.completedTaskIds).toEqual([10, 20])
+      expect(campaign.completedTaskIds).toEqual([taskId1, taskId2])
     })
   })
 

@@ -7,8 +7,8 @@
  *   npx tsx seed/scenarios.ts freeTexts
  */
 import { Prisma, PrismaClient, UserRole } from '@prisma/client'
-import { hashPasswordSync } from '../src/users/util/passwords.util'
 import { buildSlug } from '../src/shared/util/slug.util'
+import { hashPasswordSync } from '../src/users/util/passwords.util'
 import { getUserFullName } from '../src/users/util/users.util'
 import { campaignFactory } from './factories/campaign.factory'
 import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
@@ -34,7 +34,8 @@ async function createUserWithCampaign(
     update: {},
     create: {
       ...userData,
-      metaData: userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
+      metaData:
+        userData.metaData !== null ? userData.metaData : Prisma.JsonNull,
     },
   })
 
@@ -101,7 +102,9 @@ async function main() {
 }
 
 main()
-  .then(async () => { await prisma.$disconnect() })
+  .then(async () => {
+    await prisma.$disconnect()
+  })
   .catch(async (e) => {
     console.error(e)
     await prisma.$disconnect()
