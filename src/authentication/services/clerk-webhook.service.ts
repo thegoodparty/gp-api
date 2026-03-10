@@ -85,21 +85,25 @@ export class ClerkWebhookService {
 
     const email = getPrimaryEmail(data)
 
-    await this.usersService.updateUser(
-      { id: user.id },
-      {
-        ...(email ? { email } : {}),
-        ...(data.first_name !== undefined
-          ? { firstName: data.first_name ?? '' }
-          : {}),
-        ...(data.last_name !== undefined
-          ? { lastName: data.last_name ?? '' }
-          : {}),
-        ...(data.first_name !== undefined && data.last_name !== undefined
-          ? { name: `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() }
-          : {}),
-      },
-    )
+    const firstNameChanged = data.first_name !== undefined
+    const lastNameChanged = data.last_name !== undefined
+
+    const updates: Record<string, string> = {}
+    if (email) updates.email = email
+    if (firstNameChanged) updates.firstName = data.first_name ?? ''
+    if (lastNameChanged) updates.lastName = data.last_name ?? ''
+
+    if (firstNameChanged || lastNameChanged) {
+      const first = firstNameChanged
+        ? (data.first_name ?? '')
+        : (user.firstName ?? '')
+      const last = lastNameChanged
+        ? (data.last_name ?? '')
+        : (user.lastName ?? '')
+      updates.name = `${first} ${last}`.trim()
+    }
+
+    await this.usersService.updateUser({ id: user.id }, updates)
     this.logger.info(
       { userId: user.id, clerkId: data.id },
       'Updated user from Clerk',
