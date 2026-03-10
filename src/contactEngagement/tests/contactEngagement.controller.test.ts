@@ -1,4 +1,4 @@
-import { ElectedOffice, Organization } from '@prisma/client'
+import { ElectedOffice } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContactEngagementController } from '../contactEngagement.controller'
 import { ContactEngagementService } from '../contactEngagement.service'
@@ -21,26 +21,20 @@ describe('ContactEngagementController', () => {
   })
 
   describe('getIndividualActivities', () => {
-    const mockOrganization = {
-      slug: 'eo-office-1',
-      ownerId: 1,
-      positionId: null,
-      overrideDistrictId: null,
-      customPositionName: null,
-      electedOffice: {
-        id: 'office-1',
-        userId: 1,
-        campaignId: 1,
-        isActive: true,
-        electedDate: new Date('2024-01-01'),
-        swornInDate: null,
-        termStartDate: null,
-        termEndDate: null,
-        termLengthDays: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as ElectedOffice,
-    } as Organization & { electedOffice: ElectedOffice }
+    const mockElectedOffice: ElectedOffice = {
+      id: 'office-1',
+      userId: 1,
+      campaignId: 1,
+      isActive: true,
+      organizationSlug: null,
+      electedDate: new Date('2024-01-01'),
+      swornInDate: null,
+      termStartDate: null,
+      termEndDate: null,
+      termLengthDays: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
 
     const mockParams = {
       id: 'person-123',
@@ -79,7 +73,7 @@ describe('ContactEngagementController', () => {
       const result = await controller.getIndividualActivities(
         mockParams,
         mockQuery,
-        mockOrganization,
+        mockElectedOffice,
       )
 
       expect(
@@ -95,26 +89,20 @@ describe('ContactEngagementController', () => {
     })
 
     it('uses the elected office id from the decorator', async () => {
-      const differentOrganization = {
-        slug: 'eo-office-42',
-        ownerId: 42,
-        positionId: null,
-        overrideDistrictId: null,
-        customPositionName: null,
-        electedOffice: {
-          id: 'office-42',
-          userId: 42,
-          campaignId: 1,
-          isActive: true,
-          electedDate: new Date('2024-01-01'),
-          swornInDate: null,
-          termStartDate: null,
-          termEndDate: null,
-          termLengthDays: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } as ElectedOffice,
-      } as Organization & { electedOffice: ElectedOffice }
+      const differentElectedOffice: ElectedOffice = {
+        id: 'office-42',
+        userId: 42,
+        campaignId: 1,
+        isActive: true,
+        organizationSlug: null,
+        electedDate: new Date('2024-01-01'),
+        swornInDate: null,
+        termStartDate: null,
+        termEndDate: null,
+        termLengthDays: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
 
       vi.spyOn(
         contactEngagementService,
@@ -124,7 +112,7 @@ describe('ContactEngagementController', () => {
       await controller.getIndividualActivities(
         mockParams,
         mockQuery,
-        differentOrganization,
+        differentElectedOffice,
       )
 
       expect(
