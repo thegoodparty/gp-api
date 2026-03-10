@@ -17,6 +17,8 @@ import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
+import { SlackService } from '../../slack/services/slack.service'
+import { UsersService } from '../../../users/services/users.service'
 import {
   createMockLogger,
   userFactory,
@@ -157,6 +159,14 @@ describe('PeerlyIdentityService', () => {
         {
           provide: AreaCodeFromZipService,
           useValue: { getAreaCodeFromZip: vi.fn() },
+        },
+        {
+          provide: SlackService,
+          useValue: { message: vi.fn() },
+        },
+        {
+          provide: UsersService,
+          useValue: { findByCampaign: vi.fn() },
         },
       ],
     }).compile()
