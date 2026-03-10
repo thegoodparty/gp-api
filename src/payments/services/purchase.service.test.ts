@@ -177,7 +177,7 @@ describe('PurchaseService', () => {
       expect(
         mockStripeService.createCustomCheckoutSession,
       ).toHaveBeenCalledWith(
-        mockUser,
+        { userId: mockUser.id, email: mockUser.email, customerId: undefined },
         expect.objectContaining({
           purchaseType: PurchaseType.TEXT,
           amount: 5000,
@@ -235,7 +235,7 @@ describe('PurchaseService', () => {
       expect(
         mockStripeService.createCustomCheckoutSession,
       ).toHaveBeenCalledWith(
-        mockUser,
+        { userId: mockUser.id, email: mockUser.email, customerId: undefined },
         expect.objectContaining({
           productName: 'Poll Credits',
         }),

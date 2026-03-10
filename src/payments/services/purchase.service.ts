@@ -161,7 +161,14 @@ export class PurchaseService {
       },
     }
 
-    return this.stripeService.createCustomCheckoutSession(user, checkoutPayload)
+    return this.stripeService.createCustomCheckoutSession(
+      {
+        userId: user.id,
+        email: user.email,
+        customerId: user.metaData?.customerId,
+      },
+      checkoutPayload,
+    )
   }
 
   /**
