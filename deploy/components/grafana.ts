@@ -10,6 +10,7 @@ export interface GrafanaConfig {
 
 const LOKI_DATASOURCE_UID = 'grafanacloud-logs'
 const PROM_DATASOURCE_UID = 'grafanacloud-prom'
+const TEMPO_DATASOURCE_UID = 'grafanacloud-traces'
 
 const SLACK_GROUP_IDS: Record<SlackGroup, string> = {
   'serve-bugs': 'S0AD54G9D3K',
@@ -19,6 +20,7 @@ const SLACK_GROUP_IDS: Record<SlackGroup, string> = {
 const datasourceConfig = {
   log: { uid: LOKI_DATASOURCE_UID, queryType: 'range' },
   metric: { uid: PROM_DATASOURCE_UID, queryType: 'instant' },
+  trace: { uid: TEMPO_DATASOURCE_UID, queryType: 'traceqlmetrics' },
 } as const
 
 export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
@@ -187,10 +189,18 @@ export const createGrafanaResources = ({ environment }: GrafanaConfig) => {
         queryType: datasourceConfig[alert.type].queryType,
         relativeTimeRange: { from: 600, to: 0 },
         datasourceUid: datasourceConfig[alert.type].uid,
-        model: JSON.stringify({
-          expr: alert.expr.replace(/\$ENV/g, environment),
-          refId: 'A',
-        }),
+        model: JSON.stringify(
+          alert.type === 'trace'
+            ? {
+                query: alert.expr.replace(/\$ENV/g, environment),
+                queryType: 'traceqlmetrics',
+                refId: 'A',
+              }
+            : {
+                expr: alert.expr.replace(/\$ENV/g, environment),
+                refId: 'A',
+              },
+        ),
       },
       {
         refId: 'B',

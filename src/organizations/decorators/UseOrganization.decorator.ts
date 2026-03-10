@@ -1,13 +1,10 @@
 import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
 import { UseOrganizationGuard } from '../guards/UseOrganization.guard'
 
 export const REQUIRE_ORGANIZATION_META_KEY = 'requireOrganizationDecorator'
 
 export type RequireOrganizationMetadata = {
-  include?: Prisma.OrganizationInclude
   continueIfNotFound?: boolean
-  fallback?: 'campaign' | 'elected-office'
 }
 
 /**
@@ -15,8 +12,10 @@ export type RequireOrganizationMetadata = {
  * to pull in with "@ReqOrganization" decorator.
  *
  * Reads the organization slug from the `X-Organization-Slug` request header.
- * If the header is absent, falls back to deriving the slug from the user's
- * campaign or elected office (when `fallback` is specified).
+ * Used when you need Organization data directly (positionId, overrideDistrictId, etc.).
+ *
+ * For ElectedOffice or Campaign resolution, use @UseElectedOffice() or @UseCampaign()
+ * instead — those guards also resolve via the organization header with userId fallback.
  */
 export const UseOrganization = (args: RequireOrganizationMetadata = {}) => {
   return applyDecorators(
