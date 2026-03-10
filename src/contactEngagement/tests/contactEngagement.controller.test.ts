@@ -21,11 +21,12 @@ describe('ContactEngagementController', () => {
   })
 
   describe('getIndividualActivities', () => {
-    const mockElectedOffice = {
+    const mockElectedOffice: ElectedOffice = {
       id: 'office-1',
       userId: 1,
       campaignId: 1,
       isActive: true,
+      organizationSlug: null,
       electedDate: new Date('2024-01-01'),
       swornInDate: null,
       termStartDate: null,
@@ -33,7 +34,7 @@ describe('ContactEngagementController', () => {
       termLengthDays: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as ElectedOffice
+    }
 
     const mockParams = {
       id: 'person-123',
@@ -88,11 +89,12 @@ describe('ContactEngagementController', () => {
     })
 
     it('uses the elected office id from the decorator', async () => {
-      const differentElectedOffice = {
+      const differentElectedOffice: ElectedOffice = {
         id: 'office-42',
         userId: 42,
         campaignId: 1,
         isActive: true,
+        organizationSlug: null,
         electedDate: new Date('2024-01-01'),
         swornInDate: null,
         termStartDate: null,
@@ -100,7 +102,7 @@ describe('ContactEngagementController', () => {
         termLengthDays: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as ElectedOffice
+      }
 
       vi.spyOn(
         contactEngagementService,
