@@ -30,16 +30,13 @@ describe('UseElectedOfficeGuard', () => {
 
   function buildContext({
     headers = {},
-    params = {},
     userId = 1,
   }: {
     headers?: Record<string, string>
-    params?: Record<string, string>
     userId?: number
   } = {}): ExecutionContext {
     const req = {
       headers,
-      params,
       user: { id: userId },
       electedOffice: undefined,
     }
@@ -77,65 +74,8 @@ describe('UseElectedOfficeGuard', () => {
     )
   })
 
-  describe('step 1: route param', () => {
-    it('resolves EO by route param id and userId', async () => {
-      mockMetadata()
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
-
-      const ctx = buildContext({ params: { id: 'eo-1' } })
-      const result = await guard.canActivate(ctx)
-
-      expect(result).toBe(true)
-      expect(electedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { id: 'eo-1', userId: 1 },
-        include: undefined,
-      })
-      const req = ctx.switchToHttp().getRequest() as {
-        electedOffice?: ElectedOffice
-      }
-      expect(req.electedOffice).toEqual(mockEO)
-    })
-
-    it('uses custom param name', async () => {
-      mockMetadata({ param: 'electedOfficeId' })
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
-
-      const ctx = buildContext({ params: { electedOfficeId: 'eo-1' } })
-      const result = await guard.canActivate(ctx)
-
-      expect(result).toBe(true)
-      expect(electedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { id: 'eo-1', userId: 1 },
-        include: undefined,
-      })
-    })
-
-    it('throws NotFoundException when route param EO not found', async () => {
-      mockMetadata()
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(null)
-
-      const ctx = buildContext({ params: { id: 'nonexistent' } })
-
-      await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
-    })
-
-    it('skips header and fallback when route param is present', async () => {
-      mockMetadata()
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
-
-      const ctx = buildContext({
-        params: { id: 'eo-1' },
-        headers: { 'x-organization-slug': 'campaign-100' },
-      })
-      await guard.canActivate(ctx)
-
-      expect(mockOrgFindFirst).not.toHaveBeenCalled()
-      expect(electedOfficeService.findFirst).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('step 2: organization header', () => {
-    it('resolves EO via org header when no route param', async () => {
+  describe('step 1: organization header', () => {
+    it('resolves EO via org header', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
       vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
@@ -244,8 +184,8 @@ describe('UseElectedOfficeGuard', () => {
     })
   })
 
-  describe('step 3: legacy fallback (userId + isActive)', () => {
-    it('resolves EO by userId when no header and no route param', async () => {
+  describe('step 2: legacy fallback (userId + isActive)', () => {
+    it('resolves EO by userId when no header', async () => {
       mockMetadata()
       vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
 
@@ -285,23 +225,6 @@ describe('UseElectedOfficeGuard', () => {
         electedOffice?: ElectedOffice
       }
       expect(req.electedOffice).toBeUndefined()
-    })
-  })
-
-  describe('param option prevents misuse of route :id', () => {
-    it('does not use route :id when param is set to a different name', async () => {
-      mockMetadata({ param: 'electedOfficeId' })
-      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(mockEO)
-
-      const ctx = buildContext({ params: { id: 'person-123' } })
-      const result = await guard.canActivate(ctx)
-
-      expect(result).toBe(true)
-      // Should NOT have looked up 'person-123' as an EO id
-      expect(electedOfficeService.findFirst).toHaveBeenCalledWith({
-        where: { userId: 1, isActive: true },
-        include: undefined,
-      })
     })
   })
 })

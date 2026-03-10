@@ -17,9 +17,8 @@ import { ElectedOfficeService } from '../services/electedOffice.service'
  * Guard that resolves an ElectedOffice and attaches it to the request.
  *
  * Resolution order:
- * 1. Route param (e.g. `GET /elected-office/:id`) — specific EO by ID + userId.
- * 2. `X-Organization-Slug` header — look up Organization, get its electedOffice.
- * 3. Legacy fallback — user's active elected office (userId + isActive).
+ * 1. `X-Organization-Slug` header — look up Organization, get its electedOffice.
+ * 2. Legacy fallback — user's active elected office (userId + isActive).
  *
  * Once all requests include the organization header, the legacy fallback can be removed.
  */
@@ -36,54 +35,42 @@ export class UseElectedOfficeGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>
-      params?: Record<string, string>
       user: { id: number }
       electedOffice?: ElectedOffice
     }>()
 
-    const { continueIfNotFound, include, param } =
+    const { continueIfNotFound, include } =
       this.reflector.getAllAndOverride<RequireElectedOfficeMetadata>(
         REQUIRE_ELECTED_OFFICE_META_KEY,
         [context.getHandler(), context.getClass()],
       ) ?? {}
 
     const userId = request.user.id
-    const idParam = param ?? 'id'
-    const id = request.params?.[idParam]
-
     let electedOffice: ElectedOffice | null = null
 
-    if (id) {
-      // Step 1: Route param — specific EO by ID
+    // Step 1: Try x-organization-slug header
+    const slug = request.headers['x-organization-slug']
+    if (typeof slug === 'string') {
+      const [org, eo] = await Promise.all([
+        this.electedOfficeService.client.organization.findFirst({
+          where: { slug, ownerId: userId },
+        }),
+        this.electedOfficeService.findFirst({
+          where: { organizationSlug: slug, userId },
+          include,
+        }),
+      ])
+      if (org && eo) {
+        electedOffice = eo
+      }
+    }
+
+    // Step 2: Legacy fallback — user's active elected office
+    if (!electedOffice) {
       electedOffice = await this.electedOfficeService.findFirst({
-        where: { id, userId },
+        where: { userId, isActive: true },
         include,
       })
-    } else {
-      // Step 2: Try x-organization-slug header
-      const slug = request.headers['x-organization-slug']
-      if (typeof slug === 'string') {
-        const [org, eo] = await Promise.all([
-          this.electedOfficeService.client.organization.findFirst({
-            where: { slug, ownerId: userId },
-          }),
-          this.electedOfficeService.findFirst({
-            where: { organizationSlug: slug, userId },
-            include,
-          }),
-        ])
-        if (org && eo) {
-          electedOffice = eo
-        }
-      }
-
-      // Step 3: Legacy fallback — user's active elected office
-      if (!electedOffice) {
-        electedOffice = await this.electedOfficeService.findFirst({
-          where: { userId, isActive: true },
-          include,
-        })
-      }
     }
 
     if (electedOffice) {
