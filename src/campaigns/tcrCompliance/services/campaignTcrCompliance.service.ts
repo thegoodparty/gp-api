@@ -282,7 +282,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     })
   }
 
-  async checkTcrRegistrationStatus(peerlyIdentityId: string) {
+  async checkTcrRegistrationStatus(peerlyIdentityId: string, user: User) {
     const { campaign } = await this.model.findFirstOrThrow({
       where: { peerlyIdentityId },
       include: {
@@ -307,7 +307,7 @@ export class CampaignTcrComplianceService extends createPrismaBase(
     return Boolean(useCase?.activated)
   }
 
-  async getCvTokenStatus(peerlyIdentityId: string) {
+  async getCvTokenStatus(peerlyIdentityId: string, user: User) {
     const { campaign } = await this.model.findFirstOrThrow({
       where: { peerlyIdentityId },
       include: {

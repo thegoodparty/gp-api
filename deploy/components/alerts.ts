@@ -23,6 +23,16 @@ export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
   // Add more per-endpoint overrides here.
 }
 
+const tempoExploreLink = (query: string) => {
+  const panes = JSON.stringify({
+    a: {
+      datasource: 'grafanacloud-traces',
+      queries: [{ query, refId: 'A' }],
+    },
+  })
+  return `https://goodparty.grafana.net/explore?schemaVersion=1&panes=${encodeURIComponent(panes)}&from=now-1h&to=now`
+}
+
 export const GLOBAL_ALERTS: Alert[] = [
   // ------ Global Shared Alerts ------ //
   {
@@ -64,13 +74,15 @@ export const GLOBAL_ALERTS: Alert[] = [
   {
     slug: 'slow-prisma-connections',
     name: 'Slow Prisma connection acquisitions',
-    type: 'trace',
-    expr: '{ name = "prisma:engine:connection" && resource.service.name = "gp-api" && resource.deployment.environment.name = "$ENV" && duration > 250ms } | count_over_time()',
-    threshold: 0,
+    type: 'metric',
+    expr: 'histogram_quantile(0.99, sum(rate(prisma_connection_duration_ms_bucket{service_name="gp-api", deployment_environment_name="$ENV"}[5m])) by (le))',
+    threshold: 150,
     for: '5m',
     message: [
-      'Prisma connection acquisitions exceeding 250ms have been detected.',
-      'This may indicate database connection pool exhaustion or elevated database latency. Requests are fighting for Postgres connections. Click *View in Grafana* to inspect the traces, then check database metrics (active connections, query latency) and recent deployment changes. We should either increase the connection limit, or reduce the number of concurrent requests.',
+      'p99 Prisma connection acquisition time has exceeded 150ms for 5 minutes.',
+      'This may indicate database connection pool exhaustion or elevated database latency. Requests are waiting too long to acquire a Postgres connection from the pool.',
+      `<${tempoExploreLink('{ name = "prisma:engine:connection" && resource.service.name = "gp-api" && resource.deployment.environment.name = "prod" && duration > 150ms }')}|View slow connection traces in Grafana Explore>`,
+      'Check recent deployment changes and consider increasing the connection pool limit or reducing concurrent request volume.',
     ].join('\n\n'),
   },
   // ------ Serve Alerts ------ //

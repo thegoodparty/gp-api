@@ -10,11 +10,10 @@ export type Alert = {
    *
    * - `log`: A LogQL metric query against Loki.
    * - `metric`: A PromQL query against Prometheus.
-   * - `trace`: A TraceQL metrics query against Tempo.
    *
    * All use `$ENV` as a placeholder for the environment name (e.g. "prod").
    */
-  type: 'log' | 'metric' | 'trace'
+  type: 'log' | 'metric'
   /**
    * The query expression. Use `$ENV` for the environment name.
    *
@@ -25,12 +24,8 @@ export type Alert = {
    * Metric (PromQL) examples:
    *   'avg(process_cpu_utilization{service_name="gp-api", deployment_environment_name="$ENV"}) * 100'
    *
-   * Trace (TraceQL) examples:
-   *   '{ name = "prisma:engine:connection" && resource.service.name = "gp-api" && resource.deployment.environment.name = "$ENV" && duration > 100ms } | count_over_time()'
-   *
    * See: https://grafana.com/docs/loki/latest/query/metric_queries/
    * See: https://prometheus.io/docs/prometheus/latest/querying/basics/
-   * See: https://grafana.com/docs/tempo/latest/traceql/metrics-queries/
    */
   expr: string
   /**
