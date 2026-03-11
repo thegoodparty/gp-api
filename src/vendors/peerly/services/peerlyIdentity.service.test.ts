@@ -327,6 +327,64 @@ describe('PeerlyIdentityService', () => {
       })
     })
 
+    it('falls back to city for COUNTY-level candidate when county is missing (e.g. independent city)', async () => {
+      // Google Places API returns county data as an `administrative_area_level_2` component.
+      // Some locations (e.g. Virginia independent cities) don't have this component,
+      // which causes extractAddressComponents() to return county: null.
+      // In that case, city_county should fall back to the city (locality) name.
+      const placesService = module.get(GooglePlacesService)
+      vi.mocked(placesService.getAddressByPlaceId).mockResolvedValue({
+        address_components: [
+          { types: ['street_number'], long_name: '100', short_name: '100' },
+          {
+            types: ['route'],
+            long_name: 'Church Ave',
+            short_name: 'Church Ave',
+          },
+          {
+            // locality means "city" in Google Places
+            types: ['locality', 'political'],
+            long_name: 'Anytown',
+            short_name: 'Anytown',
+          },
+          // No administrative_area_level_2 component — this is what Google returns
+          // for independent cities that aren't part of any county
+          {
+            // administrative_area_level_1 = state in Google Places
+            types: ['administrative_area_level_1', 'political'],
+            long_name: 'Virginia',
+            short_name: 'VA',
+          },
+          { types: ['postal_code'], long_name: '24000', short_name: '24000' },
+        ],
+      })
+
+      const campaign = createMockCampaign({
+        details: {
+          electionDate: '2024-11-05',
+          ballotLevel: BallotReadyPositionLevel.COUNTY,
+        },
+      })
+
+      await service.submitCampaignVerifyRequest(
+        {
+          email: 'candidate@example.com',
+          ein: '12-3456789',
+          phone: '15551234567',
+          peerlyIdentityId: 'peerly-123',
+          filingUrl: 'https://example.gov/elections',
+          officeLevel: OfficeLevel.local,
+          fecCommitteeId: null,
+          committeeType: CommitteeType.CANDIDATE,
+        },
+        baseUser,
+        campaign,
+        baseDomain,
+      )
+
+      expect(lastSubmittedData.city_county).toBe('Anytown')
+    })
+
     it('includes verification_method, filing_phone_number, filing_phone_type, and filing_url_instructions when calling Peerly', async () => {
       const campaign = createMockCampaign({
         details: {

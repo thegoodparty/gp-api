@@ -426,13 +426,21 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       }
     }
 
-    const isMissingLocalLocation =
-      isLocal && !city?.long_name && !county?.long_name
-    if (isMissingLocalLocation) {
-      this.logger.warn(
-        `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
-          `This field is required by Peerly when locality is 'local'.`,
-      )
+    let cityCounty: string | undefined
+    if (isLocal) {
+      cityCounty =
+        // If it's a county, let's try to use the county name, else, use the city name.
+        ballotLevel === BallotReadyPositionLevel.COUNTY
+          ? (county?.long_name ?? city?.long_name)
+          : city?.long_name
+
+      if (!cityCounty) {
+        this.logger.error(
+          `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
+            `ballotLevel=${ballotLevel}, city=${city?.long_name}, county=${county?.long_name}. ` +
+            `This field is required by Peerly when locality is 'local'.`,
+        )
+      }
     }
 
     const submitCVData = {
@@ -468,14 +476,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           }
         : {}),
       // Local-specific fields
-      ...(isLocal
-        ? {
-            city_county:
-              ballotLevel === BallotReadyPositionLevel.COUNTY
-                ? county?.long_name
-                : city?.long_name,
-          }
-        : {}),
+      ...(isLocal ? { city_county: cityCounty } : {}),
     }
 
     let result: PeerlySubmitCVResponseBody | null = null
