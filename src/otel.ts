@@ -98,12 +98,6 @@ if (!headers) {
       process.env.OTEL_SERVICE_ENVIRONMENT || 'local',
   })
 
-  const prismaConnectionDuration = metrics
-    .getMeter('gp-api')
-    .createHistogram('prisma.connection.duration_ms', {
-      description: 'Duration of prisma:engine:connection spans in milliseconds',
-    })
-
   const prismaConnectionMetricProcessor: SpanProcessor = {
     onStart: () => undefined,
     onEnd: (span: ReadableSpan) => {
@@ -163,6 +157,13 @@ if (!headers) {
   })
 
   sdk.start()
+
+  const prismaConnectionDuration = metrics
+    .getMeter('gp-api')
+    .createHistogram('prisma.connection.duration', {
+      description: 'Duration of prisma:engine:connection spans in milliseconds',
+      unit: 'ms',
+    })
 
   const hostMetrics = new HostMetrics()
   hostMetrics.start()
