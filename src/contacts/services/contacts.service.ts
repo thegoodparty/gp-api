@@ -303,17 +303,26 @@ export class ContactsService {
           params.districtName = districtName
         }
 
-        const response = await lastValueFrom(
-          this.httpService.get<StatsResponse>(
-            `${PEOPLE_API_URL}/v1/people/stats`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              params,
-            },
-          ),
-        )
+        try {
+          const response = await lastValueFrom(
+            this.httpService.get<StatsResponse>(
+              `${PEOPLE_API_URL}/v1/people/stats`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+                params,
+              },
+            ),
+          )
 
-        return response.data
+          return response.data
+        } catch (error) {
+          if (isAxiosError(error) && error.response?.status === 404) {
+            throw new NotFoundException(
+              `No stats found for district: ${districtName} (${districtType}) in ${state}`,
+            )
+          }
+          throw error
+        }
       },
     )
   }
