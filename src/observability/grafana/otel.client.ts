@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common'
 import { metrics, trace } from '@opentelemetry/api'
-import { BlockedStateEventAttributes } from '@/observability/newrelic/newrelic.events'
+import { BlockedStateEventAttributes } from '@/observability/blockedState/blockedState.types'
 
 const logger = new Logger('OTel Client')
 

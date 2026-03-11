@@ -29,8 +29,6 @@ import { SampleContacts } from 'src/contacts/schemas/sampleContacts.schema'
 import { ContactsService } from 'src/contacts/services/contacts.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
-import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
 import { recordBlockedStateEvent } from 'src/observability/grafana/otel.client'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
@@ -614,7 +612,6 @@ export class QueueConsumerService {
         isBackground: true,
         p2vAttempts,
       }
-      recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
       recordBlockedStateEvent(blockedStateAttributes)
     }
 
