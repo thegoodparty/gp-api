@@ -745,11 +745,19 @@ export class OrganizationsBackfillService extends createPrismaBase(
         }
 
         // 1b: District differs — look up the override district.
-        const overrideDistrictId = await this.electionsService.getDistrictId(
-          state,
-          L2DistrictType,
-          L2DistrictName,
-        )
+        let overrideDistrictId: string | null = null
+        try {
+          overrideDistrictId = await this.electionsService.getDistrictId(
+            state,
+            L2DistrictType,
+            L2DistrictName,
+          )
+        } catch (err) {
+          this.logger.warn(
+            { campaignId: campaign.id, state, L2DistrictType, L2DistrictName },
+            `[organization backfill] Override district lookup failed: ${err instanceof Error ? err.message : err}`,
+          )
+        }
 
         return {
           positionId: position.id,
@@ -774,12 +782,19 @@ export class OrganizationsBackfillService extends createPrismaBase(
 
     // --- Step 2: No position — try district-only lookup from p2v data ---
     if (state && L2DistrictType && L2DistrictName) {
-      const districtId =
-        await this.organizationsService.resolveOverrideDistrictId({
+      let districtId: string | null = null
+      try {
+        districtId = await this.organizationsService.resolveOverrideDistrictId({
           state,
           L2DistrictType,
           L2DistrictName,
         })
+      } catch (err) {
+        this.logger.warn(
+          { campaignId: campaign.id, state, L2DistrictType, L2DistrictName },
+          `[organization backfill] District lookup failed (no position fallback): ${err instanceof Error ? err.message : err}`,
+        )
+      }
       if (!districtId) {
         this.logger.warn(
           { campaignId: campaign.id, state, L2DistrictType, L2DistrictName },

@@ -27,11 +27,11 @@ import { NestFactory } from '@nestjs/core'
 import { createWriteStream, mkdirSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { BackfillModule } from './backfill.module'
 import {
   BackfillDryRunRecord,
   OrganizationsBackfillService,
 } from '../dist/organizations/services/organizations-backfill.service'
+import { BackfillModule } from './backfill.module'
 
 const OUTPUT_DIR = join(__dirname, 'output')
 const DETAIL_PATH = join(OUTPUT_DIR, 'backfill-detail.jsonl')
