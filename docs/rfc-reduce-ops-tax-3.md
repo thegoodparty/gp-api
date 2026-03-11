@@ -10,19 +10,18 @@ This doc proposes three options, evaluates each against concrete data, and recom
 
 ## The Cost We're Paying Today
 
-At a high level, the multi-repo structure is costing us in four ways:
+At a high level, the multi-repo structure is costing us in three ways:
 
-- **Developer time** — 30+ duplicative PRs in 6 months, with more coming (alerting, Grafana dashboards, future tooling changes). Every infra improvement must be implemented, reviewed, and deployed N times.
-- **Reliability** — repos run different versions of critical dependencies (TypeScript, Prisma, Pulumi). Bugs in shared infrastructure propagate manually and unevenly — in the best case, a fix ships to each repo on the same day, but often there is a propagation delay of days or weeks, or the fix never propagates at all.
-- **Velocity** — cross-service changes require sequential PRs across repos instead of atomic commits. Every extra PR is an extra review cycle, merge cycle, and deployment cycle that adds zero product value.
-- **Focus** — engineering effort spent on packaging, coordination, and cross-repo maintenance is effort not spent on the product. This overhead scales linearly with each new service, and we lack the ops tooling to manage it well.
+- **Code duplication and drift** — thousands of lines of nearly identical boilerplate (OTel, Dockerfiles, CI/CD, Pulumi, shared config like tsconfig and lint rules) are maintained independently per repo. When these diverge — and they already have — bugs, inconsistencies, and wasted effort follow.
+- **Growing maintenance burden** — every infrastructure improvement, bug fix, or dependency update must be applied N times. Dependabot alone will generate hundreds of redundant PRs per year. Each new service multiplies the problem linearly.
+- **Higher defect risk** — bugs in shared infrastructure propagate manually and unevenly. Version drift across repos means a fix that works in one repo may not work in another.
 
 Each of these costs works directly against goals we've already aligned on in the VOTES framework:
 
 - **Velocity** — duplicated PRs and propagation delays inflate cycle time with zero product value
 - **Operations** — multi-repo coordination is a structural pain point in automating releases
 - **Testing** — each repo independently maintains its own test framework, coverage gates, and CI pipelines
-- **Experience** — bugs in shared boilerplate that introduce debugging pain must be fixes in each repo independently, slowing resolution of blocked states
+- **Experience** — bugs in shared boilerplate that introduce debugging pain must be fixed in each repo independently, slowing resolution of blocked states
 - **Security** — every additional repo multiplies our dependency security surface; version drift means a vulnerability patched in one repo may remain unpatched in another
 
 The sections below quantify each of these costs with specific data.
@@ -94,7 +93,7 @@ Invest in extracting duplicated backend code into npm packages that all repos co
 
 **What it solves:**
 
-- Shared code between backend repos — infra code (OTel, exception filters), Prisma base classes, NestJS boilerplate, types/schemas
+- Shared code between backend repos — infra code (OTel, exception filters), Prisma base classes, NestJS boilerplate, types/schemas, shared tsconfig and lint rules
 - CI/CD duplication — reusable workflows allow repos to call shared workflow definitions from a central repo, reducing copy-paste across CI pipelines
 - Could extend to shared Pulumi components and Docker base images
 
@@ -128,7 +127,7 @@ Consolidate all backend repos into a single repository using npm workspaces.
 
 **What it solves:**
 
-- **All duplicated infrastructure becomes shared.** OTel config, Dockerfiles, CI/CD, Pulumi components, exception filters, Prisma configuration — all exist once and are consumed by each service as workspace dependencies.
+- **All duplicated infrastructure becomes shared.** OTel config, Dockerfiles, CI/CD, Pulumi components, exception filters, Prisma configuration, shared tsconfig, and lint rules — all exist once and are consumed by each service as workspace dependencies.
 - **Version drift becomes impossible.** A single root package.json controls shared dependency versions. Dependabot generates one PR, not three.
 - **Bug fixes land once.** The circuit breaker fix would have been one PR touching one file, reviewed once, deployed everywhere.
 - **CI/CD is unified.** One workflow builds and deploys all affected services. No cross-repo coordination for releases.
@@ -136,9 +135,10 @@ Consolidate all backend repos into a single repository using npm workspaces.
 
 **What it costs:**
 
-- **Migration effort.** Moving repos into a monorepo requires git history preservation, CI/CD rework, and team coordination. This is a one-time cost, and the scope is bounded: estimated at roughly 1 week of focused effort given the similarity of the existing infrastructure.
-- **Repo size.** The combined codebase is not as large as it might seem. gp-api is ~48K lines of application code. people-api and election-api add ~6K lines combined. After eliminating duplicated boilerplate (~2,500 lines of deploy code, ~900 lines of CI/CD, and ~1,200 lines of shared infra like OTel/filters), the net new code introduced by consolidation is approximately **4,000 lines of unique application logic** from people-api and election-api. The repo gets bigger, but not dramatically so — and GitHub CODEOWNERS can maintain clear ownership boundaries by path.
-- **CI run time.** Individual CI runs will take longer, since a single pipeline now builds and tests multiple services. However, the **overall time from code change to production** gets faster: today, a cross-service change requires sequential PRs across repos, each with its own CI run, review, and merge cycle. In a monorepo, that's one PR, one CI run, one review.
+- **Migration effort.** Moving repos into a monorepo requires git history preservation, CI/CD rework, and team coordination. This is non-trivial — consolidating three repos with their own CI pipelines, Pulumi stacks, and deployment workflows will require careful planning and execution. Going forward, maintenance of the shared structure should be straightforward, but the initial migration is real work that we should not underestimate.
+- **Repo size.** gp-api is ~48K lines of application code. people-api and election-api add ~6K lines combined. After eliminating duplicated boilerplate (~2,500 lines of deploy code, ~900 lines of CI/CD, and ~1,200 lines of shared infra like OTel/filters), the net new code introduced by consolidation is approximately **4,000 lines of unique application logic** from people-api and election-api. GitHub CODEOWNERS can maintain ownership boundaries by path.
+- **Dependency reconciliation.** Merging three repos means reconciling their dependency versions into a single lockfile. The version drift table above shows this is already non-trivial (e.g., Pulumi AWS 6.x vs 7.x). A workspace-aware package manager like pnpm or Yarn 4 can help manage per-service dependency overrides during the transition, but the reconciliation work itself must happen.
+- **CI run time.** Individual CI runs may take longer, since a single pipeline now builds and tests multiple services. If this becomes a problem, change detection tooling can be added to only run CI for affected services.
 
 **What it preserves:**
 
@@ -161,7 +161,7 @@ Consolidate all backend repos into a single repository using npm workspaces.
     shared/              # Shared CI/CD, deploy scripts
 ```
 
-**Assessment:** This directly eliminates the duplication tax, prevents version drift, and reduces coordination overhead. It does not require changing our service architecture. The migration is real work, but it's bounded, one-time work — unlike the ongoing tax of the current setup which compounds with each new service.
+**Assessment:** This directly eliminates the duplication tax, prevents version drift, and reduces coordination overhead. It does not require changing our service architecture. The migration is real work — non-trivial and requiring careful execution — but it is bounded, one-time work. The ongoing tax of the current setup compounds with each new service; the monorepo migration cost does not.
 
 ### Option C: Status quo (do nothing)
 
@@ -203,7 +203,7 @@ Beyond the direct problem-solving, a monorepo aligns with our team's capabilitie
 
 ## Migration Approach (High-Level)
 
-If this is accepted, a detailed migration plan would follow. The estimated effort is **~1 week** given the high structural similarity between repos. At a high level:
+If this is accepted, a detailed migration plan would follow. The migration is non-trivial — consolidating CI/CD, reconciling dependencies, and setting up deploys all require careful work. Once the structure is in place, ongoing maintenance should be straightforward. At a high level:
 
 1. **Set up the monorepo workspace** using npm workspaces. Establish the shared package structure.
 2. **Move election-api first** (smallest repo, 51 PRs in 6 months, lowest risk). Validate the workflow.
