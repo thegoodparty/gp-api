@@ -25,13 +25,15 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-unsafe-assignment': 'error',
     '@typescript-eslint/no-unused-expressions': 'off',
-    'unused-imports/no-unused-imports': 'error',
+    '@typescript-eslint/no-useless-constructor': 'error',
+    '@typescript-eslint/no-empty-function': 'error',
     '@typescript-eslint/no-unused-vars': [
-      'warn',
+      'error',
       {
-        argsIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_',
-        destructuredArrayIgnorePattern: '^_',
+        vars: 'all',
+        args: 'all',
+        ignoreRestSiblings: false,
+        argsIgnorePattern: '^_', // allow _prefixed params as an escape hatch
         varsIgnorePattern: '^_',
       },
     ],
@@ -42,6 +44,8 @@ module.exports = {
         message: 'Use vitest instead of node:test',
       },
     ],
+    'no-unreachable': 'error',
+    'unused-imports/no-unused-imports': 'error',
   },
   overrides: [
     {

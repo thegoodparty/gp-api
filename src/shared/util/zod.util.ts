@@ -14,7 +14,7 @@ export const parseJsonString = <T>(
 
     try {
       return JSON.parse(input as string)
-    } catch (e) {
+    } catch {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: errorMessage ?? 'Must be a valid JSON string',

@@ -5,7 +5,6 @@ import { CampaignUpdateHistory } from '@prisma/client'
 test.describe('Campaigns - Update History', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
-  let createdUpdateHistoryId: number
 
   test.beforeAll(() => {
     test.skip(
@@ -61,8 +60,6 @@ test.describe('Campaigns - Update History', () => {
     expect(body.type).toBe('doorKnocking')
     expect(body.quantity).toBe(quantity)
     expect(body.id).toBeTruthy()
-
-    createdUpdateHistoryId = body.id
   })
 
   test('should delete update history', async ({ request }) => {
