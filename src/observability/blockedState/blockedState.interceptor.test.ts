@@ -7,15 +7,13 @@ import {
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host'
 import { of, throwError } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CustomEventType } from '../newrelic/newrelic.events'
 import { BlockedStateInterceptor } from './blockedState.interceptor'
 
-const recordCustomEventMock = vi.fn()
-const addCustomAttributesMock = vi.fn()
+const recordBlockedStateEventMock = vi.fn()
 
-vi.mock('../newrelic/newrelic.client', () => ({
-  recordCustomEvent: (...args: unknown[]) => recordCustomEventMock(...args),
-  addCustomAttributes: (...args: unknown[]) => addCustomAttributesMock(...args),
+vi.mock('../grafana/otel.client', () => ({
+  recordBlockedStateEvent: (...args: unknown[]) =>
+    recordBlockedStateEventMock(...args),
 }))
 
 function makeContext(params: {
@@ -37,8 +35,7 @@ function makeContext(params: {
 
 describe('BlockedStateInterceptor', () => {
   beforeEach(() => {
-    recordCustomEventMock.mockClear()
-    addCustomAttributesMock.mockClear()
+    recordBlockedStateEventMock.mockClear()
   })
 
   it('does not record BlockedState when user is not authenticated', async () => {
@@ -55,7 +52,7 @@ describe('BlockedStateInterceptor', () => {
       })
     })
 
-    expect(recordCustomEventMock).not.toHaveBeenCalled()
+    expect(recordBlockedStateEventMock).not.toHaveBeenCalled()
   })
 
   it('records BlockedState for authenticated 5xx errors', async () => {
@@ -72,9 +69,8 @@ describe('BlockedStateInterceptor', () => {
       })
     })
 
-    expect(recordCustomEventMock).toHaveBeenCalledTimes(1)
-    const [eventType, attrs] = recordCustomEventMock.mock.calls[0]
-    expect(eventType).toBe(CustomEventType.BlockedState)
+    expect(recordBlockedStateEventMock).toHaveBeenCalledTimes(1)
+    const [attrs] = recordBlockedStateEventMock.mock.calls[0]
     expect(attrs).toMatchObject({
       service: 'gp-api',
       userId: 123,
@@ -99,7 +95,7 @@ describe('BlockedStateInterceptor', () => {
       })
     })
 
-    expect(recordCustomEventMock).toHaveBeenCalledTimes(1)
+    expect(recordBlockedStateEventMock).toHaveBeenCalledTimes(1)
   })
 
   it('does not record BlockedState for authenticated non-allowlisted 4xx', async () => {
@@ -118,7 +114,7 @@ describe('BlockedStateInterceptor', () => {
       })
     })
 
-    expect(recordCustomEventMock).not.toHaveBeenCalled()
+    expect(recordBlockedStateEventMock).not.toHaveBeenCalled()
   })
 
   it('does not record BlockedState on success', async () => {
@@ -132,6 +128,6 @@ describe('BlockedStateInterceptor', () => {
       })
     })
 
-    expect(recordCustomEventMock).not.toHaveBeenCalled()
+    expect(recordBlockedStateEventMock).not.toHaveBeenCalled()
   })
 })

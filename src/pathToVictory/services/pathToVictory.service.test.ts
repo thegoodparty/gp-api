@@ -3,7 +3,6 @@ import { ElectionsService } from '@/elections/services/elections.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
 import { EmailService } from '@/email/email.service'
 import { EmailTemplateName } from '@/email/email.types'
-import { CustomEventType } from '@/observability/newrelic/newrelic.events'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
@@ -19,9 +18,10 @@ import { PathToVictoryInput } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 import { PathToVictoryService } from './pathToVictory.service'
 
-const mockRecordCustomEvent = vi.fn()
-vi.mock('src/observability/newrelic/newrelic.client', () => ({
-  recordCustomEvent: (...args: unknown[]) => mockRecordCustomEvent(...args),
+const mockRecordBlockedStateEvent = vi.fn()
+vi.mock('src/observability/grafana/otel.client', () => ({
+  recordBlockedStateEvent: (...args: unknown[]) =>
+    mockRecordBlockedStateEvent(...args),
 }))
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -266,8 +266,7 @@ describe('PathToVictoryService', () => {
           channel: SlackChannel.botPathToVictoryIssues,
         }),
       )
-      expect(mockRecordCustomEvent).toHaveBeenCalledWith(
-        CustomEventType.BlockedState,
+      expect(mockRecordBlockedStateEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           rootCause: 'p2v_failed',
           reason: 'no_district_match',
