@@ -243,7 +243,7 @@ export class AiContentService {
             date: new Date(),
             text: oldVersionData.content,
           }
-        } catch (_e) {
+        } catch {
           // dont warn because this is expected to fail sometimes.
         }
         aiContent[key] = {

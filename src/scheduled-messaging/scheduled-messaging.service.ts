@@ -41,7 +41,7 @@ export class ScheduledMessagingService extends createPrismaBase(
 
   private async queryScheduledMessagesAndFlag() {
     let messages: ScheduledMessage[] = []
-    await this.client.$transaction(async (tx) => {
+    await this.client.$transaction(async () => {
       messages = await this.model.findMany({
         where: {
           scheduledAt: {

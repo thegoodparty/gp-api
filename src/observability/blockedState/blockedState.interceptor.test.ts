@@ -28,7 +28,7 @@ function makeContext(params: {
   }
 
   class Controller {}
-  function handler() {}
+  const handler = () => undefined
 
   return new ExecutionContextHost([req, {}, {}], Controller, handler)
 }

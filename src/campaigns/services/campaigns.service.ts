@@ -651,7 +651,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return this.model.deleteMany(args)
   }
 
-  async launch(user: User, campaign: Campaign) {
+  async launch(campaign: Campaign) {
     const campaignData = campaign.data
 
     if (
