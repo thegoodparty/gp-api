@@ -23,8 +23,6 @@ COPY tsconfig.json ./
 
 ENV NODE_ENV=production
 
-# Copy New Relic configuration and entrypoint
-COPY newrelic.js ./
 COPY deploy/docker-entrypoint.sh ./
 RUN chmod +x ./docker-entrypoint.sh
 
