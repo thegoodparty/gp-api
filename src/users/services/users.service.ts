@@ -196,7 +196,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     firstName: string
     lastName: string
   }) {
-    const existingUser = await this.findUser({ email: data.email })
+    const existingUser = await this.findUserByEmail(data.email)
     if (existingUser) {
       throw new ConflictException('User with this email already exists')
     }

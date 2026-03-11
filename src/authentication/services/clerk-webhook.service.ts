@@ -1,4 +1,5 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
 import { ClerkWebhookEventData } from '../webhooks/clerk-webhook.types'
@@ -61,16 +62,39 @@ export class ClerkWebhookService {
 
     const firstName = data.first_name ?? ''
     const lastName = data.last_name ?? ''
-    const user = await this.usersService.createUserFromClerk({
-      clerkId: data.id,
-      email,
-      firstName,
-      lastName,
-    })
-    this.logger.info(
-      { userId: user.id, clerkId: data.id },
-      'Created new user from Clerk',
-    )
+    try {
+      const user = await this.usersService.createUserFromClerk({
+        clerkId: data.id,
+        email,
+        firstName,
+        lastName,
+      })
+      this.logger.info(
+        { userId: user.id, clerkId: data.id },
+        'Created new user from Clerk',
+      )
+    } catch (err) {
+      if (
+        err instanceof PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        this.logger.debug(
+          { clerkId: data.id },
+          'Concurrent user creation detected in webhook, linking existing user',
+        )
+        const existing =
+          (await this.usersService.findUser({ clerkId: data.id })) ??
+          (await this.usersService.findUserByEmail(email))
+        if (existing && !existing.clerkId) {
+          await this.usersService.updateUser(
+            { id: existing.id },
+            { clerkId: data.id },
+          )
+        }
+        return
+      }
+      throw err
+    }
   }
 
   async handleUserUpdated(data: ClerkWebhookEventData) {
@@ -120,10 +144,16 @@ export class ClerkWebhookService {
       return
     }
 
-    await this.usersService.updateUser({ id: user.id }, { clerkId: null })
+    await this.usersService.updateUser(
+      { id: user.id },
+      {
+        clerkId: null,
+        metaData: { ...((user.metaData as object) ?? {}), isDeleted: true },
+      },
+    )
     this.logger.info(
       { userId: user.id, clerkId: data.id },
-      'Cleared clerkId from user (soft delete)',
+      'Cleared clerkId and marked user as deleted (soft delete)',
     )
   }
 }
