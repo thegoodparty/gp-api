@@ -79,7 +79,7 @@ const campaignDefaults = {
 const mockCampaign: Campaign = {
   ...campaignDefaults,
   id: 100,
-  organizationSlug: null,
+  organizationSlug: 'campaign-100',
   slug: 'john-doe',
   userId: 1,
   isActive: true,
@@ -1091,6 +1091,7 @@ describe('CampaignsController', () => {
         ...mockCampaign,
         details: { electionDate: '2025-11-04' },
       }
+      vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
 
       await expect(
         controller.updateRaceTargetDetails(campaign),
@@ -1288,6 +1289,7 @@ describe('CampaignsController', () => {
       vi.spyOn(campaignsService, 'findFirstOrThrow').mockResolvedValue(
         campaignNoPosition,
       )
+      vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
 
       await expect(
         controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {}),

@@ -158,7 +158,7 @@ export class CampaignsController {
   }
 
   @Get('mine')
-  @UseCampaign()
+  @UseCampaign({ include: { pathToVictory: true, organization: true } })
   async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
   }
@@ -387,7 +387,14 @@ export class CampaignsController {
   @Put('mine/race-target-details')
   @UseCampaign()
   async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
-    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+    const campaignOrg = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+    const ballotreadyPositionId = campaignOrg?.positionId
+
+    if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
@@ -398,7 +405,7 @@ export class CampaignsController {
     const raceTargetDetails = await this.elections
       .getBallotReadyMatchedRaceTargetDetails({
         campaignId: campaign.id,
-        ballotreadyPositionId: campaign.details.positionId,
+        ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
         officeName: campaign.details.otherOffice,
@@ -458,8 +465,14 @@ export class CampaignsController {
     const campaign = await this.campaigns.findFirstOrThrow({
       where: { slug },
     })
+    const campaignOrg = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+    const ballotreadyPositionId = campaignOrg?.positionId
 
-    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+    if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
@@ -469,7 +482,7 @@ export class CampaignsController {
     const raceTargetDetails = await this.elections
       .getBallotReadyMatchedRaceTargetDetails({
         campaignId: campaign.id,
-        ballotreadyPositionId: campaign.details.positionId,
+        ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
         officeName: campaign.details.otherOffice,

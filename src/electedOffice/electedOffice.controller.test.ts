@@ -12,10 +12,19 @@ describe('ElectedOfficeController', () => {
       data: {
         userId: service.user.id,
         slug: `test-campaign-${Date.now()}`,
-        details: {
-          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
-        },
       },
+    })
+    const organizationSlug = `campaign-${campaign.id}`
+    await service.prisma.organization.create({
+      data: {
+        slug: organizationSlug,
+        ownerId: service.user.id,
+        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
+      },
+    })
+    campaign = await service.prisma.campaign.update({
+      where: { id: campaign.id },
+      data: { organizationSlug },
     })
   })
 
@@ -178,10 +187,10 @@ describe('ElectedOfficeController', () => {
       expect(electedOffice?.organizationSlug).toBe(organization?.slug)
     })
 
-    it('creates elected office when campaign has no positionId', async () => {
-      await service.prisma.campaign.update({
-        where: { id: campaign.id },
-        data: { details: {} },
+    it('creates elected office when organization has no positionId', async () => {
+      await service.prisma.organization.update({
+        where: { slug: campaign.organizationSlug! },
+        data: { positionId: null },
       })
 
       const result = await createElectedOffice({

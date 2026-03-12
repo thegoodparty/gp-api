@@ -635,9 +635,9 @@ describe('PathToVictoryService', () => {
     describe('organization upsert', () => {
       const campaignWithDetails = {
         ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
+        organization: { positionId: 'br-pos-1' },
         details: {
           state: 'CA',
-          positionId: 'br-pos-1',
           office: 'City Council',
           otherOffice: null,
         },
@@ -692,7 +692,8 @@ describe('PathToVictoryService', () => {
       it('skips org upsert when campaign has no state', async () => {
         mockPrisma.campaign.findUnique.mockResolvedValue({
           ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
-          details: { positionId: 'br-pos-1' },
+          organization: { positionId: 'br-pos-1' },
+          details: {},
         })
         mockPrisma.pathToVictory.update.mockResolvedValue({})
 

@@ -76,6 +76,7 @@ export class ElectedOfficeController {
     // Do this without guard to hopefully slowly move away from the hard link to campaign
     const campaign = await this.electedOfficeService.client.campaign.findFirst({
       where: { userId: user.id },
+      include: { organization: true },
     })
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
@@ -85,7 +86,7 @@ export class ElectedOfficeController {
       ...body,
       userId: user.id,
       campaignId: campaign.id,
-      ballotreadyPositionId: campaign.details.positionId,
+      ballotreadyPositionId: campaign.organization?.positionId ?? undefined,
       office: campaign.details.office,
       otherOffice: campaign.details.otherOffice,
     })
