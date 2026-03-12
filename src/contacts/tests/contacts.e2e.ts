@@ -1,16 +1,14 @@
 import { HttpStatus } from '@nestjs/common'
-import { expect, test } from '@playwright/test'
-import { PrismaClient } from '@prisma/client'
+import { APIRequestContext, expect, test } from '@playwright/test'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
 import { P2VSource } from '../../pathToVictory/types/pathToVictory.types'
 import {
   deleteUser,
   generateRandomEmail,
   generateRandomName,
+  loginUser,
   registerUser,
 } from '../../../e2e-tests/utils/auth.util'
-
-const prisma = new PrismaClient()
 
 const CONTACTS_TEST_DISTRICT = {
   id: '0e5bafca-93a9-86a5-2522-f373979720df',
@@ -18,52 +16,94 @@ const CONTACTS_TEST_DISTRICT = {
   name: 'CHEYENNE CITY WARD 1',
   state: 'WY',
 } as const
+const CONTACTS_TEST_POSITION_ID =
+  'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2'
 
 const AUTH_HEADER = (token: string) => ({
   Authorization: `Bearer ${token}`,
 })
 
-async function prepareCampaignAndOffice(params: {
-  campaignId: number
-  userId: number
-}) {
-  const { campaignId, userId } = params
+async function assertOk(
+  response: Awaited<ReturnType<APIRequestContext['get']>>,
+  errorPrefix: string,
+) {
+  if (!response.ok()) {
+    throw new Error(
+      `${errorPrefix}: ${response.status()} ${await response.text()}`,
+    )
+  }
+}
 
-  await prisma.campaign.update({
-    where: { id: campaignId },
+async function updateCampaignMine(params: {
+  request: APIRequestContext
+  authToken: string
+  data: Record<string, unknown>
+}) {
+  const { request, authToken, data } = params
+
+  const response = await request.put('/v1/campaigns/mine', {
+    headers: AUTH_HEADER(authToken),
     data: {
-      isPro: true,
+      ...data,
+    },
+  })
+
+  await assertOk(response, 'Campaign update failed')
+}
+
+async function createElectedOffice(params: {
+  request: APIRequestContext
+  authToken: string
+}) {
+  const { request, authToken } = params
+  const response = await request.post('/v1/elected-office', {
+    headers: AUTH_HEADER(authToken),
+    data: {
+      isActive: true,
+      electedDate: '2024-11-05',
+      swornInDate: '2025-01-01',
+    },
+  })
+
+  await assertOk(response, 'Elected office creation failed')
+  const payload = (await response.json()) as { id: string }
+  return payload.id
+}
+
+async function updateElectedOffice(params: {
+  request: APIRequestContext
+  authToken: string
+  electedOfficeId: string
+  data: Record<string, unknown>
+}) {
+  const { request, authToken, electedOfficeId, data } = params
+  const response = await request.put(`/v1/elected-office/${electedOfficeId}`, {
+    headers: AUTH_HEADER(authToken),
+    data,
+  })
+
+  await assertOk(response, 'Elected office update failed')
+}
+
+async function prepareCampaignAndOffice(params: {
+  request: APIRequestContext
+  authToken: string
+}) {
+  const { request, authToken } = params
+  await updateCampaignMine({
+    request,
+    authToken,
+    data: {
       details: {
         state: CONTACTS_TEST_DISTRICT.state,
         zip: '82001',
         office: 'Other',
         otherOffice: 'Cheyenne City Council Ward 1',
-        positionId: 'seed-position-cheyenne-city-ward-1',
+        positionId: CONTACTS_TEST_POSITION_ID,
         electionDate: '2026-11-03',
         ballotLevel: 'CITY',
       },
-    },
-  })
-
-  await prisma.pathToVictory.upsert({
-    where: { campaignId },
-    create: {
-      campaignId,
-      data: {
-        source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
-        winNumber: 3142,
-        districtId: CONTACTS_TEST_DISTRICT.id,
-        electionType: CONTACTS_TEST_DISTRICT.type,
-        electionLocation: CONTACTS_TEST_DISTRICT.name,
-        p2vCompleteDate: '2025-09-25',
-        projectedTurnout: 6282,
-        voterContactGoal: 15710,
-        districtManuallySet: false,
-      },
-    },
-    update: {
-      data: {
+      pathToVictory: {
         source: P2VSource.ElectionApi,
         p2vStatus: P2VStatus.complete,
         winNumber: 3142,
@@ -77,39 +117,41 @@ async function prepareCampaignAndOffice(params: {
       },
     },
   })
+  return createElectedOffice({ request, authToken })
+}
 
-  const existingOffice = await prisma.electedOffice.findFirst({
-    where: { campaignId, userId },
-    select: { id: true },
-  })
+async function approveCampaignForStatewideDownload(params: {
+  request: APIRequestContext
+  campaignSlug: string
+}) {
+  const { request, campaignSlug } = params
+  const adminEmail = process.env.ADMIN_EMAIL
+  const adminPassword = process.env.ADMIN_PASSWORD
 
-  if (existingOffice) {
-    await prisma.electedOffice.update({
-      where: { id: existingOffice.id },
-      data: {
-        isActive: true,
-        electedDate: new Date('2024-11-05'),
-        swornInDate: new Date('2025-01-01'),
-      },
-    })
-  } else {
-    await prisma.electedOffice.create({
-      data: {
-        campaignId,
-        userId,
-        isActive: true,
-        electedDate: new Date('2024-11-05'),
-        swornInDate: new Date('2025-01-01'),
-      },
-    })
+  if (!adminEmail || !adminPassword) {
+    throw new Error(
+      'ADMIN_EMAIL and ADMIN_PASSWORD are required for statewide contacts e2e setup',
+    )
   }
+
+  const admin = await loginUser(request, adminEmail, adminPassword)
+  const response = await request.put('/v1/campaigns/mine', {
+    headers: AUTH_HEADER(admin.token),
+    data: {
+      slug: campaignSlug,
+      canDownloadFederal: true,
+    },
+  })
+
+  await assertOk(response, 'Admin campaign approval failed')
 }
 
 test.describe('Contacts and Segments', () => {
   let authToken: string
-  let campaignId: number
+  let campaignSlug: string
   let testUserId: number
   let testAuthToken: string
+  let electedOfficeId: string
 
   test.beforeEach(async ({ request }) => {
     const registerResponse = await registerUser(request, {
@@ -123,13 +165,13 @@ test.describe('Contacts and Segments', () => {
     })
 
     authToken = registerResponse.token
-    campaignId = registerResponse.campaign.id
+    campaignSlug = registerResponse.campaign.slug
     testUserId = registerResponse.user.id
     testAuthToken = registerResponse.token
 
-    await prepareCampaignAndOffice({
-      campaignId,
-      userId: registerResponse.user.id,
+    electedOfficeId = await prepareCampaignAndOffice({
+      request,
+      authToken,
     })
   })
 
@@ -137,10 +179,6 @@ test.describe('Contacts and Segments', () => {
     if (testUserId && testAuthToken) {
       await deleteUser(request, testUserId, testAuthToken)
     }
-  })
-
-  test.afterAll(async () => {
-    await prisma.$disconnect()
   })
 
   test('should return 401 when listing contacts without auth', async ({
@@ -153,12 +191,11 @@ test.describe('Contacts and Segments', () => {
   test('should block contact search for non-pro campaigns without elected office', async ({
     request,
   }) => {
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { isPro: false },
-    })
-    await prisma.electedOffice.deleteMany({
-      where: { campaignId, userId: testUserId },
+    await updateElectedOffice({
+      request,
+      authToken,
+      electedOfficeId,
+      data: { isActive: false },
     })
 
     const response = await request.get(`/v1/contacts?search=smith`, {
@@ -175,12 +212,11 @@ test.describe('Contacts and Segments', () => {
   test('should block contact download for non-pro campaigns without elected office', async ({
     request,
   }) => {
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { isPro: false },
-    })
-    await prisma.electedOffice.deleteMany({
-      where: { campaignId, userId: testUserId },
+    await updateElectedOffice({
+      request,
+      authToken,
+      electedOfficeId,
+      data: { isActive: false },
     })
 
     const response = await request.get(`/v1/contacts/download`, {
@@ -262,27 +298,26 @@ test.describe('Contacts and Segments', () => {
   test('should return statewide stats when district picker is set to State and campaign is approved', async ({
     request,
   }) => {
-    await prisma.campaign.update({
-      where: { id: campaignId },
+    test.skip(
+      !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD,
+      'Requires ADMIN_EMAIL and ADMIN_PASSWORD for admin-only campaign approval',
+    )
+
+    await approveCampaignForStatewideDownload({
+      request,
+      campaignSlug,
+    })
+
+    await updateCampaignMine({
+      request,
+      authToken,
       data: {
-        canDownloadFederal: true,
         details: {
           state: 'WY',
           ballotLevel: 'STATE',
           office: 'Other',
           otherOffice: 'Wyoming Governor',
           electionDate: '2026-11-03',
-        },
-      },
-    })
-    await prisma.pathToVictory.update({
-      where: { campaignId },
-      data: {
-        data: {
-          source: P2VSource.ElectionApi,
-          p2vStatus: P2VStatus.complete,
-          electionType: 'State',
-          electionLocation: 'WY',
         },
       },
     })
