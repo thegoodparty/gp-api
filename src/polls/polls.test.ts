@@ -31,6 +31,26 @@ beforeEach(async () => {
     },
   })
 
+  const electedOffice = await service.prisma.electedOffice.create({
+    data: {
+      isActive: true,
+      userId: service.user.id,
+      campaignId: campaign.id,
+    },
+  })
+
+  await service.prisma.organization.create({
+    data: {
+      slug: `eo-${electedOffice.id}`,
+      ownerId: service.user.id,
+    },
+  })
+
+  await service.prisma.electedOffice.update({
+    where: { id: electedOffice.id },
+    data: { organizationSlug: `eo-${electedOffice.id}` },
+  })
+
   getStats.mockResolvedValue({
     totalConstituentsWithCellPhone: 1000,
   } as StatsResponse)
