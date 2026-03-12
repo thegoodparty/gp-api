@@ -61,7 +61,6 @@ export class AuthenticationService {
     throw new NotImplementedException(
       'Facebook token validation not implemented',
     )
-    return ''
   }
 
   private SOCIAL_MEDIA_VALIDATORS_MAP: {

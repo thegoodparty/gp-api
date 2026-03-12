@@ -11,7 +11,7 @@ import {
   SendTemplateEmailInput,
 } from './email.types'
 import { getUserFullName } from '../users/util/users.util'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { APP_ROOT, WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { isTestEmail } from './util/testEmailValidator.util'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -73,7 +73,7 @@ export class EmailService {
     const { firstName, lastName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${WEBAPP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${APP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
     const subject = 'Reset your password - GoodParty.org'
@@ -86,7 +86,7 @@ export class EmailService {
     const { firstName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${WEBAPP_ROOT}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${APP_ROOT}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
       name: firstName,
