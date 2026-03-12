@@ -14,7 +14,7 @@ import { GetIndividualActivitiesResponse } from './contactEngagement.types'
 
 @Controller('contact-engagement')
 @UsePipes(ZodValidationPipe)
-@UseElectedOffice({ param: 'electedOfficeId' })
+@UseElectedOffice()
 export class ContactEngagementController {
   constructor(
     private readonly contactEngagementService: ContactEngagementService,

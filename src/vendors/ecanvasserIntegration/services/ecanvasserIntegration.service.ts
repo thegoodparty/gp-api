@@ -69,14 +69,10 @@ export class EcanvasserIntegrationService extends createPrismaBase(
   }
 
   async mine(campaignId: number): Promise<Omit<Ecanvasser, 'apiKey'> | null> {
-    const ecanvasser = await this.model.findFirst({
+    return this.model.findFirst({
       where: { campaignId },
+      omit: { apiKey: true },
     })
-    if (!ecanvasser) {
-      return null
-    }
-    const { apiKey, ...rest } = ecanvasser
-    return rest
   }
 
   private groupInteractionsByDay(interactions: EcanvasserInteraction[]) {

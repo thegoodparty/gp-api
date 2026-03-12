@@ -30,9 +30,10 @@ vi.mock('@/polls/utils/polls.utils', async (importOriginal) => ({
   sendTevynAPIPollMessage: vi.fn(),
 }))
 
-const mockRecordCustomEvent = vi.fn()
-vi.mock('src/observability/newrelic/newrelic.client', () => ({
-  recordCustomEvent: (...args: unknown[]) => mockRecordCustomEvent(...args),
+const mockRecordBlockedStateEvent = vi.fn()
+vi.mock('src/observability/grafana/otel.client', () => ({
+  recordBlockedStateEvent: (...args: unknown[]) =>
+    mockRecordBlockedStateEvent(...args),
 }))
 
 const makeCampaign = (slug = 'test-slug') => ({
@@ -842,7 +843,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
         expect(updateData.p2vAttempts).toBe(3)
         expect(updateData.p2vStatus).toBe(P2VStatus.failed)
         expect(mockSlack.message).toHaveBeenCalled()
-        expect(mockRecordCustomEvent).toHaveBeenCalled()
+        expect(mockRecordBlockedStateEvent).toHaveBeenCalled()
       })
 
       it('returns false and preserves DistrictMatched when exhausted retries', async () => {
@@ -858,7 +859,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
         // Status preserved — gold's DistrictMatched is NOT overwritten to Failed
         expect(updateData.p2vStatus).toBe(P2VStatus.districtMatched)
         expect(mockSlack.message).not.toHaveBeenCalled()
-        expect(mockRecordCustomEvent).not.toHaveBeenCalled()
+        expect(mockRecordBlockedStateEvent).not.toHaveBeenCalled()
       })
     })
 

@@ -3,7 +3,6 @@ import * as pulumi from '@pulumi/pulumi'
 import { createAssetsBucket } from './components/assets-bucket'
 import { createAssetsRouter } from './components/assets-router'
 import { createGrafanaResources } from './components/grafana'
-import { createNewRelicLogForwarder } from './components/newrelic-log-forwarder'
 import { createService } from './components/service'
 import { createVpc } from './components/vpc'
 
@@ -409,14 +408,6 @@ export = async () => {
   if (environment !== 'preview') {
     createGrafanaResources({ environment })
 
-    createNewRelicLogForwarder({
-      environment,
-      secretArn: secretInfo.arn,
-      secretKey: 'NEW_RELIC_LICENSE_KEY',
-      logGroupName: service.logGroupName,
-      logGroupArn: service.logGroupArn,
-      serviceName: secret.NEW_RELIC_APP_NAME,
-    })
   }
 
   return {

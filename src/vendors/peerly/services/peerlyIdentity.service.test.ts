@@ -1,4 +1,3 @@
-import { HttpService } from '@nestjs/axios'
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import {
@@ -9,32 +8,37 @@ import {
   OfficeLevel,
   User,
 } from '@prisma/client'
-import { of } from 'rxjs'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AreaCodeFromZipService } from '../../../ai/util/areaCodeFromZip.util'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
-import { UsersService } from '../../../users/services/users.service'
 import { GooglePlacesService } from '../../google/services/google-places.service'
-import { SlackService } from '../../slack/services/slack.service'
 import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
+import { PeerlyHttpService } from './peerlyHttp.service'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
-import { createMockLogger } from '../../../shared/test-utils/mockLogger.util'
+import { SlackService } from '../../slack/services/slack.service'
+import { UsersService } from '../../../users/services/users.service'
+import {
+  createMockLogger,
+  userFactory,
+  campaignFactory,
+  resetAllCounters,
+} from '@/shared/test-utils'
 import { PinoLogger } from 'nestjs-pino'
 
-function createMockUser(overrides: Partial<User> = {}): User {
-  return {
+/**
+ * Create a mock user for peerly identity tests
+ * Uses the shared userFactory with peerly-specific defaults
+ */
+const createMockUser = (overrides: Partial<User> = {}): User => {
+  return userFactory({
     id: 1,
     email: 'candidate@example.com',
     phone: '+15551234567',
     firstName: 'Jane',
     lastName: 'Doe',
     name: 'Jane Doe',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    metaData: null,
-    avatar: null,
     zip: '62701',
     password: null,
     hasPassword: false,
@@ -42,49 +46,35 @@ function createMockUser(overrides: Partial<User> = {}): User {
     passwordResetToken: null,
     clerkId: null,
     ...overrides,
-  }
+  })
 }
 
-function createMockCampaign(
+/**
+ * Create a mock campaign for peerly identity tests
+ * Uses the shared campaignFactory with peerly-specific defaults
+ */
+const createMockCampaign = (
   overrides: Omit<Partial<Campaign>, 'details'> & {
     details?: PrismaJson.CampaignDetails
   } = {},
-): Campaign {
+): Campaign => {
   const { details, ...rest } = overrides
-  const campaign: Campaign = {
+  return campaignFactory({
     id: 1,
-    organizationSlug: null,
     slug: 'test-campaign',
-    isVerified: false,
-    isActive: true,
-    isPro: false,
-    isDemo: false,
-    didWin: null,
-    dateVerified: null,
-    tier: null,
     formattedAddress: '123 Main St, Springfield, IL 62701',
+    placeId: 'test-place-id',
     details: {
       electionDate: '2024-11-05',
       ballotLevel: BallotReadyPositionLevel.FEDERAL,
       ...details,
     },
-    placeId: 'test-place-id',
-    aiContent: {},
-    data: {},
-    vendorTsData: {},
     userId: 1,
-    canDownloadFederal: false,
-    completedTaskIds: [],
-    hasFreeTextsOffer: false,
-    freeTextsOfferRedeemedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
     ...rest,
-  }
-  return campaign
+  })
 }
 
-function createMockDomain(overrides: Partial<Domain> = {}): Domain {
+const createMockDomain = (overrides: Partial<Domain> = {}): Domain => {
   return {
     id: 1,
     name: 'candidate.com',
@@ -132,34 +122,31 @@ describe('PeerlyIdentityService', () => {
   const baseDomain = createMockDomain()
 
   beforeEach(async () => {
-    const mockPostFn = vi
-      .fn()
-      .mockImplementation((_url: string, data: Record<string, unknown>) => {
-        lastSubmittedData = data
-        return of({
-          data: { message: 'success', verification_id: 'v123' },
-        })
-      })
-    // The service accesses httpService[method.name], so the function needs a proper name
-    Object.defineProperty(mockPostFn, 'name', { value: 'post' })
+    resetAllCounters()
 
     module = await Test.createTestingModule({
       providers: [
         PeerlyIdentityService,
         { provide: PinoLogger, useValue: createMockLogger() },
         {
-          provide: HttpService,
+          provide: PeerlyHttpService,
           useValue: {
-            post: mockPostFn,
+            post: vi
+              .fn()
+              .mockImplementation(
+                (_path: string, data: Record<string, unknown>) => {
+                  lastSubmittedData = data
+                  return Promise.resolve({
+                    data: { message: 'success', verification_id: 'v123' },
+                  })
+                },
+              ),
+            validateResponse: vi.fn(),
           },
         },
         {
-          provide: PeerlyAuthenticationService,
-          useValue: {
-            getAuthorizationHeader: vi.fn().mockResolvedValue({
-              Authorization: 'Bearer test-token',
-            }),
-          },
+          provide: PeerlyErrorHandlingService,
+          useValue: { handleApiError: vi.fn() },
         },
         {
           provide: GooglePlacesService,
@@ -168,20 +155,20 @@ describe('PeerlyIdentityService', () => {
           },
         },
         {
-          provide: SlackService,
-          useValue: { message: vi.fn() },
-        },
-        {
-          provide: UsersService,
-          useValue: { findByCampaign: vi.fn().mockResolvedValue(baseUser) },
-        },
-        {
           provide: CampaignsService,
           useValue: { findFirstOrThrow: vi.fn() },
         },
         {
           provide: AreaCodeFromZipService,
           useValue: { getAreaCodeFromZip: vi.fn() },
+        },
+        {
+          provide: SlackService,
+          useValue: { message: vi.fn() },
+        },
+        {
+          provide: UsersService,
+          useValue: { findByCampaign: vi.fn() },
         },
       ],
     }).compile()

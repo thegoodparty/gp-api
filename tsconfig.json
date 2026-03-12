@@ -1,5 +1,5 @@
 {
-  "exclude": ["node_modules", "contracts"],
+  "exclude": ["node_modules", "contracts", "dist"],
   "compilerOptions": {
     "module": "NodeNext",
     "declaration": true,
@@ -17,9 +17,6 @@
       ],
       "@e2e-tests/*": [
         "e2e-tests/*"
-      ],
-      "newrelic": [
-        "node_modules/newrelic"
       ],
     },
     "incremental": true,
