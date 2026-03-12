@@ -17,7 +17,7 @@ export const verifyM2MToken = async (
       token,
       machineSecretKey: GP_WEBAPP_MACHINE_SECRET,
     })
-  } catch (error) {
+  } catch {
     throw new UnauthorizedException('M2M token verification failed')
   }
 }

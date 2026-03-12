@@ -20,3 +20,26 @@ export type BlockedStateDecisionInput = {
   errorMessage: string
   errorCode?: string | number | null
 }
+
+export type BlockedStateEventAttributes = {
+  service: 'gp-api'
+  environment?: string
+  userId: number
+
+  endpoint?: string
+  method?: string
+  statusCode?: number
+  errorClass?: string
+  errorMessage?: string
+  errorCode?: string | number
+
+  rootCause: BlockedStateRootCause
+  isBackground: boolean
+
+  campaignId?: number
+  slug?: string
+  feature?: string
+
+  p2vAttempts?: number
+  reason?: string
+}

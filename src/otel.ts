@@ -104,7 +104,7 @@ if (!headers) {
     })
 
   const prismaConnectionMetricProcessor: SpanProcessor = {
-    onStart: () => {},
+    onStart: () => undefined,
     onEnd: (span: ReadableSpan) => {
       if (span.name !== 'prisma:engine:connection') return
       const durationMs =
