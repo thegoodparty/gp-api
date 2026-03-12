@@ -88,10 +88,10 @@ export class HubspotService {
       oauth: mockBaseDiscovery,
       settings: mockBaseDiscovery,
       webhooks: mockBaseDiscovery,
-      init: () => {},
-      setAccessToken: () => {},
-      setApiKey: () => {},
-      setDeveloperApiKey: () => {},
+      init: () => undefined,
+      setAccessToken: () => undefined,
+      setApiKey: () => undefined,
+      setDeveloperApiKey: () => undefined,
       apiRequest: () => Promise.resolve({} as Response),
     }
   }

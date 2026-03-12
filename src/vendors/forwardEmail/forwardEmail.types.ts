@@ -77,26 +77,3 @@ export interface ForwardEmailAliasResponse {
   storage_location: string
   has_imap: boolean
 }
-
-interface CreateDomainInput {
-  domain: string
-}
-
-interface CreateAliasInput {
-  name?: string
-  recipients?: string | string[]
-  description?: string
-  labels?: string | string[]
-  has_recipient_verification?: boolean
-  is_enabled?: boolean
-  error_code_if_disabled?: 250 | 421 | 550
-  has_imap?: boolean
-  has_pgp?: boolean
-  public_key?: string
-  max_quota?: string
-  vacation_responder_is_enabled?: boolean
-  vacation_responder_start_date?: string
-  vacation_responder_end_date?: string
-  vacation_responder_subject?: string
-  vacation_responder_message?: string
-}

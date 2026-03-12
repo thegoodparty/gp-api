@@ -766,10 +766,6 @@ export class DomainsService
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase()
 
-        // Stripe returns specific error types for different scenarios
-        const errorCode =
-          'code' in error ? (error as Record<string, string>).code : null
-
         if (
           errorMessage.includes('no such payment_intent') ||
           errorMessage.includes('not found') ||

@@ -30,7 +30,7 @@ describe('PollBiasAnalysisService', () => {
 
     braintrustService = {
       enabled: false,
-      traced: vi.fn((name, fn) => fn()),
+      traced: vi.fn((_name, fn) => fn()),
       loadPromptMessages: vi.fn(),
     }
 
@@ -176,7 +176,7 @@ describe('PollBiasAnalysisService', () => {
 
     it('wraps LLM call with Braintrust tracing', async () => {
       braintrustService.enabled = true
-      braintrustService.traced.mockImplementation(async (name, fn) => fn())
+      braintrustService.traced.mockImplementation(async (_name, fn) => fn())
       braintrustService.loadPromptMessages.mockResolvedValue([
         { role: 'system', content: 'Braintrust prompt' },
         { role: 'user', content: 'Analyze: test' },
@@ -220,7 +220,7 @@ describe('PollBiasAnalysisService', () => {
         model: 'model1',
       }
 
-      braintrustService.traced.mockImplementation(async (name, fn) => {
+      braintrustService.traced.mockImplementation(async (_name, fn) => {
         try {
           return await fn()
         } catch (error) {
@@ -337,7 +337,7 @@ describe('PollBiasAnalysisService', () => {
     it('identifies validation errors correctly', async () => {
       vi.useFakeTimers()
 
-      braintrustService.traced.mockImplementation(async (name, fn) => {
+      braintrustService.traced.mockImplementation(async (_name, fn) => {
         try {
           return await fn()
         } catch (error) {

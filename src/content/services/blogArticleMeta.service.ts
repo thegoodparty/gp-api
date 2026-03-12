@@ -8,10 +8,6 @@ import { mapBlogArticlesToSections } from '../util/mapBlogArticlesToSections.uti
 export class BlogArticleMetaService extends createPrismaBase(
   MODELS.BlogArticleMeta,
 ) {
-  constructor() {
-    super()
-  }
-
   async findBlogArticleTag(tagSlug?: string) {
     const { tags: articleTags } =
       (await this.model.findFirst({
