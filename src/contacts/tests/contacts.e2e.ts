@@ -313,11 +313,20 @@ test.describe('Contacts and Segments', () => {
       authToken,
       data: {
         details: {
-          state: 'WY',
+          state: 'AL',
           ballotLevel: 'STATE',
           office: 'Other',
-          otherOffice: 'Wyoming Governor',
+          otherOffice: 'Alabama Governor',
+          positionId: null,
           electionDate: '2026-11-03',
+        },
+        pathToVictory: {
+          source: P2VSource.ElectionApi,
+          p2vStatus: P2VStatus.complete,
+          districtId: 'cfa28085-cf71-6c78-7605-a24b8e2d41ab',
+          electionType: 'State',
+          electionLocation: 'AL',
+          p2vCompleteDate: '2025-09-25',
         },
       },
     })
