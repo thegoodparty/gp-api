@@ -944,6 +944,9 @@ export class QueueConsumerService {
         sampleParams,
         campaign,
       )
+      if (sample.length === 0) {
+        throw new Error(`No contacts returned in sample for poll ${poll.id}`)
+      }
       this.logger.info(
         `${params.pollId} Generated sample of ${sample.length} contacts`,
       )
