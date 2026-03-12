@@ -385,6 +385,47 @@ describe('PeerlyIdentityService', () => {
       expect(lastSubmittedData.city_county).toBe('Anytown')
     })
 
+    it('throws BadRequestException when local candidate has no city or county', async () => {
+      const placesService = module.get(GooglePlacesService)
+      vi.mocked(placesService.getAddressByPlaceId).mockResolvedValue({
+        address_components: [
+          { types: ['street_number'], long_name: '100', short_name: '100' },
+          { types: ['route'], long_name: 'Elm St', short_name: 'Elm St' },
+          {
+            types: ['administrative_area_level_1', 'political'],
+            long_name: 'Virginia',
+            short_name: 'VA',
+          },
+          { types: ['postal_code'], long_name: '24000', short_name: '24000' },
+        ],
+      })
+
+      const campaign = createMockCampaign({
+        details: {
+          electionDate: '2024-11-05',
+          ballotLevel: BallotReadyPositionLevel.CITY,
+        },
+      })
+
+      await expect(
+        service.submitCampaignVerifyRequest(
+          {
+            email: 'candidate@example.com',
+            ein: '12-3456789',
+            phone: '15551234567',
+            peerlyIdentityId: 'peerly-123',
+            filingUrl: 'https://example.gov/elections',
+            officeLevel: OfficeLevel.local,
+            fecCommitteeId: null,
+            committeeType: CommitteeType.CANDIDATE,
+          },
+          baseUser,
+          campaign,
+          baseDomain,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
     it('includes verification_method, filing_phone_number, filing_phone_type, and filing_url_instructions when calling Peerly', async () => {
       const campaign = createMockCampaign({
         details: {

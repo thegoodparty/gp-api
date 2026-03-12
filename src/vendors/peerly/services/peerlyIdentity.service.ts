@@ -436,9 +436,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
 
       if (!cityCounty) {
         this.logger.error(
-          `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
+          `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}, placeId=${placeId}). ` +
             `ballotLevel=${ballotLevel}, city=${city?.long_name}, county=${county?.long_name}. ` +
             `This field is required by Peerly when locality is 'local'.`,
+        )
+        throw new BadRequestException(
+          `City or county name is required for local candidates but not present for placeId=${placeId}.`,
         )
       }
     }
