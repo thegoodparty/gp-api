@@ -319,6 +319,12 @@ test.describe('Contacts and Segments', () => {
           otherOffice: 'Wyoming Governor',
           electionDate: '2026-11-03',
         },
+        pathToVictory: {
+          source: P2VSource.ElectionApi,
+          p2vStatus: P2VStatus.complete,
+          electionType: 'State',
+          electionLocation: 'WY',
+        },
       },
     })
 
