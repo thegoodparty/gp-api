@@ -865,10 +865,7 @@ describe('CampaignsService - redeemFreeTexts', () => {
       const userId = 456
 
       mockPrismaClient.$transaction = vi.fn(
-        async (
-          callback: Parameters<PrismaClient['$transaction']>[0],
-          options?: Parameters<PrismaClient['$transaction']>[1],
-        ) => {
+        async (callback: Parameters<PrismaClient['$transaction']>[0]) => {
           const mockTx: MockTransactionClient = {
             campaign: {
               updateMany: vi.fn().mockResolvedValue({ count: 1 }),

@@ -441,7 +441,7 @@ export class QueueConsumerService {
       this.logger.debug(
         `Email forwarding set up for domain *@${domain.name} -> ${forwardingEmailAddress}`,
       )
-    } catch (e) {
+    } catch {
       const message = `Error setting up email forwarding for domain *@${domain.name} -> ${forwardingEmailAddress}`
       this.logger.error(message)
       throw new Error(message, { cause: { domainId, forwardingEmailAddress } })
@@ -944,6 +944,9 @@ export class QueueConsumerService {
         sampleParams,
         campaign,
       )
+      if (sample.length === 0) {
+        throw new Error(`No contacts returned in sample for poll ${poll.id}`)
+      }
       this.logger.info(
         `${params.pollId} Generated sample of ${sample.length} contacts`,
       )
