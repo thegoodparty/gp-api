@@ -119,7 +119,7 @@ describe('OrganizationsService', () => {
 
     it('resolves all three fields together', async () => {
       mockGetPositionByBallotReadyId.mockImplementation(
-        (_id: string, opts?: { includeDistrict?: boolean }) => {
+        (id: string, opts?: { includeDistrict?: boolean }) => {
           if (opts?.includeDistrict) {
             return {
               id: 'pos-id',

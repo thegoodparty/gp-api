@@ -31,6 +31,14 @@ beforeEach(async () => {
     },
   })
 
+  await service.prisma.electedOffice.create({
+    data: {
+      userId: service.user.id,
+      campaignId: campaign.id,
+      isActive: true,
+    },
+  })
+
   getStats.mockResolvedValue({
     totalConstituentsWithCellPhone: 1000,
   } as StatsResponse)
