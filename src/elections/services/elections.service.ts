@@ -156,7 +156,7 @@ export class ElectionsService {
       PositionWithOptionalDistrict,
       { includeDistrict: boolean; includeTurnout: boolean }
     >(`positions/${positionId}`, {
-      includeDistrict: false,
+      includeDistrict: true,
       includeTurnout: false,
     })
   }
