@@ -163,7 +163,7 @@ export class PurchaseService {
 
     return this.stripeService.createCustomCheckoutSession(
       {
-        userId: user.id,
+        id: user.id,
         email: user.email,
         customerId: user.metaData?.customerId,
       },
