@@ -127,10 +127,10 @@ export class StripeService {
 
   async createCustomCheckoutSession(
     {
-      userId,
+      id: userId,
       email,
       customerId,
-    }: { userId: number; email: string | null; customerId?: string },
+    }: Pick<User, 'id' | 'email'> & { customerId?: string },
     payload: CustomCheckoutSessionPayload,
   ): Promise<{
     id: string
@@ -153,9 +153,7 @@ export class StripeService {
       ...(customerId
         ? { customer: customerId }
         : { customer_email: email ?? undefined }),
-      payment_intent_data: {
-        receipt_email: email ?? undefined,
-      },
+      ...(email ? { payment_intent_data: { receipt_email: email } } : {}),
       line_items: [
         {
           price_data: {
