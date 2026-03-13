@@ -99,7 +99,7 @@ export class StripeService {
       metadata: {
         userId,
       },
-      customer_email: email ?? undefined,
+      ...(email ? { customer_email: email } : {}),
       billing_address_collection: 'auto',
       line_items: [
         {
