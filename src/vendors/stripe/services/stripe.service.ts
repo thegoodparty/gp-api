@@ -130,7 +130,8 @@ export class StripeService {
       id: userId,
       email,
       customerId,
-    }: Pick<User, 'id' | 'email'> & { customerId?: string },
+    }: Pick<User, 'id' | 'email'> &
+      Pick<NonNullable<User['metaData']>, 'customerId'>,
     payload: CustomCheckoutSessionPayload,
   ): Promise<{
     id: string
