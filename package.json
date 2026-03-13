@@ -81,6 +81,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
     "@opentelemetry/host-metrics": "^0.38.3",
     "@opentelemetry/instrumentation-http": "^0.212.0",
+    "@opentelemetry/instrumentation-nestjs-core": "^0.46.0",
     "@opentelemetry/instrumentation-pino": "^0.58.0",
     "@opentelemetry/resources": "^2.5.1",
     "@opentelemetry/sdk-logs": "^0.212.0",
