@@ -99,9 +99,7 @@ export class StripeService {
       metadata: {
         userId,
       },
-      payment_intent_data: {
-        receipt_email: email ?? undefined,
-      },
+      customer_email: email ?? undefined,
       billing_address_collection: 'auto',
       line_items: [
         {
@@ -152,7 +150,9 @@ export class StripeService {
     const session = await this.stripe.checkout.sessions.create({
       ui_mode: 'custom',
       mode: 'payment',
-      ...(customerId ? { customer: customerId } : { customer_email: email }),
+      ...(customerId
+        ? { customer: customerId }
+        : { customer_email: email ?? undefined }),
       payment_intent_data: {
         receipt_email: email ?? undefined,
       },
