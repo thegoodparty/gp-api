@@ -10,6 +10,7 @@ import { User } from '@prisma/client'
 type APIOrganization = {
   slug: string
   name: string | null
+  districtId: string | null
   electedOfficeId: string | null
   campaignId: number | null
 }
@@ -18,6 +19,7 @@ const toAPIOrganization = (org: OrganizationWithPosition): APIOrganization => {
   const result: APIOrganization = {
     slug: org.slug,
     name: null,
+    districtId: null,
     electedOfficeId: null,
     campaignId: null,
   }
@@ -33,6 +35,10 @@ const toAPIOrganization = (org: OrganizationWithPosition): APIOrganization => {
   if (org.customPositionName) {
     result.name = org.customPositionName
   }
+
+  result.districtId =
+    org.overrideDistrictId ?? org.position?.district?.id ?? null
+
   return result
 }
 
