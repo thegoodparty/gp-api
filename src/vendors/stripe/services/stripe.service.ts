@@ -152,7 +152,9 @@ export class StripeService {
       mode: 'payment',
       ...(customerId
         ? { customer: customerId }
-        : { customer_email: email ?? undefined }),
+        : email
+          ? { customer_email: email }
+          : {}),
       ...(email ? { payment_intent_data: { receipt_email: email } } : {}),
       line_items: [
         {
