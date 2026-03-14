@@ -121,7 +121,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
   }
   let electedOfficeService: { findUnique: ReturnType<typeof vi.fn> }
   let campaignsService: { findUnique: ReturnType<typeof vi.fn> }
-  let contactsService: { findContacts: ReturnType<typeof vi.fn> }
+  let contactsService: { countContacts: ReturnType<typeof vi.fn> }
   let pollIssuesService: {
     model: { deleteMany: ReturnType<typeof vi.fn> }
     client: { pollIssue: { createMany: ReturnType<typeof vi.fn> } }
@@ -170,7 +170,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       }),
     }
     contactsService = {
-      findContacts: vi
+      countContacts: vi
         .fn()
         .mockResolvedValue({ pagination: { totalResults: 100 } }),
     }

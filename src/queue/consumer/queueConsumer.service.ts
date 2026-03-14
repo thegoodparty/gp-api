@@ -662,7 +662,7 @@ export class QueueConsumerService {
       return
     }
 
-    const constituency = await this.contactsService.findContacts(
+    const constituency = await this.contactsService.countContacts(
       { segment: 'all', resultsPerPage: 5, page: 1 },
       campaign,
     )

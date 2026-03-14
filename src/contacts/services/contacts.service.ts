@@ -98,98 +98,30 @@ export class ContactsService {
     { resultsPerPage, page, search, segment }: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    if (search) {
-      const electedOffice =
-        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-      if (!campaign.isPro && !electedOffice) {
-        throw new BadRequestException(
-          'Search is only available for pro campaigns',
-        )
-      }
-    }
-    const filters = await this.segmentToFilters(segment, campaign)
-
-    return this.withFallbackDistrictName(
+    return this.fetchPeopleData<PeopleListResponse>({
       campaign,
-      async ({ state, districtType, districtName }) => {
-        try {
-          const response = await lastValueFrom(
-            this.httpService.post(
-              `${PEOPLE_API_URL}/v1/people`,
-              {
-                state,
-                districtType,
-                districtName,
-                resultsPerPage,
-                page,
-                filters,
-                search,
-              },
-              {
-                headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
-              },
-            ),
-          )
-          return response.data as PeopleListResponse
-        } catch (error) {
-          this.logger.error(
-            {
-              error,
-            },
-            `Failed to fetch from people API`,
-          )
-          throw new BadGatewayException(`Failed to fetch from people API`)
-        }
-      },
-    )
+      path: '/v1/people',
+      resultsPerPage,
+      page,
+      search,
+      segment,
+      errorMessage: 'Failed to fetch from people API',
+    })
   }
 
   async countContacts(
     { resultsPerPage, page, search, segment }: CountContactsDTO,
     campaign: CampaignWithPathToVictory,
   ) {
-    if (search) {
-      const electedOffice =
-        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-      if (!campaign.isPro && !electedOffice) {
-        throw new BadRequestException(
-          'Search is only available for pro campaigns',
-        )
-      }
-    }
-    const filters = await this.segmentToFilters(segment, campaign)
-
-    return this.withFallbackDistrictName(
+    return this.fetchPeopleData<PeopleCountResponse>({
       campaign,
-      async ({ state, districtType, districtName }) => {
-        try {
-          const response = await lastValueFrom(
-            this.httpService.post<PeopleCountResponse>(
-              `${PEOPLE_API_URL}/v1/people/count`,
-              {
-                state,
-                districtType,
-                districtName,
-                resultsPerPage,
-                page,
-                filters,
-                search,
-              },
-              {
-                headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
-              },
-            ),
-          )
-          return response.data
-        } catch (error) {
-          this.logger.error(
-            { error },
-            `Failed to fetch count from people API`,
-          )
-          throw new BadGatewayException(`Failed to fetch count from people API`)
-        }
-      },
-    )
+      path: '/v1/people/count',
+      resultsPerPage,
+      page,
+      search,
+      segment,
+      errorMessage: 'Failed to fetch count from people API',
+    })
   }
 
   async sampleContacts(
@@ -534,5 +466,76 @@ export class ContactsService {
       )
 
     return customSegment ? convertVoterFileFilterToFilters(customSegment) : {}
+  }
+
+  private async validateSearchAccess(
+    search: string | undefined,
+    campaign: CampaignWithPathToVictory,
+  ): Promise<void> {
+    if (!search) {
+      return
+    }
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    if (!campaign.isPro && !electedOffice) {
+      throw new BadRequestException(
+        'Search is only available for pro campaigns',
+      )
+    }
+  }
+
+  private async fetchPeopleData<Response>({
+    campaign,
+    path,
+    resultsPerPage,
+    page,
+    search,
+    segment,
+    errorMessage,
+  }: {
+    campaign: CampaignWithPathToVictory
+    path: string
+    resultsPerPage: number
+    page: number
+    search?: string
+    segment?: string
+    errorMessage: string
+  }): Promise<Response> {
+    await this.validateSearchAccess(search, campaign)
+    const filters = await this.segmentToFilters(segment, campaign)
+
+    return this.withFallbackDistrictName(
+      campaign,
+      async ({ state, districtType, districtName }) => {
+        try {
+          const response = await lastValueFrom(
+            this.httpService.post<Response>(
+              `${PEOPLE_API_URL}${path}`,
+              {
+                state,
+                districtType,
+                districtName,
+                resultsPerPage,
+                page,
+                filters,
+                search,
+              },
+              {
+                headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
+              },
+            ),
+          )
+          return response.data
+        } catch (error) {
+          this.logger.error(
+            {
+              error,
+            },
+            errorMessage,
+          )
+          throw new BadGatewayException(errorMessage)
+        }
+      },
+    )
   }
 }
