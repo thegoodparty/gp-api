@@ -14,3 +14,4 @@ const downloadContactsSchema = z.object({
 
 export class ListContactsDTO extends createZodDto(listContactsSchema) {}
 export class DownloadContactsDTO extends createZodDto(downloadContactsSchema) {}
+export class CountContactsDTO extends createZodDto(listContactsSchema) {}

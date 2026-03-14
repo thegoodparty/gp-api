@@ -6,6 +6,7 @@ import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { GetPersonParamsDTO } from './schemas/getPerson.schema'
 import {
+  CountContactsDTO,
   DownloadContactsDTO,
   ListContactsDTO,
 } from './schemas/listContacts.schema'
@@ -43,6 +44,14 @@ export class ContactsController {
   @Get('stats')
   getContactsStats(@ReqCampaign() campaign: CampaignWithPathToVictory) {
     return this.contactsService.getDistrictStats(campaign)
+  }
+
+  @Get('count')
+  countContacts(
+    @Query() filterDto: CountContactsDTO,
+    @ReqCampaign() campaign: CampaignWithPathToVictory,
+  ) {
+    return this.contactsService.countContacts(filterDto, campaign)
   }
 
   @Get(':id')

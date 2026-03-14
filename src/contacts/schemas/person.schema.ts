@@ -60,6 +60,18 @@ export interface PersonOutput {
 
 export interface PeopleListResponse {
   pagination: {
+    totalResults?: number
+    currentPage: number
+    pageSize: number
+    totalPages?: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
+  people: PersonOutput[]
+}
+
+export interface PeopleCountResponse {
+  pagination: {
     totalResults: number
     currentPage: number
     pageSize: number
@@ -67,5 +79,4 @@ export interface PeopleListResponse {
     hasNextPage: boolean
     hasPreviousPage: boolean
   }
-  people: PersonOutput[]
 }

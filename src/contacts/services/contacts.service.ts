@@ -18,10 +18,15 @@ import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import { CampaignWithPathToVictory, StatsResponse } from '../contacts.types'
 import {
+  CountContactsDTO,
   DownloadContactsDTO,
   ListContactsDTO,
 } from '../schemas/listContacts.schema'
-import { PeopleListResponse, PersonOutput } from '../schemas/person.schema'
+import {
+  PeopleCountResponse,
+  PeopleListResponse,
+  PersonOutput,
+} from '../schemas/person.schema'
 import type { SampleContacts } from '../schemas/sampleContacts.schema'
 import defaultSegmentToFiltersMap from '../segmentsToFiltersMap.const'
 import {
@@ -134,6 +139,54 @@ export class ContactsService {
             `Failed to fetch from people API`,
           )
           throw new BadGatewayException(`Failed to fetch from people API`)
+        }
+      },
+    )
+  }
+
+  async countContacts(
+    { resultsPerPage, page, search, segment }: CountContactsDTO,
+    campaign: CampaignWithPathToVictory,
+  ) {
+    if (search) {
+      const electedOffice =
+        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+      if (!campaign.isPro && !electedOffice) {
+        throw new BadRequestException(
+          'Search is only available for pro campaigns',
+        )
+      }
+    }
+    const filters = await this.segmentToFilters(segment, campaign)
+
+    return this.withFallbackDistrictName(
+      campaign,
+      async ({ state, districtType, districtName }) => {
+        try {
+          const response = await lastValueFrom(
+            this.httpService.post<PeopleCountResponse>(
+              `${PEOPLE_API_URL}/v1/people/count`,
+              {
+                state,
+                districtType,
+                districtName,
+                resultsPerPage,
+                page,
+                filters,
+                search,
+              },
+              {
+                headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
+              },
+            ),
+          )
+          return response.data
+        } catch (error) {
+          this.logger.error(
+            { error },
+            `Failed to fetch count from people API`,
+          )
+          throw new BadGatewayException(`Failed to fetch count from people API`)
         }
       },
     )
