@@ -9,6 +9,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { PinoLogger } from 'nestjs-pino'
 import { Webhook } from 'svix'
 import { PublicAccess } from '@/authentication/decorators/PublicAccess.decorator'
@@ -25,6 +26,7 @@ const CLERK_WEBHOOK_SECRET: string = process.env.CLERK_WEBHOOK_SECRET
 export class ClerkWebhookController {
   constructor(
     private readonly clerkWebhookService: ClerkWebhookService,
+    private readonly eventEmitter: EventEmitter2,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(ClerkWebhookController.name)
@@ -68,14 +70,13 @@ export class ClerkWebhookController {
     )
 
     switch (event.type) {
-      case 'user.created':
-        await this.clerkWebhookService.handleUserCreated(event.data)
-        break
       case 'user.updated':
         await this.clerkWebhookService.handleUserUpdated(event.data)
+        this.eventEmitter.emit('clerk.user.updated', event.data)
         break
       case 'user.deleted':
         await this.clerkWebhookService.handleUserDeleted(event.data)
+        this.eventEmitter.emit('clerk.user.deleted', event.data)
         break
       default:
         this.logger.debug(

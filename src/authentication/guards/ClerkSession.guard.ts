@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { verifyToken, ClerkClient } from '@clerk/backend'
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/authentication/providers/clerk-client.provider'
@@ -75,9 +74,7 @@ export class ClerkSessionGuard implements CanActivate {
         throw new UnauthorizedException()
       }
 
-      const user =
-        (await this.usersService.findUser({ clerkId })) ??
-        (await this.provisionUserFromClerk(clerkId))
+      const user = await this.resolveUserFromClerk(clerkId)
 
       if (!user) {
         this.logger.warn(
@@ -105,7 +102,10 @@ export class ClerkSessionGuard implements CanActivate {
     return true
   }
 
-  private async provisionUserFromClerk(clerkId: string): Promise<User | null> {
+  private async resolveUserFromClerk(clerkId: string): Promise<User | null> {
+    const existing = await this.usersService.findUser({ clerkId })
+    if (existing) return existing
+
     try {
       const clerkUser = await this.clerkClient.users.getUser(clerkId)
       const email =
@@ -119,43 +119,15 @@ export class ClerkSessionGuard implements CanActivate {
         return null
       }
 
-      const existingByEmail = await this.usersService.findUserByEmail(email)
-      if (existingByEmail) {
-        this.logger.info(
-          { userId: existingByEmail.id, clerkId },
-          'Linking existing user to Clerk account via JIT provisioning',
-        )
-        return this.usersService.updateUser(
-          { id: existingByEmail.id },
-          { clerkId },
-        )
-      }
-
-      const user = await this.usersService.createUserFromClerk({
+      return this.usersService.findOrProvisionByClerk({
         clerkId,
         email,
         firstName: clerkUser.firstName ?? '',
         lastName: clerkUser.lastName ?? '',
       })
-      this.logger.info(
-        { userId: user.id, clerkId },
-        'Created new user via JIT provisioning',
-      )
-      return user
     } catch (err) {
-      if (this.isPrismaUniqueConstraintError(err)) {
-        this.logger.debug(
-          { clerkId },
-          'Concurrent JIT provisioning detected, fetching existing user',
-        )
-        return this.usersService.findUser({ clerkId })
-      }
       this.logger.error({ err, clerkId }, 'Failed to provision user from Clerk')
       return null
     }
-  }
-
-  private isPrismaUniqueConstraintError(err: unknown): boolean {
-    return err instanceof PrismaClientKnownRequestError && err.code === 'P2002'
   }
 }

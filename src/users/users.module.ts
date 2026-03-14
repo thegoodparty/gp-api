@@ -7,13 +7,15 @@ import { SlackModule } from '@/vendors/slack/slack.module'
 import { StripeModule } from '@/vendors/stripe/stripe.module'
 import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { CrmUsersService } from './services/crmUsers.service'
+import { UserEventsStreamService } from './services/user-events-stream.service'
 import { UsersService } from './services/users.service'
+import { UserEventsController } from './user-events.controller'
 import { UsersController } from './users.controller'
 
 @Global()
 @Module({
-  controllers: [UsersController],
-  providers: [UsersService, CrmUsersService, ClerkClientProvider],
+  controllers: [UsersController, UserEventsController],
+  providers: [UsersService, CrmUsersService, UserEventsStreamService, ClerkClientProvider],
   exports: [UsersService, CrmUsersService],
   imports: [
     FilesModule,
