@@ -37,6 +37,7 @@ const userDefaults = {
   zip: '12345',
   metaData: null,
   passwordResetToken: null,
+  clerkId: null,
 }
 
 const mockUser: User = {

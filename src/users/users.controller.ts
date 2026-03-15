@@ -27,6 +27,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
+import { SyncProfileSchema } from './schemas/SyncProfile.schema'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
 import { FilesService } from 'src/files/files.service'
@@ -81,6 +82,12 @@ export class UsersController {
   @ResponseSchema(ReadUserOutputSchema)
   async updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
     return this.usersService.updateUser({ id: user.id }, body ?? {})
+  }
+
+  @Post('sync-profile')
+  @ResponseSchema(ReadUserOutputSchema)
+  async syncProfile(@ReqUser() user: User, @Body() body: SyncProfileSchema) {
+    return this.usersService.updateUser({ id: user.id }, body)
   }
 
   @Get('me/metadata')

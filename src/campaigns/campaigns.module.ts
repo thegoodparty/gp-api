@@ -1,4 +1,3 @@
-import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { OrganizationsModule } from '@/organizations/organizations.module'
 import { forwardRef, Global, Module } from '@nestjs/common'
 import { ElectionsModule } from 'src/elections/elections.module'
@@ -74,7 +73,6 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CrmCampaignsService,
     CampaignTasksService,
     CampaignTcrComplianceService,
-    ClerkClientProvider,
   ],
   exports: [
     CampaignsService,

@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
@@ -58,7 +59,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
 
   findUserByEmail(email: string) {
     return this.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
+      where: { email: { equals: email, mode: Prisma.QueryMode.insensitive } },
     })
   }
 
@@ -80,7 +81,7 @@ export class UsersService extends createPrismaBase(MODELS.User) {
   findUserByResetToken(email: string, token: string) {
     return this.findFirstOrThrow({
       where: {
-        email: { equals: email, mode: 'insensitive' },
+        email: { equals: email, mode: Prisma.QueryMode.insensitive },
         passwordResetToken: token,
       },
     })
@@ -188,6 +189,60 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     await this.crm.trackUserUpdate(user.id)
 
     return user
+  }
+
+  async findOrProvisionByClerk(data: {
+    clerkId: string
+    email: string
+    firstName: string
+    lastName: string
+  }): Promise<User | null> {
+    const existingByClerkId = await this.findUser({ clerkId: data.clerkId })
+    if (existingByClerkId) return existingByClerkId
+
+    const existingByEmail = await this.findUserByEmail(data.email)
+    if (existingByEmail) {
+      this.logger.info(
+        { userId: existingByEmail.id, clerkId: data.clerkId },
+        'Linking existing user to Clerk account',
+      )
+      return this.updateUser(
+        { id: existingByEmail.id },
+        { clerkId: data.clerkId },
+      )
+    }
+
+    try {
+      const user = await this.model.create({
+        data: {
+          clerkId: data.clerkId,
+          email: data.email,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          name: `${data.firstName} ${data.lastName}`.trim(),
+        },
+      })
+      this.logger.info(
+        { userId: user.id, clerkId: data.clerkId },
+        'Created new user from Clerk',
+      )
+      return user
+    } catch (err) {
+      if (
+        err instanceof PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        this.logger.debug(
+          { clerkId: data.clerkId },
+          'Concurrent provisioning detected, fetching existing user',
+        )
+        return (
+          (await this.findUser({ clerkId: data.clerkId })) ??
+          (await this.findUserByEmail(data.email))
+        )
+      }
+      throw err
+    }
   }
 
   async updateUser(where: Prisma.UserWhereUniqueInput, data: Partial<User>) {

@@ -22,10 +22,7 @@ import {
 import { subDays, subMonths } from 'date-fns'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
-import { AdminImpersonateSchema } from './schemas/AdminImpersonate.schema'
-import { AuthenticationService } from 'src/authentication/authentication.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
-import { ReadUserOutputSchema } from '@goodparty_org/contracts'
 import { UserRole } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -36,7 +33,6 @@ export class AdminUsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
-    private readonly authService: AuthenticationService,
     private readonly slack: SlackService,
     private readonly logger: PinoLogger,
   ) {
@@ -71,23 +67,6 @@ export class AdminUsersController {
   @Post()
   create(@Body() body: AdminCreateUserSchema) {
     return this.usersService.createUser(body)
-  }
-
-  @Post('impersonate')
-  @HttpCode(HttpStatus.OK)
-  async impersonate(@Body() { email }: AdminImpersonateSchema) {
-    const user = await this.usersService.findUserByEmail(email)
-
-    if (!user) {
-      throw new BadRequestException('Invalid user')
-    }
-
-    const token = await this.authService.generateAuthToken({
-      email: user.email,
-      sub: user.id,
-    })
-
-    return { user: ReadUserOutputSchema.parse(user), token }
   }
 
   @Delete(':id')
