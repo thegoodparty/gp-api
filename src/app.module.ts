@@ -1,9 +1,8 @@
 import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
 import { AuthenticationModule } from '@/authentication/authentication.module'
-import { ClerkSessionGuard } from '@/authentication/guards/ClerkSession.guard'
+import { SessionGuard } from '@/authentication/guards/Session.guard'
 import { AdminAuditInterceptor } from '@/authentication/interceptors/AdminAudit.interceptor'
-import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
 import { CampaignsModule } from '@/campaigns/campaigns.module'
 import { CommunityIssuesModule } from '@/communityIssues/communityIssues.module'
 import { ContactEngagementModule } from '@/contactEngagement/contactEngagement.module'
@@ -93,7 +92,7 @@ import { loggerModule } from './observability/logging/logger-module'
     SessionsService,
     {
       provide: APP_GUARD,
-      useClass: ClerkSessionGuard,
+      useClass: SessionGuard,
     },
     {
       provide: APP_INTERCEPTOR,
@@ -103,7 +102,6 @@ import { loggerModule } from './observability/logging/logger-module'
       provide: APP_INTERCEPTOR,
       useClass: BlockedStateInterceptor,
     },
-    ClerkClientProvider,
   ],
 })
 export class AppModule {}

@@ -1,7 +1,7 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
-import { ClerkWebhookEventData } from '../webhooks/clerk-webhook.types'
+import { ClerkWebhookEventData } from '@/vendors/clerk/webhooks/clerk-webhook.types'
 
 function getPrimaryEmail(data: ClerkWebhookEventData): string | undefined {
   const addresses = data.email_addresses

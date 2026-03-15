@@ -5,8 +5,7 @@ import { AuthenticationController } from './authentication.controller'
 import { APP_GUARD } from '@nestjs/core'
 import { RolesGuard } from './guards/Roles.guard'
 import { EmailModule } from 'src/email/email.module'
-import { ClerkWebhookController } from './webhooks/clerk-webhook.controller'
-import { ClerkWebhookService } from './services/clerk-webhook.service'
+import { ClerkModule } from '@/vendors/clerk/clerk.module'
 
 const JWT_EXPIRATION = '1y'
 
@@ -20,13 +19,13 @@ if (!process.env.AUTH_SECRET) {
 @Module({
   providers: [
     AuthenticationService,
-    ClerkWebhookService,
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
   ],
   imports: [
+    ClerkModule,
     JwtModule.register({
       global: true,
       secret: process.env.AUTH_SECRET,
@@ -34,7 +33,7 @@ if (!process.env.AUTH_SECRET) {
     }),
     EmailModule,
   ],
-  exports: [AuthenticationService, JwtModule],
-  controllers: [AuthenticationController, ClerkWebhookController],
+  exports: [AuthenticationService, JwtModule, ClerkModule],
+  controllers: [AuthenticationController],
 })
 export class AuthenticationModule {}

@@ -6,34 +6,28 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { verifyToken, ClerkClient } from '@clerk/backend'
 import { User } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
-import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/authentication/providers/clerk-client.provider'
+import {
+  AUTH_PROVIDER_TOKEN,
+  AuthProvider,
+} from '@/authentication/interfaces/auth-provider.interface'
 import { IncomingRequest } from '@/authentication/authentication.types'
-import { verifyM2MToken } from '@/authentication/util/VerifyM2MToken.util'
 import { routeIsPublicAndNoRoles } from '@/authentication/util/routeIsPublicAndNoRoles.util'
-import { M2M_TOKEN_PREFIX } from '../authentication.consts'
 import { UsersService } from '@/users/services/users.service'
 import { SessionsService } from '@/users/services/sessions.service'
 
-const { CLERK_SECRET_KEY } = process.env
-
-if (!CLERK_SECRET_KEY) {
-  throw new Error('CLERK_SECRET_KEY is required for application startup')
-}
-
 @Injectable()
-export class ClerkSessionGuard implements CanActivate {
+export class SessionGuard implements CanActivate {
   constructor(
-    @Inject(CLERK_CLIENT_PROVIDER_TOKEN)
-    private clerkClient: ClerkClient,
+    @Inject(AUTH_PROVIDER_TOKEN)
+    private authProvider: AuthProvider,
     private usersService: UsersService,
     private sessions: SessionsService,
     private readonly logger: PinoLogger,
     private readonly reflector: Reflector,
   ) {
-    this.logger.setContext(ClerkSessionGuard.name)
+    this.logger.setContext(SessionGuard.name)
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -47,12 +41,12 @@ export class ClerkSessionGuard implements CanActivate {
       throw new UnauthorizedException()
     }
 
-    if (token.startsWith(M2M_TOKEN_PREFIX)) {
+    if (this.authProvider.isM2MToken(token)) {
       try {
-        request.m2mToken = await verifyM2MToken(token, this.clerkClient)
+        request.m2mToken = await this.authProvider.verifyM2MToken(token)
         return true
       } catch {
-        this.logger.debug('M2M token verification failed in ClerkSessionGuard')
+        this.logger.debug('M2M token verification failed in SessionGuard')
         if (routeIsPublicAndNoRoles(context, this.reflector)) {
           return true
         }
@@ -61,24 +55,14 @@ export class ClerkSessionGuard implements CanActivate {
     }
 
     try {
-      const payload = await verifyToken(token, {
-        secretKey: CLERK_SECRET_KEY,
-      })
+      const { externalUserId } =
+        await this.authProvider.verifySessionToken(token)
 
-      const clerkId = payload.sub
-      if (!clerkId) {
-        this.logger.debug('Clerk token missing sub claim')
-        if (routeIsPublicAndNoRoles(context, this.reflector)) {
-          return true
-        }
-        throw new UnauthorizedException()
-      }
-
-      const user = await this.resolveUserFromClerk(clerkId)
+      const user = await this.resolveUser(externalUserId)
 
       if (!user) {
         this.logger.warn(
-          `Could not find or provision user for clerkId: ${clerkId}`,
+          `Could not find or provision user for externalUserId: ${externalUserId}`,
         )
         if (routeIsPublicAndNoRoles(context, this.reflector)) {
           return true
@@ -92,7 +76,7 @@ export class ClerkSessionGuard implements CanActivate {
       if (err instanceof UnauthorizedException) {
         throw err
       }
-      this.logger.debug('Clerk session token verification failed')
+      this.logger.debug('Session token verification failed')
       if (routeIsPublicAndNoRoles(context, this.reflector)) {
         return true
       }
@@ -102,31 +86,33 @@ export class ClerkSessionGuard implements CanActivate {
     return true
   }
 
-  private async resolveUserFromClerk(clerkId: string): Promise<User | null> {
-    const existing = await this.usersService.findUser({ clerkId })
+  private async resolveUser(externalUserId: string): Promise<User | null> {
+    const existing = await this.usersService.findUser({
+      clerkId: externalUserId,
+    })
     if (existing) return existing
 
     try {
-      const clerkUser = await this.clerkClient.users.getUser(clerkId)
-      const email =
-        clerkUser.primaryEmailAddress?.emailAddress ??
-        clerkUser.emailAddresses?.[0]?.emailAddress
-      if (!email) {
+      const providerUser = await this.authProvider.getUser(externalUserId)
+      if (!providerUser?.email) {
         this.logger.warn(
-          { clerkId },
-          'Clerk user has no email address, cannot provision',
+          { externalUserId },
+          'Auth provider user has no email address, cannot provision',
         )
         return null
       }
 
       return this.usersService.findOrProvisionByClerk({
-        clerkId,
-        email,
-        firstName: clerkUser.firstName ?? '',
-        lastName: clerkUser.lastName ?? '',
+        clerkId: externalUserId,
+        email: providerUser.email,
+        firstName: providerUser.firstName ?? '',
+        lastName: providerUser.lastName ?? '',
       })
     } catch (err) {
-      this.logger.error({ err, clerkId }, 'Failed to provision user from Clerk')
+      this.logger.error(
+        { err, externalUserId },
+        'Failed to provision user from auth provider',
+      )
       return null
     }
   }
