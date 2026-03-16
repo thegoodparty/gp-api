@@ -19,7 +19,7 @@ describe('ElectedOfficeController', () => {
       data: {
         slug: organizationSlug,
         ownerId: service.user.id,
-        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
+        positionId: '2875e5f3-ecf0-6fae-f270-6951f85e8468',
       },
     })
     campaign = await service.prisma.campaign.update({
