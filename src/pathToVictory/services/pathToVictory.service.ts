@@ -729,11 +729,6 @@ export class PathToVictoryService extends createPrismaBase(
       })
     }
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async getUserName(user: any): Promise<string> {
-    return user.name || 'Friend'
-  }
 }
 
 export interface P2VResponse {
