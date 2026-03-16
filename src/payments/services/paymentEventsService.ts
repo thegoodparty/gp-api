@@ -16,7 +16,6 @@ import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
-import { EmailTemplateName } from '../../email/email.types'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -135,7 +134,6 @@ export class PaymentEventsService {
 
     await Promise.allSettled([
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
-      this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
   }
@@ -261,18 +259,13 @@ export class PaymentEventsService {
     // Non-critical: Send notifications - log failures but don't fail webhook
     const results = await Promise.allSettled([
       this.sendProSignUpSlackMessage(user, campaign),
-      this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
 
     // Log any notification failures
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        const action = [
-          'send Slack message',
-          'send email',
-          'send voter file alert',
-        ][index]
+        const action = ['send Slack message', 'send voter file alert'][index]
         this.logger.error(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           { reason: result.reason },
@@ -446,32 +439,5 @@ export class PaymentEventsService {
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
-  }
-
-  async sendProConfirmationEmail(user: User, campaign: Campaign) {
-    const { details: campaignDetails } = campaign
-    const { electionDate: ISO8601DateString } = campaignDetails
-
-    const formattedCurrentDate = formatDate(new Date(), DateFormats.isoDate)
-    const electionDate =
-      ISO8601DateString && formatDate(ISO8601DateString, DateFormats.usDate)
-
-    const emailVars = {
-      userFullName: getUserFullName(user),
-      startDate: formattedCurrentDate,
-      ...(electionDate ? { electionDate } : {}),
-    }
-
-    try {
-      await this.emailService.sendTemplateEmail({
-        to: user.email,
-        subject: `Welcome to Pro! Let's Empower Your Campaign Together`,
-        template: EmailTemplateName.proConfirmation,
-        variables: emailVars,
-      })
-    } catch (e) {
-      this.logger.error({ e }, 'Error sending pro confirmation email')
-      throw e
-    }
   }
 }
