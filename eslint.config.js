@@ -104,13 +104,13 @@ module.exports = defineConfig([{
         "sonarjs/no-collapsible-if": "warn",
         "sonarjs/no-collection-size-mischeck": "warn",
 
-        "@typescript-eslint/no-unsafe-call": "warn",
-        "@typescript-eslint/no-unsafe-return": "warn",
-        "@typescript-eslint/no-unsafe-member-access": "warn",
-        "@typescript-eslint/no-unsafe-argument": "warn",
-        "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+        "@typescript-eslint/no-unsafe-call": "error",
+        "@typescript-eslint/no-unsafe-return": "error",
+        "@typescript-eslint/no-unsafe-member-access": "error",
+        "@typescript-eslint/no-unsafe-argument": "error",
+        "@typescript-eslint/no-unsafe-enum-comparison": "error",
 
-        "@typescript-eslint/naming-convention": ["warn", {
+        "@typescript-eslint/naming-convention": ["error", {
             selector: "class",
             format: ["PascalCase"],
         }, {
