@@ -5,8 +5,6 @@ import { serializeError } from 'serialize-error'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { recordBlockedStateEvent } from 'src/observability/grafana/otel.client'
-import { recordCustomEvent } from 'src/observability/newrelic/newrelic.client'
-import { CustomEventType } from 'src/observability/newrelic/newrelic.events'
 import {
   DEFAULT_PAGINATION_LIMIT,
   DEFAULT_PAGINATION_OFFSET,
@@ -488,7 +486,6 @@ export class PathToVictoryService extends createPrismaBase(
         isBackground: true,
         reason: 'no_district_match',
       }
-      recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
       recordBlockedStateEvent(blockedStateAttributes)
     }
 

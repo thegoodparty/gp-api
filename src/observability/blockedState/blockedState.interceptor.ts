@@ -8,11 +8,6 @@ import {
 import { User } from '@prisma/client'
 import { FastifyRequest } from 'fastify'
 import { Observable, catchError, throwError } from 'rxjs'
-import {
-  addCustomAttributes,
-  recordCustomEvent,
-} from '@/observability/newrelic/newrelic.client'
-import { CustomEventType } from '@/observability/newrelic/newrelic.events'
 import { recordBlockedStateEvent } from '@/observability/grafana/otel.client'
 import { deriveRootCause, shouldRecordBlockedState } from './blockedState.rules'
 
@@ -103,11 +98,6 @@ export class BlockedStateInterceptor implements NestInterceptor {
     const method = request.method
     const endpoint = safeEndpoint(request, context)
 
-    // Denominator support: attach userId to the transaction when authenticated.
-    if (userId !== null) {
-      addCustomAttributes({ userId, endpoint, method })
-    }
-
     return next.handle().pipe(
       catchError((err: unknown) => {
         if (userId === null) {
@@ -148,7 +138,6 @@ export class BlockedStateInterceptor implements NestInterceptor {
           isBackground: false,
         }
 
-        recordCustomEvent(CustomEventType.BlockedState, blockedStateAttributes)
         recordBlockedStateEvent(blockedStateAttributes)
 
         return throwError(() => err)

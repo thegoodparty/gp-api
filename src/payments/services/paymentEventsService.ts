@@ -335,7 +335,7 @@ export class PaymentEventsService {
       await this.usersService.patchUserMetaData(parseInt(userId), {
         checkoutSessionId: null,
       })
-    } catch (error) {
+    } catch {
       // User may not exist in this environment's database (e.g., session was
       // created from a different environment sharing the same Stripe test key).
       // Since this is just cleanup, log and move on rather than failing the webhook.

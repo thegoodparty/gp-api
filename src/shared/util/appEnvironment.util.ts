@@ -6,7 +6,9 @@ enum AppEnv {
 }
 const CURRENT_ENV = process.env.NODE_ENV
 
-export const WEBAPP_ROOT = process.env.WEBAPP_ROOT_URL as string
+export const APP_ROOT =
+  process.env.APP_ROOT_URL || ('https://app.goodparty.org' as const)
+export const WEBAPP_ROOT = process.env.WEBAPP_ROOT_URL as string // marketing site
 export const ASSET_DOMAIN = process.env.ASSET_DOMAIN as string
 export const WEBAPP_API_PATH = '/api/v1/'
 

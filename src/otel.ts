@@ -24,6 +24,7 @@ import type { Context } from '@opentelemetry/api'
 import { PrismaInstrumentation } from '@prisma/instrumentation'
 import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
+import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core'
 import { HostMetrics } from '@opentelemetry/host-metrics'
 import { FastifyOtelInstrumentation } from '@fastify/otel'
 
@@ -104,7 +105,7 @@ if (!headers) {
     })
 
   const prismaConnectionMetricProcessor: SpanProcessor = {
-    onStart: () => {},
+    onStart: () => undefined,
     onEnd: (span: ReadableSpan) => {
       if (span.name !== 'prisma:engine:connection') return
       const durationMs =
@@ -154,6 +155,7 @@ if (!headers) {
     ],
     instrumentations: [
       new HttpInstrumentation(),
+      new NestInstrumentation(),
       new PrismaInstrumentation(),
       new PinoInstrumentation(),
       fastifyOtelInstrumentation,

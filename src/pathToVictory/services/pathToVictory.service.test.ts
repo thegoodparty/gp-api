@@ -16,9 +16,10 @@ import { PathToVictoryInput } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 import { PathToVictoryService } from './pathToVictory.service'
 
-const mockRecordCustomEvent = vi.fn()
-vi.mock('src/observability/newrelic/newrelic.client', () => ({
-  recordCustomEvent: (...args: unknown[]) => mockRecordCustomEvent(...args),
+const mockRecordBlockedStateEvent = vi.fn()
+vi.mock('src/observability/grafana/otel.client', () => ({
+  recordBlockedStateEvent: (...args: unknown[]) =>
+    mockRecordBlockedStateEvent(...args),
 }))
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -256,8 +257,7 @@ describe('PathToVictoryService', () => {
           channel: SlackChannel.botPathToVictoryIssues,
         }),
       )
-      expect(mockRecordCustomEvent).toHaveBeenCalledWith(
-        CustomEventType.BlockedState,
+      expect(mockRecordBlockedStateEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           rootCause: 'p2v_failed',
           reason: 'no_district_match',
