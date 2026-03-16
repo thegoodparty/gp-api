@@ -1,7 +1,6 @@
 import { CrmCampaignsService } from '@/campaigns/services/crmCampaigns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
-import { CustomEventType } from '@/observability/newrelic/newrelic.events'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
