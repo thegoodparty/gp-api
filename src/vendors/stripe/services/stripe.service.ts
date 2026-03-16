@@ -1,5 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import { User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import {
   CustomCheckoutSessionPayload,
   PaymentIntentPayload,
@@ -8,7 +9,6 @@ import {
 } from 'src/payments/payments.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import Stripe from 'stripe'
-import { PinoLogger } from 'nestjs-pino'
 
 const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
   process.env
@@ -94,11 +94,12 @@ export class StripeService {
     return await this.stripe.checkout.sessions.retrieve(sessionId)
   }
 
-  async createCheckoutSession(userId: number) {
+  async createCheckoutSession(userId: number, email: string | null = null) {
     const session = await this.stripe.checkout.sessions.create({
       metadata: {
         userId,
       },
+      ...(email ? { customer_email: email } : {}),
       billing_address_collection: 'auto',
       line_items: [
         {
@@ -125,16 +126,18 @@ export class StripeService {
   }
 
   async createCustomCheckoutSession(
-    user: User,
+    {
+      id: userId,
+      email,
+      customerId,
+    }: Pick<User, 'id' | 'email'> &
+      Pick<NonNullable<User['metaData']>, 'customerId'>,
     payload: CustomCheckoutSessionPayload,
   ): Promise<{
     id: string
     clientSecret: string
     amount: number
   }> {
-    const userId = user.id
-    const customerId = user.metaData?.customerId
-
     const cleanedMetadata = Object.entries(payload.metadata || {})
       .filter(([_, value]) => value != null)
       .reduce(
@@ -150,7 +153,10 @@ export class StripeService {
       mode: 'payment',
       ...(customerId
         ? { customer: customerId }
-        : { customer_email: user.email }),
+        : email
+          ? { customer_email: email }
+          : {}),
+      ...(email ? { payment_intent_data: { receipt_email: email } } : {}),
       line_items: [
         {
           price_data: {
