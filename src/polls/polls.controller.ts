@@ -92,7 +92,6 @@ export class PollsController {
     private readonly pollBiasAnalysisService: PollBiasAnalysisService,
     private readonly campaignService: CampaignsService,
     private readonly electedOfficeService: ElectedOfficeService,
-    private readonly organizationsService: OrganizationsService,
     private readonly s3Service: S3Service,
     private readonly contactService: ContactsService,
     private readonly pollResponsesDownloadService: PollResponsesDownloadService,
