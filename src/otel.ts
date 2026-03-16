@@ -24,6 +24,7 @@ import type { Context } from '@opentelemetry/api'
 import { PrismaInstrumentation } from '@prisma/instrumentation'
 import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
+import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core'
 import { HostMetrics } from '@opentelemetry/host-metrics'
 import { FastifyOtelInstrumentation } from '@fastify/otel'
 
@@ -97,12 +98,6 @@ if (!headers) {
       process.env.OTEL_SERVICE_ENVIRONMENT || 'local',
   })
 
-  const prismaConnectionDuration = metrics
-    .getMeter('gp-api')
-    .createHistogram('prisma.connection.duration_ms', {
-      description: 'Duration of prisma:engine:connection spans in milliseconds',
-    })
-
   const prismaConnectionMetricProcessor: SpanProcessor = {
     onStart: () => undefined,
     onEnd: (span: ReadableSpan) => {
@@ -154,6 +149,7 @@ if (!headers) {
     ],
     instrumentations: [
       new HttpInstrumentation(),
+      new NestInstrumentation(),
       new PrismaInstrumentation(),
       new PinoInstrumentation(),
       fastifyOtelInstrumentation,
@@ -161,6 +157,13 @@ if (!headers) {
   })
 
   sdk.start()
+
+  const prismaConnectionDuration = metrics
+    .getMeter('gp-api')
+    .createHistogram('prisma.connection.duration', {
+      description: 'Duration of prisma:engine:connection spans in milliseconds',
+      unit: 'ms',
+    })
 
   const hostMetrics = new HostMetrics()
   hostMetrics.start()

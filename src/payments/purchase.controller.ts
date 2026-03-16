@@ -2,6 +2,7 @@ import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UsersService } from '../users/services/users.service'
@@ -12,7 +13,6 @@ import {
   CreateCheckoutSessionDto,
 } from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
-import { PinoLogger } from 'nestjs-pino'
 
 @Controller('payments/purchase')
 export class PurchaseController {
@@ -27,8 +27,9 @@ export class PurchaseController {
 
   @Post('checkout-session')
   async createProCheckoutSession(@ReqUser() user: User) {
+    const { email } = user
     const { redirectUrl, checkoutSessionId } =
-      await this.stripeService.createCheckoutSession(user.id)
+      await this.stripeService.createCheckoutSession(user.id, email)
 
     await this.usersService.patchUserMetaData(user.id, { checkoutSessionId })
 
