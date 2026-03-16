@@ -10,7 +10,7 @@ There are two categories of alerts:
 
 Every controller endpoint automatically gets two alerts:
 
-- **Error count**: Fires when any requests return error status codes (≥ 400, excluding 401/403/404/498) within a 1-hour window.
+- **Error count**: Fires when any requests return error status codes (≥ 400, excluding 401/403/404/409/498) within a 1-hour window.
 - **P95 latency**: Fires when the 95th percentile response time exceeds 2000ms for GET requests or 3000ms for writes (POST/PUT/DELETE/PATCH) over a 1-hour window.
 
 These are generated automatically from the controllers in the codebase -- you don't write them by hand. **All controller alerts are disabled by default** and require explicit opt-in via the ownership mapping (see [Ownership](#ownership) below).

@@ -7,7 +7,7 @@ import {
   ENDPOINT_OVERRIDES,
 } from '../alerts'
 
-const EXCLUDED_STATUS_CODES = [401, 403, 404, 498]
+const EXCLUDED_STATUS_CODES = [401, 403, 404, 409, 498]
 const statusCodeFilter = [
   'response_statusCode >= 400',
   ...EXCLUDED_STATUS_CODES.map((code) => `response_statusCode != ${code}`),
@@ -40,7 +40,7 @@ export const controllerAlerts = (controller: ControllerName): Alert[] => {
         threshold: 0,
         for: '1m',
         message: [
-          `\`${route.endpoint}\` returned unexpected error responses in the last hour (status ≥ 400, excluding 401/403/404/498).`,
+          `\`${route.endpoint}\` returned unexpected error responses in the last hour (status ≥ 400, excluding 401/403/404/409/498).`,
           'Click *View in Grafana* to find the failing requests, then examine their logs and stack traces to understand why errors are occurring and ship fixes.',
         ].join('\n\n'),
         notify: slackGroupName as SlackGroup,
