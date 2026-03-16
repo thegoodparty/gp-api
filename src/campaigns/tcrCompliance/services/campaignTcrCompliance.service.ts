@@ -351,7 +351,6 @@ export class CampaignTcrComplianceService extends createPrismaBase(
   }
 
   async submitCampaignVerifyToken(
-    user: User,
     tcrCompliance: TcrCompliance,
     campaignVerifyToken: string,
   ) {

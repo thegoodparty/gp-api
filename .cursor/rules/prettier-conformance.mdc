@@ -1,0 +1,53 @@
+---
+description: Write Prettier-conformant code on first write — no post-hoc formatting
+globs: "**/*.ts"
+alwaysApply: true
+---
+
+# Prettier Conformance
+
+All code MUST conform to Prettier on first write.
+
+## Effective Config (defaults + .prettierrc overrides)
+
+| Option | Value |
+|---|---|
+| printWidth | **80** |
+| tabWidth | **2** |
+| useTabs | **false** (spaces only) |
+| semi | **false** (no semicolons) |
+| singleQuote | **true** |
+| trailingComma | **"all"** |
+| bracketSpacing | **true** (`{ a }` not `{a}`) |
+| arrowParens | **"always"** (`(x) =>` not `x =>`) |
+| endOfLine | **"lf"** |
+| quoteProps | **"as-needed"** |
+| jsxSingleQuote | **false** |
+| bracketSameLine | **false** |
+| singleAttributePerLine | **false** |
+
+## Line Width
+
+Lines MUST NOT exceed 80 characters. Break arguments
+onto separate lines when needed:
+
+```typescript
+// BAD — over 80 chars
+await this.service.method(firstArg, secondArg, thirdArg)
+
+// GOOD
+await this.service.method(
+  firstArg,
+  secondArg,
+  thirdArg,
+)
+```
+
+## Checklist Before Every Line
+
+1. Under 80 characters
+2. Single quotes, no semicolons
+3. Trailing commas on multi-line structures
+4. 2-space indentation, no tabs
+5. Spaces inside braces: `{ a }` not `{a}`
+6. Parens on single arrow params: `(x) =>` not `x =>`

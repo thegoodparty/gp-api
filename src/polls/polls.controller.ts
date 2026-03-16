@@ -130,59 +130,20 @@ export class PollsController {
   }
 
   @Post('initial-poll')
+  @UseElectedOffice()
   @UseCampaign()
   async createInitialPoll(
-    @ReqUser() user: User,
+    @ReqElectedOffice() electedOffice: ElectedOffice,
     @Body()
     { message, imageUrl, swornInDate, scheduledDate }: CreatePollDto,
     @ReqCampaign() campaign: CampaignWithPathToVictory,
   ) {
-    // TEMPORARY FIX START
-    // WARNING!: This is a temporary fix to allow users to create a poll without an active elected office.
-    //     This will be removed once we lock it down. If this is still here after 12/1/25, please remove it.
-    //     If you don't have an active elected office, temporary let's create
-    let electedOffice = await this.electedOfficeService.getCurrentElectedOffice(
-      user.id,
-    )
-    if (!electedOffice) {
-      const organization = campaign.organizationSlug
-        ? await this.organizationsService.findUnique({
-            where: { slug: campaign.organizationSlug },
-          })
-        : null
-      const ballotreadyPositionId = organization?.positionId
-        ? await this.organizationsService.resolveBallotReadyPositionId(
-            organization.positionId,
-          )
-        : null
-      if (!ballotreadyPositionId) {
-        throw new BadRequestException(
-          'No ballotready position found on campaign/organization',
-        )
-      }
-      const p2v = campaign.pathToVictory?.data
-      electedOffice = await this.electedOfficeService.create({
-        isActive: true,
-        userId: user.id,
-        campaignId: campaign.id,
+    electedOffice = await this.electedOfficeService.update({
+      where: { id: electedOffice.id },
+      data: {
         swornInDate,
-        electedDate: null,
-        ballotreadyPositionId,
-        office: campaign.details.office,
-        otherOffice: campaign.details.otherOffice,
-        state: campaign.details.state,
-        L2DistrictType: p2v?.electionType,
-        L2DistrictName: p2v?.electionLocation,
-      })
-      // END OF TEMPORARY FIX
-    } else {
-      electedOffice = await this.electedOfficeService.update({
-        where: { id: electedOffice.id },
-        data: {
-          swornInDate,
-        },
-      })
-    }
+      },
+    })
 
     const [userHasPolls, districtStats] = await Promise.all([
       this.pollsService.hasPolls(electedOffice.id),

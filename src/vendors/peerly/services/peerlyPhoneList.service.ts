@@ -1,14 +1,5 @@
-import {
-  BadGatewayException,
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common'
-import { HttpService } from '@nestjs/axios'
-import { lastValueFrom } from 'rxjs'
-import { PeerlyAuthenticationService } from './peerlyAuthentication.service'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
-import { isAxiosResponse } from '../../../shared/util/http.util'
-import { format } from '@redtea/format-axios-error'
 import FormData from 'form-data'
 import {
   PhoneListDetailsResponseDto,
@@ -21,9 +12,11 @@ import {
   P2P_PHONE_LIST_MAP,
 } from '../constants/p2pJob.constants'
 import { PinoLogger } from 'nestjs-pino'
+import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
+import { PeerlyHttpService } from './peerlyHttp.service'
 
-const P2P_SUPPRESS_CELL_PHONES = '4' // Suppress landline phones
-const MAX_FILE_SIZE = 104857600 // 100MB
+const P2P_SUPPRESS_CELL_PHONES = '4'
+const MAX_FILE_SIZE = 104857600
 
 interface UploadPhoneListParams {
   listName: string
@@ -36,41 +29,10 @@ interface UploadPhoneListParams {
 export class PeerlyPhoneListService extends PeerlyBaseConfig {
   constructor(
     protected readonly logger: PinoLogger,
-    private readonly httpService: HttpService,
-    private readonly peerlyAuth: PeerlyAuthenticationService,
+    private readonly peerlyHttpService: PeerlyHttpService,
+    private readonly peerlyErrorHandling: PeerlyErrorHandlingService,
   ) {
     super(logger)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  private handleApiError(error: unknown): never {
-    this.logger.error(
-      { data: isAxiosResponse(error) ? format(error) : error },
-      'Failed to communicate with Peerly API',
-    )
-    throw new BadGatewayException('Failed to communicate with Peerly API')
-  }
-
-  private async getBaseHttpHeaders() {
-    return {
-      headers: await this.peerlyAuth.getAuthorizationHeader(),
-      timeout: this.httpTimeoutMs,
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  private validateUploadResponse(data: unknown): UploadPhoneListResponseDto {
-    return this.validateData(data, UploadPhoneListResponseDto, 'upload')
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  private validateStatusResponse(data: unknown): PhoneListStatusResponseDto {
-    return this.validateData(data, PhoneListStatusResponseDto, 'status')
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  private validateDetailsResponse(data: unknown): PhoneListDetailsResponseDto {
-    return this.validateData(data, PhoneListDetailsResponseDto, 'details')
   }
 
   async uploadPhoneList(params: UploadPhoneListParams): Promise<string> {
@@ -104,23 +66,24 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     })
 
     try {
-      const headers = {
-        ...(await this.peerlyAuth.getAuthorizationHeader()),
-        ...form.getHeaders(),
-      }
-      const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/phonelists`, form, {
-          headers,
-          timeout: this.uploadTimeoutMs,
-          maxBodyLength: MAX_FILE_SIZE,
-          maxContentLength: MAX_FILE_SIZE,
-        }),
-      )
+      const response = await this.peerlyHttpService.post('/phonelists', form, {
+        headers: form.getHeaders(),
+        timeout: this.uploadTimeoutMs,
+        maxBodyLength: MAX_FILE_SIZE,
+        maxContentLength: MAX_FILE_SIZE,
+      })
 
-      const validated = this.validateUploadResponse(response.data)
+      const validated = this.peerlyHttpService.validateResponse(
+        response.data,
+        UploadPhoneListResponseDto,
+        'upload',
+      )
       return validated.Data.token
     } catch (error) {
-      this.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError({
+        error,
+        logger: this.logger,
+      })
     }
   }
 
@@ -128,17 +91,20 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     token: string,
   ): Promise<PhoneListStatusResponseDto> {
     try {
-      const config = await this.getBaseHttpHeaders()
-      const response = await lastValueFrom(
-        this.httpService.get(
-          `${this.baseUrl}/phonelists/${token}/checkstatus`,
-          config,
-        ),
+      const response = await this.peerlyHttpService.get(
+        `/phonelists/${token}/checkstatus`,
       )
 
-      return this.validateStatusResponse(response.data)
+      return this.peerlyHttpService.validateResponse(
+        response.data,
+        PhoneListStatusResponseDto,
+        'status',
+      )
     } catch (error) {
-      this.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError({
+        error,
+        logger: this.logger,
+      })
     }
   }
 
@@ -146,14 +112,18 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     listId: number,
   ): Promise<PhoneListDetailsResponseDto> {
     try {
-      const config = await this.getBaseHttpHeaders()
-      const response = await lastValueFrom(
-        this.httpService.get(`${this.baseUrl}/phonelists/${listId}`, config),
-      )
+      const response = await this.peerlyHttpService.get(`/phonelists/${listId}`)
 
-      return this.validateDetailsResponse(response.data)
+      return this.peerlyHttpService.validateResponse(
+        response.data,
+        PhoneListDetailsResponseDto,
+        'details',
+      )
     } catch (error) {
-      this.handleApiError(error)
+      return this.peerlyErrorHandling.handleApiError({
+        error,
+        logger: this.logger,
+      })
     }
   }
 }

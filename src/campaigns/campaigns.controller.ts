@@ -294,9 +294,9 @@ export class CampaignsController {
   @Post('launch')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)
-  async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
+  async launch(@ReqCampaign() campaign: Campaign) {
     try {
-      const launchResult = await this.campaigns.launch(user, campaign)
+      const launchResult = await this.campaigns.launch(campaign)
       return launchResult
     } catch (e) {
       this.logger.error({ e }, 'Error at campaign launch')

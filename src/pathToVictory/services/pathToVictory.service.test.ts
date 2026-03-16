@@ -1,16 +1,12 @@
 import { CrmCampaignsService } from '@/campaigns/services/crmCampaigns.service'
 import { ElectionsService } from '@/elections/services/elections.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
-import { EmailService } from '@/email/email.service'
-import { EmailTemplateName } from '@/email/email.types'
-import { CustomEventType } from '@/observability/newrelic/newrelic.events'
 import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { SegmentService } from '@/vendors/segment/segment.service'
 import { SlackService } from '@/vendors/slack/services/slack.service'
 import { SlackChannel } from '@/vendors/slack/slackService.types'
-import { CampaignCreatedBy } from '@goodparty_org/contracts'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PinoLogger } from 'nestjs-pino'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -19,9 +15,10 @@ import { PathToVictoryInput } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 import { PathToVictoryService } from './pathToVictory.service'
 
-const mockRecordCustomEvent = vi.fn()
-vi.mock('src/observability/newrelic/newrelic.client', () => ({
-  recordCustomEvent: (...args: unknown[]) => mockRecordCustomEvent(...args),
+const mockRecordBlockedStateEvent = vi.fn()
+vi.mock('src/observability/grafana/otel.client', () => ({
+  recordBlockedStateEvent: (...args: unknown[]) =>
+    mockRecordBlockedStateEvent(...args),
 }))
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,9 +109,6 @@ describe('PathToVictoryService', () => {
   let mockElections: {
     buildRaceTargetDetails: ReturnType<typeof vi.fn>
   }
-  let mockEmail: {
-    sendTemplateEmail: ReturnType<typeof vi.fn>
-  }
   let mockOrganizations: {
     resolveOrgData: ReturnType<typeof vi.fn>
     resolveBallotReadyPositionId: ReturnType<typeof vi.fn>
@@ -152,9 +146,6 @@ describe('PathToVictoryService', () => {
     mockElections = {
       buildRaceTargetDetails: vi.fn().mockResolvedValue(null),
     }
-    mockEmail = {
-      sendTemplateEmail: vi.fn().mockResolvedValue(undefined),
-    }
     mockOrganizations = {
       resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
       resolveOrgData: vi.fn().mockResolvedValue({
@@ -171,7 +162,6 @@ describe('PathToVictoryService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: OfficeMatchService, useValue: mockOfficeMatch },
         { provide: SlackService, useValue: mockSlack },
-        { provide: EmailService, useValue: mockEmail },
         { provide: SegmentService, useValue: {} },
         { provide: CrmCampaignsService, useValue: mockCrm },
         { provide: AnalyticsService, useValue: mockAnalytics },
@@ -268,8 +258,7 @@ describe('PathToVictoryService', () => {
           channel: SlackChannel.botPathToVictoryIssues,
         }),
       )
-      expect(mockRecordCustomEvent).toHaveBeenCalledWith(
-        CustomEventType.BlockedState,
+      expect(mockRecordBlockedStateEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           rootCause: 'p2v_failed',
           reason: 'no_district_match',
@@ -529,67 +518,6 @@ describe('PathToVictoryService', () => {
         },
       })
       expect(mockPrisma.pathToVictory.update).toHaveBeenCalled()
-    })
-
-    it('sends victory-ready email when status transitions to Complete for non-admin campaigns', async () => {
-      const originalEnv = process.env.WEBAPP_ROOT
-      process.env.WEBAPP_ROOT = 'https://goodparty.org'
-
-      mockPrisma.campaign.findUnique.mockResolvedValue(
-        makeCampaign({ p2vStatus: P2VStatus.waiting }),
-      )
-      mockPrisma.pathToVictory.update.mockResolvedValue({})
-
-      await service.completePathToVictory('test-slug', responseWithTurnout, {
-        sendEmail: true,
-      })
-
-      expect(mockEmail.sendTemplateEmail).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: 'test@example.com',
-          template: EmailTemplateName.candidateVictoryReady,
-        }),
-      )
-
-      process.env.WEBAPP_ROOT = originalEnv
-    })
-
-    it('does not send email when sendEmail option is false', async () => {
-      const originalEnv = process.env.WEBAPP_ROOT
-      process.env.WEBAPP_ROOT = 'https://goodparty.org'
-
-      mockPrisma.campaign.findUnique.mockResolvedValue(
-        makeCampaign({ p2vStatus: P2VStatus.waiting }),
-      )
-      mockPrisma.pathToVictory.update.mockResolvedValue({})
-
-      await service.completePathToVictory('test-slug', responseWithTurnout, {
-        sendEmail: false,
-      })
-
-      expect(mockEmail.sendTemplateEmail).not.toHaveBeenCalled()
-
-      process.env.WEBAPP_ROOT = originalEnv
-    })
-
-    it('does not send email for admin-created campaigns', async () => {
-      const originalEnv = process.env.WEBAPP_ROOT
-      process.env.WEBAPP_ROOT = 'https://goodparty.org'
-
-      const adminCampaign = {
-        ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
-        data: { name: 'Admin Campaign', createdBy: CampaignCreatedBy.ADMIN },
-      }
-      mockPrisma.campaign.findUnique.mockResolvedValue(adminCampaign)
-      mockPrisma.pathToVictory.update.mockResolvedValue({})
-
-      await service.completePathToVictory('test-slug', responseWithTurnout, {
-        sendEmail: true,
-      })
-
-      expect(mockEmail.sendTemplateEmail).not.toHaveBeenCalled()
-
-      process.env.WEBAPP_ROOT = originalEnv
     })
 
     it('calls analytics.identify with winNumber', async () => {
@@ -998,54 +926,6 @@ describe('PathToVictoryService', () => {
   describe('analyzePathToVictoryResponse', () => {
     beforeEach(() => {
       vi.spyOn(service, 'completePathToVictory').mockResolvedValue(undefined)
-    })
-
-    it('sets sendEmail flag to true when first reaching Complete status', async () => {
-      const input = makeAnalyzeInput({
-        campaign: makeCampaign({ p2vStatus: P2VStatus.waiting }),
-        pathToVictoryResponse: {
-          counts: {
-            projectedTurnout: 500,
-            winNumber: 251,
-            voterContactGoal: 1255,
-          },
-          electionType: 'State_House',
-          electionLocation: 'STATE HOUSE 005',
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await service.analyzePathToVictoryResponse(input as any)
-
-      expect(service.completePathToVictory).toHaveBeenCalledWith(
-        'test-slug',
-        expect.anything(),
-        expect.objectContaining({ sendEmail: true }),
-      )
-    })
-
-    it('sets sendEmail flag to false when already Complete', async () => {
-      const input = makeAnalyzeInput({
-        campaign: makeCampaign({ p2vStatus: P2VStatus.complete }),
-        pathToVictoryResponse: {
-          counts: {
-            projectedTurnout: 500,
-            winNumber: 251,
-            voterContactGoal: 1255,
-          },
-          electionType: 'State_House',
-          electionLocation: 'STATE HOUSE 005',
-        },
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await service.analyzePathToVictoryResponse(input as any)
-
-      expect(service.completePathToVictory).toHaveBeenCalledWith(
-        'test-slug',
-        expect.anything(),
-        expect.objectContaining({ sendEmail: false }),
-      )
     })
 
     it('passes officeFingerprint to completePathToVictory', async () => {

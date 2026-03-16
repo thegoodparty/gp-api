@@ -33,7 +33,7 @@ export class MailgunService {
     if (variables) {
       try {
         emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
-      } catch (_error) {
+      } catch {
         this.logger.error(
           variables,
           `Failed to stringify variables for email ${emailData.to}:`,

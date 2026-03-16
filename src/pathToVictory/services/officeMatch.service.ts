@@ -219,7 +219,6 @@ export class OfficeMatchService {
 
     // 3) Use AI to select the top 1-5 best matching district type columns
     const foundDistrictTypes = await this.selectBestDistrictTypesWithAi(
-      slug,
       Array.from(orderedCandidates),
       officeName,
       districtTypes,
@@ -312,7 +311,6 @@ export class OfficeMatchService {
 
     let subColumns: string[] = []
     const districtValue = this.getDistrictValue(
-      slug,
       officeName,
       subAreaName,
       subAreaValue,
@@ -324,7 +322,6 @@ export class OfficeMatchService {
       districtValue
     ) {
       const subs = this.determineElectionDistricts(
-        slug,
         heuristicLevelTypes,
         officeName,
       )
@@ -367,7 +364,6 @@ export class OfficeMatchService {
 
   // Step 3 helper: Use AI to select the top 1-5 best matching district type columns
   private async selectBestDistrictTypesWithAi(
-    slug: string,
     orderedCandidates: string[],
     officeName: string,
     districtTypes: string[],
@@ -515,7 +511,6 @@ export class OfficeMatchService {
     }
 
     const districtValue = this.getDistrictValue(
-      slug,
       officeName,
       subAreaName,
       subAreaValue,
@@ -528,11 +523,7 @@ export class OfficeMatchService {
       searchColumns.length > 0 &&
       districtValue
     ) {
-      subColumns = this.determineElectionDistricts(
-        slug,
-        searchColumns,
-        officeName,
-      )
+      subColumns = this.determineElectionDistricts(searchColumns, officeName)
     }
 
     if (subColumns.length > 0) {
@@ -546,7 +537,6 @@ export class OfficeMatchService {
   }
 
   private determineElectionDistricts(
-    slug: string,
     searchColumns: string[],
     officeName: string,
   ): string[] {
@@ -681,7 +671,6 @@ export class OfficeMatchService {
   }
 
   private getDistrictValue(
-    slug: string,
     officeName: string,
     subAreaName?: string,
     subAreaValue?: string,

@@ -829,12 +829,9 @@ describe('CampaignsController', () => {
     it('returns launch result on success', async () => {
       vi.spyOn(campaignsService, 'launch').mockResolvedValue(true)
 
-      const result = await controller.launch(mockUser, mockCampaign)
+      const result = await controller.launch(mockCampaign)
 
-      expect(campaignsService.launch).toHaveBeenCalledWith(
-        mockUser,
-        mockCampaign,
-      )
+      expect(campaignsService.launch).toHaveBeenCalledWith(mockCampaign)
       expect(result).toBe(true)
     })
 
@@ -843,7 +840,7 @@ describe('CampaignsController', () => {
       vi.spyOn(campaignsService, 'launch').mockRejectedValue(error)
       vi.spyOn(slackService, 'errorMessage').mockResolvedValue(undefined)
 
-      await expect(controller.launch(mockUser, mockCampaign)).rejects.toThrow(
+      await expect(controller.launch(mockCampaign)).rejects.toThrow(
         'Launch failed',
       )
 

@@ -1,3 +1,9 @@
+import { metrics } from '@opentelemetry/api'
+import {
+  BatchSpanProcessor,
+  type ReadableSpan,
+  type SpanProcessor,
+} from '@opentelemetry/sdk-trace-base'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
@@ -18,6 +24,7 @@ import type { Context } from '@opentelemetry/api'
 import { PrismaInstrumentation } from '@prisma/instrumentation'
 import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
+import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core'
 import { HostMetrics } from '@opentelemetry/host-metrics'
 import { FastifyOtelInstrumentation } from '@fastify/otel'
 
@@ -91,12 +98,26 @@ if (!headers) {
       process.env.OTEL_SERVICE_ENVIRONMENT || 'local',
   })
 
+  const prismaConnectionMetricProcessor: SpanProcessor = {
+    onStart: () => undefined,
+    onEnd: (span: ReadableSpan) => {
+      if (span.name !== 'prisma:engine:connection') return
+      const durationMs =
+        (span.endTime[0] - span.startTime[0]) * 1e3 +
+        (span.endTime[1] - span.startTime[1]) / 1e6
+      prismaConnectionDuration.record(durationMs)
+    },
+    forceFlush: () => Promise.resolve(),
+    shutdown: () => Promise.resolve(),
+  }
+
+  const traceExporter = new OTLPTraceExporter({
+    url: `${endpoint}/v1/traces`,
+    headers: parsedHeaders,
+  })
+
   const sdk = new NodeSDK({
     resource,
-    traceExporter: new OTLPTraceExporter({
-      url: `${endpoint}/v1/traces`,
-      headers: parsedHeaders,
-    }),
     metricReader: new PeriodicExportingMetricReader({
       exporter: new OTLPMetricExporter({
         url: `${endpoint}/v1/metrics`,
@@ -122,8 +143,13 @@ if (!headers) {
         }),
       ),
     ),
+    spanProcessors: [
+      new BatchSpanProcessor(traceExporter),
+      prismaConnectionMetricProcessor,
+    ],
     instrumentations: [
       new HttpInstrumentation(),
+      new NestInstrumentation(),
       new PrismaInstrumentation(),
       new PinoInstrumentation(),
       fastifyOtelInstrumentation,
@@ -131,6 +157,13 @@ if (!headers) {
   })
 
   sdk.start()
+
+  const prismaConnectionDuration = metrics
+    .getMeter('gp-api')
+    .createHistogram('prisma.connection.duration', {
+      description: 'Duration of prisma:engine:connection spans in milliseconds',
+      unit: 'ms',
+    })
 
   const hostMetrics = new HostMetrics()
   hostMetrics.start()
