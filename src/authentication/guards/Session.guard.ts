@@ -35,10 +35,7 @@ export class SessionGuard implements CanActivate {
     const token = request.headers.authorization?.replace('Bearer ', '')
 
     if (!token) {
-      if (routeIsPublicAndNoRoles(context, this.reflector)) {
-        return true
-      }
-      throw new UnauthorizedException()
+      return this.allowPublicOrThrow(context)
     }
 
     if (this.authProvider.isM2MToken(token)) {
@@ -47,10 +44,7 @@ export class SessionGuard implements CanActivate {
         return true
       } catch {
         this.logger.debug('M2M token verification failed in SessionGuard')
-        if (routeIsPublicAndNoRoles(context, this.reflector)) {
-          return true
-        }
-        throw new UnauthorizedException()
+        return this.allowPublicOrThrow(context)
       }
     }
 
@@ -64,10 +58,7 @@ export class SessionGuard implements CanActivate {
         this.logger.warn(
           `Could not find or provision user for externalUserId: ${externalUserId}`,
         )
-        if (routeIsPublicAndNoRoles(context, this.reflector)) {
-          return true
-        }
-        throw new UnauthorizedException()
+        return this.allowPublicOrThrow(context)
       }
 
       request.user = user
@@ -77,13 +68,17 @@ export class SessionGuard implements CanActivate {
         throw err
       }
       this.logger.debug('Session token verification failed')
-      if (routeIsPublicAndNoRoles(context, this.reflector)) {
-        return true
-      }
-      throw new UnauthorizedException()
+      return this.allowPublicOrThrow(context)
     }
 
     return true
+  }
+
+  private allowPublicOrThrow(context: ExecutionContext): true {
+    if (routeIsPublicAndNoRoles(context, this.reflector)) {
+      return true
+    }
+    throw new UnauthorizedException()
   }
 
   private async resolveUser(externalUserId: string): Promise<User | null> {

@@ -1,5 +1,6 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { verifyToken, ClerkClient } from '@clerk/backend'
+import { PinoLogger } from 'nestjs-pino'
 import {
   AuthProvider,
   VerifiedM2MToken,
@@ -8,7 +9,8 @@ import {
 import { CLERK_CLIENT_PROVIDER_TOKEN } from '@/vendors/clerk/providers/clerk-client.provider'
 import { M2M_TOKEN_PREFIX } from '@/vendors/clerk/clerk.consts'
 
-const { CLERK_SECRET_KEY, GP_WEBAPP_MACHINE_SECRET } = process.env
+const { CLERK_SECRET_KEY, GP_WEBAPP_MACHINE_SECRET, CLERK_AUTHORIZED_PARTIES } =
+  process.env
 
 if (!CLERK_SECRET_KEY) {
   throw new Error('CLERK_SECRET_KEY is required for application startup')
@@ -20,21 +22,31 @@ if (!GP_WEBAPP_MACHINE_SECRET) {
   )
 }
 
+const authorizedParties = CLERK_AUTHORIZED_PARTIES
+  ? CLERK_AUTHORIZED_PARTIES.split(',')
+  : undefined
+
 @Injectable()
 export class ClerkAuthService implements AuthProvider {
   constructor(
     @Inject(CLERK_CLIENT_PROVIDER_TOKEN)
     private clerkClient: ClerkClient,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(ClerkAuthService.name)
+  }
 
   async verifySessionToken(token: string): Promise<VerifiedSession> {
     const payload = await verifyToken(token, {
       secretKey: CLERK_SECRET_KEY,
+      authorizedParties,
+    }).catch(() => {
+      throw new UnauthorizedException('Session token verification failed')
     })
 
     const externalUserId = payload.sub
     if (!externalUserId) {
-      throw new Error('Token missing sub claim')
+      throw new UnauthorizedException('Token missing sub claim')
     }
 
     return { externalUserId }
@@ -56,9 +68,11 @@ export class ClerkAuthService implements AuthProvider {
     return token.startsWith(M2M_TOKEN_PREFIX)
   }
 
-  async getUser(
-    externalUserId: string,
-  ): Promise<{ email?: string; firstName?: string; lastName?: string } | null> {
+  async getUser(externalUserId: string): Promise<{
+    email?: string
+    firstName?: string
+    lastName?: string
+  } | null> {
     try {
       const clerkUser = await this.clerkClient.users.getUser(externalUserId)
       const email =
@@ -70,7 +84,11 @@ export class ClerkAuthService implements AuthProvider {
         firstName: clerkUser.firstName ?? undefined,
         lastName: clerkUser.lastName ?? undefined,
       }
-    } catch {
+    } catch (err) {
+      this.logger.error(
+        { err, externalUserId },
+        'Failed to fetch user from Clerk',
+      )
       return null
     }
   }

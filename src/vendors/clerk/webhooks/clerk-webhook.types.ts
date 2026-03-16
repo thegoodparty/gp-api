@@ -1,3 +1,10 @@
+export const CLERK_EVENT_USER_UPDATED = 'user.updated'
+export const CLERK_EVENT_USER_DELETED = 'user.deleted'
+
+export type ClerkWebhookEventType =
+  | typeof CLERK_EVENT_USER_UPDATED
+  | typeof CLERK_EVENT_USER_DELETED
+
 export interface ClerkEmailAddress {
   email_address: string
   id: string
@@ -12,6 +19,6 @@ export interface ClerkWebhookEventData {
 }
 
 export interface ClerkWebhookPayload {
-  type: string
+  type: ClerkWebhookEventType | string
   data: ClerkWebhookEventData
 }

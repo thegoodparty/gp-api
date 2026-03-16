@@ -236,10 +236,16 @@ export class UsersService extends createPrismaBase(MODELS.User) {
           { clerkId: data.clerkId },
           'Concurrent provisioning detected, fetching existing user',
         )
-        return (
+        const existing =
           (await this.findUser({ clerkId: data.clerkId })) ??
           (await this.findUserByEmail(data.email))
-        )
+        if (!existing) {
+          this.logger.error(
+            { clerkId: data.clerkId, email: data.email },
+            'P2002 race but user not found by clerkId or email',
+          )
+        }
+        return existing
       }
       throw err
     }

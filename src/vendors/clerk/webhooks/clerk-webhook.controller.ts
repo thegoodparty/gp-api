@@ -12,6 +12,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { PinoLogger } from 'nestjs-pino'
 import { Webhook } from 'svix'
+import { z } from 'zod'
 import { PublicAccess } from '@/authentication/decorators/PublicAccess.decorator'
 import {
   AUTH_USER_DELETED_EVENT,
@@ -19,7 +20,29 @@ import {
   AuthUserEventData,
 } from '@/authentication/interfaces/auth-provider.interface'
 import { ClerkWebhookService } from '@/vendors/clerk/services/clerk-webhook.service'
-import { ClerkWebhookPayload } from '@/vendors/clerk/webhooks/clerk-webhook.types'
+import {
+  CLERK_EVENT_USER_DELETED,
+  CLERK_EVENT_USER_UPDATED,
+  ClerkWebhookPayload,
+} from '@/vendors/clerk/webhooks/clerk-webhook.types'
+
+const clerkWebhookSchema = z.object({
+  type: z.string(),
+  data: z.object({
+    id: z.string(),
+    email_addresses: z
+      .array(
+        z.object({
+          email_address: z.string(),
+          id: z.string(),
+        }),
+      )
+      .optional(),
+    primary_email_address_id: z.string().nullable().optional(),
+    first_name: z.string().nullable().optional(),
+    last_name: z.string().nullable().optional(),
+  }),
+})
 
 if (!process.env.CLERK_WEBHOOK_SECRET) {
   throw new Error('CLERK_WEBHOOK_SECRET is required for application startup')
@@ -56,18 +79,29 @@ export class ClerkWebhookController {
       throw new BadRequestException('Missing svix headers')
     }
 
-    let event: ClerkWebhookPayload
+    let verified: Record<string, unknown>
     try {
       const wh = new Webhook(CLERK_WEBHOOK_SECRET)
-      event = wh.verify(rawBody.toString(), {
+      verified = wh.verify(rawBody.toString('utf-8'), {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,
         'svix-signature': svixSignature,
-      }) as ClerkWebhookPayload
+      }) as Record<string, unknown>
     } catch (err) {
       this.logger.warn({ err }, 'Failed to verify Clerk webhook signature')
       throw new UnauthorizedException('Invalid webhook signature')
     }
+
+    const parsed = clerkWebhookSchema.safeParse(verified)
+    if (!parsed.success) {
+      this.logger.warn(
+        { errors: parsed.error.errors },
+        'Invalid Clerk webhook payload',
+      )
+      throw new BadRequestException('Invalid webhook payload')
+    }
+
+    const event: ClerkWebhookPayload = parsed.data
 
     this.logger.info(
       { eventType: event.type },
@@ -79,11 +113,11 @@ export class ClerkWebhookController {
     }
 
     switch (event.type) {
-      case 'user.updated':
+      case CLERK_EVENT_USER_UPDATED:
         await this.clerkWebhookService.handleUserUpdated(event.data)
         this.eventEmitter.emit(AUTH_USER_UPDATED_EVENT, authEvent)
         break
-      case 'user.deleted':
+      case CLERK_EVENT_USER_DELETED:
         await this.clerkWebhookService.handleUserDeleted(event.data)
         this.eventEmitter.emit(AUTH_USER_DELETED_EVENT, authEvent)
         break
