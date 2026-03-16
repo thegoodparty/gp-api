@@ -150,9 +150,14 @@ export class PollsController {
             where: { slug: campaign.organizationSlug },
           })
         : null
-      if (!organization?.positionId) {
+      const ballotreadyPositionId = organization?.positionId
+        ? await this.organizationsService.resolveBallotReadyPositionId(
+            organization.positionId,
+          )
+        : null
+      if (!ballotreadyPositionId) {
         throw new BadRequestException(
-          'No position found on organization',
+          'No ballotready position found on campaign/organization',
         )
       }
       const p2v = campaign.pathToVictory?.data
@@ -162,7 +167,7 @@ export class PollsController {
         campaignId: campaign.id,
         swornInDate,
         electedDate: null,
-        ballotreadyPositionId: organization.positionId,
+        ballotreadyPositionId,
         office: campaign.details.office,
         otherOffice: campaign.details.otherOffice,
         state: campaign.details.state,

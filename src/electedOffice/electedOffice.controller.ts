@@ -17,6 +17,7 @@ import {
 import { Prisma, User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { toDateOnlyString } from 'src/shared/util/date.util'
 import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import {
@@ -29,7 +30,10 @@ import { ElectedOfficeService } from './services/electedOffice.service'
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)
 export class ElectedOfficeController {
-  constructor(private readonly electedOfficeService: ElectedOfficeService) {}
+  constructor(
+    private readonly electedOfficeService: ElectedOfficeService,
+    private readonly organizationsService: OrganizationsService,
+  ) {}
 
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
@@ -81,12 +85,17 @@ export class ElectedOfficeController {
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
     }
+    const ballotreadyPositionId = campaign.organization?.positionId
+      ? await this.organizationsService.resolveBallotReadyPositionId(
+          campaign.organization.positionId,
+        )
+      : undefined
 
     const created = await this.electedOfficeService.create({
       ...body,
       userId: user.id,
       campaignId: campaign.id,
-      ballotreadyPositionId: campaign.organization?.positionId ?? undefined,
+      ballotreadyPositionId,
       office: campaign.details.office,
       otherOffice: campaign.details.otherOffice,
     })

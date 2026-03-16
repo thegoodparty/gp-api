@@ -195,6 +195,7 @@ describe('CampaignsController', () => {
     const organizationsServiceMock: Partial<OrganizationsService> = {
       resolveOverrideDistrictId: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue({ positionId: 'pos-1' }),
+      resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
 
@@ -1227,7 +1228,7 @@ describe('CampaignsController', () => {
         electionsService.getBallotReadyMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith({
         campaignId: mockCampaign.id,
-        ballotreadyPositionId: 'pos-1',
+        ballotreadyPositionId: 'br-pos-1',
         electionDate: '2025-11-04',
         includeTurnout: true,
         officeName: 'Mayor',

@@ -118,6 +118,17 @@ export class OrganizationsService extends createPrismaBase(
     return position?.id ?? null
   }
 
+  async resolveBallotReadyPositionId(
+    positionId?: string | null,
+  ): Promise<string | null> {
+    if (!positionId) {
+      return null
+    }
+
+    const position = await this.electionsService.getPositionById(positionId)
+    return position?.brPositionId ?? null
+  }
+
   /**
    * Resolves the override district ID for a given position and district selection.
    * Returns null if the selected district exactly matches the position's natural

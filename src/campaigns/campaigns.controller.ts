@@ -393,6 +393,10 @@ export class CampaignsController {
         })
       : null
     const ballotreadyPositionId = campaignOrg?.positionId
+      ? await this.organizations.resolveBallotReadyPositionId(
+          campaignOrg.positionId,
+        )
+      : null
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
@@ -471,6 +475,10 @@ export class CampaignsController {
         })
       : null
     const ballotreadyPositionId = campaignOrg?.positionId
+      ? await this.organizations.resolveBallotReadyPositionId(
+          campaignOrg.positionId,
+        )
+      : null
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
