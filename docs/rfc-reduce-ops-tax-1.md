@@ -13,12 +13,12 @@ This doc proposes three options, evaluates each against concrete data, and recom
 At a high level, the multi-repo structure is costing us in three ways:
 
 - **Code duplication and drift** — thousands of lines of nearly identical boilerplate (OTel, Dockerfiles, CI/CD, Pulumi, shared config like tsconfig and lint rules) are maintained independently per repo. When these diverge — and they already have — bugs, inconsistencies, and wasted effort follow.
-- **Growing maintenance burden** — every infrastructure improvement, bug fix, or dependency update must be applied N times. Dependabot alone will generate hundreds of redundant PRs per year. Each new service multiplies the problem linearly.
+- **Growing maintenance burden** — every infrastructure improvement, bug fix, or dependency update must be applied N times. Each new service multiplies the problem linearly.
 - **Higher defect risk** — bugs in shared infrastructure propagate manually and unevenly. Version drift across repos means a fix that works in one repo may not work in another.
 
 Each of these costs works directly against goals we've already aligned on in the VOTES framework:
 
-- **Velocity** — duplicated PRs and propagation delays inflate cycle tim
+- **Velocity** — duplicated PRs and propagation delays inflate cycle time
 - **Operations** — multi-repo coordination is a structural pain point in automating releases
 - **Testing** — each repo independently maintains its own test framework, coverage gates, and CI pipelines
 - **Experience** — bugs in shared boilerplate that introduce debugging pain must be fixed in each repo independently, slowing resolution of blocked states
@@ -117,9 +117,9 @@ Scaling npm-based code sharing to cover all our duplicated infrastructure would 
 
 The existing `@goodparty_org/contracts` package and `gp-sdk` are great examples of npm publishing done right — they serve external consumers who need a stable, versioned API. This proposal does not replace that work; it addresses a different problem (internal infrastructure duplication) where the publish-consume cycle adds friction without proportional benefit.
 
-### Option B: Monorepo
+### Option B: Backend Monorepo
 
-Consolidate all backend repos into a single repository using npm workspaces.
+Consolidate all backend API repos into a single repository using npm workspaces.
 
 **To be clear: this does not mean merging services into a single application.** Each service (gp-api, people-api, election-api) remains its own NestJS application, its own Prisma schema, its own Docker image, and its own ECS deployment. The services continue to be deployed separately. What changes is that they share a single repository, a single CI/CD pipeline, and a single set of infrastructure code. This is a code organization change, not an architecture change.
 
@@ -182,7 +182,7 @@ Keep the current multi-repo structure and accept the operational overhead.
 
 ## Recommendation
 
-**Option B: Monorepo.** It directly addresses every measured problem:
+**Option B: Backend Monorepo.** It directly addresses every measured problem:
 
 | Problem                               | npm + shared workflows                | Monorepo                           | Status quo        |
 | ------------------------------------- | ------------------------------------- | ---------------------------------- | ----------------- |
