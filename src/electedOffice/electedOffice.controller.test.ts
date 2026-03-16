@@ -150,8 +150,8 @@ describe('ElectedOfficeController', () => {
         termEndDate: '2026-01-15',
       })
 
-      const organization = await service.prisma.organization.findFirst({
-        where: { ownerId: service.user.id },
+      const organization = await service.prisma.organization.findUnique({
+        where: { slug: `eo-${result.data.id}` },
       })
       expect(organization).toBeDefined()
       expect(organization?.slug).toBe(`eo-${result.data.id}`)
@@ -174,8 +174,8 @@ describe('ElectedOfficeController', () => {
         electedDate: '2024-01-01',
       })
 
-      const organization = await service.prisma.organization.findFirst({
-        where: { ownerId: service.user.id },
+      const organization = await service.prisma.organization.findUnique({
+        where: { slug: `eo-${result.data.id}` },
       })
       expect(organization).toBeDefined()
       expect(organization?.slug).toBe(`eo-${result.data.id}`)
