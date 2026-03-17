@@ -12,14 +12,12 @@ import { ContactEngagementModule } from '@/contactEngagement/contactEngagement.m
 import { ContactsModule } from '@/contacts/contacts.module'
 import { ContentModule } from '@/content/content.module'
 import { CrmModule } from '@/crm/crmModule'
-import { DeclareModule } from '@/declare/declare.module'
 import { ElectedOfficeModule } from '@/electedOffice/electedOffice.module'
 import { ElectionsModule } from '@/elections/elections.module'
 import { OrganizationsModule } from '@/organizations/organizations.module'
 import { ErrorLoggerModule } from '@/errorLogger/errorLogger.module'
 import { FeaturesModule } from '@/features/features.module'
 import { HealthModule } from '@/health/health.module'
-import { JobsModule } from '@/jobs/jobs.module'
 import { BlockedStateInterceptor } from '@/observability/blockedState/blockedState.interceptor'
 import { OutreachModule } from '@/outreach/outreach.module'
 import { PaymentsModule } from '@/payments/payments.module'
@@ -57,8 +55,6 @@ import { loggerModule } from './observability/logging/logger-module'
     HealthModule,
     PrismaModule,
     ContentfulModule,
-    JobsModule,
-    DeclareModule,
     CampaignsModule,
     ElectionsModule,
     TopIssuesModule,

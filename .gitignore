@@ -83,6 +83,5 @@ scripts/*.csv
 
 # AI Tooling
 .ai
-CLAUDE.md
 repomix.config.json
 src/generated/route-types.ts

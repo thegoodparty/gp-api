@@ -16,6 +16,7 @@ import { PollsService } from './services/polls.service'
 import { PollIndividualMessageService } from './services/pollIndividualMessage.service'
 import { PollResponsesDownloadService } from './services/pollResponsesDownload.service'
 import { ContactsModule } from '@/contacts/contacts.module'
+import { OrganizationsModule } from '@/organizations/organizations.module'
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ContactsModule } from '@/contacts/contacts.module'
     AwsModule,
     LlmModule,
     ContactsModule,
+    OrganizationsModule,
   ],
   providers: [
     PollsService,
