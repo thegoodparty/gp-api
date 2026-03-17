@@ -7,6 +7,10 @@ import {
   registerUser,
   RegisterResponse,
 } from '../../../e2e-tests/utils/auth.util'
+import {
+  retryOnConflict,
+  updateCampaignWithRetry,
+} from '../../../e2e-tests/utils/request.util'
 
 test.describe('Campaigns - User Campaign Operations', () => {
   let reg: RegisterResponse
@@ -82,17 +86,12 @@ test.describe('Campaigns - User Campaign Operations', () => {
     const randomName = generateRandomName()
     const randomWebsite = `https://${Math.random().toString(36).substring(7)}.com`
 
-    const response = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
+    const response = await updateCampaignWithRetry(request, reg.token, {
       data: {
-        data: {
-          name: randomName,
-        },
-        details: {
-          website: randomWebsite,
-        },
+        name: randomName,
+      },
+      details: {
+        website: randomWebsite,
       },
     })
 
@@ -131,15 +130,10 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should set campaign office', async ({ request }) => {
-    const response = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
-      data: {
-        details: {
-          office: 'Other',
-          otherOffice: 'State Representative',
-        },
+    const response = await updateCampaignWithRetry(request, reg.token, {
+      details: {
+        office: 'Other',
+        otherOffice: 'State Representative',
       },
     })
 
@@ -147,11 +141,11 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should launch campaign', async ({ request }) => {
-    const response = await request.post('/v1/campaigns/launch', {
-      headers: {
-        Authorization: `Bearer ${reg.token}`,
-      },
-    })
+    const response = await retryOnConflict(() =>
+      request.post('/v1/campaigns/launch', {
+        headers: { Authorization: `Bearer ${reg.token}` },
+      }),
+    )
 
     expect(response.status()).toBe(200)
 
