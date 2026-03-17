@@ -79,7 +79,7 @@ const campaignDefaults = {
 const mockCampaign: Campaign = {
   ...campaignDefaults,
   id: 100,
-  organizationSlug: null,
+  organizationSlug: 'campaign-100',
   slug: 'john-doe',
   userId: 1,
   isActive: true,
@@ -194,6 +194,8 @@ describe('CampaignsController', () => {
 
     const organizationsServiceMock: Partial<OrganizationsService> = {
       resolveOverrideDistrictId: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue({ positionId: 'pos-1' }),
+      resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
 
@@ -1066,6 +1068,7 @@ describe('CampaignsController', () => {
       vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
         mockCampaignWithP2V,
       )
+      vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
 
       await controller.setDistrict(campaignNoPosition, mockUser, districtBody)
 
@@ -1086,6 +1089,7 @@ describe('CampaignsController', () => {
         ...mockCampaign,
         details: { electionDate: '2025-11-04' },
       }
+      vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
 
       await expect(
         controller.updateRaceTargetDetails(campaign),
@@ -1221,7 +1225,7 @@ describe('CampaignsController', () => {
         electionsService.getBallotReadyMatchedRaceTargetDetails,
       ).toHaveBeenCalledWith({
         campaignId: mockCampaign.id,
-        ballotreadyPositionId: 'pos-1',
+        ballotreadyPositionId: 'br-pos-1',
         electionDate: '2025-11-04',
         includeTurnout: true,
         officeName: 'Mayor',
@@ -1283,6 +1287,7 @@ describe('CampaignsController', () => {
       vi.spyOn(campaignsService, 'findFirstOrThrow').mockResolvedValue(
         campaignNoPosition,
       )
+      vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
 
       await expect(
         controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {}),
