@@ -119,7 +119,7 @@ export class OrganizationsService extends createPrismaBase(
   }
 
   async resolveBallotReadyPositionId(
-    positionId?: string | null,
+    positionId?: string,
   ): Promise<string | null> {
     if (!positionId) {
       return null

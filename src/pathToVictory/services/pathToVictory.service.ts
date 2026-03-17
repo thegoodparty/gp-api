@@ -692,7 +692,7 @@ export class PathToVictoryService extends createPrismaBase(
         const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
         const ballotReadyPositionId =
           await this.organizationsService.resolveBallotReadyPositionId(
-            campaign.organization?.positionId,
+            campaign.organization?.positionId ?? undefined,
           )
         const orgData = await this.organizationsService.resolveOrgData({
           ballotReadyPositionId,
