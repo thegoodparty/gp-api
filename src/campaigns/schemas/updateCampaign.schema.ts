@@ -53,7 +53,7 @@ const CampaignDetailsSchema = z
     party: z.string(),
     otherParty: z.string(),
     district: z.string(),
-    raceId: z.string(),
+    raceId: z.string().nullish(),
     level: ElectionLevelSchema,
     noNormalizedOffice: z.boolean(),
     website: z.string(),
