@@ -2,6 +2,7 @@ import { AdminModule } from '@/admin/admin.module'
 import { AnalyticsModule } from '@/analytics/analytics.module'
 import { AuthenticationModule } from '@/authentication/authentication.module'
 import { SessionGuard } from '@/authentication/guards/Session.guard'
+import { ImpersonationInterceptor } from '@/analytics/interceptors/Impersonation.interceptor'
 import { AdminAuditInterceptor } from '@/authentication/interceptors/AdminAudit.interceptor'
 import { CampaignsModule } from '@/campaigns/campaigns.module'
 import { CommunityIssuesModule } from '@/communityIssues/communityIssues.module'
@@ -93,6 +94,10 @@ import { loggerModule } from './observability/logging/logger-module'
     {
       provide: APP_GUARD,
       useClass: SessionGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ImpersonationInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

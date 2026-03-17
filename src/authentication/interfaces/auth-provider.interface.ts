@@ -1,5 +1,6 @@
 export interface VerifiedSession {
   externalUserId: string
+  actor?: { sub: string }
 }
 
 export interface VerifiedM2MToken {

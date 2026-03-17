@@ -49,7 +49,7 @@ export class SessionGuard implements CanActivate {
     }
 
     try {
-      const { externalUserId } =
+      const { externalUserId, actor } =
         await this.authProvider.verifySessionToken(token)
 
       const user = await this.resolveUser(externalUserId)
@@ -61,7 +61,10 @@ export class SessionGuard implements CanActivate {
         return this.allowPublicOrThrow(context)
       }
 
-      request.user = user
+      request.user = {
+        ...user,
+        impersonating: actor != null,
+      }
       this.sessions.trackSession(user)
     } catch (err) {
       if (err instanceof UnauthorizedException) {

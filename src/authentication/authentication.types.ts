@@ -3,6 +3,6 @@ import { VerifiedM2MToken } from '@/authentication/interfaces/auth-provider.inte
 
 export interface IncomingRequest extends Request {
   headers: Headers & { authorization?: string }
-  user?: User
+  user?: User & { impersonating?: boolean }
   m2mToken?: VerifiedM2MToken
 }

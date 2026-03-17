@@ -26,6 +26,17 @@ const authorizedParties = CLERK_AUTHORIZED_PARTIES
   ? CLERK_AUTHORIZED_PARTIES.split(',')
   : undefined
 
+function isActorClaim(
+  act: Record<string, unknown> | undefined,
+): act is { sub: string } {
+  return (
+    typeof act === 'object' &&
+    act !== null &&
+    'sub' in act &&
+    typeof act.sub === 'string'
+  )
+}
+
 @Injectable()
 export class ClerkAuthService implements AuthProvider {
   constructor(
@@ -49,7 +60,10 @@ export class ClerkAuthService implements AuthProvider {
       throw new UnauthorizedException('Token missing sub claim')
     }
 
-    return { externalUserId }
+    return {
+      externalUserId,
+      actor: isActorClaim(payload.act) ? payload.act : undefined,
+    }
   }
 
   async verifyM2MToken(token: string): Promise<VerifiedM2MToken> {
