@@ -3,11 +3,14 @@ import {
   Body,
   Controller,
   Get,
+  HttpStatus,
   Param,
   Post,
+  Res,
   UsePipes,
 } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
+import { FastifyReply } from 'fastify'
 import { ReqCampaign } from '../../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../campaigns/decorators/UseCampaign.decorator'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
@@ -34,18 +37,28 @@ export class P2pController {
   @UseCampaign()
   async checkPhoneListStatus(
     @Param('token') token: string,
-  ): Promise<CheckPhoneListStatusResponseDto> {
+    @Res({ passthrough: true }) res: FastifyReply,
+  ): Promise<CheckPhoneListStatusResponseDto | { message: string }> {
     try {
       const statusResponse =
         await this.peerlyPhoneListService.checkPhoneListStatus(token)
 
+      if (!statusResponse) {
+        res.status(HttpStatus.ACCEPTED)
+        return {
+          message: 'Phone list status is not yet available. Please try again.',
+        }
+      }
+
       if (statusResponse.Data.list_state !== PhoneListState.ACTIVE) {
         const status = statusResponse.Data.list_state || 'unknown'
-        const message =
-          status === PhoneListState.PROCESSING
-            ? 'Phone list is still processing. Please try again in a few moments.'
-            : `Phone list is not ready. Current status: ${status}`
-        throw new BadGatewayException(message)
+        res.status(HttpStatus.ACCEPTED)
+        return {
+          message:
+            status === PhoneListState.PROCESSING
+              ? 'Phone list is still processing. Please try again in a few moments.'
+              : `Phone list is not ready. Current status: ${status}`,
+        }
       }
 
       const listId = statusResponse.Data.list_id
