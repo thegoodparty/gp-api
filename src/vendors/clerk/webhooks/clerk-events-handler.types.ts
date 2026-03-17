@@ -16,6 +16,7 @@ export interface ClerkEventsHandlerEventData {
   primary_email_address_id?: string | null
   first_name?: string | null
   last_name?: string | null
+  image_url?: string | null
 }
 
 export interface ClerkEventsHandlerPayload {

@@ -42,7 +42,7 @@ export class ClerkEventsHandlerService {
     const firstName = data.first_name ?? user.firstName ?? ''
     const lastName = data.last_name ?? user.lastName ?? ''
 
-    const updates: Record<string, string> = {}
+    const updates: Record<string, string | null> = {}
     if (email && email !== user.email) updates.email = email
     if (firstName !== user.firstName) {
       updates.firstName = firstName
@@ -55,6 +55,11 @@ export class ClerkEventsHandlerService {
       updates.name = `${firstName} ${lastName}`.trim()
     }
 
+    const avatar = data.image_url ?? null
+    if (avatar !== user.avatar) {
+      updates.avatar = avatar
+    }
+
     if (Object.keys(updates).length === 0) return
 
     await this.usersService.updateUser({ id: user.id }, updates)
@@ -64,9 +69,7 @@ export class ClerkEventsHandlerService {
     )
   }
 
-  async handleUserDeleted(
-    data: Pick<ClerkEventsHandlerEventData, 'id'>,
-  ) {
+  async handleUserDeleted(data: Pick<ClerkEventsHandlerEventData, 'id'>) {
     const user = await this.usersService.findUser({
       clerkId: data.id,
     })
@@ -78,23 +81,18 @@ export class ClerkEventsHandlerService {
       return
     }
 
-    const existingMeta =
-      typeof user.metaData === 'object' &&
-      user.metaData !== null &&
-      !Array.isArray(user.metaData)
-        ? user.metaData
-        : {}
-
-    await this.usersService.updateUser(
-      { id: user.id },
-      {
-        clerkId: null,
-        metaData: { ...existingMeta, isDeleted: true },
-      },
-    )
-    this.logger.info(
-      { userId: user.id, clerkId: data.id },
-      'Cleared clerkId and marked as deleted (soft delete)',
-    )
+    try {
+      await this.usersService.deleteUser(user.id)
+      this.logger.info(
+        { userId: user.id, clerkId: data.id },
+        'Deleted user and cancelled subscriptions via Clerk webhook',
+      )
+    } catch (error) {
+      this.logger.error(
+        { userId: user.id, clerkId: data.id, error },
+        'Failed to delete user via Clerk webhook',
+      )
+      throw error
+    }
   }
 }
