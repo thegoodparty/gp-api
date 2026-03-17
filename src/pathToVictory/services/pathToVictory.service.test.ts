@@ -89,7 +89,7 @@ describe('PathToVictoryService', () => {
       count: ReturnType<typeof vi.fn>
     }
     organization: {
-      upsert: ReturnType<typeof vi.fn>
+      update: ReturnType<typeof vi.fn>
     }
   }
   let mockSlack: {
@@ -125,7 +125,7 @@ describe('PathToVictoryService', () => {
         count: vi.fn(),
       },
       organization: {
-        upsert: vi.fn().mockResolvedValue({}),
+        update: vi.fn().mockResolvedValue({}),
       },
     }
     mockSlack = {
@@ -571,7 +571,7 @@ describe('PathToVictoryService', () => {
         },
       }
 
-      it('upserts organization when silver resolves a district', async () => {
+      it('updates organization when silver resolves a district', async () => {
         mockPrisma.campaign.findUnique.mockResolvedValue(campaignWithDetails)
         mockPrisma.pathToVictory.update.mockResolvedValue({})
         mockOrganizations.resolveOrgData.mockResolvedValue({
@@ -590,16 +590,9 @@ describe('PathToVictoryService', () => {
           L2DistrictType: 'State_House',
           L2DistrictName: 'STATE HOUSE 005',
         })
-        expect(mockPrisma.organization.upsert).toHaveBeenCalledWith({
+        expect(mockPrisma.organization.update).toHaveBeenCalledWith({
           where: { slug: 'campaign-1' },
-          update: {
-            positionId: 'pos-uuid',
-            customPositionName: null,
-            overrideDistrictId: 'override-uuid',
-          },
-          create: {
-            slug: 'campaign-1',
-            ownerId: 10,
+          data: {
             positionId: 'pos-uuid',
             customPositionName: null,
             overrideDistrictId: 'override-uuid',
@@ -614,7 +607,7 @@ describe('PathToVictoryService', () => {
         await service.completePathToVictory('test-slug', emptyResponse)
 
         expect(mockOrganizations.resolveOrgData).not.toHaveBeenCalled()
-        expect(mockPrisma.organization.upsert).not.toHaveBeenCalled()
+        expect(mockPrisma.organization.update).not.toHaveBeenCalled()
       })
 
       it('skips org upsert when campaign has no state', async () => {
@@ -627,7 +620,7 @@ describe('PathToVictoryService', () => {
         await service.completePathToVictory('test-slug', responseWithTurnout)
 
         expect(mockOrganizations.resolveOrgData).not.toHaveBeenCalled()
-        expect(mockPrisma.organization.upsert).not.toHaveBeenCalled()
+        expect(mockPrisma.organization.update).not.toHaveBeenCalled()
       })
     })
   })

@@ -243,19 +243,13 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           { ballotReadyPositionId, position, orgSlug },
           'Updating organization',
         )
-        await tx.organization.upsert({
+        await tx.organization.update({
           where: { slug: orgSlug },
-          update: {
+          data: {
             positionId: position?.id ?? null,
             customPositionName,
             // Clear stale override — it was computed against the previous position.
             overrideDistrictId: null,
-          },
-          create: {
-            slug: orgSlug,
-            ownerId: existing.userId,
-            positionId: position?.id ?? null,
-            customPositionName,
           },
         })
       }
@@ -377,19 +371,13 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
                 merged.otherOffice,
               )
             : null
-          await tx.organization.upsert({
+          await tx.organization.update({
             where: { slug: orgSlug },
-            update: {
+            data: {
               positionId: position?.id ?? null,
               customPositionName,
               // Clear stale override — it was computed against the previous position.
               overrideDistrictId: null,
-            },
-            create: {
-              slug: orgSlug,
-              ownerId: campaign.userId,
-              positionId: position?.id ?? null,
-              customPositionName,
             },
           })
         }
@@ -397,14 +385,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         if (overrideDistrictId !== undefined) {
           const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
           const districtId = overrideDistrictId ?? null
-          await tx.organization.upsert({
+          await tx.organization.update({
             where: { slug: orgSlug },
-            update: { overrideDistrictId: districtId },
-            create: {
-              slug: orgSlug,
-              ownerId: campaign.userId,
-              overrideDistrictId: districtId,
-            },
+            data: { overrideDistrictId: districtId },
           })
         }
 
