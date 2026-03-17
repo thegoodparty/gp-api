@@ -12,7 +12,6 @@ import { VoterOutreachService } from './services/voterOutreach.service'
 import { VotersService } from './services/voters.service'
 import { VoterFileController } from './voterFile/voterFile.controller'
 import { VoterFileService } from './voterFile/voterFile.service'
-import { VotersController } from './voters.controller'
 
 @Module({
   imports: [
@@ -24,7 +23,7 @@ import { VotersController } from './voters.controller'
     ElectionsModule,
     ElectedOfficeModule,
   ],
-  controllers: [VotersController, VoterFileController],
+  controllers: [VoterFileController],
   providers: [
     VoterFileService,
     VoterDatabaseService,
