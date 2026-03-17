@@ -21,6 +21,11 @@
 import '../dist/configrc'
 
 import { PrismaClient, VoterFileFilter } from '@prisma/client'
+
+type TransactionClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>
 import { createWriteStream, mkdirSync, WriteStream } from 'fs'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
@@ -95,11 +100,11 @@ async function fetchElectedOfficesByCampaign(
 // ── Single-record mutations ──────────────────────────────────────────────────
 
 async function linkFilterToCampaignOrg(
-  prisma: PrismaClient,
+  tx: TransactionClient,
   filterId: number,
   campaignSlug: string,
 ): Promise<void> {
-  await prisma.$executeRaw`
+  await tx.$executeRaw`
     UPDATE voter_file_filter
     SET organization_slug = ${campaignSlug}, updated_at = NOW()
     WHERE id = ${filterId}
@@ -107,7 +112,7 @@ async function linkFilterToCampaignOrg(
 }
 
 async function duplicateFilterForOrg(
-  prisma: PrismaClient,
+  tx: TransactionClient,
   filter: VoterFileFilter,
   orgSlug: string,
 ): Promise<void> {
@@ -115,8 +120,8 @@ async function duplicateFilterForOrg(
     filter
   // organizationSlug exists at runtime but not in stale generated types
   delete (data as Record<string, unknown>).organizationSlug
-  const created = await prisma.voterFileFilter.create({ data })
-  await prisma.$executeRaw`
+  const created = await tx.voterFileFilter.create({ data })
+  await tx.$executeRaw`
     UPDATE voter_file_filter
     SET organization_slug = ${orgSlug}, updated_at = NOW()
     WHERE id = ${created.id}
@@ -150,22 +155,27 @@ async function processFilter(
   }
 
   try {
-    await linkFilterToCampaignOrg(prisma, filter.id, campaignSlug)
-    stats.updated++
-
     const eos = eosByCampaign.get(filter.campaignId) ?? []
     const duplicatedTo: Array<string | { slug: string; skipped: string }> = []
+    let duplicatedCount = 0
 
-    for (const eo of eos) {
-      const eoSlug = `eo-${eo.id}`
-      if (!eoOrgSlugs.has(eoSlug)) {
-        duplicatedTo.push({ slug: eoSlug, skipped: 'org does not exist' })
-        continue
+    await prisma.$transaction(async (tx) => {
+      await linkFilterToCampaignOrg(tx, filter.id, campaignSlug)
+
+      for (const eo of eos) {
+        const eoSlug = `eo-${eo.id}`
+        if (!eoOrgSlugs.has(eoSlug)) {
+          duplicatedTo.push({ slug: eoSlug, skipped: 'org does not exist' })
+          continue
+        }
+        await duplicateFilterForOrg(tx, filter, eoSlug)
+        duplicatedCount++
+        duplicatedTo.push(eoSlug)
       }
-      await duplicateFilterForOrg(prisma, filter, eoSlug)
-      stats.duplicated++
-      duplicatedTo.push(eoSlug)
-    }
+    })
+
+    stats.updated++
+    stats.duplicated += duplicatedCount
 
     detailStream.write(
       JSON.stringify({
@@ -238,58 +248,62 @@ async function main() {
   const detailStream = createWriteStream(DETAIL_PATH, { flags: 'w' })
   const stats: Stats = { updated: 0, duplicated: 0, skipped: 0, errors: [] }
 
-  const startedAt = new Date().toISOString()
-  console.log(`Backfill started at ${startedAt}`)
-  console.log(`Streaming detail to: ${DETAIL_PATH}\n`)
+  try {
+    const startedAt = new Date().toISOString()
+    console.log(`Backfill started at ${startedAt}`)
+    console.log(`Streaming detail to: ${DETAIL_PATH}\n`)
 
-  let cursor = 0
-  while (true) {
-    const ids = await fetchNullOrgSlugIds(prisma, cursor, BATCH_SIZE)
-    if (ids.length === 0) break
-    cursor = ids[ids.length - 1]
+    let cursor = 0
+    while (true) {
+      const ids = await fetchNullOrgSlugIds(prisma, cursor, BATCH_SIZE)
+      if (ids.length === 0) break
+      cursor = ids[ids.length - 1]
 
-    await processBatch(prisma, ids, stats, detailStream)
+      await processBatch(prisma, ids, stats, detailStream)
 
-    console.log(
-      `  progress: ${stats.updated} updated, ${stats.duplicated} duplicated, ${stats.skipped} skipped, ${stats.errors.length} errors`,
-    )
-  }
-
-  detailStream.end()
-
-  const completedAt = new Date().toISOString()
-  await writeFile(
-    SUMMARY_PATH,
-    JSON.stringify(
-      {
-        startedAt,
-        completedAt,
-        updated: stats.updated,
-        duplicated: stats.duplicated,
-        skipped: stats.skipped,
-        errors: stats.errors.length,
-        errorDetails: stats.errors.slice(0, 50),
-      },
-      null,
-      2,
-    ) + '\n',
-  )
-
-  console.log(`\nBackfill complete at ${completedAt}`)
-  console.log(`Updated: ${stats.updated}`)
-  console.log(`Duplicated: ${stats.duplicated}`)
-  console.log(`Skipped: ${stats.skipped}`)
-  console.log(`Errors: ${stats.errors.length}`)
-  if (stats.errors.length > 0) {
-    console.log(`First 10 errors:`)
-    for (const err of stats.errors.slice(0, 10)) {
-      console.log(`  VFF ${err.id} (campaign ${err.campaignId}): ${err.error}`)
+      console.log(
+        `  progress: ${stats.updated} updated, ${stats.duplicated} duplicated, ${stats.skipped} skipped, ${stats.errors.length} errors`,
+      )
     }
-  }
-  console.log(`\nDetail: ${DETAIL_PATH}`)
-  console.log(`Summary: ${SUMMARY_PATH}`)
 
-  await prisma.$disconnect()
+    const completedAt = new Date().toISOString()
+    await writeFile(
+      SUMMARY_PATH,
+      JSON.stringify(
+        {
+          startedAt,
+          completedAt,
+          updated: stats.updated,
+          duplicated: stats.duplicated,
+          skipped: stats.skipped,
+          errors: stats.errors.length,
+          errorDetails: stats.errors.slice(0, 50),
+        },
+        null,
+        2,
+      ) + '\n',
+    )
+
+    console.log(`\nBackfill complete at ${completedAt}`)
+    console.log(`Updated: ${stats.updated}`)
+    console.log(`Duplicated: ${stats.duplicated}`)
+    console.log(`Skipped: ${stats.skipped}`)
+    console.log(`Errors: ${stats.errors.length}`)
+    if (stats.errors.length > 0) {
+      console.log(`First 10 errors:`)
+      for (const err of stats.errors.slice(0, 10)) {
+        console.log(
+          `  VFF ${err.id} (campaign ${err.campaignId}): ${err.error}`,
+        )
+      }
+    }
+    console.log(`\nDetail: ${DETAIL_PATH}`)
+    console.log(`Summary: ${SUMMARY_PATH}`)
+  } finally {
+    detailStream.end()
+    await new Promise<void>((resolve) => detailStream.on('finish', resolve))
+    await prisma.$disconnect()
+  }
 }
 
 main().catch(async (e) => {
