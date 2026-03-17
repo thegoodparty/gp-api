@@ -19,9 +19,11 @@ export class ImpersonationInterceptor implements NestInterceptor {
     const isImpersonating = user?.impersonating === true
 
     return new Observable((subscriber) => {
+      let inner: ReturnType<Observable<unknown>['subscribe']> | undefined
       runWithImpersonation(isImpersonating, () => {
-        next.handle().subscribe(subscriber)
+        inner = next.handle().subscribe(subscriber)
       })
+      return () => inner?.unsubscribe()
     })
   }
 }
