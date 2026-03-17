@@ -149,7 +149,7 @@ module.exports = defineConfig([{
         // "@typescript-eslint/consistent-type-definitions": ["error", "type"],
     },
 }, globalIgnores(["**/.eslintrc.js", "**/.eslintrc.test.js", "eslint.config.js"]), {
-    files: ["src/**/*.test.ts"],
+    files: ["src/**/*.test.ts", "src/**/*.e2e.ts", "src/**/test-utils/**/*.ts"],
 
     rules: {
         "@typescript-eslint/no-unsafe-assignment": "off",
@@ -157,6 +157,8 @@ module.exports = defineConfig([{
         "@typescript-eslint/no-unsafe-return": "off",
         "@typescript-eslint/no-unsafe-member-access": "off",
         "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-type-assertion": "off",
+        "@typescript-eslint/no-unsafe-enum-comparison": "off",
         "max-lines-per-function": "off",
         "complexity": "off",
     },
