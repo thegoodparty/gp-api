@@ -6,7 +6,7 @@
  * Results are streamed to a JSONL file so you can `tail -f` while it runs.
  *
  * Usage:
- *   npx nest build && npx tsx scripts/backfill-dry-run.ts
+ *   npm run build && npx tsx scripts/backfill-organizations-dry-run.ts
  *
  * Required env vars:
  *   DATABASE_URL          — Postgres connection string
