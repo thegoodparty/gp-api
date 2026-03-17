@@ -52,6 +52,10 @@ export class P2pController {
 
       if (statusResponse.Data.list_state !== PhoneListState.ACTIVE) {
         const status = statusResponse.Data.list_state || 'unknown'
+        this.logger.info(
+          { listState: status },
+          'Phone list not yet active, returning 202',
+        )
         res.status(HttpStatus.ACCEPTED)
         return {
           message:
