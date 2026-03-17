@@ -14,13 +14,13 @@ export class JwtAuthStrategy extends PassportStrategy(Strategy) {
     })
   }
 
-  async validate({ sub: userId }: JwtPayload) {
+  async validate({ sub: userId, impersonating }: JwtPayload) {
     const user = await this.usersService.findUser({
       id: parseInt(userId as string),
     })
     if (!user) {
       throw new UnauthorizedException()
     }
-    return user
+    return { ...user, impersonating: impersonating === true }
   }
 }

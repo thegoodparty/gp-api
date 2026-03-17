@@ -78,7 +78,11 @@ export class AuthenticationService {
     this.logger.setContext(AuthenticationService.name)
   }
 
-  generateAuthToken(payload: { email: string; sub: number }) {
+  generateAuthToken(payload: {
+    email: string
+    sub: number
+    impersonating?: boolean
+  }) {
     return this.jwtService.sign({ ...payload, iss: GP_API_ISSUER })
   }
 
