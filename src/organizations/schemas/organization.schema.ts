@@ -8,3 +8,9 @@ export class PatchOrganizationDto extends createZodDto(
     customPositionName: z.string().nullable().optional(),
   }),
 ) {}
+
+export class AdminListOrganizationsDto extends createZodDto(
+  z.object({
+    filter: z.string().min(1).max(100).optional(),
+  }),
+) {}
