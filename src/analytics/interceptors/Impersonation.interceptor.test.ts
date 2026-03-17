@@ -1,6 +1,6 @@
 import { CallHandler, ExecutionContext } from '@nestjs/common'
 import { of, lastValueFrom } from 'rxjs'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { ImpersonationInterceptor } from './Impersonation.interceptor'
 import { getImpersonationContext } from '../impersonation-context'
 

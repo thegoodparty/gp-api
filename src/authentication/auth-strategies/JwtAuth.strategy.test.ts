@@ -20,9 +20,7 @@ describe('JwtAuthStrategy', () => {
       findUser: vi.fn().mockResolvedValue(mockUser),
     }
 
-    strategy = new JwtAuthStrategy(
-      mockUsersService as unknown as UsersService,
-    )
+    strategy = new JwtAuthStrategy(mockUsersService as unknown as UsersService)
   })
 
   describe('validate - impersonation claim', () => {
