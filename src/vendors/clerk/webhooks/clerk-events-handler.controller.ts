@@ -19,14 +19,14 @@ import {
   AUTH_USER_UPDATED_EVENT,
   AuthUserEventData,
 } from '@/authentication/interfaces/auth-provider.interface'
-import { ClerkWebhookService } from '@/vendors/clerk/services/clerk-webhook.service'
+import { ClerkEventsHandlerService } from '@/vendors/clerk/services/clerk-events-handler.service'
 import {
   CLERK_EVENT_USER_DELETED,
   CLERK_EVENT_USER_UPDATED,
-  ClerkWebhookPayload,
-} from '@/vendors/clerk/webhooks/clerk-webhook.types'
+  ClerkEventsHandlerPayload,
+} from '@/vendors/clerk/webhooks/clerk-events-handler.types'
 
-const clerkWebhookSchema = z.object({
+const clerkEventSchema = z.object({
   type: z.string(),
   data: z.object({
     id: z.string(),
@@ -51,19 +51,19 @@ if (!process.env.CLERK_WEBHOOK_SECRET) {
 const CLERK_WEBHOOK_SECRET: string = process.env.CLERK_WEBHOOK_SECRET
 
 @Controller('webhooks')
-export class ClerkWebhookController {
+export class ClerkEventsHandlerController {
   constructor(
-    private readonly clerkWebhookService: ClerkWebhookService,
+    private readonly clerkEventsHandlerService: ClerkEventsHandlerService,
     private readonly eventEmitter: EventEmitter2,
     private readonly logger: PinoLogger,
   ) {
-    this.logger.setContext(ClerkWebhookController.name)
+    this.logger.setContext(ClerkEventsHandlerController.name)
   }
 
   @Post('clerk')
   @PublicAccess()
   @HttpCode(HttpStatus.OK)
-  async handleClerkWebhook(
+  async handleClerkEvent(
     @Req() { rawBody }: RawBodyRequest<Request>,
     @Headers() headers: Record<string, string>,
   ) {
@@ -92,7 +92,7 @@ export class ClerkWebhookController {
       throw new UnauthorizedException('Invalid webhook signature')
     }
 
-    const parsed = clerkWebhookSchema.safeParse(verified)
+    const parsed = clerkEventSchema.safeParse(verified)
     if (!parsed.success) {
       this.logger.warn(
         { errors: parsed.error.errors },
@@ -101,7 +101,7 @@ export class ClerkWebhookController {
       throw new BadRequestException('Invalid webhook payload')
     }
 
-    const event: ClerkWebhookPayload = parsed.data
+    const event: ClerkEventsHandlerPayload = parsed.data
 
     this.logger.info(
       { eventType: event.type },
@@ -114,11 +114,11 @@ export class ClerkWebhookController {
 
     switch (event.type) {
       case CLERK_EVENT_USER_UPDATED:
-        await this.clerkWebhookService.handleUserUpdated(event.data)
+        await this.clerkEventsHandlerService.handleUserUpdated(event.data)
         this.eventEmitter.emit(AUTH_USER_UPDATED_EVENT, authEvent)
         break
       case CLERK_EVENT_USER_DELETED:
-        await this.clerkWebhookService.handleUserDeleted(event.data)
+        await this.clerkEventsHandlerService.handleUserDeleted(event.data)
         this.eventEmitter.emit(AUTH_USER_DELETED_EVENT, authEvent)
         break
       default:

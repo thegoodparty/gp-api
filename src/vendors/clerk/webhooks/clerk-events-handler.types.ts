@@ -1,7 +1,7 @@
 export const CLERK_EVENT_USER_UPDATED = 'user.updated'
 export const CLERK_EVENT_USER_DELETED = 'user.deleted'
 
-export type ClerkWebhookEventType =
+export type ClerkEventsHandlerEventType =
   | typeof CLERK_EVENT_USER_UPDATED
   | typeof CLERK_EVENT_USER_DELETED
 
@@ -10,7 +10,7 @@ export interface ClerkEmailAddress {
   id: string
 }
 
-export interface ClerkWebhookEventData {
+export interface ClerkEventsHandlerEventData {
   id: string
   email_addresses?: ClerkEmailAddress[]
   primary_email_address_id?: string | null
@@ -18,7 +18,7 @@ export interface ClerkWebhookEventData {
   last_name?: string | null
 }
 
-export interface ClerkWebhookPayload {
-  type: ClerkWebhookEventType | string
-  data: ClerkWebhookEventData
+export interface ClerkEventsHandlerPayload {
+  type: ClerkEventsHandlerEventType | string
+  data: ClerkEventsHandlerEventData
 }

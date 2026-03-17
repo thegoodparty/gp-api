@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { PinoLogger } from 'nestjs-pino'
 import { UsersService } from '@/users/services/users.service'
-import { ClerkWebhookEventData } from '@/vendors/clerk/webhooks/clerk-webhook.types'
+import { ClerkEventsHandlerEventData } from '@/vendors/clerk/webhooks/clerk-events-handler.types'
 
-function getPrimaryEmail(data: ClerkWebhookEventData): string | undefined {
+function getPrimaryEmail(
+  data: ClerkEventsHandlerEventData,
+): string | undefined {
   const addresses = data.email_addresses
   if (!addresses?.length) return undefined
   if (data.primary_email_address_id) {
@@ -16,15 +18,15 @@ function getPrimaryEmail(data: ClerkWebhookEventData): string | undefined {
 }
 
 @Injectable()
-export class ClerkWebhookService {
+export class ClerkEventsHandlerService {
   constructor(
     private readonly usersService: UsersService,
     private readonly logger: PinoLogger,
   ) {
-    this.logger.setContext(ClerkWebhookService.name)
+    this.logger.setContext(ClerkEventsHandlerService.name)
   }
 
-  async handleUserUpdated(data: ClerkWebhookEventData) {
+  async handleUserUpdated(data: ClerkEventsHandlerEventData) {
     const user = await this.usersService.findUser({
       clerkId: data.id,
     })
@@ -62,7 +64,9 @@ export class ClerkWebhookService {
     )
   }
 
-  async handleUserDeleted(data: Pick<ClerkWebhookEventData, 'id'>) {
+  async handleUserDeleted(
+    data: Pick<ClerkEventsHandlerEventData, 'id'>,
+  ) {
     const user = await this.usersService.findUser({
       clerkId: data.id,
     })
