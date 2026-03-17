@@ -22,7 +22,6 @@ import { CampaignPositionsService } from './positions/campaignPositions.service'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
-import { GeocodingService } from './services/geocoding.service'
 import { CampaignTasksController } from './tasks/campaignTasksController'
 import { CampaignTasksService } from './tasks/campaignTasksService'
 import { CampaignTcrComplianceController } from './tcrCompliance/campaignTcrCompliance.controller'
@@ -61,7 +60,6 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignsService,
     CampaignPlanVersionsService,
     CampaignPositionsService,
-    GeocodingService,
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTasksService,
