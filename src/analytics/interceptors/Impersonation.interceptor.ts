@@ -10,18 +10,19 @@ import { runWithImpersonation } from '../impersonation-context'
 
 @Injectable()
 export class ImpersonationInterceptor implements NestInterceptor {
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Observable<unknown> {
-    const request = context.switchToHttp().getRequest()
-    const user = (request as { user?: { impersonating?: boolean } }).user
-    const isImpersonating = user?.impersonating === true
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context
+      .switchToHttp()
+      .getRequest<FastifyRequest & { user?: { impersonating?: boolean } }>()
+    const isImpersonating = request.user?.impersonating === true
 
     return new Observable((subscriber) => {
-      runWithImpersonation(isImpersonating, () => {
-        next.handle().subscribe(subscriber)
-      })
+      const subscription = runWithImpersonation(isImpersonating, () =>
+        next.handle().subscribe(subscriber),
+      )
+      return () => {
+        subscription.unsubscribe()
+      }
     })
   }
 }
