@@ -12,19 +12,24 @@ import seedOffices from './offices'
 import { seedEcanvasserDemoAccount } from './util/seedEcanvasserDemoAccount.util'
 
 const IS_PREVIEW = process.env.IS_PREVIEW === 'true'
+const SKIP_MTFCC_SEED = ['true', '1', 'yes'].includes(
+  process.env.SKIP_MTFCC_SEED?.toLowerCase() || '',
+)
 
 const LIMIT_SEEDS =
   !IS_PREVIEW &&
   (process.env.NODE_ENV === 'production' ||
     process.env.NODE_ENV === 'qa' ||
     process.env.NODE_ENV === 'development')
+const RUN_FACTORY_SEEDS_IN_DEV =
+  process.env.NODE_ENV === 'development' && SKIP_MTFCC_SEED
 
 const prisma = new PrismaClient()
 
 async function main() {
-  if (LIMIT_SEEDS) {
+  if (LIMIT_SEEDS && !RUN_FACTORY_SEEDS_IN_DEV) {
     // only want to run seeds from CSV files in prod, qa, or dev
-    await csvSeeds(prisma, true)
+    await csvSeeds(prisma)
   } else {
     const seedType = getTypeArg()
 
@@ -45,7 +50,11 @@ async function main() {
   }
 }
 
-async function csvSeeds(prisma: PrismaClient, loadAll = false) {
+async function csvSeeds(prisma: PrismaClient) {
+  if (SKIP_MTFCC_SEED) {
+    console.log('Skipping MTFCC seed (SKIP_MTFCC_SEED=true)')
+    return
+  }
   await seedMtfcc(prisma)
 }
 

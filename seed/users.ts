@@ -1,4 +1,4 @@
-import { PrismaClient, User, UserRole } from '@prisma/client'
+import { Prisma, PrismaClient, User, UserRole } from '@prisma/client'
 import { userFactory } from './factories/user.factory'
 import { hashPasswordSync } from '../src/users/util/passwords.util'
 
@@ -37,6 +37,9 @@ const CANDIDATE_USER = {
   email: CANDIDATE_EMAIL,
   password: hashPasswordSync(CANDIDATE_PASSWORD),
   hasPassword: true,
+  firstName: 'Test',
+  lastName: 'Candidate',
+  name: 'Test Candidate',
   roles: [UserRole.candidate],
 }
 
@@ -68,6 +71,35 @@ const FIXED_USERS: Partial<User>[] = [
 ]
 
 export default async function seedUsers(prisma: PrismaClient) {
+  // Keep test login credentials in sync across repeated local seeding.
+  // createMany(skipDuplicates) does not update existing users.
+  await prisma.user.upsert({
+    where: { email: ADMIN_USER.email },
+    update: {
+      password: ADMIN_USER.password,
+      hasPassword: ADMIN_USER.hasPassword,
+      roles: ADMIN_USER.roles,
+      firstName: ADMIN_USER.firstName,
+      lastName: ADMIN_USER.lastName,
+      name: ADMIN_USER.name,
+      metaData: ADMIN_USER.metaData,
+    },
+    create: ADMIN_USER as Prisma.UserCreateInput,
+  })
+
+  await prisma.user.upsert({
+    where: { email: CANDIDATE_USER.email },
+    update: {
+      password: CANDIDATE_USER.password,
+      hasPassword: CANDIDATE_USER.hasPassword,
+      firstName: CANDIDATE_USER.firstName,
+      lastName: CANDIDATE_USER.lastName,
+      name: CANDIDATE_USER.name,
+      roles: CANDIDATE_USER.roles,
+    },
+    create: CANDIDATE_USER as Prisma.UserCreateInput,
+  })
+
   const fakeUsers = new Array(NUM_USERS)
 
   for (let i = 0; i < NUM_USERS; i++) {
@@ -83,6 +115,5 @@ export default async function seedUsers(prisma: PrismaClient) {
     `Created ${users.length} users (skipped ${fakeUsers.length - users.length} duplicates)`,
   )
 
-  // Filter out users to not create campaigns for them with seedCampaigns
   return users.filter((u) => u.email !== USER_W_NO_CAMPAIGN.email)
 }
