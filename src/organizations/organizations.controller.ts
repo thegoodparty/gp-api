@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UsePipes } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, UsePipes } from '@nestjs/common'
 import { ZodValidationPipe } from 'nestjs-zod'
 import {
   OrganizationsService,
@@ -6,6 +6,7 @@ import {
 } from './services/organizations.service'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { User } from '@prisma/client'
+import { PatchOrganizationDto } from './schemas/organization.schema'
 
 type APIOrganization = {
   slug: string
@@ -60,6 +61,21 @@ export class OrganizationsController {
     @ReqUser() user: User,
   ): Promise<APIOrganization> {
     const org = await this.organizationsService.getOrganization(user.id, slug)
+    return toAPIOrganization(org)
+  }
+
+  @Patch('/:slug')
+  async patchOrganization(
+    @Param('slug') slug: string,
+    @ReqUser() user: User,
+    @Body() updates: PatchOrganizationDto,
+  ): Promise<APIOrganization> {
+    const org = await this.organizationsService.patchOrganization(
+      user.id,
+      slug,
+      updates,
+    )
+
     return toAPIOrganization(org)
   }
 }

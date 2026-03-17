@@ -1,12 +1,14 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { PositionWithOptionalDistrict } from '@/elections/types/elections.types'
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, ElectedOffice, Organization } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { PatchOrganizationDto } from '../schemas/organization.schema'
 
 export type OrganizationWithPosition = Organization & {
   position: PositionWithOptionalDistrict | null
@@ -56,6 +58,49 @@ export class OrganizationsService extends createPrismaBase(
     }
 
     return this.withPosition(org)
+  }
+
+  async patchOrganization(
+    userId: number,
+    slug: string,
+    updates: PatchOrganizationDto,
+  ) {
+    const org = await this.getOrganization(userId, slug)
+
+    let position: PositionWithOptionalDistrict | null = org.position
+    let overrideDistrictId: string | null = org.overrideDistrictId
+
+    if (updates.ballotReadyPositionId) {
+      position = await this.electionsService.getPositionByBallotReadyId(
+        updates.ballotReadyPositionId,
+      )
+
+      if (!position) {
+        throw new BadRequestException('Position not found')
+      }
+    }
+
+    if (updates.overrideDistrictId) {
+      // If the override district ID is the same as the position's district ID,
+      // set the override district ID to null
+      if (updates.overrideDistrictId === position?.district?.id) {
+        overrideDistrictId = null
+      } else {
+        overrideDistrictId = updates.overrideDistrictId
+      }
+    }
+
+    const updated = await this.client.organization.update({
+      where: { slug: org.slug },
+      data: {
+        positionId: position?.id ?? null,
+        overrideDistrictId,
+        customPositionName: updates.customPositionName,
+      },
+      include: { campaign: true, electedOffice: true },
+    })
+
+    return this.withPosition(updated)
   }
 
   /**

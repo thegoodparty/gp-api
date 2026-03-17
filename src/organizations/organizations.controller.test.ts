@@ -373,3 +373,303 @@ describe('GET /v1/organizations/:slug', () => {
     expect(result.status).toBe(404)
   })
 })
+
+describe('PATCH /v1/organizations/:slug', () => {
+  it('updates customPositionName', async () => {
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-200',
+        ownerId: service.user.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-200',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-200',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/campaign-200',
+      {
+        customPositionName: 'New Custom Name',
+      },
+    )
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        slug: 'campaign-200',
+        name: 'New Custom Name',
+        campaignId: 200,
+        electedOfficeId: null,
+      },
+    })
+  })
+
+  it('updates ballotReadyPositionId and resolves position', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionByBallotReadyId').mockResolvedValue({
+      id: 'pos-new',
+      brPositionId: 'br-pos-new',
+      brDatabaseId: 'br-db-new',
+      state: 'TX',
+      name: 'Governor',
+    })
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-new',
+      brPositionId: 'br-pos-new',
+      brDatabaseId: 'br-db-new',
+      state: 'TX',
+      name: 'Governor',
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-201',
+        ownerId: service.user.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-201',
+        details: {},
+        organizationSlug: 'campaign-201',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/campaign-201',
+      {
+        ballotReadyPositionId: 'br-pos-new',
+      },
+    )
+
+    expect(result.status).toBe(200)
+    expect(result.data.slug).toBe('campaign-201')
+  })
+
+  it('returns 400 when ballotReadyPositionId resolves to no position', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionByBallotReadyId').mockResolvedValue(
+      null,
+    )
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-202',
+        ownerId: service.user.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-202',
+        details: {},
+        organizationSlug: 'campaign-202',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/campaign-202',
+      {
+        ballotReadyPositionId: 'nonexistent',
+      },
+    )
+
+    expect(result.status).toBe(400)
+  })
+
+  it('sets overrideDistrictId to null when it matches position district', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionByBallotReadyId').mockResolvedValue({
+      id: 'pos-dist',
+      brPositionId: 'br-pos-dist',
+      brDatabaseId: 'br-db-dist',
+      state: 'CA',
+      name: 'Mayor',
+      district: {
+        id: 'district-abc',
+        L2DistrictType: 'City',
+        L2DistrictName: 'Los Angeles',
+        projectedTurnout: null,
+      },
+    })
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-dist',
+      brPositionId: 'br-pos-dist',
+      brDatabaseId: 'br-db-dist',
+      state: 'CA',
+      name: 'Mayor',
+      district: {
+        id: 'district-abc',
+        L2DistrictType: 'City',
+        L2DistrictName: 'Los Angeles',
+        projectedTurnout: null,
+      },
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-203',
+        ownerId: service.user.id,
+        overrideDistrictId: 'old-district',
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-203',
+        details: {},
+        organizationSlug: 'campaign-203',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/campaign-203',
+      {
+        ballotReadyPositionId: 'br-pos-dist',
+        overrideDistrictId: 'district-abc',
+      },
+    )
+
+    expect(result.status).toBe(200)
+
+    const updated = await service.prisma.organization.findUnique({
+      where: { slug: 'campaign-203' },
+    })
+    expect(updated?.overrideDistrictId).toBeNull()
+  })
+
+  it('sets overrideDistrictId when it differs from position district', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionByBallotReadyId').mockResolvedValue({
+      id: 'pos-dist2',
+      brPositionId: 'br-pos-dist2',
+      brDatabaseId: 'br-db-dist2',
+      state: 'CA',
+      name: 'Mayor',
+      district: {
+        id: 'district-xyz',
+        L2DistrictType: 'City',
+        L2DistrictName: 'San Francisco',
+        projectedTurnout: null,
+      },
+    })
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-dist2',
+      brPositionId: 'br-pos-dist2',
+      brDatabaseId: 'br-db-dist2',
+      state: 'CA',
+      name: 'Mayor',
+      district: {
+        id: 'district-xyz',
+        L2DistrictType: 'City',
+        L2DistrictName: 'San Francisco',
+        projectedTurnout: null,
+      },
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-204',
+        ownerId: service.user.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-204',
+        details: {},
+        organizationSlug: 'campaign-204',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/campaign-204',
+      {
+        ballotReadyPositionId: 'br-pos-dist2',
+        overrideDistrictId: 'different-district',
+      },
+    )
+
+    expect(result.status).toBe(200)
+
+    const updated = await service.prisma.organization.findUnique({
+      where: { slug: 'campaign-204' },
+    })
+    expect(updated?.overrideDistrictId).toBe('different-district')
+  })
+
+  it('returns 404 for a non-existent slug', async () => {
+    const result = await service.client.patch(
+      '/v1/organizations/does-not-exist',
+      { customPositionName: 'test' },
+    )
+
+    expect(result.status).toBe(404)
+  })
+
+  it('returns 404 for an organization owned by another user', async () => {
+    const otherUser = await service.prisma.user.create({
+      data: { email: 'other-patch@goodparty.org' },
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'other-patch-org',
+        ownerId: otherUser.id,
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/other-patch-org',
+      { customPositionName: 'test' },
+    )
+
+    expect(result.status).toBe(404)
+  })
+
+  it('clears customPositionName when set to null', async () => {
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-205',
+        ownerId: service.user.id,
+        customPositionName: 'Old Name',
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-205',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-205',
+      },
+    })
+
+    const result = await service.client.patch(
+      '/v1/organizations/campaign-205',
+      {
+        customPositionName: null,
+      },
+    )
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        slug: 'campaign-205',
+        name: '2026 Campaign',
+        campaignId: 205,
+      },
+    })
+  })
+})
