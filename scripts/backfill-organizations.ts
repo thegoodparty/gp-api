@@ -5,7 +5,7 @@
  * enriched with position & district data from the election-api.
  *
  * Usage:
- *   npx nest build && npx tsx scripts/backfill-organizations.ts
+ *   npm run build && npx tsx scripts/backfill-organizations.ts
  *
  * Required env vars:
  *   DATABASE_URL          — Postgres connection string
@@ -92,20 +92,31 @@ async function main() {
 
   // --- Phase 2: Real backfill ---
   console.log('Phase 2/2: Running backfill (writing to database)...')
-  await backfillService.backfillOrganizations()
+  const { campaignStats, eoStats } =
+    await backfillService.backfillOrganizations()
 
   const completedAt = new Date().toISOString()
+
+  const campaignTotal = (Object.values(campaignStats) as number[]).reduce(
+    (a, b) => a + b,
+    0,
+  )
+  const eoTotal = (Object.values(eoStats) as number[]).reduce((a, b) => a + b, 0)
 
   const summary = {
     startedAt,
     completedAt,
     campaigns: {
-      total: dryRunCampaignTotal,
-      categories: dryRunCampaignStats,
+      total: campaignTotal,
+      categories: campaignStats,
     },
     electedOffices: {
-      total: dryRunEoTotal,
-      categories: dryRunEoStats,
+      total: eoTotal,
+      categories: eoStats,
+    },
+    dryRunPreview: {
+      campaigns: { total: dryRunCampaignTotal, categories: dryRunCampaignStats },
+      electedOffices: { total: dryRunEoTotal, categories: dryRunEoStats },
     },
     errors,
   }
@@ -114,10 +125,10 @@ async function main() {
 
   console.log(`\nBackfill complete at ${completedAt}`)
   console.log(`Total records: ${totalRecords}`)
-  console.log(`Campaigns: ${dryRunCampaignTotal}`)
-  console.log(`  Categories:`, JSON.stringify(dryRunCampaignStats, null, 2))
-  console.log(`Elected offices: ${dryRunEoTotal}`)
-  console.log(`  Categories:`, JSON.stringify(dryRunEoStats, null, 2))
+  console.log(`Campaigns: ${campaignTotal}`)
+  console.log(`  Categories:`, JSON.stringify(campaignStats, null, 2))
+  console.log(`Elected offices: ${eoTotal}`)
+  console.log(`  Categories:`, JSON.stringify(eoStats, null, 2))
   console.log(`Errors: ${errors.length}`)
   if (errors.length > 0) {
     console.log(`  First 10 errors:`)

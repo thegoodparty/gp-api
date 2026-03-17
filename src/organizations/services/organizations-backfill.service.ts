@@ -114,6 +114,7 @@ export class OrganizationsBackfillService extends createPrismaBase(
       { campaignStats, electedOfficeStats: eoStats },
       '[organization backfill] Organization backfill complete',
     )
+    return { campaignStats, eoStats }
   }
 
   // ---------------------------------------------------------------------------
@@ -713,7 +714,12 @@ export class OrganizationsBackfillService extends createPrismaBase(
           { campaignId: campaign.id, ballotReadyPositionId },
           '[organization backfill] Position not found in election-api for ballotReady ID',
         )
-        // Fall through to district-only lookup below
+        return {
+          positionId: null,
+          overrideDistrictId: null,
+          customPositionName,
+          category: C.POSITION_NOT_FOUND,
+        }
       }
 
       // 1a-c: Position has a district — compare with p2v data.
