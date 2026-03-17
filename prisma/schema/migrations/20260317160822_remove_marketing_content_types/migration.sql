@@ -17,16 +17,16 @@ DELETE FROM "content" WHERE "type" IN (
   'redirects',
   'teamMember',
   'teamMilestone',
-  'termsOfService',
-  'aiContentCategories',
-  'candidateContentPrompts',
-  'contentPromptsQuestions'
+  'termsOfService'
 );
 
 -- Create new enum type with only the values we need
 CREATE TYPE "ContentType_new" AS ENUM (
   'aiChatPrompt',
+  'aiContentCategories',
   'aiContentTemplate',
+  'candidateContentPrompts',
+  'contentPromptsQuestions',
   'onboardingPrompts',
   'pledge',
   'promptInputFields'
