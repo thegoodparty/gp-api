@@ -34,6 +34,44 @@ const ensureCampaignExists = async (
   expect([200, 201, 409]).toContain(create.status())
 }
 
+const getTokenWithCampaign = async (
+  request: APIRequestContext,
+  candidateEmail: string,
+  candidatePassword: string,
+): Promise<{
+  token: string
+  cleanup?: { userId: number; token: string }
+}> => {
+  const { token } = await loginUser(request, candidateEmail, candidatePassword)
+  await ensureCampaignExists(request, token)
+
+  const mine = await request.get('/v1/campaigns/mine', {
+    headers: authHeaders(token),
+  })
+  if (mine.status() === 200) {
+    return { token }
+  }
+
+  const firstName = generateRandomName()
+  const lastName = generateRandomName()
+  const email = generateRandomEmail()
+  const password = generateRandomPassword()
+  const registered = await registerUser(request, {
+    firstName,
+    lastName,
+    email,
+    password,
+    phone: '5555555555',
+    zip: '12345-1234',
+    signUpMode: 'candidate',
+  })
+
+  return {
+    token: registered.token,
+    cleanup: { userId: registered.user.id, token: registered.token },
+  }
+}
+
 test.describe('Campaigns - User Campaign Operations', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
   const candidatePassword = process.env.CANDIDATE_PASSWORD
@@ -113,36 +151,41 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should update campaign', async ({ request }) => {
-    const { token } = await loginUser(
+    const { token, cleanup } = await getTokenWithCampaign(
       request,
       candidateEmail!,
       candidatePassword!,
     )
-    await ensureCampaignExists(request, token)
 
     const randomName = generateRandomName()
     const randomWebsite = `https://${Math.random().toString(36).substring(7)}.com`
 
-    const response = await request.put('/v1/campaigns/mine', {
-      headers: authHeaders(token),
-      data: {
+    try {
+      const response = await request.put('/v1/campaigns/mine', {
+        headers: authHeaders(token),
         data: {
-          name: randomName,
+          data: {
+            name: randomName,
+          },
+          details: {
+            website: randomWebsite,
+          },
         },
-        details: {
-          website: randomWebsite,
-        },
-      },
-    })
+      })
 
-    expect(response.status()).toBe(200)
+      expect(response.status()).toBe(200)
 
-    const campaign = (await response.json()) as {
-      data: { name: string }
-      details: { website: string }
+      const campaign = (await response.json()) as {
+        data: { name: string }
+        details: { website: string }
+      }
+      expect(campaign.data.name).toBe(randomName)
+      expect(campaign.details.website).toBe(randomWebsite)
+    } finally {
+      if (cleanup) {
+        await deleteUser(request, cleanup.userId, cleanup.token)
+      }
     }
-    expect(campaign.data.name).toBe(randomName)
-    expect(campaign.details.website).toBe(randomWebsite)
   })
 
   test('should reject invalid field types in campaign update', async ({
@@ -176,24 +219,29 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should set campaign office', async ({ request }) => {
-    const { token } = await loginUser(
+    const { token, cleanup } = await getTokenWithCampaign(
       request,
       candidateEmail!,
       candidatePassword!,
     )
-    await ensureCampaignExists(request, token)
 
-    const response = await request.put('/v1/campaigns/mine', {
-      headers: authHeaders(token),
-      data: {
-        details: {
-          office: 'Other',
-          otherOffice: 'State Representative',
+    try {
+      const response = await request.put('/v1/campaigns/mine', {
+        headers: authHeaders(token),
+        data: {
+          details: {
+            office: 'Other',
+            otherOffice: 'State Representative',
+          },
         },
-      },
-    })
+      })
 
-    expect(response.status()).toBe(200)
+      expect(response.status()).toBe(200)
+    } finally {
+      if (cleanup) {
+        await deleteUser(request, cleanup.userId, cleanup.token)
+      }
+    }
   })
 
   test('should launch campaign', async ({ request }) => {
