@@ -186,11 +186,11 @@ describe('CampaignsService - Organization positionId sync', () => {
   })
 
   describe('update', () => {
-    it('should upsert organization with resolved GP positionId when positionId is in update data', async () => {
+    it('should update organization with resolved GP positionId when positionId is in update data', async () => {
       const {
         service,
         mockGetPosition,
-        mockOrgUpsert,
+        mockOrgUpdate,
         mockCampaignFindUnique,
       } = await buildOrgSyncModule()
 
@@ -206,27 +206,21 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: GP_POSITION_ID,
           customPositionName: null,
           overrideDistrictId: null,
         },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: GP_POSITION_ID,
-          customPositionName: null,
-        },
       })
     })
 
-    it('should upsert organization positionId from existing campaign when not in update data', async () => {
+    it('should update organization positionId from existing campaign when not in update data', async () => {
       const {
         service,
         mockGetPosition,
-        mockOrgUpsert,
+        mockOrgUpdate,
         mockCampaignFindUnique,
       } = await buildOrgSyncModule()
 
@@ -242,27 +236,21 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: GP_POSITION_ID,
           customPositionName: null,
           overrideDistrictId: null,
         },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: GP_POSITION_ID,
-          customPositionName: null,
-        },
       })
     })
 
-    it('should upsert organization with null positionId when no positionId exists', async () => {
+    it('should update organization with null positionId when no positionId exists', async () => {
       const {
         service,
         mockGetPosition,
-        mockOrgUpsert,
+        mockOrgUpdate,
         mockCampaignFindUnique,
       } = await buildOrgSyncModule()
 
@@ -278,18 +266,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: null,
           customPositionName: 'Mayor',
           overrideDistrictId: null,
-        },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: null,
-          customPositionName: 'Mayor',
         },
       })
     })
@@ -298,7 +280,7 @@ describe('CampaignsService - Organization positionId sync', () => {
       const {
         service,
         mockGetPosition,
-        mockOrgUpsert,
+        mockOrgUpdate,
         mockCampaignFindUnique,
       } = await buildOrgSyncModule()
 
@@ -314,18 +296,12 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: null,
           customPositionName: null,
           overrideDistrictId: null,
-        },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: null,
-          customPositionName: null,
         },
       })
     })
@@ -334,7 +310,7 @@ describe('CampaignsService - Organization positionId sync', () => {
       const {
         service,
         mockGetPosition,
-        mockOrgUpsert,
+        mockOrgUpdate,
         mockCampaignFindUnique,
       } = await buildOrgSyncModule()
 
@@ -345,7 +321,7 @@ describe('CampaignsService - Organization positionId sync', () => {
 
       expect(mockCampaignFindUnique).not.toHaveBeenCalled()
       expect(mockGetPosition).not.toHaveBeenCalled()
-      expect(mockOrgUpsert).not.toHaveBeenCalled()
+      expect(mockOrgUpdate).not.toHaveBeenCalled()
     })
   })
 
@@ -359,8 +335,8 @@ describe('CampaignsService - Organization positionId sync', () => {
       pathToVictory: null,
     }
 
-    it('should upsert organization with resolved GP positionId when positionId is in body details', async () => {
-      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+    it('should update organization with resolved GP positionId when positionId is in body details', async () => {
+      const { service, mockGetPosition, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -373,24 +349,18 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: GP_POSITION_ID,
           customPositionName: null,
           overrideDistrictId: null,
         },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: GP_POSITION_ID,
-          customPositionName: null,
-        },
       })
     })
 
-    it('should upsert organization positionId from existing campaign when not in body', async () => {
-      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+    it('should update organization positionId from existing campaign when not in body', async () => {
+      const { service, mockGetPosition, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -403,24 +373,18 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).toHaveBeenCalledWith(BR_POSITION_ID)
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: GP_POSITION_ID,
           customPositionName: null,
           overrideDistrictId: null,
         },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: GP_POSITION_ID,
-          customPositionName: null,
-        },
       })
     })
 
-    it('should upsert organization with null positionId when no positionId exists', async () => {
-      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+    it('should update organization with null positionId when no positionId exists', async () => {
+      const { service, mockGetPosition, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -433,24 +397,18 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: null,
           customPositionName: 'Mayor',
           overrideDistrictId: null,
-        },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: null,
-          customPositionName: 'Mayor',
         },
       })
     })
 
     it('should clear positionId when explicitly set to null', async () => {
-      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+      const { service, mockGetPosition, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -463,24 +421,18 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: {
+        data: {
           positionId: null,
           customPositionName: null,
           overrideDistrictId: null,
-        },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          positionId: null,
-          customPositionName: null,
         },
       })
     })
 
     it('should skip org sync when details is not in body', async () => {
-      const { service, mockGetPosition, mockOrgUpsert, mockCampaignFindFirst } =
+      const { service, mockGetPosition, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -492,11 +444,11 @@ describe('CampaignsService - Organization positionId sync', () => {
       })
 
       expect(mockGetPosition).not.toHaveBeenCalled()
-      expect(mockOrgUpsert).not.toHaveBeenCalled()
+      expect(mockOrgUpdate).not.toHaveBeenCalled()
     })
 
-    it('should upsert organization overrideDistrictId when provided', async () => {
-      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+    it('should update organization overrideDistrictId when provided', async () => {
+      const { service, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -508,19 +460,14 @@ describe('CampaignsService - Organization positionId sync', () => {
         overrideDistrictId: 'district-uuid-123',
       })
 
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { overrideDistrictId: 'district-uuid-123' },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          overrideDistrictId: 'district-uuid-123',
-        },
+        data: { overrideDistrictId: 'district-uuid-123' },
       })
     })
 
-    it('should upsert organization with null overrideDistrictId', async () => {
-      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+    it('should update organization with null overrideDistrictId', async () => {
+      const { service, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -532,19 +479,14 @@ describe('CampaignsService - Organization positionId sync', () => {
         overrideDistrictId: null,
       })
 
-      expect(mockOrgUpsert).toHaveBeenCalledWith({
+      expect(mockOrgUpdate).toHaveBeenCalledWith({
         where: { slug: 'campaign-10' },
-        update: { overrideDistrictId: null },
-        create: {
-          slug: 'campaign-10',
-          ownerId: 1,
-          overrideDistrictId: null,
-        },
+        data: { overrideDistrictId: null },
       })
     })
 
-    it('should not upsert organization when overrideDistrictId is not in body', async () => {
-      const { service, mockOrgUpsert, mockCampaignFindFirst } =
+    it('should not update organization when overrideDistrictId is not in body', async () => {
+      const { service, mockOrgUpdate, mockCampaignFindFirst } =
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
@@ -555,7 +497,7 @@ describe('CampaignsService - Organization positionId sync', () => {
         pathToVictory: { electionType: 'State Senate' },
       })
 
-      expect(mockOrgUpsert).not.toHaveBeenCalled()
+      expect(mockOrgUpdate).not.toHaveBeenCalled()
     })
   })
 })

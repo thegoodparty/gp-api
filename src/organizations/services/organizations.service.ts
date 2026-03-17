@@ -94,7 +94,7 @@ export class OrganizationsService extends createPrismaBase(
     let overrideDistrictId: string | null = null
     if (state && L2DistrictType && L2DistrictName) {
       overrideDistrictId = await this.resolveOverrideDistrictId({
-        positionId: ballotReadyPositionId,
+        positionId,
         state,
         L2DistrictType,
         L2DistrictName,
@@ -118,6 +118,13 @@ export class OrganizationsService extends createPrismaBase(
     return position?.id ?? null
   }
 
+  async resolveBallotReadyPositionId(
+    positionId: string,
+  ): Promise<string | null> {
+    const position = await this.electionsService.getPositionById(positionId)
+    return position?.brPositionId ?? null
+  }
+
   /**
    * Resolves the override district ID for a given position and district selection.
    * Returns null if the selected district exactly matches the position's natural
@@ -135,10 +142,9 @@ export class OrganizationsService extends createPrismaBase(
     )
 
     if (positionId) {
-      const position = await this.electionsService.getPositionByBallotReadyId(
-        positionId,
-        { includeDistrict: true },
-      )
+      const position = await this.electionsService.getPositionById(positionId, {
+        includeDistrict: true,
+      })
 
       const isExactMatch =
         position?.district?.L2DistrictType === L2DistrictType &&
