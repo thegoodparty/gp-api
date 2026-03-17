@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { APIRequestContext, expect, test } from '@playwright/test'
 import {
   deleteUser,
   generateRandomEmail,
@@ -7,6 +7,32 @@ import {
   loginUser,
   registerUser,
 } from '../../../e2e-tests/utils/auth.util'
+
+const authHeaders = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+})
+
+const ensureCampaignExists = async (
+  request: APIRequestContext,
+  token: string,
+) => {
+  const mine = await request.get('/v1/campaigns/mine', {
+    headers: authHeaders(token),
+  })
+
+  if (mine.status() !== 404) {
+    return
+  }
+
+  const create = await request.post('/v1/campaigns', {
+    headers: authHeaders(token),
+    data: {
+      details: { zip: '12345' },
+    },
+  })
+
+  expect([200, 201, 409]).toContain(create.status())
+}
 
 test.describe('Campaigns - User Campaign Operations', () => {
   const candidateEmail = process.env.CANDIDATE_EMAIL
@@ -92,14 +118,13 @@ test.describe('Campaigns - User Campaign Operations', () => {
       candidateEmail!,
       candidatePassword!,
     )
+    await ensureCampaignExists(request, token)
 
     const randomName = generateRandomName()
     const randomWebsite = `https://${Math.random().toString(36).substring(7)}.com`
 
     const response = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: authHeaders(token),
       data: {
         data: {
           name: randomName,
@@ -156,11 +181,10 @@ test.describe('Campaigns - User Campaign Operations', () => {
       candidateEmail!,
       candidatePassword!,
     )
+    await ensureCampaignExists(request, token)
 
     const response = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: authHeaders(token),
       data: {
         details: {
           office: 'Other',
