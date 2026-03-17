@@ -704,14 +704,9 @@ export class PathToVictoryService extends createPrismaBase(
           L2DistrictName: pathToVictoryResponse.electionLocation,
         })
 
-        await this.prisma.organization.upsert({
+        await this.prisma.organization.update({
           where: { slug: orgSlug },
-          update: orgData,
-          create: {
-            slug: orgSlug,
-            ownerId: campaign.userId,
-            ...orgData,
-          },
+          data: orgData,
         })
       }
 
