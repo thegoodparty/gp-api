@@ -71,9 +71,10 @@ const FIXED_USERS: Partial<User>[] = [
 ]
 
 export default async function seedUsers(prisma: PrismaClient) {
-  // Keep test login credentials in sync across repeated local seeding.
-  // createMany(skipDuplicates) does not update existing users.
-  await prisma.user.upsert({
+  // Upsert key users so credentials stay in sync across repeated seeding.
+  // These must be captured separately because createManyAndReturn with
+  // skipDuplicates silently excludes already-existing rows from its result.
+  const adminUser = await prisma.user.upsert({
     where: { email: ADMIN_USER.email },
     update: {
       password: ADMIN_USER.password,
@@ -87,7 +88,7 @@ export default async function seedUsers(prisma: PrismaClient) {
     create: ADMIN_USER as Prisma.UserCreateInput,
   })
 
-  await prisma.user.upsert({
+  const candidateUser = await prisma.user.upsert({
     where: { email: CANDIDATE_USER.email },
     update: {
       password: CANDIDATE_USER.password,
@@ -106,14 +107,21 @@ export default async function seedUsers(prisma: PrismaClient) {
     fakeUsers[i] = userFactory(FIXED_USERS[i])
   }
 
-  const users = await prisma.user.createManyAndReturn({
+  const createdUsers = await prisma.user.createManyAndReturn({
     data: fakeUsers,
     skipDuplicates: true,
   })
 
   console.log(
-    `Created ${users.length} users (skipped ${fakeUsers.length - users.length} duplicates)`,
+    `Created ${createdUsers.length} users (skipped ${fakeUsers.length - createdUsers.length} duplicates)`,
   )
 
-  return users.filter((u) => u.email !== USER_W_NO_CAMPAIGN.email)
+  const upsertedIds = new Set([adminUser.id, candidateUser.id])
+  const allUsers = [
+    adminUser,
+    candidateUser,
+    ...createdUsers.filter((u) => !upsertedIds.has(u.id)),
+  ]
+
+  return allUsers.filter((u) => u.email !== USER_W_NO_CAMPAIGN.email)
 }
