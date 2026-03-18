@@ -47,7 +47,6 @@ npm run prisma-format      # Format Prisma schema files
 ## Code Style
 
 - **No semicolons**, single quotes, trailing commas everywhere (`.prettierrc`)
-- **No comments** in code
 - `@typescript-eslint/no-explicit-any` is an **error** — never use `any`
 - `unused-imports/no-unused-imports` is an **error**
 - Path alias: `@/*` → `src/*` (e.g., `import { Foo } from '@/shared/util/foo'`)
