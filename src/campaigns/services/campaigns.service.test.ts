@@ -24,13 +24,7 @@ import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CampaignsService } from './campaigns.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
-const { FeaturesService } = vi.hoisted(() => {
-  class FeaturesService {
-    isFeatureEnabled = vi.fn().mockResolvedValue(false)
-  }
-  return { FeaturesService }
-})
-vi.mock('@/features/services/features.service', () => ({ FeaturesService }))
+import { FEATURE_FLAG_CHECKER } from './campaigns.service'
 
 const GP_POSITION_ID = 'gp-position-uuid-123'
 const BR_POSITION_ID = 'br-position-456'
@@ -122,7 +116,7 @@ const buildOrgSyncModule = async (overrides?: {
       },
       { provide: SlackService, useValue: {} },
       {
-        provide: FeaturesService,
+        provide: FEATURE_FLAG_CHECKER,
         useValue: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
       },
       { provide: PinoLogger, useValue: createMockLogger() },
@@ -636,7 +630,7 @@ describe('CampaignsService - redeemFreeTexts', () => {
           useValue: {},
         },
         {
-          provide: FeaturesService,
+          provide: FEATURE_FLAG_CHECKER,
           useValue: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
         },
         // Provide CampaignsService LAST - all dependencies are now available

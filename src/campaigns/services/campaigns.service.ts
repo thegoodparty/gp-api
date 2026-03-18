@@ -15,7 +15,6 @@ import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
-import { FeaturesService } from 'src/features/services/features.service'
 import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import {
@@ -42,6 +41,16 @@ import {
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
+// Indirection to avoid a circular import at module load time:
+// campaigns.service → features.service → users.service → crmUsers.service → campaigns.service
+// Once CrmUsersService is decoupled from UsersService (or moved out of
+// the users module), FeaturesService can be injected directly and this
+// token + interface can be removed.
+export const FEATURE_FLAG_CHECKER = Symbol('FEATURE_FLAG_CHECKER')
+export interface FeatureFlagChecker {
+  isFeatureEnabled(params: { user: number; feature: string }): Promise<boolean>
+}
+
 enum CandidateVerification {
   yes = 'YES',
   no = 'NO',
@@ -60,14 +69,15 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly googlePlaces: GooglePlacesService,
     private readonly elections: ElectionsService,
     private readonly slack: SlackService,
-    @Inject(forwardRef(() => FeaturesService))
-    private readonly features: FeaturesService,
+    @Inject(FEATURE_FLAG_CHECKER)
+    private readonly featureFlags: FeatureFlagChecker,
   ) {
     super()
   }
 
   private async shouldReplicateToEO(userId: number): Promise<boolean> {
-    const isWinServeSplit = await this.features.isFeatureEnabled({
+    const features = this.featureFlags
+    const isWinServeSplit = await features.isFeatureEnabled({
       user: userId,
       feature: 'win-serve-split',
     })
