@@ -7,11 +7,15 @@ import {
 } from '@nestjs/common'
 import { Campaign, ElectedOffice, Organization } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { PatchOrganizationDto } from '../schemas/organization.schema'
+import {
+  AdminListOrganizationsDto,
+  PatchOrganizationDto,
+} from '../schemas/organization.schema'
 import pmap from 'p-map'
 
 export type FriendlyOrganization = {
   slug: string
+  hasDistrictOverride: boolean
   customPositionName: string | null
   position: { id: string; name: string; brPositionId: string } | null
   district: { id: string; l2Type: string; l2Name: string } | null
@@ -96,12 +100,13 @@ export class OrganizationsService extends createPrismaBase(
     return this.makeFriendly(updated)
   }
 
-  async adminListOrganizations(filter: string | undefined) {
+  async adminListOrganizations(query: AdminListOrganizationsDto) {
     const organizations = await this.client.organization.findMany({
       where: {
-        owner: {
-          email: { contains: filter },
-        },
+        OR: [
+          { slug: { contains: query.slug } },
+          { owner: { email: { contains: query.email } } },
+        ],
       },
       include: { owner: true, campaign: true, electedOffice: true },
       // This is important to prevent the query from scanning the whole table.
@@ -230,8 +235,8 @@ export class OrganizationsService extends createPrismaBase(
   ): Promise<FriendlyOrganization> {
     const [position, overrideDistrict] = await Promise.all([
       org.positionId
-        ? await this.electionsService
-            .getPositionById(org.positionId)
+        ? this.electionsService
+            .getPositionById(org.positionId, { includeDistrict: true })
             .then((position) => {
               if (!position) {
                 throw new InternalServerErrorException(
@@ -259,6 +264,7 @@ export class OrganizationsService extends createPrismaBase(
 
     return {
       slug: org.slug,
+      hasDistrictOverride: !!org.overrideDistrictId,
       customPositionName: org.customPositionName,
       position: position
         ? {

@@ -871,7 +871,7 @@ describe('GET /v1/organizations/admin/list', () => {
     })
 
     const result = await service.client.get(
-      '/v1/organizations/admin/list?filter=alice',
+      '/v1/organizations/admin/list?email=alice',
     )
 
     expect(result.status).toBe(200)

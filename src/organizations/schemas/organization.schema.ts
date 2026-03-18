@@ -11,6 +11,7 @@ export class PatchOrganizationDto extends createZodDto(
 
 export class AdminListOrganizationsDto extends createZodDto(
   z.object({
-    filter: z.string().min(1).max(100).optional(),
+    slug: z.string().min(1).max(100).optional(),
+    email: z.string().min(1).max(100).optional(),
   }),
 ) {}

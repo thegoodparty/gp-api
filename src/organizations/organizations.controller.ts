@@ -111,7 +111,7 @@ export class OrganizationsController {
   @Roles(UserRole.admin)
   async adminListOrganizations(@Query() query: AdminListOrganizationsDto) {
     const organizations =
-      await this.organizationsService.adminListOrganizations(query.filter)
+      await this.organizationsService.adminListOrganizations(query)
 
     return {
       organizations: organizations.map((org) => {
@@ -119,6 +119,8 @@ export class OrganizationsController {
         return {
           ...apiShape,
           extra: {
+            positionName: org.position?.name ?? null,
+            hasDistrictOverride: org.hasDistrictOverride,
             owner: pick(org.owner, [
               'id',
               'email',
