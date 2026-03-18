@@ -161,6 +161,21 @@ describe('P2pController', () => {
       })
     })
 
+    it('wraps unexpected errors in BadGatewayException', async () => {
+      vi.mocked(
+        mockPeerlyPhoneListService.checkPhoneListStatus,
+      ).mockRejectedValue(new Error('Unexpected failure'))
+
+      await expect(
+        controller.checkPhoneListStatus('test-token', mockRes),
+      ).rejects.toThrow(BadGatewayException)
+      await expect(
+        controller.checkPhoneListStatus('test-token', mockRes),
+      ).rejects.toMatchObject({
+        message: 'Failed to check phone list status.',
+      })
+    })
+
     it('returns phoneListId and leadsLoaded when list is ACTIVE with list_id', async () => {
       vi.mocked(
         mockPeerlyPhoneListService.checkPhoneListStatus,

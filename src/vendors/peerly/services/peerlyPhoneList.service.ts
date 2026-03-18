@@ -119,9 +119,13 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
   private isTransientPhoneListError(error: unknown): boolean {
     if (!isAxiosError(error)) return false
     if (error.response?.status !== 400) return false
-    const data = error.response?.data as Record<string, unknown> | undefined
-    if (!data) return false
-    const message = data.error || data.message || data.Error || ''
+    const data: unknown = error.response?.data
+    if (!data || typeof data !== 'object') return false
+    const message =
+      ('error' in data && data.error) ||
+      ('message' in data && data.message) ||
+      ('Error' in data && data.Error) ||
+      ''
     return (
       typeof message === 'string' &&
       message
