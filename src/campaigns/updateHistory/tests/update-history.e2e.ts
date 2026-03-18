@@ -125,10 +125,7 @@ test.describe('Campaigns - Update History (Admin Access)', () => {
   let candidateReg: RegisterResponse
 
   test.beforeAll(async ({ request }) => {
-    test.skip(
-      !adminEmail || !adminPassword,
-      'Admin credentials not configured',
-    )
+    test.skip(!adminEmail || !adminPassword, 'Admin credentials not configured')
 
     candidateReg = await registerUser(request, {
       firstName: generateRandomName(),
