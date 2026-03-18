@@ -37,6 +37,19 @@
       "count": 1
     }
   },
+  "src/authentication/authentication.controller.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    }
+  },
+  "src/authentication/authentication.service.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 1
+    }
+  },
   "src/campaigns/ai/chat/aiChat.controller.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 6
@@ -88,6 +101,9 @@
   "src/campaigns/services/crmCampaigns.service.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
+    },
+    "@typescript-eslint/no-unsafe-enum-comparison": {
+      "count": 4
     },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 4
@@ -152,11 +168,17 @@
     "@typescript-eslint/naming-convention": {
       "count": 4
     },
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 3
     }
   },
   "src/elections/services/races.service.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 2
+    },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 14
     },
@@ -180,6 +202,9 @@
     }
   },
   "src/email/email.service.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 2
+    },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 3
     }
@@ -214,6 +239,11 @@
       "count": 1
     }
   },
+  "src/outreach/outreach.module.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    }
+  },
   "src/pathToVictory/services/enqueuePathToVictory.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 3
@@ -225,6 +255,9 @@
     }
   },
   "src/pathToVictory/services/pathToVictory.service.ts": {
+    "@typescript-eslint/no-unsafe-enum-comparison": {
+      "count": 1
+    },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
     }
@@ -235,6 +268,9 @@
     }
   },
   "src/payments/services/paymentEventsService.ts": {
+    "@typescript-eslint/no-unsafe-enum-comparison": {
+      "count": 8
+    },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 5
     }
@@ -247,6 +283,11 @@
   "src/payments/services/purchase.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 5
+    }
+  },
+  "src/polls/polls.module.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
     }
   },
   "src/polls/services/pollBiasAnalysis.service.ts": {
@@ -387,6 +428,9 @@
     }
   },
   "src/vendors/peerly/services/p2pPhoneListUpload.service.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 2
+    },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 1
     },
@@ -438,6 +482,9 @@
     }
   },
   "src/vendors/vercel/services/vercel.service.ts": {
+    "@typescript-eslint/no-unsafe-enum-comparison": {
+      "count": 1
+    },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
     }
@@ -462,7 +509,15 @@
       "count": 2
     }
   },
+  "src/voters/voterFile/util/voterFile.util.ts": {
+    "@typescript-eslint/no-unsafe-enum-comparison": {
+      "count": 7
+    }
+  },
   "src/voters/voterFile/voterFile.service.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 3
+    },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 3
     },
@@ -476,12 +531,20 @@
     }
   },
   "src/websites/services/domains.service.ts": {
+    "@typescript-eslint/no-unsafe-enum-comparison": {
+      "count": 2
+    },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 4
     }
   },
   "src/websites/services/websites.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/websites/websites.module.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
       "count": 1
     }
   }

@@ -124,7 +124,7 @@ export class EmailService {
         if (error.status === 429) {
           // Rate limit exceeded
           const retryAfter =
-            parseInt(error.response.headers['retry-after'], 10) || 1 // Retry-After header is in seconds
+            parseInt(String(error.response?.headers?.['retry-after']), 10) || 1 // Retry-After header is in seconds
           this.logger.warn(
             `Rate limit exceeded. Retrying after ${retryAfter} seconds...`,
           )
@@ -136,8 +136,7 @@ export class EmailService {
             'Error sending email via Mailgun:',
           )
           throw new BadGatewayException(
-            'error communicating w/ mail service: ',
-            error,
+            `error communicating w/ mail service: ${error instanceof Error ? error.message : String(error)}`,
           )
         }
       }

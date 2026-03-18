@@ -67,7 +67,7 @@ export class ElectionsService {
           paramsSerializer: (params) =>
             Object.entries(params)
               .filter(([, v]) => v !== undefined && v !== null)
-              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+              .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
               .join('&'),
         }),
       )) as { data: Res; status: number }

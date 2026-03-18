@@ -36,7 +36,7 @@ export class VercelService {
   isVercelNotFoundError(e: unknown): e is NotFound {
     return (
       e instanceof NotFound ||
-      (e instanceof VercelError && e.statusCode === HttpStatus.NOT_FOUND)
+      (e instanceof VercelError && e.statusCode === Number(HttpStatus.NOT_FOUND))
     )
   }
 

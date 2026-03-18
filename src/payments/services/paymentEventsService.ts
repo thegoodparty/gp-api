@@ -179,16 +179,15 @@ export class PaymentEventsService {
     event: Stripe.CheckoutSessionCompletedEvent,
   ) {
     const session = event.data.object
-    const { mode } = session
 
     // Route to appropriate handler based on checkout session mode
-    if (mode === CheckoutSessionMode.SUBSCRIPTION) {
+    if (session.mode === CheckoutSessionMode.SUBSCRIPTION) {
       return this.handleSubscriptionCheckoutCompleted(session)
-    } else if (mode === CheckoutSessionMode.PAYMENT) {
+    } else if (session.mode === CheckoutSessionMode.PAYMENT) {
       return this.handleOneTimePaymentCheckoutCompleted(session)
     }
 
-    this.logger.warn(`Unknown checkout session mode: ${mode}`)
+    this.logger.warn(`Unknown checkout session mode: ${session.mode}`)
   }
 
   /**

@@ -172,7 +172,7 @@ export class DomainsService
 
   async handleDomainPostPurchase(
     sessionId: string,
-    metadata: DomainPurchaseMetadata & { userId?: string },
+    rawMetadata: unknown,
   ): Promise<{
     domain: Domain
     registrationResult: {
@@ -182,7 +182,22 @@ export class DomainsService
     }
     message: string
   }> {
-    const { domainName, websiteId, userId } = metadata
+    if (
+      !rawMetadata ||
+      typeof rawMetadata !== 'object' ||
+      !('domainName' in rawMetadata) ||
+      !('websiteId' in rawMetadata) ||
+      !('userId' in rawMetadata)
+    ) {
+      throw new BadRequestException(
+        'Invalid domain purchase metadata: missing required fields',
+      )
+    }
+
+    const domainName = String(rawMetadata.domainName)
+    const websiteId = Number(rawMetadata.websiteId)
+    const userId = String(rawMetadata.userId)
+
     if (!websiteId) {
       throw new BadRequestException(
         'Website ID is required for domain registration',
@@ -222,7 +237,7 @@ export class DomainsService
     // Get user from metadata (validation already done in completeCheckoutSession)
     const { user } = await this.payments.getValidatedSessionUser(
       sessionId,
-      metadata as unknown as Record<string, string>,
+      rawMetadata as Record<string, string>,
     )
 
     return this.processDomainRegistration({
@@ -484,7 +499,7 @@ export class DomainsService
     try {
       const mxRecords = dnsRecords.filter(
         (r: Records) =>
-          r.type === VercelDnsRecordType.Mx &&
+          r.type === String(VercelDnsRecordType.Mx) &&
           [FORWARDEMAIL_MX1_VALUE, FORWARDEMAIL_MX2_VALUE].includes(r.value),
       )
       if (mxRecords.length === 2) {
@@ -503,7 +518,7 @@ export class DomainsService
     try {
       const txtVerificationRecord = dnsRecords.find(
         (r: Records) =>
-          r.type === VercelDnsRecordType.Txt &&
+          r.type === String(VercelDnsRecordType.Txt) &&
           r.value ===
             `${FORWARDEMAIL_TXT_VALUE_PREFIX}${forwardEmailDomain.verification_record}`,
       )

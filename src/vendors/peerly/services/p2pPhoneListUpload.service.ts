@@ -111,7 +111,7 @@ export class P2pPhoneListUploadService {
     let withFixColumns = false
     try {
       const sqlResponse = await this.voterDatabaseService.query(countQuery)
-      const count = parseInt(sqlResponse.rows[0].count)
+      const count = parseInt(String(sqlResponse.rows[0].count))
       withFixColumns = count === 0
       this.logger.debug({ count, withFixColumns }, 'P2P voter count check:')
     } catch (error) {
@@ -154,7 +154,7 @@ export class P2pPhoneListUploadService {
     const chunks: Buffer[] = []
 
     return new Promise((resolve, reject) => {
-      stream.on('data', (chunk) => {
+      stream.on('data', (chunk: Buffer) => {
         chunks.push(Buffer.from(chunk))
       })
 

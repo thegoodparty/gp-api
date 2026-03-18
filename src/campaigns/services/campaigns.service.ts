@@ -777,7 +777,10 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       // here, we determine if we need to save an older version of the content.
       // because in the past we didn't create a Content version for every new generation.
       // otherwise if they translate they won't have the old version to go back to.
-      versions[key].push(oldVersion)
+      versions[key].push({
+        ...oldVersion,
+        date: oldVersion.date.toString(),
+      })
     }
 
     if (updateExistingVersion === false) {

@@ -547,14 +547,14 @@ export class CrmCampaignsService {
       },
     }
 
-    if (propertyName === HubSpot.IncomingProperty.verified_candidates) {
+    if (propertyName === String(HubSpot.IncomingProperty.verified_candidates)) {
       updatePayload.isVerified =
-        propertyValue.toLowerCase() === HubSpot.VerifiedCandidate.YES
+        propertyValue.toLowerCase() === String(HubSpot.VerifiedCandidate.YES)
     }
 
-    if (propertyName === HubSpot.IncomingProperty.election_results) {
+    if (propertyName === String(HubSpot.IncomingProperty.election_results)) {
       updatePayload.didWin =
-        propertyValue.toLowerCase() === HubSpot.ElectionResult.WON_GENERAL
+        propertyValue.toLowerCase() === String(HubSpot.ElectionResult.WON_GENERAL)
     }
 
     this.campaigns.update({

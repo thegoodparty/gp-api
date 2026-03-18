@@ -29,13 +29,13 @@ import {
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 
-enum SpecialOfficePhrase {
-  AtLarge = 'At Large',
-  PresidentOfUS = 'President of the United States',
-  Senate = 'Senate',
-  Governor = 'Governor',
-  Mayor = 'Mayor',
-}
+const SpecialOfficePhrase = {
+  AtLarge: 'At Large',
+  PresidentOfUS: 'President of the United States',
+  Senate: 'Senate',
+  Governor: 'Governor',
+  Mayor: 'Mayor',
+} as const
 
 const SPECIAL_OFFICE_PHRASES = Object.freeze(Object.values(SpecialOfficePhrase))
 

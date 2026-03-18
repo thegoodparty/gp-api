@@ -3,9 +3,10 @@ import { Prisma } from '@prisma/client'
 export type CampaignPlanVersionData = Record<string, PlanVersion[]>
 
 export type PlanVersion = {
-  date: Date | string
+  date: string
   text: string
   language?: string
+  inputValues?: unknown
 }
 
 export type CampaignWith<T extends keyof Prisma.CampaignInclude> =

@@ -92,7 +92,7 @@ export function typeToQuery(
   if (selectedColumns?.length) {
     // Use selected columns
     columns = selectedColumns.map((col) => `"${col.db}"`).join(', ')
-  } else if (type === 'full') {
+  } else if (type === VoterFileType.full) {
     columns = `"LALVOTERID",
     "Voters_FirstName",
     "Voters_LastName",
@@ -180,7 +180,7 @@ export function typeToQuery(
     "Voters_Gender",
     "Voters_Age"`
 
-    if (type === 'doorKnocking') {
+    if (type === VoterFileType.doorKnocking) {
       columns += `, "Residence_Addresses_Latitude",
       "Residence_Addresses_Longitude",
       "Residence_Addresses_AddressLine",
@@ -191,7 +191,7 @@ export function typeToQuery(
       "Residence_Addresses_Zip"`
     }
 
-    if (type === 'digitalAds') {
+    if (type === VoterFileType.digitalAds) {
       columns += `, "VoterTelephones_CellPhoneFormatted",
       "Residence_Addresses_AddressLine",
       "Residence_Addresses_ExtraAddressLine",
@@ -203,7 +203,7 @@ export function typeToQuery(
       whereClause += `${whereClause ? ' AND ' : ''}"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
     }
 
-    if (type === 'directMail') {
+    if (type === VoterFileType.directMail) {
       columns += `, "Mailing_Addresses_AddressLine",
       "Mailing_Addresses_ExtraAddressLine",
       "Mailing_Addresses_City",
@@ -226,7 +226,7 @@ export function typeToQuery(
       )`
     }
 
-    if (type === 'telemarketing' || type === 'robocall') {
+    if (type === VoterFileType.telemarketing || type === VoterFileType.robocall) {
       columns += `, "VoterTelephones_LandlineFormatted",
       "Languages_Description"`
 
@@ -234,7 +234,7 @@ export function typeToQuery(
     }
   }
 
-  if (type === 'sms') {
+  if (type === VoterFileType.sms) {
     columns += `, "VoterTelephones_CellPhoneFormatted"`
     if (whereClause) {
       whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`

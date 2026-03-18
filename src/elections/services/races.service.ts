@@ -583,8 +583,8 @@ export class RacesService {
         const { position, election } = result.node
         if (position?.name && election?.electionDay) {
           if (position.name.toLowerCase() === officeName.toLowerCase()) {
-            if (!electionDates.includes(election.electionDay)) {
-              electionDates.push(election.electionDay)
+            if (!electionDates.includes(String(election.electionDay))) {
+              electionDates.push(String(election.electionDay))
             }
           }
         }
