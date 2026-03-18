@@ -240,3 +240,4 @@ We use [Claude Code](https://claude.ai/code) for AI-assisted development. Projec
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
