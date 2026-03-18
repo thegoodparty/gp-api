@@ -4,31 +4,39 @@ import {
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
-  loginUser,
   registerUser,
+  RegisterResponse,
 } from '../../../e2e-tests/utils/auth.util'
+import {
+  retryOnConflict,
+  updateCampaignWithRetry,
+} from '../../../e2e-tests/utils/request.util'
 
 test.describe('Campaigns - User Campaign Operations', () => {
-  const candidateEmail = process.env.CANDIDATE_EMAIL
-  const candidatePassword = process.env.CANDIDATE_PASSWORD
+  let reg: RegisterResponse
 
-  test.beforeAll(() => {
-    test.skip(
-      !candidateEmail || !candidatePassword,
-      'Candidate credentials not configured',
-    )
+  test.beforeAll(async ({ request }) => {
+    reg = await registerUser(request, {
+      firstName: generateRandomName(),
+      lastName: generateRandomName(),
+      email: generateRandomEmail(),
+      password: generateRandomPassword(),
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (reg?.user?.id && reg?.token) {
+      await deleteUser(request, reg.user.id, reg.token)
+    }
   })
 
   test('should get campaign status for logged in user', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.get('/v1/campaigns/mine/status', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -42,15 +50,9 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should get logged in user campaign', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.get('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -71,15 +73,9 @@ test.describe('Campaigns - User Campaign Operations', () => {
   test('should get campaign plan version or 404 if not found', async ({
     request,
   }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.get('/v1/campaigns/mine/plan-version', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -87,26 +83,15 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should update campaign', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const randomName = generateRandomName()
     const randomWebsite = `https://${Math.random().toString(36).substring(7)}.com`
 
-    const response = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const response = await updateCampaignWithRetry(request, reg.token, {
       data: {
-        data: {
-          name: randomName,
-        },
-        details: {
-          website: randomWebsite,
-        },
+        name: randomName,
+      },
+      details: {
+        website: randomWebsite,
       },
     })
 
@@ -123,15 +108,9 @@ test.describe('Campaigns - User Campaign Operations', () => {
   test('should reject invalid field types in campaign update', async ({
     request,
   }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
       data: {
         details: {
@@ -151,21 +130,10 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should set campaign office', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
-    const response = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      data: {
-        details: {
-          office: 'Other',
-          otherOffice: 'State Representative',
-        },
+    const response = await updateCampaignWithRetry(request, reg.token, {
+      details: {
+        office: 'Other',
+        otherOffice: 'State Representative',
       },
     })
 
@@ -173,17 +141,11 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should launch campaign', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
+    const response = await retryOnConflict(() =>
+      request.post('/v1/campaigns/launch', {
+        headers: { Authorization: `Bearer ${reg.token}` },
+      }),
     )
-
-    const response = await request.post('/v1/campaigns/launch', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
 
     expect(response.status()).toBe(200)
 

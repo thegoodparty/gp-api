@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test'
 import { config } from 'dotenv'
 import { join } from 'path'
 
+// Load app env first so e2e uses the same seeded credentials by default.
+config({ path: join(__dirname, '../.env') })
 config({ path: join(__dirname, '.env') })
 
 export default defineConfig({

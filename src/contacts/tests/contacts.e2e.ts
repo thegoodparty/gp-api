@@ -9,6 +9,7 @@ import {
   loginUser,
   registerUser,
 } from '../../../e2e-tests/utils/auth.util'
+import { updateCampaignWithRetry } from '../../../e2e-tests/utils/request.util'
 
 const CONTACTS_TEST_DISTRICT = {
   id: '0e5bafca-93a9-86a5-2522-f373979720df',
@@ -41,13 +42,7 @@ async function updateCampaignMine(params: {
 }) {
   const { request, authToken, data } = params
 
-  const response = await request.put('/v1/campaigns/mine', {
-    headers: AUTH_HEADER(authToken),
-    data: {
-      ...data,
-    },
-  })
-
+  const response = await updateCampaignWithRetry(request, authToken, data)
   await assertOk(response, 'Campaign update failed')
 }
 
@@ -135,12 +130,9 @@ async function approveCampaignForStatewideDownload(params: {
   }
 
   const admin = await loginUser(request, adminEmail, adminPassword)
-  const response = await request.put('/v1/campaigns/mine', {
-    headers: AUTH_HEADER(admin.token),
-    data: {
-      slug: campaignSlug,
-      canDownloadFederal: true,
-    },
+  const response = await updateCampaignWithRetry(request, admin.token, {
+    slug: campaignSlug,
+    canDownloadFederal: true,
   })
 
   await assertOk(response, 'Admin campaign approval failed')

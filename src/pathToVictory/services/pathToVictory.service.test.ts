@@ -111,6 +111,7 @@ describe('PathToVictoryService', () => {
   }
   let mockOrganizations: {
     resolveOrgData: ReturnType<typeof vi.fn>
+    resolveBallotReadyPositionId: ReturnType<typeof vi.fn>
   }
 
   beforeEach(async () => {
@@ -146,6 +147,7 @@ describe('PathToVictoryService', () => {
       buildRaceTargetDetails: vi.fn().mockResolvedValue(null),
     }
     mockOrganizations = {
+      resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
       resolveOrgData: vi.fn().mockResolvedValue({
         positionId: null,
         customPositionName: null,
@@ -563,9 +565,9 @@ describe('PathToVictoryService', () => {
     describe('organization upsert', () => {
       const campaignWithDetails = {
         ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
+        organization: { positionId: 'gp-pos-1' },
         details: {
           state: 'CA',
-          positionId: 'br-pos-1',
           office: 'City Council',
           otherOffice: null,
         },
@@ -582,6 +584,9 @@ describe('PathToVictoryService', () => {
 
         await service.completePathToVictory('test-slug', responseWithTurnout)
 
+        expect(
+          mockOrganizations.resolveBallotReadyPositionId,
+        ).toHaveBeenCalledWith('gp-pos-1')
         expect(mockOrganizations.resolveOrgData).toHaveBeenCalledWith({
           ballotReadyPositionId: 'br-pos-1',
           office: 'City Council',
@@ -613,7 +618,8 @@ describe('PathToVictoryService', () => {
       it('skips org upsert when campaign has no state', async () => {
         mockPrisma.campaign.findUnique.mockResolvedValue({
           ...makeCampaign({ p2vStatus: P2VStatus.waiting }),
-          details: { positionId: 'br-pos-1' },
+          organization: { positionId: 'gp-pos-1' },
+          details: {},
         })
         mockPrisma.pathToVictory.update.mockResolvedValue({})
 
