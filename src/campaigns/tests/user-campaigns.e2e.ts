@@ -1,98 +1,42 @@
-import { APIRequestContext, expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import {
   deleteUser,
   generateRandomEmail,
   generateRandomName,
   generateRandomPassword,
-  loginUser,
   registerUser,
+  RegisterResponse,
 } from '../../../e2e-tests/utils/auth.util'
-
-const authHeaders = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-})
-
-const ensureCampaignExists = async (
-  request: APIRequestContext,
-  token: string,
-) => {
-  const mine = await request.get('/v1/campaigns/mine', {
-    headers: authHeaders(token),
-  })
-
-  if (mine.status() !== 404) {
-    return
-  }
-
-  const create = await request.post('/v1/campaigns', {
-    headers: authHeaders(token),
-    data: {
-      details: { zip: '12345' },
-    },
-  })
-
-  expect([200, 201, 409]).toContain(create.status())
-}
-
-const getTokenWithCampaign = async (
-  request: APIRequestContext,
-  candidateEmail: string,
-  candidatePassword: string,
-): Promise<{
-  token: string
-  cleanup?: { userId: number; token: string }
-}> => {
-  const { token } = await loginUser(request, candidateEmail, candidatePassword)
-  await ensureCampaignExists(request, token)
-
-  const mine = await request.get('/v1/campaigns/mine', {
-    headers: authHeaders(token),
-  })
-  if (mine.status() === 200) {
-    return { token }
-  }
-
-  const firstName = generateRandomName()
-  const lastName = generateRandomName()
-  const email = generateRandomEmail()
-  const password = generateRandomPassword()
-  const registered = await registerUser(request, {
-    firstName,
-    lastName,
-    email,
-    password,
-    phone: '5555555555',
-    zip: '12345-1234',
-    signUpMode: 'candidate',
-  })
-
-  return {
-    token: registered.token,
-    cleanup: { userId: registered.user.id, token: registered.token },
-  }
-}
+import {
+  retryOnConflict,
+  updateCampaignWithRetry,
+} from '../../../e2e-tests/utils/request.util'
 
 test.describe('Campaigns - User Campaign Operations', () => {
-  const candidateEmail = process.env.CANDIDATE_EMAIL
-  const candidatePassword = process.env.CANDIDATE_PASSWORD
+  let reg: RegisterResponse
 
-  test.beforeAll(() => {
-    test.skip(
-      !candidateEmail || !candidatePassword,
-      'Candidate credentials not configured',
-    )
+  test.beforeAll(async ({ request }) => {
+    reg = await registerUser(request, {
+      firstName: generateRandomName(),
+      lastName: generateRandomName(),
+      email: generateRandomEmail(),
+      password: generateRandomPassword(),
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (reg?.user?.id && reg?.token) {
+      await deleteUser(request, reg.user.id, reg.token)
+    }
   })
 
   test('should get campaign status for logged in user', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.get('/v1/campaigns/mine/status', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -106,15 +50,9 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should get logged in user campaign', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.get('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -135,15 +73,9 @@ test.describe('Campaigns - User Campaign Operations', () => {
   test('should get campaign plan version or 404 if not found', async ({
     request,
   }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.get('/v1/campaigns/mine/plan-version', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -151,55 +83,34 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should update campaign', async ({ request }) => {
-    const { token, cleanup } = await getTokenWithCampaign(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const randomName = generateRandomName()
     const randomWebsite = `https://${Math.random().toString(36).substring(7)}.com`
 
-    try {
-      const response = await request.put('/v1/campaigns/mine', {
-        headers: authHeaders(token),
-        data: {
-          data: {
-            name: randomName,
-          },
-          details: {
-            website: randomWebsite,
-          },
-        },
-      })
+    const response = await updateCampaignWithRetry(request, reg.token, {
+      data: {
+        name: randomName,
+      },
+      details: {
+        website: randomWebsite,
+      },
+    })
 
-      expect(response.status()).toBe(200)
+    expect(response.status()).toBe(200)
 
-      const campaign = (await response.json()) as {
-        data: { name: string }
-        details: { website: string }
-      }
-      expect(campaign.data.name).toBe(randomName)
-      expect(campaign.details.website).toBe(randomWebsite)
-    } finally {
-      if (cleanup) {
-        await deleteUser(request, cleanup.userId, cleanup.token)
-      }
+    const campaign = (await response.json()) as {
+      data: { name: string }
+      details: { website: string }
     }
+    expect(campaign.data.name).toBe(randomName)
+    expect(campaign.details.website).toBe(randomWebsite)
   })
 
   test('should reject invalid field types in campaign update', async ({
     request,
   }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.put('/v1/campaigns/mine', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
       data: {
         details: {
@@ -219,43 +130,22 @@ test.describe('Campaigns - User Campaign Operations', () => {
   })
 
   test('should set campaign office', async ({ request }) => {
-    const { token, cleanup } = await getTokenWithCampaign(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
+    const response = await updateCampaignWithRetry(request, reg.token, {
+      details: {
+        office: 'Other',
+        otherOffice: 'State Representative',
+      },
+    })
 
-    try {
-      const response = await request.put('/v1/campaigns/mine', {
-        headers: authHeaders(token),
-        data: {
-          details: {
-            office: 'Other',
-            otherOffice: 'State Representative',
-          },
-        },
-      })
-
-      expect(response.status()).toBe(200)
-    } finally {
-      if (cleanup) {
-        await deleteUser(request, cleanup.userId, cleanup.token)
-      }
-    }
+    expect(response.status()).toBe(200)
   })
 
   test('should launch campaign', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
+    const response = await retryOnConflict(() =>
+      request.post('/v1/campaigns/launch', {
+        headers: { Authorization: `Bearer ${reg.token}` },
+      }),
     )
-
-    const response = await request.post('/v1/campaigns/launch', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
 
     expect(response.status()).toBe(200)
 
