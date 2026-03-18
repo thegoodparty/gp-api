@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { UsersService } from '../../users/services/users.service'
 import { Experiment } from '@amplitude/experiment-node-server'
 import { User } from '@prisma/client'
@@ -14,6 +14,7 @@ const amplitude = Experiment.initializeRemote(AMPLITUDE_PROJECT_API_KEY)
 @Injectable()
 export class FeaturesService {
   constructor(
+    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly logger: PinoLogger,
   ) {
