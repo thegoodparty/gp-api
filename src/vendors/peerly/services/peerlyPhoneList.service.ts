@@ -105,6 +105,7 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     } catch (error) {
       if (this.isTransientPhoneListError(error)) {
         this.logger.warn(
+          { token },
           'Peerly returned a transient error during phone list status check. This is expected during processing and will likely resolve on retry.',
         )
         return null
