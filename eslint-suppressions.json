@@ -1,12 +1,12 @@
 {
   "src/ai/ai.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 5
+      "count": 4
     }
   },
   "src/ai/util/areaCodeFromZip.util.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
+      "count": 2
     }
   },
   "src/analytics/analytics.service.ts": {
@@ -29,14 +29,9 @@
       "count": 1
     }
   },
-  "src/campaigns/ai/chat/aiChat.controller.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 6
-    }
-  },
   "src/campaigns/ai/chat/aiChat.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
+      "count": 2
     }
   },
   "src/campaigns/ai/content/aiContent.controller.ts": {
@@ -46,7 +41,7 @@
   },
   "src/campaigns/ai/content/aiContent.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 10
+      "count": 7
     }
   },
   "src/campaigns/guards/UseCampaign.guard.ts": {
@@ -56,7 +51,7 @@
   },
   "src/campaigns/services/campaigns.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 10
+      "count": 6
     }
   },
   "src/campaigns/services/crmCampaigns.service.ts": {
@@ -106,17 +101,12 @@
   },
   "src/elections/services/races.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 8
+      "count": 1
     }
   },
   "src/elections/util/parseRaces.util.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
-    }
-  },
-  "src/email/mailgun.service.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
     }
   },
   "src/files/interceptors/files.interceptor.ts": {
@@ -174,11 +164,6 @@
       "count": 1
     }
   },
-  "src/polls/services/pollResponsesDownload.service.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "src/prisma/prisma.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
@@ -191,7 +176,7 @@
   },
   "src/queue/consumer/queueConsumer.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 19
+      "count": 1
     }
   },
   "src/queue/producer/queueProducer.service.ts": {
@@ -206,7 +191,7 @@
   },
   "src/shared/util/appEnvironment.util.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
+      "count": 1
     }
   },
   "src/shared/util/http.util.ts": {
@@ -254,11 +239,6 @@
       "count": 2
     }
   },
-  "src/vendors/forwardEmail/services/forwardEmail.service.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 5
-    }
-  },
   "src/vendors/peerly/services/p2pPhoneListUpload.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
@@ -281,7 +261,7 @@
   },
   "src/vendors/slack/services/slack.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
+      "count": 1
     }
   },
   "src/vendors/stripe/services/stripe.service.ts": {
@@ -292,11 +272,6 @@
   "src/vendors/vercel/services/vercel.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
-    }
-  },
-  "src/voters/services/voterDatabase.service.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
     }
   },
   "src/voters/util/voterOutreach.util.ts": {

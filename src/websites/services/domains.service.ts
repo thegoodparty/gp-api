@@ -784,7 +784,7 @@ export class DomainsService
         if (
           errorMessage.includes('no such payment_intent') ||
           errorMessage.includes('not found') ||
-          (error as Error & { code?: string }).code === 'resource_missing'
+          ('code' in error && error.code) === 'resource_missing'
         ) {
           // Payment doesn't exist - this might be acceptable in some cases
           // Return null to maintain backward compatibility for now
@@ -796,7 +796,7 @@ export class DomainsService
           errorMessage.includes('network') ||
           errorMessage.includes('timeout') ||
           errorMessage.includes('service') ||
-          (error as Error & { code?: string }).code === 'api_connection_error'
+          ('code' in error && error.code) === 'api_connection_error'
         ) {
           throw new BadGatewayException(
             `Stripe service unavailable: ${error.message}`,
@@ -806,7 +806,7 @@ export class DomainsService
         // Invalid payment ID format
         if (
           errorMessage.includes('invalid') ||
-          (error as Error & { code?: string }).code === 'invalid_request_error'
+          ('code' in error && error.code) === 'invalid_request_error'
         ) {
           throw new BadRequestException(
             `Invalid payment ID format: ${error.message}`,

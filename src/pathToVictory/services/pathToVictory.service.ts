@@ -133,10 +133,7 @@ export class PathToVictoryService extends createPrismaBase(
     }
   }
 
-  async handlePathToVictory(input: PathToVictoryInput): Promise<{
-    slug: string
-    pathToVictoryResponse: PathToVictoryResponse
-  }> {
+  async handlePathToVictory(input: PathToVictoryInput): Promise<P2VResponse> {
     const pathToVictoryResponse: PathToVictoryResponse = {
       electionType: '',
       electionLocation: '',
@@ -731,9 +728,6 @@ export class PathToVictoryService extends createPrismaBase(
   }
 }
 
-export interface P2VResponse {
-  slug: string
+export type P2VResponse = PathToVictoryInput & {
   pathToVictoryResponse: PathToVictoryResponse
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any
 }

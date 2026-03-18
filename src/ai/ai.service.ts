@@ -157,15 +157,16 @@ export class AiService {
     try {
       completion = await modelWithFallback.invoke(sanitizedMessages)
     } catch (error) {
-      const err = error as Error & {
-        response?: Record<string, string | number | boolean>
-      }
-      this.logger.error({ err }, 'Error in utils/ai/llmChatCompletion')
-      this.logger.error({ response: err?.response }, 'error response')
+      this.logger.error({ err: error }, 'Error in utils/ai/llmChatCompletion')
+      const errorResponse =
+        error instanceof Error && 'response' in error
+          ? error.response
+          : undefined
+      this.logger.error({ response: errorResponse }, 'error response')
 
       await this.slack.errorMessage({
         message: 'Error in AI completion (raw)',
-        error: err,
+        error,
       })
     }
 

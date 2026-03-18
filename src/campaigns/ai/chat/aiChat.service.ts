@@ -10,12 +10,9 @@ import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { requireEnv } from 'src/shared/utils/env'
 
-const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
-
-if (!LLAMA_AI_ASSISTANT) {
-  throw new Error('Please set LLAMA_AI_ASSISTANT in your .env')
-}
+const LLAMA_AI_ASSISTANT = requireEnv('LLAMA_AI_ASSISTANT')
 
 @Injectable()
 export class AiChatService extends createPrismaBase(MODELS.AiChat) {

@@ -6,8 +6,9 @@ import { HEADER_MAPPING } from '../constants/headerMapping.const'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { GetVoterFileSchema } from '../voterFile/schemas/GetVoterFile.schema'
 import { PinoLogger } from 'nestjs-pino'
+import { requireEnv } from 'src/shared/utils/env'
 
-const VOTER_DATASTORE = process.env.VOTER_DATASTORE as string
+const VOTER_DATASTORE = requireEnv('VOTER_DATASTORE')
 
 @Injectable()
 export class VoterDatabaseService implements OnModuleDestroy {

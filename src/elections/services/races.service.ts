@@ -248,12 +248,15 @@ export class RacesService {
     let tier: string | number | undefined
 
     try {
-      electionDate = race?.election?.electionDay as string | undefined
-      termLength = race?.position?.electionFrequencies[0].frequency[0] as number
-      level = race?.position?.level.toLowerCase() as string
+      const rawElectionDay = race?.election?.electionDay
+      electionDate =
+        typeof rawElectionDay === 'string' ? rawElectionDay : undefined
+      termLength =
+        race?.position?.electionFrequencies[0]?.frequency[0] ?? termLength
+      level = race?.position?.level?.toLowerCase() ?? level
       positionId = race?.position?.id
-      mtfcc = race?.position.mtfcc as string | undefined | null
-      geoId = race?.position.geoId as string | undefined | null
+      mtfcc = race?.position.mtfcc
+      geoId = race?.position.geoId
       tier = race?.position.tier
     } catch (e) {
       this.logger.error({ slug, e }, 'error getting election date')
@@ -296,8 +299,7 @@ export class RacesService {
       // and a more accurate electionLevel
       this.logger.debug({ slug }, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const geoData = (await this.resolveMtfcc(mtfcc, geoId)) as GeoData
+        const geoData = await this.resolveMtfcc(mtfcc, geoId)
         this.logger.debug({ slug, geoData }, 'geoData')
         if (geoData?.city) {
           city = geoData.city as string
@@ -377,10 +379,7 @@ export class RacesService {
         if (locationResp.level === 'county') {
           county = locationResp.county
         } else {
-          if (
-            locationResp.county &&
-            locationResp.level in locationResp
-          ) {
+          if (locationResp.county && locationResp.level in locationResp) {
             city = locationResp[locationResp.level]
             county = locationResp.county
           }
@@ -415,12 +414,17 @@ export class RacesService {
       //   }
       // }
 
-      if ((!priorElectionDates || priorElectionDates.length === 0) && zip) {
+      const positionLevel = race?.position?.level
+      if (
+        (!priorElectionDates || priorElectionDates.length === 0) &&
+        zip &&
+        positionLevel
+      ) {
         priorElectionDates = await this.getElectionDates(
           slug,
           officeName,
           zip,
-          race?.position?.level as PositionLevel,
+          positionLevel,
         )
       }
     }
@@ -430,12 +434,12 @@ export class RacesService {
     data.electionDate = electionDate
     data.electionTerm = termLength
     data.electionLevel = electionLevel
-    data.electionState = electionState as string | undefined
+    data.electionState = electionState ?? undefined
     data.electionCounty = county
     data.electionMunicipality = city
     data.subAreaName = subAreaName
     data.subAreaValue = subAreaValue
-    data.partisanType = partisanType as string | undefined
+    data.partisanType = partisanType ?? undefined
     data.priorElectionDates = priorElectionDates
     data.positionId = positionId
     data.tier = tier
@@ -467,8 +471,10 @@ export class RacesService {
       }
     }
 
-    const toolProperties: Record<string, { type: string; description: string }> =
-      {}
+    const toolProperties: Record<
+      string,
+      { type: string; description: string }
+    > = {}
     let systemPrompt: string | undefined
     if (level === 'county') {
       systemPrompt = COUNTY_PROMPT

@@ -44,7 +44,7 @@ export class ForwardEmailService {
     this.logger.setContext(ForwardEmailService.name)
   }
 
-  private handleApiError(error: Error | AxiosResponse | string): never {
+  private handleApiError(error: unknown): never {
     this.logger.error(
       { data: isAxiosResponse(error) ? format(error) : error },
       'Failed to communicate with Forward Email API',
@@ -97,7 +97,7 @@ export class ForwardEmailService {
               backoff = Math.min(backoff * 2, maxBackoff)
               attempt += 1
             } else {
-              this.handleApiError(e as Error)
+              this.handleApiError(e)
             }
           }
         }
@@ -118,7 +118,7 @@ export class ForwardEmailService {
       }
       return all
     } catch (error) {
-      this.handleApiError(error as Error)
+      this.handleApiError(error)
     }
   }
 
@@ -162,7 +162,7 @@ export class ForwardEmailService {
       this.logger.debug(data, 'Successfully created Forward Email domain')
       return data
     } catch (error) {
-      this.handleApiError(error as Error)
+      this.handleApiError(error)
     }
   }
 
@@ -214,7 +214,7 @@ export class ForwardEmailService {
       )
       return data
     } catch (error) {
-      this.handleApiError(error as Error)
+      this.handleApiError(error)
     }
   }
 
@@ -240,7 +240,7 @@ export class ForwardEmailService {
       )
       return data
     } catch (error) {
-      this.handleApiError(error as Error)
+      this.handleApiError(error)
     }
   }
 }

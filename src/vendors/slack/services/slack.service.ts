@@ -85,7 +85,7 @@ export class SlackService {
   ): Promise<string | undefined> {
     return await this.formattedMessage({
       message,
-      error: error as Error | string | Record<string, unknown>,
+      error,
       channel: channel || SlackChannel.botDev,
     })
   }
@@ -96,7 +96,7 @@ export class SlackService {
   }: VanitySlackMethodArgs): Promise<string | undefined> {
     return this.formattedMessage({
       message,
-      error: error as Error | string | Record<string, unknown>,
+      error,
       channel: SlackChannel.botAi,
     })
   }

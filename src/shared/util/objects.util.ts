@@ -43,5 +43,5 @@ export function pickKeys<
   ) as Pick<O, K[number]>
 }
 
-export const objectNotEmpty = (obj: object) =>
+export const objectNotEmpty = (obj: object | null | undefined) =>
   Boolean(obj && Object.values(obj).length > 0)

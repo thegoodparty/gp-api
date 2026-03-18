@@ -4,14 +4,11 @@ import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { z } from 'zod'
 import { AiService } from '../ai.service'
 import { PinoLogger } from 'nestjs-pino'
+import { requireEnv } from 'src/shared/utils/env'
 
 const ZIP_TO_AREA_CODE_FILE = 'zip-to-area-code-mappings.json'
 const CACHE_EXPIRY_YEARS = 1
-const ZIP_TO_AREA_CODE_BUCKET = process.env.ZIP_TO_AREA_CODE_BUCKET as string
-
-if (!ZIP_TO_AREA_CODE_BUCKET) {
-  throw new Error('ZIP_TO_AREA_CODE_BUCKET environment variable is required')
-}
+const ZIP_TO_AREA_CODE_BUCKET = requireEnv('ZIP_TO_AREA_CODE_BUCKET')
 
 const AreaCodeResponseSchema = z.array(
   z.string().regex(/^\d{3}$/, 'Area code must be a 3-digit number'),

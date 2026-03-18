@@ -10,7 +10,11 @@ import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
 import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'
-import { MessageGroup, QueueType } from '../../../queue/queue.types'
+import {
+  MessageGroup,
+  QueueMessage,
+  QueueType,
+} from '../../../queue/queue.types'
 import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
@@ -105,15 +109,14 @@ export class AiContentService {
       },
     })
 
-    if (!aiContent.generationStatus[key]) {
-      aiContent.generationStatus[key] = {} as AiContentGenerationStatus
+    aiContent.generationStatus[key] = {
+      ...aiContent.generationStatus[key],
+      status: GenerationStatus.processing,
+      prompt,
+      existingChat: (chat as AiChatMessage[]) || [],
+      inputValues,
+      createdAt: new Date().valueOf(),
     }
-    aiContent.generationStatus[key].status = GenerationStatus.processing
-    aiContent.generationStatus[key].prompt = prompt as string
-    aiContent.generationStatus[key].existingChat =
-      (chat as AiChatMessage[]) || []
-    aiContent.generationStatus[key].inputValues = inputValues
-    aiContent.generationStatus[key].createdAt = new Date().valueOf()
 
     await this.slack.message(
       {
@@ -141,12 +144,12 @@ export class AiContentService {
       throw e
     }
 
-    const queueMessage = {
+    const queueMessage: QueueMessage = {
       type: QueueType.GENERATE_AI_CONTENT,
       data: {
         slug,
         key,
-        regenerate,
+        regenerate: regenerate ?? false,
       },
     }
 
@@ -272,14 +275,11 @@ export class AiContentService {
         ) {
           aiContent.generationStatus = {}
         }
-        if (
-          !aiContent?.generationStatus[key] ||
-          typeof aiContent.generationStatus[key] !== 'object'
-        ) {
-          aiContent.generationStatus[key] = {} as AiContentGenerationStatus
+        aiContent.generationStatus[key] = {
+          ...aiContent.generationStatus[key],
+          status: GenerationStatus.completed,
+          createdAt: aiContent.generationStatus[key]?.createdAt ?? Date.now(),
         }
-
-        aiContent.generationStatus[key].status = GenerationStatus.completed
 
         await this.campaignsService.update({
           where: { id: campaign.id },
@@ -292,23 +292,32 @@ export class AiContentService {
         })
       }
     } catch (error) {
-      const e = error as Error & {
-        data?: { error?: string }
-      }
-      this.logger.error({ e }, 'error at consumer')
+      this.logger.error({ e: error }, 'error at consumer')
       this.logger.error({ messages }, 'messages')
       generateError = true
 
-      if (e.data?.error) {
+      // Extract API error data if present (e.g., from OpenAI/Together)
+      const apiErrorMessage =
+        error != null &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data != null &&
+        typeof error.data === 'object' &&
+        'error' in error.data &&
+        typeof error.data.error === 'string'
+          ? error.data.error
+          : undefined
+
+      if (apiErrorMessage) {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer (with msg): ',
-          error: e.data.error,
+          error: apiErrorMessage,
         })
         await this.slack.aiMessage({
           message: 'error at AI queue consumer (with msg): ',
-          error: e.data.error,
+          error: apiErrorMessage,
         })
-        this.logger.error({ error: e.data.error }, 'error')
+        this.logger.error({ error: apiErrorMessage }, 'error')
       } else {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer. Queue Message: ',
@@ -316,11 +325,11 @@ export class AiContentService {
         })
         await this.slack.errorMessage({
           message: 'error at AI queue consumer debug: ',
-          error: e,
+          error,
         })
         await this.slack.aiMessage({
           message: 'error at AI queue consumer debug: ',
-          error: e,
+          error,
         })
       }
     }

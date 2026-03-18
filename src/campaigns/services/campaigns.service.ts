@@ -316,9 +316,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         if (!campaign) return false
 
         // Handle data and details JSON fields
-        const campaignUpdateData = {} as Prisma.CampaignUpdateInput
-        if (scalarFields) {
-          Object.assign(campaignUpdateData, scalarFields)
+        const campaignUpdateData: Prisma.CampaignUpdateInput = {
+          ...scalarFields,
         }
         if (data) {
           campaignUpdateData.data = deepMerge(campaign.data as object, data)
@@ -354,7 +353,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           }
           campaignUpdateData.details = mergedDetails
         }
-        if (objectNotEmpty(aiContent as object)) {
+        if (objectNotEmpty(aiContent)) {
           campaignUpdateData.aiContent = deepMerge(
             (campaign.aiContent as object) || {},
             aiContent,
@@ -397,7 +396,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         })
 
         // Handle pathToVictory relation separately if needed
-        if (objectNotEmpty(pathToVictory as object)) {
+        if (objectNotEmpty(pathToVictory)) {
           if (campaign.pathToVictory) {
             await tx.pathToVictory.update({
               where: { id: campaign.pathToVictory.id },
@@ -688,7 +687,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       }
     }
 
-    return slug as never // should not happen
+    throw new InternalServerErrorException(
+      `Could not find unique slug for user ${user.id} after ${MAX_TRIES} attempts`,
+    )
   }
 
   async saveCampaignPlanVersion(inputs: {
@@ -706,8 +707,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     let language = 'English'
     if (Array.isArray(inputValues) && inputValues.length > 0) {
       inputValues.forEach((inputValue) => {
-        if (inputValue?.language) {
-          language = inputValue.language as string
+        if (typeof inputValue?.language === 'string') {
+          language = inputValue.language
         }
       })
     }
@@ -786,7 +787,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (updateExistingVersion === false) {
       this.logger.info('adding new version')
       // add new version to the top of the list.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const length = versions[key].unshift(newVersion)
       if (length > 10) {
         versions[key].length = 10
