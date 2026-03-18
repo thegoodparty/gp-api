@@ -385,7 +385,7 @@ export class RacesService {
         } else {
           if (
             locationResp.county &&
-            locationResp.hasOwnProperty(locationResp.level)
+            locationResp.level in locationResp
           ) {
             city = locationResp[locationResp.level] as string
             county = locationResp.county as string

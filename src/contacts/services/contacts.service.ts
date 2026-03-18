@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream'
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
@@ -247,7 +248,7 @@ export class ContactsService {
       async ({ state, districtType, districtName }) => {
         try {
           const response = await lastValueFrom(
-            this.httpService.post(
+            this.httpService.post<Readable>(
               `${PEOPLE_API_URL}/v1/people/download`,
               { state, districtType, districtName, filters },
               {

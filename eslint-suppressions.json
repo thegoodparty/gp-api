@@ -65,17 +65,6 @@
       "count": 2
     }
   },
-  "src/campaigns/ai/chat/util/buildSlackBlocks.util.ts": {
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "src/campaigns/ai/content/aiContent.controller.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
@@ -101,23 +90,12 @@
       "count": 1
     }
   },
-  "src/campaigns/map/campaignMap.service.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 4
-    }
-  },
   "src/campaigns/services/campaigns.service.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
     },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 10
-    },
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 11
+      "count": 10
     }
   },
   "src/campaigns/services/crmCampaigns.service.ts": {
@@ -129,17 +107,6 @@
     },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 4
-    }
-  },
-  "src/campaigns/services/geocoding.service.ts": {
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 2
     }
   },
   "src/campaigns/tasks/campaignTasks.types.ts": {
@@ -158,12 +125,6 @@
     }
   },
   "src/contacts/services/contacts.service.ts": {
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 4
     }
@@ -175,62 +136,17 @@
   },
   "src/content/CONTENT_TYPE_MAP.const.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 9
+      "count": 4
     }
   },
   "src/content/content.types.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 2
+      "count": 1
     }
   },
   "src/content/services/content.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 9
-    }
-  },
-  "src/content/transformers/blogSectionsTransformer.ts": {
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    }
-  },
-  "src/content/transformers/glossaryItemsTransformer.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    }
-  },
-  "src/content/util/glossaryItems.util.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/content/util/mapBlogArticlesToSections.util.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/content/util/transformBlogArticleReferences.util.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/content/util/transformContentMedia.util.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
+      "count": 5
     }
   },
   "src/crm/crm.controller.ts": {
@@ -248,14 +164,6 @@
       "count": 2
     }
   },
-  "src/declare/declare.service.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "src/elections/services/elections.service.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 4
@@ -271,11 +179,8 @@
     "@typescript-eslint/no-unsafe-argument": {
       "count": 2
     },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 15
+      "count": 14
     },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 15
@@ -306,7 +211,7 @@
   },
   "src/email/email.types.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 7
+      "count": 4
     }
   },
   "src/email/mailgun.service.ts": {
@@ -319,30 +224,9 @@
       "count": 3
     }
   },
-  "src/jobs/jobs.controller.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/jobs/jobs.service.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 3
-    }
-  },
   "src/llm/services/llm.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 4
-    }
-  },
-  "src/observability/blockedState/blockedState.rules.ts": {
-    "sonarjs/no-all-duplicated-branches": {
-      "count": 1
     }
   },
   "src/observability/logging/logger-module.ts": {
@@ -372,12 +256,6 @@
   },
   "src/pathToVictory/services/pathToVictory.service.ts": {
     "@typescript-eslint/no-unsafe-enum-comparison": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
       "count": 1
     },
     "@typescript-eslint/no-unsafe-type-assertion": {
@@ -463,11 +341,6 @@
       "count": 1
     }
   },
-  "src/shared/interceptors/ZodResponse.interceptor.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    }
-  },
   "src/shared/util/appEnvironment.util.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 3
@@ -544,14 +417,6 @@
       "count": 5
     }
   },
-  "src/vendors/google/services/google-places.service.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    }
-  },
   "src/vendors/google/util/GooglePlaces.util.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
@@ -593,14 +458,6 @@
   },
   "src/vendors/peerly/utils/audienceMapping.util.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/vendors/peerly/utils/getPeerlyLocaleFromBallotLevel.util.ts": {
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
       "count": 1
     }
   },

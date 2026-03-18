@@ -1,9 +1,12 @@
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
-import { PEERLY_LOCALITY_CATEGORIES } from '../services/peerly.const'
+import {
+  PEERLY_LOCALITIES,
+  PEERLY_LOCALITY_CATEGORIES,
+} from '../services/peerly.const'
 
 export const getPeerlyLocaleFromBallotLevel = (
   ballotLevel: BallotReadyPositionLevel,
 ) =>
-  Object.keys(PEERLY_LOCALITY_CATEGORIES).find((key) =>
-    PEERLY_LOCALITY_CATEGORIES[key].includes(ballotLevel),
+  Object.values(PEERLY_LOCALITIES).find((locality) =>
+    PEERLY_LOCALITY_CATEGORIES[locality].includes(ballotLevel),
   )

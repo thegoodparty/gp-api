@@ -729,7 +729,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     this.logger.info({ existingVersions }, 'existingVersions')
 
-    let versions = {}
+    let versions: CampaignPlanVersionData = {}
     if (existingVersions) {
       versions = existingVersions?.data as CampaignPlanVersionData
     }
