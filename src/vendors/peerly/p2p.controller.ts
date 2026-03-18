@@ -15,7 +15,10 @@ import { ReqCampaign } from '../../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../campaigns/decorators/UseCampaign.decorator'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PhoneListState } from './peerly.types'
-import { CheckPhoneListStatusResponseDto } from './schemas/p2pPhoneListStatus.schema'
+import {
+  CheckPhoneListStatusAcceptedResponseDto,
+  CheckPhoneListStatusResponseDto,
+} from './schemas/p2pPhoneListStatus.schema'
 import { P2pPhoneListRequestSchema } from './schemas/p2pPhoneListRequest.schema'
 import { P2pPhoneListResponseSchema } from './schemas/p2pPhoneListResponse.schema'
 import { P2pPhoneListUploadService } from './services/p2pPhoneListUpload.service'
@@ -38,7 +41,9 @@ export class P2pController {
   async checkPhoneListStatus(
     @Param('token') token: string,
     @Res({ passthrough: true }) res: FastifyReply,
-  ): Promise<CheckPhoneListStatusResponseDto | { message: string }> {
+  ): Promise<
+    CheckPhoneListStatusResponseDto | CheckPhoneListStatusAcceptedResponseDto
+  > {
     try {
       const statusResponse =
         await this.peerlyPhoneListService.checkPhoneListStatus(token)
@@ -52,10 +57,6 @@ export class P2pController {
 
       if (statusResponse.Data.list_state !== PhoneListState.ACTIVE) {
         const status = statusResponse.Data.list_state || 'unknown'
-        this.logger.info(
-          { listState: status },
-          'Phone list not yet active, returning 202',
-        )
         res.status(HttpStatus.ACCEPTED)
         return {
           message:
