@@ -116,6 +116,8 @@ export class P2pPhoneListUploadService {
       withFixColumns = count === 0
       this.logger.debug({ count, withFixColumns }, 'P2P voter count check:')
     } catch (error) {
+      // Catch clause error is unknown — pg error codes are not in the type system
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as { code?: string })?.code === '42703') {
         // Column does not exist — fall back to fixColumns mode
         withFixColumns = true

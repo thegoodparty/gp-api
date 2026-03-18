@@ -74,7 +74,6 @@ class JsonBodyLogRecordProcessor implements LogRecordProcessor {
 const headers = process.env.OTEL_EXPORTER_OTLP_HEADERS
 
 declare global {
-  // eslint-disable-next-line no-var
   var __fastifyOtelInstrumentation: FastifyOtelInstrumentation | undefined
 }
 

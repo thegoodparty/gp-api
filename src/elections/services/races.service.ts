@@ -554,6 +554,8 @@ export class RacesService {
     const content = completion?.content
     let decodedContent: Record<string, string> = {}
     try {
+      // JSON.parse returns unknown — no way to infer parsed shape at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       decodedContent = JSON.parse(content) as Record<string, string>
       decodedContent.level = level
     } catch (e) {

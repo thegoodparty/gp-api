@@ -7,6 +7,8 @@ import {
 } from 'contentful'
 import { Injectable } from '@nestjs/common'
 
+// process.env values are string | undefined — would need requireEnv() refactor
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const { CONTENTFUL_SPACE_ID, CONTENTFUL_ACCESS_TOKEN } = process.env as Record<
   string,
   string
@@ -52,6 +54,8 @@ export class ContentfulService {
       await contentfulClient.sync({
         ...(!nextSyncToken ? { initial: true } : { nextSyncToken }),
       })
+    // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     nextSyncToken = newToken as string
 
     return {

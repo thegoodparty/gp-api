@@ -16,6 +16,8 @@ export class JwtAuthStrategy extends PassportStrategy(Strategy) {
 
   async validate({ sub: userId }: JwtPayload) {
     const user = await this.usersService.findUser({
+      // Type narrowing from nullable/union — runtime context guarantees string but type is broader
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       id: parseInt(userId as string),
     })
     if (!user) {

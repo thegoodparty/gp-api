@@ -438,6 +438,8 @@ export function buildSlackBlocks({
       : undefined,
   ]
 
+  // .filter(x => x !== undefined) doesn't narrow away undefined in TS — would need a type guard
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     blocks: blocks.filter((block) => block !== undefined),
   } as { blocks: SlackMessageBlock[] }

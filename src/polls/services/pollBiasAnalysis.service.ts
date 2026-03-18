@@ -72,6 +72,8 @@ export class PollBiasAnalysisService {
           )
 
           const parsed = this.convertBiasSubstringsToIndices(
+            // LLM structured output typed as unknown — OpenAI SDK returns generic object
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             result.object as {
               bias_spans: {
                 substring: string

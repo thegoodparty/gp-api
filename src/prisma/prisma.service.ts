@@ -20,6 +20,8 @@ export class PrismaService
     super({
       log: PRISMA_LOG_LEVELS.map((level) => ({
         emit: 'event',
+        // Prisma log level from string config — Prisma types the config array loosely
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         level: level as Prisma.LogLevel,
       })),
       errorFormat: 'pretty',

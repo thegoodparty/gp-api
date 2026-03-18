@@ -35,6 +35,8 @@ export class CrmController {
   @Roles(UserRole.admin) // push from all campaigns to hubspot, but only for certain fields
   async massRefreshCompanies(@Query() { fields }: MassRefreshCompanySchema) {
     return await this.crmCampaignsService.massRefreshCompanies(
+      // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       fields as Array<HubSpot.OutgoingProperty>,
     )
   }

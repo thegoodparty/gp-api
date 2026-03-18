@@ -126,6 +126,8 @@ export class ContactsService {
               },
             ),
           )
+          // People API response is untyped — external API returns unknown response shape
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return response.data as PeopleListResponse
         } catch (error) {
           this.logger.error(
@@ -329,6 +331,8 @@ export class ContactsService {
 
   private isTokenValid(token: string): boolean {
     try {
+      // jwt.decode returns string | JwtPayload | null — runtime shape depends on token contents
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const decoded = jwt.decode(token) as { exp?: number }
       if (!decoded || !decoded.exp) {
         return false
@@ -449,6 +453,8 @@ export class ContactsService {
   ): boolean {
     const type = electionType.toLowerCase()
     const stateLong =
+      // Dynamic key lookup into const object — TypeScript cannot narrow string to known keys
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       SHORT_TO_LONG_STATE[stateCode as keyof typeof SHORT_TO_LONG_STATE]
     const matchesCode = districtName.toUpperCase() === stateCode.toUpperCase()
     const matchesLong =
@@ -464,6 +470,8 @@ export class ContactsService {
     const resolvedSegment = segment || 'all'
     const segmentToFiltersMap =
       defaultSegmentToFiltersMap[
+        // Dynamic key lookup into const object — TypeScript cannot narrow string to known keys
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         resolvedSegment as keyof typeof defaultSegmentToFiltersMap
       ]
 

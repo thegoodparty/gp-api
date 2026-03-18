@@ -39,6 +39,8 @@ export class SlackService {
   }
 
   private getChannelConfig(channel: SlackChannel) {
+    // Slack channel config indexed by enum — Record index signature returns string | undefined
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const channelConfig = SLACK_CHANNEL_IDS[channel] as
       | { channelId: string; channelToken: string }
       | undefined

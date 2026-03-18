@@ -28,6 +28,8 @@ export function parseRaces(
       electionDay: string
       name: string
     }
+    // GraphQL codegen types scalars as any — would need custom scalar mapping to fix
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const { name, hasPrimary } = (node?.position || {}) as {
       name: string
       hasPrimary: boolean
@@ -59,6 +61,8 @@ export function parseRaces(
   for (const edge of races.edges) {
     const { node } = edge || {}
     const { isPrimary } = node || {}
+    // GraphQL codegen types scalars as any — would need custom scalar mapping to fix
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const { hasPrimary, id, partisanType } = (node?.position || {}) as {
       hasPrimary: boolean
       id: string

@@ -26,6 +26,8 @@ const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 
 @Injectable()
 export class StripeService {
+  // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   private stripe = new Stripe(STRIPE_SECRET_KEY as string)
 
   constructor(
@@ -105,6 +107,8 @@ export class StripeService {
         {
           // We should never have more than 1 price for Pro. But if we do, this
           //  will need to be more intelligent.
+          // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           price: (await this.getPrice()) as string,
           quantity: 1,
         },
@@ -209,6 +213,8 @@ export class StripeService {
     return this.stripe.webhooks.constructEvent(
       rawBody,
       stripeSignature,
+      // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       STRIPE_WEBSOCKET_SECRET as string,
     )
   }
@@ -237,6 +243,8 @@ export class StripeService {
       return null
     }
 
+    // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const { customer } = checkoutSession as unknown as Stripe.Checkout.Session
 
     if (!customer) {
@@ -281,6 +289,8 @@ export class StripeService {
           })
 
         for (const subscription of response.data) {
+          // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const customer = subscription.customer as Stripe.Customer
           const email = customer?.email
           if (email) {

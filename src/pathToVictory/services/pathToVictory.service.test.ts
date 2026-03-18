@@ -21,7 +21,6 @@ vi.mock('src/observability/grafana/otel.client', () => ({
     mockRecordBlockedStateEvent(...args),
 }))
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const makeCampaign = (p2vData: Record<string, unknown> = {}) => ({
   id: 1,
   userId: 10,

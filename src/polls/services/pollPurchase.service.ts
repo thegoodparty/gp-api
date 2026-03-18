@@ -97,6 +97,8 @@ export class PollPurchaseHandlerService implements PurchaseHandler<unknown> {
       return this.processExpansion(metadata)
     }
 
+    // Stripe metadata typed as Metadata (Record<string, string>) — no generic parameterization
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const userId = (rawMetadata as Record<string, string>)?.userId
     if (!userId) {
       throw new BadRequestException('No userId found in session metadata')

@@ -90,6 +90,8 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         data: {
           assistant: LLAMA_AI_ASSISTANT,
           threadId: completion.threadId,
+          // Prisma optional relation — user.id guaranteed by auth guard but typed as nullable
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           userId: campaign.user?.id as number,
           campaignId: campaign.id,
           data: {
@@ -144,6 +146,8 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
 
     const chatMessage: AiChatMessage = {
       role: 'user',
+      // Type narrowing from nullable — runtime context guarantees string but type is broader
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       content: message as string,
       id: crypto.randomUUID(),
       createdAt: new Date().valueOf(),

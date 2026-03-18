@@ -100,6 +100,8 @@ export class AreaCodeFromZipService {
     }
 
     try {
+      // JSON.parse returns unknown — no way to infer parsed shape at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const mappings = JSON.parse(json) as ZipToAreaCodeMapping
       return mappings[zipCode] || null
     } catch (error) {
@@ -195,6 +197,8 @@ export class AreaCodeFromZipService {
 
     if (existingfile) {
       try {
+        // JSON.parse returns unknown — no way to infer parsed shape at compile time
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         mappings = JSON.parse(existingfile) as ZipToAreaCodeMapping
       } catch (error) {
         this.logger.error(

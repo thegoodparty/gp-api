@@ -227,6 +227,8 @@ export class DomainsService
     // to `always` and `if_required` is subscription-only). The null check below
     // is a defensive guard for any unexpected Stripe behavior.
     const session = await this.stripe.retrieveCheckoutSession(sessionId)
+    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const paymentIntentId = session.payment_intent as string
     if (!paymentIntentId) {
       throw new BadRequestException(
@@ -237,6 +239,8 @@ export class DomainsService
     // Get user from metadata (validation already done in completeCheckoutSession)
     const { user } = await this.payments.getValidatedSessionUser(
       sessionId,
+      // Stripe metadata typed as Metadata | null — no generic parameterization available
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       rawMetadata as Record<string, string>,
     )
 
@@ -289,6 +293,8 @@ export class DomainsService
       const domainParams = {
         websiteId: validWebsiteId,
         name: domainName,
+        // Prisma optional relation — user.id guaranteed by auth guard but typed as nullable
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         price: this.validateDomainSearchResult(searchResult).price as number,
         paymentId,
         status: DomainStatus.pending,
@@ -770,6 +776,8 @@ export class DomainsService
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
     try {
       const paymentIntent = await this.payments.retrievePayment(paymentId)
+      // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return paymentIntent.status as PaymentStatus
     } catch (error) {
       this.logger.warn(

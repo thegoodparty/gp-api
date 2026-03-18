@@ -69,8 +69,12 @@ export class AiContentService {
     // generating a new ai content here
     const cmsPrompts = await this.contentService.getAiContentPrompts()
     const keyNoDigits = key.replace(/\d+$/, '')
+    // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     let prompt = cmsPrompts[keyNoDigits] as string
 
+    // Prisma include query — TypeScript cannot narrow the included relations at compile time
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const campaignWithRelations = (await this.campaignsService.findFirst({
       where: { id: campaign.id },
       include: {
@@ -94,6 +98,8 @@ export class AiContentService {
       await this.slack.errorMessage({
         message: 'empty prompt replace',
         error: {
+          // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           cmsPrompt: cmsPrompts[keyNoDigits] as string | undefined,
           promptAfterReplace: prompt,
           campaign,
@@ -104,6 +110,8 @@ export class AiContentService {
     await this.slack.aiMessage({
       message: 'prompt',
       error: {
+        // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         cmsPrompt: cmsPrompts[keyNoDigits] as string | undefined,
         promptAfterReplace: prompt,
       },
@@ -113,6 +121,8 @@ export class AiContentService {
       ...aiContent.generationStatus[key],
       status: GenerationStatus.processing,
       prompt,
+      // Prisma JSON column typed as JsonValue — chat messages stored as JSON array
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       existingChat: (chat as AiChatMessage[]) || [],
       inputValues,
       createdAt: new Date().valueOf(),
@@ -253,6 +263,8 @@ export class AiContentService {
           name: camelToSentence(key),
           updatedAt: new Date().valueOf(),
           inputValues,
+          // LLM response content is string | null — context guarantees string but type does not
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           content: chatResponse as string,
         }
 
@@ -288,6 +300,8 @@ export class AiContentService {
 
         await this.slack.aiMessage({
           message: `updated campaign with ai. chatResponse: key: ${key}`,
+          // LLM response content is string | null — context guarantees string but type does not
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           error: chatResponse as string,
         })
       }

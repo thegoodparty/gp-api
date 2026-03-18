@@ -21,4 +21,6 @@ function isEnvironment(env: AppEnv) {
   return CURRENT_ENV === env
 }
 
+// NODE_ENV is string | undefined — cannot constrain to AppEnv union without runtime check
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 export const CURRENT_ENVIRONMENT = CURRENT_ENV as AppEnv

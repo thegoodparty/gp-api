@@ -171,6 +171,8 @@ export class AiService {
     }
 
     if (completion && completion?.content) {
+      // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       let content = completion.content as string
       if (content.includes('```html')) {
         content = content.match(/```html([\s\S]*?)```/)![1]
@@ -316,6 +318,8 @@ export class AiService {
     if (match) {
       const [functionName, argsString] = match
       try {
+        // JSON.parse returns unknown — no way to infer parsed shape at compile time
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const args = JSON.parse(argsString) as string
         return {
           function: functionName,
@@ -413,6 +417,8 @@ export class AiService {
       let newPrompt = prompt
 
       const campaignPositions = campaign.campaignPositions
+      // Prisma optional relation — user is guaranteed by auth but Prisma types it as nullable
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const user = campaign.user as User
 
       const name = getUserFullName(user)
@@ -531,6 +537,8 @@ export class AiService {
           totalRegisteredVoters,
           budgetLow,
           budgetHigh,
+        // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
         replaceArr.push(
           {

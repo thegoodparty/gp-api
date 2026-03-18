@@ -54,6 +54,8 @@ export class ElectionsService {
       string,
       string | number | boolean | null | undefined
     >
+    // Object.keys/fromEntries returns string[] — TypeScript deliberately widens key types
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const filteredParams = Object.fromEntries(
       Object.entries(rawParams).filter(
         ([, v]) => v !== undefined && v !== null,
@@ -74,11 +76,11 @@ export class ElectionsService {
       if (status >= 200 && status < 300) return data
       this.logger.warn(`Election API GET ${path}} responded ${status}`)
       return null
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (error: unknown) {
       const baseMessage = `Election API GET ${path} failed`
       if (isAxiosError(error)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // Axios error response is untyped — AxiosError.response.data is unknown
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const data = error.response?.data as Record<string, unknown> | undefined
         const apiMessage =
           typeof data?.message === 'string' ? data.message : undefined
@@ -97,7 +99,6 @@ export class ElectionsService {
   private buildSlackErrorMessage(
     title: string,
     context: Record<string, string | number | boolean | null | undefined>,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     error: unknown,
   ): string {
     const contextLines = Object.entries(context)
@@ -109,6 +110,8 @@ export class ElectionsService {
       ? JSON.stringify(
           {
             status: error.response?.status,
+            // Axios error response is untyped — AxiosError.response.data is unknown
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             data: error.response?.data as Record<
               string,
               string | number | boolean

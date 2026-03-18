@@ -7,6 +7,8 @@ export const VALID_CHAT_ROLES = ['system', 'user', 'assistant'] as const
 export type ValidChatRole = (typeof VALID_CHAT_ROLES)[number]
 
 export const isValidChatRole = (role: string): role is ValidChatRole =>
+  // Braintrust SDK generic return type — SDK returns unknown from LLM proxy calls
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   VALID_CHAT_ROLES.includes(role as ValidChatRole)
 
 class LlmExecutionError extends Error {
@@ -93,6 +95,8 @@ export class BraintrustService {
       )
 
       if (llmExecuted) {
+        // Braintrust SDK generic return type — SDK returns unknown from LLM proxy calls
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return llmResult as T
       }
 
@@ -275,6 +279,8 @@ export class BraintrustService {
     }
 
     // Safe: any non-null, non-array object satisfies Record<string, unknown>
+    // Braintrust SDK generic return type — SDK returns unknown from LLM proxy calls
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as Record<string, unknown>
   }
 }

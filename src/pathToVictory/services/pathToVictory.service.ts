@@ -162,6 +162,8 @@ export class PathToVictoryService extends createPrismaBase(
         searchColumns = await this.officeMatchService.searchDistrictTypes(
           input.slug,
           input.officeName,
+          // String to enum narrowing — GraphQL returns string, runtime validation would add overhead
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           input.electionLevel as ElectionLevel,
           input.electionState,
           input.subAreaName,
@@ -211,6 +213,8 @@ export class PathToVictoryService extends createPrismaBase(
         electionLocation = columnResponse.value
 
         if (
+          // String to enum narrowing — GraphQL returns string, runtime validation would add overhead
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (input.electionLevel as ElectionLevel) === ElectionLevel.federal &&
           (FEDERAL_SPECIAL_PHRASES.some((p) => input.officeName.includes(p)) ||
             input.officeName.includes(SpecialOfficePhrase.Governor)) &&

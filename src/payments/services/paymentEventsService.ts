@@ -75,6 +75,8 @@ export class PaymentEventsService {
       throw new BadRequestException('No subscriptionId found in subscription')
     }
 
+    // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = await this.usersService.findByCustomerId(customerId as string)
     if (!user) {
       throw new BadGatewayException(
@@ -110,6 +112,8 @@ export class PaymentEventsService {
       throw new BadRequestException('No customerId found in subscription')
     }
 
+    // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = await this.usersService.findByCustomerId(customerId as string)
     if (!user) {
       throw new BadGatewayException(
@@ -165,6 +169,8 @@ export class PaymentEventsService {
       subscriptionCancelAt: cancelAt,
     })
 
+    // Prisma optional relation — user is guaranteed by auth but Prisma types it as nullable
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = (await this.usersService.findByCampaign(campaign)) as User
     const isCancellationRequest =
       cancelAt && previousCancelAt && previousCancelAt > cancelAt
@@ -234,6 +240,8 @@ export class PaymentEventsService {
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
     await this.campaignsService.patchCampaignDetails(campaignId, {
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       subscriptionId: subscriptionId as string,
     })
     await this.campaignsService.setIsPro(campaignId)
@@ -251,6 +259,8 @@ export class PaymentEventsService {
 
     // Critical: Update user metadata with customerId - must succeed
     await this.usersService.patchUserMetaData(user.id, {
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       customerId: customerId as string,
       checkoutSessionId: null,
     })

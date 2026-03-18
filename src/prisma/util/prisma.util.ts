@@ -74,7 +74,11 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
       // Have to do these in onModuleInit, client is not available at constructor
       for (const method of PASSTHROUGH_MODEL_METHODS) {
         const thisWithMethod: Record<string, (...args: unknown[]) => unknown> =
+          // Prisma delegate types are dynamically resolved — no static narrowing possible
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           this as unknown as Record<string, (...args: unknown[]) => unknown>
+        // Prisma delegate types are dynamically resolved — no static narrowing possible
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         thisWithMethod[method] = this.model[method].bind(this.model) as (
           ...args: unknown[]
         ) => unknown
@@ -112,6 +116,8 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
     ): Promise<ExistingRecord> {
       // By using the generic T, we know the specific model type at compile time.
       // We create a typed reference to the model delegate to avoid union type issues.
+      // Prisma delegate types are dynamically resolved — no static narrowing possible
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const modelDelegate = this.model as TypedModelDelegate
 
       return retryIf(
@@ -139,6 +145,8 @@ export function createPrismaBase<T extends Prisma.ModelName>(modelName: T) {
 
           const patch = await modification(existing as ExistingRecord)
 
+          // Prisma delegate types are dynamically resolved — no static narrowing possible
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const result = await modelDelegate.updateManyAndReturn({
             where: {
               AND: [params.where, { updatedAt: existing.updatedAt }],

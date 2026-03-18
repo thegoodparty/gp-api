@@ -849,6 +849,8 @@ export class OfficeMatchService {
     ]
 
     const completion = await this.aiService.getChatToolCompletion({
+      // Prisma JSON column typed as JsonValue — chat messages stored as JSON array
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       messages: messages as AiChatMessage[],
       temperature: 0.1,
       topP: 0.1,

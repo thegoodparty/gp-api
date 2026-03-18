@@ -119,7 +119,11 @@ function createJsonOrConditionString(
   const filterLower = filter.toLowerCase().trim()
 
   const normalizedPaths = Array.isArray(paths[0])
+    // Filter array shape depends on runtime condition — could be string[] or string[][]
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     ? (paths as string[][])
+    // Filter array shape depends on runtime condition — could be string[] or string[][]
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     : [paths as string[]]
 
   const orConditions = normalizedPaths

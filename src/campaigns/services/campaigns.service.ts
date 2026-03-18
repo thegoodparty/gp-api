@@ -67,6 +67,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
   ) {
+    // Prisma include query — TypeScript cannot narrow the included relations at compile time
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return this.findFirst({
       where: { userId },
       include,
@@ -293,6 +295,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       const incomingPositionId = details.positionId
       const ballotReadyPositionId =
         incomingPositionId !== undefined
+          // Type narrowing from nullable/union — runtime context guarantees string but type is broader
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           ? (incomingPositionId as string | null)
           : (existing?.details?.positionId ?? null)
 
@@ -338,6 +342,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           ) as PrismaJson.CampaignDetails
           if (details?.customIssues) {
             // If this isn't done, customIssues' entries duplicate
+            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             mergedDetails.customIssues = details.customIssues as Array<{
               position: string
               title: string
@@ -345,6 +351,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           }
           if (details.runningAgainst) {
             // If this isn't done, runningAgainst's entries duplicate
+            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             mergedDetails.runningAgainst = details.runningAgainst as Array<{
               name: string
               party: string
@@ -354,6 +362,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           campaignUpdateData.details = mergedDetails
         }
         if (objectNotEmpty(aiContent)) {
+          // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           campaignUpdateData.aiContent = deepMerge(
             (campaign.aiContent as object) || {},
             aiContent,
@@ -363,6 +373,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         if (details) {
           const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
           const merged =
+            // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             campaignUpdateData.details as PrismaJson.CampaignDetails
           const customPositionName = !position
             ? OrganizationsService.resolveCustomPositionName(
@@ -760,7 +772,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     if (updateExistingVersion === true) {
       for (let i = 0; i < versions[key].length; i++) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const version = versions[key][i]
         if (
           JSON.stringify(version.inputValues) === JSON.stringify(inputValues)

@@ -94,6 +94,8 @@ export class CrmCampaignsService {
     }
     try {
       return await this.getCompanyOwner(
+        // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         parseInt(crmCompany?.properties?.hubspot_owner_id as string),
       )
     } catch (e) {
@@ -187,6 +189,8 @@ export class CrmCampaignsService {
       id: campaignId,
     } = campaign || {}
     const user: User =
+      // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (await this.users.findByCampaign(campaign)) || ({} as User)
     const aiChatCount = userId
       ? await this.aiChat.count({ where: { id: userId } })
@@ -712,6 +716,8 @@ export class CrmCampaignsService {
     campaign: Campaign,
     fields: Array<keyof CRMCompanyProperties | 'all'>,
   ): Promise<SimplePublicObjectBatchInput | null> {
+    // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const id = campaign.data.hubspotId as string
     const crmCompanyProperties =
       await this.calculateCRMCompanyProperties(campaign)
@@ -725,6 +731,8 @@ export class CrmCampaignsService {
       fields,
     )
 
+    // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return { id, properties } as SimplePublicObjectBatchInput
   }
 

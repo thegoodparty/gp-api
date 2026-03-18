@@ -218,6 +218,8 @@ export class QueueConsumerService {
       return true // Delete invalid messages from queue
     }
 
+    // JSON.parse returns unknown — no way to infer parsed shape at compile time
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const queueMessage = JSON.parse(message.Body) as QueueMessage
     this.logger.info(`processing queue message type ${queueMessage.type}`)
 
