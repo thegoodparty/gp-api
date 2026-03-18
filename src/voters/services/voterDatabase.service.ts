@@ -27,8 +27,10 @@ export class VoterDatabaseService implements OnModuleDestroy {
     this.pool.end()
   }
 
-  async query(queryString: string) {
-    return this.pool.query(queryString)
+  async query<R extends Record<string, unknown> = Record<string, unknown>>(
+    queryString: string,
+  ) {
+    return this.pool.query<R>(queryString)
   }
 
   async csvStream(

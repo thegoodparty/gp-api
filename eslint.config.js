@@ -124,14 +124,19 @@ module.exports = defineConfig([{
             format: ["PascalCase"],
         }, {
             selector: "enumMember",
-            format: ["PascalCase", "UPPER_CASE"],
+            format: ["PascalCase", "UPPER_CASE", "camelCase"],
         }, {
             selector: "function",
             format: ["camelCase", "PascalCase"],
         }, {
+            // Destructured variables often mirror external API or DB column names
+            selector: "variable",
+            modifiers: ["destructured"],
+            format: null,
+        }, {
             selector: "variable",
             format: ["camelCase", "UPPER_CASE", "PascalCase"],
-            leadingUnderscore: "allow",
+            leadingUnderscore: "allowSingleOrDouble",
         }, {
             selector: "parameter",
             format: ["camelCase"],

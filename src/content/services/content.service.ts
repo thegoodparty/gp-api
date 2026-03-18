@@ -6,7 +6,7 @@ import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from '../CONTENT_TYPE_MAP.const'
-import { AIChatPromptContents, findByTypeOptions } from '../content.types'
+import { AIChatPromptContents, FindByTypeOptions } from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
 import { InputJsonObject } from '@prisma/client/runtime/client'
@@ -21,7 +21,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     super()
   }
 
-  async findByType({ type, take, orderBy, where }: findByTypeOptions) {
+  async findByType({ type, take, orderBy, where }: FindByTypeOptions) {
     const queryType =
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
 

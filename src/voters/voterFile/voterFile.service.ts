@@ -80,7 +80,7 @@ export class VoterFileService {
     )
     this.logger.debug({ countQuery }, 'Count Query:')
 
-    const sqlResponse = await this.voterDb.query(countQuery)
+    const sqlResponse = await this.voterDb.query<{ count: string }>(countQuery)
     const count = parseInt(String(sqlResponse.rows[0].count))
 
     // If count is 0, try with fix columns as fallback
@@ -94,7 +94,8 @@ export class VoterFileService {
         true,
       )
       this.logger.debug({ countQueryWithFix }, 'Count Query with Fix Columns:')
-      const sqlResponseWithFix = await this.voterDb.query(countQueryWithFix)
+      const sqlResponseWithFix =
+        await this.voterDb.query<{ count: string }>(countQueryWithFix)
       return parseInt(String(sqlResponseWithFix.rows[0].count))
     }
 
@@ -119,7 +120,7 @@ export class VoterFileService {
     )
     this.logger.debug({ countQuery }, 'Count Query:')
 
-    const sqlResponse = await this.voterDb.query(countQuery)
+    const sqlResponse = await this.voterDb.query<{ count: string }>(countQuery)
     const count = parseInt(String(sqlResponse.rows[0].count))
     const withFixColumns = count === 0
 

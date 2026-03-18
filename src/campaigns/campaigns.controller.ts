@@ -314,7 +314,7 @@ export class CampaignsController {
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
-    @Body() { slug, L2DistrictType, L2DistrictName }: SetDistrictDTO,
+    @Body() { slug, L2DistrictType: l2DistrictType, L2DistrictName: l2DistrictName }: SetDistrictDTO,
   ) {
     if (
       slug &&
@@ -332,16 +332,16 @@ export class CampaignsController {
         campaign,
         ...{
           slug,
-          L2DistrictType,
-          L2DistrictName,
+          L2DistrictType: l2DistrictType,
+          L2DistrictName: l2DistrictName,
         },
       },
       'Updating campaign with district',
     )
 
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
-      L2DistrictType,
-      L2DistrictName,
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
       electionDate: campaign.details?.electionDate || '',
       state: campaign.details?.state || '',
     })
@@ -358,15 +358,15 @@ export class CampaignsController {
       await this.organizations.resolveOverrideDistrictId({
         positionId: campaignOrg?.positionId ?? undefined,
         state: campaign.details?.state || '',
-        L2DistrictType,
-        L2DistrictName,
+        L2DistrictType: l2DistrictType,
+        L2DistrictName: l2DistrictName,
       })
 
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         ...(raceTargetDetails || {}),
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
+        electionType: l2DistrictType,
+        electionLocation: l2DistrictName,
         districtManuallySet: true,
         ...(!hasTurnout
           ? {

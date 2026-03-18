@@ -176,11 +176,19 @@ export class AiService {
       }
       content = content.replace('/n', '<br/><br/>')
 
+      // Verbose narrowing required: LangChain types response_metadata as Record<string, any>
+      const tokenUsage: unknown = completion?.response_metadata?.tokenUsage
+      const totalTokens =
+        tokenUsage &&
+        typeof tokenUsage === 'object' &&
+        'totalTokens' in tokenUsage &&
+        typeof tokenUsage.totalTokens === 'number'
+          ? tokenUsage.totalTokens
+          : 0
+
       return {
         content,
-        tokens:
-          (completion?.response_metadata?.tokenUsage?.totalTokens as number) ||
-          0,
+        tokens: totalTokens,
       }
     } else {
       return {

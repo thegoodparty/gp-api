@@ -175,8 +175,8 @@ export class ElectionsService {
 
   async getDistrictId(
     state: string,
-    L2DistrictType: string,
-    L2DistrictName: string,
+    l2DistrictType: string,
+    l2DistrictName: string,
   ): Promise<string | null> {
     const districts = await this.electionApiGet<
       { id: string }[],
@@ -188,8 +188,8 @@ export class ElectionsService {
       }
     >(ElectionApiRoutes.districts.list.path, {
       state,
-      L2DistrictType,
-      L2DistrictName: this.cleanDistrictName(L2DistrictName),
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: this.cleanDistrictName(l2DistrictName),
       districtColumns: 'id',
     })
     return districts?.[0]?.id ?? null
@@ -366,14 +366,14 @@ export class ElectionsService {
   }
 
   async getValidDistrictNames(
-    L2DistrictType: string,
+    l2DistrictType: string,
     state?: string,
     electionYear?: string | number,
     excludeInvalid = true,
   ) {
     const shouldExclude = excludeInvalid === true
     const query = {
-      L2DistrictType,
+      L2DistrictType: l2DistrictType,
       state,
       excludeInvalid: shouldExclude,
       ...(shouldExclude ? { electionYear } : {}),
@@ -384,11 +384,11 @@ export class ElectionsService {
     )
   }
 
-  cleanDistrictName(L2DistrictName: string) {
-    const segments = L2DistrictName.split('##')
+  cleanDistrictName(l2DistrictName: string) {
+    const segments = l2DistrictName.split('##')
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
-    if (segments.length === 0) return L2DistrictName
+    if (segments.length === 0) return l2DistrictName
     let longest = segments[0]
     for (let i = 1; i < segments.length; i++) {
       if (segments[i].length > longest.length) {

@@ -1,4 +1,5 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
+import APIError from 'mailgun.js/Classes/common/Error'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getBasicEmailContent,
@@ -119,24 +120,19 @@ export class EmailService {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
         return await this.mailgun.sendMessage(emailData)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (error: any) {
-        if (error.status === 429) {
-          // Rate limit exceeded
-          const retryAfter =
-            parseInt(String(error.response?.headers?.['retry-after']), 10) || 1 // Retry-After header is in seconds
-          this.logger.warn(
-            `Rate limit exceeded. Retrying after ${retryAfter} seconds...`,
-          )
-          await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
+      } catch (error: unknown) {
+        if (error instanceof APIError && error.status === 429) {
+          this.logger.warn('Rate limit exceeded. Retrying after 1 second...')
+          await new Promise((resolve) => setTimeout(resolve, 1000))
         } else {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error)
           this.logger.error(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            { data: error.message || error },
+            { data: errorMessage },
             'Error sending email via Mailgun:',
           )
           throw new BadGatewayException(
-            `error communicating w/ mail service: ${error instanceof Error ? error.message : String(error)}`,
+            `error communicating w/ mail service: ${errorMessage}`,
           )
         }
       }

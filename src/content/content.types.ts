@@ -2,7 +2,7 @@ import { Content, ContentType, Prisma } from '@prisma/client'
 import { InferredContentTypes } from './CONTENT_TYPE_MAP.const'
 import { PinoLogger } from 'nestjs-pino'
 
-export interface findByTypeOptions {
+export interface FindByTypeOptions {
   type: ContentType | InferredContentTypes
   orderBy?: Prisma.ContentOrderByWithRelationInput
   take?: number

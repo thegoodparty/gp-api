@@ -1,8 +1,8 @@
-export enum ELECTION_LEVELS {
+export enum ElectionLevels {
   Local = 'LOCAL',
   City = 'CITY',
   County = 'COUNTY',
   State = 'STATE',
   Federal = 'FEDERAL',
 }
-export const LEVELS = Object.values(ELECTION_LEVELS) as [string, ...string[]]
+export const LEVELS = Object.values(ElectionLevels) as [string, ...string[]]

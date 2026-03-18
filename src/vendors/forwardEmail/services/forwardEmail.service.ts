@@ -12,7 +12,7 @@ import {
 import { PinoLogger } from 'nestjs-pino'
 
 const FORWARDEMAIL_TIMEOUT_MS = 10000
-enum FORWARDEMAIL_PLAN {
+enum ForwardEmailPlan {
   Free = 'free',
   EnhancedProtection = 'enhanced_protection',
   Team = 'team',
@@ -154,7 +154,7 @@ export class ForwardEmailService {
         await lastValueFrom(
           this.httpService.post<ForwardEmailDomainResponse>(
             `${this.baseUrl}/domains`,
-            { domain: domain.name, plan: FORWARDEMAIL_PLAN.EnhancedProtection },
+            { domain: domain.name, plan: ForwardEmailPlan.EnhancedProtection },
             this.getBaseHttpHeaders(),
           ),
         )

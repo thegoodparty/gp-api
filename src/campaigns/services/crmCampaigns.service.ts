@@ -265,7 +265,7 @@ export class CrmCampaignsService {
       ? HubSpot.ProSubStatus.ACTIVE
       : HubSpot.ProSubStatus.INACTIVE
 
-    const p2v_status =
+    const p2vStatusValue =
       p2vNotNeeded || !p2vStatus
         ? P2V_LOCKED_STATUS
         : totalRegisteredVoters
@@ -350,7 +350,7 @@ export class CrmCampaignsService {
         typeof score === 'number'
           ? Math.floor(score > 5 ? 5 : score)
           : undefined,
-      p2v_status: p2v_status,
+      p2v_status: p2vStatusValue,
       totalregisteredvoters: totalRegisteredVoters
         ? Number(totalRegisteredVoters)
         : undefined,
