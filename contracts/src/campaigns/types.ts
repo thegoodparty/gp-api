@@ -150,7 +150,7 @@ export type CampaignDetails = {
   party?: string
   otherParty?: string
   district?: string
-  raceId?: string
+  raceId?: string | null
   level?: ElectionLevel | null
   noNormalizedOffice?: boolean
   website?: string

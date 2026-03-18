@@ -24,6 +24,8 @@ import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CampaignsService } from './campaigns.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
+import { FEATURE_FLAG_CHECKER } from './campaigns.service'
+
 const GP_POSITION_ID = 'gp-position-uuid-123'
 const BR_POSITION_ID = 'br-position-456'
 
@@ -72,6 +74,7 @@ const buildOrgSyncModule = async (overrides?: {
           findFirst: mockCampaignFindFirst,
         },
         pathToVictory: { update: vi.fn(), create: vi.fn() },
+        electedOffice: { findFirst: vi.fn().mockResolvedValue(null) },
       }
       return callback(
         tx as unknown as Parameters<
@@ -112,6 +115,10 @@ const buildOrgSyncModule = async (overrides?: {
         useValue: { getPositionByBallotReadyId: mockGetPosition },
       },
       { provide: SlackService, useValue: {} },
+      {
+        provide: FEATURE_FLAG_CHECKER,
+        useValue: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
+      },
       { provide: PinoLogger, useValue: createMockLogger() },
       CampaignsService,
     ],
@@ -340,6 +347,7 @@ describe('CampaignsService - Organization positionId sync', () => {
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
+        .mockResolvedValueOnce({ userId: 1 })
         .mockResolvedValueOnce({ details: {} })
         .mockResolvedValueOnce({ ...baseCampaign })
         .mockResolvedValueOnce({ ...baseCampaign })
@@ -364,6 +372,7 @@ describe('CampaignsService - Organization positionId sync', () => {
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
+        .mockResolvedValueOnce({ userId: 1 })
         .mockResolvedValueOnce({ details: { positionId: BR_POSITION_ID } })
         .mockResolvedValueOnce({ ...baseCampaign })
         .mockResolvedValueOnce({ ...baseCampaign })
@@ -388,6 +397,7 @@ describe('CampaignsService - Organization positionId sync', () => {
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
+        .mockResolvedValueOnce({ userId: 1 })
         .mockResolvedValueOnce({ details: {} })
         .mockResolvedValueOnce({ ...baseCampaign })
         .mockResolvedValueOnce({ ...baseCampaign })
@@ -412,6 +422,7 @@ describe('CampaignsService - Organization positionId sync', () => {
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
+        .mockResolvedValueOnce({ userId: 1 })
         .mockResolvedValueOnce({ details: { positionId: BR_POSITION_ID } })
         .mockResolvedValueOnce({ ...baseCampaign })
         .mockResolvedValueOnce({ ...baseCampaign })
@@ -452,6 +463,7 @@ describe('CampaignsService - Organization positionId sync', () => {
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
+        .mockResolvedValueOnce({ userId: 1 })
         .mockResolvedValueOnce({ ...baseCampaign })
         .mockResolvedValueOnce({ ...baseCampaign })
 
@@ -471,6 +483,7 @@ describe('CampaignsService - Organization positionId sync', () => {
         await buildOrgSyncModule()
 
       mockCampaignFindFirst
+        .mockResolvedValueOnce({ userId: 1 })
         .mockResolvedValueOnce({ ...baseCampaign })
         .mockResolvedValueOnce({ ...baseCampaign })
 
@@ -615,6 +628,10 @@ describe('CampaignsService - redeemFreeTexts', () => {
         {
           provide: SlackService,
           useValue: {},
+        },
+        {
+          provide: FEATURE_FLAG_CHECKER,
+          useValue: { isFeatureEnabled: vi.fn().mockResolvedValue(false) },
         },
         // Provide CampaignsService LAST - all dependencies are now available
         { provide: PinoLogger, useValue: createMockLogger() },

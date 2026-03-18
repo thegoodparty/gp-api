@@ -538,7 +538,7 @@ export class PathToVictoryService extends createPrismaBase(
     try {
       const campaign = await this.prisma.campaign.findUnique({
         where: { slug },
-        include: { user: true, pathToVictory: true },
+        include: { user: true, pathToVictory: true, organization: true },
       })
 
       if (!campaign) {
@@ -690,8 +690,13 @@ export class PathToVictoryService extends createPrismaBase(
       // email/analytics/CRM updates from running.
       if (shouldOverwriteDistrict && campaign.details?.state) {
         const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+        const ballotReadyPositionId = campaign.organization?.positionId
+          ? await this.organizationsService.resolveBallotReadyPositionId(
+              campaign.organization.positionId,
+            )
+          : null
         const orgData = await this.organizationsService.resolveOrgData({
-          ballotReadyPositionId: campaign.details?.positionId,
+          ballotReadyPositionId,
           office: campaign.details?.office,
           otherOffice: campaign.details?.otherOffice,
           state: campaign.details.state,

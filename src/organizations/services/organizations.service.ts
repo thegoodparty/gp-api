@@ -1,12 +1,15 @@
 import { ElectionsService } from '@/elections/services/elections.service'
 import { PositionWithOptionalDistrict } from '@/elections/types/elections.types'
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common'
 import { Campaign, ElectedOffice, Organization } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { PatchOrganizationDto } from '../schemas/organization.schema'
+import pmap from 'p-map'
 
 export type OrganizationWithPosition = Organization & {
   position: PositionWithOptionalDistrict | null
@@ -58,6 +61,63 @@ export class OrganizationsService extends createPrismaBase(
     return this.withPosition(org)
   }
 
+  async patchOrganization(
+    userId: number,
+    slug: string,
+    updates: PatchOrganizationDto,
+  ) {
+    const org = await this.getOrganization(userId, slug)
+
+    let position: PositionWithOptionalDistrict | null = org.position
+
+    if (updates.ballotReadyPositionId) {
+      position = await this.electionsService.getPositionByBallotReadyId(
+        updates.ballotReadyPositionId,
+        { includeDistrict: true },
+      )
+
+      if (!position) {
+        throw new BadRequestException('Position not found')
+      }
+    }
+
+    const updated = await this.client.organization.update({
+      where: { slug: org.slug },
+      data: {
+        positionId: position?.id ?? null,
+        overrideDistrictId: updates.overrideDistrictId,
+        customPositionName: updates.customPositionName,
+      },
+      include: { campaign: true, electedOffice: true },
+    })
+
+    return this.withPosition(updated)
+  }
+
+  async adminListOrganizations(filter: string | undefined) {
+    const organizations = await this.client.organization.findMany({
+      where: {
+        owner: {
+          email: { contains: filter },
+        },
+      },
+      include: { owner: true, campaign: true, electedOffice: true },
+      // This is important to prevent the query from scanning the whole table.
+      take: 25,
+    })
+
+    return pmap(
+      organizations,
+      async (org) => {
+        const orgWithPosition = await this.withPosition(org)
+        return { ...orgWithPosition, owner: org.owner }
+      },
+      {
+        concurrency: 5,
+      },
+    )
+  }
+
   /**
    * Resolves positionId, customPositionName, and overrideDistrictId from
    * campaign data by calling the election API.
@@ -94,7 +154,7 @@ export class OrganizationsService extends createPrismaBase(
     let overrideDistrictId: string | null = null
     if (state && L2DistrictType && L2DistrictName) {
       overrideDistrictId = await this.resolveOverrideDistrictId({
-        positionId: ballotReadyPositionId,
+        positionId,
         state,
         L2DistrictType,
         L2DistrictName,
@@ -118,6 +178,13 @@ export class OrganizationsService extends createPrismaBase(
     return position?.id ?? null
   }
 
+  async resolveBallotReadyPositionId(
+    positionId: string,
+  ): Promise<string | null> {
+    const position = await this.electionsService.getPositionById(positionId)
+    return position?.brPositionId ?? null
+  }
+
   /**
    * Resolves the override district ID for a given position and district selection.
    * Returns null if the selected district exactly matches the position's natural
@@ -135,10 +202,9 @@ export class OrganizationsService extends createPrismaBase(
     )
 
     if (positionId) {
-      const position = await this.electionsService.getPositionByBallotReadyId(
-        positionId,
-        { includeDistrict: true },
-      )
+      const position = await this.electionsService.getPositionById(positionId, {
+        includeDistrict: true,
+      })
 
       const isExactMatch =
         position?.district?.L2DistrictType === L2DistrictType &&

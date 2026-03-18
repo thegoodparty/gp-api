@@ -12,10 +12,19 @@ describe('ElectedOfficeController', () => {
       data: {
         userId: service.user.id,
         slug: `test-campaign-${Date.now()}`,
-        details: {
-          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vMTczNzA2',
-        },
       },
+    })
+    const organizationSlug = `campaign-${campaign.id}`
+    await service.prisma.organization.create({
+      data: {
+        slug: organizationSlug,
+        ownerId: service.user.id,
+        positionId: '2875e5f3-ecf0-6fae-f270-6951f85e8468',
+      },
+    })
+    campaign = await service.prisma.campaign.update({
+      where: { id: campaign.id },
+      data: { organizationSlug },
     })
   })
 
@@ -141,8 +150,8 @@ describe('ElectedOfficeController', () => {
         termEndDate: '2026-01-15',
       })
 
-      const organization = await service.prisma.organization.findFirst({
-        where: { ownerId: service.user.id },
+      const organization = await service.prisma.organization.findUnique({
+        where: { slug: `eo-${result.data.id}` },
       })
       expect(organization).toBeDefined()
       expect(organization?.slug).toBe(`eo-${result.data.id}`)
@@ -165,8 +174,8 @@ describe('ElectedOfficeController', () => {
         electedDate: '2024-01-01',
       })
 
-      const organization = await service.prisma.organization.findFirst({
-        where: { ownerId: service.user.id },
+      const organization = await service.prisma.organization.findUnique({
+        where: { slug: `eo-${result.data.id}` },
       })
       expect(organization).toBeDefined()
       expect(organization?.slug).toBe(`eo-${result.data.id}`)
@@ -178,10 +187,10 @@ describe('ElectedOfficeController', () => {
       expect(electedOffice?.organizationSlug).toBe(organization?.slug)
     })
 
-    it('creates elected office when campaign has no positionId', async () => {
-      await service.prisma.campaign.update({
-        where: { id: campaign.id },
-        data: { details: {} },
+    it('creates elected office when organization has no positionId', async () => {
+      await service.prisma.organization.update({
+        where: { slug: campaign.organizationSlug! },
+        data: { positionId: null },
       })
 
       const result = await createElectedOffice({

@@ -49,22 +49,6 @@ test.describe('VoterData', () => {
     expect(response.status()).toBe(HttpStatus.OK)
   })
 
-  test('should get voter locations', async ({ request }) => {
-    const response = await request.get(
-      '/v1/voters/locations?state=VA&electionType=City',
-      {
-        headers: {
-          Authorization: `Bearer ${candidateToken}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(HttpStatus.OK)
-
-    const locations = (await response.json()) as unknown[]
-    expect(Array.isArray(locations)).toBe(true)
-  })
-
   test('should not allow user without campaign to download voter file', async ({
     request,
   }) => {

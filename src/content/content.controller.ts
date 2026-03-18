@@ -1,74 +1,16 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  ParseIntPipe,
-  Query,
-} from '@nestjs/common'
+import { BadRequestException, Controller, Get, Param } from '@nestjs/common'
 import { ContentService } from './services/content.service'
 import { ContentType } from '@prisma/client'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from './CONTENT_TYPE_MAP.const'
-import {
-  groupGlossaryItemsByAlpha,
-  mapGlossaryItemsToSlug,
-} from './util/glossaryItems.util'
-import { BlogArticleMetaService } from './services/blogArticleMeta.service'
 import { PublicAccess } from '../authentication/decorators/PublicAccess.decorator'
-import { DerivedContentTypes } from './content.types'
 
 @Controller('content')
 @PublicAccess()
 export class ContentController {
-  constructor(
-    private readonly contentService: ContentService,
-    private readonly blogArticleMetaService: BlogArticleMetaService,
-  ) {}
-
-  @Get()
-  findAll() {
-    return this.contentService.findAll()
-  }
-
-  @Get(':id')
-  findById(@Param('id') id: string) {
-    return this.contentService.findById(id)
-  }
-
-  @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}`)
-  getGlossaryItems() {
-    return this.contentService.fetchGlossaryItems()
-  }
-
-  // TODO: This endpoint shouldn't be needed: https://goodparty.atlassian.net/browse/WEB-3374
-  @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}/by-letter`)
-  async getGlossaryItemsGroupedByAlpha() {
-    return groupGlossaryItemsByAlpha(
-      await this.contentService.fetchGlossaryItems(),
-    )
-  }
-
-  // TODO: This endpoint shouldn't be needed: https://goodparty.atlassian.net/browse/WEB-3374
-  @Get(`type/${CONTENT_TYPE_MAP.glossaryItem.name}/by-slug`)
-  async getGlossaryItemsMappedBySlug() {
-    return mapGlossaryItemsToSlug(
-      await this.contentService.fetchGlossaryItems(),
-    )
-  }
-
-  @Get(`type/${DerivedContentTypes.blogArticleTitles}`)
-  async getBlogArticleTitles() {
-    return await this.blogArticleMetaService.findMany({
-      select: {
-        title: true,
-        slug: true,
-      },
-    })
-  }
+  constructor(private readonly contentService: ContentService) {}
 
   @Get('type/:type')
   findByType(@Param('type') type: ContentType | InferredContentTypes) {
@@ -89,69 +31,5 @@ export class ContentController {
       updateEntriesCount: updateEntries.length,
       deletedEntriesCount: deletedEntries.length,
     }
-  }
-
-  @Get('blog-articles-by-tag/:tag')
-  async findBlogArticlesByTag(@Param('tag') tag: string) {
-    return this.blogArticleMetaService.findBlogArticlesByTag(tag)
-  }
-
-  @Get('blog-article/:slug')
-  async findBlogArticleBySlug(@Param('slug') slug: string) {
-    const article = (
-      await this.contentService.findByType({
-        type: ContentType.blogArticle,
-        where: {
-          data: {
-            path: ['slug'],
-            equals: slug,
-          },
-        },
-      })
-    )[0]
-    if (!article) {
-      throw new NotFoundException(`Article with slug ${slug} not found`)
-    }
-    return article
-  }
-
-  @Get('blog-articles')
-  async listBlogArticleSummaries(
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-  ) {
-    return this.blogArticleMetaService.findMany({
-      orderBy: {
-        publishDate: 'desc',
-      },
-      ...(limit ? { take: limit } : {}),
-    })
-  }
-
-  @Get(['blog-articles/by-section/:sectionSlug', 'blog-articles/by-section'])
-  async listBlogArticleSummariesBySection(
-    @Param('sectionSlug') sectionSlug?: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number, // Limit articles per section
-  ) {
-    return this.blogArticleMetaService.listArticlesBySection(sectionSlug, limit)
-  }
-
-  @Get('blog-articles/sections')
-  async getBlogArticleSections() {
-    return this.blogArticleMetaService.listArticleSections()
-  }
-
-  @Get('blog-articles/sections/:sectionSlug')
-  async getBlogArticleSectionBySlug(@Param('sectionSlug') sectionSlug: string) {
-    return this.blogArticleMetaService.getBlogArticleSectionBySlug(sectionSlug)
-  }
-
-  @Get('article-tags')
-  async articleTags() {
-    return this.blogArticleMetaService.findBlogArticleTags()
-  }
-
-  @Get('article-tags/:tagSlug')
-  async articleTag(@Param('tagSlug') tagSlug: string) {
-    return this.blogArticleMetaService.findBlogArticleTag(tagSlug)
   }
 }
