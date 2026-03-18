@@ -41,6 +41,7 @@ const clerkEventSchema = z.object({
     primary_email_address_id: z.string().nullable().optional(),
     first_name: z.string().nullable().optional(),
     last_name: z.string().nullable().optional(),
+    image_url: z.string().nullable().optional(),
   }),
 })
 
