@@ -16,6 +16,7 @@ import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
 import { SlackChannel } from '../vendors/slack/slackService.types'
 import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
 import { PinoLogger } from 'nestjs-pino'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 if (!TOGETHER_AI_KEY) {
@@ -69,6 +70,7 @@ type GetAssistantCompletionArgs = {
 export class AiService {
   constructor(
     private slack: SlackService,
+    private readonly organizations: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AiService.name)
@@ -418,8 +420,10 @@ export class AiService {
       if (party === 'Independent') {
         party = 'Independent / non-partisan'
       }
-      const office =
-        details.office === 'Other' ? details.otherOffice : details?.office
+      const positionName =
+        await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
 
       const replaceArr: {
         find: string
@@ -455,9 +459,10 @@ export class AiService {
         },
         {
           find: 'office',
-          replace: `${office}${
-            details.district ? ` in ${details.district}` : ''
-          }`,
+          replace:
+            positionName && details.district
+              ? `${positionName} in ${details.district}`
+              : positionName || '',
         },
         {
           find: 'positions',

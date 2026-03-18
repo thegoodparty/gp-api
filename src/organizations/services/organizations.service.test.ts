@@ -21,6 +21,9 @@ describe('OrganizationsService', () => {
       getDistrictId: mockGetDistrictId,
       cleanDistrictName: mockCleanDistrictName,
     } as unknown as ElectionsService)
+    ;(
+      service as unknown as { logger: { error: ReturnType<typeof vi.fn> } }
+    ).logger = { error: vi.fn() }
 
     vi.clearAllMocks()
   })
@@ -266,6 +269,61 @@ describe('OrganizationsService', () => {
       })
 
       expect(result).toBe('fallback-uuid')
+    })
+  })
+
+  describe('resolvePositionName', () => {
+    it('returns customPositionName when provided', async () => {
+      const result = await service.resolvePositionName({
+        customPositionName: 'Community Advocate',
+        positionId: 'pos-id',
+      })
+
+      expect(result).toBe('Community Advocate')
+      expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+
+    it('returns position name when no customPositionName', async () => {
+      mockGetPositionById.mockResolvedValue({
+        id: 'pos-id',
+        name: 'Mayor',
+      })
+
+      const result = await service.resolvePositionName({
+        customPositionName: null,
+        positionId: 'pos-id',
+      })
+
+      expect(result).toBe('Mayor')
+      expect(mockGetPositionById).toHaveBeenCalledWith('pos-id')
+    })
+
+    it('returns null when no customPositionName and no positionId', async () => {
+      const result = await service.resolvePositionName({
+        customPositionName: null,
+        positionId: null,
+      })
+
+      expect(result).toBeNull()
+      expect(mockGetPositionById).not.toHaveBeenCalled()
+    })
+
+    it('returns null when position lookup fails', async () => {
+      mockGetPositionById.mockRejectedValue(new Error('election-api down'))
+
+      const result = await service.resolvePositionName({
+        customPositionName: null,
+        positionId: 'pos-id',
+      })
+
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('resolvePositionNameByOrganizationSlug', () => {
+    it('returns null when no organizationSlug is provided', async () => {
+      const result = await service.resolvePositionNameByOrganizationSlug(null)
+      expect(result).toBeNull()
     })
   })
 })

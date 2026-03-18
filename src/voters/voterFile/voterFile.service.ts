@@ -18,6 +18,7 @@ import {
   VoterFileType,
 } from './voterFile.types'
 import { PinoLogger } from 'nestjs-pino'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 @Injectable()
 export class VoterFileService {
@@ -26,6 +27,7 @@ export class VoterFileService {
     private readonly slack: SlackService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private readonly crm: WrapperType<CrmCampaignsService>,
+    private readonly organizations: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(VoterFileService.name)
@@ -156,16 +158,16 @@ export class VoterFileService {
     const { details, tier, data } = campaign
     const { hubspotId: crmCompanyId } = data
 
-    const candidateOffice =
-      details.office?.toLowerCase().trim() === 'other'
-        ? details.otherOffice
-        : details.office
+    const candidatePositionName =
+      await this.organizations.resolvePositionNameByOrganizationSlug(
+        campaign.organizationSlug,
+      )
 
     const slackBlocks = buildSlackBlocks({
       name: `${firstName} ${lastName}`,
       email,
       phone,
-      office: candidateOffice,
+      office: candidatePositionName ?? undefined,
       state: details.state,
       tier,
       type,

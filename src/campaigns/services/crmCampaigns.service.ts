@@ -31,6 +31,7 @@ import {
 } from 'src/elections/types/pathToVictory.types'
 import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
 import { PinoLogger } from 'nestjs-pino'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 
@@ -44,6 +45,7 @@ export class CrmCampaignsService {
     private readonly hubspot: HubspotService,
     @Inject(forwardRef(() => CrmUsersService))
     private readonly crmUsers: WrapperType<CrmUsersService>,
+    private readonly organizations: OrganizationsService,
     private readonly aiChat: AiChatService,
     @Inject(forwardRef(() => PathToVictoryService))
     private readonly pathToVictory: WrapperType<PathToVictoryService>,
@@ -254,7 +256,10 @@ export class CrmCampaignsService {
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
-    const resolvedOffice = office === 'Other' ? otherOffice : office
+    const positionName =
+      await this.organizations.resolvePositionNameByOrganizationSlug(
+        campaign.organizationSlug,
+      )
 
     const longState = usStates.find(
       (usState) => usState.abbreviation === state?.toUpperCase(),
@@ -304,7 +309,7 @@ export class CrmCampaignsService {
       candidate_email: user?.email,
       candidate_name: name,
       name: name,
-      candidate_office: resolvedOffice,
+      candidate_office: positionName ?? undefined,
       office_level: ballotLevel,
       candidate_party: party,
       candidate_state: longState,

@@ -41,6 +41,49 @@ export class OrganizationsService extends createPrismaBase(
     return resolved || null
   }
 
+  async resolvePositionName(params: {
+    customPositionName?: string | null
+    positionId?: string | null
+  }): Promise<string | null> {
+    const { customPositionName, positionId } = params
+
+    if (customPositionName) {
+      return customPositionName
+    }
+
+    if (!positionId) {
+      return null
+    }
+
+    try {
+      const position = await this.electionsService.getPositionById(positionId)
+      return position?.name ?? null
+    } catch (error) {
+      this.logger.error(
+        { error, positionId },
+        'Failed to resolve position name from position',
+      )
+      return null
+    }
+  }
+
+  async resolvePositionNameByOrganizationSlug(
+    organizationSlug?: string | null,
+  ): Promise<string | null> {
+    if (!organizationSlug) {
+      return null
+    }
+
+    const organization = await this.findUnique({
+      where: { slug: organizationSlug },
+    })
+
+    return this.resolvePositionName({
+      customPositionName: organization?.customPositionName,
+      positionId: organization?.positionId,
+    })
+  }
+
   async listOrganizations(userId: number) {
     const orgs = await this.model.findMany({
       where: { ownerId: userId },

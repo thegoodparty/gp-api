@@ -194,8 +194,11 @@ describe('CampaignsController', () => {
 
     const organizationsServiceMock: Partial<OrganizationsService> = {
       resolveOverrideDistrictId: vi.fn().mockResolvedValue(null),
-      findUnique: vi.fn().mockResolvedValue({ positionId: 'pos-1' }),
+      findUnique: vi
+        .fn()
+        .mockResolvedValue({ positionId: 'pos-1', customPositionName: null }),
       resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
+      resolvePositionName: vi.fn().mockResolvedValue('Mayor'),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
 
@@ -1230,6 +1233,29 @@ describe('CampaignsController', () => {
         includeTurnout: true,
         officeName: 'Mayor',
       })
+    })
+
+    it('passes undefined officeName when org resolver returns null', async () => {
+      vi.spyOn(organizationsService, 'resolvePositionName').mockResolvedValue(
+        null,
+      )
+      vi.spyOn(
+        electionsService,
+        'getBallotReadyMatchedRaceTargetDetails',
+      ).mockResolvedValue(mockRaceTargetDetails)
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      await controller.updateRaceTargetDetails(mockCampaign)
+
+      expect(
+        electionsService.getBallotReadyMatchedRaceTargetDetails,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          officeName: undefined,
+        }),
+      )
     })
   })
 
