@@ -10,6 +10,7 @@ import seedWebsiteData from './websiteData'
 import seedMtfcc from './mtfcc'
 import seedOffices from './offices'
 import { seedEcanvasserDemoAccount } from './util/seedEcanvasserDemoAccount.util'
+import seedContentful from './contentful'
 
 const IS_PREVIEW = process.env.IS_PREVIEW === 'true'
 const SKIP_MTFCC_SEED = ['true', '1', 'yes'].includes(
@@ -47,6 +48,7 @@ async function main() {
     await seedEcanvasserDemoAccount(ADMIN_USER.email, prisma)
     await seedWebsiteData(prisma)
     await seedOffices(SERVE_USER.email, prisma)
+    await seedContentful(prisma)
   }
 }
 
