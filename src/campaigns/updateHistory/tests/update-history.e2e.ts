@@ -1,28 +1,40 @@
 import { test, expect } from '@playwright/test'
-import { loginUser } from '../../../../e2e-tests/utils/auth.util'
+import {
+  deleteUser,
+  generateRandomEmail,
+  generateRandomName,
+  generateRandomPassword,
+  loginUser,
+  registerUser,
+  RegisterResponse,
+} from '../../../../e2e-tests/utils/auth.util'
 import { CampaignUpdateHistory } from '@prisma/client'
 
 test.describe('Campaigns - Update History', () => {
-  const candidateEmail = process.env.CANDIDATE_EMAIL
-  const candidatePassword = process.env.CANDIDATE_PASSWORD
+  let reg: RegisterResponse
 
-  test.beforeAll(() => {
-    test.skip(
-      !candidateEmail || !candidatePassword,
-      'Candidate credentials not configured',
-    )
+  test.beforeAll(async ({ request }) => {
+    reg = await registerUser(request, {
+      firstName: generateRandomName(),
+      lastName: generateRandomName(),
+      email: generateRandomEmail(),
+      password: generateRandomPassword(),
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (reg?.user?.id && reg?.token) {
+      await deleteUser(request, reg.user.id, reg.token)
+    }
   })
 
   test('should get current user update history', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.get('/v1/campaigns/mine/update-history', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -32,21 +44,14 @@ test.describe('Campaigns - Update History', () => {
       Record<string, string | number | boolean>
     >
     expect(Array.isArray(body)).toBe(true)
-    expect(body.length).toBeGreaterThan(0)
   })
 
   test('should create update history', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const quantity = Math.floor(Math.random() * 100) + 1
 
     const response = await request.post('/v1/campaigns/mine/update-history', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
       data: {
         type: 'doorKnocking',
@@ -63,18 +68,12 @@ test.describe('Campaigns - Update History', () => {
   })
 
   test('should delete update history', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const quantity = Math.floor(Math.random() * 100) + 1
     const createResponse = await request.post(
       '/v1/campaigns/mine/update-history',
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${reg.token}`,
         },
         data: {
           type: 'doorKnocking',
@@ -89,7 +88,7 @@ test.describe('Campaigns - Update History', () => {
       `/v1/campaigns/mine/update-history/${created.id}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${reg.token}`,
         },
       },
     )
@@ -100,15 +99,9 @@ test.describe('Campaigns - Update History', () => {
   test('should deny access to other user update history', async ({
     request,
   }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const slugResponse = await request.get('/v1/campaigns/mine/status', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
     const { slug } = (await slugResponse.json()) as { slug: string }
@@ -117,7 +110,7 @@ test.describe('Campaigns - Update History', () => {
       `/v1/campaigns/mine/update-history?slug=${slug}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${reg.token}`,
         },
       },
     )
@@ -129,27 +122,44 @@ test.describe('Campaigns - Update History', () => {
 test.describe('Campaigns - Update History (Admin Access)', () => {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
-  const candidateEmail = process.env.CANDIDATE_EMAIL
-  const candidatePassword = process.env.CANDIDATE_PASSWORD
+  let candidateReg: RegisterResponse
 
-  test.beforeAll(() => {
-    test.skip(
-      !adminEmail || !adminPassword || !candidateEmail || !candidatePassword,
-      'Admin or candidate credentials not configured',
-    )
+  test.beforeAll(async ({ request }) => {
+    test.skip(!adminEmail || !adminPassword, 'Admin credentials not configured')
+
+    candidateReg = await registerUser(request, {
+      firstName: generateRandomName(),
+      lastName: generateRandomName(),
+      email: generateRandomEmail(),
+      password: generateRandomPassword(),
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
+
+    await request.post('/v1/campaigns/mine/update-history', {
+      headers: {
+        Authorization: `Bearer ${candidateReg.token}`,
+      },
+      data: {
+        type: 'doorKnocking',
+        quantity: 5,
+      },
+    })
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (candidateReg?.user?.id && candidateReg?.token) {
+      await deleteUser(request, candidateReg.user.id, candidateReg.token)
+    }
   })
 
   test('should allow admin to view other user update history', async ({
     request,
   }) => {
-    const candidateLogin = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
     const slugResponse = await request.get('/v1/campaigns/mine/status', {
       headers: {
-        Authorization: `Bearer ${candidateLogin.token}`,
+        Authorization: `Bearer ${candidateReg.token}`,
       },
     })
     const { slug } = (await slugResponse.json()) as { slug: string }
