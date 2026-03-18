@@ -10,7 +10,7 @@ import {
 import { ZodValidationPipe } from 'nestjs-zod'
 import {
   OrganizationsService,
-  OrganizationWithPosition,
+  FriendlyOrganization,
 } from './services/organizations.service'
 import { ReqUser } from '@/authentication/decorators/ReqUser.decorator'
 import { User, UserRole } from '@prisma/client'
@@ -24,28 +24,43 @@ import { pick } from 'es-toolkit'
 type APIOrganization = {
   slug: string
   name: string | null
+  position: null | { id: string; brPositionId: string }
+  district: null | { id: string; l2Type: string; l2Name: string }
   electedOfficeId: string | null
   campaignId: number | null
 }
 
-const toAPIOrganization = (org: OrganizationWithPosition): APIOrganization => {
+const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
   const result: APIOrganization = {
     slug: org.slug,
     name: null,
+    position: null,
+    district: null,
     electedOfficeId: null,
     campaignId: null,
   }
 
+  result.position = org.position
+    ? { id: org.position.id, brPositionId: org.position.brPositionId }
+    : null
+  result.district = org.district
+    ? {
+        id: org.district.id,
+        l2Type: org.district.l2Type,
+        l2Name: org.district.l2Name,
+      }
+    : null
+
   if (org.slug.startsWith('eo-')) {
     result.electedOfficeId = org.slug.replace('eo-', '')
     result.name = org.position?.name ?? null
+    if (org.customPositionName) {
+      result.name = org.customPositionName
+    }
   } else {
     result.campaignId = parseInt(org.slug.replace('campaign-', ''))
     const electionYear = org.campaign?.details.electionDate?.split('-').at(0)
     result.name = [electionYear, 'Campaign'].filter(Boolean).join(' ')
-  }
-  if (org.customPositionName) {
-    result.name = org.customPositionName
   }
   return result
 }

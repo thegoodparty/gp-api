@@ -92,7 +92,7 @@ describe('GET /v1/organizations', () => {
     })
   })
 
-  it('returns customPositionName as name when set', async () => {
+  it('ignores customPositionName for campaign orgs', async () => {
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-3',
@@ -118,7 +118,7 @@ describe('GET /v1/organizations', () => {
         organizations: [
           {
             slug: 'campaign-3',
-            name: 'Custom Office Name',
+            name: '2026 Campaign',
             campaignId: 3,
             electedOfficeId: null,
           },
@@ -319,7 +319,7 @@ describe('GET /v1/organizations/:slug', () => {
     })
   })
 
-  it('returns customPositionName as name when set', async () => {
+  it('ignores customPositionName for campaign orgs', async () => {
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-100',
@@ -343,7 +343,7 @@ describe('GET /v1/organizations/:slug', () => {
       status: 200,
       data: {
         slug: 'campaign-100',
-        name: 'Custom Office Name',
+        name: '2026 Campaign',
         campaignId: 100,
         electedOfficeId: null,
       },
@@ -403,7 +403,7 @@ describe('PATCH /v1/organizations/:slug', () => {
       status: 200,
       data: {
         slug: 'campaign-200',
-        name: 'New Custom Name',
+        name: '2026 Campaign',
         campaignId: 200,
         electedOfficeId: null,
       },
@@ -514,6 +514,12 @@ describe('PATCH /v1/organizations/:slug', () => {
         projectedTurnout: null,
       },
     })
+    vi.spyOn(electionsService, 'getDistrict').mockResolvedValue({
+      id: 'different-district',
+      L2DistrictType: 'City',
+      L2DistrictName: 'Los Angeles',
+      projectedTurnout: null,
+    })
 
     await service.prisma.organization.create({
       data: {
@@ -577,6 +583,14 @@ describe('PATCH /v1/organizations/:slug', () => {
   })
 
   it('clears overrideDistrictId when set to null', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getDistrict').mockResolvedValue({
+      id: 'existing-district',
+      L2DistrictType: 'County',
+      L2DistrictName: 'Test County',
+      projectedTurnout: null,
+    })
+
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-206',
@@ -610,6 +624,14 @@ describe('PATCH /v1/organizations/:slug', () => {
   })
 
   it('preserves overrideDistrictId when not included in update', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getDistrict').mockResolvedValue({
+      id: 'keep-this-district',
+      L2DistrictType: 'County',
+      L2DistrictName: 'Test County',
+      projectedTurnout: null,
+    })
+
     await service.prisma.organization.create({
       data: {
         slug: 'campaign-207',
