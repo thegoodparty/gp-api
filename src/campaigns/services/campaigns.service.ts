@@ -41,6 +41,16 @@ import {
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
 
+// Indirection to avoid a circular import at module load time:
+// campaigns.service → features.service → users.service → crmUsers.service → campaigns.service
+// Once CrmUsersService is decoupled from UsersService (or moved out of
+// the users module), FeaturesService can be injected directly and this
+// token + interface can be removed.
+export const FEATURE_FLAG_CHECKER = Symbol('FEATURE_FLAG_CHECKER')
+export interface FeatureFlagChecker {
+  isFeatureEnabled(params: { user: number; feature: string }): Promise<boolean>
+}
+
 enum CandidateVerification {
   yes = 'YES',
   no = 'NO',
@@ -59,8 +69,40 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     private readonly googlePlaces: GooglePlacesService,
     private readonly elections: ElectionsService,
     private readonly slack: SlackService,
+    @Inject(FEATURE_FLAG_CHECKER)
+    private readonly featureFlags: FeatureFlagChecker,
   ) {
     super()
+  }
+
+  private async shouldReplicateToEO(userId: number): Promise<boolean> {
+    const features = this.featureFlags
+    const isWinServeSplit = await features.isFeatureEnabled({
+      user: userId,
+      feature: 'win-serve-split',
+    })
+    return !isWinServeSplit
+  }
+
+  private async replicateOrgDataToLinkedEO(
+    tx: Prisma.TransactionClient,
+    campaignId: number,
+    orgData: {
+      positionId?: string | null
+      customPositionName?: string | null
+      overrideDistrictId?: string | null
+    },
+  ) {
+    const eo = await tx.electedOffice.findFirst({
+      where: { campaignId },
+      select: { organizationSlug: true },
+    })
+    if (!eo?.organizationSlug) return
+
+    await tx.organization.update({
+      where: { slug: eo.organizationSlug },
+      data: orgData,
+    })
   }
 
   findByUserId<T extends Prisma.CampaignInclude>(
@@ -225,6 +267,11 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       ? await this.elections.getPositionByBallotReadyId(ballotReadyPositionId)
       : null
 
+    const replicate =
+      hasDetailsUpdate && existing
+        ? await this.shouldReplicateToEO(existing.userId)
+        : false
+
     const campaign = await this.client.$transaction(async (tx) => {
       if (hasDetailsUpdate && existing) {
         const orgSlug = OrganizationsService.campaignOrgSlug(args.where.id)
@@ -243,21 +290,19 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           { ballotReadyPositionId, position, orgSlug },
           'Updating organization',
         )
-        await tx.organization.upsert({
+        const orgUpdate = {
+          positionId: position?.id ?? null,
+          customPositionName,
+          overrideDistrictId: null as string | null,
+        }
+        await tx.organization.update({
           where: { slug: orgSlug },
-          update: {
-            positionId: position?.id ?? null,
-            customPositionName,
-            // Clear stale override — it was computed against the previous position.
-            overrideDistrictId: null,
-          },
-          create: {
-            slug: orgSlug,
-            ownerId: existing.userId,
-            positionId: position?.id ?? null,
-            customPositionName,
-          },
+          data: orgUpdate,
         })
+
+        if (replicate) {
+          await this.replicateOrgDataToLinkedEO(tx, args.where.id, orgUpdate)
+        }
       }
 
       return tx.campaign.update(args)
@@ -290,6 +335,18 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     let position: Awaited<
       ReturnType<ElectionsService['getPositionByBallotReadyId']>
     > = null
+
+    const needsReplication = !!(details || overrideDistrictId !== undefined)
+    let replicate = false
+    if (needsReplication) {
+      const owner = await this.model.findFirst({
+        where: { id },
+        select: { userId: true },
+      })
+      if (owner) {
+        replicate = await this.shouldReplicateToEO(owner.userId)
+      }
+    }
 
     if (details) {
       const existing = await this.model.findFirst({
@@ -377,35 +434,38 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
                 merged.otherOffice,
               )
             : null
-          await tx.organization.upsert({
+          const detailsOrgUpdate = {
+            positionId: position?.id ?? null,
+            customPositionName,
+            overrideDistrictId: null as string | null,
+          }
+          await tx.organization.update({
             where: { slug: orgSlug },
-            update: {
-              positionId: position?.id ?? null,
-              customPositionName,
-              // Clear stale override — it was computed against the previous position.
-              overrideDistrictId: null,
-            },
-            create: {
-              slug: orgSlug,
-              ownerId: campaign.userId,
-              positionId: position?.id ?? null,
-              customPositionName,
-            },
+            data: detailsOrgUpdate,
           })
+
+          if (replicate) {
+            await this.replicateOrgDataToLinkedEO(
+              tx,
+              campaign.id,
+              detailsOrgUpdate,
+            )
+          }
         }
 
         if (overrideDistrictId !== undefined) {
           const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
           const districtId = overrideDistrictId ?? null
-          await tx.organization.upsert({
+          await tx.organization.update({
             where: { slug: orgSlug },
-            update: { overrideDistrictId: districtId },
-            create: {
-              slug: orgSlug,
-              ownerId: campaign.userId,
-              overrideDistrictId: districtId,
-            },
+            data: { overrideDistrictId: districtId },
           })
+
+          if (replicate) {
+            await this.replicateOrgDataToLinkedEO(tx, campaign.id, {
+              overrideDistrictId: districtId,
+            })
+          }
         }
 
         await tx.campaign.update({

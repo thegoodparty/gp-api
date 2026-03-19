@@ -45,7 +45,7 @@ declare global {
       party?: string
       otherParty?: string
       district?: string
-      raceId?: string
+      raceId?: string | null
       level?: ElectionLevel | null
       noNormalizedOffice?: boolean
       website?: string

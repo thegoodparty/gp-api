@@ -6,15 +6,9 @@ import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from '../CONTENT_TYPE_MAP.const'
-import {
-  AIChatPromptContents,
-  BlogArticleContentRaw,
-  findByTypeOptions,
-  GlossaryItemAugmented,
-} from '../content.types'
+import { AIChatPromptContents, findByTypeOptions } from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
-import { preProcessBlogArticleMeta } from '../util/preProcessBlogArticleMeta'
 import { InputJsonObject } from '@prisma/client/runtime/client'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -25,23 +19,6 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     private timers: ProcessTimersService,
   ) {
     super()
-  }
-
-  async findAll() {
-    return this.findMany()
-  }
-
-  async findById(id: string) {
-    const content = await this.findFirstOrThrow({
-      where: {
-        id: {
-          equals: id,
-          mode: 'insensitive',
-        },
-      },
-    })
-
-    return this.transformContent(content.type, [content])?.[0]
   }
 
   async findByType({ type, take, orderBy, where }: findByTypeOptions) {
@@ -70,22 +47,12 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     return this.transformContent(type, entries)
   }
 
-  async fetchGlossaryItems(): Promise<GlossaryItemAugmented[]> {
-    const entries = await this.findMany({
-      where: {
-        type: ContentType.glossaryItem,
-      },
-    })
-    return this.transformContent(
-      ContentType.glossaryItem,
-      entries,
-    ) as GlossaryItemAugmented[]
-  }
-
   async getAiContentPrompts() {
     const [onboardingPrompts, candidatePrompts] = await Promise.all([
       this.findByType({ type: ContentType.onboardingPrompts }),
-      this.findByType({ type: InferredContentTypes.candidateContentPrompts }),
+      this.findByType({
+        type: InferredContentTypes.candidateContentPrompts,
+      }),
     ])
     if (!onboardingPrompts || !candidatePrompts) {
       throw new InternalServerErrorException(
@@ -180,10 +147,7 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     await this.client.$transaction(
       async (tx) => {
         for (const entry of updateEntries) {
-          const contentTypeDef = CONTENT_TYPE_MAP[
-            entry.sys.contentType.sys.id
-          ] as (typeof CONTENT_TYPE_MAP)[keyof typeof CONTENT_TYPE_MAP]
-          const record = await tx.content.update({
+          await tx.content.update({
             where: {
               id: entry.sys.id,
             },
@@ -192,51 +156,30 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
                 ...entry.fields,
                 updateDate: new Date(entry.sys.updatedAt)
                   .toISOString()
-                  .split('T')[0], // lets keep the same format as publishDate e.g "2024-06-14"
+                  .split('T')[0],
               } as InputJsonObject,
             },
           })
-          if (contentTypeDef.name === ContentType.blogArticle) {
-            const blogArticleMeta = preProcessBlogArticleMeta(
-              record as BlogArticleContentRaw,
-            )
-            await tx.blogArticleMeta.update({
-              where: {
-                contentId: record.id,
-              },
-              data: blogArticleMeta,
-            })
-          }
         }
 
         for (const entry of createEntries) {
           const contentTypeDef = CONTENT_TYPE_MAP[
             entry.sys.contentType.sys.id
           ] as (typeof CONTENT_TYPE_MAP)[keyof typeof CONTENT_TYPE_MAP]
-          const contentRecord = {
-            id: entry.sys.id,
-            type: contentTypeDef.name as ContentType,
+          await tx.content.create({
             data: {
-              ...entry.fields,
-              updateDate: new Date(entry.sys.updatedAt)
-                .toISOString()
-                .split('T')[0],
-            } as InputJsonObject,
-          }
-          const record = await tx.content.create({
-            data: contentRecord,
+              id: entry.sys.id,
+              type: contentTypeDef.name as ContentType,
+              data: {
+                ...entry.fields,
+                updateDate: new Date(entry.sys.updatedAt)
+                  .toISOString()
+                  .split('T')[0],
+              } as InputJsonObject,
+            },
           })
-          if (contentTypeDef.name === ContentType.blogArticle) {
-            const blogArticleMeta = preProcessBlogArticleMeta(
-              record as BlogArticleContentRaw,
-            )
-            await tx.blogArticleMeta.create({
-              data: blogArticleMeta,
-            })
-          }
         }
 
-        // No need to delete blogArticleMeta records, as they are cascade deleted
         await tx.content.deleteMany({
           where: {
             id: {

@@ -1,28 +1,39 @@
 import { test, expect } from '@playwright/test'
-import { loginUser } from '../../../../e2e-tests/utils/auth.util'
+import {
+  deleteUser,
+  generateRandomEmail,
+  generateRandomName,
+  generateRandomPassword,
+  registerUser,
+  RegisterResponse,
+} from '../../../../e2e-tests/utils/auth.util'
 import { CampaignTask } from '../campaignTasks.types'
 
 type CampaignTaskWithCompletion = CampaignTask & { completed: boolean }
 
 test.describe('Campaigns Tasks - Complete Tasks', () => {
-  const candidateEmail = process.env.CANDIDATE_EMAIL
-  const candidatePassword = process.env.CANDIDATE_PASSWORD
+  let reg: RegisterResponse
   let testTaskId: string
 
-  test.beforeAll(() => {
-    test.skip(
-      !candidateEmail || !candidatePassword,
-      'Candidate credentials not configured',
-    )
+  test.beforeAll(async ({ request }) => {
+    reg = await registerUser(request, {
+      firstName: generateRandomName(),
+      lastName: generateRandomName(),
+      email: generateRandomEmail(),
+      password: generateRandomPassword(),
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (reg?.user?.id && reg?.token) {
+      await deleteUser(request, reg.user.id, reg.token)
+    }
   })
 
   test('should complete a task', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const date = '2025-03-25T21:17:31.648Z'
     const endDate = '2025-04-13T21:17:31.648Z'
 
@@ -30,7 +41,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${reg.token}`,
         },
       },
     )
@@ -42,7 +53,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       `/v1/campaigns/tasks/complete/${testTaskId}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${reg.token}`,
         },
       },
     )
@@ -55,12 +66,6 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
   })
 
   test('should uncomplete a task', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const date = '2025-03-25T21:17:31.648Z'
     const endDate = '2025-04-13T21:17:31.648Z'
 
@@ -68,7 +73,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${reg.token}`,
         },
       },
     )
@@ -78,7 +83,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
 
     await request.put(`/v1/campaigns/tasks/complete/${testTaskId}`, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -86,7 +91,7 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       `/v1/campaigns/tasks/complete/${testTaskId}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${reg.token}`,
         },
       },
     )
