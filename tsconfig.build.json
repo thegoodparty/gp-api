@@ -6,6 +6,7 @@
     "test",
     "dist",
     "e2e-tests",
+    "scripts",
     "**/*spec.ts",
     "**/*.e2e.ts"
   ]
