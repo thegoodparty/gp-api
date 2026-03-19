@@ -24,9 +24,9 @@ export class HubspotService {
   get client(): Client {
     return this.isTokenAvailable()
       ? this._client
-      // Incompatible types require double assertion — no shared base type exists
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      : (this.createMockClient() as unknown as Client)
+      : // Incompatible types require double assertion — no shared base type exists
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (this.createMockClient() as unknown as Client)
   }
 
   private createMockClient(): MockHubspotClient {

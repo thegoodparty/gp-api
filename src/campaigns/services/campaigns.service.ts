@@ -358,9 +358,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       const incomingPositionId = details.positionId
       const ballotReadyPositionId =
         incomingPositionId !== undefined
-          // Type narrowing from nullable/union — runtime context guarantees string but type is broader
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          ? (incomingPositionId as string | null)
+          ? // Type narrowing from nullable/union — runtime context guarantees string but type is broader
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (incomingPositionId as string | null)
           : (existing?.details?.positionId ?? null)
 
       position = ballotReadyPositionId

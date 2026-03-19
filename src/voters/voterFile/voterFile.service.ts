@@ -46,14 +46,14 @@ export class VoterFileService {
       type === VoterFileType.custom && customFilters?.channel
         ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
         : (Object.values(CampaignTaskType) as string[]).includes(type as string)
-          // Union narrowing from dynamic input — runtime value comes from user request
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          ? TASK_TO_TYPE_MAP[type as CampaignTaskType]
+          ? // Union narrowing from dynamic input — runtime value comes from user request
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            TASK_TO_TYPE_MAP[type as CampaignTaskType]
           : type === OutreachType.p2p
             ? VoterFileType.sms
-            // Union narrowing from dynamic input — runtime value comes from user request
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            : (type as VoterFileType)
+            : // Union narrowing from dynamic input — runtime value comes from user request
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              (type as VoterFileType)
 
     if (countOnly) {
       return this.getVoterCount(resolvedType, campaign, customFilters)
@@ -98,8 +98,9 @@ export class VoterFileService {
         true,
       )
       this.logger.debug({ countQueryWithFix }, 'Count Query with Fix Columns:')
-      const sqlResponseWithFix =
-        await this.voterDb.query<{ count: string }>(countQueryWithFix)
+      const sqlResponseWithFix = await this.voterDb.query<{ count: string }>(
+        countQueryWithFix,
+      )
       return parseInt(String(sqlResponseWithFix.rows[0].count))
     }
 

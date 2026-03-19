@@ -314,7 +314,12 @@ export class CampaignsController {
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
-    @Body() { slug, L2DistrictType: l2DistrictType, L2DistrictName: l2DistrictName }: SetDistrictDTO,
+    @Body()
+    {
+      slug,
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
+    }: SetDistrictDTO,
   ) {
     if (
       slug &&

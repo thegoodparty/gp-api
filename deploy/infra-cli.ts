@@ -43,11 +43,15 @@ const run = (cmd: string, opts?: ExecSyncOptions) => {
     })
   } catch (e) {
     console.error(`\nCommand failed: ${cmd}`)
+    // Caught error has no static type — extracting exit code for process.exit
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     process.exit((e as { status?: number }).status ?? 1)
   }
 }
 
 const setupStack = async (env: string) => {
+  // env is validated by this includes check — narrowing string to environment literal
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   if (!ENVIRONMENTS.includes(env as (typeof ENVIRONMENTS)[number])) {
     console.error(
       `Invalid environment: ${env}. Must be one of: ${ENVIRONMENTS.join(', ')}`,

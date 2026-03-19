@@ -226,7 +226,10 @@ export function typeToQuery(
       )`
     }
 
-    if (type === VoterFileType.telemarketing || type === VoterFileType.robocall) {
+    if (
+      type === VoterFileType.telemarketing ||
+      type === VoterFileType.robocall
+    ) {
       columns += `, "VoterTelephones_LandlineFormatted",
       "Languages_Description"`
 

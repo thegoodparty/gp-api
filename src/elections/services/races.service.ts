@@ -248,6 +248,8 @@ export class RacesService {
     let tier: string | number | undefined
 
     try {
+      // BallotReady API response field is untyped — validated with typeof check on next line
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const rawElectionDay = race?.election?.electionDay
       electionDate =
         typeof rawElectionDay === 'string' ? rawElectionDay : undefined

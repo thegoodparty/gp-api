@@ -192,8 +192,8 @@ export class EcanvasserService {
         method = Methods.GET,
         data,
         params = {},
-      // Ecanvasser API client is untyped — third-party SDK has no generic response types
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        // Ecanvasser API client is untyped — third-party SDK has no generic response types
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       } = options as {
         method?: Methods
         data?: Record<string, string | number | boolean>

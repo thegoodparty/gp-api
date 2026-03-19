@@ -87,6 +87,8 @@ export class SlackService {
   ): Promise<string | undefined> {
     return await this.formattedMessage({
       message,
+      // VanitySlackMethodArgs.error is typed as any — passed through to JSON.stringify for logging
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       error,
       channel: channel || SlackChannel.botDev,
     })
@@ -98,6 +100,7 @@ export class SlackService {
   }: VanitySlackMethodArgs): Promise<string | undefined> {
     return this.formattedMessage({
       message,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       error,
       channel: SlackChannel.botAi,
     })

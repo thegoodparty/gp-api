@@ -94,9 +94,10 @@ export class VoterFileFilterService extends createPrismaBase(
       age50Plus,
       genderMale,
       genderFemale,
-    }: Partial<VoterFileFilter> = typeof idOrFilter === 'number'
-      ? await this.model.findUniqueOrThrow({ where: { id: idOrFilter } })
-      : idOrFilter
+    }: Partial<VoterFileFilter> =
+      typeof idOrFilter === 'number'
+        ? await this.model.findUniqueOrThrow({ where: { id: idOrFilter } })
+        : idOrFilter
 
     return {
       ...(audienceSuperVoters === true

@@ -167,7 +167,12 @@ export class AiChatController {
 
   private logApiErrorData(error: unknown) {
     if (error == null || typeof error !== 'object') return
-    if (!('data' in error) || error.data == null || typeof error.data !== 'object') return
+    if (
+      !('data' in error) ||
+      error.data == null ||
+      typeof error.data !== 'object'
+    )
+      return
     if (!('error' in error.data) || typeof error.data.error !== 'string') return
     this.logger.error({ error: error.data.error }, '*** error*** :')
   }

@@ -303,10 +303,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         )
 
       const {
-        data: {
-          campaign_verify_token: _campaignVerifyToken,
-          ...identityBrand
-        },
+        data: { campaign_verify_token: _campaignVerifyToken, ...identityBrand },
       } = response
       this.logger.debug(`Successfully approved 10DLC Brand: ${identityBrand}`)
 

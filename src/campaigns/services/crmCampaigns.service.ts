@@ -558,7 +558,8 @@ export class CrmCampaignsService {
 
     if (propertyName === String(HubSpot.IncomingProperty.election_results)) {
       updatePayload.didWin =
-        propertyValue.toLowerCase() === String(HubSpot.ElectionResult.WON_GENERAL)
+        propertyValue.toLowerCase() ===
+        String(HubSpot.ElectionResult.WON_GENERAL)
     }
 
     this.campaigns.update({

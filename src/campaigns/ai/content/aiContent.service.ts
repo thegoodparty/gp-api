@@ -8,7 +8,7 @@ import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
-import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
+import { GenerationStatus } from './aiContent.types'
 import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import {
   MessageGroup,
