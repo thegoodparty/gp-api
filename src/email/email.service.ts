@@ -1,5 +1,4 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
-import APIError from 'mailgun.js/Classes/common/Error'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getBasicEmailContent,
@@ -120,19 +119,30 @@ export class EmailService {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
         return await this.mailgun.sendMessage(emailData)
-      } catch (error: unknown) {
-        if (error instanceof APIError && error.status === 429) {
-          this.logger.warn('Rate limit exceeded. Retrying after 1 second...')
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+        // Mailgun SDK errors are untyped — catch as any to access status and response headers
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (error.status === 429) {
+          // Rate limit exceeded — parse retry-after from Mailgun response headers
+          const retryAfter =
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+            parseInt(error.response.headers['retry-after'], 10) || 1 // Retry-After header is in seconds
+          this.logger.warn(
+            `Rate limit exceeded. Retrying after ${retryAfter} seconds...`,
+          )
+          await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error)
+          // Mailgun error shape is untyped — safely extract message for logging
           this.logger.error(
-            { data: errorMessage },
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+            { data: error.message || error },
             'Error sending email via Mailgun:',
           )
           throw new BadGatewayException(
-            `error communicating w/ mail service: ${errorMessage}`,
+            'error communicating w/ mail service: ',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            error,
           )
         }
       }

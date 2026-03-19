@@ -178,14 +178,15 @@ export class BraintrustService {
     const validMessages: Array<{ role: ValidChatRole; content: string }> = []
 
     for (const msg of params.messages) {
-      if (!isValidChatRole(msg.role)) {
+      const role = msg.role || 'user'
+      if (!isValidChatRole(role)) {
         this.logger.warn(
-          `Invalid role "${msg.role}" in Braintrust prompt "${promptName}", skipping message`,
+          `Invalid role "${role}" in Braintrust prompt "${promptName}", skipping message`,
         )
         continue
       }
       validMessages.push({
-        role: msg.role,
+        role,
         content: this.extractContent(msg.content),
       })
     }
