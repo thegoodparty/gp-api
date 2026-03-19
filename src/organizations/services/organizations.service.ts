@@ -1,5 +1,4 @@
 import { ElectionsService } from '@/elections/services/elections.service'
-import { PositionWithOptionalDistrict } from '@/elections/types/elections.types'
 import {
   BadRequestException,
   Injectable,
@@ -8,11 +7,18 @@ import {
 } from '@nestjs/common'
 import { Campaign, ElectedOffice, Organization } from '@prisma/client'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { PatchOrganizationDto } from '../schemas/organization.schema'
+import {
+  AdminListOrganizationsDto,
+  PatchOrganizationDto,
+} from '../schemas/organization.schema'
 import pmap from 'p-map'
 
-export type OrganizationWithPosition = Organization & {
-  position: PositionWithOptionalDistrict | null
+export type FriendlyOrganization = {
+  slug: string
+  hasDistrictOverride: boolean
+  customPositionName: string | null
+  position: { id: string; name: string; brPositionId: string } | null
+  district: { id: string; l2Type: string; l2Name: string } | null
   campaign: Campaign | null
   electedOffice: ElectedOffice | null
 }
@@ -46,7 +52,7 @@ export class OrganizationsService extends createPrismaBase(
       where: { ownerId: userId },
       include: { campaign: true, electedOffice: true },
     })
-    return await Promise.all(orgs.map((org) => this.withPosition(org)))
+    return await Promise.all(orgs.map((org) => this.makeFriendly(org)))
   }
 
   async getOrganization(userId: number, slug: string) {
@@ -58,7 +64,7 @@ export class OrganizationsService extends createPrismaBase(
       throw new NotFoundException('Organization not found')
     }
 
-    return this.withPosition(org)
+    return this.makeFriendly(org)
   }
 
   async patchOrganization(
@@ -68,7 +74,7 @@ export class OrganizationsService extends createPrismaBase(
   ) {
     const org = await this.getOrganization(userId, slug)
 
-    let position: PositionWithOptionalDistrict | null = org.position
+    let position: { id: string } | null = org.position
 
     if (updates.ballotReadyPositionId) {
       position = await this.electionsService.getPositionByBallotReadyId(
@@ -91,15 +97,16 @@ export class OrganizationsService extends createPrismaBase(
       include: { campaign: true, electedOffice: true },
     })
 
-    return this.withPosition(updated)
+    return this.makeFriendly(updated)
   }
 
-  async adminListOrganizations(filter: string | undefined) {
+  async adminListOrganizations(query: AdminListOrganizationsDto) {
     const organizations = await this.client.organization.findMany({
       where: {
-        owner: {
-          email: { contains: filter },
-        },
+        OR: [
+          { slug: { contains: query.slug } },
+          { owner: { email: { contains: query.email } } },
+        ],
       },
       include: { owner: true, campaign: true, electedOffice: true },
       // This is important to prevent the query from scanning the whole table.
@@ -109,7 +116,7 @@ export class OrganizationsService extends createPrismaBase(
     return pmap(
       organizations,
       async (org) => {
-        const orgWithPosition = await this.withPosition(org)
+        const orgWithPosition = await this.makeFriendly(org)
         return { ...orgWithPosition, owner: org.owner }
       },
       {
@@ -220,25 +227,61 @@ export class OrganizationsService extends createPrismaBase(
     )
   }
 
-  private async withPosition(
+  private async makeFriendly(
     org: Organization & {
       campaign: Campaign | null
       electedOffice: ElectedOffice | null
     },
-  ) {
-    if (!org.positionId) {
-      return { ...org, position: null }
+  ): Promise<FriendlyOrganization> {
+    const [position, overrideDistrict] = await Promise.all([
+      org.positionId
+        ? this.electionsService
+            .getPositionById(org.positionId, { includeDistrict: true })
+            .then((position) => {
+              if (!position) {
+                throw new InternalServerErrorException(
+                  'Organization references a non-existent position',
+                )
+              }
+              return position
+            })
+        : Promise.resolve(null),
+      org.overrideDistrictId
+        ? this.electionsService
+            .getDistrict(org.overrideDistrictId)
+            .then((district) => {
+              if (!district) {
+                throw new InternalServerErrorException(
+                  'Organization references a non-existent district',
+                )
+              }
+              return district
+            })
+        : Promise.resolve(null),
+    ])
+
+    const district = overrideDistrict ?? position?.district
+
+    return {
+      slug: org.slug,
+      hasDistrictOverride: !!org.overrideDistrictId,
+      customPositionName: org.customPositionName,
+      position: position
+        ? {
+            id: position.id,
+            name: position.name,
+            brPositionId: position.brPositionId,
+          }
+        : null,
+      district: district
+        ? {
+            id: district.id,
+            l2Type: district.L2DistrictType,
+            l2Name: district.L2DistrictName,
+          }
+        : null,
+      campaign: org.campaign,
+      electedOffice: org.electedOffice,
     }
-    const position = await this.electionsService.getPositionById(org.positionId)
-    if (!position) {
-      this.logger.error(
-        { org },
-        'Organization references a non-existent position',
-      )
-      throw new InternalServerErrorException(
-        'Organization references a non-existent position',
-      )
-    }
-    return { ...org, position }
   }
 }
