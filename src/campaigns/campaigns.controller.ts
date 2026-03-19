@@ -529,15 +529,11 @@ export class CampaignsController {
           where: { slug: campaign.organizationSlug },
         })
       : null
-    const ballotreadyPositionId = campaignOrganization?.positionId
-      ? await this.organizations.resolveBallotReadyPositionId(
-          campaignOrganization.positionId,
-        )
-      : null
-    const positionName = await this.organizations.resolvePositionName({
-      customPositionName: campaignOrganization?.customPositionName,
-      positionId: campaignOrganization?.positionId,
-    })
+    const { ballotReadyPositionId: ballotreadyPositionId, name: positionName } =
+      await this.organizations.resolvePositionContext({
+        customPositionName: campaignOrganization?.customPositionName,
+        positionId: campaignOrganization?.positionId,
+      })
 
     return { ballotreadyPositionId, positionName }
   }

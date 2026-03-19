@@ -228,6 +228,31 @@ export class OrganizationsService extends createPrismaBase(
     return position?.brPositionId ?? null
   }
 
+  async resolvePositionContext(params: {
+    customPositionName?: string | null
+    positionId?: string | null
+  }): Promise<{ ballotReadyPositionId: string | null; name: string | null }> {
+    const { customPositionName, positionId } = params
+
+    if (!positionId) {
+      return { ballotReadyPositionId: null, name: customPositionName ?? null }
+    }
+
+    try {
+      const position = await this.electionsService.getPositionById(positionId)
+      return {
+        ballotReadyPositionId: position?.brPositionId ?? null,
+        name: customPositionName || position?.name || null,
+      }
+    } catch (error) {
+      this.logger.error(
+        { error, positionId },
+        'Failed to resolve position context',
+      )
+      return { ballotReadyPositionId: null, name: customPositionName ?? null }
+    }
+  }
+
   /**
    * Resolves the override district ID for a given position and district selection.
    * Returns null if the selected district exactly matches the position's natural
