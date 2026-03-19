@@ -9,6 +9,8 @@ import { createVpc } from './components/vpc'
 export = async () => {
   const config = new pulumi.Config()
 
+  // Pulumi config returns string — narrowing to known environment literals, validated by select() usage
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const environment = config.require('environment') as
     | 'preview'
     | 'dev'
@@ -59,6 +61,8 @@ export = async () => {
     name: secretName,
   })
 
+  // JSON.parse returns any — AWS secret is always a string-keyed object, validated by key checks below
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const secret: Record<string, string> = JSON.parse(
     secretVersion.secretString || '{}',
   ) as Record<string, string>
@@ -407,7 +411,6 @@ export = async () => {
 
   if (environment !== 'preview') {
     createGrafanaResources({ environment })
-
   }
 
   return {

@@ -17,7 +17,6 @@ export class HealthService {
     try {
       await this.prisma.$queryRaw`SELECT 1`
       return true
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (e: unknown) {
       this.logger.error(
         { data: e instanceof Error ? e.message : e },

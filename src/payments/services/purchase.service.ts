@@ -97,6 +97,8 @@ export class PurchaseService {
     // this PI is reused. For checkout sessions we must reject the duplicate to
     // prevent charging the user twice for the same purchase.
     const existingPayment = await handler.validatePurchase({
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ...(dto.metadata as Record<string, unknown>),
       ...(campaign?.id ? { campaignId: campaign?.id } : {}),
     })
@@ -111,6 +113,8 @@ export class PurchaseService {
     // Handlers like outreach need campaignId to check free texts eligibility.
     // We must use the server-validated campaign, not trust the client's campaignId.
     const mergedMetadata = {
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ...(dto.metadata as Record<string, unknown>),
       ...(campaign?.id ? { campaignId: campaign.id } : {}),
     }
@@ -156,6 +160,8 @@ export class PurchaseService {
       allowPromoCodes: true,
       returnUrl,
       metadata: {
+        // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         ...(dto.metadata as Record<string, unknown>),
         ...(campaign?.id ? { campaignId: campaign.id } : {}),
       },
@@ -197,12 +203,16 @@ export class PurchaseService {
       throw new Error(`Checkout session not completed: ${session.status}`)
     }
 
+    // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const purchaseType = session.metadata?.purchaseType as PurchaseType
     if (!purchaseType) {
       throw new Error('No purchase type found in session metadata')
     }
 
     // Check idempotency: verify if post-purchase was already processed
+    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const paymentIntentId = session.payment_intent as string
     if (paymentIntentId) {
       const paymentIntent =

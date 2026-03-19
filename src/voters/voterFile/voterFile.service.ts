@@ -46,10 +46,14 @@ export class VoterFileService {
       type === VoterFileType.custom && customFilters?.channel
         ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
         : (Object.values(CampaignTaskType) as string[]).includes(type as string)
-          ? TASK_TO_TYPE_MAP[type as CampaignTaskType]
+          ? // Union narrowing from dynamic input — runtime value comes from user request
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            TASK_TO_TYPE_MAP[type as CampaignTaskType]
           : type === OutreachType.p2p
             ? VoterFileType.sms
-            : (type as VoterFileType)
+            : // Union narrowing from dynamic input — runtime value comes from user request
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              (type as VoterFileType)
 
     if (countOnly) {
       return this.getVoterCount(resolvedType, campaign, customFilters)
@@ -80,8 +84,8 @@ export class VoterFileService {
     )
     this.logger.debug({ countQuery }, 'Count Query:')
 
-    const sqlResponse = await this.voterDb.query(countQuery)
-    const count = parseInt(sqlResponse.rows[0].count)
+    const sqlResponse = await this.voterDb.query<{ count: string }>(countQuery)
+    const count = parseInt(String(sqlResponse.rows[0].count))
 
     // If count is 0, try with fix columns as fallback
     if (count === 0) {
@@ -94,8 +98,10 @@ export class VoterFileService {
         true,
       )
       this.logger.debug({ countQueryWithFix }, 'Count Query with Fix Columns:')
-      const sqlResponseWithFix = await this.voterDb.query(countQueryWithFix)
-      return parseInt(sqlResponseWithFix.rows[0].count)
+      const sqlResponseWithFix = await this.voterDb.query<{ count: string }>(
+        countQueryWithFix,
+      )
+      return parseInt(String(sqlResponseWithFix.rows[0].count))
     }
 
     return count
@@ -119,8 +125,8 @@ export class VoterFileService {
     )
     this.logger.debug({ countQuery }, 'Count Query:')
 
-    const sqlResponse = await this.voterDb.query(countQuery)
-    const count = parseInt(sqlResponse.rows[0].count)
+    const sqlResponse = await this.voterDb.query<{ count: string }>(countQuery)
+    const count = parseInt(String(sqlResponse.rows[0].count))
     const withFixColumns = count === 0
 
     this.logger.debug({ count }, 'count')

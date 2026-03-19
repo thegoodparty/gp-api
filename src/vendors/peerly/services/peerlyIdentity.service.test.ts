@@ -13,7 +13,7 @@ import { AreaCodeFromZipService } from '../../../ai/util/areaCodeFromZip.util'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { GooglePlacesService } from '../../google/services/google-places.service'
-import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
+import { PeerlyCvVerificationType } from '../peerly.types'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
@@ -192,7 +192,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
+          verification_type: PeerlyCvVerificationType.Federal,
           committee_type: 'H', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
@@ -207,7 +207,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
+          verification_type: PeerlyCvVerificationType.Federal,
           committee_type: 'S', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
@@ -222,7 +222,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
+          verification_type: PeerlyCvVerificationType.Federal,
           committee_type: 'P', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
@@ -238,7 +238,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.STATE,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+          verification_type: PeerlyCvVerificationType.StateLocal,
           committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: false,
@@ -254,7 +254,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.CITY,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+          verification_type: PeerlyCvVerificationType.StateLocal,
           committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: true,
@@ -270,7 +270,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.COUNTY,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+          verification_type: PeerlyCvVerificationType.StateLocal,
           committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: true,

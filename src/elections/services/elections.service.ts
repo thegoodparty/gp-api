@@ -54,6 +54,8 @@ export class ElectionsService {
       string,
       string | number | boolean | null | undefined
     >
+    // Object.keys/fromEntries returns string[] — TypeScript deliberately widens key types
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const filteredParams = Object.fromEntries(
       Object.entries(rawParams).filter(
         ([, v]) => v !== undefined && v !== null,
@@ -67,18 +69,18 @@ export class ElectionsService {
           paramsSerializer: (params) =>
             Object.entries(params)
               .filter(([, v]) => v !== undefined && v !== null)
-              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+              .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
               .join('&'),
         }),
       )) as { data: Res; status: number }
       if (status >= 200 && status < 300) return data
       this.logger.warn(`Election API GET ${path}} responded ${status}`)
       return null
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (error: unknown) {
       const baseMessage = `Election API GET ${path} failed`
       if (isAxiosError(error)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // Axios error response is untyped — AxiosError.response.data is unknown
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const data = error.response?.data as Record<string, unknown> | undefined
         const apiMessage =
           typeof data?.message === 'string' ? data.message : undefined
@@ -97,7 +99,6 @@ export class ElectionsService {
   private buildSlackErrorMessage(
     title: string,
     context: Record<string, string | number | boolean | null | undefined>,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     error: unknown,
   ): string {
     const contextLines = Object.entries(context)
@@ -109,6 +110,8 @@ export class ElectionsService {
       ? JSON.stringify(
           {
             status: error.response?.status,
+            // Axios error response is untyped — AxiosError.response.data is unknown
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             data: error.response?.data as Record<
               string,
               string | number | boolean
@@ -175,8 +178,8 @@ export class ElectionsService {
 
   async getDistrictId(
     state: string,
-    L2DistrictType: string,
-    L2DistrictName: string,
+    l2DistrictType: string,
+    l2DistrictName: string,
   ): Promise<string | null> {
     const districts = await this.electionApiGet<
       { id: string }[],
@@ -188,8 +191,8 @@ export class ElectionsService {
       }
     >(ElectionApiRoutes.districts.list.path, {
       state,
-      L2DistrictType,
-      L2DistrictName: this.cleanDistrictName(L2DistrictName),
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: this.cleanDistrictName(l2DistrictName),
       districtColumns: 'id',
     })
     return districts?.[0]?.id ?? null
@@ -366,14 +369,14 @@ export class ElectionsService {
   }
 
   async getValidDistrictNames(
-    L2DistrictType: string,
+    l2DistrictType: string,
     state?: string,
     electionYear?: string | number,
     excludeInvalid = true,
   ) {
     const shouldExclude = excludeInvalid === true
     const query = {
-      L2DistrictType,
+      L2DistrictType: l2DistrictType,
       state,
       excludeInvalid: shouldExclude,
       ...(shouldExclude ? { electionYear } : {}),
@@ -384,11 +387,12 @@ export class ElectionsService {
     )
   }
 
-  cleanDistrictName(L2DistrictName: string) {
-    const segments = L2DistrictName.split('##')
+  cleanDistrictName(l2DistrictName: string) {
+    const segments = l2DistrictName
+      .split('##')
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
-    if (segments.length === 0) return L2DistrictName
+    if (segments.length === 0) return l2DistrictName
     let longest = segments[0]
     for (let i = 1; i < segments.length; i++) {
       if (segments[i].length > longest.length) {

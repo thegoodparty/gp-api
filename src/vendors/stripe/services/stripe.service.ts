@@ -10,23 +10,18 @@ import {
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import Stripe from 'stripe'
 
-const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
-  process.env
-if (!STRIPE_SECRET_KEY || !WEBAPP_ROOT_URL) {
-  throw new Error(
-    'Please set STRIPE_SECRET_KEY and WEBAPP_ROOT_URL in your .env',
-  )
-}
-if (!STRIPE_WEBSOCKET_SECRET) {
-  throw new Error('Please set STRIPE_WEBSOCKET_SECRET in your .env')
-}
+import { requireEnv } from 'src/shared/utils/env'
+
+const STRIPE_SECRET_KEY = requireEnv('STRIPE_SECRET_KEY')
+const WEBAPP_ROOT_URL = requireEnv('WEBAPP_ROOT_URL')
+const STRIPE_WEBSOCKET_SECRET = requireEnv('STRIPE_WEBSOCKET_SECRET')
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 
 @Injectable()
 export class StripeService {
-  private stripe = new Stripe(STRIPE_SECRET_KEY as string)
+  private stripe = new Stripe(STRIPE_SECRET_KEY)
 
   constructor(
     private readonly slack: SlackService,
@@ -105,6 +100,8 @@ export class StripeService {
         {
           // We should never have more than 1 price for Pro. But if we do, this
           //  will need to be more intelligent.
+          // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           price: (await this.getPrice()) as string,
           quantity: 1,
         },
@@ -209,7 +206,7 @@ export class StripeService {
     return this.stripe.webhooks.constructEvent(
       rawBody,
       stripeSignature,
-      STRIPE_WEBSOCKET_SECRET as string,
+      STRIPE_WEBSOCKET_SECRET,
     )
   }
 
@@ -237,7 +234,7 @@ export class StripeService {
       return null
     }
 
-    const { customer } = checkoutSession as unknown as Stripe.Checkout.Session
+    const { customer } = checkoutSession
 
     if (!customer) {
       return null
@@ -281,6 +278,8 @@ export class StripeService {
           })
 
         for (const subscription of response.data) {
+          // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const customer = subscription.customer as Stripe.Customer
           const email = customer?.email
           if (email) {

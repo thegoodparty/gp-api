@@ -68,8 +68,6 @@ export async function assertResponseOk(
   label: string,
 ): Promise<void> {
   if (!response.ok()) {
-    throw new Error(
-      `${label}: ${response.status()} ${await response.text()}`,
-    )
+    throw new Error(`${label}: ${response.status()} ${await response.text()}`)
   }
 }

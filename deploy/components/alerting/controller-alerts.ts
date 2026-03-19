@@ -21,6 +21,8 @@ export const controllerAlerts = (controller: ControllerName): Alert[] => {
 
   return routes.flatMap((route) => {
     const overrides =
+      // Route endpoint is a string that may match ENDPOINT_OVERRIDES keys — validated by optional chaining below
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ENDPOINT_OVERRIDES[route.endpoint as keyof typeof ENDPOINT_OVERRIDES]
     const p95LatencyMs =
       overrides?.p95LatencyMs ??
@@ -43,6 +45,8 @@ export const controllerAlerts = (controller: ControllerName): Alert[] => {
           `\`${route.endpoint}\` returned unexpected error responses in the last hour (status ≥ 400, excluding 401/403/404/409/498).`,
           'Click *View in Grafana* to find the failing requests, then examine their logs and stack traces to understand why errors are occurring and ship fixes.',
         ].join('\n\n'),
+        // slackGroupName comes from Object.entries find — disabled flag guards undefined case
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         notify: slackGroupName as SlackGroup,
         disabled: !slackGroupName,
       } satisfies Alert,
@@ -57,6 +61,7 @@ export const controllerAlerts = (controller: ControllerName): Alert[] => {
           `\`${route.endpoint}\` p95 latency has exceeded ${p95LatencyMs}ms over the last hour.`,
           'Click *View in Grafana* to find the slow requests, then examine their traces to identify the bottleneck (slow DB queries, external API calls, etc.). If this endpoint is expected to be this slow, <https://github.com/thegoodparty/gp-api/blob/develop/ALERTING.md#how-to-override-thresholds|raise the threshold>.',
         ].join('\n\n'),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         notify: slackGroupName as SlackGroup,
         disabled: !slackGroupName,
       } satisfies Alert,

@@ -212,6 +212,8 @@ export class DomainsService
     // to `always` and `if_required` is subscription-only). The null check below
     // is a defensive guard for any unexpected Stripe behavior.
     const session = await this.stripe.retrieveCheckoutSession(sessionId)
+    // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const paymentIntentId = session.payment_intent as string
     if (!paymentIntentId) {
       throw new BadRequestException(
@@ -222,6 +224,8 @@ export class DomainsService
     // Get user from metadata (validation already done in completeCheckoutSession)
     const { user } = await this.payments.getValidatedSessionUser(
       sessionId,
+      // Stripe metadata typed as Metadata | null — no generic parameterization available
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       metadata as unknown as Record<string, string>,
     )
 
@@ -274,6 +278,8 @@ export class DomainsService
       const domainParams = {
         websiteId: validWebsiteId,
         name: domainName,
+        // Prisma Decimal | null — validateDomainSearchResult guards against null
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         price: this.validateDomainSearchResult(searchResult).price as number,
         paymentId,
         status: DomainStatus.pending,
@@ -484,6 +490,8 @@ export class DomainsService
     try {
       const mxRecords = dnsRecords.filter(
         (r: Records) =>
+          // Vercel SDK types r.type as string — enum comparison is safe since values match
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
           r.type === VercelDnsRecordType.Mx &&
           [FORWARDEMAIL_MX1_VALUE, FORWARDEMAIL_MX2_VALUE].includes(r.value),
       )
@@ -503,6 +511,8 @@ export class DomainsService
     try {
       const txtVerificationRecord = dnsRecords.find(
         (r: Records) =>
+          // Vercel SDK types r.type as string — enum comparison is safe since values match
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
           r.type === VercelDnsRecordType.Txt &&
           r.value ===
             `${FORWARDEMAIL_TXT_VALUE_PREFIX}${forwardEmailDomain.verification_record}`,
@@ -755,6 +765,8 @@ export class DomainsService
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
     try {
       const paymentIntent = await this.payments.retrievePayment(paymentId)
+      // Stripe SDK uses broad union types — cannot narrow without runtime expandable-field check
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return paymentIntent.status as PaymentStatus
     } catch (error) {
       this.logger.warn(
@@ -769,6 +781,8 @@ export class DomainsService
         if (
           errorMessage.includes('no such payment_intent') ||
           errorMessage.includes('not found') ||
+          // Stripe errors have a code property not in the base Error type
+
           (error as Error & { code?: string }).code === 'resource_missing'
         ) {
           // Payment doesn't exist - this might be acceptable in some cases
@@ -781,6 +795,8 @@ export class DomainsService
           errorMessage.includes('network') ||
           errorMessage.includes('timeout') ||
           errorMessage.includes('service') ||
+          // Stripe errors have a code property not in the base Error type
+
           (error as Error & { code?: string }).code === 'api_connection_error'
         ) {
           throw new BadGatewayException(
@@ -791,6 +807,8 @@ export class DomainsService
         // Invalid payment ID format
         if (
           errorMessage.includes('invalid') ||
+          // Stripe errors have a code property not in the base Error type
+
           (error as Error & { code?: string }).code === 'invalid_request_error'
         ) {
           throw new BadRequestException(

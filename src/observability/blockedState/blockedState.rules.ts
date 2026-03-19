@@ -61,5 +61,5 @@ export function deriveRootCause(params: {
     return 'data_integrity_campaign'
   }
 
-  return params.statusCode >= 500 ? 'internal_unknown' : 'internal_unknown'
+  return 'internal_unknown'
 }

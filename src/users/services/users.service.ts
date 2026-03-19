@@ -237,6 +237,8 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     })
 
     const campaign = user?.campaigns?.[0]
+    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const subscriptionId = (campaign?.details as { subscriptionId?: string })
       ?.subscriptionId
 

@@ -1,11 +1,11 @@
 import { CommitteeType, OfficeLevel } from '@prisma/client'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
-import { PEERLY_COMMITTEE_TYPE } from '../peerly.types'
+import { PeerlyCommitteeType } from '../peerly.types'
 
 export const PEERLY_ENTITY_TYPE = 'NON_PROFIT'
 export const PEERLY_USECASE = 'POLITICAL'
 
-export enum PEERLY_LOCALITIES {
+export enum PeerlyLocalities {
   local = 'local',
   state = 'state',
   federal = 'federal',
@@ -13,43 +13,43 @@ export enum PEERLY_LOCALITIES {
 
 export const getPeerlyLocaleFromOfficeLevel = (
   officeLevel: OfficeLevel,
-): PEERLY_LOCALITIES => {
+): PeerlyLocalities => {
   switch (officeLevel) {
     case OfficeLevel.federal:
-      return PEERLY_LOCALITIES.federal
+      return PeerlyLocalities.federal
     case OfficeLevel.state:
-      return PEERLY_LOCALITIES.state
+      return PeerlyLocalities.state
     case OfficeLevel.local:
-      return PEERLY_LOCALITIES.local
+      return PeerlyLocalities.local
   }
 }
 
 export const getPeerlyCommitteeType = (
   committeeType: CommitteeType,
-): PEERLY_COMMITTEE_TYPE => {
+): PeerlyCommitteeType => {
   switch (committeeType) {
     case CommitteeType.HOUSE:
-      return PEERLY_COMMITTEE_TYPE.House
+      return PeerlyCommitteeType.House
     case CommitteeType.SENATE:
-      return PEERLY_COMMITTEE_TYPE.Senate
+      return PeerlyCommitteeType.Senate
     case CommitteeType.PRESIDENTIAL:
-      return PEERLY_COMMITTEE_TYPE.Presidential
+      return PeerlyCommitteeType.Presidential
     case CommitteeType.CANDIDATE:
-      return PEERLY_COMMITTEE_TYPE.Candidate
+      return PeerlyCommitteeType.Candidate
   }
 }
 
 export const PEERLY_LOCALITY_CATEGORIES: Record<
-  PEERLY_LOCALITIES,
+  PeerlyLocalities,
   BallotReadyPositionLevel[]
 > = {
-  [PEERLY_LOCALITIES.local]: [
+  [PeerlyLocalities.local]: [
     BallotReadyPositionLevel.CITY,
     BallotReadyPositionLevel.COUNTY,
     BallotReadyPositionLevel.LOCAL,
     BallotReadyPositionLevel.REGIONAL,
     BallotReadyPositionLevel.TOWNSHIP,
   ],
-  [PEERLY_LOCALITIES.state]: [BallotReadyPositionLevel.STATE],
-  [PEERLY_LOCALITIES.federal]: [BallotReadyPositionLevel.FEDERAL],
+  [PeerlyLocalities.state]: [BallotReadyPositionLevel.STATE],
+  [PeerlyLocalities.federal]: [BallotReadyPositionLevel.FEDERAL],
 }

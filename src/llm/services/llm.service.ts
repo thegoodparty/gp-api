@@ -407,6 +407,8 @@ export class LlmService {
     )
 
     try {
+      // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const completion = (await this.client.chat.completions.create(
         requestParams,
         {
@@ -428,7 +430,10 @@ export class LlmService {
           model,
           baseURL: this.client.baseURL,
           error: error instanceof Error ? error.message : String(error),
-          status: (error as { status?: number })?.status,
+          status:
+            error != null && typeof error === 'object' && 'status' in error
+              ? error.status
+              : undefined,
         },
         'TogetherAI API request failed',
       )
@@ -483,6 +488,8 @@ export class LlmService {
       'Making TogetherAI JSON-mode API request',
     )
 
+    // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const completion = (await this.client.chat.completions.create(
       requestParams,
       {
@@ -565,6 +572,8 @@ export class LlmService {
       stream: false,
     }
 
+    // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const completion = (await this.client.chat.completions.create(
       requestParams,
       {

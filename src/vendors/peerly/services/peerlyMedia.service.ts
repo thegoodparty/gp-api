@@ -75,6 +75,8 @@ export class PeerlyMediaService extends PeerlyBaseConfig {
         maxBodyLength: MAX_FILE_SIZE,
         maxContentLength: MAX_FILE_SIZE,
       })
+      // Peerly API response is untyped — third-party SDK has no typed response interface
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const { data } = response as {
         data: Record<string, string | number | boolean>
       }
