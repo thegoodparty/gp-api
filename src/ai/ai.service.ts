@@ -2,7 +2,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { BaseMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
 
-import { Injectable } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Prisma, User } from '@prisma/client'
 import { OpenAI } from 'openai'
 import {
@@ -70,6 +70,7 @@ type GetAssistantCompletionArgs = {
 export class AiService {
   constructor(
     private slack: SlackService,
+    @Inject(forwardRef(() => OrganizationsService))
     private readonly organizations: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {

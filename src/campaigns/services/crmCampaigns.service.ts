@@ -222,23 +222,17 @@ export class CrmCampaignsService {
     const {
       zip,
       party,
-      office,
       ballotLevel,
-      level: _level,
       state,
       pledged,
-      campaignCommittee: _campaignCommittee,
-      otherOffice,
       district,
       city,
-      website: _website,
       runForOffice,
       electionDate,
       primaryElectionDate,
       filingPeriodsStart,
       filingPeriodsEnd,
       isProUpdatedAt,
-      subscriptionCanceledAt: _subscriptionCanceledAt,
     } = campaignDetails || {}
 
     const canDownloadVoterFile = this.voterFile.canDownload({
