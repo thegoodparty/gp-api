@@ -15,6 +15,7 @@ import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
+  District,
   DistrictNameItem,
   DistrictTypeItem,
   PositionWithOptionalDistrict,
@@ -174,6 +175,10 @@ export class ElectionsService {
       includeTurnout: options?.includeTurnout ?? false,
       electionDate: options?.electionDate,
     })
+  }
+
+  async getDistrict(id: string): Promise<District | null> {
+    return this.electionApiGet<District, object>(`districts/${id}`, {})
   }
 
   async getDistrictId(
