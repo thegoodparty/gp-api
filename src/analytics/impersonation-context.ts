@@ -4,8 +4,7 @@ interface ImpersonationStore {
   isImpersonating: boolean
 }
 
-export const impersonationStorage =
-  new AsyncLocalStorage<ImpersonationStore>()
+export const impersonationStorage = new AsyncLocalStorage<ImpersonationStore>()
 
 export function getImpersonationContext(): boolean | undefined {
   return impersonationStorage.getStore()?.isImpersonating
