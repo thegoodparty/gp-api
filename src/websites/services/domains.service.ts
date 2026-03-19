@@ -172,7 +172,7 @@ export class DomainsService
 
   async handleDomainPostPurchase(
     sessionId: string,
-    rawMetadata: unknown,
+    metadata: DomainPurchaseMetadata & { userId?: string },
   ): Promise<{
     domain: Domain
     registrationResult: {
@@ -182,22 +182,7 @@ export class DomainsService
     }
     message: string
   }> {
-    if (
-      !rawMetadata ||
-      typeof rawMetadata !== 'object' ||
-      !('domainName' in rawMetadata) ||
-      !('websiteId' in rawMetadata) ||
-      !('userId' in rawMetadata)
-    ) {
-      throw new BadRequestException(
-        'Invalid domain purchase metadata: missing required fields',
-      )
-    }
-
-    const domainName = String(rawMetadata.domainName)
-    const websiteId = Number(rawMetadata.websiteId)
-    const userId = String(rawMetadata.userId)
-
+    const { domainName, websiteId, userId } = metadata
     if (!websiteId) {
       throw new BadRequestException(
         'Website ID is required for domain registration',
@@ -241,7 +226,7 @@ export class DomainsService
       sessionId,
       // Stripe metadata typed as Metadata | null — no generic parameterization available
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      rawMetadata as Record<string, string>,
+      metadata as unknown as Record<string, string>,
     )
 
     return this.processDomainRegistration({
@@ -293,7 +278,7 @@ export class DomainsService
       const domainParams = {
         websiteId: validWebsiteId,
         name: domainName,
-        // Prisma optional relation — user.id guaranteed by auth guard but typed as nullable
+        // Prisma Decimal | null — validateDomainSearchResult guards against null
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         price: this.validateDomainSearchResult(searchResult).price as number,
         paymentId,
@@ -505,7 +490,9 @@ export class DomainsService
     try {
       const mxRecords = dnsRecords.filter(
         (r: Records) =>
-          r.type === String(VercelDnsRecordType.Mx) &&
+          // Vercel SDK types r.type as string — enum comparison is safe since values match
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+          r.type === VercelDnsRecordType.Mx &&
           [FORWARDEMAIL_MX1_VALUE, FORWARDEMAIL_MX2_VALUE].includes(r.value),
       )
       if (mxRecords.length === 2) {
@@ -524,7 +511,9 @@ export class DomainsService
     try {
       const txtVerificationRecord = dnsRecords.find(
         (r: Records) =>
-          r.type === String(VercelDnsRecordType.Txt) &&
+          // Vercel SDK types r.type as string — enum comparison is safe since values match
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+          r.type === VercelDnsRecordType.Txt &&
           r.value ===
             `${FORWARDEMAIL_TXT_VALUE_PREFIX}${forwardEmailDomain.verification_record}`,
       )
@@ -792,7 +781,9 @@ export class DomainsService
         if (
           errorMessage.includes('no such payment_intent') ||
           errorMessage.includes('not found') ||
-          ('code' in error && error.code) === 'resource_missing'
+          // Stripe errors have a code property not in the base Error type
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (error as Error & { code?: string }).code === 'resource_missing'
         ) {
           // Payment doesn't exist - this might be acceptable in some cases
           // Return null to maintain backward compatibility for now
@@ -804,7 +795,9 @@ export class DomainsService
           errorMessage.includes('network') ||
           errorMessage.includes('timeout') ||
           errorMessage.includes('service') ||
-          ('code' in error && error.code) === 'api_connection_error'
+          // Stripe errors have a code property not in the base Error type
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (error as Error & { code?: string }).code === 'api_connection_error'
         ) {
           throw new BadGatewayException(
             `Stripe service unavailable: ${error.message}`,
@@ -814,7 +807,9 @@ export class DomainsService
         // Invalid payment ID format
         if (
           errorMessage.includes('invalid') ||
-          ('code' in error && error.code) === 'invalid_request_error'
+          // Stripe errors have a code property not in the base Error type
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (error as Error & { code?: string }).code === 'invalid_request_error'
         ) {
           throw new BadRequestException(
             `Invalid payment ID format: ${error.message}`,
