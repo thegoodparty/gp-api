@@ -141,16 +141,22 @@ module.exports = defineConfig([
         },
         {
           selector: 'enumMember',
-          format: ['PascalCase', 'UPPER_CASE'],
+          format: ['PascalCase', 'UPPER_CASE', 'camelCase'],
         },
         {
           selector: 'function',
           format: ['camelCase', 'PascalCase'],
         },
         {
+          // Destructured variables often mirror external API or DB column names
+          selector: 'variable',
+          modifiers: ['destructured'],
+          format: null,
+        },
+        {
           selector: 'variable',
           format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
-          leadingUnderscore: 'allow',
+          leadingUnderscore: 'allowSingleOrDouble',
         },
         {
           selector: 'parameter',
@@ -176,7 +182,7 @@ module.exports = defineConfig([
     'eslint.config.js',
   ]),
   {
-    files: ['src/**/*.test.ts'],
+    files: ['src/**/*.test.ts', 'src/**/*.e2e.ts', 'src/**/test-utils/**/*.ts'],
 
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
@@ -184,8 +190,25 @@ module.exports = defineConfig([
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-type-assertion': 'off',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'off',
       'max-lines-per-function': 'off',
       complexity: 'off',
+    },
+  },
+  {
+    files: ['seed/**/*.ts', 'e2e-tests/**/*.ts'],
+
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-type-assertion': 'off',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/naming-convention': 'off',
     },
   },
   globalIgnores(['**/generated/', '**/dist/']),
