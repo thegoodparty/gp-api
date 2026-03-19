@@ -33,7 +33,6 @@ export class PathToVictoryController {
 
   @Get('list')
   async list(@Query() query: ListPathToVictoryPaginationSchema) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- IDE-only false positive: resolves correctly via tsc/eslint CLI
     const { data, meta }: PaginatedResults<PathToVictory> =
       await this.pathToVictoryService.listPathToVictories(query)
     return {

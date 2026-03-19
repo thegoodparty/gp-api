@@ -57,6 +57,8 @@ export class SubscribeService {
     }
 
     if (additionalFields) {
+      // JSON.parse returns unknown — no way to infer parsed shape at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const fields = JSON.parse(additionalFields) as Array<{
         name: string
         value: string

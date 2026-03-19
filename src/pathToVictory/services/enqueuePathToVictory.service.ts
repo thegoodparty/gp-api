@@ -74,8 +74,12 @@ export class EnqueuePathToVictoryService {
 
         queueMessage = {
           type: QueueType.PATH_TO_VICTORY,
+          // GraphQL race data spread into typed input — BallotReady types fields as any
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           data: {
             campaignId: campaignId.toString(),
+            // GraphQL race data spread into typed input — BallotReady types fields as any
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(raceData as Record<
               string,
               string | number | boolean | string[]
@@ -132,6 +136,8 @@ export class EnqueuePathToVictoryService {
   private async sendVictoryIssuesSlackMessage(campaign: Campaign, user: User) {
     const { slug, data: details } = campaign
     const { office, state, city, district } =
+      // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (details as PrismaJson.CampaignDetails) || {}
     const appBase = process.env.WEBAPP_ROOT
 

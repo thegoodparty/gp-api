@@ -12,6 +12,8 @@ import { ZodValidationException } from 'nestjs-zod'
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
   constructor(private authenticationService: AuthenticationService) {
+    // PassportStrategy() returns error-typed class — @nestjs/passport types need upstream fix
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     super({
       usernameField: 'email',
     })

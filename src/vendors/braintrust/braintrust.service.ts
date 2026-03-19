@@ -7,6 +7,8 @@ export const VALID_CHAT_ROLES = ['system', 'user', 'assistant'] as const
 export type ValidChatRole = (typeof VALID_CHAT_ROLES)[number]
 
 export const isValidChatRole = (role: string): role is ValidChatRole =>
+  // Braintrust SDK generic return type — SDK returns unknown from LLM proxy calls
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   VALID_CHAT_ROLES.includes(role as ValidChatRole)
 
 class LlmExecutionError extends Error {
@@ -93,6 +95,8 @@ export class BraintrustService {
       )
 
       if (llmExecuted) {
+        // Braintrust SDK generic return type — SDK returns unknown from LLM proxy calls
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return llmResult as T
       }
 
@@ -167,7 +171,7 @@ export class BraintrustService {
     }
 
     const params = prompt.build(variables || {})
-    if (!params.messages || !Array.isArray(params.messages)) {
+    if (!params.messages?.length) {
       return null
     }
 
@@ -182,7 +186,7 @@ export class BraintrustService {
         continue
       }
       validMessages.push({
-        role: role as ValidChatRole,
+        role,
         content: this.extractContent(msg.content),
       })
     }
@@ -229,14 +233,16 @@ export class BraintrustService {
     }, prompt)
   }
 
-  private extractContent(content: unknown): string {
+  private extractContent(
+    content: string | unknown[] | null | undefined,
+  ): string {
     if (typeof content === 'string') {
       return content
     }
 
     if (Array.isArray(content)) {
       return content
-        .map((block) => {
+        .map((block: unknown) => {
           if (typeof block === 'string') return block
           if (block && typeof block === 'object') {
             if ('text' in block) return String(block.text)
@@ -250,27 +256,32 @@ export class BraintrustService {
     return String(content || '')
   }
 
+  private hasToJSON(
+    value: object,
+  ): value is { toJSON(): Record<string, unknown> } {
+    return 'toJSON' in value && typeof value.toJSON === 'function'
+  }
+
   private serializeOutput(result: unknown): Record<string, unknown> {
     if (result === null || result === undefined) {
       return { result: null }
     }
 
-    if (
-      typeof result === 'object' &&
-      'toJSON' in result &&
-      typeof (result as { toJSON: unknown }).toJSON === 'function'
-    ) {
-      return (result as { toJSON: () => Record<string, unknown> }).toJSON()
-    }
-
-    if (typeof result === 'object' && !Array.isArray(result)) {
-      return result as Record<string, unknown>
+    if (typeof result !== 'object') {
+      return { result: String(result) }
     }
 
     if (Array.isArray(result)) {
       return { result }
     }
 
-    return { result: String(result) }
+    if (this.hasToJSON(result)) {
+      return result.toJSON()
+    }
+
+    // Safe: any non-null, non-array object satisfies Record<string, unknown>
+    // Braintrust SDK generic return type — SDK returns unknown from LLM proxy calls
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return result as Record<string, unknown>
   }
 }

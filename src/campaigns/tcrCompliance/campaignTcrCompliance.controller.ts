@@ -22,7 +22,7 @@ import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
 import { UsersService } from '../../users/services/users.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
-import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
+import { SubmitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { EVENTS } from 'src/vendors/segment/segment.types'
@@ -142,7 +142,7 @@ export class CampaignTcrComplianceController {
   @HttpCode(HttpStatus.OK)
   async submitCampaignVerifyPIN(
     @Param('id') tcrComplianceId: string,
-    @Body() { pin }: submitCampaignVerifyPinDto,
+    @Body() { pin }: SubmitCampaignVerifyPinDto,
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
   ) {

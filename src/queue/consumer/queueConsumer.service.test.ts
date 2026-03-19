@@ -804,7 +804,6 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
     })
 
     describe('handlePathToVictoryFailure', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let handleFailure: (
         campaign: ReturnType<typeof makeCampaign>,
       ) => Promise<boolean>

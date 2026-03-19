@@ -39,6 +39,8 @@ export class SlackService {
   }
 
   private getChannelConfig(channel: SlackChannel) {
+    // Slack channel config indexed by enum — Record index signature returns string | undefined
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const channelConfig = SLACK_CHANNEL_IDS[channel] as
       | { channelId: string; channelToken: string }
       | undefined
@@ -85,7 +87,9 @@ export class SlackService {
   ): Promise<string | undefined> {
     return await this.formattedMessage({
       message,
-      error: error as Error | string | Record<string, unknown>,
+      // VanitySlackMethodArgs.error is typed as any — passed through to JSON.stringify for logging
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      error,
       channel: channel || SlackChannel.botDev,
     })
   }
@@ -96,7 +100,8 @@ export class SlackService {
   }: VanitySlackMethodArgs): Promise<string | undefined> {
     return this.formattedMessage({
       message,
-      error: error as Error | string | Record<string, unknown>,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      error,
       channel: SlackChannel.botAi,
     })
   }

@@ -25,6 +25,8 @@ export class SocialLoginStrategy extends PassportStrategy(
     const { socialProvider } = req.params
     // TODO: figure out how to properly type req.body in a PassportStrategy so as to
     // avoid using `unknown` and `as` casts
+    // Express/Fastify request body is any — framework does not parameterize request generics
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const socialAuthPayload = req.body as unknown as SocialAuthPayload
     return this.authService.socialUserValidation(
       socialAuthPayload,

@@ -93,7 +93,6 @@ export class UpdateCampaignSchema extends createZodDto(
     .partial()
     .extend({
       details: CampaignDetailsSchema.optional(),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
     })
     .strict(),

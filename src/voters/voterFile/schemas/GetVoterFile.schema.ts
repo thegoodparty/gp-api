@@ -17,6 +17,8 @@ const LOWER_CASE_TYPE_MAP = {
 }
 
 const SelectedColumnSchema = z.object({
+  // Zod z.enum() requires non-empty tuple — Object.values() returns string[], not [string, ...]
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   db: z.enum(ALLOWED_COLUMNS as [string, ...string[]]),
   label: z.string().optional(),
 })
@@ -26,6 +28,8 @@ export class GetVoterFileSchema extends createZodDto(
     type: z.preprocess(
       (val) => {
         // check if val is a lowercase version
+        // Zod transform input is unknown — z.preprocess callback receives unknown
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return LOWER_CASE_TYPE_MAP[val as string] ?? val
       },
       z.union([
