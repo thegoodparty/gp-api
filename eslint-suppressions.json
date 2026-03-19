@@ -1,4 +1,95 @@
 {
+  "deploy/components/alerting/controller-alerts.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 3
+    }
+  },
+  "deploy/index.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    },
+    "prettier/prettier": {
+      "count": 1
+    }
+  },
+  "deploy/infra-cli.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "e2e-tests/utils/auth.util.ts": {
+    "@typescript-eslint/no-unsafe-enum-comparison": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "e2e-tests/utils/request.util.ts": {
+    "prettier/prettier": {
+      "count": 1
+    }
+  },
+  "seed/campaigns.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "seed/contentful.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "seed/factories/campaign.factory.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "seed/factories/campaignPosition.factory.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "seed/factories/generate.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "seed/factories/position.factory.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "seed/factories/topIssue.factory.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed/mtfcc.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 16
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "seed/util/csv.util.ts": {
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 1
+    }
+  },
   "src/admin/tests/admin.e2e.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
@@ -141,21 +232,6 @@
       "count": 1
     }
   },
-  "src/campaigns/map/campaignMap.service.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 4
-    }
-  },
-  "src/campaigns/map/tests/get-map-count.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
-    }
-  },
-  "src/campaigns/map/tests/get-map.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 4
-    }
-  },
   "src/campaigns/services/campaigns.service.test.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 13
@@ -184,17 +260,6 @@
     },
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 4
-    }
-  },
-  "src/campaigns/services/geocoding.service.ts": {
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 2
     }
   },
   "src/campaigns/tasks/campaignTasks.types.ts": {
@@ -280,102 +345,22 @@
   },
   "src/content/CONTENT_TYPE_MAP.const.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 9
+      "count": 4
     }
   },
   "src/content/content.types.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 2
+      "count": 1
     }
   },
   "src/content/services/content.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 9
+      "count": 5
     }
   },
   "src/content/tests/aiContent.e2e.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 5
-    }
-  },
-  "src/content/tests/articleTags.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 2
-    }
-  },
-  "src/content/tests/blogArticles.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 6
-    }
-  },
-  "src/content/tests/blogArticlesBySection.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 4
-    }
-  },
-  "src/content/tests/blogSections.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
-    }
-  },
-  "src/content/tests/faqArticles.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
-    }
-  },
-  "src/content/tests/general.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
-    }
-  },
-  "src/content/tests/glossaryItems.e2e.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
-    }
-  },
-  "src/content/transformers/blogSectionsTransformer.ts": {
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    }
-  },
-  "src/content/transformers/glossaryItemsTransformer.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    }
-  },
-  "src/content/util/glossaryItems.util.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/content/util/mapBlogArticlesToSections.util.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/content/util/transformBlogArticleReferences.util.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/content/util/transformContentMedia.util.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
     }
   },
   "src/crm/crm.controller.ts": {
@@ -391,14 +376,6 @@
   "src/crm/hubspot.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 2
-    }
-  },
-  "src/declare/declare.service.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
     }
   },
   "src/electedOffice/guards/UseElectedOffice.guard.test.ts": {
@@ -476,7 +453,7 @@
   },
   "src/email/email.types.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 7
+      "count": 4
     }
   },
   "src/email/mailgun.service.ts": {
@@ -485,27 +462,6 @@
     }
   },
   "src/files/interceptors/files.interceptor.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 3
-    }
-  },
-  "src/jobs/jobs.controller.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
-  "src/jobs/jobs.service.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 3
-    }
-  },
-  "src/jobs/tests/jobs.e2e.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 3
     }
@@ -547,9 +503,6 @@
   },
   "src/otel.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-call": {
       "count": 1
     }
   },
@@ -598,17 +551,11 @@
   },
   "src/pathToVictory/services/pathToVictory.service.test.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 6
+      "count": 4
     }
   },
   "src/pathToVictory/services/pathToVictory.service.ts": {
     "@typescript-eslint/no-unsafe-enum-comparison": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
       "count": 1
     },
     "@typescript-eslint/no-unsafe-type-assertion": {
@@ -878,6 +825,11 @@
       "count": 1
     }
   },
+  "src/vendors/peerly/p2p.controller.test.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 3
+    }
+  },
   "src/vendors/peerly/peerly.types.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
@@ -920,6 +872,11 @@
   "src/vendors/peerly/services/peerlyMedia.service.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1
+    }
+  },
+  "src/vendors/peerly/services/peerlyPhoneList.service.test.ts": {
+    "@typescript-eslint/no-unsafe-type-assertion": {
+      "count": 4
     }
   },
   "src/vendors/peerly/utils/audienceMapping.util.ts": {
@@ -975,7 +932,7 @@
   },
   "src/voters/tests/voter-data.e2e.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 2
+      "count": 1
     }
   },
   "src/voters/util/voterOutreach.util.ts": {
