@@ -430,9 +430,10 @@ export class LlmService {
           model,
           baseURL: this.client.baseURL,
           error: error instanceof Error ? error.message : String(error),
-          // Catch clause error is unknown — OpenAI SDK errors have status but no shared type
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          status: (error as { status?: number })?.status,
+          status:
+            error != null && typeof error === 'object' && 'status' in error
+              ? error.status
+              : undefined,
         },
         'TogetherAI API request failed',
       )

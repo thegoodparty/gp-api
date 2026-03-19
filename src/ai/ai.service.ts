@@ -3,7 +3,7 @@ import { BaseMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
 
 import { Injectable } from '@nestjs/common'
-import { Prisma, User } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { OpenAI } from 'openai'
 import {
   ChatCompletion,
@@ -417,9 +417,10 @@ export class AiService {
       let newPrompt = prompt
 
       const campaignPositions = campaign.campaignPositions
-      // Prisma optional relation — user is guaranteed by auth but Prisma types it as nullable
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const user = campaign.user as User
+      if (!campaign.user) {
+        throw new Error('Campaign has no associated user')
+      }
+      const user = campaign.user
 
       const name = getUserFullName(user)
       const details = campaign.details
@@ -537,8 +538,8 @@ export class AiService {
           totalRegisteredVoters,
           budgetLow,
           budgetHigh,
-        // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
         replaceArr.push(
           {

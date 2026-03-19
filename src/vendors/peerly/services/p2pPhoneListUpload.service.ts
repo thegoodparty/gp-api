@@ -110,15 +110,19 @@ export class P2pPhoneListUploadService {
     )
     let withFixColumns = false
     try {
-      const sqlResponse =
-        await this.voterDatabaseService.query<{ count: string }>(countQuery)
+      const sqlResponse = await this.voterDatabaseService.query<{
+        count: string
+      }>(countQuery)
       const count = parseInt(String(sqlResponse.rows[0].count))
       withFixColumns = count === 0
       this.logger.debug({ count, withFixColumns }, 'P2P voter count check:')
     } catch (error) {
-      // Catch clause error is unknown — pg error codes are not in the type system
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      if ((error as { code?: string })?.code === '42703') {
+      if (
+        error != null &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === '42703'
+      ) {
         // Column does not exist — fall back to fixColumns mode
         withFixColumns = true
         this.logger.debug(

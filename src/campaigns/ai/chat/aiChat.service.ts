@@ -86,13 +86,14 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         usage: completion.usage,
       }
 
+      if (!campaign.user?.id) {
+        throw new Error('Campaign has no associated user')
+      }
       await this.model.create({
         data: {
           assistant: LLAMA_AI_ASSISTANT,
           threadId: completion.threadId,
-          // Prisma optional relation — user.id guaranteed by auth guard but typed as nullable
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          userId: campaign.user?.id as number,
+          userId: campaign.user.id,
           campaignId: campaign.id,
           data: {
             messages: [chatMessage, chatResponse],

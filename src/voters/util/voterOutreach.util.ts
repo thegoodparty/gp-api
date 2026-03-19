@@ -438,7 +438,7 @@ export function buildSlackBlocks({
       : undefined,
   ]
 
-  // .filter(x => x !== undefined) doesn't narrow away undefined in TS — would need a type guard
+  // SlackMessageBlock type doesn't include all properties used in blocks (e.g. url) — needs type update
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     blocks: blocks.filter((block) => block !== undefined),
