@@ -1,7 +1,14 @@
 import { test, expect } from '@playwright/test'
 import { HttpStatus } from '@nestjs/common'
 import { OutreachType } from '@prisma/client'
-import { loginUser } from '../../../e2e-tests/utils/auth.util'
+import {
+  deleteUser,
+  generateRandomEmail,
+  generateRandomName,
+  generateRandomPassword,
+  registerUser,
+  RegisterResponse,
+} from '../../../e2e-tests/utils/auth.util'
 import { resolveScriptContent } from '../util/resolveScriptContent.util'
 
 interface Outreach {
@@ -14,25 +21,24 @@ interface Outreach {
 }
 
 test.describe('Outreach', () => {
-  const candidateEmail = process.env.CANDIDATE_EMAIL
-  const candidatePassword = process.env.CANDIDATE_PASSWORD
+  let reg: RegisterResponse
 
-  test.beforeAll(() => {
-    test.skip(
-      !candidateEmail || !candidatePassword,
-      'Candidate credentials not configured',
-    )
+  test.beforeAll(async ({ request }) => {
+    reg = await registerUser(request, {
+      firstName: generateRandomName(),
+      lastName: generateRandomName(),
+      email: generateRandomEmail(),
+      password: generateRandomPassword(),
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
   })
 
-  let candidateToken: string
-
-  test.beforeEach(async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-    candidateToken = token
+  test.afterAll(async ({ request }) => {
+    if (reg?.user?.id && reg?.token) {
+      await deleteUser(request, reg.user.id, reg.token)
+    }
   })
 
   test('should fetch outreach campaigns for authenticated user', async ({
@@ -40,7 +46,7 @@ test.describe('Outreach', () => {
   }) => {
     const response = await request.get('/v1/outreach', {
       headers: {
-        Authorization: `Bearer ${candidateToken}`,
+        Authorization: `Bearer ${reg.token}`,
       },
     })
 
@@ -81,26 +87,30 @@ test.describe('Outreach', () => {
 })
 
 test.describe('Outreach - Validation', () => {
-  const candidateEmail = process.env.CANDIDATE_EMAIL
-  const candidatePassword = process.env.CANDIDATE_PASSWORD
+  let reg: RegisterResponse
 
-  test.beforeAll(() => {
-    test.skip(
-      !candidateEmail || !candidatePassword,
-      'Candidate credentials not configured',
-    )
+  test.beforeAll(async ({ request }) => {
+    reg = await registerUser(request, {
+      firstName: generateRandomName(),
+      lastName: generateRandomName(),
+      email: generateRandomEmail(),
+      password: generateRandomPassword(),
+      phone: '5555555555',
+      zip: '12345-1234',
+      signUpMode: 'candidate',
+    })
+  })
+
+  test.afterAll(async ({ request }) => {
+    if (reg?.user?.id && reg?.token) {
+      await deleteUser(request, reg.user.id, reg.token)
+    }
   })
 
   test('should reject POST without required fields', async ({ request }) => {
-    const { token } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
     const response = await request.post('/v1/outreach', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
       data: {},
     })
@@ -111,23 +121,12 @@ test.describe('Outreach - Validation', () => {
   test('should reject P2P outreach without required P2P fields', async ({
     request,
   }) => {
-    const { token, campaign } = await loginUser(
-      request,
-      candidateEmail!,
-      candidatePassword!,
-    )
-
-    if (!campaign?.id) {
-      test.skip()
-      return
-    }
-
     const response = await request.post('/v1/outreach', {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${reg.token}`,
       },
       data: {
-        campaignId: campaign.id,
+        campaignId: reg.campaign.id,
         outreachType: OutreachType.p2p,
       },
     })
