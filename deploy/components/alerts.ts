@@ -18,10 +18,10 @@ export const ALERT_OWNERSHIP: Record<SlackGroup, ControllerName[]> = {
 
 export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
   'GET /v1/contacts': {
-    p95LatencyMs: 5000,
+    p95LatencyMs: 12000,
   },
   'GET /v1/contacts/download': {
-    p95LatencyMs: 8000,
+    p95LatencyMs: 15000,
   },
   'POST /v1/polls/analyze-bias': {
     p95LatencyMs: 6000,
