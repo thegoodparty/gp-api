@@ -119,8 +119,127 @@ describe('GET /v1/organizations', () => {
           {
             slug: 'campaign-3',
             name: '2026 Campaign',
+            positionName: 'Custom Office Name',
             campaignId: 3,
             electedOfficeId: null,
+          },
+        ],
+      },
+    })
+  })
+
+  it('returns positionName from position when no customPositionName', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-pn1',
+      brPositionId: 'br-pos-pn1',
+      brDatabaseId: 'br-db-pn1',
+      state: 'CA',
+      name: 'Mayor',
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-4',
+        ownerId: service.user.id,
+        positionId: 'br-pos-pn1',
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-pn1',
+        details: { electionDate: '2026-11-03' },
+        organizationSlug: 'campaign-4',
+      },
+    })
+
+    const result = await service.client.get('/v1/organizations')
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        organizations: [
+          {
+            slug: 'campaign-4',
+            positionName: 'Mayor',
+            name: '2026 Campaign',
+          },
+        ],
+      },
+    })
+  })
+
+  it('returns null positionName when no customPositionName or position', async () => {
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-5',
+        ownerId: service.user.id,
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-pn2',
+        details: {},
+        organizationSlug: 'campaign-5',
+      },
+    })
+
+    const result = await service.client.get('/v1/organizations')
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        organizations: [
+          {
+            slug: 'campaign-5',
+            positionName: null,
+          },
+        ],
+      },
+    })
+  })
+
+  it('prefers customPositionName over position name for positionName', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-pn2',
+      brPositionId: 'br-pos-pn2',
+      brDatabaseId: 'br-db-pn2',
+      state: 'NY',
+      name: 'City Council',
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'campaign-6',
+        ownerId: service.user.id,
+        positionId: 'br-pos-pn2',
+        customPositionName: 'Custom Council',
+      },
+    })
+
+    await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: 'test-campaign-pn3',
+        details: {},
+        organizationSlug: 'campaign-6',
+      },
+    })
+
+    const result = await service.client.get('/v1/organizations')
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        organizations: [
+          {
+            slug: 'campaign-6',
+            positionName: 'Custom Council',
           },
         ],
       },
@@ -229,6 +348,7 @@ describe('GET /v1/organizations', () => {
     expect(eoOrg).toMatchObject({
       slug: 'eo-abc-123',
       name: 'City Council',
+      positionName: 'City Council',
       electedOfficeId: 'abc-123',
       campaignId: null,
     })
@@ -313,7 +433,41 @@ describe('GET /v1/organizations/:slug', () => {
       data: {
         slug: 'eo-def-456',
         name: 'School Board',
+        positionName: 'School Board',
         electedOfficeId: 'def-456',
+        campaignId: null,
+      },
+    })
+  })
+
+  it('returns positionName from customPositionName on elected office org', async () => {
+    const electionsService = service.app.get(ElectionsService)
+    vi.spyOn(electionsService, 'getPositionById').mockResolvedValue({
+      id: 'pos-eo-custom',
+      brPositionId: 'br-pos-eo-custom',
+      brDatabaseId: 'br-db-eo-custom',
+      state: 'TX',
+      name: 'County Judge',
+    })
+
+    await service.prisma.organization.create({
+      data: {
+        slug: 'eo-custom-123',
+        ownerId: service.user.id,
+        positionId: 'br-pos-eo-custom',
+        customPositionName: 'Custom Judge Title',
+      },
+    })
+
+    const result = await service.client.get('/v1/organizations/eo-custom-123')
+
+    expect(result).toMatchObject({
+      status: 200,
+      data: {
+        slug: 'eo-custom-123',
+        name: 'Custom Judge Title',
+        positionName: 'Custom Judge Title',
+        electedOfficeId: 'custom-123',
         campaignId: null,
       },
     })
