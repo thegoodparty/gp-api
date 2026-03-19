@@ -782,7 +782,7 @@ export class DomainsService
           errorMessage.includes('no such payment_intent') ||
           errorMessage.includes('not found') ||
           // Stripe errors have a code property not in the base Error type
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
           (error as Error & { code?: string }).code === 'resource_missing'
         ) {
           // Payment doesn't exist - this might be acceptable in some cases
@@ -796,7 +796,7 @@ export class DomainsService
           errorMessage.includes('timeout') ||
           errorMessage.includes('service') ||
           // Stripe errors have a code property not in the base Error type
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
           (error as Error & { code?: string }).code === 'api_connection_error'
         ) {
           throw new BadGatewayException(
@@ -808,7 +808,7 @@ export class DomainsService
         if (
           errorMessage.includes('invalid') ||
           // Stripe errors have a code property not in the base Error type
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
           (error as Error & { code?: string }).code === 'invalid_request_error'
         ) {
           throw new BadRequestException(
