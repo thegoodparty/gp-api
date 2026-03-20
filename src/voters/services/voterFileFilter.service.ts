@@ -9,6 +9,7 @@ export class VoterFileFilterService extends createPrismaBase(
 ) {
   async create(
     campaignId: number,
+    organizationSlug: string,
     data: Omit<
       Prisma.VoterFileFilterCreateInput,
       'campaign' | 'outreach' | 'organization'
@@ -17,6 +18,7 @@ export class VoterFileFilterService extends createPrismaBase(
     return this.model.create({
       data: {
         campaignId,
+        organizationSlug,
         ...data,
       },
     })
