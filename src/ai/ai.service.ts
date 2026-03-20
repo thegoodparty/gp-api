@@ -3,7 +3,7 @@ import { BaseMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
 
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
-import { Prisma, User } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { OpenAI } from 'openai'
 import {
   ChatCompletion,
