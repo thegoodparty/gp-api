@@ -392,11 +392,9 @@ export class CampaignsController {
   @Put('mine/race-target-details')
   @UseCampaign()
   async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
-    const campaignOrg = campaign.organizationSlug
-      ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
-        })
-      : null
+    const campaignOrg = await this.organizations.findUnique({
+      where: { slug: campaign.organizationSlug },
+    })
     const ballotreadyPositionId = campaignOrg?.positionId
       ? await this.organizations.resolveBallotReadyPositionId(
           campaignOrg.positionId,
@@ -474,11 +472,9 @@ export class CampaignsController {
     const campaign = await this.campaigns.findFirstOrThrow({
       where: { slug },
     })
-    const campaignOrg = campaign.organizationSlug
-      ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
-        })
-      : null
+    const campaignOrg = await this.organizations.findUnique({
+      where: { slug: campaign.organizationSlug },
+    })
     const ballotreadyPositionId = campaignOrg?.positionId
       ? await this.organizations.resolveBallotReadyPositionId(
           campaignOrg.positionId,

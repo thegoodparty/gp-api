@@ -8,13 +8,8 @@ describe('ElectedOfficeController', () => {
   let campaign: Campaign
 
   beforeEach(async () => {
-    campaign = await service.prisma.campaign.create({
-      data: {
-        userId: service.user.id,
-        slug: `test-campaign-${Date.now()}`,
-      },
-    })
-    const organizationSlug = `campaign-${campaign.id}`
+    const suffix = Date.now()
+    const organizationSlug = `campaign-${suffix}`
     await service.prisma.organization.create({
       data: {
         slug: organizationSlug,
@@ -22,9 +17,12 @@ describe('ElectedOfficeController', () => {
         positionId: '2875e5f3-ecf0-6fae-f270-6951f85e8468',
       },
     })
-    campaign = await service.prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { organizationSlug },
+    campaign = await service.prisma.campaign.create({
+      data: {
+        userId: service.user.id,
+        slug: `test-campaign-${suffix}`,
+        organizationSlug,
+      },
     })
   })
 
@@ -108,19 +106,29 @@ describe('ElectedOfficeController', () => {
         },
       })
 
+      const otherOrgSlug = `campaign-other-${Date.now()}`
+      await service.prisma.organization.create({
+        data: { slug: otherOrgSlug, ownerId: otherUser.id },
+      })
       await service.prisma.campaign.create({
         data: {
           userId: otherUser.id,
           slug: `other-campaign-${Date.now()}`,
+          organizationSlug: otherOrgSlug,
         },
       })
 
+      const eoOrgSlug = `eo-other-${Date.now()}`
+      await service.prisma.organization.create({
+        data: { slug: eoOrgSlug, ownerId: otherUser.id },
+      })
       const office = await service.prisma.electedOffice.create({
         data: {
           electedDate: new Date('2024-01-01'),
           isActive: true,
           userId: otherUser.id,
           campaignId: campaign.id,
+          organizationSlug: eoOrgSlug,
         },
       })
 
@@ -189,7 +197,7 @@ describe('ElectedOfficeController', () => {
 
     it('creates elected office when organization has no positionId', async () => {
       await service.prisma.organization.update({
-        where: { slug: campaign.organizationSlug! },
+        where: { slug: campaign.organizationSlug },
         data: { positionId: null },
       })
 
@@ -261,12 +269,17 @@ describe('ElectedOfficeController', () => {
         },
       })
 
+      const eoOrgSlug = `eo-update-other-${Date.now()}`
+      await service.prisma.organization.create({
+        data: { slug: eoOrgSlug, ownerId: otherUser.id },
+      })
       const office = await service.prisma.electedOffice.create({
         data: {
           electedDate: new Date('2024-01-01'),
           isActive: true,
           userId: otherUser.id,
           campaignId: campaign.id,
+          organizationSlug: eoOrgSlug,
         },
       })
 

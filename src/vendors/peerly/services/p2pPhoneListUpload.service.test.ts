@@ -1,12 +1,12 @@
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException } from '@nestjs/common'
 import { Readable } from 'stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignWith } from '../../../campaigns/campaigns.types'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
+import * as voterFileUtil from '../../../voters/voterFile/util/voterFile.util'
 import { P2pPhoneListRequestSchema } from '../schemas/p2pPhoneListRequest.schema'
 import { P2P_CSV_COLUMN_MAPPINGS } from '../utils/audienceMapping.util'
 import { P2pPhoneListUploadService } from './p2pPhoneListUpload.service'
-import * as voterFileUtil from '../../../voters/voterFile/util/voterFile.util'
 
 vi.mock('../../../voters/voterFile/util/voterFile.util', () => ({
   typeToQuery: vi.fn().mockReturnValue('SELECT 1'),
@@ -16,7 +16,7 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   id: 1,
   userId: 1,
   slug: 'jane-doe',
-  organizationSlug: null,
+  organizationSlug: 'campaign-1',
   isActive: true,
   isPro: false,
   isDemo: false,
