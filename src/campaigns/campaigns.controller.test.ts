@@ -1149,7 +1149,7 @@ describe('CampaignsController', () => {
         'resolvePositionContext',
       ).mockResolvedValue({
         ballotReadyPositionId: null,
-        name: null,
+        positionName: null,
       })
 
       await expect(
@@ -1299,7 +1299,7 @@ describe('CampaignsController', () => {
         'resolvePositionContext',
       ).mockResolvedValue({
         ballotReadyPositionId: 'br-pos-1',
-        name: null,
+        positionName: null,
       })
       vi.spyOn(
         electionsService,
@@ -1381,7 +1381,7 @@ describe('CampaignsController', () => {
         'resolvePositionContext',
       ).mockResolvedValue({
         ballotReadyPositionId: null,
-        name: null,
+        positionName: null,
       })
 
       await expect(

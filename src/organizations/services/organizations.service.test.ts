@@ -273,7 +273,7 @@ describe('OrganizationsService', () => {
   })
 
   describe('resolvePositionContext', () => {
-    it('returns customPositionName as name without calling election-api', async () => {
+    it('returns customPositionName as positionName without calling election-api', async () => {
       const result = await service.resolvePositionContext({
         customPositionName: 'Community Advocate',
         positionId: null,
@@ -281,7 +281,7 @@ describe('OrganizationsService', () => {
 
       expect(result).toEqual({
         ballotReadyPositionId: null,
-        name: 'Community Advocate',
+        positionName: 'Community Advocate',
       })
       expect(mockGetPositionById).not.toHaveBeenCalled()
     })
@@ -300,7 +300,7 @@ describe('OrganizationsService', () => {
 
       expect(result).toEqual({
         ballotReadyPositionId: 'br-pos-id',
-        name: 'Mayor',
+        positionName: 'Mayor',
       })
       expect(mockGetPositionById).toHaveBeenCalledWith('pos-id')
     })
@@ -319,7 +319,7 @@ describe('OrganizationsService', () => {
 
       expect(result).toEqual({
         ballotReadyPositionId: 'br-pos-id',
-        name: 'Custom Title',
+        positionName: 'Custom Title',
       })
     })
 
@@ -331,7 +331,7 @@ describe('OrganizationsService', () => {
 
       expect(result).toEqual({
         ballotReadyPositionId: null,
-        name: null,
+        positionName: null,
       })
       expect(mockGetPositionById).not.toHaveBeenCalled()
     })
