@@ -14,7 +14,7 @@ describe('UseElectedOffice guard (integration)', () => {
   beforeEach(async () => {
     const campaignId = 8888
     const campaignOrgSlug = `campaign-${campaignId}`
-    const campaignOrg = await service.prisma.organization.create({
+    await service.prisma.organization.create({
       data: {
         slug: campaignOrgSlug,
         ownerId: service.user.id,
