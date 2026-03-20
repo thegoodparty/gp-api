@@ -37,6 +37,7 @@ import { PeerlyModule } from '@/vendors/peerly/peerly.module'
 import { SegmentModule } from '@/vendors/segment/segment.module'
 import { VotersModule } from '@/voters/voters.module'
 import { WebsitesModule } from '@/websites/websites.module'
+import { TestSeedModule } from '@/testSeed/testSeed.module'
 import { Module } from '@nestjs/common'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
@@ -84,7 +85,12 @@ import { loggerModule } from './observability/logging/logger-module'
     // In the future, we might be able to support testing end-to-end background work
     // with a local mock queue, or https://www.localstack.cloud, or by migrating to a
     // more local-friendly background-work service like e.g. https://www.inngest.com.
-    .concat(process.env.NODE_ENV === 'test' ? [] : [QueueConsumerModule]),
+    .concat(process.env.NODE_ENV === 'test' ? [] : [QueueConsumerModule])
+    .concat(
+      process.env.TCR_COMPLIANCE_BACKDOOR_ENABLED === 'true'
+        ? [TestSeedModule]
+        : [],
+    ),
   providers: [
     SessionsService,
     {
