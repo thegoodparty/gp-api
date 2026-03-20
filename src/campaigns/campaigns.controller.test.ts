@@ -199,12 +199,10 @@ describe('CampaignsController', () => {
         .mockResolvedValue({ positionId: 'pos-1', customPositionName: null }),
       resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
       resolvePositionName: vi.fn().mockResolvedValue('Mayor'),
-      resolvePositionContext: vi
-        .fn()
-        .mockResolvedValue({
-          ballotReadyPositionId: 'br-pos-1',
-          name: 'Mayor',
-        }),
+      resolvePositionContext: vi.fn().mockResolvedValue({
+        ballotReadyPositionId: 'br-pos-1',
+        name: 'Mayor',
+      }),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
 
