@@ -504,17 +504,53 @@ describe('CampaignsController', () => {
   })
 
   describe('findBySlug', () => {
-    it('returns campaign with pathToVictory', async () => {
-      const campaignWithP2V = { ...mockCampaign, pathToVictory: mockP2V }
+    it('returns campaign with resolved positionName', async () => {
+      const campaignWithP2V = {
+        ...mockCampaign,
+        pathToVictory: mockP2V,
+        organization: { customPositionName: null, positionId: 'pos-1' },
+      }
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
+      vi.spyOn(organizationsService, 'resolvePositionName').mockResolvedValue(
+        'Mayor',
+      )
 
       const result = await controller.findBySlug(mockCampaign.slug)
 
       expect(campaignsService.findFirst).toHaveBeenCalledWith({
         where: { slug: mockCampaign.slug },
-        include: { pathToVictory: true },
+        include: {
+          pathToVictory: true,
+          organization: {
+            select: { customPositionName: true, positionId: true },
+          },
+        },
       })
-      expect(result).toEqual(campaignWithP2V)
+      expect(organizationsService.resolvePositionName).toHaveBeenCalledWith({
+        customPositionName: null,
+        positionId: 'pos-1',
+      })
+      expect(result).toEqual({ ...campaignWithP2V, positionName: 'Mayor' })
+    })
+
+    it('returns null positionName when no organization', async () => {
+      const campaignWithP2V = {
+        ...mockCampaign,
+        pathToVictory: mockP2V,
+        organization: null,
+      }
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
+      vi.spyOn(organizationsService, 'resolvePositionName').mockResolvedValue(
+        null,
+      )
+
+      const result = await controller.findBySlug(mockCampaign.slug)
+
+      expect(organizationsService.resolvePositionName).toHaveBeenCalledWith({
+        customPositionName: undefined,
+        positionId: undefined,
+      })
+      expect(result.positionName).toBeNull()
     })
 
     it('throws NotFoundException when slug not found', async () => {

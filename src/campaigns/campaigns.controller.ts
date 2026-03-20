@@ -192,12 +192,25 @@ export class CampaignsController {
   async findBySlug(@Param('slug') slug: string) {
     const campaign = await this.campaigns.findFirst({
       where: { slug },
-      include: { pathToVictory: true },
+      include: {
+        pathToVictory: true,
+        organization: {
+          select: {
+            customPositionName: true,
+            positionId: true,
+          },
+        },
+      },
     })
 
     if (!campaign) throw new NotFoundException()
 
-    return campaign
+    const positionName = await this.organizations.resolvePositionName({
+      customPositionName: campaign.organization?.customPositionName,
+      positionId: campaign.organization?.positionId,
+    })
+
+    return { ...campaign, positionName }
   }
 
   @Post()
