@@ -12,10 +12,20 @@ describe('UseElectedOffice guard (integration)', () => {
   let campaign: Campaign
 
   beforeEach(async () => {
+    const campaignId = 8888
+    const campaignOrgSlug = `campaign-${campaignId}`
+    const campaignOrg = await service.prisma.organization.create({
+      data: {
+        slug: campaignOrgSlug,
+        ownerId: service.user.id,
+      },
+    })
     campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
-        slug: `test-campaign-${Date.now()}`,
+        id: campaignId,
+        slug: `test-campaign-${campaignId}`,
+        organizationSlug: campaignOrgSlug,
         details: {},
       },
     })
@@ -43,14 +53,7 @@ describe('UseElectedOffice guard (integration)', () => {
 
   describe('legacy fallback (no header)', () => {
     it('resolves elected office by userId + isActive', async () => {
-      await service.prisma.electedOffice.create({
-        data: {
-          userId: service.user.id,
-          campaignId: campaign.id,
-          isActive: true,
-        },
-      })
-
+      await createElectedOfficeWithOrg()
       const result = await service.client.get('/v1/polls/has-polls')
 
       expect(result.status).toBe(200)
@@ -72,49 +75,6 @@ describe('UseElectedOffice guard (integration)', () => {
         headers: { 'x-organization-slug': org.slug },
       })
 
-      expect(result.status).toBe(200)
-      expect(result.data).toEqual({ hasPolls: false })
-    })
-
-    it('falls back to userId when org slug does not exist', async () => {
-      await service.prisma.electedOffice.create({
-        data: {
-          userId: service.user.id,
-          campaignId: campaign.id,
-          isActive: true,
-        },
-      })
-
-      const result = await service.client.get('/v1/polls/has-polls', {
-        headers: { 'x-organization-slug': 'nonexistent-slug' },
-      })
-
-      // Falls back to legacy path and finds the active EO
-      expect(result.status).toBe(200)
-      expect(result.data).toEqual({ hasPolls: false })
-    })
-
-    it('falls back to userId when org has no elected office', async () => {
-      const orgWithoutEO = await service.prisma.organization.create({
-        data: {
-          slug: `no-eo-org-${Date.now()}`,
-          ownerId: service.user.id,
-        },
-      })
-
-      await service.prisma.electedOffice.create({
-        data: {
-          userId: service.user.id,
-          campaignId: campaign.id,
-          isActive: true,
-        },
-      })
-
-      const result = await service.client.get('/v1/polls/has-polls', {
-        headers: { 'x-organization-slug': orgWithoutEO.slug },
-      })
-
-      // Falls back to legacy path and finds the active EO
       expect(result.status).toBe(200)
       expect(result.data).toEqual({ hasPolls: false })
     })

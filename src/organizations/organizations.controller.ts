@@ -24,6 +24,7 @@ import { pick } from 'es-toolkit'
 type APIOrganization = {
   slug: string
   name: string | null
+  positionName: string | null
   position: null | { id: string; brPositionId: string }
   district: null | { id: string; l2Type: string; l2Name: string }
   electedOfficeId: string | null
@@ -34,6 +35,7 @@ const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
   const result: APIOrganization = {
     slug: org.slug,
     name: null,
+    positionName: org.customPositionName ?? org.position?.name ?? null,
     position: null,
     district: null,
     electedOfficeId: null,
@@ -53,10 +55,7 @@ const toAPIOrganization = (org: FriendlyOrganization): APIOrganization => {
 
   if (org.slug.startsWith('eo-')) {
     result.electedOfficeId = org.slug.replace('eo-', '')
-    result.name = org.position?.name ?? null
-    if (org.customPositionName) {
-      result.name = org.customPositionName
-    }
+    result.name = result.positionName
   } else {
     result.campaignId = parseInt(org.slug.replace('campaign-', ''))
     const electionYear = org.campaign?.details.electionDate?.split('-').at(0)
