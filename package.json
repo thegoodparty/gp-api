@@ -35,6 +35,8 @@
     "test:e2e:ui": "playwright test --config=e2e-tests/playwright.config.ts --ui",
     "test:e2e:debug": "playwright test --config=e2e-tests/playwright.config.ts --debug",
     "test:e2e:report": "playwright show-report e2e-tests/playwright-report",
+    "types": "npx tsc",
+    "types:quiet": "npx tsc --noEmit",
     "install:clean": "rm -rf node_modules package-lock.json && npm install",
     "infra": "tsx deploy/infra-cli.ts"
   },
