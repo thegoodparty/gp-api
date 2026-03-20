@@ -12,6 +12,8 @@ type PositionWithTopIssue = Prisma.CampaignPositionGetPayload<{
 export class WebsitesService extends createPrismaBase(MODELS.Website) {
   createByCampaign(user: User, campaign: CampaignWith<'campaignPositions'>) {
     const campaignPositions =
+      // Prisma include query — TypeScript cannot narrow the included relations at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       campaign.campaignPositions as PositionWithTopIssue[]
     const issues = campaignPositions.map((position, index) => ({
       title: position.topIssue?.name ?? `Issue ${index + 1}`,

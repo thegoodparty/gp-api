@@ -266,6 +266,8 @@ export const convertVoterFileFilterToFilters = (
   }
 
   if (shouldIncludeNull && ageRanges.length > 0) {
+    // Filter object shape varies at runtime — broad Prisma filter type requires narrowing
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const currentFilter = filters['ageInt'] as {
       gte?: number
       lte?: number

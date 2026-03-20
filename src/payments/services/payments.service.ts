@@ -95,6 +95,8 @@ export class PaymentsService {
 
     this.logger.info(`userId: ${user.id} missing customerId`)
 
+    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const checkoutSessionId = user.metaData?.checkoutSessionId as string
     const customerId = checkoutSessionId
       ? await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
@@ -160,6 +162,8 @@ export class PaymentsService {
 
     // Filter to only users without customerId
     const users = batch.filter((user) => {
+      // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const metadata = user.metaData as {
         customerId?: string
         checkoutSessionId?: string

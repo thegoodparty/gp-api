@@ -45,6 +45,8 @@ export class QueueProducerService {
 
     const message: Message = {
       id: uuid,
+      // Type narrowing from nullable/union — runtime context guarantees string but type is broader
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       body: body as string,
       deduplicationId: uuid,
       groupId: `gp-queue-${group}`,

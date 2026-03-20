@@ -91,7 +91,7 @@ export class AuthenticationController {
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
   @Post('social-login/:socialProvider')
   async socialLogin(
-    @Res({ passthrough: true }) response,
+    @Res({ passthrough: true }) response: FastifyReply,
     @ReqUser() user: User,
   ): Promise<LoginResult> {
     const token = this.authenticationService.generateAuthToken({

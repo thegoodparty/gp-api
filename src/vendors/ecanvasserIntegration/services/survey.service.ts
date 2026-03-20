@@ -24,6 +24,8 @@ export class SurveyService {
       throw new NotFoundException('Ecanvasser record not found')
     }
 
+    // Ecanvasser API client is untyped — third-party SDK has no generic response types
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return this.ecanvasser.createSurvey(ecanvasser.apiKey, {
       name: createSurveyDto.name,
       description: createSurveyDto.description,
@@ -93,6 +95,8 @@ export class SurveyService {
     }
 
     return this.ecanvasser.createSurveyQuestion(
+      // Ecanvasser API client is untyped — third-party SDK has no generic response types
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       {
         survey_id: surveyId,
         name: createQuestionDto.name,

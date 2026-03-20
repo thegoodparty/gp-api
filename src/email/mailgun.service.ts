@@ -3,12 +3,10 @@ import FormData from 'form-data'
 import Mailgun, { MailgunMessageData } from 'mailgun.js'
 import { IMailgunClient } from 'mailgun.js/Interfaces'
 import { PinoLogger } from 'nestjs-pino'
+import { requireEnv } from 'src/shared/utils/env'
 
 const EMAIL_DOMAIN = 'mg.goodparty.org'
-const API_KEY = process.env.MAILGUN_API_KEY as string
-if (!API_KEY) {
-  throw new Error('Please set MAILGUN_API_KEY in your .env')
-}
+const API_KEY = requireEnv('MAILGUN_API_KEY')
 
 export type EmailData = MailgunMessageData & {
   variables?: Record<string, string | number | boolean>

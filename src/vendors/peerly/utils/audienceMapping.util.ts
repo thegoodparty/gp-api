@@ -113,6 +113,8 @@ export function mapAudienceFields(
 export function audienceFieldsToCustomFilters(
   audienceFields: AudienceFieldsOutput,
 ): CustomFilter[] {
+  // Object.keys/fromEntries returns string[] — TypeScript deliberately widens key types
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return Object.keys(audienceFields) as CustomFilter[]
 }
 

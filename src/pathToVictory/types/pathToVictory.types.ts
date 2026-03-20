@@ -19,6 +19,7 @@ export interface PathToVictoryInput {
   subAreaValue?: string
   partisanType: string
   priorElectionDates: string[]
+  positionId?: string
   electionType?: string
   electionLocation?: string
 }

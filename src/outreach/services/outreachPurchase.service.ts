@@ -83,12 +83,19 @@ export class OutreachPurchaseHandlerService
 
   async executePostPurchase(
     paymentIntentId: string,
-    metadata: OutreachPurchaseMetadata,
+    rawMetadata: unknown,
   ): Promise<void> {
-    const { outreachType } = metadata
-    const campaignId = metadata.campaignId
-      ? Number(metadata.campaignId)
-      : undefined
+    if (
+      !rawMetadata ||
+      typeof rawMetadata !== 'object' ||
+      !('outreachType' in rawMetadata) ||
+      !('campaignId' in rawMetadata)
+    ) {
+      return
+    }
+
+    const { outreachType, campaignId: rawCampaignId } = rawMetadata
+    const campaignId = rawCampaignId ? Number(rawCampaignId) : undefined
 
     if (!campaignId || outreachType !== 'p2p') {
       return

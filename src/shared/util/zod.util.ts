@@ -13,6 +13,8 @@ export const parseJsonString = <T>(
     if (input === undefined) return
 
     try {
+      // JSON.parse returns unknown — no way to infer parsed shape at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(input as string)
     } catch {
       ctx.addIssue({

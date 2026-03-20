@@ -47,6 +47,8 @@ export class PaymentsController {
     let event: Stripe.Event
     try {
       event = await this.stripeService.parseWebhookEvent(
+        // NestJS raw body is typed as unknown — framework does not expose Buffer type statically
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawBody as Buffer,
         stripeSignature,
       )

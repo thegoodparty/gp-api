@@ -38,9 +38,8 @@ export class OutreachModule {
 
     this.purchaseService.registerCheckoutSessionPostPurchaseHandler(
       PurchaseType.TEXT,
-      this.outreachPurchaseHandler.executePostPurchase.bind(
-        this.outreachPurchaseHandler,
-      ),
+      (sessionId, metadata) =>
+        this.outreachPurchaseHandler.executePostPurchase(sessionId, metadata),
     )
   }
 }
