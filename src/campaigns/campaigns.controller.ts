@@ -205,10 +205,11 @@ export class CampaignsController {
 
     if (!campaign) throw new NotFoundException()
 
-    const positionName = await this.organizations.resolvePositionName({
-      customPositionName: campaign.organization?.customPositionName,
-      positionId: campaign.organization?.positionId,
-    })
+    const { positionName } =
+      await this.organizations.resolvePositionContext({
+        customPositionName: campaign.organization?.customPositionName,
+        positionId: campaign.organization?.positionId,
+      })
 
     return { ...campaign, positionName }
   }
@@ -547,7 +548,7 @@ export class CampaignsController {
           where: { slug: campaign.organizationSlug },
         })
       : null
-    const { ballotReadyPositionId: ballotreadyPositionId, name: positionName } =
+    const { ballotReadyPositionId: ballotreadyPositionId, positionName } =
       await this.organizations.resolvePositionContext({
         customPositionName: campaignOrganization?.customPositionName,
         positionId: campaignOrganization?.positionId,

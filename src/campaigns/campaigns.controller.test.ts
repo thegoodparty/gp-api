@@ -198,10 +198,9 @@ describe('CampaignsController', () => {
         .fn()
         .mockResolvedValue({ positionId: 'pos-1', customPositionName: null }),
       resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
-      resolvePositionName: vi.fn().mockResolvedValue('Mayor'),
       resolvePositionContext: vi.fn().mockResolvedValue({
         ballotReadyPositionId: 'br-pos-1',
-        name: 'Mayor',
+        positionName: 'Mayor',
       }),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
@@ -511,9 +510,13 @@ describe('CampaignsController', () => {
         organization: { customPositionName: null, positionId: 'pos-1' },
       }
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
-      vi.spyOn(organizationsService, 'resolvePositionName').mockResolvedValue(
-        'Mayor',
-      )
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: 'br-pos-1',
+        positionName: 'Mayor',
+      })
 
       const result = await controller.findBySlug(mockCampaign.slug)
 
@@ -526,7 +529,9 @@ describe('CampaignsController', () => {
           },
         },
       })
-      expect(organizationsService.resolvePositionName).toHaveBeenCalledWith({
+      expect(
+        organizationsService.resolvePositionContext,
+      ).toHaveBeenCalledWith({
         customPositionName: null,
         positionId: 'pos-1',
       })
@@ -540,13 +545,19 @@ describe('CampaignsController', () => {
         organization: null,
       }
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
-      vi.spyOn(organizationsService, 'resolvePositionName').mockResolvedValue(
-        null,
-      )
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: null,
+        positionName: null,
+      })
 
       const result = await controller.findBySlug(mockCampaign.slug)
 
-      expect(organizationsService.resolvePositionName).toHaveBeenCalledWith({
+      expect(
+        organizationsService.resolvePositionContext,
+      ).toHaveBeenCalledWith({
         customPositionName: undefined,
         positionId: undefined,
       })

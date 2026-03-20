@@ -272,39 +272,67 @@ describe('OrganizationsService', () => {
     })
   })
 
-  describe('resolvePositionName', () => {
-    it('returns customPositionName when provided', async () => {
-      const result = await service.resolvePositionName({
+  describe('resolvePositionContext', () => {
+    it('returns customPositionName as name without calling election-api', async () => {
+      const result = await service.resolvePositionContext({
         customPositionName: 'Community Advocate',
-        positionId: 'pos-id',
+        positionId: null,
       })
 
-      expect(result).toBe('Community Advocate')
+      expect(result).toEqual({
+        ballotReadyPositionId: null,
+        name: 'Community Advocate',
+      })
       expect(mockGetPositionById).not.toHaveBeenCalled()
     })
 
-    it('returns position name when no customPositionName', async () => {
+    it('returns position name and brPositionId when positionId is set', async () => {
       mockGetPositionById.mockResolvedValue({
         id: 'pos-id',
         name: 'Mayor',
+        brPositionId: 'br-pos-id',
       })
 
-      const result = await service.resolvePositionName({
+      const result = await service.resolvePositionContext({
         customPositionName: null,
         positionId: 'pos-id',
       })
 
-      expect(result).toBe('Mayor')
+      expect(result).toEqual({
+        ballotReadyPositionId: 'br-pos-id',
+        name: 'Mayor',
+      })
       expect(mockGetPositionById).toHaveBeenCalledWith('pos-id')
     })
 
-    it('returns null when no customPositionName and no positionId', async () => {
-      const result = await service.resolvePositionName({
+    it('prefers customPositionName over position name when both available', async () => {
+      mockGetPositionById.mockResolvedValue({
+        id: 'pos-id',
+        name: 'Mayor',
+        brPositionId: 'br-pos-id',
+      })
+
+      const result = await service.resolvePositionContext({
+        customPositionName: 'Custom Title',
+        positionId: 'pos-id',
+      })
+
+      expect(result).toEqual({
+        ballotReadyPositionId: 'br-pos-id',
+        name: 'Custom Title',
+      })
+    })
+
+    it('returns nulls when no customPositionName and no positionId', async () => {
+      const result = await service.resolvePositionContext({
         customPositionName: null,
         positionId: null,
       })
 
-      expect(result).toBeNull()
+      expect(result).toEqual({
+        ballotReadyPositionId: null,
+        name: null,
+      })
       expect(mockGetPositionById).not.toHaveBeenCalled()
     })
 
@@ -312,7 +340,7 @@ describe('OrganizationsService', () => {
       mockGetPositionById.mockResolvedValue(null)
 
       await expect(
-        service.resolvePositionName({
+        service.resolvePositionContext({
           customPositionName: null,
           positionId: 'pos-id',
         }),
@@ -325,7 +353,7 @@ describe('OrganizationsService', () => {
       mockGetPositionById.mockRejectedValue(new Error('election-api down'))
 
       await expect(
-        service.resolvePositionName({
+        service.resolvePositionContext({
           customPositionName: null,
           positionId: 'pos-id',
         }),

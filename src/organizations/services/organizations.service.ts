@@ -47,29 +47,6 @@ export class OrganizationsService extends createPrismaBase(
     return resolved || null
   }
 
-  async resolvePositionName(params: {
-    customPositionName?: string | null
-    positionId?: string | null
-  }): Promise<string | null> {
-    const { customPositionName, positionId } = params
-
-    if (customPositionName) {
-      return customPositionName
-    }
-
-    if (!positionId) {
-      return null
-    }
-
-    const position = await this.electionsService.getPositionById(positionId)
-    if (!position) {
-      throw new InternalServerErrorException(
-        `Stored positionId ${positionId} does not exist in election-api`,
-      )
-    }
-    return position.name
-  }
-
   async resolvePositionNameByOrganizationSlug(
     organizationSlug: string,
   ): Promise<string | null> {
@@ -77,10 +54,11 @@ export class OrganizationsService extends createPrismaBase(
       where: { slug: organizationSlug },
     })
 
-    return this.resolvePositionName({
+    const { positionName } = await this.resolvePositionContext({
       customPositionName: organization?.customPositionName,
       positionId: organization?.positionId,
     })
+    return positionName
   }
 
   async listOrganizations(userId: number) {
@@ -231,11 +209,17 @@ export class OrganizationsService extends createPrismaBase(
   async resolvePositionContext(params: {
     customPositionName?: string | null
     positionId?: string | null
-  }): Promise<{ ballotReadyPositionId: string | null; name: string | null }> {
+  }): Promise<{
+    ballotReadyPositionId: string | null
+    positionName: string | null
+  }> {
     const { customPositionName, positionId } = params
 
     if (!positionId) {
-      return { ballotReadyPositionId: null, name: customPositionName ?? null }
+      return {
+        ballotReadyPositionId: null,
+        positionName: customPositionName ?? null,
+      }
     }
 
     const position = await this.electionsService.getPositionById(positionId)
@@ -246,7 +230,7 @@ export class OrganizationsService extends createPrismaBase(
     }
     return {
       ballotReadyPositionId: position.brPositionId ?? null,
-      name: customPositionName || position.name || null,
+      positionName: customPositionName || position.name || null,
     }
   }
 
