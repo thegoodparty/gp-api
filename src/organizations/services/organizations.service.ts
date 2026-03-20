@@ -47,6 +47,20 @@ export class OrganizationsService extends createPrismaBase(
     return resolved || null
   }
 
+  async resolvePositionNameByOrganizationSlug(
+    organizationSlug: string,
+  ): Promise<string | null> {
+    const organization = await this.findUnique({
+      where: { slug: organizationSlug },
+    })
+
+    const { positionName } = await this.resolvePositionContext({
+      customPositionName: organization?.customPositionName,
+      positionId: organization?.positionId,
+    })
+    return positionName
+  }
+
   async listOrganizations(userId: number) {
     const orgs = await this.model.findMany({
       where: { ownerId: userId },
@@ -190,6 +204,34 @@ export class OrganizationsService extends createPrismaBase(
   ): Promise<string | null> {
     const position = await this.electionsService.getPositionById(positionId)
     return position?.brPositionId ?? null
+  }
+
+  async resolvePositionContext(params: {
+    customPositionName?: string | null
+    positionId?: string | null
+  }): Promise<{
+    ballotReadyPositionId: string | null
+    positionName: string | null
+  }> {
+    const { customPositionName, positionId } = params
+
+    if (!positionId) {
+      return {
+        ballotReadyPositionId: null,
+        positionName: customPositionName ?? null,
+      }
+    }
+
+    const position = await this.electionsService.getPositionById(positionId)
+    if (!position) {
+      throw new InternalServerErrorException(
+        `Stored positionId ${positionId} does not exist in election-api`,
+      )
+    }
+    return {
+      ballotReadyPositionId: position.brPositionId ?? null,
+      positionName: customPositionName || position.name || null,
+    }
   }
 
   /**
