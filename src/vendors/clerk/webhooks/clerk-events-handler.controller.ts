@@ -80,14 +80,14 @@ export class ClerkEventsHandlerController {
       throw new BadRequestException('Missing svix headers')
     }
 
-    let verified: Record<string, unknown>
+    let verified: unknown
     try {
       const wh = new Webhook(CLERK_WEBHOOK_SECRET)
       verified = wh.verify(rawBody.toString('utf-8'), {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,
         'svix-signature': svixSignature,
-      }) as Record<string, unknown>
+      })
     } catch (err) {
       this.logger.warn({ err }, 'Failed to verify Clerk webhook signature')
       throw new UnauthorizedException('Invalid webhook signature')

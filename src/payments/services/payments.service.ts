@@ -93,7 +93,18 @@ export class PaymentsService {
       return null
     }
 
-    const checkoutSessionId = user.metaData?.checkoutSessionId as string
+    const meta = user.metaData
+    const rawSessionId =
+      meta !== null &&
+      typeof meta === 'object' &&
+      !Array.isArray(meta) &&
+      'checkoutSessionId' in meta
+        ? meta.checkoutSessionId
+        : undefined
+    const checkoutSessionId =
+      typeof rawSessionId === 'string' && rawSessionId !== ''
+        ? rawSessionId
+        : null
     if (!checkoutSessionId) {
       return null
     }
