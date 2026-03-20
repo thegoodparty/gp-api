@@ -66,10 +66,7 @@ export class UseCampaignGuard implements CanActivate {
       if (org && cam) {
         campaign = cam
       }
-    }
-
-    // Step 2: Legacy fallback — find by userId
-    if (!campaign) {
+    } else {
       campaign = await this.campaignsService.findByUserId(userId, include)
     }
 

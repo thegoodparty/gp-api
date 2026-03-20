@@ -31,18 +31,12 @@ describe('UseCampaign guard (integration)', () => {
 
   describe('legacy fallback (no header)', () => {
     it('resolves campaign by userId', async () => {
-      const campaign = await service.prisma.campaign.create({
-        data: {
-          userId: service.user.id,
-          slug: 'legacy-campaign',
-          details: {},
-        },
-      })
+      const { campaign } = await createCampaignWithOrg('legacy')
 
       const result = await service.client.get('/v1/campaigns/mine')
 
       expect(result.status).toBe(200)
-      expect(result.data.slug).toBe('legacy-campaign')
+      expect(result.data.slug).toBe(campaign.slug)
       expect(result.data.id).toBe(campaign.id)
     })
 
@@ -89,25 +83,17 @@ describe('UseCampaign guard (integration)', () => {
       expect(result1.data.slug).toBe('test-campaign-multi-1')
     })
 
-    it('falls back to userId when org slug does not exist', async () => {
-      const campaign = await service.prisma.campaign.create({
-        data: {
-          userId: service.user.id,
-          slug: 'fallback-campaign',
-          details: {},
-        },
-      })
+    it('returns 404 when org slug does not exist', async () => {
+      await createCampaignWithOrg('exists-but-not-matched')
 
       const result = await service.client.get('/v1/campaigns/mine', {
         headers: { 'x-organization-slug': 'nonexistent-slug' },
       })
 
-      expect(result.status).toBe(200)
-      expect(result.data.slug).toBe('fallback-campaign')
-      expect(result.data.id).toBe(campaign.id)
+      expect(result.status).toBe(404)
     })
 
-    it('falls back to userId when org has no campaign', async () => {
+    it('returns 404 when org has no campaign', async () => {
       const orgWithoutCampaign = await service.prisma.organization.create({
         data: {
           slug: 'no-campaign-org',
@@ -115,24 +101,16 @@ describe('UseCampaign guard (integration)', () => {
         },
       })
 
-      const campaign = await service.prisma.campaign.create({
-        data: {
-          userId: service.user.id,
-          slug: 'fallback-no-org-campaign',
-          details: {},
-        },
-      })
+      await createCampaignWithOrg('unrelated')
 
       const result = await service.client.get('/v1/campaigns/mine', {
         headers: { 'x-organization-slug': orgWithoutCampaign.slug },
       })
 
-      expect(result.status).toBe(200)
-      expect(result.data.slug).toBe('fallback-no-org-campaign')
-      expect(result.data.id).toBe(campaign.id)
+      expect(result.status).toBe(404)
     })
 
-    it('returns 404 when org belongs to another user and no fallback campaign', async () => {
+    it('returns 404 when org belongs to another user', async () => {
       const otherUser = await service.prisma.user.create({
         data: { email: 'other@goodparty.org' },
       })
