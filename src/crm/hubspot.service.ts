@@ -24,7 +24,9 @@ export class HubspotService {
   get client(): Client {
     return this.isTokenAvailable()
       ? this._client
-      : (this.createMockClient() as unknown as Client)
+      : // Incompatible types require double assertion — no shared base type exists
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (this.createMockClient() as unknown as Client)
   }
 
   private createMockClient(): MockHubspotClient {
@@ -92,6 +94,8 @@ export class HubspotService {
       setAccessToken: () => undefined,
       setApiKey: () => undefined,
       setDeveloperApiKey: () => undefined,
+      // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       apiRequest: () => Promise.resolve({} as Response),
     }
   }

@@ -160,30 +160,41 @@ export class AiService {
     try {
       completion = await modelWithFallback.invoke(sanitizedMessages)
     } catch (error) {
-      const err = error as Error & {
-        response?: Record<string, string | number | boolean>
-      }
-      this.logger.error({ err }, 'Error in utils/ai/llmChatCompletion')
-      this.logger.error({ response: err?.response }, 'error response')
+      this.logger.error({ err: error }, 'Error in utils/ai/llmChatCompletion')
+      const errorResponse =
+        error instanceof Error && 'response' in error
+          ? error.response
+          : undefined
+      this.logger.error({ response: errorResponse }, 'error response')
 
       await this.slack.errorMessage({
         message: 'Error in AI completion (raw)',
-        error: err,
+        error,
       })
     }
 
     if (completion && completion?.content) {
+      // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       let content = completion.content as string
       if (content.includes('```html')) {
         content = content.match(/```html([\s\S]*?)```/)![1]
       }
       content = content.replace('/n', '<br/><br/>')
 
+      // Verbose narrowing required: LangChain types response_metadata as Record<string, any>
+      const tokenUsage: unknown = completion?.response_metadata?.tokenUsage
+      const totalTokens =
+        tokenUsage &&
+        typeof tokenUsage === 'object' &&
+        'totalTokens' in tokenUsage &&
+        typeof tokenUsage.totalTokens === 'number'
+          ? tokenUsage.totalTokens
+          : 0
+
       return {
         content,
-        tokens:
-          (completion?.response_metadata?.tokenUsage?.totalTokens as number) ||
-          0,
+        tokens: totalTokens,
       }
     } else {
       return {
@@ -310,6 +321,8 @@ export class AiService {
     if (match) {
       const [functionName, argsString] = match
       try {
+        // JSON.parse returns unknown — no way to infer parsed shape at compile time
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const args = JSON.parse(argsString) as string
         return {
           function: functionName,
@@ -407,7 +420,10 @@ export class AiService {
       let newPrompt = prompt
 
       const campaignPositions = campaign.campaignPositions
-      const user = campaign.user as User
+      if (!campaign.user) {
+        throw new Error('Campaign has no associated user')
+      }
+      const user = campaign.user
 
       const name = getUserFullName(user)
       const details = campaign.details
@@ -529,6 +545,8 @@ export class AiService {
           totalRegisteredVoters,
           budgetLow,
           budgetHigh,
+          // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
         replaceArr.push(
           {

@@ -61,7 +61,6 @@ export class AnalyticsService {
       `[ANALYTICS] Starting event tracking - Event: ${eventName}, User: ${userId}`,
     )
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userContext = await this.getUserContext(userId)
 
     const eventData = {
@@ -92,7 +91,6 @@ export class AnalyticsService {
       `[ANALYTICS] Starting user identification - User: ${userId}`,
     )
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userContext = await this.getUserContext(userId)
 
     try {
@@ -176,6 +174,8 @@ export class AnalyticsService {
       let paymentMethodType: Stripe.PaymentMethod.Type | null = null
       let walletType: Stripe.PaymentMethod.Card.Wallet.Type | null = null
       if (paymentIntent?.payment_method) {
+        // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const pm = paymentIntent.payment_method as Stripe.PaymentMethod
         paymentMethodType = pm.type
 

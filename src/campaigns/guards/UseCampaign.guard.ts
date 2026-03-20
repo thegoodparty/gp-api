@@ -74,6 +74,8 @@ export class UseCampaignGuard implements CanActivate {
     }
 
     if (campaign) {
+      // Prisma include query — TypeScript cannot narrow the included relations at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       request.campaign = campaign as CampaignWith<'pathToVictory'>
       return true
     } else if (continueIfNotFound === true) {

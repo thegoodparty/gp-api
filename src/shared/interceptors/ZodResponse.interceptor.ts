@@ -21,7 +21,7 @@ export class ZodResponseInterceptor implements NestInterceptor {
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const schema = this.reflector.get<ZodSchema | undefined>(
+    const schema = this.reflector.get<ZodSchema<unknown> | undefined>(
       RESPONSE_SCHEMA_KEY,
       context.getHandler(),
     )

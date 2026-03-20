@@ -55,6 +55,8 @@ export class WebsitesModule {
     // Also register for Custom Checkout Sessions (used for promo code support)
     this.purchaseService.registerCheckoutSessionPostPurchaseHandler(
       PurchaseType.DOMAIN_REGISTRATION,
+      // .bind() returns any — TypeScript cannot infer the bound method signature
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       this.domainsService.handleDomainPostPurchase.bind(this.domainsService),
     )
   }

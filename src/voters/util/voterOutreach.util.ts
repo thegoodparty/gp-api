@@ -438,6 +438,8 @@ export function buildSlackBlocks({
       : undefined,
   ]
 
+  // SlackMessageBlock type doesn't include all properties used in blocks (e.g. url) — needs type update
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     blocks: blocks.filter((block) => block !== undefined),
   } as { blocks: SlackMessageBlock[] }

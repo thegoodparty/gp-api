@@ -11,6 +11,7 @@ import { UsersService } from '../users/services/users.service'
 import { CreateUserInputDto } from '../users/schemas/CreateUserInput.schema'
 import { LoginPayload } from './schemas/LoginPayload.schema'
 import { compare } from 'bcrypt'
+import { User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { nanoid } from 'nanoid'
 import {
@@ -157,7 +158,7 @@ export class AuthenticationService {
     token: string,
     password: string,
   ) {
-    let user
+    let user: User
     try {
       this.jwtService.verify(token)
       user = await this.usersService.findUserByResetToken(email, token)
