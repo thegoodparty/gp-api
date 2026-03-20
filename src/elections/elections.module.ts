@@ -1,3 +1,4 @@
+import { Agent as HttpsAgent } from 'node:https'
 import { HttpModule } from '@nestjs/axios'
 import { forwardRef, Module } from '@nestjs/common'
 import { SlackModule } from 'src/vendors/slack/slack.module'
@@ -23,7 +24,9 @@ import { RacesService } from './services/races.service'
     AiModule,
     EmailModule,
     forwardRef(() => CampaignsModule),
-    HttpModule,
+    HttpModule.register({
+      httpsAgent: new HttpsAgent({ keepAlive: true }),
+    }),
     SlackModule,
   ],
 })
