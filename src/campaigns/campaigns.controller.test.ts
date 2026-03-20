@@ -529,9 +529,7 @@ describe('CampaignsController', () => {
           },
         },
       })
-      expect(
-        organizationsService.resolvePositionContext,
-      ).toHaveBeenCalledWith({
+      expect(organizationsService.resolvePositionContext).toHaveBeenCalledWith({
         customPositionName: null,
         positionId: 'pos-1',
       })
@@ -555,9 +553,7 @@ describe('CampaignsController', () => {
 
       const result = await controller.findBySlug(mockCampaign.slug)
 
-      expect(
-        organizationsService.resolvePositionContext,
-      ).toHaveBeenCalledWith({
+      expect(organizationsService.resolvePositionContext).toHaveBeenCalledWith({
         customPositionName: undefined,
         positionId: undefined,
       })

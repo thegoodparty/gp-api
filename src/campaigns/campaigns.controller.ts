@@ -205,11 +205,10 @@ export class CampaignsController {
 
     if (!campaign) throw new NotFoundException()
 
-    const { positionName } =
-      await this.organizations.resolvePositionContext({
-        customPositionName: campaign.organization?.customPositionName,
-        positionId: campaign.organization?.positionId,
-      })
+    const { positionName } = await this.organizations.resolvePositionContext({
+      customPositionName: campaign.organization?.customPositionName,
+      positionId: campaign.organization?.positionId,
+    })
 
     return { ...campaign, positionName }
   }
