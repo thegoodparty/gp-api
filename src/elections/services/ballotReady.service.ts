@@ -4,7 +4,7 @@ import { Headers, MimeTypes } from 'http-constants-ts'
 import { PositionLevel } from 'src/generated/graphql.types'
 import { truncateZip } from 'src/shared/util/zipcodes.util'
 import zipcodes from 'zipcodes'
-import { ELECTION_LEVELS } from '../../shared/constants/governmentLevels'
+import { ElectionLevels } from '../../shared/constants/governmentLevels'
 import {
   RacesByIdNode,
   RacesByZipcode,
@@ -135,11 +135,11 @@ export class BallotReadyService {
     const state = zipcodes.lookup(zipcode)?.state
 
     let levelWithTownship = level?.toUpperCase()
-    if (levelWithTownship === ELECTION_LEVELS.Local) {
-      levelWithTownship = `${ELECTION_LEVELS.Local},TOWNSHIP,${ELECTION_LEVELS.City}`
+    if (levelWithTownship === ElectionLevels.Local) {
+      levelWithTownship = `${ElectionLevels.Local},TOWNSHIP,${ElectionLevels.City}`
     }
-    if (levelWithTownship === ELECTION_LEVELS.County) {
-      levelWithTownship = `${ELECTION_LEVELS.County},REGIONAL`
+    if (levelWithTownship === ElectionLevels.County) {
+      levelWithTownship = `${ElectionLevels.County},REGIONAL`
     }
 
     const query = gql`

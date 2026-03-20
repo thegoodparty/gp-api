@@ -9,3 +9,7 @@ const checkPhoneListStatusResponseSchema = z.object({
 export class CheckPhoneListStatusResponseDto extends createZodDto(
   checkPhoneListStatusResponseSchema,
 ) {}
+
+export type CheckPhoneListStatusAcceptedResponseDto = {
+  message: string
+}

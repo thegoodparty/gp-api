@@ -75,11 +75,16 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# Script output
+scripts/output/
+
 # just junior dev stuff
 ztestfile
 
+# Script output
+scripts/*.csv
+
 # AI Tooling
 .ai
-CLAUDE.md
 repomix.config.json
 src/generated/route-types.ts

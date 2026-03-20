@@ -81,18 +81,21 @@ export class EcanvasserIntegrationService extends createPrismaBase(
         interaction.createdAt > new Date(Date.now() - THIRTY_DAYS),
     )
 
-    return recentInteractions.reduce((acc, interaction) => {
-      const date = interaction.date.toISOString().split('T')[0]
-      if (!acc[date]) {
-        acc[date] = { count: 0 }
-      }
-      acc[date].count++
-      if (!acc[date][interaction.status]) {
-        acc[date][interaction.status] = 0
-      }
-      acc[date][interaction.status]++
-      return acc
-    }, {})
+    return recentInteractions.reduce<Record<string, Record<string, number>>>(
+      (acc, interaction) => {
+        const date = interaction.date.toISOString().split('T')[0]
+        if (!acc[date]) {
+          acc[date] = { count: 0 }
+        }
+        acc[date].count++
+        if (!acc[date][interaction.status]) {
+          acc[date][interaction.status] = 0
+        }
+        acc[date][interaction.status]++
+        return acc
+      },
+      {},
+    )
   }
 
   private calculateAverageRating(

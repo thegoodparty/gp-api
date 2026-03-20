@@ -248,12 +248,17 @@ export class RacesService {
     let tier: string | number | undefined
 
     try {
-      electionDate = race?.election?.electionDay as string | undefined
-      termLength = race?.position?.electionFrequencies[0].frequency[0] as number
-      level = race?.position?.level.toLowerCase() as string
+      // BallotReady API response field is untyped — validated with typeof check on next line
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const rawElectionDay = race?.election?.electionDay
+      electionDate =
+        typeof rawElectionDay === 'string' ? rawElectionDay : undefined
+      termLength =
+        race?.position?.electionFrequencies[0]?.frequency[0] ?? termLength
+      level = race?.position?.level?.toLowerCase() ?? level
       positionId = race?.position?.id
-      mtfcc = race?.position.mtfcc as string | undefined | null
-      geoId = race?.position.geoId as string | undefined | null
+      mtfcc = race?.position.mtfcc
+      geoId = race?.position.geoId
       tier = race?.position.tier
     } catch (e) {
       this.logger.error({ slug, e }, 'error getting election date')
@@ -287,8 +292,7 @@ export class RacesService {
         : undefined
     const electionState = race?.election?.state
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let locationResp: any
+    let locationResp: Record<string, string> | false | undefined
     let county: string | undefined
     let city: string | undefined
 
@@ -297,8 +301,7 @@ export class RacesService {
       // and a more accurate electionLevel
       this.logger.debug({ slug }, `mtfcc: ${mtfcc}, geoId: ${geoId}`)
       if (mtfcc && geoId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const geoData = (await this.resolveMtfcc(mtfcc, geoId)) as GeoData
+        const geoData = await this.resolveMtfcc(mtfcc, geoId)
         this.logger.debug({ slug, geoData }, 'geoData')
         if (geoData?.city) {
           city = geoData.city as string
@@ -361,34 +364,26 @@ export class RacesService {
         )
 
         // If we couldn't get city/county with mtfcc/geo then use the AI.
-        locationResp = (await this.extractLocationAi(
+        locationResp = await this.extractLocationAi(
           officeName + ' - ' + electionState,
           level,
-        )) as {
-          level: string
-          county?: string
-          [key: string]: string | undefined
-        }
+        )
         this.logger.debug(
           {
             slug,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             locationResp,
           },
           'locationResp',
         )
       }
 
-      if (locationResp?.level) {
+      if (typeof locationResp === 'object' && locationResp.level) {
         if (locationResp.level === 'county') {
-          county = locationResp.county as string
+          county = locationResp.county
         } else {
-          if (
-            locationResp.county &&
-            locationResp.hasOwnProperty(locationResp.level)
-          ) {
-            city = locationResp[locationResp.level] as string
-            county = locationResp.county as string
+          if (locationResp.county && locationResp.level in locationResp) {
+            city = locationResp[locationResp.level]
+            county = locationResp.county
           }
         }
       }
@@ -421,12 +416,17 @@ export class RacesService {
       //   }
       // }
 
-      if ((!priorElectionDates || priorElectionDates.length === 0) && zip) {
+      const positionLevel = race?.position?.level
+      if (
+        (!priorElectionDates || priorElectionDates.length === 0) &&
+        zip &&
+        positionLevel
+      ) {
         priorElectionDates = await this.getElectionDates(
           slug,
           officeName,
           zip,
-          race?.position?.level as PositionLevel,
+          positionLevel,
         )
       }
     }
@@ -436,12 +436,12 @@ export class RacesService {
     data.electionDate = electionDate
     data.electionTerm = termLength
     data.electionLevel = electionLevel
-    data.electionState = electionState as string | undefined
+    data.electionState = electionState ?? undefined
     data.electionCounty = county
     data.electionMunicipality = city
     data.subAreaName = subAreaName
     data.subAreaValue = subAreaValue
-    data.partisanType = partisanType as string | undefined
+    data.partisanType = partisanType ?? undefined
     data.priorElectionDates = priorElectionDates
     data.positionId = positionId
     data.tier = tier
@@ -473,42 +473,34 @@ export class RacesService {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tool: any = {
-      type: 'function',
-      function: {
-        name: 'extractLocation',
-        description: 'Extract the location from the office name.',
-        parameters: {
-          type: 'object',
-          properties: {},
-        },
-      },
-    }
-    let systemPrompt
+    const toolProperties: Record<
+      string,
+      { type: string; description: string }
+    > = {}
+    let systemPrompt: string | undefined
     if (level === 'county') {
       systemPrompt = COUNTY_PROMPT
     } else if (level === 'city') {
       systemPrompt = CITY_PROMPT
-      tool.function.parameters.properties.city = {
+      toolProperties.city = {
         type: 'string',
         description: 'The city name.',
       }
     } else if (level === 'town') {
       systemPrompt = TOWN_PROMPT
-      tool.function.parameters.properties.town = {
+      toolProperties.town = {
         type: 'string',
         description: 'The town name.',
       }
     } else if (level === 'township') {
       systemPrompt = TOWNSHIP_PROMPT
-      tool.function.parameters.properties.township = {
+      toolProperties.township = {
         type: 'string',
         description: 'The township name.',
       }
     } else if (level === 'village') {
       systemPrompt = VILLAGE_PROMPT
-      tool.function.parameters.properties.village = {
+      toolProperties.village = {
         type: 'string',
         description: 'The village name.',
       }
@@ -517,15 +509,27 @@ export class RacesService {
     }
 
     // we always try to get the county name
-    tool.function.parameters.properties.county = {
+    toolProperties.county = {
       type: 'string',
       description: 'The county name.',
+    }
+
+    const tool: ChatCompletionTool = {
+      type: 'function',
+      function: {
+        name: 'extractLocation',
+        description: 'Extract the location from the office name.',
+        parameters: {
+          type: 'object',
+          properties: toolProperties,
+        },
+      },
     }
 
     const messages: AiChatMessage[] = [
       {
         role: 'system',
-        content: systemPrompt as string,
+        content: systemPrompt,
       },
       {
         role: 'user',
@@ -534,15 +538,15 @@ export class RacesService {
       },
     ]
 
-    const toolChoice = {
+    const toolChoice: ChatCompletionNamedToolChoice = {
       type: 'function',
       function: { name: 'extractLocation' },
     }
 
     const completion = await this.ai.getChatToolCompletion({
       messages,
-      tool: tool as ChatCompletionTool,
-      toolChoice: toolChoice as ChatCompletionNamedToolChoice,
+      tool,
+      toolChoice,
     })
 
     this.logger.debug(
@@ -552,6 +556,8 @@ export class RacesService {
     const content = completion?.content
     let decodedContent: Record<string, string> = {}
     try {
+      // JSON.parse returns unknown — no way to infer parsed shape at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       decodedContent = JSON.parse(content) as Record<string, string>
       decodedContent.level = level
     } catch (e) {
@@ -583,8 +589,8 @@ export class RacesService {
         const { position, election } = result.node
         if (position?.name && election?.electionDay) {
           if (position.name.toLowerCase() === officeName.toLowerCase()) {
-            if (!electionDates.includes(election.electionDay)) {
-              electionDates.push(election.electionDay)
+            if (!electionDates.includes(String(election.electionDay))) {
+              electionDates.push(String(election.electionDay))
             }
           }
         }

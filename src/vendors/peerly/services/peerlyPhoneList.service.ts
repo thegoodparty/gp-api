@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
+import { isAxiosError } from 'axios'
 import { PeerlyBaseConfig } from '../config/peerlyBaseConfig'
 import FormData from 'form-data'
 import {
@@ -87,9 +88,10 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
     }
   }
 
+  // Returns null if status is not available yet (e.g. still processing), otherwise returns the status response.
   async checkPhoneListStatus(
     token: string,
-  ): Promise<PhoneListStatusResponseDto> {
+  ): Promise<PhoneListStatusResponseDto | null> {
     try {
       const response = await this.peerlyHttpService.get(
         `/phonelists/${token}/checkstatus`,
@@ -101,11 +103,36 @@ export class PeerlyPhoneListService extends PeerlyBaseConfig {
         'status',
       )
     } catch (error) {
+      if (this.isTransientPhoneListError(error)) {
+        this.logger.warn(
+          { token },
+          'Peerly returned a transient error during phone list status check. This is expected during processing and will likely resolve on retry.',
+        )
+        return null
+      }
       return this.peerlyErrorHandling.handleApiError({
         error,
         logger: this.logger,
       })
     }
+  }
+
+  private isTransientPhoneListError(error: unknown): boolean {
+    if (!isAxiosError(error)) return false
+    if (error.response?.status !== 400) return false
+    const data: unknown = error.response?.data
+    if (!data || typeof data !== 'object') return false
+    const message =
+      ('error' in data && data.error) ||
+      ('message' in data && data.message) ||
+      ('Error' in data && data.Error) ||
+      ''
+    return (
+      typeof message === 'string' &&
+      message
+        .toLowerCase()
+        .includes('there may be an error with the phone list for context')
+    )
   }
 
   async getPhoneListDetails(

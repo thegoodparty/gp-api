@@ -7,6 +7,7 @@ import {
   generateRandomPassword,
   loginUser,
 } from '../../../e2e-tests/utils/auth.util'
+import { updateCampaignWithRetry } from '../../../e2e-tests/utils/request.util'
 import { CampaignWithPathToVictory } from '../campaigns.types'
 
 test.describe('Campaigns - Race Target Details', () => {
@@ -41,11 +42,10 @@ test.describe('Campaigns - Race Target Details', () => {
       token: registerResponse.token,
     })
 
-    const updateResponse = await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${registerResponse.token}`,
-      },
-      data: {
+    const updateResponse = await updateCampaignWithRetry(
+      request,
+      registerResponse.token,
+      {
         details: {
           office: 'Other',
           otherOffice: 'Creola City Mayor',
@@ -54,7 +54,7 @@ test.describe('Campaigns - Race Target Details', () => {
           positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
         },
       },
-    })
+    )
 
     expect(updateResponse.status()).toBe(200)
   })
@@ -82,18 +82,13 @@ test.describe('Campaigns - Race Target Details', () => {
       token: registerResponse.token,
     })
 
-    await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${registerResponse.token}`,
-      },
-      data: {
-        details: {
-          office: 'Other',
-          otherOffice: 'Creola City Mayor',
-          state: 'GA',
-          electionDate: '2025-11-03',
-          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-        },
+    await updateCampaignWithRetry(request, registerResponse.token, {
+      details: {
+        office: 'Other',
+        otherOffice: 'Creola City Mayor',
+        state: 'GA',
+        electionDate: '2025-11-03',
+        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
       },
     })
 
@@ -151,18 +146,13 @@ test.describe('Campaigns - Race Target Details', () => {
       token: registerResponse.token,
     })
 
-    await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${registerResponse.token}`,
-      },
-      data: {
-        details: {
-          office: 'Other',
-          otherOffice: 'Creola City Mayor',
-          state: 'GA',
-          electionDate: '2025-11-03',
-          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-        },
+    await updateCampaignWithRetry(request, registerResponse.token, {
+      details: {
+        office: 'Other',
+        otherOffice: 'Creola City Mayor',
+        state: 'GA',
+        electionDate: '2025-11-03',
+        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
       },
     })
 
@@ -233,18 +223,13 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     })
     testSlug = registerResponse.campaign.slug
 
-    await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${registerResponse.token}`,
-      },
-      data: {
-        details: {
-          office: 'Other',
-          otherOffice: 'Creola City Mayor',
-          state: 'GA',
-          electionDate: '2025-11-03',
-          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-        },
+    await updateCampaignWithRetry(request, registerResponse.token, {
+      details: {
+        office: 'Other',
+        otherOffice: 'Creola City Mayor',
+        state: 'GA',
+        electionDate: '2025-11-03',
+        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
       },
     })
 
@@ -296,18 +281,13 @@ test.describe('Campaigns - Race Target Details (Admin)', () => {
     })
     testSlug = registerResponse.campaign.slug
 
-    await request.put('/v1/campaigns/mine', {
-      headers: {
-        Authorization: `Bearer ${registerResponse.token}`,
-      },
-      data: {
-        details: {
-          office: 'Other',
-          otherOffice: 'Creola City Mayor',
-          state: 'GA',
-          electionDate: '2025-11-03',
-          positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
-        },
+    await updateCampaignWithRetry(request, registerResponse.token, {
+      details: {
+        office: 'Other',
+        otherOffice: 'Creola City Mayor',
+        state: 'GA',
+        electionDate: '2025-11-03',
+        positionId: 'Z2lkOi8vYmFsbG90LWZhY3RvcnkvUG9zaXRpb24vNDYyMTM=',
       },
     })
 

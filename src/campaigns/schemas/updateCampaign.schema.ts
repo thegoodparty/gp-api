@@ -53,7 +53,7 @@ const CampaignDetailsSchema = z
     party: z.string(),
     otherParty: z.string(),
     district: z.string(),
-    raceId: z.string(),
+    raceId: z.string().nullish(),
     level: ElectionLevelSchema,
     noNormalizedOffice: z.boolean(),
     website: z.string(),
@@ -93,7 +93,6 @@ export class UpdateCampaignSchema extends createZodDto(
     .partial()
     .extend({
       details: CampaignDetailsSchema.optional(),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
     })
     .strict(),

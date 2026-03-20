@@ -1,4 +1,4 @@
-import { CampaignCreatedBy, ElectionLevel } from '@goodparty_org/contracts'
+import { ElectionLevel } from '@goodparty_org/contracts'
 import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory, Prisma } from '@prisma/client'
 import { serializeError } from 'serialize-error'
@@ -16,8 +16,6 @@ import { DateFormats, formatDate } from 'src/shared/util/date.util'
 import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { P2VStatus } from '../../elections/types/pathToVictory.types'
-import { EmailService } from '../../email/email.service'
-import { EmailTemplateName } from '../../email/email.types'
 import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { PrismaService } from '../../prisma/prisma.service'
 import { createPrismaBase, MODELS } from '../../prisma/util/prisma.util'
@@ -31,13 +29,13 @@ import {
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 
-enum SpecialOfficePhrase {
-  AtLarge = 'At Large',
-  PresidentOfUS = 'President of the United States',
-  Senate = 'Senate',
-  Governor = 'Governor',
-  Mayor = 'Mayor',
-}
+const SpecialOfficePhrase = {
+  AtLarge: 'At Large',
+  PresidentOfUS: 'President of the United States',
+  Senate: 'Senate',
+  Governor: 'Governor',
+  Mayor: 'Mayor',
+} as const
 
 const SPECIAL_OFFICE_PHRASES = Object.freeze(Object.values(SpecialOfficePhrase))
 
@@ -85,7 +83,6 @@ export class PathToVictoryService extends createPrismaBase(
     private prisma: PrismaService,
     private officeMatchService: OfficeMatchService,
     private slackService: SlackService,
-    private emailService: EmailService,
     @Inject(forwardRef(() => CrmCampaignsService))
     private crmService: WrapperType<CrmCampaignsService>,
     @Inject(forwardRef(() => AnalyticsService))
@@ -136,10 +133,7 @@ export class PathToVictoryService extends createPrismaBase(
     }
   }
 
-  async handlePathToVictory(input: PathToVictoryInput): Promise<{
-    slug: string
-    pathToVictoryResponse: PathToVictoryResponse
-  }> {
+  async handlePathToVictory(input: PathToVictoryInput): Promise<P2VResponse> {
     const pathToVictoryResponse: PathToVictoryResponse = {
       electionType: '',
       electionLocation: '',
@@ -168,6 +162,8 @@ export class PathToVictoryService extends createPrismaBase(
         searchColumns = await this.officeMatchService.searchDistrictTypes(
           input.slug,
           input.officeName,
+          // String to enum narrowing — GraphQL returns string, runtime validation would add overhead
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           input.electionLevel as ElectionLevel,
           input.electionState,
           input.subAreaName,
@@ -217,6 +213,8 @@ export class PathToVictoryService extends createPrismaBase(
         electionLocation = columnResponse.value
 
         if (
+          // String to enum narrowing — GraphQL returns string, runtime validation would add overhead
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (input.electionLevel as ElectionLevel) === ElectionLevel.federal &&
           (FEDERAL_SPECIAL_PHRASES.some((p) => input.officeName.includes(p)) ||
             input.officeName.includes(SpecialOfficePhrase.Governor)) &&
@@ -442,13 +440,8 @@ export class PathToVictoryService extends createPrismaBase(
       !!pathToVictoryResponse.electionLocation
 
     let statusOverride: P2VStatus | undefined
-    let sendEmailFlag = false
-
     // --- Branch 1: Full success — district + turnout found ---
     if (hasTurnout) {
-      // Only send the "victory ready" email if this is the first time reaching Complete
-      sendEmailFlag =
-        campaign.pathToVictory?.data?.p2vStatus !== P2VStatus.complete
       const turnoutSlackMessage = `
       ￮ Projected Turnout: ${pathToVictoryResponse.counts.projectedTurnout}
       ￮ Win Number: ${pathToVictoryResponse.counts.winNumber}
@@ -514,7 +507,6 @@ export class PathToVictoryService extends createPrismaBase(
     // handlePathToVictoryFailure, which tracks p2vAttempts and retries.
     if (hasTurnout) {
       await this.completePathToVictory(campaign.slug, pathToVictoryResponse, {
-        sendEmail: sendEmailFlag,
         p2vStatusOverride: statusOverride,
         officeFingerprint,
       })
@@ -534,7 +526,6 @@ export class PathToVictoryService extends createPrismaBase(
       electionLocation: string
     },
     options?: {
-      sendEmail?: boolean
       p2vStatusOverride?: P2VStatus
       officeFingerprint?: string
     },
@@ -548,7 +539,7 @@ export class PathToVictoryService extends createPrismaBase(
     try {
       const campaign = await this.prisma.campaign.findUnique({
         where: { slug },
-        include: { user: true, pathToVictory: true },
+        include: { user: true, pathToVictory: true, organization: true },
       })
 
       if (!campaign) {
@@ -700,8 +691,13 @@ export class PathToVictoryService extends createPrismaBase(
       // email/analytics/CRM updates from running.
       if (shouldOverwriteDistrict && campaign.details?.state) {
         const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+        const ballotReadyPositionId = campaign.organization?.positionId
+          ? await this.organizationsService.resolveBallotReadyPositionId(
+              campaign.organization.positionId,
+            )
+          : null
         const orgData = await this.organizationsService.resolveOrgData({
-          ballotReadyPositionId: campaign.details?.positionId,
+          ballotReadyPositionId,
           office: campaign.details?.office,
           otherOffice: campaign.details?.otherOffice,
           state: campaign.details.state,
@@ -709,48 +705,15 @@ export class PathToVictoryService extends createPrismaBase(
           L2DistrictName: pathToVictoryResponse.electionLocation,
         })
 
-        await this.prisma.organization.upsert({
+        await this.prisma.organization.update({
           where: { slug: orgSlug },
-          update: orgData,
-          create: {
-            slug: orgSlug,
-            ownerId: campaign.userId,
-            ...orgData,
-          },
+          data: orgData,
         })
       }
 
       await this.analytics.identify(campaign.userId, {
         winNumber: pathToVictoryResponse.counts.winNumber,
       })
-
-      const shouldSendEmail = options?.sendEmail ?? true
-      if (p2vStatus === 'Complete' && shouldSendEmail && campaign.user?.email) {
-        const name = campaign.user
-          ? await this.getUserName(campaign.user)
-          : 'Friend'
-        const variables = {
-          name,
-          link: `${process.env.WEBAPP_ROOT}/dashboard`,
-        }
-
-        if (
-          process.env.WEBAPP_ROOT === 'https://goodparty.org' &&
-          campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN
-        ) {
-          this.logger.debug(
-            { email: campaign.user.email },
-            'sending email to user',
-          )
-          await this.emailService.sendTemplateEmail({
-            to: campaign.user.email,
-            subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-            template: EmailTemplateName.candidateVictoryReady,
-            variables,
-            cc: 'jared@goodparty.org',
-          })
-        }
-      }
 
       await this.crmService.handleUpdateCampaign(
         campaign,
@@ -767,16 +730,8 @@ export class PathToVictoryService extends createPrismaBase(
       })
     }
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async getUserName(user: any): Promise<string> {
-    return user.name || 'Friend'
-  }
 }
 
-export interface P2VResponse {
-  slug: string
+export type P2VResponse = PathToVictoryInput & {
   pathToVictoryResponse: PathToVictoryResponse
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any
 }

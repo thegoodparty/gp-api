@@ -110,12 +110,19 @@ export class P2pPhoneListUploadService {
     )
     let withFixColumns = false
     try {
-      const sqlResponse = await this.voterDatabaseService.query(countQuery)
-      const count = parseInt(sqlResponse.rows[0].count)
+      const sqlResponse = await this.voterDatabaseService.query<{
+        count: string
+      }>(countQuery)
+      const count = parseInt(String(sqlResponse.rows[0].count))
       withFixColumns = count === 0
       this.logger.debug({ count, withFixColumns }, 'P2P voter count check:')
     } catch (error) {
-      if ((error as { code?: string })?.code === '42703') {
+      if (
+        error != null &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === '42703'
+      ) {
         // Column does not exist — fall back to fixColumns mode
         withFixColumns = true
         this.logger.debug(
@@ -154,7 +161,7 @@ export class P2pPhoneListUploadService {
     const chunks: Buffer[] = []
 
     return new Promise((resolve, reject) => {
-      stream.on('data', (chunk) => {
+      stream.on('data', (chunk: Buffer) => {
         chunks.push(Buffer.from(chunk))
       })
 

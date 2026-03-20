@@ -26,7 +26,7 @@ import {
   CampaignVerificationStatus,
   Peerly10DlcBrandData,
   Peerly10DLCBrandSubmitResponseBody,
-  PEERLY_CV_VERIFICATION_TYPE,
+  PeerlyCvVerificationType,
   PeerlyApiErrorContext,
   PeerlyCreateCVTokenResponse,
   PeerlyGetCvRequestResponseBody,
@@ -43,7 +43,7 @@ import {
   getPeerlyCommitteeType,
   getPeerlyLocaleFromOfficeLevel,
   PEERLY_ENTITY_TYPE,
-  PEERLY_LOCALITIES,
+  PeerlyLocalities,
   PEERLY_USECASE,
 } from './peerly.const'
 import { SlackService } from '../../slack/services/slack.service'
@@ -303,10 +303,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
         )
 
       const {
-        data: {
-          campaign_verify_token: _campaign_verify_token,
-          ...identityBrand
-        },
+        data: { campaign_verify_token: _campaignVerifyToken, ...identityBrand },
       } = response
       this.logger.debug(`Successfully approved 10DLC Brand: ${identityBrand}`)
 
@@ -339,7 +336,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       )
       result = data
     } catch (e) {
-      if (isAxiosError(e)) {
+      if (isAxiosError<{ status_code?: number }>(e)) {
         // Peerly returns 400 with nested status_code: 404 when CV doesn't exist
         const is404 =
           e.status === 404 ||
@@ -392,7 +389,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     }
 
     const {
-      street: filing_address_line1,
+      street: filingAddressLine1,
       city,
       state,
       county,
@@ -406,12 +403,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
     const peerlyLocale = getPeerlyLocaleFromOfficeLevel(officeLevel)
 
     const verificationType =
-      peerlyLocale === PEERLY_LOCALITIES.federal
-        ? PEERLY_CV_VERIFICATION_TYPE.Federal
-        : PEERLY_CV_VERIFICATION_TYPE.StateLocal
+      peerlyLocale === PeerlyLocalities.federal
+        ? PeerlyCvVerificationType.Federal
+        : PeerlyCvVerificationType.StateLocal
 
-    const isFederal = peerlyLocale === PEERLY_LOCALITIES.federal
-    const isLocal = peerlyLocale === PEERLY_LOCALITIES.local
+    const isFederal = peerlyLocale === PeerlyLocalities.federal
+    const isLocal = peerlyLocale === PeerlyLocalities.local
 
     // Validate required federal fields
     if (isFederal) {
@@ -426,13 +423,24 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       }
     }
 
-    const isMissingLocalLocation =
-      isLocal && !city?.long_name && !county?.long_name
-    if (isMissingLocalLocation) {
-      this.logger.warn(
-        `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}). ` +
-          `This field is required by Peerly when locality is 'local'.`,
-      )
+    let cityCounty: string | undefined
+    if (isLocal) {
+      cityCounty =
+        // If it's a county, let's try to use the county name, else, use the city name.
+        ballotLevel === BallotReadyPositionLevel.COUNTY
+          ? (county?.long_name ?? city?.long_name)
+          : city?.long_name
+
+      if (!cityCounty) {
+        this.logger.error(
+          `[Campaign Verify] Missing city_county for local submission (campaignId=${campaign.id}, placeId=${placeId}). ` +
+            `ballotLevel=${ballotLevel}, city=${city?.long_name}, county=${county?.long_name}. ` +
+            `This field is required by Peerly when locality is 'local'.`,
+        )
+        throw new BadRequestException(
+          `City or county name is required for local candidates but not present for placeId=${placeId}.`,
+        )
+      }
     }
 
     const submitCVData = {
@@ -446,7 +454,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
       committee_type: getPeerlyCommitteeType(committeeType),
       committee_ein: ein,
       election_date: formatDate(new Date(electionDate), DateFormats.isoDate),
-      filing_address_line1,
+      filing_address_line1: filingAddressLine1,
       filing_city: city?.long_name,
       filing_state: state?.short_name,
       filing_zip: postalCode?.long_name,
@@ -468,14 +476,7 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           }
         : {}),
       // Local-specific fields
-      ...(isLocal
-        ? {
-            city_county:
-              ballotLevel === BallotReadyPositionLevel.COUNTY
-                ? county?.long_name
-                : city?.long_name,
-          }
-        : {}),
+      ...(isLocal ? { city_county: cityCounty } : {}),
     }
 
     let result: PeerlySubmitCVResponseBody | null = null
@@ -511,12 +512,12 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           `/v2/tdlc/${peerlyIdentityId}/retrieve_cv`,
         )
       const { data } = response
-      const { verification_status } = data
+      const { verification_status: verificationStatus } = data
       this.logger.debug(
         { data },
         'Successfully retrieved campaign verify status:',
       )
-      return verification_status
+      return verificationStatus
     } catch (e) {
       await this.handleApiError(e, { campaign, peerlyIdentityId })
     }
@@ -534,8 +535,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           { code: pin },
         )
       const { data } = response
-      const { cv_verification_status } = data
-      return cv_verification_status === CampaignVerificationStatus.VERIFIED
+      const { cv_verification_status: cvVerificationStatus } = data
+      return cvVerificationStatus === CampaignVerificationStatus.VERIFIED
     } catch (e) {
       if (isAxiosError(e) && e.status === 400) {
         this.logger.warn(
@@ -567,8 +568,8 @@ export class PeerlyIdentityService extends PeerlyBaseConfig {
           `/v2/tdlc/${peerlyIdentityId}/create_cv_token`,
         )
       const { data } = response
-      const { campaign_verify_token } = data
-      return campaign_verify_token
+      const { campaign_verify_token: campaignVerifyToken } = data
+      return campaignVerifyToken
     } catch (e) {
       await this.handleApiError(e, { campaign, peerlyIdentityId })
     }

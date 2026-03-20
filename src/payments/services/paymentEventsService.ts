@@ -16,7 +16,6 @@ import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
-import { EmailTemplateName } from '../../email/email.types'
 import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
@@ -76,6 +75,8 @@ export class PaymentEventsService {
       throw new BadRequestException('No subscriptionId found in subscription')
     }
 
+    // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = await this.usersService.findByCustomerId(customerId as string)
     if (!user) {
       throw new BadGatewayException(
@@ -111,6 +112,8 @@ export class PaymentEventsService {
       throw new BadRequestException('No customerId found in subscription')
     }
 
+    // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = await this.usersService.findByCustomerId(customerId as string)
     if (!user) {
       throw new BadGatewayException(
@@ -135,7 +138,6 @@ export class PaymentEventsService {
 
     await Promise.allSettled([
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
-      this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
   }
@@ -167,6 +169,8 @@ export class PaymentEventsService {
       subscriptionCancelAt: cancelAt,
     })
 
+    // Prisma optional relation — user is guaranteed by auth but Prisma types it as nullable
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = (await this.usersService.findByCampaign(campaign)) as User
     const isCancellationRequest =
       cancelAt && previousCancelAt && previousCancelAt > cancelAt
@@ -181,16 +185,15 @@ export class PaymentEventsService {
     event: Stripe.CheckoutSessionCompletedEvent,
   ) {
     const session = event.data.object
-    const { mode } = session
 
     // Route to appropriate handler based on checkout session mode
-    if (mode === CheckoutSessionMode.SUBSCRIPTION) {
+    if (session.mode === CheckoutSessionMode.SUBSCRIPTION) {
       return this.handleSubscriptionCheckoutCompleted(session)
-    } else if (mode === CheckoutSessionMode.PAYMENT) {
+    } else if (session.mode === CheckoutSessionMode.PAYMENT) {
       return this.handleOneTimePaymentCheckoutCompleted(session)
     }
 
-    this.logger.warn(`Unknown checkout session mode: ${mode}`)
+    this.logger.warn(`Unknown checkout session mode: ${session.mode}`)
   }
 
   /**
@@ -237,6 +240,8 @@ export class PaymentEventsService {
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
     await this.campaignsService.patchCampaignDetails(campaignId, {
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       subscriptionId: subscriptionId as string,
     })
     await this.campaignsService.setIsPro(campaignId)
@@ -254,6 +259,8 @@ export class PaymentEventsService {
 
     // Critical: Update user metadata with customerId - must succeed
     await this.usersService.patchUserMetaData(user.id, {
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       customerId: customerId as string,
       checkoutSessionId: null,
     })
@@ -261,18 +268,13 @@ export class PaymentEventsService {
     // Non-critical: Send notifications - log failures but don't fail webhook
     const results = await Promise.allSettled([
       this.sendProSignUpSlackMessage(user, campaign),
-      this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
 
     // Log any notification failures
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        const action = [
-          'send Slack message',
-          'send email',
-          'send voter file alert',
-        ][index]
+        const action = ['send Slack message', 'send voter file alert'][index]
         this.logger.error(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           { reason: result.reason },
@@ -446,32 +448,5 @@ export class PaymentEventsService {
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
-  }
-
-  async sendProConfirmationEmail(user: User, campaign: Campaign) {
-    const { details: campaignDetails } = campaign
-    const { electionDate: ISO8601DateString } = campaignDetails
-
-    const formattedCurrentDate = formatDate(new Date(), DateFormats.isoDate)
-    const electionDate =
-      ISO8601DateString && formatDate(ISO8601DateString, DateFormats.usDate)
-
-    const emailVars = {
-      userFullName: getUserFullName(user),
-      startDate: formattedCurrentDate,
-      ...(electionDate ? { electionDate } : {}),
-    }
-
-    try {
-      await this.emailService.sendTemplateEmail({
-        to: user.email,
-        subject: `Welcome to Pro! Let's Empower Your Campaign Together`,
-        template: EmailTemplateName.proConfirmation,
-        variables: emailVars,
-      })
-    } catch (e) {
-      this.logger.error({ e }, 'Error sending pro confirmation email')
-      throw e
-    }
   }
 }

@@ -1,5 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common'
 import { User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 import {
   CustomCheckoutSessionPayload,
   PaymentIntentPayload,
@@ -8,25 +9,19 @@ import {
 } from 'src/payments/payments.types'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
 import Stripe from 'stripe'
-import { PinoLogger } from 'nestjs-pino'
 
-const { STRIPE_SECRET_KEY, WEBAPP_ROOT_URL, STRIPE_WEBSOCKET_SECRET } =
-  process.env
-if (!STRIPE_SECRET_KEY || !WEBAPP_ROOT_URL) {
-  throw new Error(
-    'Please set STRIPE_SECRET_KEY and WEBAPP_ROOT_URL in your .env',
-  )
-}
-if (!STRIPE_WEBSOCKET_SECRET) {
-  throw new Error('Please set STRIPE_WEBSOCKET_SECRET in your .env')
-}
+import { requireEnv } from 'src/shared/utils/env'
+
+const STRIPE_SECRET_KEY = requireEnv('STRIPE_SECRET_KEY')
+const WEBAPP_ROOT_URL = requireEnv('WEBAPP_ROOT_URL')
+const STRIPE_WEBSOCKET_SECRET = requireEnv('STRIPE_WEBSOCKET_SECRET')
 
 const LIVE_PRODUCT_ID = 'prod_QCGFVVUhD6q2Jo'
 const TEST_PRODUCT_ID = 'prod_QAR4xrqUhyHHqX'
 
 @Injectable()
 export class StripeService {
-  private stripe = new Stripe(STRIPE_SECRET_KEY as string)
+  private stripe = new Stripe(STRIPE_SECRET_KEY)
 
   constructor(
     private readonly slack: SlackService,
@@ -94,16 +89,19 @@ export class StripeService {
     return await this.stripe.checkout.sessions.retrieve(sessionId)
   }
 
-  async createCheckoutSession(userId: number) {
+  async createCheckoutSession(userId: number, email: string | null = null) {
     const session = await this.stripe.checkout.sessions.create({
       metadata: {
         userId,
       },
+      ...(email ? { customer_email: email } : {}),
       billing_address_collection: 'auto',
       line_items: [
         {
           // We should never have more than 1 price for Pro. But if we do, this
           //  will need to be more intelligent.
+          // Stripe SDK uses broad union types — e.g. customer can be string | Customer | DeletedCustomer
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           price: (await this.getPrice()) as string,
           quantity: 1,
         },
@@ -125,16 +123,18 @@ export class StripeService {
   }
 
   async createCustomCheckoutSession(
-    user: User,
+    {
+      id: userId,
+      email,
+      customerId,
+    }: Pick<User, 'id' | 'email'> &
+      Pick<NonNullable<User['metaData']>, 'customerId'>,
     payload: CustomCheckoutSessionPayload,
   ): Promise<{
     id: string
     clientSecret: string
     amount: number
   }> {
-    const userId = user.id
-    const customerId = user.metaData?.customerId
-
     const cleanedMetadata = Object.entries(payload.metadata || {})
       .filter(([_, value]) => value != null)
       .reduce(
@@ -150,7 +150,10 @@ export class StripeService {
       mode: 'payment',
       ...(customerId
         ? { customer: customerId }
-        : { customer_email: user.email }),
+        : email
+          ? { customer_email: email }
+          : {}),
+      ...(email ? { payment_intent_data: { receipt_email: email } } : {}),
       line_items: [
         {
           price_data: {
@@ -203,7 +206,7 @@ export class StripeService {
     return this.stripe.webhooks.constructEvent(
       rawBody,
       stripeSignature,
-      STRIPE_WEBSOCKET_SECRET as string,
+      STRIPE_WEBSOCKET_SECRET,
     )
   }
 
@@ -231,7 +234,7 @@ export class StripeService {
       return null
     }
 
-    const { customer } = checkoutSession as unknown as Stripe.Checkout.Session
+    const { customer } = checkoutSession
 
     if (!customer) {
       return null

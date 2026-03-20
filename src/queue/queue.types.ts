@@ -1,4 +1,5 @@
 import { TcrCompliance } from '@prisma/client'
+import type { PathToVictoryInput } from 'src/pathToVictory/types/pathToVictory.types'
 import z from 'zod'
 
 export enum QueueType {
@@ -11,11 +12,23 @@ export enum QueueType {
   POLL_EXPANSION = 'pollExpansion',
 }
 
-export type QueueMessage = {
-  type: QueueType
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  data: unknown // any until we define the actual data structure for each message type
-}
+export type QueueMessage =
+  | { type: QueueType.GENERATE_AI_CONTENT; data: GenerateAiContentMessageData }
+  | { type: QueueType.PATH_TO_VICTORY; data: PathToVictoryInput }
+  | {
+      type: QueueType.TCR_COMPLIANCE_STATUS_CHECK
+      data: TcrComplianceStatusCheckMessage
+    }
+  | {
+      type: QueueType.DOMAIN_EMAIL_FORWARDING
+      data: DomainEmailForwardingMessage
+    }
+  | {
+      type: QueueType.POLL_ANALYSIS_COMPLETE
+      data: PollAnalysisCompleteEvent['data']
+    }
+  | { type: QueueType.POLL_CREATION; data: PollCreationEvent['data'] }
+  | { type: QueueType.POLL_EXPANSION; data: PollExpansionEvent['data'] }
 
 export type GenerateAiContentMessageData = {
   slug: string

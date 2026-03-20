@@ -48,19 +48,19 @@ export class CrmUsersService {
     const whyBrowsing =
       typeof meta?.whyBrowsing === 'string' ? meta.whyBrowsing : undefined
 
-    let browsing_intent: string = ''
+    let browsingIntent: string = ''
     switch (whyBrowsing) {
       case 'considering':
-        browsing_intent = 'considering run'
+        browsingIntent = 'considering run'
         break
       case 'learning':
-        browsing_intent = 'learning about gp'
+        browsingIntent = 'learning about gp'
         break
       case 'test':
-        browsing_intent = 'testing tools'
+        browsingIntent = 'testing tools'
         break
       case 'else':
-        browsing_intent = 'other'
+        browsingIntent = 'other'
         break
     }
 
@@ -100,7 +100,7 @@ export class CrmUsersService {
             product_user: 'yes',
           }
         : {}),
-      ...(browsing_intent ? { browsing_intent } : {}),
+      ...(browsingIntent ? { browsing_intent: browsingIntent } : {}),
     }
   }
 

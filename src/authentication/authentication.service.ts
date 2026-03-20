@@ -6,6 +6,7 @@ import {
 import { JsonWebTokenError, JwtService, TokenExpiredError } from '@nestjs/jwt'
 import { UsersService } from '../users/services/users.service'
 import { compare } from 'bcrypt'
+import { User } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { nanoid } from 'nanoid'
 import { PinoLogger } from 'nestjs-pino'
@@ -31,7 +32,7 @@ export class AuthenticationService {
     token: string,
     password: string,
   ) {
-    let user
+    let user: User
     try {
       this.jwtService.verify(token)
       user = await this.usersService.findUserByResetToken(email, token)

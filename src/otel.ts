@@ -24,6 +24,7 @@ import type { Context } from '@opentelemetry/api'
 import { PrismaInstrumentation } from '@prisma/instrumentation'
 import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
+import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core'
 import { HostMetrics } from '@opentelemetry/host-metrics'
 import { FastifyOtelInstrumentation } from '@fastify/otel'
 
@@ -73,7 +74,6 @@ class JsonBodyLogRecordProcessor implements LogRecordProcessor {
 const headers = process.env.OTEL_EXPORTER_OTLP_HEADERS
 
 declare global {
-  // eslint-disable-next-line no-var
   var __fastifyOtelInstrumentation: FastifyOtelInstrumentation | undefined
 }
 
@@ -96,12 +96,6 @@ if (!headers) {
     [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]:
       process.env.OTEL_SERVICE_ENVIRONMENT || 'local',
   })
-
-  const prismaConnectionDuration = metrics
-    .getMeter('gp-api')
-    .createHistogram('prisma.connection.duration_ms', {
-      description: 'Duration of prisma:engine:connection spans in milliseconds',
-    })
 
   const prismaConnectionMetricProcessor: SpanProcessor = {
     onStart: () => undefined,
@@ -154,6 +148,7 @@ if (!headers) {
     ],
     instrumentations: [
       new HttpInstrumentation(),
+      new NestInstrumentation(),
       new PrismaInstrumentation(),
       new PinoInstrumentation(),
       fastifyOtelInstrumentation,
@@ -161,6 +156,13 @@ if (!headers) {
   })
 
   sdk.start()
+
+  const prismaConnectionDuration = metrics
+    .getMeter('gp-api')
+    .createHistogram('prisma.connection.duration', {
+      description: 'Duration of prisma:engine:connection spans in milliseconds',
+      unit: 'ms',
+    })
 
   const hostMetrics = new HostMetrics()
   hostMetrics.start()

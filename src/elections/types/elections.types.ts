@@ -118,18 +118,20 @@ interface ByYearAndCode {
 export type BuildRaceTargetDetailsInput = DistrictInfo &
   (ByDate | ByYearAndCode)
 
+export type District = {
+  id: string
+  L2DistrictType: string
+  L2DistrictName: string
+  projectedTurnout: SourceProjectedTurnout | null
+}
+
 export type PositionWithOptionalDistrict = {
   id: string
   brPositionId: string
   brDatabaseId: string
   state: string
   name: string
-  district?: {
-    id: string
-    L2DistrictType: string
-    L2DistrictName: string
-    projectedTurnout: SourceProjectedTurnout | null
-  }
+  district?: District
 }
 
 type SourceProjectedTurnout = {

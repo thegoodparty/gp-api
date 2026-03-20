@@ -158,7 +158,7 @@ export class CampaignsController {
   }
 
   @Get('mine')
-  @UseCampaign()
+  @UseCampaign({ include: { pathToVictory: true, organization: true } })
   async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
   }
@@ -314,7 +314,12 @@ export class CampaignsController {
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
-    @Body() { slug, L2DistrictType, L2DistrictName }: SetDistrictDTO,
+    @Body()
+    {
+      slug,
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
+    }: SetDistrictDTO,
   ) {
     if (
       slug &&
@@ -332,16 +337,16 @@ export class CampaignsController {
         campaign,
         ...{
           slug,
-          L2DistrictType,
-          L2DistrictName,
+          L2DistrictType: l2DistrictType,
+          L2DistrictName: l2DistrictName,
         },
       },
       'Updating campaign with district',
     )
 
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
-      L2DistrictType,
-      L2DistrictName,
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
       electionDate: campaign.details?.electionDate || '',
       state: campaign.details?.state || '',
     })
@@ -350,19 +355,23 @@ export class CampaignsController {
       !!raceTargetDetails?.projectedTurnout &&
       raceTargetDetails.projectedTurnout > 0
 
+    const campaignOrg = await this.organizations.findUnique({
+      where: { slug: OrganizationsService.campaignOrgSlug(campaign.id) },
+    })
+
     const overrideDistrictId =
       await this.organizations.resolveOverrideDistrictId({
-        positionId: campaign.details?.positionId ?? undefined,
+        positionId: campaignOrg?.positionId ?? undefined,
         state: campaign.details?.state || '',
-        L2DistrictType,
-        L2DistrictName,
+        L2DistrictType: l2DistrictType,
+        L2DistrictName: l2DistrictName,
       })
 
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         ...(raceTargetDetails || {}),
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
+        electionType: l2DistrictType,
+        electionLocation: l2DistrictName,
         districtManuallySet: true,
         ...(!hasTurnout
           ? {
@@ -383,7 +392,18 @@ export class CampaignsController {
   @Put('mine/race-target-details')
   @UseCampaign()
   async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
-    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+    const campaignOrg = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+    const ballotreadyPositionId = campaignOrg?.positionId
+      ? await this.organizations.resolveBallotReadyPositionId(
+          campaignOrg.positionId,
+        )
+      : null
+
+    if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
@@ -394,7 +414,7 @@ export class CampaignsController {
     const raceTargetDetails = await this.elections
       .getBallotReadyMatchedRaceTargetDetails({
         campaignId: campaign.id,
-        ballotreadyPositionId: campaign.details.positionId,
+        ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
         officeName: campaign.details.otherOffice,
@@ -454,8 +474,18 @@ export class CampaignsController {
     const campaign = await this.campaigns.findFirstOrThrow({
       where: { slug },
     })
+    const campaignOrg = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+    const ballotreadyPositionId = campaignOrg?.positionId
+      ? await this.organizations.resolveBallotReadyPositionId(
+          campaignOrg.positionId,
+        )
+      : null
 
-    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+    if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
@@ -465,7 +495,7 @@ export class CampaignsController {
     const raceTargetDetails = await this.elections
       .getBallotReadyMatchedRaceTargetDetails({
         campaignId: campaign.id,
-        ballotreadyPositionId: campaign.details.positionId,
+        ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
         officeName: campaign.details.otherOffice,

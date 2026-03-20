@@ -102,6 +102,7 @@ export class PaymentsService {
 
     const customerId =
       await this.stripe.fetchCustomerIdFromCheckoutSession(checkoutSessionId)
+
     if (!customerId) {
       return null
     }

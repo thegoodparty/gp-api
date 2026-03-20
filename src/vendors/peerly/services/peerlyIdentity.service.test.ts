@@ -13,7 +13,7 @@ import { AreaCodeFromZipService } from '../../../ai/util/areaCodeFromZip.util'
 import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from '../../../campaigns/services/campaigns.service'
 import { GooglePlacesService } from '../../google/services/google-places.service'
-import { PEERLY_CV_VERIFICATION_TYPE } from '../peerly.types'
+import { PeerlyCvVerificationType } from '../peerly.types'
 import { PeerlyErrorHandlingService } from './peerlyErrorHandling.service'
 import { PeerlyHttpService } from './peerlyHttp.service'
 import { PeerlyIdentityService } from './peerlyIdentity.service'
@@ -194,7 +194,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
+          verification_type: PeerlyCvVerificationType.Federal,
           committee_type: 'H', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
@@ -209,7 +209,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
+          verification_type: PeerlyCvVerificationType.Federal,
           committee_type: 'S', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
@@ -224,7 +224,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.FEDERAL,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.Federal,
+          verification_type: PeerlyCvVerificationType.Federal,
           committee_type: 'P', // Peerly API expects short code
           fec_committee_id: 'C00123456',
           has_city_county: false,
@@ -240,7 +240,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.STATE,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+          verification_type: PeerlyCvVerificationType.StateLocal,
           committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: false,
@@ -256,7 +256,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.CITY,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+          verification_type: PeerlyCvVerificationType.StateLocal,
           committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: true,
@@ -272,7 +272,7 @@ describe('PeerlyIdentityService', () => {
           ballotLevel: BallotReadyPositionLevel.COUNTY,
         },
         expected: {
-          verification_type: PEERLY_CV_VERIFICATION_TYPE.StateLocal,
+          verification_type: PeerlyCvVerificationType.StateLocal,
           committee_type: 'CA', // Peerly API expects short code
           fec_committee_id: undefined,
           has_city_county: true,
@@ -327,6 +327,105 @@ describe('PeerlyIdentityService', () => {
           expect(lastSubmittedData).not.toHaveProperty('city_county')
         }
       })
+    })
+
+    it('falls back to city for COUNTY-level candidate when county is missing (e.g. independent city)', async () => {
+      // Google Places API returns county data as an `administrative_area_level_2` component.
+      // Some locations (e.g. Virginia independent cities) don't have this component,
+      // which causes extractAddressComponents() to return county: null.
+      // In that case, city_county should fall back to the city (locality) name.
+      const placesService = module.get(GooglePlacesService)
+      vi.mocked(placesService.getAddressByPlaceId).mockResolvedValue({
+        address_components: [
+          { types: ['street_number'], long_name: '100', short_name: '100' },
+          {
+            types: ['route'],
+            long_name: 'Church Ave',
+            short_name: 'Church Ave',
+          },
+          {
+            // locality means "city" in Google Places
+            types: ['locality', 'political'],
+            long_name: 'Anytown',
+            short_name: 'Anytown',
+          },
+          // No administrative_area_level_2 component — this is what Google returns
+          // for independent cities that aren't part of any county
+          {
+            // administrative_area_level_1 = state in Google Places
+            types: ['administrative_area_level_1', 'political'],
+            long_name: 'Virginia',
+            short_name: 'VA',
+          },
+          { types: ['postal_code'], long_name: '24000', short_name: '24000' },
+        ],
+      })
+
+      const campaign = createMockCampaign({
+        details: {
+          electionDate: '2024-11-05',
+          ballotLevel: BallotReadyPositionLevel.COUNTY,
+        },
+      })
+
+      await service.submitCampaignVerifyRequest(
+        {
+          email: 'candidate@example.com',
+          ein: '12-3456789',
+          phone: '15551234567',
+          peerlyIdentityId: 'peerly-123',
+          filingUrl: 'https://example.gov/elections',
+          officeLevel: OfficeLevel.local,
+          fecCommitteeId: null,
+          committeeType: CommitteeType.CANDIDATE,
+        },
+        baseUser,
+        campaign,
+        baseDomain,
+      )
+
+      expect(lastSubmittedData.city_county).toBe('Anytown')
+    })
+
+    it('throws BadRequestException when local candidate has no city or county', async () => {
+      const placesService = module.get(GooglePlacesService)
+      vi.mocked(placesService.getAddressByPlaceId).mockResolvedValue({
+        address_components: [
+          { types: ['street_number'], long_name: '100', short_name: '100' },
+          { types: ['route'], long_name: 'Elm St', short_name: 'Elm St' },
+          {
+            types: ['administrative_area_level_1', 'political'],
+            long_name: 'Virginia',
+            short_name: 'VA',
+          },
+          { types: ['postal_code'], long_name: '24000', short_name: '24000' },
+        ],
+      })
+
+      const campaign = createMockCampaign({
+        details: {
+          electionDate: '2024-11-05',
+          ballotLevel: BallotReadyPositionLevel.CITY,
+        },
+      })
+
+      await expect(
+        service.submitCampaignVerifyRequest(
+          {
+            email: 'candidate@example.com',
+            ein: '12-3456789',
+            phone: '15551234567',
+            peerlyIdentityId: 'peerly-123',
+            filingUrl: 'https://example.gov/elections',
+            officeLevel: OfficeLevel.local,
+            fecCommitteeId: null,
+            committeeType: CommitteeType.CANDIDATE,
+          },
+          baseUser,
+          campaign,
+          baseDomain,
+        ),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it('includes verification_method, filing_phone_number, filing_phone_type, and filing_url_instructions when calling Peerly', async () => {

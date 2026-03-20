@@ -1,3 +1,6 @@
+// HubSpot property names use snake_case — names must match the HubSpot API exactly,
+// renaming would break the integration.
+/* eslint-disable @typescript-eslint/naming-convention */
 export enum PrimaryElectionResult {
   WON = 'Won Primary',
   LOST = 'Lost Primary',
@@ -263,6 +266,5 @@ export type MockHubspotClient = {
   setAccessToken: (token: string) => void
   setApiKey: (apiKey: string) => void
   setDeveloperApiKey: (developerApiKey: string) => void
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   apiRequest: (opts?: Record<string, unknown>) => Promise<Response>
 }

@@ -18,10 +18,10 @@ export const ALERT_OWNERSHIP: Record<SlackGroup, ControllerName[]> = {
 
 export const ENDPOINT_OVERRIDES: Partial<Record<Endpoint, EndpointOverride>> = {
   'GET /v1/contacts': {
-    p95LatencyMs: 5000,
+    p95LatencyMs: 12000,
   },
   'GET /v1/contacts/download': {
-    p95LatencyMs: 8000,
+    p95LatencyMs: 15000,
   },
   'POST /v1/polls/analyze-bias': {
     p95LatencyMs: 6000,
@@ -80,7 +80,7 @@ export const GLOBAL_ALERTS: Alert[] = [
     slug: 'slow-prisma-connections',
     name: 'Slow Prisma connection acquisitions',
     type: 'metric',
-    expr: 'histogram_quantile(0.99, sum(rate(prisma_connection_duration_ms_bucket{service_name="gp-api", deployment_environment_name="$ENV"}[5m])) by (le))',
+    expr: 'histogram_quantile(0.99, sum(rate(prisma_connection_duration_milliseconds_bucket{service_name="gp-api", deployment_environment_name="$ENV"}[5m])) by (le))',
     threshold: 150,
     for: '5m',
     message: [

@@ -127,6 +127,8 @@ export class AiContentController {
   async systemPrompt(
     @Query() { slug, initial = false }: GetSystemPromptSchema,
   ) {
+    // Prisma include-based query — result type loses included relations without assertion
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const campaign = (await this.campaigns.findFirst({
       where: { slug },
       include: {
