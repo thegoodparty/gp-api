@@ -398,7 +398,7 @@ function createMockCampaign(
 
   return {
     id: overrides.id ?? 1,
-    organizationSlug: null,
+    organizationSlug: 'test-org',
     slug: overrides.slug ?? 'test-campaign',
     details: overrides.details ?? {},
     canDownloadFederal: overrides.canDownloadFederal ?? false,

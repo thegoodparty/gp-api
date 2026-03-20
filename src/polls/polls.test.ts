@@ -10,6 +10,14 @@ const service = useTestService()
 const getStats = vi.fn(ContactsService.prototype.getDistrictStats)
 
 beforeEach(async () => {
+  const campaignOrg = await service.prisma.organization.create({
+    data: {
+      slug: `campaign-org-${Date.now()}`,
+      ownerId: service.user.id,
+      positionId: 'gp-position-1',
+    },
+  })
+
   const campaign = await service.prisma.campaign.create({
     data: {
       userId: service.user.id,
@@ -17,21 +25,8 @@ beforeEach(async () => {
       details: {
         state: 'WY',
       },
+      organizationSlug: campaignOrg.slug,
     },
-  })
-
-  const organizationSlug = `campaign-${campaign.id}`
-  await service.prisma.organization.create({
-    data: {
-      slug: organizationSlug,
-      ownerId: service.user.id,
-      positionId: 'gp-position-1',
-    },
-  })
-
-  await service.prisma.campaign.update({
-    where: { id: campaign.id },
-    data: { organizationSlug },
   })
 
   await service.prisma.pathToVictory.create({
@@ -44,11 +39,19 @@ beforeEach(async () => {
     },
   })
 
+  const eoOrg = await service.prisma.organization.create({
+    data: {
+      slug: `eo-org-${campaign.id}`,
+      ownerId: service.user.id,
+    },
+  })
+
   await service.prisma.electedOffice.create({
     data: {
       userId: service.user.id,
       campaignId: campaign.id,
       isActive: true,
+      organizationSlug: eoOrg.slug,
     },
   })
 

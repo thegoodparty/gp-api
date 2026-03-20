@@ -31,11 +31,18 @@ describe('UseCampaign guard (integration)', () => {
 
   describe('legacy fallback (no header)', () => {
     it('resolves campaign by userId', async () => {
+      const legacyOrg = await service.prisma.organization.create({
+        data: {
+          slug: `legacy-org-${Date.now()}`,
+          ownerId: service.user.id,
+        },
+      })
       const campaign = await service.prisma.campaign.create({
         data: {
           userId: service.user.id,
           slug: 'legacy-campaign',
           details: {},
+          organizationSlug: legacyOrg.slug,
         },
       })
 
@@ -90,11 +97,18 @@ describe('UseCampaign guard (integration)', () => {
     })
 
     it('falls back to userId when org slug does not exist', async () => {
+      const fallbackOrg = await service.prisma.organization.create({
+        data: {
+          slug: `fallback-org-${Date.now()}`,
+          ownerId: service.user.id,
+        },
+      })
       const campaign = await service.prisma.campaign.create({
         data: {
           userId: service.user.id,
           slug: 'fallback-campaign',
           details: {},
+          organizationSlug: fallbackOrg.slug,
         },
       })
 
@@ -115,11 +129,18 @@ describe('UseCampaign guard (integration)', () => {
         },
       })
 
+      const fallbackNoOrgCampaignOrg = await service.prisma.organization.create({
+        data: {
+          slug: `fallback-no-org-campaign-org-${Date.now()}`,
+          ownerId: service.user.id,
+        },
+      })
       const campaign = await service.prisma.campaign.create({
         data: {
           userId: service.user.id,
           slug: 'fallback-no-org-campaign',
           details: {},
+          organizationSlug: fallbackNoOrgCampaignOrg.slug,
         },
       })
 

@@ -25,11 +25,19 @@ describe('OrganizationsBackfillService', () => {
       },
     })
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-exact-match',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-exact-match',
         details: { positionId: 'br-pos-1', state: 'CA' },
+        organizationSlug: org.slug,
       },
     })
 
@@ -44,11 +52,11 @@ describe('OrganizationsBackfillService', () => {
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: 'election-api-pos-id',
       overrideDistrictId: null,
       customPositionName: null,
@@ -81,11 +89,19 @@ describe('OrganizationsBackfillService', () => {
       'override-district-uuid',
     )
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-override',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-override',
         details: { positionId: 'br-pos-2', state: 'CA' },
+        organizationSlug: org.slug,
       },
     })
 
@@ -102,11 +118,11 @@ describe('OrganizationsBackfillService', () => {
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: 'election-api-pos-id-2',
       overrideDistrictId: 'override-district-uuid',
       customPositionName: null,
@@ -131,11 +147,19 @@ describe('OrganizationsBackfillService', () => {
     })
     vi.spyOn(electionsService, 'getDistrictId').mockResolvedValue(null)
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-district-not-found',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-district-not-found',
         details: { positionId: 'br-pos-3', state: 'CA' },
+        organizationSlug: org.slug,
       },
     })
 
@@ -156,11 +180,11 @@ describe('OrganizationsBackfillService', () => {
     expect(stats.district_not_found).toBe(1)
     expect(stats.exact_match).toBe(0)
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: 'election-api-pos-id-3',
       overrideDistrictId: null,
       customPositionName: null,
@@ -177,11 +201,19 @@ describe('OrganizationsBackfillService', () => {
       'fallback-district-uuid',
     )
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-no-position',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-no-position',
         details: { state: 'NY' },
+        organizationSlug: org.slug,
       },
     })
 
@@ -198,11 +230,11 @@ describe('OrganizationsBackfillService', () => {
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: null,
       overrideDistrictId: 'fallback-district-uuid',
       customPositionName: null,
@@ -211,22 +243,30 @@ describe('OrganizationsBackfillService', () => {
   })
 
   it('returns nulls when no position and no district data', async () => {
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-no-data',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-no-data',
         details: {},
+        organizationSlug: org.slug,
       },
     })
 
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: null,
       overrideDistrictId: null,
       customPositionName: null,
@@ -238,11 +278,19 @@ describe('OrganizationsBackfillService', () => {
     const electionsService = service.app.get(ElectionsService)
     const spy = vi.spyOn(electionsService, 'getPositionByBallotReadyId')
 
+    const ownerOrg = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-skip-existing',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-skip-existing',
         details: { positionId: 'br-pos-skip', state: 'CA' },
+        organizationSlug: ownerOrg.slug,
       },
     })
 
@@ -270,11 +318,19 @@ describe('OrganizationsBackfillService', () => {
     const electionsService = service.app.get(ElectionsService)
     const spy = vi.spyOn(electionsService, 'getPositionByBallotReadyId')
 
+    const ownerOrg = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-skip-override',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-skip-override',
         details: { state: 'TX' },
+        organizationSlug: ownerOrg.slug,
       },
     })
 
@@ -313,11 +369,19 @@ describe('OrganizationsBackfillService', () => {
       },
     })
 
+    const ownerOrg = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-eo-campaign',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-eo-campaign',
         details: { positionId: 'br-pos-eo', state: 'FL' },
+        organizationSlug: ownerOrg.slug,
       },
     })
 
@@ -344,6 +408,7 @@ describe('OrganizationsBackfillService', () => {
       data: {
         userId: service.user.id,
         campaignId: campaign.id,
+        organizationSlug: ownerOrg.slug,
       },
     })
 
@@ -379,12 +444,20 @@ describe('OrganizationsBackfillService', () => {
       'district-for-second',
     )
 
+    const org1 = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-fail-first',
+        ownerId: service.user.id,
+      },
+    })
+
     // First campaign will fail (position lookup throws)
     const campaign1 = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-fail-first',
         details: { positionId: 'br-pos-fail', state: 'CA' },
+        organizationSlug: org1.slug,
       },
     })
 
@@ -395,12 +468,20 @@ describe('OrganizationsBackfillService', () => {
       },
     })
 
+    const org2 = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-succeed-second',
+        ownerId: service.user.id,
+      },
+    })
+
     // Second campaign should still succeed (no positionId, falls back to district lookup)
     const campaign2 = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-succeed-second',
         details: { state: 'NY' },
+        organizationSlug: org2.slug,
       },
     })
 
@@ -418,20 +499,20 @@ describe('OrganizationsBackfillService', () => {
     await backfillService['backfillOrganizations']()
 
     // First campaign should have an empty org (created before resolution failed)
-    const org1 = await service.prisma.organization.findUnique({
+    const createdOrg1 = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign1.id}` },
     })
-    expect(org1).toMatchObject({
+    expect(createdOrg1).toMatchObject({
       positionId: null,
       overrideDistrictId: null,
       customPositionName: null,
     })
 
     // Second campaign should have an org
-    const org2 = await service.prisma.organization.findUnique({
+    const createdOrg2 = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign2.id}` },
     })
-    expect(org2).toMatchObject({
+    expect(createdOrg2).toMatchObject({
       positionId: null,
       overrideDistrictId: 'district-for-second',
       customPositionName: null,
@@ -439,24 +520,32 @@ describe('OrganizationsBackfillService', () => {
   })
 
   it('handles campaign with non-object details gracefully', async () => {
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-bad-details',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-bad-details',
         // Prisma JSON column accepts any JSON value; simulate old data
         details: 'some-string-value' as unknown as Record<string, unknown>,
+        organizationSlug: org.slug,
       },
     })
 
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
     // Org should still be created, but with null values
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: null,
       overrideDistrictId: null,
       customPositionName: null,
@@ -465,6 +554,13 @@ describe('OrganizationsBackfillService', () => {
   })
 
   it('handles campaign with non-string positionId gracefully', async () => {
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-numeric-posid',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
@@ -473,17 +569,18 @@ describe('OrganizationsBackfillService', () => {
           string,
           unknown
         >,
+        organizationSlug: org.slug,
       },
     })
 
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: null,
       overrideDistrictId: null,
       customPositionName: null,
@@ -497,11 +594,19 @@ describe('OrganizationsBackfillService', () => {
       'getPositionByBallotReadyId',
     ).mockResolvedValue(null)
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-no-p2v',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-no-p2v',
         details: { positionId: 'br-pos-no-p2v', state: 'CA' },
+        organizationSlug: org.slug,
       },
     })
     // No pathToVictory created
@@ -509,12 +614,12 @@ describe('OrganizationsBackfillService', () => {
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
     // Org created with nulls since position not found and no p2v district data
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: null,
       overrideDistrictId: null,
       customPositionName: null,
@@ -532,11 +637,19 @@ describe('OrganizationsBackfillService', () => {
       name: 'Treasurer',
     })
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-pos-no-district',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-pos-no-district',
         details: { positionId: 'br-pos-no-dist', state: 'CA' },
+        organizationSlug: org.slug,
       },
     })
 
@@ -550,11 +663,11 @@ describe('OrganizationsBackfillService', () => {
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: 'pos-no-district',
       overrideDistrictId: null,
       customPositionName: null,
@@ -570,11 +683,19 @@ describe('OrganizationsBackfillService', () => {
       'custom-district-uuid',
     )
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-custom-office',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: 'test-custom-office',
         details: { office: 'City Assessor', state: 'CA' },
+        organizationSlug: org.slug,
       },
     })
 
@@ -591,11 +712,11 @@ describe('OrganizationsBackfillService', () => {
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: null,
       customPositionName: 'City Assessor',
       ownerId: service.user.id,
@@ -622,11 +743,19 @@ describe('OrganizationsBackfillService', () => {
         },
       })
 
+      const org = await service.prisma.organization.create({
+        data: {
+          slug: 'owner-org-dry-run',
+          ownerId: service.user.id,
+        },
+      })
+
       const campaign = await service.prisma.campaign.create({
         data: {
           userId: service.user.id,
           slug: 'test-dry-run',
           details: { positionId: 'br-dry', state: 'CA' },
+          organizationSlug: org.slug,
         },
       })
 
@@ -642,6 +771,7 @@ describe('OrganizationsBackfillService', () => {
         data: {
           userId: service.user.id,
           campaignId: campaign.id,
+          organizationSlug: org.slug,
         },
       })
 
@@ -728,6 +858,13 @@ describe('OrganizationsBackfillService', () => {
       'other-district-uuid',
     )
 
+    const org = await service.prisma.organization.create({
+      data: {
+        slug: 'owner-org-other-office',
+        ownerId: service.user.id,
+      },
+    })
+
     const campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
@@ -738,6 +875,7 @@ describe('OrganizationsBackfillService', () => {
           positionId: 'br-pos-not-found',
           state: 'NY',
         },
+        organizationSlug: org.slug,
       },
     })
 
@@ -754,11 +892,11 @@ describe('OrganizationsBackfillService', () => {
     const backfillService = service.app.get(OrganizationsBackfillService)
     await backfillService['backfillOrganizations']()
 
-    const org = await service.prisma.organization.findUnique({
+    const createdOrg = await service.prisma.organization.findUnique({
       where: { slug: `campaign-${campaign.id}` },
     })
 
-    expect(org).toMatchObject({
+    expect(createdOrg).toMatchObject({
       positionId: null,
       customPositionName: 'Mayor',
       ownerId: service.user.id,

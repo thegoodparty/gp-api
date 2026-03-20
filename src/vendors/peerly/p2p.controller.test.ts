@@ -12,7 +12,7 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   id: 1,
   userId: 1,
   slug: 'test-campaign',
-  organizationSlug: null,
+  organizationSlug: 'test-org',
   isActive: true,
   isPro: false,
   isDemo: false,

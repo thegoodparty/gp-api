@@ -12,11 +12,18 @@ describe('UseElectedOffice guard (integration)', () => {
   let campaign: Campaign
 
   beforeEach(async () => {
+    const campaignOrg = await service.prisma.organization.create({
+      data: {
+        slug: `campaign-org-${Date.now()}`,
+        ownerId: service.user.id,
+      },
+    })
     campaign = await service.prisma.campaign.create({
       data: {
         userId: service.user.id,
         slug: `test-campaign-${Date.now()}`,
         details: {},
+        organizationSlug: campaignOrg.slug,
       },
     })
   })
@@ -43,11 +50,18 @@ describe('UseElectedOffice guard (integration)', () => {
 
   describe('legacy fallback (no header)', () => {
     it('resolves elected office by userId + isActive', async () => {
+      const legacyEoOrg = await service.prisma.organization.create({
+        data: {
+          slug: `legacy-eo-org-${Date.now()}`,
+          ownerId: service.user.id,
+        },
+      })
       await service.prisma.electedOffice.create({
         data: {
           userId: service.user.id,
           campaignId: campaign.id,
           isActive: true,
+          organizationSlug: legacyEoOrg.slug,
         },
       })
 
@@ -77,11 +91,18 @@ describe('UseElectedOffice guard (integration)', () => {
     })
 
     it('falls back to userId when org slug does not exist', async () => {
+      const fallbackEoOrg = await service.prisma.organization.create({
+        data: {
+          slug: `fallback-eo-org-${Date.now()}`,
+          ownerId: service.user.id,
+        },
+      })
       await service.prisma.electedOffice.create({
         data: {
           userId: service.user.id,
           campaignId: campaign.id,
           isActive: true,
+          organizationSlug: fallbackEoOrg.slug,
         },
       })
 
@@ -102,11 +123,18 @@ describe('UseElectedOffice guard (integration)', () => {
         },
       })
 
+      const fallbackEoOrg2 = await service.prisma.organization.create({
+        data: {
+          slug: `fallback-eo-org2-${Date.now()}`,
+          ownerId: service.user.id,
+        },
+      })
       await service.prisma.electedOffice.create({
         data: {
           userId: service.user.id,
           campaignId: campaign.id,
           isActive: true,
+          organizationSlug: fallbackEoOrg2.slug,
         },
       })
 
