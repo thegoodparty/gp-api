@@ -66,14 +66,13 @@ export class UseCampaignGuard implements CanActivate {
       if (org && cam) {
         campaign = cam
       }
-    }
-
-    // Step 2: Legacy fallback — find by userId
-    if (!campaign) {
+    } else {
       campaign = await this.campaignsService.findByUserId(userId, include)
     }
 
     if (campaign) {
+      // Prisma include query — TypeScript cannot narrow the included relations at compile time
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       request.campaign = campaign as CampaignWith<'pathToVictory'>
       return true
     } else if (continueIfNotFound === true) {

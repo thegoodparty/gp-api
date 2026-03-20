@@ -262,14 +262,14 @@ export enum PeerlyCvVerificationStatus {
 export type PeerlyRetrieveCampaignVerifyStatusResponseBody = {
   verification_status: PeerlyCvVerificationStatus
 }
-export enum PEERLY_COMMITTEE_TYPE {
+export enum PeerlyCommitteeType {
   House = 'H',
   Senate = 'S',
   Presidential = 'P',
   Candidate = 'CA',
 }
 
-export enum PEERLY_CV_VERIFICATION_TYPE {
+export enum PeerlyCvVerificationType {
   StateLocal = 'state_local',
   Federal = 'federal',
 }

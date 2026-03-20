@@ -4,10 +4,11 @@ import { to as copyTo } from 'pg-copy-streams'
 import { PassThrough } from 'stream'
 import { stripLeadingNewlines } from '../utils/polls.utils'
 import { PinoLogger } from 'nestjs-pino'
+import { requireEnv } from 'src/shared/utils/env'
 
 const UTF8_BOM = '\uFEFF'
 
-const DATABASE_URL = process.env.DATABASE_URL as string
+const DATABASE_URL = requireEnv('DATABASE_URL')
 
 @Injectable()
 export class PollResponsesDownloadService implements OnModuleDestroy {

@@ -27,6 +27,7 @@ import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
 import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core'
 import { HostMetrics } from '@opentelemetry/host-metrics'
 import { FastifyOtelInstrumentation } from '@fastify/otel'
+import { RuntimeNodeInstrumentation } from '@opentelemetry/instrumentation-runtime-node'
 
 /**
  * Why we want this:
@@ -74,7 +75,6 @@ class JsonBodyLogRecordProcessor implements LogRecordProcessor {
 const headers = process.env.OTEL_EXPORTER_OTLP_HEADERS
 
 declare global {
-  // eslint-disable-next-line no-var
   var __fastifyOtelInstrumentation: FastifyOtelInstrumentation | undefined
 }
 
@@ -152,6 +152,7 @@ if (!headers) {
       new NestInstrumentation(),
       new PrismaInstrumentation(),
       new PinoInstrumentation(),
+      new RuntimeNodeInstrumentation(),
       fastifyOtelInstrumentation,
     ],
   })

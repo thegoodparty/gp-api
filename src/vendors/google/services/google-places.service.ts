@@ -18,7 +18,10 @@ export class GooglePlacesService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.get(url, {
+        this.httpService.get<{
+          status: string
+          result: GooglePlacesApiResponse
+        }>(url, {
           params: {
             place_id: placeId,
             key: googleApiKey,

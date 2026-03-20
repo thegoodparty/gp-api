@@ -36,7 +36,8 @@ export class VercelService {
   isVercelNotFoundError(e: unknown): e is NotFound {
     return (
       e instanceof NotFound ||
-      (e instanceof VercelError && e.statusCode === HttpStatus.NOT_FOUND)
+      (e instanceof VercelError &&
+        e.statusCode === Number(HttpStatus.NOT_FOUND))
     )
   }
 
@@ -258,9 +259,13 @@ export class VercelService {
           return []
         }
         const page = res as GetRecordsResponseBody
+        // Vercel API pagination/records are untyped — SDK does not expose typed page structure
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const records = (page as { records: VercelDNSRecord[] }).records ?? []
         all.push(...records)
         const nextTs =
+          // Vercel API pagination/records are untyped — SDK does not expose typed page structure
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (page as { pagination?: { next?: number | null } }).pagination
             ?.next ?? null
         hasMore = Boolean(nextTs)

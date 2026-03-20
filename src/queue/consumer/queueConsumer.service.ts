@@ -52,7 +52,6 @@ import { EVENTS } from '../../vendors/segment/segment.types'
 import { DomainsService } from '../../websites/services/domains.service'
 import {
   DomainEmailForwardingMessage,
-  GenerateAiContentMessageData,
   PollAnalysisCompleteEvent,
   PollAnalysisCompleteEventSchema,
   PollCreationEvent,
@@ -172,7 +171,8 @@ export class QueueConsumerService {
     try {
       return await fn()
     } catch (error) {
-      const shouldRequeue = this.legacyShouldRequeueError(error as Error)
+      const shouldRequeue =
+        error instanceof Error && this.legacyShouldRequeueError(error)
       if (shouldRequeue) {
         return false // Requeue the message
       }
@@ -218,16 +218,16 @@ export class QueueConsumerService {
       return true // Delete invalid messages from queue
     }
 
-    const parsedBody = JSON.parse(message.Body) as QueueMessage
-    const queueMessage: QueueMessage = parsedBody
+    // JSON.parse returns unknown — no way to infer parsed shape at compile time
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const queueMessage = JSON.parse(message.Body) as QueueMessage
     this.logger.info(`processing queue message type ${queueMessage.type}`)
 
     switch (queueMessage.type) {
       case QueueType.GENERATE_AI_CONTENT:
         return await this.withLegacyErrorSwallowing(message, async () => {
           this.logger.info('received generateAiContent message')
-          const generateAiContentMessage =
-            queueMessage.data as GenerateAiContentMessageData
+          const { data: generateAiContentMessage } = queueMessage
 
           try {
             await this.aiContentService.handleGenerateAiContent(
@@ -261,24 +261,19 @@ export class QueueConsumerService {
         })
       case QueueType.PATH_TO_VICTORY:
         this.logger.info('received pathToVictory message')
-        const pathToVictoryMessage = queueMessage.data as PathToVictoryInput
         return await this.withLegacyErrorSwallowing(message, async () => {
-          await this.handlePathToVictoryMessage(pathToVictoryMessage)
+          await this.handlePathToVictoryMessage(queueMessage.data)
           return true
         })
       case QueueType.TCR_COMPLIANCE_STATUS_CHECK:
         this.logger.info('received tcrComplianceStatusCheck message')
         return await this.withLegacyErrorSwallowing(message, () =>
-          this.handleTcrComplianceCheckMessage(
-            queueMessage.data as TcrComplianceStatusCheckMessage,
-          ),
+          this.handleTcrComplianceCheckMessage(queueMessage.data),
         )
       case QueueType.DOMAIN_EMAIL_FORWARDING:
         this.logger.info('received domainEmailForwarding message')
         return await this.withLegacyErrorSwallowing(message, () =>
-          this.handleDomainEmailForwardingMessage(
-            queueMessage.data as DomainEmailForwardingMessage,
-          ),
+          this.handleDomainEmailForwardingMessage(queueMessage.data),
         )
       case QueueType.POLL_ANALYSIS_COMPLETE:
         this.logger.info('received pollAnalysisComplete message')
@@ -490,29 +485,32 @@ export class QueueConsumerService {
         include: { pathToVictory: true },
       })
 
-      if (!campaign || campaign === null) {
+      if (!campaign) {
         this.logger.error('campaign not found')
         throw new Error('campaign not found')
       }
 
+      if (!campaign.pathToVictory) {
+        this.logger.error('pathToVictory not found on campaign')
+        throw new Error('pathToVictory not found on campaign')
+      }
+
       p2vSuccess = await this.pathToVictoryService.analyzePathToVictoryResponse(
         {
-          campaign: campaign as Campaign & { pathToVictory: PathToVictory },
+          campaign: { ...campaign, pathToVictory: campaign.pathToVictory },
           pathToVictoryResponse: p2vResponse.pathToVictoryResponse,
-          officeName: (p2vResponse.officeName as string) || '',
-          electionDate: (p2vResponse.electionDate as string) || '',
-          electionTerm: (p2vResponse.electionTerm as number) || 0,
-          electionLevel: (p2vResponse.electionLevel as string) || '',
-          electionState: (p2vResponse.electionState as string) || '',
-          electionCounty: (p2vResponse.electionCounty as string) || '',
-          electionMunicipality:
-            (p2vResponse.electionMunicipality as string) || '',
-          subAreaName: p2vResponse.subAreaName as string | undefined,
-          subAreaValue: p2vResponse.subAreaValue as string | undefined,
-          partisanType: (p2vResponse.partisanType as string) || '',
-          priorElectionDates:
-            (p2vResponse.priorElectionDates as string[]) || [],
-          positionId: p2vResponse.positionId as string | undefined,
+          officeName: p2vResponse.officeName,
+          electionDate: p2vResponse.electionDate,
+          electionTerm: p2vResponse.electionTerm,
+          electionLevel: p2vResponse.electionLevel,
+          electionState: p2vResponse.electionState,
+          electionCounty: p2vResponse.electionCounty || '',
+          electionMunicipality: p2vResponse.electionMunicipality || '',
+          subAreaName: p2vResponse.subAreaName,
+          subAreaValue: p2vResponse.subAreaValue,
+          partisanType: p2vResponse.partisanType,
+          priorElectionDates: p2vResponse.priorElectionDates,
+          positionId: p2vResponse.positionId,
         },
       )
     } catch (e) {
@@ -581,7 +579,7 @@ export class QueueConsumerService {
     }
     p2vAttempts += 1
 
-    const existingStatus = p2v.data.p2vStatus as string | undefined
+    const existingStatus = p2v.data.p2vStatus
     const isAlreadyMatched =
       existingStatus === P2VStatus.districtMatched ||
       existingStatus === P2VStatus.complete

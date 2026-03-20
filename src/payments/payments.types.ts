@@ -1,17 +1,17 @@
 import { PurchaseType } from '@/payments/purchase.types'
-export enum WebhookEventType {
-  CheckoutSessionCompleted = 'checkout.session.completed',
-  CheckoutSessionExpired = 'checkout.session.expired',
-  CustomerSubscriptionCreated = 'customer.subscription.created',
-  CustomerSubscriptionDeleted = 'customer.subscription.deleted',
-  CustomerSubscriptionUpdated = 'customer.subscription.updated',
-  CustomerSubscriptionResumed = 'customer.subscription.resumed',
-}
+export const WebhookEventType = {
+  CheckoutSessionCompleted: 'checkout.session.completed',
+  CheckoutSessionExpired: 'checkout.session.expired',
+  CustomerSubscriptionCreated: 'customer.subscription.created',
+  CustomerSubscriptionDeleted: 'customer.subscription.deleted',
+  CustomerSubscriptionUpdated: 'customer.subscription.updated',
+  CustomerSubscriptionResumed: 'customer.subscription.resumed',
+} as const
 
-export enum CheckoutSessionMode {
-  PAYMENT = 'payment',
-  SUBSCRIPTION = 'subscription',
-}
+export const CheckoutSessionMode = {
+  PAYMENT: 'payment',
+  SUBSCRIPTION: 'subscription',
+} as const
 
 export enum PaymentStatus {
   REQUIRES_PAYMENT_METHOD = 'requires_payment_method',

@@ -29,13 +29,13 @@ import {
 } from '../types/pathToVictory.types'
 import { OfficeMatchService } from './officeMatch.service'
 
-enum SpecialOfficePhrase {
-  AtLarge = 'At Large',
-  PresidentOfUS = 'President of the United States',
-  Senate = 'Senate',
-  Governor = 'Governor',
-  Mayor = 'Mayor',
-}
+const SpecialOfficePhrase = {
+  AtLarge: 'At Large',
+  PresidentOfUS: 'President of the United States',
+  Senate: 'Senate',
+  Governor: 'Governor',
+  Mayor: 'Mayor',
+} as const
 
 const SPECIAL_OFFICE_PHRASES = Object.freeze(Object.values(SpecialOfficePhrase))
 
@@ -133,10 +133,7 @@ export class PathToVictoryService extends createPrismaBase(
     }
   }
 
-  async handlePathToVictory(input: PathToVictoryInput): Promise<{
-    slug: string
-    pathToVictoryResponse: PathToVictoryResponse
-  }> {
+  async handlePathToVictory(input: PathToVictoryInput): Promise<P2VResponse> {
     const pathToVictoryResponse: PathToVictoryResponse = {
       electionType: '',
       electionLocation: '',
@@ -165,6 +162,8 @@ export class PathToVictoryService extends createPrismaBase(
         searchColumns = await this.officeMatchService.searchDistrictTypes(
           input.slug,
           input.officeName,
+          // String to enum narrowing — GraphQL returns string, runtime validation would add overhead
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           input.electionLevel as ElectionLevel,
           input.electionState,
           input.subAreaName,
@@ -214,6 +213,8 @@ export class PathToVictoryService extends createPrismaBase(
         electionLocation = columnResponse.value
 
         if (
+          // String to enum narrowing — GraphQL returns string, runtime validation would add overhead
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (input.electionLevel as ElectionLevel) === ElectionLevel.federal &&
           (FEDERAL_SPECIAL_PHRASES.some((p) => input.officeName.includes(p)) ||
             input.officeName.includes(SpecialOfficePhrase.Governor)) &&
@@ -731,9 +732,6 @@ export class PathToVictoryService extends createPrismaBase(
   }
 }
 
-export interface P2VResponse {
-  slug: string
+export type P2VResponse = PathToVictoryInput & {
   pathToVictoryResponse: PathToVictoryResponse
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any
 }
