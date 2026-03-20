@@ -421,10 +421,11 @@ export class AiService {
       if (party === 'Independent') {
         party = 'Independent / non-partisan'
       }
-      const positionName =
-        await this.organizations.resolvePositionNameByOrganizationSlug(
-          campaign.organizationSlug,
-        )
+      const positionName = campaign.organizationSlug
+        ? await this.organizations.resolvePositionNameByOrganizationSlug(
+            campaign.organizationSlug,
+          )
+        : null
 
       const replaceArr: {
         find: string

@@ -55,25 +55,18 @@ export class OrganizationsService extends createPrismaBase(
       return null
     }
 
-    try {
-      const position = await this.electionsService.getPositionById(positionId)
-      return position?.name ?? null
-    } catch (error) {
-      this.logger.error(
-        { error, positionId },
-        'Failed to resolve position name from position',
+    const position = await this.electionsService.getPositionById(positionId)
+    if (!position) {
+      throw new InternalServerErrorException(
+        `Stored positionId ${positionId} does not exist in election-api`,
       )
-      return null
     }
+    return position.name
   }
 
   async resolvePositionNameByOrganizationSlug(
-    organizationSlug?: string | null,
+    organizationSlug: string,
   ): Promise<string | null> {
-    if (!organizationSlug) {
-      return null
-    }
-
     const organization = await this.findUnique({
       where: { slug: organizationSlug },
     })
@@ -238,18 +231,15 @@ export class OrganizationsService extends createPrismaBase(
       return { ballotReadyPositionId: null, name: customPositionName ?? null }
     }
 
-    try {
-      const position = await this.electionsService.getPositionById(positionId)
-      return {
-        ballotReadyPositionId: position?.brPositionId ?? null,
-        name: customPositionName || position?.name || null,
-      }
-    } catch (error) {
-      this.logger.error(
-        { error, positionId },
-        'Failed to resolve position context',
+    const position = await this.electionsService.getPositionById(positionId)
+    if (!position) {
+      throw new InternalServerErrorException(
+        `Stored positionId ${positionId} does not exist in election-api`,
       )
-      return { ballotReadyPositionId: null, name: customPositionName ?? null }
+    }
+    return {
+      ballotReadyPositionId: position.brPositionId ?? null,
+      name: customPositionName || position.name || null,
     }
   }
 

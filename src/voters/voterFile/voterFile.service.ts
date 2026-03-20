@@ -158,10 +158,11 @@ export class VoterFileService {
     const { details, tier, data } = campaign
     const { hubspotId: crmCompanyId } = data
 
-    const candidatePositionName =
-      await this.organizations.resolvePositionNameByOrganizationSlug(
-        campaign.organizationSlug,
-      )
+    const candidatePositionName = campaign.organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
 
     const slackBlocks = buildSlackBlocks({
       name: `${firstName} ${lastName}`,

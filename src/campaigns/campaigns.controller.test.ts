@@ -199,6 +199,9 @@ describe('CampaignsController', () => {
         .mockResolvedValue({ positionId: 'pos-1', customPositionName: null }),
       resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
       resolvePositionName: vi.fn().mockResolvedValue('Mayor'),
+      resolvePositionContext: vi
+        .fn()
+        .mockResolvedValue({ ballotReadyPositionId: 'br-pos-1', name: 'Mayor' }),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
 
@@ -1093,6 +1096,13 @@ describe('CampaignsController', () => {
         details: { electionDate: '2025-11-04' },
       }
       vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: null,
+        name: null,
+      })
 
       await expect(
         controller.updateRaceTargetDetails(campaign),
@@ -1236,9 +1246,13 @@ describe('CampaignsController', () => {
     })
 
     it('passes undefined officeName when org resolver returns null', async () => {
-      vi.spyOn(organizationsService, 'resolvePositionName').mockResolvedValue(
-        null,
-      )
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: 'br-pos-1',
+        name: null,
+      })
       vi.spyOn(
         electionsService,
         'getBallotReadyMatchedRaceTargetDetails',
@@ -1314,6 +1328,13 @@ describe('CampaignsController', () => {
         campaignNoPosition,
       )
       vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: null,
+        name: null,
+      })
 
       await expect(
         controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {}),

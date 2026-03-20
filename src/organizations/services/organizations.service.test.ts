@@ -308,22 +308,28 @@ describe('OrganizationsService', () => {
       expect(mockGetPositionById).not.toHaveBeenCalled()
     })
 
-    it('returns null when position lookup fails', async () => {
+    it('throws when position lookup returns null (dangling positionId)', async () => {
+      mockGetPositionById.mockResolvedValue(null)
+
+      await expect(
+        service.resolvePositionName({
+          customPositionName: null,
+          positionId: 'pos-id',
+        }),
+      ).rejects.toThrow(
+        'Stored positionId pos-id does not exist in election-api',
+      )
+    })
+
+    it('lets election-api errors propagate', async () => {
       mockGetPositionById.mockRejectedValue(new Error('election-api down'))
 
-      const result = await service.resolvePositionName({
-        customPositionName: null,
-        positionId: 'pos-id',
-      })
-
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('resolvePositionNameByOrganizationSlug', () => {
-    it('returns null when no organizationSlug is provided', async () => {
-      const result = await service.resolvePositionNameByOrganizationSlug(null)
-      expect(result).toBeNull()
+      await expect(
+        service.resolvePositionName({
+          customPositionName: null,
+          positionId: 'pos-id',
+        }),
+      ).rejects.toThrow('election-api down')
     })
   })
 })

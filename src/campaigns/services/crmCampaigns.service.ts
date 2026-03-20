@@ -250,10 +250,11 @@ export class CrmCampaignsService {
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
-    const positionName =
-      await this.organizations.resolvePositionNameByOrganizationSlug(
-        campaign.organizationSlug,
-      )
+    const positionName = campaign.organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
 
     const longState = usStates.find(
       (usState) => usState.abbreviation === state?.toUpperCase(),
