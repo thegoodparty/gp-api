@@ -6,7 +6,7 @@ const {
   PEERLY_API_BASE_URL,
   PEERLY_ACCOUNT_NUMBER,
   PEERLY_HTTP_TIMEOUT = '60000', // 60 seconds default
-  PEERLY_UPLOAD_TIMEOUT_MS = '30000', // 30 seconds for uploads
+  PEERLY_UPLOAD_TIMEOUT_MS = '60000', // 60 seconds for uploads
   PEERLY_TEST_ENVIRONMENT,
   PEERLY_SCHEDULE_ID, // Default schedule ID for P2P jobs
 } = process.env
