@@ -50,7 +50,6 @@ export class AiCampaignManagerService {
       }
     })
     const requestData = params.toString()
-
     try {
       const response = await lastValueFrom(
         this.httpService.post<CampaignPlanSession>(url, requestData, {

@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, MessageEvent } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
+import { Observable, Subscriber } from 'rxjs'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { CampaignTask } from '../campaignTasks.types'
@@ -90,6 +91,102 @@ export class CampaignTasksService extends createPrismaBase(
       )
       return this.saveTasks(campaign.id, [])
     }
+  }
+
+  generateTasksStream(campaign: Campaign): Observable<MessageEvent> {
+    return new Observable((subscriber: Subscriber<MessageEvent>) => {
+      this.runGenerationStream(campaign, subscriber).catch((error) => {
+        subscriber.next({
+          data: { type: 'error', message: String(error) },
+        })
+        subscriber.complete()
+      })
+    })
+  }
+
+  private async runGenerationStream(
+    campaign: Campaign,
+    subscriber: Subscriber<MessageEvent>,
+  ): Promise<void> {
+    await this.generateDefaultTasks(campaign)
+
+    subscriber.next({
+      data: {
+        type: 'progress',
+        progress: 0,
+        message: 'Starting AI task generation...',
+      },
+    })
+
+    try {
+      const result =
+        await this.aiCampaignManagerIntegration.startOrGetCached(campaign)
+
+      if (result.cached) {
+        const savedTasks = await this.saveTasks(campaign.id, result.tasks)
+        subscriber.next({
+          data: { type: 'complete', tasks: savedTasks },
+        })
+        subscriber.complete()
+        return
+      }
+
+      const { sessionId } = result
+      const pollIntervalMs = 5000
+      const maxWaitTimeMs = 300000
+      const startTime = Date.now()
+
+      while (Date.now() - startTime < maxWaitTimeMs) {
+        const progress =
+          await this.aiCampaignManagerIntegration.getLatestProgress(sessionId)
+
+        if (progress) {
+          subscriber.next({
+            data: {
+              type: 'progress',
+              progress: progress.progress,
+              message: progress.message,
+            },
+          })
+
+          if (progress.status === 'completed') {
+            const generatedTasks =
+              await this.aiCampaignManagerIntegration.finishGeneration(
+                sessionId,
+                campaign,
+              )
+            const savedTasks = await this.saveTasks(campaign.id, generatedTasks)
+            subscriber.next({
+              data: { type: 'complete', tasks: savedTasks },
+            })
+            subscriber.complete()
+            return
+          }
+
+          if (progress.status === 'failed') {
+            throw new Error('Campaign plan generation failed')
+          }
+        }
+
+        await this.sleep(pollIntervalMs)
+      }
+
+      throw new Error('Campaign plan generation timed out')
+    } catch (error) {
+      this.logger.error(
+        { error, campaignId: campaign.id },
+        'AI task generation failed during stream, saving empty task set',
+      )
+      const tasks = await this.saveTasks(campaign.id, [])
+      subscriber.next({
+        data: { type: 'complete', tasks },
+      })
+      subscriber.complete()
+    }
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   async generateDefaultTasks(campaign: Campaign) {

@@ -65,6 +65,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     },
     vendorTsData: {},
     canDownloadFederal: faker.datatype.boolean(0.3),
+    completedTaskIds: [],
     hasFreeTextsOffer: faker.datatype.boolean(0.2),
     freeTextsOfferRedeemedAt: null,
   }

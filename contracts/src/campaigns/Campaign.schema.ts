@@ -22,6 +22,7 @@ export const CampaignSchema = z.object({
   vendorTsData: z.record(z.string(), z.unknown()),
   userId: z.number(),
   canDownloadFederal: z.boolean(),
+  completedTaskIds: z.array(z.string()),
   hasFreeTextsOffer: z.boolean(),
   freeTextsOfferRedeemedAt: z.coerce.date().nullish(),
 })

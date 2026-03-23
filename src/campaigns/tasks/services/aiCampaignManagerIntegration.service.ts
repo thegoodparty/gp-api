@@ -6,6 +6,7 @@ import {
   StartCampaignPlanRequest,
   CampaignPlanResponse,
   CampaignPlanTask,
+  ProgressStreamData,
 } from '../aiCampaignManager.types'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
@@ -72,6 +73,47 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       this.logger.error('Failed to generate campaign tasks', error)
       throw error
     }
+  }
+
+  async startOrGetCached(
+    campaign: CampaignWithPathToVictory,
+  ): Promise<
+    | { cached: true; tasks: CampaignTask[] }
+    | { cached: false; sessionId: string }
+  > {
+    const request = this.buildCampaignPlanRequest(campaign)
+    const existingTasks = await this.checkForExistingPlanVersion(
+      campaign,
+      request,
+    )
+    if (existingTasks) {
+      return { cached: true, tasks: existingTasks }
+    }
+    const session =
+      await this.aiCampaignManager.startCampaignPlanGeneration(request)
+    this.logger.info(
+      `Started campaign plan generation with session ID: ${session.session_id}`,
+    )
+    return { cached: false, sessionId: session.session_id }
+  }
+
+  async getLatestProgress(
+    sessionId: string,
+  ): Promise<ProgressStreamData | null> {
+    const progressData =
+      await this.aiCampaignManager.getProgressStream(sessionId)
+    return progressData[progressData.length - 1] || null
+  }
+
+  async finishGeneration(
+    sessionId: string,
+    campaign: CampaignWithPathToVictory,
+  ): Promise<CampaignTask[]> {
+    const campaignPlanJson =
+      await this.aiCampaignManager.downloadJson(sessionId)
+    const request = this.buildCampaignPlanRequest(campaign)
+    await this.saveCampaignPlan(campaignPlanJson, campaign, request)
+    return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
   }
 
   private buildCampaignPlanRequest(

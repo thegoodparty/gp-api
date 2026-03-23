@@ -28,6 +28,8 @@ import {
 } from './services/campaigns.service'
 import { CrmCampaignsService } from './services/crmCampaigns.service'
 import { CampaignTasksController } from './tasks/campaignTasksController'
+import { LegacyCampaignTasksController } from './tasks/legacy/legacyCampaignTasks.controller'
+import { LegacyCampaignTasksService } from './tasks/legacy/services/legacyCampaignTasks.service'
 import { CampaignTasksService } from './tasks/services/campaignTasks.service'
 import { AiCampaignManagerService } from './tasks/services/aiCampaignManager.service'
 import { AiCampaignManagerIntegrationService } from './tasks/services/aiCampaignManagerIntegration.service'
@@ -62,6 +64,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignPositionsController,
     CampaignUpdateHistoryController,
     CampaignTasksController,
+    LegacyCampaignTasksController,
     CampaignTcrComplianceController,
   ],
   providers: [
@@ -75,6 +78,7 @@ import { CampaignUpdateHistoryService } from './updateHistory/campaignUpdateHist
     CampaignUpdateHistoryService,
     CrmCampaignsService,
     CampaignTasksService,
+    LegacyCampaignTasksService,
     AiCampaignManagerService,
     AiCampaignManagerIntegrationService,
     CampaignTcrComplianceService,

@@ -72,6 +72,7 @@ const campaignDefaults = {
   aiContent: {},
   vendorTsData: {},
   canDownloadFederal: false,
+  completedTaskIds: [],
   hasFreeTextsOffer: false,
   freeTextsOfferRedeemedAt: null,
 }

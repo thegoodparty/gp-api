@@ -110,6 +110,7 @@ describe('PurchaseService', () => {
     vendorTsData: {},
     userId: 1,
     canDownloadFederal: false,
+    completedTaskIds: [],
     hasFreeTextsOffer: true,
     freeTextsOfferRedeemedAt: null,
   }
