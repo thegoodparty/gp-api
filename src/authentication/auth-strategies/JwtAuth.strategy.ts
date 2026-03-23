@@ -14,7 +14,7 @@ export class JwtAuthStrategy extends PassportStrategy(Strategy) {
     })
   }
 
-  async validate({ sub: userId }: JwtPayload) {
+  async validate({ sub: userId, impersonating }: JwtPayload) {
     if (!userId) {
       throw new UnauthorizedException()
     }
@@ -24,6 +24,6 @@ export class JwtAuthStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException()
     }
-    return user
+    return { ...user, impersonating: impersonating === true }
   }
 }
