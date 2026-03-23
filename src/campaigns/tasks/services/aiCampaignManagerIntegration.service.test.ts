@@ -23,9 +23,7 @@ const mockAiManager: Partial<AiCampaignManagerService> = {
 }
 
 const makeCampaign = (
-  overrides: Partial<
-    Campaign & { pathToVictory?: PathToVictory | null }
-  > = {},
+  overrides: Partial<Campaign & { pathToVictory?: PathToVictory | null }> = {},
 ) =>
   ({
     id: 1,
@@ -58,7 +56,9 @@ const makeCampaign = (
     ...overrides,
   }) as Campaign & { pathToVictory: PathToVictory | null }
 
-const makeAiTask = (overrides: Partial<CampaignPlanTask> = {}): CampaignPlanTask => ({
+const makeAiTask = (
+  overrides: Partial<CampaignPlanTask> = {},
+): CampaignPlanTask => ({
   title: 'AI Generated Door Knock',
   description: 'Knock on doors to meet voters',
   cta: 'Start knocking',
@@ -137,7 +137,7 @@ describe('AiCampaignManagerIntegrationService', () => {
       // Access private method via prototype
       const buildRequest = (
         service as unknown as {
-          buildCampaignPlanRequest: typeof service['buildCampaignPlanRequest']
+          buildCampaignPlanRequest: (typeof service)['buildCampaignPlanRequest']
         }
       ).buildCampaignPlanRequest.call(service, campaign)
       const hash = (
@@ -238,15 +238,12 @@ describe('AiCampaignManagerIntegrationService', () => {
 
       await service.generateCampaignTasks(campaign)
 
-      const request = vi.mocked(
-        mockAiManager.startCampaignPlanGeneration!,
-      ).mock.calls[0][0]
+      const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
+        .calls[0][0]
 
       expect(request.candidate_name).toBe('Jane Doe')
       expect(request.election_date).toBe('2025-11-04')
-      expect(request.office_and_jurisdiction).toBe(
-        'City Council in California',
-      )
+      expect(request.office_and_jurisdiction).toBe('City Council in California')
       expect(request.race_type).toBe('Nonpartisan')
       expect(request.win_number).toBe(500)
       expect(request.total_likely_voters).toBe(1800)
@@ -282,9 +279,8 @@ describe('AiCampaignManagerIntegrationService', () => {
 
       await service.generateCampaignTasks(campaign)
 
-      const request = vi.mocked(
-        mockAiManager.startCampaignPlanGeneration!,
-      ).mock.calls[0][0]
+      const request = vi.mocked(mockAiManager.startCampaignPlanGeneration!).mock
+        .calls[0][0]
 
       expect(request.candidate_name).toBe('Campaign 1')
       expect(request.office_and_jurisdiction).toBe(
@@ -518,10 +514,7 @@ describe('AiCampaignManagerIntegrationService', () => {
       const generateHash = (
         service as unknown as {
           generateCampaignInfoHash: (
-            info: Record<
-              string,
-              string | number | boolean | null | undefined
-            >,
+            info: Record<string, string | number | boolean | null | undefined>,
           ) => string
         }
       ).generateCampaignInfoHash.bind(service)
@@ -543,10 +536,7 @@ describe('AiCampaignManagerIntegrationService', () => {
       const generateHash = (
         service as unknown as {
           generateCampaignInfoHash: (
-            info: Record<
-              string,
-              string | number | boolean | null | undefined
-            >,
+            info: Record<string, string | number | boolean | null | undefined>,
           ) => string
         }
       ).generateCampaignInfoHash.bind(service)

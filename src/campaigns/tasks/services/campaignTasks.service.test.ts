@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
-import { Campaign, CampaignTaskType } from '@prisma/client'
-import { CampaignTask } from '../campaignTasks.types'
+import { Campaign } from '@prisma/client'
+import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 const mockModel = {
@@ -153,10 +153,7 @@ describe('CampaignTasksService', () => {
     it('returns null when task not found', async () => {
       mockModel.findFirst.mockResolvedValue(null)
 
-      const result = await service.unCompleteTask(
-        makeCampaign(),
-        'nonexistent',
-      )
+      const result = await service.unCompleteTask(makeCampaign(), 'nonexistent')
 
       expect(result).toBeNull()
       expect(mockModel.update).not.toHaveBeenCalled()

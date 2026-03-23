@@ -232,9 +232,9 @@ describe('AiCampaignManagerService', () => {
         of(makeAxiosResponse(sseData)),
       )
 
-      await expect(
-        service.waitForCompletion('session-abc'),
-      ).rejects.toThrow(BadGatewayException)
+      await expect(service.waitForCompletion('session-abc')).rejects.toThrow(
+        BadGatewayException,
+      )
     })
 
     it('throws on timeout', async () => {

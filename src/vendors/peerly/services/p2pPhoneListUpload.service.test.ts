@@ -29,7 +29,6 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   aiContent: {},
   vendorTsData: {},
   canDownloadFederal: false,
-  completedTaskIds: [],
   hasFreeTextsOffer: false,
   freeTextsOfferRedeemedAt: null,
   createdAt: new Date('2025-01-01'),

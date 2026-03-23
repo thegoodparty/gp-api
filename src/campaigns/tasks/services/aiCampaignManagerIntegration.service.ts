@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Campaign, PathToVictory } from '@prisma/client'
 import { createHash } from 'crypto'
 import { AiCampaignManagerService } from './aiCampaignManager.service'
@@ -34,8 +34,6 @@ type CampaignWithPathToVictory = Campaign & {
 export class AiCampaignManagerIntegrationService extends createPrismaBase(
   MODELS.CampaignPlan,
 ) {
-  readonly logger = new Logger(AiCampaignManagerIntegrationService.name)
-
   constructor(private readonly aiCampaignManager: AiCampaignManagerService) {
     super()
   }
@@ -54,12 +52,12 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       }
       const session =
         await this.aiCampaignManager.startCampaignPlanGeneration(request)
-      this.logger.log(
+      this.logger.info(
         `Started campaign plan generation with session ID: ${session.session_id}`,
       )
 
       await this.aiCampaignManager.waitForCompletion(session.session_id)
-      this.logger.log(
+      this.logger.info(
         `Campaign plan generation completed for session: ${session.session_id}`,
       )
 
@@ -230,7 +228,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       existingPlan.campaignInfoHash === currentHash &&
       isCampaignPlanResponse(existingPlan.rawJson)
     ) {
-      this.logger.log(
+      this.logger.info(
         `Campaign plan unchanged for campaign ${campaign.id}, returning existing tasks`,
       )
       return this.parseCampaignPlanToTasks(existingPlan.rawJson, campaign)
@@ -477,7 +475,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
         data: campaignPlanData,
       })
 
-      this.logger.log(
+      this.logger.info(
         `Campaign plan saved for campaign ${campaign.id} with hash ${campaignInfoHash}`,
       )
     } catch (error) {

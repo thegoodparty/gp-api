@@ -71,7 +71,6 @@ export const campaignFactory = generateFactory<Campaign>((args) => {
     },
     aiContent,
     vendorTsData: {},
-    completedTaskIds: [],
     canDownloadFederal: false,
     hasFreeTextsOffer: false,
     freeTextsOfferRedeemedAt: null,
