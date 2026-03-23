@@ -1,8 +1,8 @@
+import { SSM } from '@aws-sdk/client-ssm'
 import { execSync, ExecSyncOptions } from 'node:child_process'
+import { userInfo } from 'node:os'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
-import { SSM } from '@aws-sdk/client-ssm'
-import { userInfo } from 'node:os'
 
 const ECR_REGISTRY = '333022194791.dkr.ecr.us-west-2.amazonaws.com'
 
@@ -177,6 +177,101 @@ yargs(hideBin(process.argv))
       process.env.IMAGE_URI = 'placeholder'
       await setupStack(argv.environment)
       run('pulumi refresh --diff')
+    },
+  )
+  .command(
+    'destroy <environment>',
+    'Destroy infrastructure and remove stack state',
+    (yargs) =>
+      yargs.positional('environment', {
+        describe: 'Target environment',
+        choices: ENVIRONMENTS,
+        demandOption: true,
+      }),
+    async (argv) => {
+      const env = argv.environment
+
+      if (!ENVIRONMENTS.includes(env as (typeof ENVIRONMENTS)[number])) {
+        console.error(
+          `Invalid environment: ${env}. Must be one of ${ENVIRONMENTS.join('')}`
+        ),
+          process.exit(1)
+      }
+
+      let stack: string
+      if (env === 'preview') {
+        const prNumber = process.env.GITHUB_PR_NUMBER
+        if (!prNumber) {
+          console.error(
+            'Error: GITHUB_PR_NUMBER environment variable is required for preview environment',
+          )
+          process.exit(1)
+        }
+        stack = `organization/gp-api/gp-api-pr-${prNumber}`
+      } else {
+        stack = `organization/gp-api/gp-api-${env}`
+      }
+
+      try {
+        execSync('aws sts get-caller-identity', { stdio: 'pipe' })
+      } catch {
+        console.error(
+          'It looks like you are not authenticated via the AWS CLI. Please authenticate and try again.',
+        )
+        process.exit(1)
+      }
+
+      process.env.IMAGE_URI = 'placeholder'
+
+      PULUMI_CONFIG_PASSPHRASE = await getSSMParameter(
+        'pulumi-state-config-passphrase',
+      )
+      GRAFANA_AUTH = await getSSMParameter('grafana-shared-service-account-token')
+
+      run('pulumi login s3://goodparty-iac-state', {
+        stdio: process.env.CI ? ['inherit', 'ignore', 'inherit'] : 'inherit',
+      })
+
+      try {
+        execSync(`pulumi stack select ${stack}`, {
+          stdio: 'pipe',
+          cwd: __dirname,
+          env: {
+            ...process.env,
+            AWS_REGION,
+            PULUMI_CONFIG_PASSPHRASE,
+            GRAFANA_AUTH,
+          },
+        })
+      } catch {
+        console.log(`Stack ${stack} does not exist — nothing to destroy. ✅`)
+        process.exit(0)
+      }
+
+      if (process.env.CI) {
+        run('pulumi destroy --yes --skip-preview')
+      } else {
+        run('pulumi destroy')
+      }
+
+      // ECS creates this log group automatically outside of Pulumi state
+      // so it won't be removed by pulumi destroy — must be deleted manually
+      const prNumber = process.env.GITHUB_PR_NUMBER
+      try {
+        execSync(
+          `aws logs delete-log-group --log-group-name "/aws/ecs/containerinsights/gp-pr-${prNumber}-fargateCluster/performance"`,
+          {
+            stdio: 'pipe',
+            env: { ...process.env, AWS_REGION },
+          },
+        )
+        console.log('✅ Deleted ECS container insights log group')
+      } catch {
+        // Log group may not exist if container insights never fired — safe to ignore
+        console.log('ℹ️ ECS log group not found, skipping deletion')
+      }
+
+      run('pulumi stack rm --yes')
     },
   )
   .demandCommand(1, 'You must specify a command')

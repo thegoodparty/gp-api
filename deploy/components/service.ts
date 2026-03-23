@@ -1,5 +1,5 @@
-import * as pulumi from '@pulumi/pulumi'
 import * as aws from '@pulumi/aws'
+import * as pulumi from '@pulumi/pulumi'
 import { sortBy } from 'es-toolkit'
 
 export interface ServiceConfig {
@@ -297,7 +297,7 @@ export function createService({
       healthCheckGracePeriodSeconds: 120,
       deploymentCircuitBreaker: {
         enable: true,
-        rollback: false,
+        rollback: true,
       },
       enableExecuteCommand: true,
       waitForSteadyState: true,

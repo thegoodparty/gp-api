@@ -7,9 +7,11 @@ permissions:
 
 on:
   workflow_dispatch:
+  pull_request:
+    types: [closed]
   schedule:
     # Run every 3 hours
-    - cron: "0 */3 * * *"
+    - cron: '0 */3 * * *'
 
 jobs:
   discover-stale-stacks:
@@ -34,7 +36,7 @@ jobs:
       - name: Install Pulumi CLI
         uses: pulumi/actions@v6
         with:
-          pulumi-version: "^3"
+          pulumi-version: '^3'
 
       - run: npm ci
 
@@ -75,7 +77,7 @@ jobs:
       - name: Install Pulumi CLI
         uses: pulumi/actions@v6
         with:
-          pulumi-version: "^3"
+          pulumi-version: '^3'
 
       - run: npm ci
 
