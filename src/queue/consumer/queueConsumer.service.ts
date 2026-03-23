@@ -1081,7 +1081,7 @@ export class QueueConsumerService {
 
   private async handleGenerateTasksMessage(message: GenerateTasksMessage) {
     try {
-      this.logger.log(`Generating tasks for campaign ${message.campaignId}`)
+      this.logger.info(`Generating tasks for campaign ${message.campaignId}`)
 
       const campaign = await this.campaignsService.findUniqueOrThrow({
         where: { id: message.campaignId },
@@ -1090,7 +1090,7 @@ export class QueueConsumerService {
 
       await this.campaignTasksService.generateTasks(campaign)
 
-      this.logger.log(
+      this.logger.info(
         `Successfully generated tasks for campaign ${message.campaignId}`,
       )
     } catch (error) {
