@@ -120,12 +120,12 @@ export class ContactsService {
     }
 
     // No district on the org (statewide/federal case).
-    const state = this.getCampaignState(campaign)
     if (!this.canUseStatewideFallback(campaign)) {
       throw new BadRequestException(
         'Statewide or federal contacts require admin approval',
       )
     }
+    const state = this.getCampaignState(campaign)
     return fn({ state })
   }
 
