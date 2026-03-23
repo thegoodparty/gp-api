@@ -57,7 +57,6 @@ export class AnalyticsService {
     userId: number,
     eventName: string,
     properties?: SegmentTrackEventProperties,
-    isImpersonating?: boolean,
   ) {
     this.logger.debug(
       `[ANALYTICS] Starting event tracking - Event: ${eventName}, User: ${userId}`,
@@ -65,7 +64,7 @@ export class AnalyticsService {
 
     const userContext = await this.getUserContext(userId)
 
-    const impersonationState = isImpersonating ?? getImpersonationContext()
+    const impersonationState = getImpersonationContext()
 
     const eventData = {
       ...(userContext?.email ? { email: userContext.email as string } : {}),

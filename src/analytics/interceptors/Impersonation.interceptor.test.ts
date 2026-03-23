@@ -1,5 +1,5 @@
 import { CallHandler, ExecutionContext } from '@nestjs/common'
-import { of, lastValueFrom } from 'rxjs'
+import { of, lastValueFrom, from } from 'rxjs'
 import { describe, expect, it } from 'vitest'
 import { ImpersonationInterceptor } from './Impersonation.interceptor'
 import { getImpersonationContext } from '../impersonation-context'
@@ -62,5 +62,27 @@ describe('ImpersonationInterceptor', () => {
     await lastValueFrom(result$)
 
     expect(getImpersonationContext()).toBeUndefined()
+  })
+
+  it('propagates context through async handler', async () => {
+    let captured: boolean | undefined
+
+    const context = createMockContext({ impersonating: true })
+    const handler: CallHandler = {
+      handle: () =>
+        from(
+          (async () => {
+            await new Promise((r) => setTimeout(r, 1))
+            captured = getImpersonationContext()
+            return 'async-result'
+          })(),
+        ),
+    }
+
+    const result$ = interceptor.intercept(context, handler)
+    const result = await lastValueFrom(result$)
+
+    expect(captured).toBe(true)
+    expect(result).toBe('async-result')
   })
 })

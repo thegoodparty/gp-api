@@ -42,74 +42,8 @@ describe('AnalyticsService', () => {
     mockUsersService.findFirst.mockResolvedValue(mockUser)
   })
 
-  describe('track - isImpersonating parameter', () => {
-    it('includes impersonation: true in event data when isImpersonating is true', async () => {
-      await service.track(7, 'Test Event', { source: 'test' }, true)
-
-      expect(mockSegment.trackEvent).toHaveBeenCalledWith(
-        7,
-        'Test Event',
-        {
-          email: 'test@example.com',
-          source: 'test',
-          impersonation: true,
-        },
-        { email: 'test@example.com', hubspotId: 'hs-123' },
-      )
-    })
-
-    it('includes impersonation: false in event data when isImpersonating is false', async () => {
-      await service.track(7, 'Test Event', { source: 'test' }, false)
-
-      expect(mockSegment.trackEvent).toHaveBeenCalledWith(
-        7,
-        'Test Event',
-        {
-          email: 'test@example.com',
-          source: 'test',
-          impersonation: false,
-        },
-        { email: 'test@example.com', hubspotId: 'hs-123' },
-      )
-    })
-
-    it('omits impersonation key from event data when isImpersonating is not provided', async () => {
-      await service.track(7, 'Test Event', { source: 'test' })
-
-      expect(mockSegment.trackEvent).toHaveBeenCalledWith(
-        7,
-        'Test Event',
-        {
-          email: 'test@example.com',
-          source: 'test',
-        },
-        { email: 'test@example.com', hubspotId: 'hs-123' },
-      )
-    })
-
-    it('passes user context from UsersService to segment', async () => {
-      await service.track(7, 'Test Event', { source: 'test' }, true)
-
-      expect(mockSegment.trackEvent).toHaveBeenCalledWith(
-        7,
-        'Test Event',
-        expect.any(Object),
-        { email: 'test@example.com', hubspotId: 'hs-123' },
-      )
-    })
-
-    it('re-throws when segment tracking fails', async () => {
-      const error = new Error('Segment service down')
-      mockSegment.trackEvent.mockRejectedValueOnce(error)
-
-      await expect(
-        service.track(7, 'Test Event', { source: 'test' }),
-      ).rejects.toThrow('Segment service down')
-    })
-  })
-
-  describe('track - AsyncLocalStorage fallback', () => {
-    it('reads impersonation from AsyncLocalStorage when param is undefined', async () => {
+  describe('track - impersonation via AsyncLocalStorage', () => {
+    it('includes impersonation: true when context is impersonating', async () => {
       await runWithImpersonation(true, async () => {
         await service.track(7, 'Test Event', { source: 'test' })
       })
@@ -126,9 +60,9 @@ describe('AnalyticsService', () => {
       )
     })
 
-    it('explicit param takes precedence over AsyncLocalStorage', async () => {
-      await runWithImpersonation(true, async () => {
-        await service.track(7, 'Test Event', { source: 'test' }, false)
+    it('includes impersonation: false when context is not impersonating', async () => {
+      await runWithImpersonation(false, async () => {
+        await service.track(7, 'Test Event', { source: 'test' })
       })
 
       expect(mockSegment.trackEvent).toHaveBeenCalledWith(
@@ -143,7 +77,7 @@ describe('AnalyticsService', () => {
       )
     })
 
-    it('omits impersonation when both param and AsyncLocalStorage are undefined', async () => {
+    it('omits impersonation when no context is set', async () => {
       await service.track(7, 'Test Event', { source: 'test' })
 
       expect(mockSegment.trackEvent).toHaveBeenCalledWith(
@@ -155,6 +89,28 @@ describe('AnalyticsService', () => {
         },
         { email: 'test@example.com', hubspotId: 'hs-123' },
       )
+    })
+
+    it('passes user context from UsersService to segment', async () => {
+      await runWithImpersonation(true, async () => {
+        await service.track(7, 'Test Event', { source: 'test' })
+      })
+
+      expect(mockSegment.trackEvent).toHaveBeenCalledWith(
+        7,
+        'Test Event',
+        expect.any(Object),
+        { email: 'test@example.com', hubspotId: 'hs-123' },
+      )
+    })
+
+    it('re-throws when segment tracking fails', async () => {
+      const error = new Error('Segment service down')
+      mockSegment.trackEvent.mockRejectedValueOnce(error)
+
+      await expect(
+        service.track(7, 'Test Event', { source: 'test' }),
+      ).rejects.toThrow('Segment service down')
     })
   })
 })
