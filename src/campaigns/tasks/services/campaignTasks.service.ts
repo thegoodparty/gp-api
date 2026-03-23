@@ -83,7 +83,11 @@ export class CampaignTasksService extends createPrismaBase(
         await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
 
       return this.saveTasks(campaign.id, generatedTasks)
-    } catch {
+    } catch (error) {
+      this.logger.error(
+        { error, campaignId: campaign.id },
+        'AI task generation failed, saving empty task set',
+      )
       return this.saveTasks(campaign.id, [])
     }
   }
@@ -99,10 +103,6 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   async saveTasks(campaignId: number, tasks: CampaignTask[]) {
-    await this.model.deleteMany({
-      where: { campaignId, isDefaultTask: false },
-    })
-
     const tasksToCreate = tasks.map((task) => ({
       campaignId,
       title: task.title,
@@ -119,8 +119,13 @@ export class CampaignTasksService extends createPrismaBase(
       isDefaultTask: task.isDefaultTask || false,
     }))
 
-    await this.model.createMany({
-      data: tasksToCreate,
+    await this.client.$transaction(async (tx) => {
+      await tx.campaignTask.deleteMany({
+        where: { campaignId, isDefaultTask: false },
+      })
+      await tx.campaignTask.createMany({
+        data: tasksToCreate,
+      })
     })
 
     return this.model.findMany({

@@ -1095,8 +1095,8 @@ export class QueueConsumerService {
       )
     } catch (error) {
       this.logger.error(
+        { error, campaignId: message.campaignId },
         `Failed to generate tasks for campaign ${message.campaignId}`,
-        error,
       )
       throw error
     }

@@ -111,6 +111,8 @@ export class AiCampaignManagerService {
     }
   }
 
+  // TODO: each poll re-fetches and re-parses the entire progress stream history.
+  // Consider tracking position or fetching only new events to avoid O(n^2) work.
   async waitForCompletion(
     sessionId: string,
     maxWaitTimeMs = 300000, // 5 minutes default

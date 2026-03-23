@@ -34,12 +34,7 @@ import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
-import {
-  GenerateTasksMessage,
-  MessageGroup,
-  QueueMessage,
-  QueueType,
-} from 'src/queue/queue.types'
+import { MessageGroup, QueueMessage, QueueType } from 'src/queue/queue.types'
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
@@ -477,7 +472,7 @@ export class CampaignsController {
       type: QueueType.GENERATE_TASKS,
       data: {
         campaignId: campaign.id,
-      } as GenerateTasksMessage,
+      },
     }
 
     try {

@@ -7,7 +7,7 @@ import {
   CampaignPlanTask,
 } from '../aiCampaignManager.types'
 import { CampaignTaskType } from '../campaignTasks.types'
-import { Logger } from '@nestjs/common'
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 const mockModel = {
   findUnique: vi.fn(),
@@ -108,15 +108,8 @@ describe('AiCampaignManagerIntegrationService', () => {
       configurable: true,
     })
     Object.defineProperty(service, 'logger', {
-      value: {
-        log: vi.fn(),
-        error: vi.fn(),
-        warn: vi.fn(),
-        debug: vi.fn(),
-        verbose: vi.fn(),
-      } as unknown as Logger,
+      get: () => createMockLogger(),
       configurable: true,
-      writable: true,
     })
   })
 

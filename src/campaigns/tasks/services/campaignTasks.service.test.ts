@@ -5,6 +5,11 @@ import { Campaign } from '@prisma/client'
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
+const mockTxModel = {
+  deleteMany: vi.fn(),
+  createMany: vi.fn(),
+}
+
 const mockModel = {
   findMany: vi.fn(),
   findFirst: vi.fn(),
@@ -12,6 +17,12 @@ const mockModel = {
   deleteMany: vi.fn(),
   createMany: vi.fn(),
 }
+
+const mockTransaction = vi.fn(
+  async (callback: (tx: unknown) => Promise<unknown>) => {
+    return callback({ campaignTask: mockTxModel })
+  },
+)
 
 const mockAiIntegration: Partial<AiCampaignManagerIntegrationService> = {
   generateCampaignTasks: vi.fn(),
@@ -62,7 +73,10 @@ describe('CampaignTasksService', () => {
       mockAiIntegration as AiCampaignManagerIntegrationService,
     )
     Object.defineProperty(service, '_prisma', {
-      get: () => ({ campaignTask: mockModel }),
+      get: () => ({
+        campaignTask: mockModel,
+        $transaction: mockTransaction,
+      }),
       configurable: true,
     })
     Object.defineProperty(service, 'logger', {
@@ -178,8 +192,8 @@ describe('CampaignTasksService', () => {
         .mockResolvedValueOnce([]) // generateDefaultTasks check
         .mockResolvedValueOnce(savedTasks) // saveTasks (default) return
         .mockResolvedValueOnce(savedTasks) // saveTasks (AI) return
-      mockModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockModel.createMany.mockResolvedValue({ count: 1 })
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
       vi.mocked(mockAiIntegration.generateCampaignTasks!).mockResolvedValue(
         aiTasks,
       )
@@ -196,15 +210,15 @@ describe('CampaignTasksService', () => {
       mockModel.findMany
         .mockResolvedValueOnce([makeDbTask({ isDefaultTask: true })]) // defaults exist
         .mockResolvedValueOnce(savedTasks) // saveTasks return
-      mockModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockModel.createMany.mockResolvedValue({ count: 0 })
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 0 })
       vi.mocked(mockAiIntegration.generateCampaignTasks!).mockRejectedValue(
         new Error('AI service unavailable'),
       )
 
       const result = await service.generateTasks(makeCampaign())
 
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({
+      expect(mockTxModel.deleteMany).toHaveBeenCalledWith({
         where: { campaignId: 1, isDefaultTask: false },
       })
       expect(result).toEqual(savedTasks)
@@ -216,13 +230,13 @@ describe('CampaignTasksService', () => {
       mockModel.findMany
         .mockResolvedValueOnce([]) // no existing defaults
         .mockResolvedValueOnce([]) // saveTasks return
-      mockModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockModel.createMany.mockResolvedValue({ count: 1 })
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
 
       await service.generateDefaultTasks(makeCampaign())
 
-      expect(mockModel.createMany).toHaveBeenCalled()
-      const createCall = mockModel.createMany.mock.calls[0][0]
+      expect(mockTxModel.createMany).toHaveBeenCalled()
+      const createCall = mockTxModel.createMany.mock.calls[0][0]
       expect(createCall.data.length).toBeGreaterThan(0)
       expect(createCall.data[0]).toHaveProperty('campaignId', 1)
     })
@@ -234,12 +248,12 @@ describe('CampaignTasksService', () => {
 
       await service.generateDefaultTasks(makeCampaign())
 
-      expect(mockModel.createMany).not.toHaveBeenCalled()
+      expect(mockTxModel.createMany).not.toHaveBeenCalled()
     })
   })
 
   describe('saveTasks', () => {
-    it('deletes non-default tasks and creates new ones', async () => {
+    it('deletes non-default tasks and creates new ones in a transaction', async () => {
       const tasks: CampaignTask[] = [
         {
           id: 'new-1',
@@ -252,16 +266,17 @@ describe('CampaignTasksService', () => {
           date: '2025-11-01',
         },
       ]
-      mockModel.deleteMany.mockResolvedValue({ count: 1 })
-      mockModel.createMany.mockResolvedValue({ count: 1 })
+      mockTxModel.deleteMany.mockResolvedValue({ count: 1 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
       mockModel.findMany.mockResolvedValue([makeDbTask()])
 
       await service.saveTasks(1, tasks)
 
-      expect(mockModel.deleteMany).toHaveBeenCalledWith({
+      expect(mockTransaction).toHaveBeenCalled()
+      expect(mockTxModel.deleteMany).toHaveBeenCalledWith({
         where: { campaignId: 1, isDefaultTask: false },
       })
-      expect(mockModel.createMany).toHaveBeenCalledWith({
+      expect(mockTxModel.createMany).toHaveBeenCalledWith({
         data: [
           expect.objectContaining({
             campaignId: 1,
@@ -288,13 +303,13 @@ describe('CampaignTasksService', () => {
           week: 1,
         },
       ]
-      mockModel.deleteMany.mockResolvedValue({ count: 0 })
-      mockModel.createMany.mockResolvedValue({ count: 1 })
+      mockTxModel.deleteMany.mockResolvedValue({ count: 0 })
+      mockTxModel.createMany.mockResolvedValue({ count: 1 })
       mockModel.findMany.mockResolvedValue([])
 
       await service.saveTasks(1, tasks)
 
-      expect(mockModel.createMany).toHaveBeenCalledWith({
+      expect(mockTxModel.createMany).toHaveBeenCalledWith({
         data: [
           expect.objectContaining({
             date: null,
