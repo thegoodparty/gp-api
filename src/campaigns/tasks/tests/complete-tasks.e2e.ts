@@ -25,6 +25,12 @@ test.describe('Campaigns Tasks - Complete Tasks', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+
+    await request.post('/v1/campaigns/tasks/generate', {
+      headers: {
+        Authorization: `Bearer ${reg.token}`,
+      },
+    })
   })
 
   test.afterAll(async ({ request }) => {

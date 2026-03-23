@@ -22,6 +22,12 @@ test.describe('Campaigns Tasks - List Tasks', () => {
       zip: '12345-1234',
       signUpMode: 'candidate',
     })
+
+    await request.post('/v1/campaigns/tasks/generate', {
+      headers: {
+        Authorization: `Bearer ${reg.token}`,
+      },
+    })
   })
 
   test.afterAll(async ({ request }) => {
@@ -41,30 +47,95 @@ test.describe('Campaigns Tasks - List Tasks', () => {
 
     const tasks = (await response.json()) as CampaignTask[]
     expect(Array.isArray(tasks)).toBe(true)
-
-    const tasksByWeek = tasks.reduce(
-      (acc, task) => {
-        if (!acc[task.week]) acc[task.week] = []
-        acc[task.week].push(task)
-        return acc
-      },
-      {} as Record<number, CampaignTask[]>,
-    )
-
-    const expectedWeeks = [1, 2, 3, 4, 5, 6, 7, 8]
-    for (const week of expectedWeeks) {
-      expect(tasksByWeek[week]?.length).toBeGreaterThan(0)
-    }
+    expect(tasks.length).toBeGreaterThan(0)
 
     const ids = new Set(tasks.map((t) => t.id))
     expect(ids.size).toBe(tasks.length)
   })
 
-  test('should list tasks for week 1', async ({ request }) => {
+  test('should return tasks with valid structure', async ({ request }) => {
+    const response = await request.get('/v1/campaigns/tasks', {
+      headers: {
+        Authorization: `Bearer ${reg.token}`,
+      },
+    })
+
+    expect(response.status()).toBe(200)
+
+    const tasks = (await response.json()) as CampaignTask[]
+    expect(tasks.length).toBeGreaterThan(0)
+
+    for (const task of tasks) {
+      expect(task.id).toBeDefined()
+      expect(task.title).toBeDefined()
+      expect(task.week).toBeDefined()
+      expect(typeof task.week).toBe('number')
+      expect(task.flowType).toBeDefined()
+    }
+  })
+
+  test('should return tasks ordered by week descending', async ({
+    request,
+  }) => {
+    const response = await request.get('/v1/campaigns/tasks', {
+      headers: {
+        Authorization: `Bearer ${reg.token}`,
+      },
+    })
+
+    expect(response.status()).toBe(200)
+
+    const tasks = (await response.json()) as CampaignTask[]
+    expect(tasks.length).toBeGreaterThan(0)
+
+    for (let i = 1; i < tasks.length; i++) {
+      expect(tasks[i - 1].week).toBeGreaterThanOrEqual(tasks[i].week)
+    }
+  })
+
+  test('should return default tasks with isDefaultTask flag', async ({
+    request,
+  }) => {
+    const response = await request.get('/v1/campaigns/tasks', {
+      headers: {
+        Authorization: `Bearer ${reg.token}`,
+      },
+    })
+
+    expect(response.status()).toBe(200)
+
+    const tasks = (await response.json()) as CampaignTask[]
+    expect(tasks.length).toBeGreaterThan(0)
+    expect(tasks.some((task) => task.isDefaultTask === true)).toBe(true)
+  })
+
+  test('should return unique task ids', async ({ request }) => {
+    const response = await request.get('/v1/campaigns/tasks', {
+      headers: {
+        Authorization: `Bearer ${reg.token}`,
+      },
+    })
+
+    expect(response.status()).toBe(200)
+
+    const tasks = (await response.json()) as CampaignTask[]
+    const ids = new Set(tasks.map((t) => t.id))
+    expect(ids.size).toBe(tasks.length)
+  })
+
+  test('should ignore date query params and return all tasks', async ({
+    request,
+  }) => {
     const date = '2025-03-25T21:17:31.648Z'
     const endDate = '2025-04-01T21:17:31.648Z'
 
-    const response = await request.get(
+    const allResponse = await request.get('/v1/campaigns/tasks', {
+      headers: {
+        Authorization: `Bearer ${reg.token}`,
+      },
+    })
+
+    const filteredResponse = await request.get(
       `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
       {
         headers: {
@@ -73,180 +144,12 @@ test.describe('Campaigns Tasks - List Tasks', () => {
       },
     )
 
-    expect(response.status()).toBe(200)
+    expect(allResponse.status()).toBe(200)
+    expect(filteredResponse.status()).toBe(200)
 
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(tasks.every((task) => task.week === 1)).toBe(true)
+    const allTasks = (await allResponse.json()) as CampaignTask[]
+    const filteredTasks = (await filteredResponse.json()) as CampaignTask[]
 
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
-  })
-
-  test('should list tasks for week 2 date range', async ({ request }) => {
-    const date = '2025-03-25T21:17:31.648Z'
-    const endDate = '2025-04-06T21:17:31.648Z'
-
-    const response = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
-      {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(200)
-
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(Array.isArray(tasks)).toBe(true)
-    expect(tasks.length).toBeGreaterThan(0)
-    expect(tasks.some((task) => task.week === 1)).toBe(true)
-
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
-  })
-
-  test('should list tasks for week 3 date range', async ({ request }) => {
-    const date = '2025-03-25T21:17:31.648Z'
-    const endDate = '2025-04-13T21:17:31.648Z'
-
-    const response = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
-      {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(200)
-
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(Array.isArray(tasks)).toBe(true)
-    expect(tasks.length).toBeGreaterThan(0)
-    expect(tasks.some((task) => task.week === 2)).toBe(true)
-
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
-  })
-
-  test('should list tasks for week 4 date range', async ({ request }) => {
-    const date = '2025-03-25T21:17:31.648Z'
-    const endDate = '2025-04-20T21:17:31.648Z'
-
-    const response = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
-      {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(200)
-
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(Array.isArray(tasks)).toBe(true)
-    expect(tasks.length).toBeGreaterThan(0)
-    expect(tasks.some((task) => task.week === 3)).toBe(true)
-
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
-  })
-
-  test('should list tasks for week 5 date range', async ({ request }) => {
-    const date = '2025-03-25T21:17:31.648Z'
-    const endDate = '2025-04-27T21:17:31.648Z'
-
-    const response = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
-      {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(200)
-
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(Array.isArray(tasks)).toBe(true)
-    expect(tasks.length).toBeGreaterThan(0)
-    expect(tasks.some((task) => task.week === 4)).toBe(true)
-
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
-  })
-
-  test('should list tasks for week 7 date range', async ({ request }) => {
-    const date = '2025-03-25T21:17:31.648Z'
-    const endDate = '2025-05-04T21:17:31.648Z'
-
-    const response = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
-      {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(200)
-
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(Array.isArray(tasks)).toBe(true)
-    expect(tasks.length).toBeGreaterThan(0)
-    expect(tasks.some((task) => task.week === 5)).toBe(true)
-
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
-  })
-
-  test('should list tasks for week 8 date range', async ({ request }) => {
-    const date = '2025-03-25T21:17:31.648Z'
-    const endDate = '2025-05-11T21:17:31.648Z'
-
-    const response = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
-      {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(200)
-
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(Array.isArray(tasks)).toBe(true)
-    expect(tasks.length).toBeGreaterThan(0)
-    expect(tasks.some((task) => task.week === 6)).toBe(true)
-
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
-  })
-
-  test('should list tasks for extended date range', async ({ request }) => {
-    const date = '2025-03-25T21:17:31.648Z'
-    const endDate = '2025-05-19T21:17:31.648Z'
-
-    const response = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
-      {
-        headers: {
-          Authorization: `Bearer ${reg.token}`,
-        },
-      },
-    )
-
-    expect(response.status()).toBe(200)
-
-    const tasks = (await response.json()) as CampaignTask[]
-    expect(Array.isArray(tasks)).toBe(true)
-    expect(tasks.length).toBeGreaterThan(0)
-    expect(tasks.some((task) => task.week === 7)).toBe(true)
-
-    const ids = new Set(tasks.map((t) => t.id))
-    expect(ids.size).toBe(tasks.length)
+    expect(allTasks.length).toBe(filteredTasks.length)
   })
 })
