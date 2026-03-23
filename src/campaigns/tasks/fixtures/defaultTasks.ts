@@ -141,6 +141,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.text,
     proRequired: true,
     defaultAiTemplateId: '6Adu3kct9uvZ0YNCXLPUvd',
+    isDefaultTask: true,
   },
   {
     id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
@@ -151,6 +152,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.robocall,
     proRequired: true,
     defaultAiTemplateId: '452l4TPYpWdQZYxHHJsdUb',
+    isDefaultTask: true,
   },
   {
     id: 'd1e2f3a4-b5c6-7d8e-9f0a-1b2c3d4e5f6a',
@@ -161,6 +163,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.doorKnocking,
     proRequired: true,
     defaultAiTemplateId: 'wgbnDDTxrf8OrresVE1HU',
+    isDefaultTask: true,
   },
   {
     id: 'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a',
@@ -171,6 +174,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.phoneBanking,
     proRequired: true,
     defaultAiTemplateId: '5N93cglp3cvq62EIwu1IOa',
+    isDefaultTask: true,
   },
   {
     id: '4b5c6d7e-8f9a-0b1c-2d3e-4f5a6b7c8d9e',
@@ -180,6 +184,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 4,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: 'Xboqgh6Ye3SgSwO6moujw',
+    isDefaultTask: true,
   },
   {
     id: '4c5d6e7f-8g9h-0i1j-2k3l-4m5n6o7p8q9r',
@@ -190,6 +195,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 4,
     flowType: CampaignTaskType.education,
     link: 'https://goodparty.org/blog/article/turning-support-into-victory-vote-phase-of-a-political-campaign',
+    isDefaultTask: true,
   },
   {
     id: 'f58b4523-c36d-4a5b-9e5f-88e4d3a7c70c',
@@ -200,6 +206,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.text,
     proRequired: true,
     defaultAiTemplateId: '5NbCRs4cIhti8pxnI8IM0P',
+    isDefaultTask: true,
   },
   {
     id: 'a5f07d6c-8e3d-49e2-b131-92103c2be07e',
@@ -210,6 +217,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.robocall,
     proRequired: true,
     defaultAiTemplateId: '6ZH4tMYcZNXshFOcLtjMJB',
+    isDefaultTask: true,
   },
   {
     id: 'd92e5b8c-7ac0-4e1a-9b87-562f5824dfe9',
@@ -220,6 +228,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.doorKnocking,
     proRequired: true,
     defaultAiTemplateId: '2p3mztAVPhuDHOYJetmdWJ',
+    isDefaultTask: true,
   },
   {
     id: 'b41c6e7f-29e8-438d-89d3-6ed28742c4a5',
@@ -230,6 +239,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.phoneBanking,
     proRequired: true,
     defaultAiTemplateId: '1HcpEmwIcXMCSW26ilxQP7',
+    isDefaultTask: true,
   },
   {
     id: 'e718329f-8b47-4e18-9f3b-8c7dfa96021c',
@@ -240,6 +250,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 2,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: '2X5rPGVz0sneUZ06w0ezcl',
+    isDefaultTask: true,
   },
   {
     id: '17a6ceb8-5f9d-4e83-80c7-2f8e41736104',
@@ -249,6 +260,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 2,
     flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/how-to-organize-campaign-events',
+    isDefaultTask: true,
   },
   {
     id: '41b8b290-7e50-4d5a-8c9f-b8e17b253cde',
@@ -260,6 +272,7 @@ export const defaultTasks: CampaignTask[] = [
     deadline: 3,
     proRequired: true,
     defaultAiTemplateId: '5b6W9pYlX796TBI2HV7HlQ',
+    isDefaultTask: true,
   },
   {
     id: '5fc21abd-2792-4c09-96f1-de94a28b2b3c',
@@ -271,6 +284,7 @@ export const defaultTasks: CampaignTask[] = [
     deadline: 3,
     proRequired: true,
     defaultAiTemplateId: '2GMO6bQoQermNhdRmRe1fh',
+    isDefaultTask: true,
   },
   {
     id: '83cb4a9e-ae02-4c30-a0d9-27b9672ce556',
@@ -281,6 +295,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.doorKnocking,
     proRequired: true,
     defaultAiTemplateId: '2p3mztAVPhuDHOYJetmdWJ',
+    isDefaultTask: true,
   },
   {
     id: 'cf0b27bc-fd6b-48f1-8ce0-e69e3b0c16d5',
@@ -291,6 +306,7 @@ export const defaultTasks: CampaignTask[] = [
     flowType: CampaignTaskType.phoneBanking,
     proRequired: true,
     defaultAiTemplateId: '1HcpEmwIcXMCSW26ilxQP7',
+    isDefaultTask: true,
   },
   {
     id: '1a9fcb0d-ce37-46a0-87e2-3e8c8bdcca5d',
@@ -300,6 +316,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 1,
     flowType: CampaignTaskType.socialMedia,
     defaultAiTemplateId: 'GpWsRql46Nif2wYroxj81',
+    isDefaultTask: true,
   },
   {
     id: '62efdb34-5865-4c2d-85a0-c71d7650a8a7',
@@ -310,6 +327,7 @@ export const defaultTasks: CampaignTask[] = [
     week: 1,
     flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/turning-support-into-victory-vote-phase-of-a-political-campaign',
+    isDefaultTask: true,
   },
   {
     id: '3e7b69f2-9ea5-4d4a-b98d-c2d9e6b60e18',
@@ -319,5 +337,6 @@ export const defaultTasks: CampaignTask[] = [
     week: 1,
     flowType: CampaignTaskType.events,
     link: 'https://goodparty.org/blog/article/what-to-do-after-winning-or-losing-election',
+    isDefaultTask: true,
   },
 ]
