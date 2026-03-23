@@ -6,69 +6,80 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Param,
   Post,
   Put,
+  Query,
   UnauthorizedException,
   UseGuards,
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { UsersService } from './services/users.service'
-import { ReadUserOutputSchema } from './schemas/ReadUserOutput.schema'
+import {
+  ListUsersPaginationSchema,
+  ReadUserOutputSchema,
+  UpdatePasswordSchema,
+} from '@goodparty_org/contracts'
 import { User } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { UserOwnerOrAdminGuard } from './guards/UserOwnerOrAdmin.guard'
 import { GenerateSignedUploadUrlArgsDto } from './schemas/GenerateSignedUploadUrlArgs.schema'
-import { ZodValidationPipe } from 'nestjs-zod'
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { UpdateMetadataSchema } from './schemas/UpdateMetadata.schema'
 import { FilesService } from 'src/files/files.service'
 import { FileUpload } from 'src/files/files.types'
 import { ReqFile } from 'src/files/decorators/ReqFiles.decorator'
 import { FilesInterceptor } from 'src/files/interceptors/files.interceptor'
 import { MimeTypes } from 'http-constants-ts'
-import { UpdatePasswordSchemaDto } from './schemas/UpdatePassword.schema'
 import { AuthenticationService } from '../authentication/authentication.service'
-import { UpdateUserInputSchema } from './schemas/UpdateUserInput.schema'
+import {
+  UpdateUserAdminInputSchema,
+  UpdateUserInputSchema,
+} from './schemas/UpdateUserInput.schema'
+import { UserIdParamSchema } from './schemas/UserIdParam.schema'
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+import { PinoLogger } from 'nestjs-pino'
+
+class ListUsersPaginationDto extends createZodDto(ListUsersPaginationSchema) {}
+
+class UpdatePasswordDto extends createZodDto(UpdatePasswordSchema) {}
 
 @Controller('users')
 @UsePipes(ZodValidationPipe)
+@UseInterceptors(ZodResponseInterceptor)
 export class UsersController {
-  private readonly logger = new Logger(UsersController.name)
-
   constructor(
     private usersService: UsersService,
     private readonly filesService: FilesService,
     private readonly authenticationService: AuthenticationService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(UsersController.name)
+  }
 
-  @UseGuards(UserOwnerOrAdminGuard)
-  @Get(':id')
-  async findOne(@Param('id') id: string, @ReqUser() user: User) {
-    const paramId = parseInt(id)
-    if (paramId === user.id) {
-      // No need to hit the DB again if the user is requesting their own data
-      return ReadUserOutputSchema.parse(user)
-    }
-
-    const dbUser = await this.usersService.findUser({ id: paramId })
-    if (!dbUser) {
-      throw new NotFoundException('User not found')
-    }
-    return ReadUserOutputSchema.parse(dbUser)
+  @UseGuards(M2MOnly)
+  @Get()
+  @ResponseSchema(PaginatedResponseSchema(ReadUserOutputSchema))
+  async list(@Query() query: ListUsersPaginationDto) {
+    const { data, meta } = await this.usersService.listUsers(query)
+    return { data, meta }
   }
 
   @Get('me')
+  @ResponseSchema(ReadUserOutputSchema)
   async findMe(@ReqUser() user: User) {
-    return ReadUserOutputSchema.parse(
-      await this.usersService.findUser({ id: user.id }),
-    )
+    return this.usersService.findUser({ id: user.id })
   }
 
   @Put('me')
-  updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
+  @ResponseSchema(ReadUserOutputSchema)
+  async updateMe(@ReqUser() user: User, @Body() body: UpdateUserInputSchema) {
     return this.usersService.updateUser({ id: user.id }, body ?? {})
   }
 
@@ -96,34 +107,14 @@ export class UsersController {
       ],
     }),
   )
+  @ResponseSchema(ReadUserOutputSchema)
   async uploadImage(@ReqUser() user: User, @ReqFile() file?: FileUpload) {
     if (!file) {
       throw new BadRequestException('No file found')
     }
 
     const avatar = await this.filesService.uploadFile(file, 'uploads')
-    const updatedUser = await this.usersService.updateUser(
-      { id: user.id },
-      { avatar },
-    )
-    return ReadUserOutputSchema.parse(updatedUser)
-  }
-
-  @UseGuards(UserOwnerOrAdminGuard)
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') id: string) {
-    try {
-      return await this.usersService.deleteUser(parseInt(id))
-    } catch (e: Error | any) {
-      if (e?.code !== 'P2025') {
-        // P2025: Prisma error code for "Record to delete does not exist"
-        throw e
-      }
-      this.logger.warn(
-        `request to delete user that does not exist, w/ id: ${id}`,
-      )
-    }
+    return this.usersService.updateUser({ id: user.id }, { avatar })
   }
 
   @Put('files/generate-signed-upload-url')
@@ -133,12 +124,54 @@ export class UsersController {
     }
   }
 
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  @ResponseSchema(ReadUserOutputSchema)
+  async updateUser(
+    @Param() { id }: UserIdParamSchema,
+    @Body() body: UpdateUserAdminInputSchema,
+  ) {
+    return this.usersService.updateUser({ id }, body)
+  }
+
+  @UseGuards(UserOwnerOrAdminGuard)
+  @Get(':id')
+  @ResponseSchema(ReadUserOutputSchema)
+  async findOne(@Param() { id }: UserIdParamSchema, @ReqUser() user: User) {
+    if (user && id === user.id) {
+      return user
+    }
+
+    const dbUser = await this.usersService.findUser({ id })
+    if (!dbUser) {
+      throw new NotFoundException('User not found')
+    }
+    return dbUser
+  }
+
+  @UseGuards(UserOwnerOrAdminGuard)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(@Param() { id }: UserIdParamSchema) {
+    try {
+      return await this.usersService.deleteUser(id)
+    } catch (error: unknown | PrismaClientKnownRequestError) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        this.logger.warn(
+          `request to delete user that does not exist, w/ id: ${id}`,
+        )
+        return
+      }
+      throw error
+    }
+  }
+
   @UseGuards(UserOwnerOrAdminGuard)
   @Put(':id/password')
-  async updatePassword(
-    @Body() body: UpdatePasswordSchemaDto,
-    @ReqUser() user: User,
-  ) {
+  async updatePassword(@Body() body: UpdatePasswordDto, @ReqUser() user: User) {
     const { hasPassword, password } = user
     const { newPassword, oldPassword } = body
     if (hasPassword && !oldPassword) {

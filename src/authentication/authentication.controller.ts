@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common'
 import { AuthenticationService } from './authentication.service'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { ReadUserOutputSchema } from '../users/schemas/ReadUserOutput.schema'
+import { ReadUserOutputSchema } from '@goodparty_org/contracts'
 import { RecoverPasswordSchema } from './schemas/RecoverPasswordEmail.schema'
 import { SetPasswordEmailSchema } from './schemas/SetPasswordEmail.schema'
 import { UsersService } from 'src/users/services/users.service'
@@ -31,9 +31,10 @@ import { FastifyReply } from 'fastify'
 import { SOCIAL_LOGIN_STRATEGY_NAME } from './auth-strategies/SocialLogin.strategy'
 import { CrmUsersService } from '../users/services/crmUsers.service'
 import { setTokenCookie } from './util/setTokenCookie.util'
-import { CampaignCreatedBy } from 'src/campaigns/campaigns.types'
-import { EVENTS } from 'src/segment/segment.types'
+import { CampaignCreatedBy } from '@goodparty_org/contracts'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { WrapperType } from 'src/shared/types/utility.types'
 
 @PublicAccess()
 @Controller('authentication')
@@ -42,7 +43,7 @@ export class AuthenticationController {
   constructor(
     private authenticationService: AuthenticationService,
     @Inject(forwardRef(() => UsersService))
-    private usersService: UsersService,
+    private usersService: WrapperType<UsersService>,
     private campaignsService: CampaignsService,
     private emailService: EmailService,
     private readonly crmUsers: CrmUsersService,
@@ -56,15 +57,13 @@ export class AuthenticationController {
   ) {
     const { token, user } = await this.authenticationService.register(userData)
     setTokenCookie(response, token)
-    const campaign = await this.campaignsService.createForUser(user)
-    return { user: ReadUserOutputSchema.parse(user), token, campaign }
+    return { user: ReadUserOutputSchema.parse(user), token }
   }
 
-  private async reconcileCampaignForUser(
+  private async findCampaignForUser(
     user: User,
   ): Promise<LoginResult['campaign']> {
-    const existingCampaign = await this.campaignsService.findByUserId(user.id)
-    return existingCampaign || (await this.campaignsService.createForUser(user))
+    return (await this.campaignsService.findByUserId(user.id)) ?? null
   }
 
   @UseGuards(AuthGuard('local'))
@@ -84,7 +83,7 @@ export class AuthenticationController {
 
     return {
       user: ReadUserOutputSchema.parse(user),
-      campaign: await this.reconcileCampaignForUser(user),
+      campaign: await this.findCampaignForUser(user),
       token,
     }
   }
@@ -92,7 +91,7 @@ export class AuthenticationController {
   @UseGuards(AuthGuard(SOCIAL_LOGIN_STRATEGY_NAME))
   @Post('social-login/:socialProvider')
   async socialLogin(
-    @Res({ passthrough: true }) response,
+    @Res({ passthrough: true }) response: FastifyReply,
     @ReqUser() user: User,
   ): Promise<LoginResult> {
     const token = this.authenticationService.generateAuthToken({
@@ -103,7 +102,7 @@ export class AuthenticationController {
     setTokenCookie(response, token)
     return {
       user: ReadUserOutputSchema.parse(user),
-      campaign: await this.reconcileCampaignForUser(user),
+      campaign: await this.findCampaignForUser(user),
       token,
     }
   }

@@ -1,15 +1,15 @@
 import {
   SlackMessageBlock,
   SlackMessageType,
-} from '../../../../shared/services/slackService.types'
+} from '../../../../vendors/slack/slackService.types'
 
 export function buildSlackBlocks(
-  type,
-  email,
-  threadId,
-  userMessage,
-  userPrompt,
-  lastThreadMessage,
+  type: string,
+  email: string,
+  threadId: string,
+  userMessage: string | undefined,
+  userPrompt: string,
+  lastThreadMessage: string,
 ): { blocks: SlackMessageBlock[] } {
   const title = `${
     type.charAt(0).toUpperCase() + type.slice(1)
@@ -126,7 +126,7 @@ export function buildSlackBlocks(
             elements: [
               {
                 type: SlackMessageType.TEXT,
-                text: lastThreadMessage,
+                text: lastThreadMessage as string,
               },
             ],
           },

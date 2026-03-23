@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import { BadGatewayException, Injectable } from '@nestjs/common'
 import { EmailData, MailgunService } from './mailgun.service'
 import {
   getBasicEmailContent,
@@ -11,15 +11,20 @@ import {
   SendTemplateEmailInput,
 } from './email.types'
 import { getUserFullName } from '../users/util/users.util'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { APP_ROOT, WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
 import { isTestEmail } from './util/testEmailValidator.util'
+import { PinoLogger } from 'nestjs-pino'
 
 const SKIPPED_EMAIL_STATUS = { status: 'test-email-skipped', id: 'test-email' }
 
 @Injectable()
 export class EmailService {
-  private readonly logger = new Logger(EmailService.name)
-  constructor(private mailgun: MailgunService) {}
+  constructor(
+    private mailgun: MailgunService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(EmailService.name)
+  }
 
   async sendEmail({ to, subject, message, from }: SendEmailInput) {
     if (isTestEmail(to)) {
@@ -68,7 +73,7 @@ export class EmailService {
     const { firstName, lastName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${WEBAPP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${APP_ROOT}/reset-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const name = `${firstName} ${lastName}`
     const subject = 'Reset your password - GoodParty.org'
@@ -81,7 +86,7 @@ export class EmailService {
     const { firstName, email, passwordResetToken } = user
     const encodedEmail = email.replace('+', '%2b')
     const link = encodeURI(
-      `${WEBAPP_ROOT}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
+      `${APP_ROOT}/set-password?email=${encodedEmail}&token=${passwordResetToken}`,
     )
     const variables = {
       name: firstName,
@@ -114,19 +119,29 @@ export class EmailService {
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
         return await this.mailgun.sendMessage(emailData)
+        // Mailgun SDK errors are untyped — catch as any to access status and response headers
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (error.status === 429) {
-          // Rate limit exceeded
+          // Rate limit exceeded — parse retry-after from Mailgun response headers
           const retryAfter =
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
             parseInt(error.response.headers['retry-after'], 10) || 1 // Retry-After header is in seconds
           this.logger.warn(
             `Rate limit exceeded. Retrying after ${retryAfter} seconds...`,
           )
           await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000)) // Convert to milliseconds
         } else {
+          // Mailgun error shape is untyped — safely extract message for logging
+          this.logger.error(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+            { data: error.message || error },
+            'Error sending email via Mailgun:',
+          )
           throw new BadGatewayException(
             'error communicating w/ mail service: ',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             error,
           )
         }

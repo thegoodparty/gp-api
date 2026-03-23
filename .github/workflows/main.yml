@@ -1,31 +1,249 @@
-name: Deploy and Test
+name: CI
 
 on:
+  pull_request:
   push:
-    branches: ['develop', 'qa', 'master']
+    branches: [develop, qa, master]
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+env:
+  AWS_REGION: us-west-2
+  IMAGE_URI: 333022194791.dkr.ecr.us-west-2.amazonaws.com/gp-api:${{ github.sha }}
 
 jobs:
-  deploy:
+  main:
+    name: Build & Deploy
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
+      cancel-in-progress: false
+    outputs:
+      environment: ${{ steps.context.outputs.environment }}
+      service_url: ${{ steps.pulumi.outputs.service_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
+      - name: Check contracts changes
+        id: contracts-changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PREV="${{ github.event.pull_request.base.sha }}"
+          else
+            PREV="${{ github.event.before }}"
+          fi
+          CURRENT="${{ github.event.pull_request.head.sha || github.sha }}"
+          CHANGED=$(git diff --name-only "$PREV" "$CURRENT" -- 'contracts/src/' 'contracts/package.json' 'contracts/tsup.config.ts' 'contracts/scripts/' | head -1)
+          RESULT=$( [ -n "$CHANGED" ] && echo true || echo false )
+          echo "contracts=$RESULT" >> "$GITHUB_OUTPUT"
+          echo "Contracts changed: $RESULT (comparing $PREV..$CURRENT)"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+
+      # Validation
+      - run: npm run generate
+
+      - name: Build contracts
+        run: cd contracts && npm run build
+
+      - run: npx tsc --noEmit
+      - run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
+      - run: npx prettier --check "src/**/*.{ts,js,json}"
+      - run: npm run test -- --coverage
+
+      - run: npm run build
+
+      - name: Setup Node 24 for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: RC version contracts
+        if: >-
+          github.ref_name != 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        id: rc-version
+        working-directory: contracts
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SNAPSHOT_TAG="rc-pr-${{ github.event.number }}"
+          else
+            SNAPSHOT_TAG="rc-${{ github.ref_name }}"
+          fi
+          BEFORE=$(node -p "require('./package.json').version")
+          npx changeset version --snapshot "$SNAPSHOT_TAG" --snapshot-prerelease-template '{tag}.{commit}'
+          AFTER=$(node -p "require('./package.json').version")
+          echo "changed=$( [ "$BEFORE" != "$AFTER" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "version=$AFTER" >> "$GITHUB_OUTPUT"
+
+      - name: Publish RC contracts
+        if: >-
+          github.ref_name != 'master'
+          && steps.rc-version.outputs.changed == 'true'
+          && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        working-directory: contracts
+        run: npx changeset publish --tag rc
+
+      - name: Comment RC version on PR
+        if: github.event_name == 'pull_request' && steps.rc-version.outputs.changed == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            **@goodparty_org/contracts** RC published: `${{ steps.rc-version.outputs.version }}`
+            ```
+            npm install @goodparty_org/contracts@${{ steps.rc-version.outputs.version }}
+            ```
+
+      - name: Generate App token
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Create Release PR or Publish contracts
+        if: >-
+          github.ref_name == 'master'
+          && steps.contracts-changed.outputs.contracts == 'true'
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: npx changeset publish
+          title: "chore: release @goodparty_org/contracts"
+          cwd: contracts
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Calculate overall coverage
+        id: coverage-calc
+        if: always()
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            OVERALL=$(jq -r '(.total.lines.pct + .total.statements.pct + .total.functions.pct + .total.branches.pct) / 4' coverage/coverage-summary.json)
+            OVERALL_ROUNDED=$(printf "%.2f" "$OVERALL")
+            echo "overall_pct=$OVERALL_ROUNDED" >> $GITHUB_OUTPUT
+            echo "📊 Overall Coverage: ${OVERALL_ROUNDED}%"
+            echo "## 📊 Overall Test Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**${OVERALL_ROUNDED}%** (average of lines, statements, functions, and branches)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "overall_pct=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish coverage to PR + summary
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          threshold-icons: "{0: '🔴', 80: '🟠', 90: '🟢'}"
+
+      - name: Add overall coverage to PR comment
+        if: always() && github.event_name == 'pull_request' && steps.coverage-calc.outputs.overall_pct != '0'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ## 📊 Overall Test Coverage
+
+            **${{ steps.coverage-calc.outputs.overall_pct }}%** (average of lines, statements, functions, and branches)
+          comment-id: ${{ steps.coverage-calc.outputs.comment-id }}
+
+      # Determine deployment context
+      - name: Determine deployment context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "environment=preview" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.ref_name }}" in
+              develop) echo "environment=dev" >> "$GITHUB_OUTPUT" ;;
+              qa) echo "environment=qa" >> "$GITHUB_OUTPUT" ;;
+              master) echo "environment=prod" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      # Docker build and push
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v5
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # Each branch has a different codebuild project.
-      - name: Run CodeBuild
-        uses: aws-actions/aws-codebuild-run-build@v1
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t "${IMAGE_URI}" -f deploy/Dockerfile .
+          docker push "${IMAGE_URI}"
+
+      # Pulumi deployment
+      - name: Install Pulumi
+        uses: pulumi/actions@v6
         with:
-          project-name: gp-deploy-build-${{ github.ref_name }}
+          pulumi-version: "^3"
 
-      - name: Notify Slack on Success
-        if: success()
+      - name: Run Pulumi Deploy
+        id: pulumi
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+          GITHUB_PR_NUMBER: ${{ github.event.number }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
+          CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
+        run: |
+          npm run infra deploy ${{ steps.context.outputs.environment }}
+          cd deploy && SERVICE_URL=$(pulumi stack output serviceUrl 2>/dev/null || echo "")
+          echo "service_url=${SERVICE_URL}" >> "$GITHUB_OUTPUT"
+
+      # PR comment for preview environments
+      - name: Find existing PR comment
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "Preview Environment"
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request' && steps.find-comment.outputs.comment-id == '' && steps.pulumi.outputs.service_url != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            ## Preview Environment
+
+            Your preview environment is ready!
+
+            | Resource | URL |
+            |----------|-----|
+            | **API** | ${{ steps.pulumi.outputs.service_url }} |
+            | **Health Check** | ${{ steps.pulumi.outputs.service_url }}/v1/health |
+
+            > This environment will be automatically destroyed when the PR is closed.
+
+      # Slack notifications
+      - name: Notify Slack on Deploy Success
+        if: success() && github.event_name == 'push'
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -33,25 +251,112 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Notify Slack on Failure
+      - name: Notify Slack on Deploy Failure
         if: failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
           fields: repo,commit,author,action,eventName,ref,workflow,took
-          # only_mention_if: failure
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  # tests:
-  #   needs: deploy
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v3
+  tests:
+    name: E2E Tests
+    needs: main
+    if: github.ref_name != 'master'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
 
-  #     - name: Run Playwright tests
-  #       # Example step to run your browser-based tests
-  #       run: |
-  #         npm install
-  #         npx playwright test
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        id: run-tests
+        env:
+          API_BASE_URL: ${{ needs.main.outputs.service_url }}
+          CANDIDATE_EMAIL: ${{ secrets.CANDIDATE_EMAIL }}
+          CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CANDIDATE_ID: ${{ needs.main.outputs.environment == 'qa' && secrets.QA_CANDIDATE_ID || secrets.DEV_CANDIDATE_ID }}
+          CAMPAIGN_SLUG: ${{ needs.main.outputs.environment == 'qa' && secrets.QA_CAMPAIGN_SLUG || secrets.DEV_CAMPAIGN_SLUG }}
+        run: npm run test:e2e
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-reports-${{ needs.main.outputs.environment }}-${{ github.sha }}
+          path: |
+            e2e-tests/playwright-report
+            e2e-tests/test-results
+
+      - name: Parse test results
+        if: always()
+        id: test-results
+        run: |
+          if [ -f "e2e-tests/test-results/results.json" ]; then
+            TOTAL_TESTS=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[]] | length' 2>/dev/null || echo "0")
+            FAILED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == false)] | length' 2>/dev/null || echo "0")
+            PASSED_COUNT=$(cat e2e-tests/test-results/results.json | jq '[.. | .specs? // empty | .[] | select(.ok == true)] | length' 2>/dev/null || echo "0")
+
+            echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+            echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
+            echo "passed_count=$PASSED_COUNT" >> $GITHUB_OUTPUT
+
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              FAILED_TESTS=$(cat e2e-tests/test-results/results.json | jq -r '[.. | .specs? // empty | .[] | select(.ok == false) | .title] | .[:10] | map("• " + .) | join("\\n")' 2>/dev/null || echo "• Failed to parse test names")
+              echo "failed_tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+              echo "tests_ran=true" >> $GITHUB_OUTPUT
+            else
+              echo "failed_tests=" >> $GITHUB_OUTPUT
+              echo "tests_ran=$( [ "$TOTAL_TESTS" -gt 0 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "failed_tests=• Test results file not found" >> $GITHUB_OUTPUT
+            echo "failed_count=0" >> $GITHUB_OUTPUT
+            echo "passed_count=0" >> $GITHUB_OUTPUT
+            echo "total_tests=0" >> $GITHUB_OUTPUT
+            echo "tests_ran=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify Slack on Test Success
+        if: steps.run-tests.outcome == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: 'E2E Tests Passed',
+              attachments: [{
+                color: 'good',
+                text: `${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.main.outputs.environment }}\n${{ steps.test-results.outputs.passed_count }}/${{ steps.test-results.outputs.total_tests }} tests passed\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>`
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on Test Failure
+        if: steps.run-tests.outcome == 'failure' || failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "${{ steps.test-results.outputs.tests_ran == 'true' && 'E2E Tests Failed (Non-blocking)' || 'Test Environment Not Ready' }}",
+              "attachments": [{
+                "color": "${{ steps.test-results.outputs.tests_ran == 'true' && 'warning' || 'danger' }}",
+                "text": "${{ github.repository }} - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }} by ${{ github.actor }}\nEnvironment: ${{ needs.main.outputs.environment }}\n\n${{ steps.test-results.outputs.tests_ran == 'true' && format('{0}/{1} tests failed\n{2}/{1} tests passed\n\nFailed Tests:\n{3}', steps.test-results.outputs.failed_count, steps.test-results.outputs.total_tests, steps.test-results.outputs.passed_count, steps.test-results.outputs.failed_tests) || 'Tests did not run - environment health check failed or test setup error occurred.' }}\n\n<https://github.com/${{ github.repository }}/${{ github.event_name == 'pull_request' && format('pull/{0}', github.event.number) || format('actions/runs/{0}', github.run_id) }}|View>"
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

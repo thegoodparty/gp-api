@@ -73,7 +73,7 @@ export function FilesInterceptor(
       const req = ctx.switchToHttp().getRequest<
         FastifyRequest & {
           fileUploads?: FileUpload[]
-          body?: Record<string, any>
+          body?: Record<string, Prisma.JsonValue>
         }
       >()
 
@@ -83,7 +83,7 @@ export function FilesInterceptor(
       }
 
       req.fileUploads = []
-      req.body ??= {}
+      req.body ??= {} as Record<string, Prisma.JsonValue>
 
       const parts = req.parts({
         limits: { files: numFiles, fileSize: sizeLimit },
@@ -122,9 +122,13 @@ export function FilesInterceptor(
             setNestedProperty(
               req.body,
               part.fieldname,
+              // Multipart form value to Prisma JSON — no shared type between fastify and Prisma
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               part.value as Prisma.JsonValue,
             )
           } else {
+            // Multipart form value to Prisma JSON — no shared type between fastify and Prisma
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             req.body[part.fieldname] = part.value as Prisma.JsonValue
           }
         }
@@ -171,6 +175,8 @@ function setNestedProperty(
       current[key] = {}
     }
 
+    // Multipart form value to Prisma JSON — no shared type between fastify and Prisma
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     current = current[key] as Prisma.JsonObject
   }
 

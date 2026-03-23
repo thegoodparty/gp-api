@@ -1,19 +1,18 @@
 import {
+  Campaign,
   CampaignUpdateHistoryType,
   Prisma,
   PrismaClient,
   User,
 } from '@prisma/client'
+import { buildSlug } from '../src/shared/util/slug.util'
+import { getUserFullName } from '../src/users/util/users.util'
 import { campaignFactory } from './factories/campaign.factory'
-import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
-import { userFactory } from './factories/user.factory'
-import { pathToVictoryFactory } from './factories/pathToVictory.factory'
-import { buildSlug } from 'src/shared/util/slug.util'
-import { getUserFullName } from 'src/users/util/users.util'
-import { Campaign } from '@prisma/client'
-import fixedCampaigns from './fixedCampaigns.json'
-import 'prisma/schema/pathToVictory.jsonTypes'
 import { campaignPlanVersionFactory } from './factories/campaignPlanVersion.factory'
+import { campaignUpdateHistoryFactory } from './factories/campaignUpdateHistory.factory'
+import { pathToVictoryFactory } from './factories/pathToVictory.factory'
+import { userFactory } from './factories/user.factory'
+import fixedCampaigns from './fixedCampaigns.json'
 const NUM_GENERATED_CAMPAIGNS = 100
 const NUM_UPDATE_HISTORY = 3
 const FIXED_CAMPAIGNS: Partial<Campaign>[] =
@@ -71,8 +70,12 @@ export default async function seedCampaigns(
 
   await prisma.campaignUpdateHistory.createMany({
     data: fakeUpdateHistory,
+    skipDuplicates: true,
   })
-  await prisma.pathToVictory.createMany({ data: fakeP2Vs })
+  await prisma.pathToVictory.createMany({
+    data: fakeP2Vs,
+    skipDuplicates: true,
+  })
 
   console.log(`Created ${campaignIds.length} campaigns`)
 

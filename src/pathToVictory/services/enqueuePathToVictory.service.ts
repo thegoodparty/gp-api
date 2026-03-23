@@ -1,26 +1,28 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
-import { SlackService } from '../../shared/services/slack.service'
-import {
-  MessageGroup,
-  QueueProducerService,
-} from '../../queue/producer/queueProducer.service'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackService } from '../../vendors/slack/services/slack.service'
+import { QueueProducerService } from '../../queue/producer/queueProducer.service'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { Campaign, User } from '@prisma/client'
 import { RacesService } from '../../elections/services/races.service'
-import { PathToVictoryQueueMessage } from '../types/pathToVictory.types'
-import { QueueType } from '../../queue/queue.types'
+import {
+  PathToVictoryInput,
+  PathToVictoryQueueMessage,
+} from '../types/pathToVictory.types'
+import { MessageGroup, QueueType } from '../../queue/queue.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class EnqueuePathToVictoryService {
-  private readonly logger = new Logger(EnqueuePathToVictoryService.name)
-
   constructor(
     private prisma: PrismaService,
     private slackService: SlackService,
     private queueService: QueueProducerService,
     private racesService: RacesService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(EnqueuePathToVictoryService.name)
+  }
 
   async enqueuePathToVictory(campaignId: number) {
     try {
@@ -67,41 +69,25 @@ export class EnqueuePathToVictoryService {
           return { message: 'not ok' }
         }
 
-        this.logger.debug('race data', raceData)
+        this.logger.debug(raceData, 'race data')
         // queueMessage.data = { campaignId, ...raceData }
 
         queueMessage = {
           type: QueueType.PATH_TO_VICTORY,
+          // GraphQL race data spread into typed input — BallotReady types fields as any
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           data: {
             campaignId: campaignId.toString(),
-            ...raceData,
-          },
+            // GraphQL race data spread into typed input — BallotReady types fields as any
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            ...(raceData as Record<
+              string,
+              string | number | boolean | string[]
+            >),
+          } as PathToVictoryInput,
         }
 
-        // Update Campaign details
-        if (details) {
-          await this.prisma.campaign.update({
-            where: { id: campaign.id },
-            data: {
-              details: {
-                ...details,
-                ...(raceData && {
-                  officeTermLength: raceData.electionTerm,
-                  electionDate: raceData.electionDate,
-                  level: raceData.electionLevel,
-                  state: raceData.electionState,
-                  county: raceData.electionCounty,
-                  city: raceData.electionMunicipality,
-                  district: raceData.subAreaValue,
-                  partisanType: raceData.partisanType,
-                  priorElectionDates: raceData.priorElectionDates,
-                  positionId: raceData.positionId,
-                  tier: raceData.tier,
-                }),
-              },
-            },
-          })
-        }
+        // raceData is used only to build the queue payload for P2V processing.
       } else {
         const user = await this.prisma.user.findUnique({
           where: { id: campaign.userId },
@@ -124,11 +110,21 @@ export class EnqueuePathToVictoryService {
         }
       }
 
-      this.logger.debug('queueing Message', queueMessage)
-      await this.queueService.sendMessage(queueMessage, MessageGroup.p2v)
+      this.logger.debug(queueMessage, 'queueing Message')
+      this.logger.info({
+        event: 'DistrictMatch',
+        action: 'silver_fallback_triggered',
+        slug,
+        campaignId,
+        officeName: queueMessage.data.officeName,
+        electionState: queueMessage.data.electionState,
+        electionLevel: queueMessage.data.electionLevel,
+        electionDate: queueMessage.data.electionDate,
+      })
+      await this.queueService.sendMessage(queueMessage!, MessageGroup.p2v)
       return { message: 'ok' }
     } catch (e) {
-      this.logger.error('error at enqueue', e)
+      this.logger.error({ e }, 'error at enqueue')
       await this.slackService.errorMessage({
         message: 'error at enqueue p2v',
         error: e,
@@ -140,6 +136,8 @@ export class EnqueuePathToVictoryService {
   private async sendVictoryIssuesSlackMessage(campaign: Campaign, user: User) {
     const { slug, data: details } = campaign
     const { office, state, city, district } =
+      // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (details as PrismaJson.CampaignDetails) || {}
     const appBase = process.env.WEBAPP_ROOT
 

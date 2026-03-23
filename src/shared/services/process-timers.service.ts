@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { v4 as uuidv4 } from 'uuid'
+import { PinoLogger } from 'nestjs-pino'
 
 const CHECK_DELAY = 1000
 const TIMER_TIMEOUT = 2000
@@ -18,11 +19,11 @@ const registry = new FinalizationRegistry((intervalId: NodeJS.Timeout) =>
 
 @Injectable()
 export class ProcessTimersService {
-  private readonly logger = new Logger(ProcessTimersService.name)
   private timers: ProcessTimersMap = new Map()
   private readonly checkIntervalId: NodeJS.Timeout
 
-  constructor() {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(ProcessTimersService.name)
     this.checkIntervalId = setInterval(() => this.checkTimers(), CHECK_DELAY)
     registry.register(this, this.checkIntervalId)
   }

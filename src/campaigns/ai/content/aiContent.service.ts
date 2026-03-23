@@ -1,31 +1,34 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { CampaignsService } from '../../services/campaigns.service'
 import { CreateAiContentSchema } from '../schemas/CreateAiContent.schema'
 import { ContentService } from 'src/content/services/content.service'
 import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
-import { SlackService } from 'src/shared/services/slack.service'
-import {
-  MessageGroup,
-  QueueProducerService,
-} from 'src/queue/producer/queueProducer.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { camelToSentence } from 'src/shared/util/strings.util'
 import { AiChatMessage } from '../chat/aiChat.types'
-import { AiContentGenerationStatus, GenerationStatus } from './aiContent.types'
-import { SlackChannel } from '../../../shared/services/slackService.types'
-import { QueueType } from '../../../queue/queue.types'
+import { GenerationStatus } from './aiContent.types'
+import { SlackChannel } from '../../../vendors/slack/slackService.types'
+import {
+  MessageGroup,
+  QueueMessage,
+  QueueType,
+} from '../../../queue/queue.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class AiContentService {
-  private readonly logger = new Logger(AiContentService.name)
-
   constructor(
     private readonly campaignsService: CampaignsService,
     private readonly contentService: ContentService,
     private readonly aiService: AiService,
     private readonly slack: SlackService,
     private readonly queue: QueueProducerService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiContentService.name)
+  }
 
   /** function to kickoff ai content generation and enqueue a message to run later */
   async createContent(campaign: Campaign, inputs: CreateAiContentSchema) {
@@ -65,9 +68,13 @@ export class AiContentService {
 
     // generating a new ai content here
     const cmsPrompts = await this.contentService.getAiContentPrompts()
-    const keyNoDigits = key.replace(/\d+$/, '') // we allow multiple keys like key1, key2
+    const keyNoDigits = key.replace(/\d+$/, '')
+    // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     let prompt = cmsPrompts[keyNoDigits] as string
 
+    // Prisma include query — TypeScript cannot narrow the included relations at compile time
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const campaignWithRelations = (await this.campaignsService.findFirst({
       where: { id: campaign.id },
       include: {
@@ -91,7 +98,9 @@ export class AiContentService {
       await this.slack.errorMessage({
         message: 'empty prompt replace',
         error: {
-          cmsPrompt: cmsPrompts[keyNoDigits],
+          // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          cmsPrompt: cmsPrompts[keyNoDigits] as string | undefined,
           promptAfterReplace: prompt,
           campaign,
         },
@@ -101,20 +110,23 @@ export class AiContentService {
     await this.slack.aiMessage({
       message: 'prompt',
       error: {
-        cmsPrompt: cmsPrompts[keyNoDigits],
+        // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        cmsPrompt: cmsPrompts[keyNoDigits] as string | undefined,
         promptAfterReplace: prompt,
       },
     })
 
-    if (!aiContent.generationStatus[key]) {
-      aiContent.generationStatus[key] = {} as AiContentGenerationStatus
+    aiContent.generationStatus[key] = {
+      ...aiContent.generationStatus[key],
+      status: GenerationStatus.processing,
+      prompt,
+      // Prisma JSON column typed as JsonValue — chat messages stored as JSON array
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      existingChat: (chat as AiChatMessage[]) || [],
+      inputValues,
+      createdAt: new Date().valueOf(),
     }
-    aiContent.generationStatus[key].status = GenerationStatus.processing
-    aiContent.generationStatus[key].prompt = prompt as string
-    aiContent.generationStatus[key].existingChat =
-      (chat as AiChatMessage[]) || []
-    aiContent.generationStatus[key].inputValues = inputValues
-    aiContent.generationStatus[key].createdAt = new Date().valueOf()
 
     await this.slack.message(
       {
@@ -124,7 +136,7 @@ export class AiContentService {
     )
 
     try {
-      this.logger.log(aiContent)
+      this.logger.info(aiContent)
       await this.campaignsService.update({
         where: { id: campaign.id },
         data: { aiContent },
@@ -142,12 +154,12 @@ export class AiContentService {
       throw e
     }
 
-    const queueMessage = {
+    const queueMessage: QueueMessage = {
       type: QueueType.GENERATE_AI_CONTENT,
       data: {
         slug,
         key,
-        regenerate,
+        regenerate: regenerate ?? false,
       },
     }
 
@@ -172,7 +184,7 @@ export class AiContentService {
   }) {
     const { slug, key, regenerate } = message
 
-    let campaign = await this.campaignsService.findFirstOrThrow({
+    let campaign: Campaign = await this.campaignsService.findFirstOrThrow({
       where: { slug },
       include: { pathToVictory: true, user: true },
     })
@@ -218,7 +230,7 @@ export class AiContentService {
         0.9,
       )
 
-      chatResponse = completion.content
+      chatResponse = completion.content as string
       const totalTokens = completion.tokens
 
       await this.slack.aiMessage({
@@ -233,36 +245,39 @@ export class AiContentService {
           include: { pathToVictory: true, user: true },
         })) || campaign
       aiContent = campaign.aiContent
-      let oldVersion
+      let oldVersion: { date: Date; text: string } | undefined
       if (chatResponse && chatResponse !== '') {
         try {
-          const oldVersionData = aiContent[key]
+          const oldVersionData = aiContent[key] as {
+            content: string
+            updatedAt?: number
+          }
           oldVersion = {
-            // todo: try to convert oldVersionData.updatedAt to a date object.
-            date: new Date().toString(),
+            date: new Date(),
             text: oldVersionData.content,
           }
-        } catch (_e) {
+        } catch {
           // dont warn because this is expected to fail sometimes.
-          // console.log('error getting old version', e);
         }
         aiContent[key] = {
-          name: camelToSentence(key), // todo: check if this overwrites a name they've chosen.
+          name: camelToSentence(key),
           updatedAt: new Date().valueOf(),
           inputValues,
-          content: chatResponse,
+          // LLM response content is string | null — context guarantees string but type does not
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          content: chatResponse as string,
         }
 
-        this.logger.log('saving campaign version', key)
-        this.logger.log('inputValues', inputValues)
-        this.logger.log('oldVersion', oldVersion)
+        this.logger.info({ key }, 'saving campaign version')
+        this.logger.info({ inputValues }, 'inputValues')
+        this.logger.info({ oldVersion }, 'oldVersion')
 
         await this.campaignsService.saveCampaignPlanVersion({
           aiContent,
           key,
           campaignId: campaign.id,
           inputValues,
-          oldVersion,
+          oldVersion: oldVersion!,
           regenerate: regenerate ? regenerate : false,
         })
 
@@ -272,14 +287,11 @@ export class AiContentService {
         ) {
           aiContent.generationStatus = {}
         }
-        if (
-          !aiContent?.generationStatus[key] ||
-          typeof aiContent.generationStatus[key] !== 'object'
-        ) {
-          aiContent.generationStatus[key] = {} as AiContentGenerationStatus
+        aiContent.generationStatus[key] = {
+          ...aiContent.generationStatus[key],
+          status: GenerationStatus.completed,
+          createdAt: aiContent.generationStatus[key]?.createdAt ?? Date.now(),
         }
-
-        aiContent.generationStatus[key].status = GenerationStatus.completed
 
         await this.campaignsService.update({
           where: { id: campaign.id },
@@ -288,25 +300,38 @@ export class AiContentService {
 
         await this.slack.aiMessage({
           message: `updated campaign with ai. chatResponse: key: ${key}`,
-          error: chatResponse,
+          // LLM response content is string | null — context guarantees string but type does not
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          error: chatResponse as string,
         })
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      this.logger.error('error at consumer', e)
-      this.logger.error('messages', messages)
+    } catch (error) {
+      this.logger.error({ e: error }, 'error at consumer')
+      this.logger.error({ messages }, 'messages')
       generateError = true
 
-      if (e.data) {
+      // Extract API error data if present (e.g., from OpenAI/Together)
+      const apiErrorMessage =
+        error != null &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data != null &&
+        typeof error.data === 'object' &&
+        'error' in error.data &&
+        typeof error.data.error === 'string'
+          ? error.data.error
+          : undefined
+
+      if (apiErrorMessage) {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer (with msg): ',
-          error: e.data.error,
+          error: apiErrorMessage,
         })
         await this.slack.aiMessage({
           message: 'error at AI queue consumer (with msg): ',
-          error: e.data.error,
+          error: apiErrorMessage,
         })
-        this.logger.error('error', e.data?.error)
+        this.logger.error({ error: apiErrorMessage }, 'error')
       } else {
         await this.slack.errorMessage({
           message: 'error at AI queue consumer. Queue Message: ',
@@ -314,11 +339,11 @@ export class AiContentService {
         })
         await this.slack.errorMessage({
           message: 'error at AI queue consumer debug: ',
-          error: e,
+          error,
         })
         await this.slack.aiMessage({
           message: 'error at AI queue consumer debug: ',
-          error: e,
+          error,
         })
       }
     }
@@ -368,7 +393,7 @@ export class AiContentService {
           message: `Error at consumer updating campaign with ai. key: ${key}`,
           error: e,
         })
-        this.logger.error('error at consumer', e)
+        this.logger.error({ e }, 'error at consumer')
       }
       // throw an Error so that the message goes back to the queue or the DLQ.
       throw new Error(`error generating ai content. slug: ${slug}, key: ${key}`)

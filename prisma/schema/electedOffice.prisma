@@ -1,0 +1,31 @@
+model ElectedOffice {
+  id               String        @id @default(uuid(7))
+  organizationSlug String?       @unique @map("organization_slug")
+  organization     Organization? @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
+
+  electedDate    DateTime? @map("elected_date") @db.Date
+  swornInDate    DateTime? @map("sworn_in_date") @db.Date
+  termStartDate  DateTime? @map("term_start_date") @db.Date
+  termLengthDays Int?      @map("term_length_days")
+  termEndDate    DateTime? @map("term_end_date") @db.Date
+
+  isActive Boolean @default(true) @map("is_active")
+
+  user   User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int   @map("user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // temporary relationship to campaign
+  // goal would be to move away from the hard link to campaign, but is necessary for now
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: NoAction)
+  campaignId Int      @map("campaign_id")
+
+  polls                  Poll[]
+  pollIndividualMessages PollIndividualMessage[]
+
+  @@index([userId])
+  @@index([campaignId])
+  @@map("elected_office")
+}

@@ -1,20 +1,24 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { Prisma, VoterFileFilter } from '@prisma/client'
+import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
 
 @Injectable()
 export class VoterFileFilterService extends createPrismaBase(
   MODELS.VoterFileFilter,
 ) {
-  readonly logger = new Logger(VoterFileFilterService.name)
-
   async create(
     campaignId: number,
-    data: Omit<Prisma.VoterFileFilterCreateInput, 'campaign' | 'outreach'>,
+    organizationSlug: string | null,
+    data: Omit<
+      Prisma.VoterFileFilterCreateInput,
+      'campaign' | 'outreach' | 'organization'
+    >,
   ) {
     return this.model.create({
       data: {
         campaignId,
+        organizationSlug,
         ...data,
       },
     })
@@ -36,49 +40,96 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
+  findByCampaignId(campaignId: number): Promise<VoterFileFilter[]> {
+    return this.model.findMany({
+      where: { campaignId },
+      orderBy: { name: 'asc' },
+    })
+  }
+
+  findByIdAndCampaignId(
+    id: number,
+    campaignId: number,
+  ): Promise<VoterFileFilter | null> {
+    return this.findFirst({
+      where: { id, campaignId },
+    })
+  }
+
+  updateByIdAndCampaignId(
+    id: number,
+    campaignId: number,
+    data: UpdateVoterFileFilterSchema,
+  ): Promise<VoterFileFilter> {
+    return this.model.update({
+      where: { id, campaignId },
+      data,
+    })
+  }
+
+  deleteByIdAndCampaignId(
+    id: number,
+    campaignId: number,
+  ): Promise<VoterFileFilter> {
+    return this.model.delete({
+      where: { id, campaignId },
+    })
+  }
+
   // TODO: Fix the keys for the audience fields in the frontend so we don't have to do this mapping: https://goodparty.atlassian.net/browse/WEB-4277
   // NOTE: This function duplicates field mapping logic with transformRequestToFilters in P2P service.
   // Consider using the shared utility function mapAudienceFields from src/peerly/utils/audienceMapping.util.ts
   // in a future refactor to consolidate this logic and reduce code duplication.
   async voterFileFilterToAudience(idOrFilter: VoterFileFilter | number) {
     const {
-      audienceSuperVoters: audience_superVoters,
-      audienceLikelyVoters: audience_likelyVoters,
-      audienceUnreliableVoters: audience_unreliableVoters,
-      audienceUnlikelyVoters: audience_unlikelyVoters,
-      audienceFirstTimeVoters: audience_firstTimeVoters,
-      partyIndependent: party_independent,
-      partyDemocrat: party_democrat,
-      partyRepublican: party_republican,
-      age18_25: age_18_25,
-      age25_35: age_25_35,
-      age35_50: age_35_50,
-      age50Plus: age_50_plus,
-      genderMale: gender_male,
-      genderFemale: gender_female,
-    }: Partial<VoterFileFilter> = typeof idOrFilter === 'number'
-      ? await this.model.findUniqueOrThrow({ where: { id: idOrFilter } })
-      : idOrFilter
+      audienceSuperVoters,
+      audienceLikelyVoters,
+      audienceUnreliableVoters,
+      audienceUnlikelyVoters,
+      audienceFirstTimeVoters,
+      partyIndependent,
+      partyDemocrat,
+      partyRepublican,
+      age18_25,
+      age25_35,
+      age35_50,
+      age50Plus,
+      genderMale,
+      genderFemale,
+    }: Partial<VoterFileFilter> =
+      typeof idOrFilter === 'number'
+        ? await this.model.findUniqueOrThrow({ where: { id: idOrFilter } })
+        : idOrFilter
 
     return {
-      ...(audience_superVoters === true ? { audience_superVoters } : {}),
-      ...(audience_likelyVoters === true ? { audience_likelyVoters } : {}),
-      ...(audience_unreliableVoters === true
-        ? { audience_unreliableVoters }
+      ...(audienceSuperVoters === true
+        ? { audience_superVoters: audienceSuperVoters }
         : {}),
-      ...(audience_unlikelyVoters === true ? { audience_unlikelyVoters } : {}),
-      ...(audience_firstTimeVoters === true
-        ? { audience_firstTimeVoters }
+      ...(audienceLikelyVoters === true
+        ? { audience_likelyVoters: audienceLikelyVoters }
         : {}),
-      ...(party_independent === true ? { party_independent } : {}),
-      ...(party_democrat === true ? { party_democrat } : {}),
-      ...(party_republican === true ? { party_republican } : {}),
-      ...(age_18_25 === true ? { age_18_25 } : {}),
-      ...(age_25_35 === true ? { age_25_35 } : {}),
-      ...(age_35_50 === true ? { age_35_50 } : {}),
-      ...(age_50_plus === true ? { age_50_plus } : {}),
-      ...(gender_male === true ? { gender_male } : {}),
-      ...(gender_female === true ? { gender_female } : {}),
+      ...(audienceUnreliableVoters === true
+        ? { audience_unreliableVoters: audienceUnreliableVoters }
+        : {}),
+      ...(audienceUnlikelyVoters === true
+        ? { audience_unlikelyVoters: audienceUnlikelyVoters }
+        : {}),
+      ...(audienceFirstTimeVoters === true
+        ? { audience_firstTimeVoters: audienceFirstTimeVoters }
+        : {}),
+      ...(partyIndependent === true
+        ? { party_independent: partyIndependent }
+        : {}),
+      ...(partyDemocrat === true ? { party_democrat: partyDemocrat } : {}),
+      ...(partyRepublican === true
+        ? { party_republican: partyRepublican }
+        : {}),
+      ...(age18_25 === true ? { age_18_25: age18_25 } : {}),
+      ...(age25_35 === true ? { age_25_35: age25_35 } : {}),
+      ...(age35_50 === true ? { age_35_50: age35_50 } : {}),
+      ...(age50Plus === true ? { age_50_plus: age50Plus } : {}),
+      ...(genderMale === true ? { gender_male: genderMale } : {}),
+      ...(genderFemale === true ? { gender_female: genderFemale } : {}),
     }
   }
 }

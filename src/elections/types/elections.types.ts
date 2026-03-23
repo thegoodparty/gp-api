@@ -87,6 +87,16 @@ export enum DistrictSourceColumns {
   L2DistrictName = 'L2DistrictName',
 }
 
+export type DistrictTypeItem = {
+  id: string
+  L2DistrictType: string
+}
+
+export type DistrictNameItem = {
+  id: string
+  L2DistrictName: string
+}
+
 interface DistrictInfo {
   state: string
   L2DistrictType: string
@@ -108,16 +118,20 @@ interface ByYearAndCode {
 export type BuildRaceTargetDetailsInput = DistrictInfo &
   (ByDate | ByYearAndCode)
 
-export type PositionWithMatchedDistrict = {
-  positionId: string
+export type District = {
+  id: string
+  L2DistrictType: string
+  L2DistrictName: string
+  projectedTurnout: SourceProjectedTurnout | null
+}
+
+export type PositionWithOptionalDistrict = {
+  id: string
   brPositionId: string
   brDatabaseId: string
-  district: {
-    id: string
-    L2DistrictType: string
-    L2DistrictName: string
-    projectedTurnout: SourceProjectedTurnout
-  }
+  state: string
+  name: string
+  district?: District
 }
 
 type SourceProjectedTurnout = {

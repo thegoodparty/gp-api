@@ -1,24 +1,27 @@
+import { HttpModule } from '@nestjs/axios'
 import { Global, Module } from '@nestjs/common'
+import { FilesModule } from '@/files/files.module'
+import { AuthenticationModule } from '@/authentication/authentication.module'
+import { CrmModule } from '@/crm/crmModule'
+import { SlackModule } from '@/vendors/slack/slack.module'
+import { StripeModule } from '@/vendors/stripe/stripe.module'
+import { ClerkClientProvider } from '@/authentication/providers/clerk-client.provider'
+import { CrmUsersService } from './services/crmUsers.service'
 import { UsersService } from './services/users.service'
 import { UsersController } from './users.controller'
-import { FilesModule } from 'src/files/files.module'
-import { AuthenticationModule } from '../authentication/authentication.module'
-import { CrmModule } from '../crm/crmModule'
-import { CrmUsersService } from './services/crmUsers.service'
-import { HttpModule } from '@nestjs/axios'
-import { AnalyticsModule } from '../analytics/analytics.module'
 
 @Global()
 @Module({
   controllers: [UsersController],
-  providers: [UsersService, CrmUsersService],
+  providers: [UsersService, CrmUsersService, ClerkClientProvider],
   exports: [UsersService, CrmUsersService],
   imports: [
     FilesModule,
     AuthenticationModule,
     CrmModule,
     HttpModule,
-    AnalyticsModule,
+    SlackModule,
+    StripeModule,
   ],
 })
 export class UsersModule {}

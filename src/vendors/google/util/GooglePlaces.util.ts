@@ -5,12 +5,12 @@ import {
 } from '../../../shared/types/GooglePlaces.types'
 
 export const extractAddressComponent = (
-  { address_components }: GooglePlacesApiResponse,
+  { address_components: addressComponents }: GooglePlacesApiResponse,
   types: GoogleAddressPlace | GoogleAddressPlace[],
 ): GoogleAddressComponent | null => {
   const typeArray = Array.isArray(types) ? types : [types]
   return (
-    address_components.find((comp) =>
+    addressComponents.find((comp) =>
       typeArray.every((type) => comp.types.includes(type)),
     ) || null
   )

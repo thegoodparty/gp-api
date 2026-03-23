@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
@@ -6,8 +5,7 @@ import {
   CustomVoterFile,
   VoterFileType,
 } from '../voterFile.types'
-
-const logger = new Logger('Voter File Utils')
+import { PinoLogger } from 'nestjs-pino'
 
 const VOTER_FILE_LATEST_EVEN_YEAR = Number(
   process.env.VOTER_FILE_LATEST_EVEN_YEAR,
@@ -28,7 +26,13 @@ if (
   )
 }
 
+// TODO: This is an absolute MESS. Building raw queries like this is absolutely a
+//  recipe for disaster and the cyclomatic complexity here is off the charts ridiculous.
+//  We should NOT be querying the Voter DB directly like this.  We need to be calling
+//  the PeopleAPI to fetch the segment of voters we want. Rip this out and replace
+//  it with a call to the PeopleAPI: https://goodparty.clickup.com/t/90132012119/ENG-5032
 export function typeToQuery(
+  logger: PinoLogger,
   type: VoterFileType,
   campaign: CampaignWith<'pathToVictory'>,
   customFilters?: Pick<CustomVoterFile, 'channel' | 'filters' | 'purpose'>,
@@ -49,66 +53,89 @@ export function typeToQuery(
   let l2ColumnName = campaign.pathToVictory?.data.electionType
   const l2ColumnValue = campaign.pathToVictory?.data.electionLocation
 
-  // TODO: if these two are not present, should we throw an error?
-  if (l2ColumnName && l2ColumnValue) {
+  logger.debug(
+    `Building query: state=${state}, electionType=${l2ColumnName}, electionLocation=${l2ColumnValue}`,
+  )
+
+  // For statewide offices (electionType === 'State'), we skip the district filter.
+  // The voter tables are already state-specific (e.g., VoterCO), so querying that
+  // table already targets voters in that state and we don't need to filter by district
+  const isStatewideOffice = l2ColumnName === 'State'
+
+  if (!isStatewideOffice && (!l2ColumnName || !l2ColumnValue)) {
+    logger.warn(
+      `Missing L2 data for campaign ${campaign.id}. l2ColumnName: ${l2ColumnName}, l2ColumnValue: ${l2ColumnValue}`,
+    )
+    throw new Error(
+      'L2 data is required to generate voter file. Please ensure the campaign has been processed by PathToVictory and contains electionType and electionLocation data.',
+    )
+  }
+
+  if (l2ColumnName && l2ColumnValue && !isStatewideOffice) {
     // value is like "IN##CLARK##CLARK CNTY COMM DIST 1" we need just CLARK CNTY COMM DIST 1
-    const cleanValue = extractLocation(l2ColumnValue, fixColumns)
+    const cleanValue = extractLocation(logger, l2ColumnValue, fixColumns)
     if (fixColumns) {
-      logger.debug('before fix columns:', l2ColumnName)
+      logger.debug({ l2ColumnName }, 'before fix columns:')
       l2ColumnName = fixCityCountyColumns(l2ColumnName)
-      logger.debug('after fix columns:', l2ColumnName)
+      logger.debug({ l2ColumnName }, 'after fix columns:')
     }
-    whereClause += `("${l2ColumnName}" = '${cleanValue}' OR "${l2ColumnName}" = '${cleanValue} (EST.)') `
+    if (cleanValue) {
+      whereClause += `("${l2ColumnName}" = '${cleanValue}'
+      OR "${l2ColumnName}" = '${cleanValue} (EST.)'
+      OR "${l2ColumnName}" = '${cleanValue.replace(/^0/, '')}') `
+    }
+  } else if (isStatewideOffice) {
+    logger.debug('Statewide office - skipping district filter')
   }
 
   let columns: string
   if (selectedColumns?.length) {
     // Use selected columns
     columns = selectedColumns.map((col) => `"${col.db}"`).join(', ')
-  } else if (type === 'full') {
-    columns = `"LALVOTERID", 
-    "Voters_FirstName", 
-    "Voters_LastName", 
+  } else if (type === VoterFileType.full) {
+    columns = `"LALVOTERID",
+    "Voters_FirstName",
+    "Voters_LastName",
     "Parties_Description",
     "Voters_Gender",
     "Voters_Age",
     "Voters_VotingPerformanceEvenYearGeneral",
-    "Voters_VotingPerformanceEvenYearPrimary", 
+    "Voters_VotingPerformanceEvenYearPrimary",
     "Voters_VotingPerformanceEvenYearGeneralAndPrimary",
-    "Residence_Addresses_ApartmentType", 
-    "EthnicGroups_EthnicGroup1Desc", 
-    "Residence_Addresses_Latitude", 
-    "Residence_Addresses_Longitude", 
-    "Residence_HHParties_Description", 
-    "Mailing_Families_HHCount", 
+    "Residence_Addresses_ApartmentType",
+    "EthnicGroups_EthnicGroup1Desc",
+    "Residence_Addresses_Latitude",
+    "Residence_Addresses_Longitude",
+    "Residence_HHParties_Description",
+    "Mailing_Families_HHCount",
     "Voters_SequenceOddEven",
-    "VoterTelephones_CellPhoneFormatted", 
+    "VoterTelephones_CellPhoneFormatted",
     "VoterTelephones_CellConfidenceCode",
     "VoterParties_Change_Changed_Party",
     "Languages_Description",
-    "Residence_Addresses_AddressLine", 
-    "Residence_Addresses_ExtraAddressLine", 
+    "Residence_Addresses_AddressLine",
+    "Residence_Addresses_ExtraAddressLine",
     "Residence_Addresses_HouseNumber",
-    "Residence_Addresses_City", 
-    "Residence_Addresses_State", 
-    "Residence_Addresses_Zip", 
+    "Residence_Addresses_City",
+    "Residence_Addresses_State",
+    "Residence_Addresses_Zip",
     "Residence_Addresses_ZipPlus4",
-    "Mailing_Addresses_AddressLine", 
-    "Mailing_Addresses_ExtraAddressLine", 
-    "Mailing_Addresses_City", 
-    "Mailing_Addresses_State", 
-    "Mailing_Addresses_Zip", 
-    "Mailing_Addresses_ZipPlus4", 
-    "Mailing_Addresses_DPBC", 
-    "Mailing_Addresses_CheckDigit", 
-    "Mailing_Addresses_HouseNumber", 
-    "Mailing_Addresses_PrefixDirection", 
-    "Mailing_Addresses_StreetName", 
-    "Mailing_Addresses_Designator", 
-    "Mailing_Addresses_SuffixDirection", 
-    "Mailing_Addresses_ApartmentNum", 
-    "Mailing_Addresses_ApartmentType", 
-    "MaritalStatus_Description", 
+    "Mailing_Addresses_AddressLine",
+    "Mailing_Addresses_ExtraAddressLine",
+    "Mailing_Addresses_City",
+    "Mailing_Addresses_State",
+    "Mailing_Addresses_Zip",
+    "Mailing_Addresses_ZipPlus4",
+    "Mailing_Addresses_DPBC",
+    "Mailing_Addresses_CheckDigit",
+    "Mailing_Addresses_HouseNumber",
+    "Mailing_Addresses_PrefixDirection",
+    "Mailing_Addresses_StreetName",
+    "Mailing_Addresses_Designator",
+    "Mailing_Addresses_SuffixDirection",
+    "Mailing_Addresses_ApartmentNum",
+    "Mailing_Addresses_ApartmentType",
+    "MaritalStatus_Description",
     "Mailing_Families_FamilyID",
     "Mailing_Families_HHCount",
     "Mailing_HHParties_Description",
@@ -146,52 +173,43 @@ export function typeToQuery(
 
     columns += columnsSuffix
   } else {
-    columns = `"LALVOTERID", 
-    "Voters_FirstName", 
-    "Voters_LastName", 
+    columns = `"LALVOTERID",
+    "Voters_FirstName",
+    "Voters_LastName",
     "Parties_Description",
     "Voters_Gender",
     "Voters_Age"`
 
-    if (type === 'doorKnocking') {
-      columns += `, "Residence_Addresses_Latitude", 
-      "Residence_Addresses_Longitude", 
-      "Residence_Addresses_AddressLine", 
-      "Residence_Addresses_ExtraAddressLine", 
+    if (type === VoterFileType.doorKnocking) {
+      columns += `, "Residence_Addresses_Latitude",
+      "Residence_Addresses_Longitude",
+      "Residence_Addresses_AddressLine",
+      "Residence_Addresses_ExtraAddressLine",
       "Residence_Addresses_HouseNumber",
-      "Residence_Addresses_City", 
-      "Residence_Addresses_State", 
+      "Residence_Addresses_City",
+      "Residence_Addresses_State",
       "Residence_Addresses_Zip"`
     }
 
-    if (type === 'sms') {
-      columns += `, "VoterTelephones_CellPhoneFormatted"`
-      if (whereClause) {
-        whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-      } else {
-        whereClause += `"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
-      }
-    }
-
-    if (type === 'digitalAds') {
+    if (type === VoterFileType.digitalAds) {
       columns += `, "VoterTelephones_CellPhoneFormatted",
-      "Residence_Addresses_AddressLine", 
-      "Residence_Addresses_ExtraAddressLine", 
+      "Residence_Addresses_AddressLine",
+      "Residence_Addresses_ExtraAddressLine",
       "Residence_Addresses_HouseNumber",
-      "Residence_Addresses_City", 
-      "Residence_Addresses_State", 
+      "Residence_Addresses_City",
+      "Residence_Addresses_State",
       "Residence_Addresses_Zip"`
 
-      whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
+      whereClause += `${whereClause ? ' AND ' : ''}"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
     }
 
-    if (type === 'directMail') {
-      columns += `, "Mailing_Addresses_AddressLine", 
-      "Mailing_Addresses_ExtraAddressLine", 
-      "Mailing_Addresses_City", 
-      "Mailing_Addresses_State", 
-      "Mailing_Addresses_Zip", 
-      "Mailing_Addresses_ZipPlus4", 
+    if (type === VoterFileType.directMail) {
+      columns += `, "Mailing_Addresses_AddressLine",
+      "Mailing_Addresses_ExtraAddressLine",
+      "Mailing_Addresses_City",
+      "Mailing_Addresses_State",
+      "Mailing_Addresses_Zip",
+      "Mailing_Addresses_ZipPlus4",
       "Mailing_Families_HHCount"`
 
       nestedWhereClause = 'a'
@@ -208,11 +226,23 @@ export function typeToQuery(
       )`
     }
 
-    if (type === 'telemarketing' || type === 'robocall') {
+    if (
+      type === VoterFileType.telemarketing ||
+      type === VoterFileType.robocall
+    ) {
       columns += `, "VoterTelephones_LandlineFormatted",
       "Languages_Description"`
 
-      whereClause += ` AND "VoterTelephones_LandlineFormatted" IS NOT NULL`
+      whereClause += ` ${whereClause ? 'AND' : ''} "VoterTelephones_LandlineFormatted" IS NOT NULL`
+    }
+  }
+
+  if (type === VoterFileType.sms) {
+    columns += `, "VoterTelephones_CellPhoneFormatted"`
+    if (whereClause) {
+      whereClause += ` AND "VoterTelephones_CellPhoneFormatted" IS NOT NULL`
+    } else {
+      whereClause += `"VoterTelephones_CellPhoneFormatted" IS NOT NULL`
     }
   }
 
@@ -232,20 +262,34 @@ export function typeToQuery(
   }`
 }
 
-function extractLocation(input: string, fixColumns?: boolean) {
+function extractLocation(
+  logger: PinoLogger,
+  input: string,
+  fixColumns?: boolean,
+) {
   logger.debug(
     `Extracting location from: ${input} ${
       fixColumns ? '- with fixColumns' : ''
     }`,
   )
+  // ## denotes the old raw values coming from L2. If that's not present, we
+  //  don't need to do anything, it's already been normalized by our ETL pipeline.
+  if (!input.includes('##')) {
+    return input
+  }
+
+  // TODO: Figure out if we even need this.
+  //  I'm not event sure this works anymore. Given the example in typeToQuery,
+  //  "IN##CLARK##CLARK CNTY COMM DIST 1", this doesn't return "CLARK CNTY COMM DIST 1".
+  //  It just returns "CLARK": https://codesandbox.io/p/sandbox/4rs4vq
   const extracted = input.replace(/##$/, '')
 
-  const res = extracted
+  const location = extracted
     ?.split('##')
     ?.at(fixColumns ? 1 : -1)
     ?.replace(' (EST.)', '')
-  logger.debug('Extracted:', res)
-  return res
+  logger.debug({ location }, 'Extracted:')
+  return location
 }
 
 function fixCityCountyColumns(value: string) {
@@ -269,44 +313,44 @@ function customFiltersToQuery(filters: CustomFilter[]) {
   filters.forEach((filter) => {
     switch (filter) {
       case 'audience_superVoters':
-        filterConditions.audience.push(`CASE 
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$' 
+        filterConditions.audience.push(`CASE
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
                                           THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
                                           ELSE NULL
                                         END > 75`)
         break
       case 'audience_likelyVoters':
-        filterConditions.audience.push(`(CASE 
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$' 
+        filterConditions.audience.push(`(CASE
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
                                           THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
                                           ELSE NULL
-                                        END > 50 AND 
-                                        CASE 
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$' 
+                                        END > 50 AND
+                                        CASE
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
                                           THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
                                           ELSE NULL
                                         END <= 75)`)
         break
       case 'audience_unreliableVoters':
-        filterConditions.audience.push(`(CASE 
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$' 
+        filterConditions.audience.push(`(CASE
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
                                           THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
                                           ELSE NULL
-                                        END > 25 AND 
-                                        CASE 
-                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$' 
+                                        END > 25 AND
+                                        CASE
+                                          WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
                                           THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
                                           ELSE NULL
                                         END <= 50)`)
         break
       case 'audience_unlikelyVoters':
-        filterConditions.audience.push(`(CASE 
-                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$' 
+        filterConditions.audience.push(`(CASE
+                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
                                               THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
                                               ELSE NULL
-                                            END > 1 AND 
-                                            CASE 
-                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$' 
+                                            END > 1 AND
+                                            CASE
+                                              WHEN "Voters_VotingPerformanceEvenYearGeneral" ~ '^[0-9]+%$'
                                               THEN CAST(REPLACE("Voters_VotingPerformanceEvenYearGeneral", '%', '') AS numeric)
                                               ELSE NULL
                                             END <= 25)`)

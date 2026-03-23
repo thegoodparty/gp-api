@@ -1,9 +1,10 @@
-import { Campaign, CampaignTier } from '@prisma/client'
 import { faker } from '@faker-js/faker'
-import { STATE_CODES } from '../../src/shared/constants/states'
+import { Campaign, CampaignTier } from '@prisma/client'
+import { GenerationStatus } from '../../src/campaigns/ai/content/aiContent.types'
+import { CampaignLaunchStatus, OnboardingStep } from '@goodparty_org/contracts'
 import { LEVELS } from '../../src/shared/constants/governmentLevels'
+import { STATE_CODES } from '../../src/shared/constants/states'
 import { generateFactory } from './generate'
-import { GenerationStatus } from 'src/campaigns/ai/content/aiContent.types'
 
 export const campaignFactory = generateFactory<Campaign>(() => {
   const electionDate = faker.date.between({
@@ -13,6 +14,7 @@ export const campaignFactory = generateFactory<Campaign>(() => {
   const campaign = {
     createdAt: new Date(),
     updatedAt: faker.date.anytime(),
+    organizationSlug: null,
     slug: faker.lorem.words(5),
     isActive: faker.datatype.boolean(0.5),
     isVerified: faker.datatype.boolean(0.5),
@@ -29,6 +31,8 @@ export const campaignFactory = generateFactory<Campaign>(() => {
         verified_candidates: faker.helpers.arrayElement(['Yes', 'No']),
         office_type: faker.lorem.word(),
       },
+      currentStep: OnboardingStep.complete,
+      launchStatus: CampaignLaunchStatus.launched,
     },
     details: {
       state: faker.helpers.arrayElement(STATE_CODES),
@@ -61,6 +65,8 @@ export const campaignFactory = generateFactory<Campaign>(() => {
     },
     vendorTsData: {},
     canDownloadFederal: faker.datatype.boolean(0.3),
+    hasFreeTextsOffer: faker.datatype.boolean(0.2),
+    freeTextsOfferRedeemedAt: null,
   }
 
   // NOTE: putting this in the object literal above gives a TS error on the generationStatus key

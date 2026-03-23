@@ -1,7 +1,5 @@
-import { z } from 'zod'
+import { EmailSchema } from '@goodparty_org/contracts'
 import { toLowerAndTrim } from '../util/strings.util'
-
-export const EmailSchema = z.string().email()
 
 /** Schema for accepting email input value */
 export const WriteEmailSchema = EmailSchema.transform((v) =>

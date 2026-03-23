@@ -9,7 +9,10 @@ import { UserRole } from '@prisma/client'
 export class CampaignOwnerOrAdminGuard implements CanActivate {
   constructor(private campaignService: CampaignsService) {}
   async canActivate(context: ExecutionContext) {
-    const { user, params } = context.switchToHttp().getRequest()
+    const { user, params } = context.switchToHttp().getRequest<{
+      user: { id: number; roles: UserRole[] }
+      params: { id: string }
+    }>()
     const { id: campaignId } = params
     const campaign = await this.campaignService.findFirst({
       where: { id: parseInt(campaignId) },

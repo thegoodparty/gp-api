@@ -1,4 +1,10 @@
 import {
+  CampaignLaunchStatus,
+  CampaignStatus,
+  OnboardingStep,
+  type ListCampaignsPagination,
+} from '@goodparty_org/contracts'
+import {
   BadRequestException,
   forwardRef,
   Inject,
@@ -9,26 +15,41 @@ import { Campaign, Prisma, User } from '@prisma/client'
 import { deepmerge as deepMerge } from 'deepmerge-ts'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
-import { SlackService } from 'src/shared/services/slack.service'
+import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+} from 'src/shared/constants/paginationOptions.consts'
+import { PaginatedResults, WrapperType } from 'src/shared/types/utility.types'
 import { objectNotEmpty } from 'src/shared/util/objects.util'
 import { buildSlug } from 'src/shared/util/slug.util'
 import { UsersService } from 'src/users/services/users.service'
 import { getUserFullName } from 'src/users/util/users.util'
 import { GooglePlacesService } from 'src/vendors/google/services/google-places.service'
-import { parseIsoDateString } from '../../shared/util/date.util'
-import { StripeService } from '../../stripe/services/stripe.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
 import { AiContentInputValues } from '../ai/content/aiContent.types'
 import {
-  CampaignLaunchStatus,
   CampaignPlanVersionData,
-  CampaignStatus,
-  OnboardingStep,
   PlanVersion,
+  UpdateCampaignFieldsInput,
 } from '../campaigns.types'
-import { UpdateCampaignSchema } from '../schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './campaignPlanVersions.service'
 import { CrmCampaignsService } from './crmCampaigns.service'
+
+// Indirection to avoid a circular import at module load time:
+// campaigns.service → features.service → users.service → crmUsers.service → campaigns.service
+// Once CrmUsersService is decoupled from UsersService (or moved out of
+// the users module), FeaturesService can be injected directly and this
+// token + interface can be removed.
+export const FEATURE_FLAG_CHECKER = Symbol('FEATURE_FLAG_CHECKER')
+export interface FeatureFlagChecker {
+  isFeatureEnabled(params: { user: number; feature: string }): Promise<boolean>
+}
 
 enum CandidateVerification {
   yes = 'YES',
@@ -39,27 +60,91 @@ enum CandidateVerification {
 export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
   constructor(
     @Inject(forwardRef(() => UsersService))
-    private usersService: UsersService,
+    private usersService: WrapperType<UsersService>,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private readonly crm: CrmCampaignsService,
+    private readonly crm: WrapperType<CrmCampaignsService>,
     private readonly analytics: AnalyticsService,
     private planVersionService: CampaignPlanVersionsService,
     private readonly stripeService: StripeService,
     private readonly googlePlaces: GooglePlacesService,
     private readonly elections: ElectionsService,
     private readonly slack: SlackService,
+    @Inject(FEATURE_FLAG_CHECKER)
+    private readonly featureFlags: FeatureFlagChecker,
   ) {
     super()
+  }
+
+  private async shouldReplicateToEO(userId: number): Promise<boolean> {
+    const features = this.featureFlags
+    const isWinServeSplit = await features.isFeatureEnabled({
+      user: userId,
+      feature: 'win-serve-split',
+    })
+    return !isWinServeSplit
+  }
+
+  private async replicateOrgDataToLinkedEO(
+    tx: Prisma.TransactionClient,
+    campaignId: number,
+    orgData: {
+      positionId?: string | null
+      customPositionName?: string | null
+      overrideDistrictId?: string | null
+    },
+  ) {
+    const eo = await tx.electedOffice.findFirst({
+      where: { campaignId },
+      select: { organizationSlug: true },
+    })
+    if (!eo?.organizationSlug) return
+
+    await tx.organization.update({
+      where: { slug: eo.organizationSlug },
+      data: orgData,
+    })
   }
 
   findByUserId<T extends Prisma.CampaignInclude>(
     userId: Prisma.CampaignWhereInput['userId'],
     include?: T,
   ) {
+    // Prisma include query — TypeScript cannot narrow the included relations at compile time
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return this.findFirst({
       where: { userId },
       include,
     }) as Promise<Prisma.CampaignGetPayload<{ include: T }>>
+  }
+
+  async listCampaigns({
+    offset: skip = DEFAULT_PAGINATION_OFFSET,
+    limit = DEFAULT_PAGINATION_LIMIT,
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
+    userId,
+    slug,
+  }: ListCampaignsPagination): Promise<PaginatedResults<Campaign>> {
+    const where: Prisma.CampaignWhereInput = {
+      ...(userId ? { userId } : {}),
+      ...(slug
+        ? { slug: { contains: slug, mode: Prisma.QueryMode.insensitive } }
+        : {}),
+    }
+
+    return {
+      data: await this.model.findMany({
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        where,
+      }),
+      meta: {
+        total: await this.model.count({ where }),
+        offset: skip,
+        limit,
+      },
+    }
   }
 
   async create(args: Prisma.CampaignCreateArgs) {
@@ -90,35 +175,143 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       },
     })
   }
-  async createForUser(user: User) {
-    this.logger.debug('Creating campaign for user', user)
+  async createForUser(
+    user: User,
+    initialData: {
+      details: PrismaJson.CampaignDetails
+      data?: Record<string, unknown>
+    },
+  ) {
+    this.logger.debug(user, 'Creating campaign for user')
     const slug = await this.findSlug(user)
 
-    const newCampaign = await this.create({
-      data: {
-        slug,
-        isActive: false,
-        userId: user.id,
-        details: {
-          zip: user.zip,
+    const baseDetails: PrismaJson.CampaignDetails = { zip: user.zip }
+    const baseData: PrismaJson.CampaignData = {
+      slug,
+    }
+
+    const position = initialData.details.positionId
+      ? await this.elections.getPositionByBallotReadyId(
+          initialData.details.positionId,
+        )
+      : null
+
+    const customPositionName = !position
+      ? OrganizationsService.resolveCustomPositionName(
+          initialData.details.office,
+          initialData.details.otherOffice,
+        )
+      : null
+
+    const newCampaign = await this.client.$transaction(async (tx) => {
+      const [{ nextval: id }] = await tx.$queryRaw<[{ nextval: bigint }]>`
+        SELECT nextval('campaign_id_seq')`
+
+      const campaignId = Number(id)
+      const orgSlug = OrganizationsService.campaignOrgSlug(campaignId)
+
+      this.logger.info(
+        {
+          ballotReadyPositionId: initialData.details.positionId,
+          position,
+          campaignId,
+          orgSlug,
         },
+        'Creating organization',
+      )
+
+      await tx.organization.create({
         data: {
-          slug,
-          currentStep: OnboardingStep.registration,
+          slug: orgSlug,
+          ownerId: user.id,
+          positionId: position?.id ?? null,
+          customPositionName,
         },
-      },
+      })
+
+      return tx.campaign.create({
+        data: {
+          id: campaignId,
+          slug,
+          organizationSlug: orgSlug,
+          isActive: false,
+          userId: user.id,
+          // @ts-expect-error TS isn't smart enough to know that deepMerge will return
+          // a valid CampaignDetails
+          details: deepMerge(baseDetails, initialData.details),
+          data: initialData.data
+            ? deepMerge(baseData, initialData.data)
+            : baseData,
+        },
+      })
     })
-    this.logger.debug('Created campaign', newCampaign)
+    this.logger.debug({ newCampaign }, 'Created campaign')
     await this.crm.trackCampaign(newCampaign.id)
 
     return newCampaign
   }
 
-  async update(args: Prisma.CampaignUpdateArgs) {
-    const campaign = await this.model.update(args)
+  async update(args: Prisma.CampaignUpdateArgs & { where: { id: number } }) {
+    const hasDetailsUpdate = !!args.data.details
+
+    const existing = hasDetailsUpdate
+      ? await this.model.findUnique({ where: args.where })
+      : null
+
+    const incomingPositionId = args.data.details?.positionId
+    const ballotReadyPositionId = hasDetailsUpdate
+      ? incomingPositionId !== undefined
+        ? (incomingPositionId as string | null)
+        : (existing?.details?.positionId ?? null)
+      : null
+
+    const position = ballotReadyPositionId
+      ? await this.elections.getPositionByBallotReadyId(ballotReadyPositionId)
+      : null
+
+    const replicate =
+      hasDetailsUpdate && existing
+        ? await this.shouldReplicateToEO(existing.userId)
+        : false
+
+    const campaign = await this.client.$transaction(async (tx) => {
+      if (hasDetailsUpdate && existing) {
+        const orgSlug = OrganizationsService.campaignOrgSlug(args.where.id)
+        const mergedDetails = {
+          ...existing.details,
+          ...(typeof args.data.details === 'object' ? args.data.details : {}),
+        } as PrismaJson.CampaignDetails
+        const customPositionName = !position
+          ? OrganizationsService.resolveCustomPositionName(
+              mergedDetails.office,
+              mergedDetails.otherOffice,
+            )
+          : null
+
+        this.logger.info(
+          { ballotReadyPositionId, position, orgSlug },
+          'Updating organization',
+        )
+        const orgUpdate = {
+          positionId: position?.id ?? null,
+          customPositionName,
+          overrideDistrictId: null as string | null,
+        }
+        await tx.organization.update({
+          where: { slug: orgSlug },
+          data: orgUpdate,
+        })
+
+        if (replicate) {
+          await this.replicateOrgDataToLinkedEO(tx, args.where.id, orgUpdate)
+        }
+      }
+
+      return tx.campaign.update(args)
+    })
     const isPro = args?.data?.isPro
     if (isPro) {
-      this.analytics.identify(campaign?.userId, { isPro })
+      await this.analytics.identify(campaign?.userId, { isPro })
     }
     await this.crm.trackCampaign(campaign.id)
     return campaign
@@ -126,8 +319,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
   async updateJsonFields(
     id: number,
-    body: Omit<UpdateCampaignSchema, 'slug'>,
+    body: UpdateCampaignFieldsInput,
     trackCampaign: boolean = true,
+    scalarFields?: Prisma.CampaignUpdateInput,
   ) {
     const {
       data,
@@ -137,11 +331,46 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       formattedAddress,
       placeId,
       canDownloadFederal,
+      overrideDistrictId,
     } = body
+
+    let position: Awaited<
+      ReturnType<ElectionsService['getPositionByBallotReadyId']>
+    > = null
+
+    const needsReplication = !!(details || overrideDistrictId !== undefined)
+    let replicate = false
+    if (needsReplication) {
+      const owner = await this.model.findFirst({
+        where: { id },
+        select: { userId: true },
+      })
+      if (owner) {
+        replicate = await this.shouldReplicateToEO(owner.userId)
+      }
+    }
+
+    if (details) {
+      const existing = await this.model.findFirst({
+        where: { id },
+        select: { details: true },
+      })
+      const incomingPositionId = details.positionId
+      const ballotReadyPositionId =
+        incomingPositionId !== undefined
+          ? // Type narrowing from nullable/union — runtime context guarantees string but type is broader
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (incomingPositionId as string | null)
+          : (existing?.details?.positionId ?? null)
+
+      position = ballotReadyPositionId
+        ? await this.elections.getPositionByBallotReadyId(ballotReadyPositionId)
+        : null
+    }
 
     const updatedCampaign = await this.client.$transaction(
       async (tx) => {
-        this.logger.debug('Updating campaign json fields', { id, body })
+        this.logger.debug({ id, body }, 'Updating campaign json fields')
         // TODO: This should be .findUniqueOrThrow which would remove the need
         //  for the null check below and subsequently simplify the return
         //  signature of this method
@@ -154,7 +383,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
         if (!campaign) return false
 
         // Handle data and details JSON fields
-        const campaignUpdateData = {} as Prisma.CampaignUpdateInput
+        const campaignUpdateData: Prisma.CampaignUpdateInput = {
+          ...scalarFields,
+        }
         if (data) {
           campaignUpdateData.data = deepMerge(campaign.data as object, data)
         }
@@ -168,13 +399,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           campaignUpdateData.canDownloadFederal = canDownloadFederal
         }
         if (details) {
-          await this.handleSubscriptionCancelAtUpdate(campaign.details, details)
           const mergedDetails = deepMerge(
             campaign.details as object,
             details,
           ) as PrismaJson.CampaignDetails
           if (details?.customIssues) {
             // If this isn't done, customIssues' entries duplicate
+            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             mergedDetails.customIssues = details.customIssues as Array<{
               position: string
               title: string
@@ -182,6 +414,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           }
           if (details.runningAgainst) {
             // If this isn't done, runningAgainst's entries duplicate
+            // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             mergedDetails.runningAgainst = details.runningAgainst as Array<{
               name: string
               party: string
@@ -190,21 +424,68 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
           }
           campaignUpdateData.details = mergedDetails
         }
-        if (objectNotEmpty(aiContent as object)) {
+        if (objectNotEmpty(aiContent)) {
+          // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           campaignUpdateData.aiContent = deepMerge(
             (campaign.aiContent as object) || {},
             aiContent,
           ) as PrismaJson.CampaignAiContent
         }
 
-        // Update the campaign with JSON fields
+        if (details) {
+          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+          const merged =
+            // Prisma JSON column typed as JsonValue — prisma-json-types-generator cannot narrow here
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            campaignUpdateData.details as PrismaJson.CampaignDetails
+          const customPositionName = !position
+            ? OrganizationsService.resolveCustomPositionName(
+                merged.office,
+                merged.otherOffice,
+              )
+            : null
+          const detailsOrgUpdate = {
+            positionId: position?.id ?? null,
+            customPositionName,
+            overrideDistrictId: null as string | null,
+          }
+          await tx.organization.update({
+            where: { slug: orgSlug },
+            data: detailsOrgUpdate,
+          })
+
+          if (replicate) {
+            await this.replicateOrgDataToLinkedEO(
+              tx,
+              campaign.id,
+              detailsOrgUpdate,
+            )
+          }
+        }
+
+        if (overrideDistrictId !== undefined) {
+          const orgSlug = OrganizationsService.campaignOrgSlug(campaign.id)
+          const districtId = overrideDistrictId ?? null
+          await tx.organization.update({
+            where: { slug: orgSlug },
+            data: { overrideDistrictId: districtId },
+          })
+
+          if (replicate) {
+            await this.replicateOrgDataToLinkedEO(tx, campaign.id, {
+              overrideDistrictId: districtId,
+            })
+          }
+        }
+
         await tx.campaign.update({
           where: { id: campaign.id },
           data: campaignUpdateData,
         })
 
         // Handle pathToVictory relation separately if needed
-        if (objectNotEmpty(pathToVictory as object)) {
+        if (objectNotEmpty(pathToVictory)) {
           if (campaign.pathToVictory) {
             await tx.pathToVictory.update({
               where: { id: campaign.pathToVictory.id },
@@ -241,29 +522,15 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     // TODO: this should throw an exception if the update failed
     //  https://goodparty.atlassian.net/browse/WEB-4384
     if (updatedCampaign && trackCampaign) {
-      // Track campaign and user
+      if (scalarFields?.isPro) {
+        await this.analytics.identify(updatedCampaign.userId, {
+          isPro: scalarFields.isPro,
+        })
+      }
       await this.crm.trackCampaign(updatedCampaign.id)
     }
 
     return updatedCampaign ? updatedCampaign : null
-  }
-
-  private async handleSubscriptionCancelAtUpdate(
-    currentDetails: PrismaJson.CampaignDetails,
-    updateDetails: Partial<PrismaJson.CampaignDetails>,
-  ) {
-    const { subscriptionId } = currentDetails
-    const { electionDate: electionDateUpdateStr } = updateDetails
-
-    // If we're changing the electionDate and there's an existing subscriptionId,
-    //  then we need to also update the cancelAt date on the subscription
-    if (electionDateUpdateStr && subscriptionId) {
-      const electionDate = parseIsoDateString(electionDateUpdateStr)
-      await this.stripeService.setSubscriptionCancelAt(
-        subscriptionId,
-        electionDate,
-      )
-    }
   }
 
   async patchCampaignDetails(
@@ -279,8 +546,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       )
     }
     const { details: currentDetails } = currentCampaign
-
-    await this.handleSubscriptionCancelAtUpdate(currentDetails, details)
 
     const updatedDetails = {
       ...currentDetails,
@@ -319,9 +584,26 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     isPro: boolean = true,
     trackCampaign: boolean = true,
   ) {
+    const existingCampaign = await this.model.findUnique({
+      where: { id: campaignId },
+      select: {
+        isPro: true,
+        hasFreeTextsOffer: true,
+        freeTextsOfferRedeemedAt: true,
+      },
+    })
+
+    const isBecomingProFirstTime = !existingCampaign?.isPro && isPro
+    const hasNeverRedeemedFreeTexts =
+      !existingCampaign?.freeTextsOfferRedeemedAt
+    const shouldGrantOffer = isBecomingProFirstTime && hasNeverRedeemedFreeTexts
+
     const campaign = await this.model.update({
       where: { id: campaignId },
-      data: { isPro },
+      data: {
+        isPro,
+        ...(shouldGrantOffer && { hasFreeTextsOffer: true }),
+      },
     })
     // Must be in serial so as to not overwrite campaign details w/ concurrent queries
     await this.patchCampaignDetails(campaignId, {
@@ -331,9 +613,56 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     if (trackCampaign) {
       const updatedIsPro = campaign?.isPro
       if (updatedIsPro) {
-        this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
+        await this.analytics.identify(campaign?.userId, { isPro: updatedIsPro })
       }
       await this.crm.trackCampaign(campaignId)
+    }
+  }
+
+  async checkFreeTextsEligibility(campaignId: number): Promise<boolean> {
+    const campaign = await this.model.findUnique({
+      where: { id: campaignId },
+      select: { hasFreeTextsOffer: true },
+    })
+    return campaign?.hasFreeTextsOffer ?? false
+  }
+
+  async redeemFreeTexts(campaignId: number): Promise<void> {
+    const result = await this.client.$transaction(
+      async (tx) => {
+        const updatedCampaign = await tx.campaign.updateMany({
+          where: {
+            id: campaignId,
+            hasFreeTextsOffer: true,
+          },
+          data: {
+            hasFreeTextsOffer: false,
+            freeTextsOfferRedeemedAt: new Date(),
+          },
+        })
+
+        if (updatedCampaign.count === 0) {
+          throw new BadRequestException(
+            'No free texts offer available for this campaign',
+          )
+        }
+
+        const campaign = await tx.campaign.findUnique({
+          where: { id: campaignId },
+          select: { userId: true },
+        })
+
+        return campaign?.userId
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    )
+    if (result) {
+      this.analytics.track(result, EVENTS.Outreach.FreeTextsOfferRedeemed, {
+        campaignId,
+        redeemedAt: new Date().toISOString(),
+      })
     }
   }
 
@@ -393,14 +722,14 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     return this.model.deleteMany(args)
   }
 
-  async launch(user: User, campaign: Campaign) {
+  async launch(campaign: Campaign) {
     const campaignData = campaign.data
 
     if (
       campaign.isActive ||
       campaignData.launchStatus === CampaignLaunchStatus.launched
     ) {
-      this.logger.log('Campaign already launched, skipping launch')
+      this.logger.info('Campaign already launched, skipping launch')
       return true
     }
 
@@ -447,7 +776,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
       }
     }
 
-    return slug as never // should not happen
+    throw new InternalServerErrorException(
+      `Could not find unique slug for user ${user.id} after ${MAX_TRIES} attempts`,
+    )
   }
 
   async saveCampaignPlanVersion(inputs: {
@@ -456,7 +787,7 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     campaignId: number
     inputValues?: AiContentInputValues | AiContentInputValues[]
     regenerate: boolean
-    oldVersion: { date: Date; text: string }
+    oldVersion?: { date: Date; text: string }
   }) {
     const { aiContent, key, campaignId, inputValues, oldVersion, regenerate } =
       inputs
@@ -465,8 +796,8 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     let language = 'English'
     if (Array.isArray(inputValues) && inputValues.length > 0) {
       inputValues.forEach((inputValue) => {
-        if (inputValue?.language) {
-          language = inputValue.language as string
+        if (typeof inputValue?.language === 'string') {
+          language = inputValue.language
         }
       })
     }
@@ -486,9 +817,9 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     const existingVersions =
       await this.planVersionService.findByCampaignId(campaignId)
 
-    this.logger.log('existingVersions', existingVersions)
+    this.logger.info({ existingVersions }, 'existingVersions')
 
-    let versions = {}
+    let versions: CampaignPlanVersionData = {}
     if (existingVersions) {
       versions = existingVersions?.data as CampaignPlanVersionData
     }
@@ -518,7 +849,6 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
 
     if (updateExistingVersion === true) {
       for (let i = 0; i < versions[key].length; i++) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const version = versions[key][i]
         if (
           JSON.stringify(version.inputValues) === JSON.stringify(inputValues)
@@ -532,17 +862,19 @@ export class CampaignsService extends createPrismaBase(MODELS.Campaign) {
     }
 
     if (!foundKey && oldVersion) {
-      this.logger.log(`no key found for ${key} yet we have oldVersion`)
+      this.logger.info(`no key found for ${key} yet we have oldVersion`)
       // here, we determine if we need to save an older version of the content.
       // because in the past we didn't create a Content version for every new generation.
       // otherwise if they translate they won't have the old version to go back to.
-      versions[key].push(oldVersion)
+      versions[key].push({
+        ...oldVersion,
+        date: oldVersion.date.toString(),
+      })
     }
 
     if (updateExistingVersion === false) {
-      this.logger.log('adding new version')
+      this.logger.info('adding new version')
       // add new version to the top of the list.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const length = versions[key].unshift(newVersion)
       if (length > 10) {
         versions[key].length = 10

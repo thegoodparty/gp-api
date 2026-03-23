@@ -1,20 +1,16 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { ContentfulService } from '../../contentful/contentful.service'
+import { ContentfulService } from '../../vendors/contentful/contentful.service'
 import { Content, ContentType } from '@prisma/client'
 import { Entry } from 'contentful'
 import {
   CONTENT_TYPE_MAP,
   InferredContentTypes,
 } from '../CONTENT_TYPE_MAP.const'
-import {
-  AIChatPromptContents,
-  BlogArticleContentRaw,
-  findByTypeOptions,
-} from '../content.types'
+import { AIChatPromptContents, FindByTypeOptions } from '../content.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { ProcessTimersService } from '../../shared/services/process-timers.service'
-import { preProcessBlogArticleMeta } from '../util/preProcessBlogArticleMeta'
 import { InputJsonObject } from '@prisma/client/runtime/client'
+import { PinoLogger } from 'nestjs-pino'
 
 @Injectable()
 export class ContentService extends createPrismaBase(MODELS.Content) {
@@ -25,25 +21,10 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     super()
   }
 
-  async findAll() {
-    return this.findMany()
-  }
-
-  async findById(id: string) {
-    const content = await this.findFirstOrThrow({
-      where: {
-        id: {
-          equals: id,
-          mode: 'insensitive',
-        },
-      },
-    })
-
-    return this.transformContent(content.type, [content])?.[0]
-  }
-
-  async findByType({ type, take, orderBy, where }: findByTypeOptions) {
+  async findByType({ type, take, orderBy, where }: FindByTypeOptions) {
     const queryType =
+      // CMS content types use dynamic string keys — CONTENT_TYPE_MAP is indexed by runtime values
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       CONTENT_TYPE_MAP[type]?.inferredFrom || (type as ContentType)
 
     const whereCondition = Array.isArray(queryType)
@@ -68,19 +49,12 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     return this.transformContent(type, entries)
   }
 
-  async fetchGlossaryItems() {
-    const entries = await this.findMany({
-      where: {
-        type: ContentType.glossaryItem,
-      },
-    })
-    return this.transformContent(ContentType.glossaryItem, entries)
-  }
-
   async getAiContentPrompts() {
     const [onboardingPrompts, candidatePrompts] = await Promise.all([
       this.findByType({ type: ContentType.onboardingPrompts }),
-      this.findByType({ type: InferredContentTypes.candidateContentPrompts }),
+      this.findByType({
+        type: InferredContentTypes.candidateContentPrompts,
+      }),
     ])
     if (!onboardingPrompts || !candidatePrompts) {
       throw new InternalServerErrorException(
@@ -105,6 +79,8 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
 
     if (aiChatPrompts == null) throw Error('Failed to load system prompt')
 
+    // CMS content types use dynamic string keys — indexing by runtime key returns broad union
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const promptData = aiChatPrompts.data as AIChatPromptContents
 
     const initialPrompt = promptData.initialPrompt
@@ -152,8 +128,14 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     entries: Content[],
   ) {
     const timerId = this.timers.start(`TransformContent type: ${type}`)
-    const transformer = CONTENT_TYPE_MAP[type]?.transformer
-    const result = transformer ? transformer(entries) : entries
+    // CMS content types use dynamic string keys — CONTENT_TYPE_MAP is indexed by runtime values
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const transformer = CONTENT_TYPE_MAP[type]?.transformer as
+      | ((entries: Content[], logger: PinoLogger) => Content[])
+      | undefined
+    const result: Content[] = transformer
+      ? transformer(entries, this.logger)
+      : entries
     this.timers.end(timerId)
     return result
   }
@@ -171,49 +153,43 @@ export class ContentService extends createPrismaBase(MODELS.Content) {
     await this.client.$transaction(
       async (tx) => {
         for (const entry of updateEntries) {
-          const contentTypeDef = CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]
-          const record = await tx.content.update({
+          await tx.content.update({
             where: {
               id: entry.sys.id,
             },
             data: {
-              data: entry.fields as InputJsonObject,
+              data: {
+                ...entry.fields,
+                updateDate: new Date(entry.sys.updatedAt)
+                  .toISOString()
+                  .split('T')[0],
+              } as InputJsonObject,
             },
           })
-          if (contentTypeDef.name === ContentType.blogArticle) {
-            const blogArticleMeta = preProcessBlogArticleMeta(
-              record as BlogArticleContentRaw,
-            )
-            await tx.blogArticleMeta.update({
-              where: {
-                contentId: record.id,
-              },
-              data: blogArticleMeta,
-            })
-          }
         }
 
         for (const entry of createEntries) {
-          const contentTypeDef = CONTENT_TYPE_MAP[entry.sys.contentType.sys.id]
-          const contentRecord = {
-            id: entry.sys.id,
-            type: contentTypeDef.name,
-            data: entry.fields as InputJsonObject,
-          }
-          const record = await tx.content.create({
-            data: contentRecord,
+          // CMS content types use dynamic string keys — CONTENT_TYPE_MAP is indexed by runtime values
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const contentTypeDef = CONTENT_TYPE_MAP[
+            entry.sys.contentType.sys.id
+          ] as (typeof CONTENT_TYPE_MAP)[keyof typeof CONTENT_TYPE_MAP]
+          await tx.content.create({
+            data: {
+              id: entry.sys.id,
+              // CMS content types use dynamic string keys — CONTENT_TYPE_MAP is indexed by runtime values
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              type: contentTypeDef.name as ContentType,
+              data: {
+                ...entry.fields,
+                updateDate: new Date(entry.sys.updatedAt)
+                  .toISOString()
+                  .split('T')[0],
+              } as InputJsonObject,
+            },
           })
-          if (contentTypeDef.name === ContentType.blogArticle) {
-            const blogArticleMeta = preProcessBlogArticleMeta(
-              record as BlogArticleContentRaw,
-            )
-            await tx.blogArticleMeta.create({
-              data: blogArticleMeta,
-            })
-          }
         }
 
-        // No need to delete blogArticleMeta records, as they are cascade deleted
         await tx.content.deleteMany({
           where: {
             id: {

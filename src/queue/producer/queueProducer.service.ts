@@ -1,15 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { SQSClient, SQSClientConfig } from '@aws-sdk/client-sqs'
 import { Producer } from 'sqs-producer'
 import { Message } from '@ssut/nestjs-sqs/dist/sqs.types'
 import { queueConfig } from '../queue.config'
-
-export enum MessageGroup {
-  p2v = 'p2v',
-  content = 'content',
-  tcrCompliance = 'tcrCompliance',
-  default = 'default',
-}
+import { MessageGroup, QueueMessage } from '../queue.types'
+import { PinoLogger } from 'nestjs-pino'
 
 const config: SQSClientConfig = {
   region: process.env.AWS_REGION || '',
@@ -36,10 +31,13 @@ const producer = Producer.create({
 
 @Injectable()
 export class QueueProducerService {
-  private readonly logger = new Logger(QueueProducerService.name)
-  constructor() {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async sendMessage(msg: any, group: MessageGroup = MessageGroup.default) {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(QueueProducerService.name)
+  }
+  async sendMessage(
+    msg: QueueMessage,
+    group: MessageGroup | string = MessageGroup.default,
+  ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = JSON.stringify(msg)
 
@@ -47,15 +45,17 @@ export class QueueProducerService {
 
     const message: Message = {
       id: uuid,
-      body,
-      deduplicationId: uuid, // Required for FIFO queues
-      groupId: `gp-queue-${group}`, // Required for FIFO queues
+      // Type narrowing from nullable/union — runtime context guarantees string but type is broader
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      body: body as string,
+      deduplicationId: uuid,
+      groupId: `gp-queue-${group}`,
     }
 
     try {
       await producer.send(message)
     } catch (error) {
-      this.logger.error('error queueing message', error)
+      this.logger.error({ error }, 'error queueing message')
     }
   }
 }

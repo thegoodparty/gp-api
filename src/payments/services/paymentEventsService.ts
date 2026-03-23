@@ -1,27 +1,30 @@
 import {
   BadGatewayException,
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
-  Logger,
 } from '@nestjs/common'
-import { StripeService } from '../../stripe/services/stripe.service'
-import { WebhookEventType } from '../payments.types'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
+import { CheckoutSessionMode, WebhookEventType } from '../payments.types'
 import Stripe from 'stripe'
 import { CampaignsService } from '../../campaigns/services/campaigns.service'
 import { UsersService } from '../../users/services/users.service'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign, User } from '@prisma/client'
 import { DateFormats, formatDate } from '../../shared/util/date.util'
 import { getUserFullName } from '../../users/util/users.util'
 import { EmailService } from '../../email/email.service'
-import { EmailTemplateName } from '../../email/email.types'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { parseCampaignElectionDate } from '../../campaigns/util/parseCampaignElectionDate.util'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { WrapperType } from 'src/shared/types/utility.types'
+import { PurchaseService } from './purchase.service'
+import { PinoLogger } from 'nestjs-pino'
 
 const { STRIPE_WEBSOCKET_SECRET } = process.env
 if (!STRIPE_WEBSOCKET_SECRET) {
@@ -30,8 +33,6 @@ if (!STRIPE_WEBSOCKET_SECRET) {
 
 @Injectable()
 export class PaymentEventsService {
-  private readonly logger = new Logger(PaymentEventsService.name)
-
   constructor(
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
@@ -41,7 +42,12 @@ export class PaymentEventsService {
     private readonly voterFileDownloadAccess: VoterFileDownloadAccessService,
     private readonly stripeService: StripeService,
     private readonly analytics: AnalyticsService,
-  ) {}
+    @Inject(forwardRef(() => PurchaseService))
+    private readonly purchaseService: WrapperType<PurchaseService>,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PaymentEventsService.name)
+  }
 
   async handleEvent(event: Stripe.Event) {
     switch (event.type) {
@@ -69,6 +75,8 @@ export class PaymentEventsService {
       throw new BadRequestException('No subscriptionId found in subscription')
     }
 
+    // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = await this.usersService.findByCustomerId(customerId as string)
     if (!user) {
       throw new BadGatewayException(
@@ -104,6 +112,8 @@ export class PaymentEventsService {
       throw new BadRequestException('No customerId found in subscription')
     }
 
+    // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = await this.usersService.findByCustomerId(customerId as string)
     if (!user) {
       throw new BadGatewayException(
@@ -119,13 +129,6 @@ export class PaymentEventsService {
       )
     }
     const { id: campaignId } = campaign
-    const electionDate = parseCampaignElectionDate(campaign)
-
-    if (!electionDate || electionDate < new Date()) {
-      throw new BadGatewayException(
-        'No electionDate or electionDate is in the past',
-      )
-    }
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
     await this.campaignsService.patchCampaignDetails(campaignId, {
@@ -134,9 +137,7 @@ export class PaymentEventsService {
     await this.campaignsService.setIsPro(campaignId)
 
     await Promise.allSettled([
-      this.stripeService.setSubscriptionCancelAt(subscriptionId, electionDate),
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
-      this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
   }
@@ -163,30 +164,13 @@ export class PaymentEventsService {
       throw new BadGatewayException('No campaign found with given subscription')
     }
 
-    // The only way for us to determine if a user is resuming a subscription that
-    //  they previously requested to cancel, but haven't reached the end of
-    //  their pay period, is to do this check, and then reset the cancel_at date
-    //  to the election date for their campaign.
-    const isResumeEvent = !cancelAt && previousCancelAt
-    if (isResumeEvent) {
-      const electionDate = parseCampaignElectionDate(campaign)
-      if (!electionDate || electionDate < new Date()) {
-        throw new BadGatewayException(
-          'No electionDate or electionDate is in the past',
-        )
-      }
+    await this.campaignsService.patchCampaignDetails(campaign.id, {
+      subscriptionCanceledAt: canceledAt,
+      subscriptionCancelAt: cancelAt,
+    })
 
-      await this.stripeService.setSubscriptionCancelAt(
-        subscriptionId,
-        electionDate,
-      )
-    } else {
-      await this.campaignsService.patchCampaignDetails(campaign.id, {
-        subscriptionCanceledAt: canceledAt,
-        subscriptionCancelAt: cancelAt,
-      })
-    }
-
+    // Prisma optional relation — user is guaranteed by auth but Prisma types it as nullable
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const user = (await this.usersService.findByCampaign(campaign)) as User
     const isCancellationRequest =
       cancelAt && previousCancelAt && previousCancelAt > cancelAt
@@ -201,6 +185,23 @@ export class PaymentEventsService {
     event: Stripe.CheckoutSessionCompletedEvent,
   ) {
     const session = event.data.object
+
+    // Route to appropriate handler based on checkout session mode
+    if (session.mode === CheckoutSessionMode.SUBSCRIPTION) {
+      return this.handleSubscriptionCheckoutCompleted(session)
+    } else if (session.mode === CheckoutSessionMode.PAYMENT) {
+      return this.handleOneTimePaymentCheckoutCompleted(session)
+    }
+
+    this.logger.warn(`Unknown checkout session mode: ${session.mode}`)
+  }
+
+  /**
+   * Handles checkout.session.completed events for subscription checkouts (Pro plan).
+   */
+  private async handleSubscriptionCheckoutCompleted(
+    session: Stripe.Checkout.Session,
+  ) {
     const { customer: customerId, subscription: subscriptionId } = session
     if (!customerId) {
       throw new BadGatewayException('No customerId found in checkout session')
@@ -239,25 +240,93 @@ export class PaymentEventsService {
 
     // These have to happen in serial since setIsPro also mutates the JSONP details column
     await this.campaignsService.patchCampaignDetails(campaignId, {
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       subscriptionId: subscriptionId as string,
     })
     await this.campaignsService.setIsPro(campaignId)
 
-    this.analytics.trackProPayment(user.id, session)
+    // Track analytics with proper error handling
+    try {
+      await this.analytics.trackProPayment(user.id, session)
+    } catch (error) {
+      this.logger.error(
+        { error },
+        `[WEBHOOK] Failed to track pro payment analytics - User: ${user.id}, Session: ${session.id}`,
+      )
+      // Don't throw - we don't want to fail the webhook for analytics issues
+    }
 
-    return await Promise.allSettled([
-      this.usersService.patchUserMetaData(user.id, {
-        customerId: customerId as string,
-        checkoutSessionId: null,
-      }),
-      this.stripeService.setSubscriptionCancelAt(
-        subscriptionId as string,
-        electionDate,
-      ),
+    // Critical: Update user metadata with customerId - must succeed
+    await this.usersService.patchUserMetaData(user.id, {
+      // Stripe SDK uses broad union types — metadata and IDs are string | null | Stripe.* unions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      customerId: customerId as string,
+      checkoutSessionId: null,
+    })
+
+    // Non-critical: Send notifications - log failures but don't fail webhook
+    const results = await Promise.allSettled([
       this.sendProSignUpSlackMessage(user, campaign),
-      this.sendProConfirmationEmail(user, campaign),
       this.voterFileDownloadAccess.downloadAccessAlert(campaign, user),
     ])
+
+    // Log any notification failures
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const action = ['send Slack message', 'send voter file alert'][index]
+        this.logger.error(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          { reason: result.reason },
+          `[WEBHOOK] Failed to ${action} - User: ${user.id}, CustomerId: ${customerId}`,
+        )
+      }
+    })
+  }
+
+  /**
+   * Handles checkout.session.completed events for one-time payment checkouts.
+   * Routes to the appropriate post-purchase handler based on purchaseType in metadata.
+   *
+   * This handler is used for Custom Checkout Sessions created with `ui_mode: 'custom'`
+   * that support promo codes.
+   */
+  private async handleOneTimePaymentCheckoutCompleted(
+    session: Stripe.Checkout.Session,
+  ) {
+    const { id: sessionId, metadata } = session
+
+    if (!metadata?.userId) {
+      throw new BadGatewayException(
+        'No userId found in checkout session metadata',
+      )
+    }
+
+    if (!metadata?.purchaseType) {
+      throw new BadGatewayException(
+        'No purchaseType found in checkout session metadata',
+      )
+    }
+
+    this.logger.info({
+      sessionId,
+      purchaseType: metadata.purchaseType,
+      userId: metadata.userId,
+      msg: 'Processing one-time payment checkout session completion',
+    })
+
+    // Delegate to purchase service for post-purchase processing
+    try {
+      await this.purchaseService.completeCheckoutSession({
+        checkoutSessionId: sessionId,
+      })
+    } catch (error) {
+      this.logger.error(
+        { error },
+        `[WEBHOOK] Failed to complete checkout session - Session: ${sessionId}, PurchaseType: ${metadata.purchaseType}`,
+      )
+      throw error
+    }
   }
 
   async checkoutSessionExpiredHandler(
@@ -271,9 +340,19 @@ export class PaymentEventsService {
       )
     }
 
-    await this.usersService.patchUserMetaData(parseInt(userId), {
-      checkoutSessionId: null,
-    })
+    try {
+      await this.usersService.patchUserMetaData(parseInt(userId), {
+        checkoutSessionId: null,
+      })
+    } catch {
+      // User may not exist in this environment's database (e.g., session was
+      // created from a different environment sharing the same Stripe test key).
+      // Since this is just cleanup, log and move on rather than failing the webhook.
+      // Stripe retries when it receives a non-2xx response, so we don't want to cause repeated failures.
+      this.logger.warn(
+        `[WEBHOOK] Could not clear checkoutSessionId for userId ${userId} — user may not exist in this environment`,
+      )
+    }
   }
 
   async customerSubscriptionDeletedHandler(
@@ -304,19 +383,19 @@ export class PaymentEventsService {
     }
     const { metaData } = user
     if (metaData?.isDeleted) {
-      this.logger.log('User is already deleted')
+      this.logger.info('User is already deleted')
       return
     }
 
     await this.campaignsService.persistCampaignProCancellation(campaign)
+    await this.campaignsService.patchCampaignDetails(campaign.id, {
+      subscriptionCanceledAt: Date.now(),
+    })
     await this.sendProCancellationSlackMessage(user, campaign)
   }
 
   async sendProCancellationSlackMessage(user: User, campaign: Campaign) {
     const { details = {} } = campaign || {}
-    if (details.endOfElectionSubscriptionCanceled) {
-      return // don't send Slack message if subscription was canceled at end of election
-    }
     const { office, otherOffice } = details
     const fullName = getUserFullName(user)
 
@@ -369,32 +448,5 @@ export class PaymentEventsService {
       },
       IS_PROD ? SlackChannel.botPolitics : SlackChannel.botDev,
     )
-  }
-
-  async sendProConfirmationEmail(user: User, campaign: Campaign) {
-    const { details: campaignDetails } = campaign
-    const { electionDate: ISO8601DateString } = campaignDetails
-
-    const formattedCurrentDate = formatDate(new Date(), DateFormats.isoDate)
-    const electionDate =
-      ISO8601DateString && formatDate(ISO8601DateString, DateFormats.usDate)
-
-    const emailVars = {
-      userFullName: getUserFullName(user),
-      startDate: formattedCurrentDate,
-      ...(electionDate ? { electionDate } : {}),
-    }
-
-    try {
-      await this.emailService.sendTemplateEmail({
-        to: user.email,
-        subject: `Welcome to Pro! Let's Empower Your Campaign Together`,
-        template: EmailTemplateName.proConfirmation,
-        variables: emailVars,
-      })
-    } catch (e) {
-      this.logger.error('Error sending pro confirmation email', e)
-      throw e
-    }
   }
 }

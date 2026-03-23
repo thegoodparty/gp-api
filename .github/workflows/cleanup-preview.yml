@@ -1,0 +1,102 @@
+name: Cleanup Preview
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every 3 hours
+    - cron: "0 */3 * * *"
+
+jobs:
+  discover-stale-stacks:
+    runs-on: ubuntu-latest
+    outputs:
+      stacks: ${{ steps.find-stale.outputs.stacks }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: "^3"
+
+      - run: npm ci
+
+      - name: Find stale PR stacks
+        id: find-stale
+        working-directory: deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          pulumi login s3://goodparty-iac-state
+          npx tsx ../scripts/find-stale-preview-stacks.ts /tmp/stale-stacks.json
+          echo "stacks=$(cat /tmp/stale-stacks.json)" >> $GITHUB_OUTPUT
+
+  destroy:
+    needs: discover-stale-stacks
+    if: needs.discover-stale-stacks.outputs.stacks != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        stack: ${{ fromJson(needs.discover-stale-stacks.outputs.stacks) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: "^3"
+
+      - run: npm ci
+
+      - name: Destroy Stack
+        working-directory: ./deploy
+        env:
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+        run: |
+          # Login to S3 Backend
+          pulumi login s3://goodparty-iac-state
+
+          STACK_NAME="${{ matrix.stack }}"
+          echo "Destroying stack: $STACK_NAME"
+
+          if pulumi stack select "$STACK_NAME"; then
+            echo "Stack found. Destroying..."
+            pulumi destroy --yes --skip-preview
+            # This log group is created by ECS automatically and needs to be deleted manually
+            aws logs delete-log-group --log-group-name "/aws/ecs/containerinsights/gp-pr-${STACK_NAME#gp-api-pr-}-fargateCluster/performance" || true
+            pulumi stack rm --yes
+            echo "Stack $STACK_NAME destroyed successfully"
+          else
+            echo "Stack $STACK_NAME not found. Skipping."
+          fi

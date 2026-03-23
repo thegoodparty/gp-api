@@ -1,10 +1,18 @@
+import { ReqCampaign } from '@/campaigns/decorators/ReqCampaign.decorator'
+import { UseCampaign } from '@/campaigns/decorators/UseCampaign.decorator'
 import { BadRequestException, Body, Controller, Post } from '@nestjs/common'
-import { StripeService } from '../stripe/services/stripe.service'
+import { Campaign, User } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
+import { serializeError } from 'serialize-error'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
-import { Prisma, User } from '@prisma/client'
 import { UsersService } from '../users/services/users.service'
+import { StripeService } from '../vendors/stripe/services/stripe.service'
+import {
+  CompleteCheckoutSessionDto,
+  CompleteFreePurchaseDto,
+  CreateCheckoutSessionDto,
+} from './purchase.types'
 import { PurchaseService } from './services/purchase.service'
-import { CreatePurchaseIntentDto, CompletePurchaseDto } from './purchase.types'
 
 @Controller('payments/purchase')
 export class PurchaseController {
@@ -12,25 +20,18 @@ export class PurchaseController {
     private readonly stripeService: StripeService,
     private readonly usersService: UsersService,
     private readonly purchaseService: PurchaseService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(PurchaseController.name)
+  }
 
   @Post('checkout-session')
-  async createCheckoutSession(@ReqUser() user: User) {
+  async createProCheckoutSession(@ReqUser() user: User) {
+    const { email } = user
     const { redirectUrl, checkoutSessionId } =
-      await this.stripeService.createCheckoutSession(user.id)
-    const currentUserMetaData = (user.metaData as Prisma.JsonObject) || {}
+      await this.stripeService.createCheckoutSession(user.id, email)
 
-    await this.usersService.updateUser(
-      {
-        id: user.id,
-      },
-      {
-        metaData: {
-          ...currentUserMetaData,
-          checkoutSessionId,
-        },
-      },
-    )
+    await this.usersService.patchUserMetaData(user.id, { checkoutSessionId })
 
     return { redirectUrl }
   }
@@ -40,23 +41,84 @@ export class PurchaseController {
     const { metaData } = user
     const { customerId } = metaData || {}
     if (!customerId) {
-      throw new BadRequestException('User does not have a customerId')
+      throw new BadRequestException({
+        message: 'User does not have a customerId',
+        errorCode: 'BILLING_CUSTOMER_ID_MISSING',
+      })
     }
     const { url: redirectUrl } =
       await this.stripeService.createPortalSession(customerId)
     return { redirectUrl }
   }
 
-  @Post('create-intent')
-  async createPurchaseIntent(
+  /**
+   * Creates a Custom Checkout Session for one-time payments with promo code support.
+   * This is the new preferred method for purchases that should support promo codes.
+   *
+   * Migration reference: https://docs.stripe.com/payments/payment-element/migration-ewcs
+   */
+  @Post('create-checkout-session')
+  @UseCampaign()
+  async createCheckoutSession(
     @ReqUser() user: User,
-    @Body() dto: CreatePurchaseIntentDto,
+    @Body() dto: CreateCheckoutSessionDto<unknown>,
+    @ReqCampaign() campaign: Campaign,
   ) {
-    return this.purchaseService.createPurchaseIntent(user, dto)
+    try {
+      const result = await this.purchaseService.createCheckoutSession({
+        user,
+        dto,
+        campaign,
+      })
+      return result
+    } catch (error) {
+      this.logger.error({
+        err: serializeError(error),
+        user: user.id,
+        campaign,
+        dto,
+        msg: 'Error creating checkout session',
+      })
+      throw error
+    }
   }
 
-  @Post('complete')
-  async completePurchase(@Body() dto: CompletePurchaseDto) {
-    return this.purchaseService.completePurchase(dto)
+  /**
+   * Completes a purchase made via Checkout Session.
+   * Called after the user completes payment and is redirected back.
+   */
+  @Post('complete-checkout-session')
+  async completeCheckoutSession(@Body() dto: CompleteCheckoutSessionDto) {
+    return this.purchaseService.completeCheckoutSession(dto)
+  }
+
+  /**
+   * Completes a zero-amount (free) purchase by executing post-purchase handlers.
+   * Called when the user explicitly confirms a free purchase (e.g., clicks
+   * "Schedule text" after the free texts offer covers the entire cost).
+   * The campaignId is server-validated via @UseCampaign().
+   */
+  @Post('complete-free-purchase')
+  @UseCampaign()
+  async completeFreePurchase(
+    @ReqUser() user: User,
+    @Body() dto: CompleteFreePurchaseDto,
+    @ReqCampaign() campaign?: Campaign,
+  ) {
+    try {
+      return await this.purchaseService.completeFreePurchase({
+        dto,
+        campaign,
+        user,
+      })
+    } catch (error) {
+      this.logger.error({
+        err: serializeError(error),
+        campaign: campaign?.id,
+        dto,
+        msg: 'Error completing free purchase',
+      })
+      throw error
+    }
   }
 }

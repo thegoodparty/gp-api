@@ -40,6 +40,21 @@
 $ npm install
 ```
 
+### (Optional) Use Docker for postgres
+
+[Install Docker](https://docs.docker.com/get-started/get-docker/)
+
+```bash
+$ docker compose up -d
+
+# to stop docker
+$ docker compose stop
+
+# docker can also be managed in the docker dashboard of the desktop app
+```
+
+### Install Postgres locally (Not docker)
+
 - Create a Postgres database for the project to connect to. There are many ways to do this, below is an example using Homebrew on macOS:
 
   ```sh
@@ -68,7 +83,10 @@ $ npm install
   ALTER USER postgres CREATEDB;
   ```
 
+### Database Setup
+
 - Copy `.env.example` to `.env` and fill in the necessary environment variables.
+
 - Run the following command to create the database tables:
 
 ```bash
@@ -80,7 +98,7 @@ $ npm run migrate:reset
 
 ### Database Stop & Cleanup
 
-  Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
+Enter `\q` to exit the psql prompt and `brew services stop postgresql` to stop the postgres instance. To clean up the local database instance, reinstall with `brew reinstall postgresql`.
 
 ## Compile and run the project
 
@@ -114,9 +132,93 @@ You can run the tests in the Postman desktop app or you can run them using the P
 
 (This will eventually be automated to run in a npm/npx script to automatically fetch the collection and environment keys for you)
 
+### AWS Setup
+
+To set up your AWS CLI locally, run the following script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thegoodparty/gp-api/master/scripts/aws-setup.sh | bash
+```
+
+## Contracts Package (`@goodparty_org/contracts`)
+
+A shared Zod schema and TypeScript types package published to npm as `@goodparty_org/contracts`. It is consumed by `gp-sdk` and other projects to keep API request/response types in sync without duplication.
+
+The contracts source lives in the `contracts/` directory at the repo root and is managed as an npm workspace.
+
+### Local Development
+
+Contracts are built automatically as part of `npm run start:dev` and `npm run build` — no extra steps needed. A fresh clone workflow is:
+
+```bash
+npm install
+npm run start:dev
+```
+
+This runs Prisma client generation, contracts codegen + build, then starts the NestJS watcher.
+
+For live rebuilds of contracts source during development (e.g., when editing schemas for `gp-sdk` consumption):
+
+```bash
+cd contracts && npm run dev
+```
+
+### When You Modify a Contract Schema
+
+Add a changeset file before opening your PR:
+
+```bash
+cd contracts
+npx changeset
+```
+
+Follow the interactive prompt to select a semver bump type and write a summary, then commit the generated changeset file with your PR.
+
+### When You Modify a Prisma Enum
+
+Run `npm run generate` at the repo root first (to regenerate Prisma client), then:
+
+```bash
+cd contracts && npm run build
+```
+
+This regenerates the enum definitions in `contracts/src/generated/enums.ts`.
+
+### How Publishing Works
+
+Contracts are automatically published to npm when changes are merged to `master`. The `changesets/action` in CI opens a "Version Packages" PR to bump the version. Merging that PR triggers the actual npm publish.
+
+On `develop` and `qa` branches, contracts receive a snapshot version that is committed but not published.
+
+### Testing Against gp-sdk Locally
+
+Build contracts first, then use the path form of `npm link` from gp-sdk:
+
+```bash
+cd ~/dev/good-party/gp-api/contracts
+npm run build
+
+cd ~/dev/good-party/gp-sdk
+npm link ../gp-api/contracts
+```
+
+Run `npm run dev` in both `contracts/` and `gp-sdk/` for live rebuild chaining. To revert to the npm-published version:
+
+```bash
+cd ~/dev/good-party/gp-sdk
+npm unlink @goodparty_org/contracts
+npm install
+```
+
 ## Deployment
 
-Check out the README in the [deploy](./deploy) directory for more information on how the project is deployed.
+This project's deployment is managed via [Pulumi](https://www.pulumi.com/) within the [deploy](./deploy) directory.
+
+There is an in-tree CLI for interacting with the Pulumi stack: `npm run infra`.
+
+For example, to validate deployment changes, you can run `npm run infra diff <dev|qa|prod>` -- this will output a summary of changes that will be applied to the specified environment.
+
+> Note: You'll need to be authenticated via the AWS CLI locally before running `infra` commands.
 
 ## Resources
 
@@ -131,15 +233,9 @@ Check out a few resources that may come in handy when working with NestJS:
 - To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
 - Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
-## Support
+## AI-Assisted Development
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+We use [Claude Code](https://claude.ai/code) for AI-assisted development. Project-specific context lives in `CLAUDE.md` at the repo root. If you find yourself teaching the AI the same thing more than once, add it to `CLAUDE.md` so all future sessions (for the whole team) benefit.
 
 ## License
 

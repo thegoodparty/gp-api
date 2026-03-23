@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Param,
   Post,
   Put,
@@ -20,18 +19,20 @@ import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { CreateAiChatSchema } from './schemas/CreateAiChat.schema'
 import { AiChatService } from './aiChat.service'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { PromptReplaceCampaign } from 'src/ai/ai.service'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/ai/chat')
 @UsePipes(ZodValidationPipe)
 export class AiChatController {
-  private readonly logger = new Logger(AiChatController.name)
-
   constructor(
     private aiChatService: AiChatService,
     private slack: SlackService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiChatController.name)
+  }
 
   @Get()
   async list(@ReqUser() { id: userId }: User) {
@@ -39,9 +40,10 @@ export class AiChatController {
 
     const chats: { threadId: string; updatedAt: Date; name: string }[] = []
     for (const chat of aiChats) {
+      if (!chat.threadId) continue
       const chatData = chat.data
       chats.push({
-        threadId: chat.threadId as string,
+        threadId: chat.threadId,
         updatedAt: chat.updatedAt,
         name: chatData.messages?.length > 0 ? chatData.messages[0].content : '',
       })
@@ -86,18 +88,14 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.create(campaign, body)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      this.logger.error('Error generating AI chat', e)
+    } catch (error) {
+      this.logger.error({ e: error }, 'Error generating AI chat')
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
-        error: e,
+        error,
       })
-      if (e.data && e.data.error) {
-        this.logger.error('*** error*** :', e.data.error)
-      }
-
-      throw e
+      this.logApiErrorData(error)
+      throw error
     }
   }
 
@@ -122,18 +120,14 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.update(threadId, campaign, body)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      this.logger.error('Error generating AI chat', e)
+    } catch (error) {
+      this.logger.error({ e: error }, 'Error generating AI chat')
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
-        error: e,
+        error,
       })
-      if (e.data && e.data.error) {
-        this.logger.error('*** error*** :', e.data.error)
-      }
-
-      throw e
+      this.logApiErrorData(error)
+      throw error
     }
   }
 
@@ -146,7 +140,7 @@ export class AiChatController {
     try {
       return await this.aiChatService.delete(threadId, userId)
     } catch (e) {
-      this.logger.error('Error at ai/chat/delete', e)
+      this.logger.error({ e }, 'Error at ai/chat/delete')
       throw e
     }
   }
@@ -160,17 +154,26 @@ export class AiChatController {
   ) {
     try {
       return await this.aiChatService.feedback(user, threadId, body)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      this.logger.error('Error giving AI chat feedback', e)
+    } catch (error) {
+      this.logger.error({ e: error }, 'Error giving AI chat feedback')
       await this.slack.errorMessage({
         message: 'Error generating AI chat',
-        error: e,
+        error,
       })
-      if (e.data && e.data.error) {
-        this.logger.log('*** error*** :', e.data.error)
-      }
-      throw e
+      this.logApiErrorData(error)
+      throw error
     }
+  }
+
+  private logApiErrorData(error: unknown) {
+    if (error == null || typeof error !== 'object') return
+    if (
+      !('data' in error) ||
+      error.data == null ||
+      typeof error.data !== 'object'
+    )
+      return
+    if (!('error' in error.data) || typeof error.data.error !== 'string') return
+    this.logger.error({ error: error.data.error }, '*** error*** :')
   }
 }

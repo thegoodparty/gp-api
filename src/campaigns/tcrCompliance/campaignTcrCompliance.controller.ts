@@ -22,14 +22,11 @@ import { Campaign, TcrComplianceStatus, User } from '@prisma/client'
 import { UsersService } from '../../users/services/users.service'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { CampaignsService } from '../services/campaigns.service'
-import { submitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
+import { SubmitCampaignVerifyPinDto } from './schemas/submitCampaignVerifyPinDto.schema'
 import { ReqUser } from '../../authentication/decorators/ReqUser.decorator'
-import {
-  MessageGroup,
-  QueueProducerService,
-} from '../../queue/producer/queueProducer.service'
-import { QueueType } from '../../queue/queue.types'
-import { getTwelveHoursFromDate } from '../../shared/util/date.util'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/tcr-compliance')
 @UsePipes(ZodValidationPipe)
@@ -38,8 +35,11 @@ export class CampaignTcrComplianceController {
     private readonly userService: UsersService,
     private readonly tcrComplianceService: CampaignTcrComplianceService,
     private readonly campaignsService: CampaignsService,
-    private queueService: QueueProducerService,
-  ) {}
+    private readonly analytics: AnalyticsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(CampaignTcrComplianceController.name)
+  }
 
   @Get('mine')
   @UseCampaign()
@@ -67,10 +67,16 @@ export class CampaignTcrComplianceController {
         'TCR compliance already exists for this campaign',
       )
     }
+
     const { placeId, formattedAddress, ...tcrComplianceCreatePayload } =
       tcrComplianceDto
     const { ein, committeeName } = tcrComplianceCreatePayload
     const user = await this.userService.findByCampaign(campaign)
+
+    if (!user) {
+      throw new NotFoundException('User not found for this campaign')
+    }
+
     const updatedCampaign = await this.campaignsService.updateJsonFields(
       campaign.id,
       {
@@ -89,11 +95,26 @@ export class CampaignTcrComplianceController {
       )
     }
 
-    return this.tcrComplianceService.create(
-      user!,
+    const result = await this.tcrComplianceService.create(
+      user,
       updatedCampaign,
       tcrComplianceCreatePayload,
     )
+
+    try {
+      await this.analytics.track(
+        user.id,
+        EVENTS.Outreach.ComplianceFormSubmitted,
+        { source: 'compliance_flow' },
+      )
+    } catch (e) {
+      this.logger.error(
+        { e },
+        `Failed to track compliance form submitted event for user ${user.id}`,
+      )
+    }
+
+    return result
   }
 
   private readonly retrieveTcrCompliance = async (
@@ -121,7 +142,7 @@ export class CampaignTcrComplianceController {
   @HttpCode(HttpStatus.OK)
   async submitCampaignVerifyPIN(
     @Param('id') tcrComplianceId: string,
-    @Body() { pin }: submitCampaignVerifyPinDto,
+    @Body() { pin }: SubmitCampaignVerifyPinDto,
     @ReqUser() user: User,
     @ReqCampaign() campaign: Campaign,
   ) {
@@ -144,28 +165,30 @@ export class CampaignTcrComplianceController {
 
     const campaignVerifyBrand =
       await this.tcrComplianceService.submitCampaignVerifyToken(
-        user,
         tcrCompliance,
         campaignVerifyToken,
       )
 
-    const { peerlyIdentityId } = await this.tcrComplianceService.model.update({
+    await this.tcrComplianceService.model.update({
       where: { id: tcrCompliance.id },
       data: {
         status: TcrComplianceStatus.pending,
       },
     })
 
-    await this.queueService.sendMessage(
-      {
-        type: QueueType.TCR_COMPLIANCE_STATUS_CHECK,
-        data: {
-          peerlyIdentityId,
-          processTime: getTwelveHoursFromDate().toISOString(),
-        },
-      },
-      MessageGroup.tcrCompliance,
-    )
+    try {
+      await this.analytics.track(
+        user.id,
+        EVENTS.Outreach.CompliancePinSubmitted,
+        { source: 'compliance_flow' },
+      )
+    } catch (e) {
+      // TODO: Alert on this.
+      this.logger.error(
+        { e },
+        `Failed to track compliance PIN submitted event for user ${user.id}`,
+      )
+    }
 
     return campaignVerifyBrand
   }

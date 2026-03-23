@@ -6,6 +6,8 @@ enum CampaignTier {
 
 model Campaign {
   id                    Int                     @id @default(autoincrement())
+  organizationSlug      String?                 @unique @map("organization_slug")
+  organization          Organization?           @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
   slug                  String                  @unique
@@ -35,6 +37,9 @@ model Campaign {
   campaignPlanVersion   CampaignPlanVersion?
   aiChats               AiChat[]
   ecanvasser            Ecanvasser?
+  completedTaskIds      String[]                @default([]) @map("completed_task_ids")
+  hasFreeTextsOffer     Boolean                 @default(false) @map("has_free_texts_offer")
+  freeTextsOfferRedeemedAt DateTime?            @map("free_texts_offer_redeemed_at")
   ScheduledMessage      ScheduledMessage[]
   tcrCompliance         TcrCompliance?
   voterFileFilters      VoterFileFilter[]
@@ -43,6 +48,7 @@ model Campaign {
   communityIssue        CommunityIssue[]
   campaignTasks         CampaignTask[]
   campaignPlan          CampaignPlan?
+  electedOffices        ElectedOffice[]
 
   @@index([slug])
   @@map("campaign")

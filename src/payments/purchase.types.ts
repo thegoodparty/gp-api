@@ -1,45 +1,44 @@
+import type { OutreachPurchaseMetadata } from '../outreach/types/outreach.types'
+import type { DomainPurchaseMetadata } from '../websites/domains.types'
+import Stripe from 'stripe'
 export enum PurchaseType {
   DOMAIN_REGISTRATION = 'DOMAIN_REGISTRATION',
   TEXT = 'TEXT',
+  POLL = 'POLL',
 }
 
 export interface BasePurchaseMetadata {
   campaignId?: number
 }
 
-export type PurchaseMetadata<
-  T extends BasePurchaseMetadata = BasePurchaseMetadata,
-> = T
-
-export interface CreatePurchaseIntentDto<
-  T extends BasePurchaseMetadata = BasePurchaseMetadata,
-> {
+export interface CreateCheckoutSessionDto<Metadata> {
   type: PurchaseType
-  metadata: PurchaseMetadata<T>
+  metadata: Metadata
+  returnUrl?: string
 }
 
-export interface CompletePurchaseDto {
-  paymentIntentId: string
+export interface CompleteCheckoutSessionDto {
+  checkoutSessionId: string
 }
 
-export type PostPurchaseHandler<
-  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  TResult = unknown,
-> = (
-  paymentIntentId: string,
-  metadata: PurchaseMetadata<TMetadata>,
-) => Promise<TResult>
+export type FreePurchaseMetadata =
+  | OutreachPurchaseMetadata
+  | DomainPurchaseMetadata
+  | BasePurchaseMetadata
 
-export interface PurchaseHandler<
-  TMetadata extends BasePurchaseMetadata = BasePurchaseMetadata,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  TResult = unknown,
-> {
-  validatePurchase(metadata: PurchaseMetadata<TMetadata>): Promise<void>
-  calculateAmount(metadata: PurchaseMetadata<TMetadata>): Promise<number>
-  executePostPurchase?(
-    paymentIntentId: string,
-    metadata: PurchaseMetadata<TMetadata>,
-  ): Promise<TResult>
+export interface CompleteFreePurchaseDto {
+  purchaseType: PurchaseType
+  metadata: FreePurchaseMetadata
+}
+
+export type CheckoutSessionPostPurchaseHandler<Metadata> = (
+  sessionId: string,
+  metadata: Metadata,
+) => Promise<unknown>
+
+export interface PurchaseHandler<Metadata> {
+  validatePurchase(metadata: Metadata): Promise<void | Stripe.PaymentIntent>
+  calculateAmount(metadata: Metadata): Promise<number>
+  getProductName?(metadata: Metadata): string
+  getProductDescription?(metadata: Metadata): string | undefined
 }

@@ -22,8 +22,17 @@ export class CreateOutreachSchema extends createZodDto(
       voterFileFilterId: z.coerce.number().int().positive().optional(),
       phoneListId: z.coerce.number().int().positive().optional(),
       // P2P-specific fields
-      identityId: z.string().optional(),
-      didState: z.string().optional(),
+      didState: z
+        .string()
+        .regex(
+          /^([A-Z]{2}|USA)$/,
+          'didState must be a 2-letter US state code or "USA"',
+        )
+        .optional(),
+      didNpaSubset: z
+        .array(z.string().regex(/^\d{3}$/, 'Each area code must be 3 digits'))
+        .max(50, 'didNpaSubset cannot exceed 50 area codes')
+        .optional(),
       title: z.string().optional(),
     })
     .strict()
@@ -33,13 +42,6 @@ export class CreateOutreachSchema extends createZodDto(
           path: ['phoneListId'],
           code: z.ZodIssueCode.custom,
           message: 'Phone list ID is required for P2P outreach',
-        })
-      }
-      if (data.outreachType === OutreachType.p2p && !data.identityId) {
-        ctx.addIssue({
-          path: ['identityId'],
-          code: z.ZodIssueCode.custom,
-          message: 'Identity ID is required for P2P outreach',
         })
       }
       if (data.outreachType === OutreachType.p2p && !data.script) {

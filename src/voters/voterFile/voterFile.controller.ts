@@ -1,38 +1,44 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Param,
+  ParseIntPipe,
   Post,
+  Put,
   Query,
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { VoterFileService } from './voterFile.service'
-import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
-import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
-import { CanDownloadVoterFileGuard } from './guards/CanDownloadVoterFile.guard'
-import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { Campaign, User, UserRole, VoterFileFilter } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
-import { Campaign, User, UserRole } from '@prisma/client'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
+import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
+import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
+import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { userHasRole } from 'src/users/util/users.util'
+import { OutreachService } from '../../outreach/services/outreach.service'
+import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
+import { CreateVoterFileFilterSchema } from '../schemas/CreateVoterFileFilterSchema'
+import { UpdateVoterFileFilterSchema } from '../schemas/UpdateVoterFileFilterSchema'
+import { VoterFileFilterService } from '../services/voterFileFilter.service'
+import { VoterOutreachService } from '../services/voterOutreach.service'
+import { CanDownloadVoterFileGuard } from './guards/CanDownloadVoterFile.guard'
+import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
 import { ScheduleOutreachCampaignSchema } from './schemas/ScheduleOutreachCampaign.schema'
-import { VoterOutreachService } from '../services/voterOutreach.service'
-import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { userHasRole } from 'src/users/util/users.util'
-import { CampaignsService } from 'src/campaigns/services/campaigns.service'
-import { VoterFileFilterService } from '../services/voterFileFilter.service'
-import { CreateVoterFileFilterSchema } from '../schemas/CreateVoterFileFilterSchema'
-import { OutreachService } from '../../outreach/services/outreach.service'
+import { VoterFileService } from './voterFile.service'
+import { PinoLogger } from 'nestjs-pino'
 
-export const VOTER_FILE_ROUTE = 'voters/voter-file'
-
-@Controller(VOTER_FILE_ROUTE)
+@Controller('voters/voter-file')
 @UsePipes(ZodValidationPipe)
 export class VoterFileController {
   constructor(
@@ -42,7 +48,11 @@ export class VoterFileController {
     private readonly campaigns: CampaignsService,
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
-  ) {}
+    private readonly electedOfficeService: ElectedOfficeService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(VoterFileController.name)
+  }
 
   @Get()
   @UseCampaign({
@@ -86,10 +96,16 @@ export class VoterFileController {
     @ReqCampaign() campaign: Campaign,
     @Body() { outreachId, audienceRequest }: ScheduleOutreachCampaignSchema,
   ) {
-    const outreach = await this.outreachService.model.findUniqueOrThrow({
-      where: { id: outreachId },
+    const outreach = await this.outreachService.model.findFirst({
+      where: { id: outreachId, campaignId: campaign.id },
       include: { voterFileFilter: true },
     })
+    if (!outreach) {
+      this.logger.warn(
+        `Outreach not found for schedule: outreachId=${outreachId}, campaignId=${campaign.id}. Ensure the client uses the outreach id from the POST /outreach 201 response.`,
+      )
+      throw new NotFoundException('Outreach not found')
+    }
     return this.voterOutreachService.scheduleOutreachCampaign(
       user,
       campaign,
@@ -121,10 +137,81 @@ export class VoterFileController {
 
   @Post('filter')
   @UseCampaign()
-  createVoterFileFilter(
+  async createVoterFileFilter(
     @ReqCampaign() campaign: Campaign,
     @Body() voterFileFilter: CreateVoterFileFilterSchema,
   ) {
-    return this.voterFileFilterService.create(campaign.id, voterFileFilter)
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    if (!campaign.isPro && !electedOffice) {
+      throw new BadRequestException('Campaign is not pro')
+    }
+    const campaignFilter = await this.voterFileFilterService.create(
+      campaign.id,
+      campaign.organizationSlug,
+      voterFileFilter,
+    )
+    if (electedOffice) {
+      await this.voterFileFilterService.create(
+        campaign.id,
+        electedOffice.organizationSlug,
+        voterFileFilter,
+      )
+    }
+    return campaignFilter
+  }
+
+  @Get('filters')
+  @UseCampaign()
+  listVoterFileFilters(@ReqCampaign() campaign: Campaign) {
+    return this.voterFileFilterService.findByCampaignId(campaign.id)
+  }
+
+  @Get('filter/:id')
+  @UseCampaign()
+  async getVoterFileFilter(
+    @Param('id', ParseIntPipe) id: number,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const filter: VoterFileFilter | null =
+      await this.voterFileFilterService.findByIdAndCampaignId(id, campaign.id)
+    if (!filter) {
+      throw new NotFoundException('Voter file filter not found')
+    }
+    return filter
+  }
+
+  @Put('filter/:id')
+  @UseCampaign()
+  async updateVoterFileFilter(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateVoterFileFilterSchema,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    const electedOffice =
+      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
+    if (!campaign.isPro && !electedOffice) {
+      throw new BadRequestException('Campaign is not pro')
+    }
+    const filter: VoterFileFilter | null =
+      await this.voterFileFilterService.findByIdAndCampaignId(id, campaign.id)
+    if (!filter) {
+      throw new NotFoundException('Voter file filter not found')
+    }
+    return this.voterFileFilterService.updateByIdAndCampaignId(
+      id,
+      campaign.id,
+      body,
+    )
+  }
+
+  @Delete('filter/:id')
+  @UseCampaign()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteVoterFileFilter(
+    @Param('id', ParseIntPipe) id: number,
+    @ReqCampaign() campaign: Campaign,
+  ) {
+    await this.voterFileFilterService.deleteByIdAndCampaignId(id, campaign.id)
   }
 }

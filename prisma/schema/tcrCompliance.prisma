@@ -6,10 +6,19 @@ enum TcrComplianceStatus {
   error
 }
 
-enum MatchingContactFieldType {
-  email
-  postalAddress
-  phone
+enum OfficeLevel {
+  federal
+  state
+  local
+}
+
+// Committee types that map to Peerly's committee_type field.
+// See: https://api-docs.peerly.com/reference/submit-campaign-verify-request
+enum CommitteeType {
+  HOUSE        @map("house")
+  SENATE       @map("senate")
+  PRESIDENTIAL @map("presidential")
+  CANDIDATE    @map("candidate")
 }
 
 model TcrCompliance {
@@ -21,13 +30,15 @@ model TcrCompliance {
   filingUrl             String                     @map("filing_url")
   phone                 String
   email                 String
+  officeLevel           OfficeLevel                @map("office_level")
+  fecCommitteeId        String?                    @map("fec_committee_id")
+  committeeType         CommitteeType              @default(CANDIDATE) @map("committee_type")
   status                TcrComplianceStatus?       @default(submitted)
   tdlcNumber            String?                    @map("tdlc_number")
   createdAt             DateTime                   @default(now()) @map("created_at")
   updatedAt             DateTime                   @updatedAt @map("updated_at")
   campaign              Campaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   campaignId            Int                        @unique @map("campaign_id")
-  matchingContactFields MatchingContactFieldType[] @default([]) @map("matching_contact_fields")
 
   peerlyIdentityId              String? @unique @map("peerly_identity_id")
   peerlyRegistrationLink        String? @map("peerly_registration_link")

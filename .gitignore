@@ -5,14 +5,11 @@ api/dist
 # Node.js runtime environment
 node_modules
 nestjs/node_modules
-sst/node_modules
 
-# SST specific
-.sst
-sst-env.d.ts
-deploy/sst-env.d.ts
-deploy/.sst
-.build
+# Pulumi
+deploy/Pulumi.*.yaml
+!deploy/Pulumi.yaml
+deploy/bin/
 
 # Logs
 logs
@@ -29,6 +26,13 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/test-scripts
+/postman
+/newman
+/test-results
+/e2e-tests/test-results
+/e2e-tests/playwright-report
+/e2e-tests/postman-old-tests
 
 # IDEs and editors
 /.vscode
@@ -49,7 +53,6 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
-sst/.env
 /nestjs/.env
 /nestjs/.env.development.local
 /nestjs/.env.test.local
@@ -66,13 +69,22 @@ pids
 *.seed
 *.pid.lock
 
+# build cache
+.eslintcache
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Script output
+scripts/output/
 
 # just junior dev stuff
 ztestfile
 
+# Script output
+scripts/*.csv
+
 # AI Tooling
 .ai
-CLAUDE.md
 repomix.config.json
+src/generated/route-types.ts

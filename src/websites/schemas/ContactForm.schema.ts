@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod'
-import { EmailSchema, PhoneSchema } from 'src/shared/schemas'
+import { EmailSchema, PhoneSchema } from '@goodparty_org/contracts'
 import { z } from 'zod'
 
 export class ContactFormSchema extends createZodDto(

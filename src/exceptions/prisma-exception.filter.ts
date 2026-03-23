@@ -3,9 +3,9 @@ import {
   Catch,
   ExceptionFilter,
   HttpStatus,
-  Logger,
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 const prismaErrorClasses = [
   Prisma.PrismaClientKnownRequestError,
@@ -17,19 +17,33 @@ const prismaErrorClasses = [
 
 @Catch(...prismaErrorClasses)
 export class PrismaExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(PrismaExceptionFilter.name)
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(PrismaExceptionFilter.name)
+  }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  catch(exception: any, host: ArgumentsHost) {
+  catch(
+    exception: Prisma.PrismaClientKnownRequestError | Error,
+    host: ArgumentsHost,
+  ) {
     const ctx = host.switchToHttp()
-    const response = ctx.getResponse()
-    const request = ctx.getRequest()
+    const response: {
+      status: (code: number) => {
+        send: (body: Record<string, (() => string) | string | number>) => void
+      }
+    } = ctx.getResponse()
+    const request: { url: string; method: string } = ctx.getRequest()
 
     let statusCode: HttpStatus | null = null
     let message: string | null = null
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      this.logger.error(exception, exception.meta)
+      this.logger.error(
+        {
+          err: exception,
+          meta: exception.meta,
+        },
+        'Encountered known prisma exception',
+      )
       switch (exception.code) {
         case 'P2002': // Unique constraint violation
           statusCode = HttpStatus.CONFLICT
@@ -63,19 +77,24 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     }
 
     this.logger.error(
-      `Exception caught: ${message}`,
-      exception.stack || 'No stack trace available',
       {
-        url: request.url,
-        method: request.method,
+        err: exception,
+        url: (request as { url: string }).url,
+        method: (request as { method: string }).method,
         statusCode,
       },
+      `Exception caught: ${message}`,
     )
 
-    response.status(statusCode).send({
+    const typedResponse = response as {
+      status: (code: number) => {
+        send: (body: Record<string, (() => string) | string | number>) => void
+      }
+    }
+    typedResponse.status(statusCode).send({
       statusCode,
       timestamp: new Date().toISOString,
-      path: request.url,
+      path: (request as { url: string }).url,
       error: message,
     })
   }

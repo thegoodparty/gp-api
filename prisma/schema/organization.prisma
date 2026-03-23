@@ -1,0 +1,16 @@
+model Organization {
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at")
+  slug               String            @id
+  owner              User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId            Int               @map("owner_id")
+  positionId         String?           @map("position_id")
+  overrideDistrictId String?           @map("override_district_id")
+  customPositionName String?           @map("custom_position_name")
+  campaign           Campaign?
+  electedOffice      ElectedOffice?
+  voterFileFilters   VoterFileFilter[]
+
+  @@index([ownerId])
+  @@map("organization")
+}

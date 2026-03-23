@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import usStates from 'states-us'
 import { HubSpot } from '../../crm/crm.types'
 import {
@@ -8,7 +8,7 @@ import {
 } from '@hubspot/api-client/lib/codegen/crm/companies'
 import { HubspotService } from '../../crm/hubspot.service'
 import { CampaignsService } from './campaigns.service'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Campaign, Prisma, User } from '@prisma/client'
 import { getUserFullName } from '../../users/util/users.util'
 import { formatDateForCRM } from '../../crm/util/cms.util'
@@ -18,52 +18,55 @@ import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/
 import { AssociationTypes } from '@hubspot/api-client'
 import { AiChatService } from '../ai/chat/aiChat.service'
 import { PathToVictoryService } from '../../pathToVictory/services/pathToVictory.service'
-import { pick } from '../../shared/util/objects.util'
-import { SlackChannel } from '../../shared/services/slackService.types'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
-import { EcanvasserIntegrationService } from '../../ecanvasserIntegration/services/ecanvasserIntegration.service'
+import { EcanvasserIntegrationService } from '../../vendors/ecanvasserIntegration/services/ecanvasserIntegration.service'
 import {
   CRMCompanyProperties,
   CRMCompanyPropertiesSchema,
 } from 'src/crm/schemas/CRMCompanyProperties.schema'
+import { WrapperType } from 'src/shared/types/utility.types'
 import {
   P2V_LOCKED_STATUS,
   P2VStatus,
 } from 'src/elections/types/pathToVictory.types'
-import { CampaignCreatedBy, OnboardingStep } from '../campaigns.types'
+import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
+import { PinoLogger } from 'nestjs-pino'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 const HUBSPOT_COMPANY_PROPERTIES = Object.values(HubSpot.IncomingProperty)
 
 @Injectable()
 export class CrmCampaignsService {
-  private readonly logger = new Logger(this.constructor.name)
   constructor(
     @Inject(forwardRef(() => CampaignsService))
-    private readonly campaigns: CampaignsService,
+    private readonly campaigns: WrapperType<CampaignsService>,
     @Inject(forwardRef(() => UsersService))
-    private readonly users: UsersService,
+    private readonly users: WrapperType<UsersService>,
     private readonly hubspot: HubspotService,
     @Inject(forwardRef(() => CrmUsersService))
-    private readonly crmUsers: CrmUsersService,
+    private readonly crmUsers: WrapperType<CrmUsersService>,
+    private readonly organizations: OrganizationsService,
     private readonly aiChat: AiChatService,
-    private readonly pathToVictory: PathToVictoryService,
+    @Inject(forwardRef(() => PathToVictoryService))
+    private readonly pathToVictory: WrapperType<PathToVictoryService>,
     private readonly voterFile: VoterFileDownloadAccessService,
     private readonly slack: SlackService,
     private readonly ecanvasser: EcanvasserIntegrationService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(this.constructor.name)
+  }
 
   async getCrmCompanyById(hubspotId: string) {
     try {
-      return await this.hubspot.throttleRequest(() =>
-        this.hubspot.client.crm.companies.basicApi.getById(
-          hubspotId,
-          HUBSPOT_COMPANY_PROPERTIES,
-        ),
+      return await this.hubspot.client.crm.companies.basicApi.getById(
+        hubspotId,
+        HUBSPOT_COMPANY_PROPERTIES,
       )
     } catch (error) {
       const message = 'hubspot error - get-company-by-id'
-      this.logger.error(message, error)
-      this.slack.errorMessage({
+      this.logger.error({ error }, message)
+      await this.slack.errorMessage({
         message,
         error,
       })
@@ -72,13 +75,13 @@ export class CrmCampaignsService {
 
   private async getCompanyOwner(companyOwnerId: number) {
     try {
-      return await this.hubspot.throttleRequest(() =>
-        this.hubspot.client.crm.owners.ownersApi.getById(companyOwnerId),
+      return await this.hubspot.client.crm.owners.ownersApi.getById(
+        companyOwnerId,
       )
     } catch (error) {
       const message = 'hubspot error - get-company-owner'
-      this.logger.error(message, error)
-      this.slack.errorMessage({
+      this.logger.error({ error }, message)
+      await this.slack.errorMessage({
         message,
         error,
       })
@@ -93,10 +96,12 @@ export class CrmCampaignsService {
     }
     try {
       return await this.getCompanyOwner(
+        // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         parseInt(crmCompany?.properties?.hubspot_owner_id as string),
       )
     } catch (e) {
-      this.logger.error('error getting crm company owner', e)
+      this.logger.error({ e }, 'error getting crm company owner')
     }
   }
 
@@ -111,27 +116,25 @@ export class CrmCampaignsService {
   private async createCompany(companyObj: CRMCompanyProperties) {
     let crmCompany: SimplePublicObject | null = null
     try {
-      crmCompany = await this.hubspot.throttleRequest(() =>
-        this.hubspot.client.crm.companies.basicApi.create({
-          properties: companyObj,
-        }),
-      )
+      crmCompany = await this.hubspot.client.crm.companies.basicApi.create({
+        properties: companyObj,
+      })
     } catch (error) {
-      this.logger.error('error creating company', error)
-      this.slack.errorMessage({
+      this.logger.error({ error }, 'error creating company')
+      await this.slack.errorMessage({
         message: `Error creating company for ${companyObj.candidate_name} in hubspot`,
         error,
       })
     }
 
     if (!crmCompany) {
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message: `Error creating company for ${companyObj.candidate_name} in hubspot. No response from hubspot.`,
       })
       return
     }
 
-    this.logger.debug('CRM Company created:', crmCompany)
+    this.logger.debug(crmCompany, 'CRM Company created:')
 
     return crmCompany
   }
@@ -143,16 +146,17 @@ export class CrmCampaignsService {
     let crmCompany: SimplePublicObject
 
     try {
-      crmCompany = await this.hubspot.throttleRequest(() =>
-        this.hubspot.client.crm.companies.basicApi.update(hubspotId, {
+      crmCompany = await this.hubspot.client.crm.companies.basicApi.update(
+        hubspotId,
+        {
           properties: crmCompanyProperties,
-        }),
+        },
       )
     } catch (e) {
       const { candidate_name: name } = crmCompanyProperties
-      this.logger.error('error updating crm', e)
+      this.logger.error({ e }, 'error updating crm')
       if (e instanceof ApiException && e.code === 404) {
-        this.slack.errorMessage({
+        await this.slack.errorMessage({
           message: `Could not find hubspot company for ${name} with hubspotId ${hubspotId}`,
           error: e,
         })
@@ -166,7 +170,7 @@ export class CrmCampaignsService {
             },
           }))
       } else {
-        this.slack.errorMessage({
+        await this.slack.errorMessage({
           message: `Error updating company for ${name} with existing hubspotId: ${hubspotId} in hubspot`,
           error: e,
         })
@@ -187,6 +191,8 @@ export class CrmCampaignsService {
       id: campaignId,
     } = campaign || {}
     const user: User =
+      // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (await this.users.findByCampaign(campaign)) || ({} as User)
     const aiChatCount = userId
       ? await this.aiChat.count({ where: { id: userId } })
@@ -220,23 +226,17 @@ export class CrmCampaignsService {
     const {
       zip,
       party,
-      office,
       ballotLevel,
-      level: _level,
       state,
       pledged,
-      campaignCommittee: _campaignCommittee,
-      otherOffice,
       district,
       city,
-      website: _website,
       runForOffice,
       electionDate,
       primaryElectionDate,
       filingPeriodsStart,
       filingPeriodsEnd,
       isProUpdatedAt,
-      subscriptionCanceledAt: _subscriptionCanceledAt,
     } = campaignDetails || {}
 
     const canDownloadVoterFile = this.voterFile.canDownload({
@@ -254,7 +254,11 @@ export class CrmCampaignsService {
     const filingStartMs = formatDateForCRM(filingPeriodsStart)
     const filingEndMs = formatDateForCRM(filingPeriodsEnd)
     const lastStepDateMs = formatDateForCRM(lastStepDate)
-    const resolvedOffice = office === 'Other' ? otherOffice : office
+    const positionName = campaign.organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
 
     const longState = usStates.find(
       (usState) => usState.abbreviation === state?.toUpperCase(),
@@ -265,7 +269,7 @@ export class CrmCampaignsService {
       ? HubSpot.ProSubStatus.ACTIVE
       : HubSpot.ProSubStatus.INACTIVE
 
-    const p2v_status =
+    const p2vStatusValue =
       p2vNotNeeded || !p2vStatus
         ? P2V_LOCKED_STATUS
         : totalRegisteredVoters
@@ -304,7 +308,7 @@ export class CrmCampaignsService {
       candidate_email: user?.email,
       candidate_name: name,
       name: name,
-      candidate_office: resolvedOffice,
+      candidate_office: positionName ?? undefined,
       office_level: ballotLevel,
       candidate_party: party,
       candidate_state: longState,
@@ -350,7 +354,7 @@ export class CrmCampaignsService {
         typeof score === 'number'
           ? Math.floor(score > 5 ? 5 : score)
           : undefined,
-      p2v_status: p2v_status,
+      p2v_status: p2vStatusValue,
       totalregisteredvoters: totalRegisteredVoters
         ? Number(totalRegisteredVoters)
         : undefined,
@@ -370,11 +374,14 @@ export class CrmCampaignsService {
     if (!validated.success) {
       // Handle validation errors
       const msg = `CRM Push cancelled - validation failed for campaign slug: ${campaign.slug}.`
-      this.logger.error(msg, {
-        errors: validated.error.errors,
-        fields: fieldsToSync,
-      })
-      this.slack.errorMessage({
+      this.logger.error(
+        {
+          errors: validated.error.errors,
+          fields: fieldsToSync,
+        },
+        msg,
+      )
+      await this.slack.errorMessage({
         message: msg,
         error: validated.error,
       })
@@ -399,8 +406,10 @@ export class CrmCampaignsService {
     }
 
     try {
-      await this.hubspot.throttleRequest(() =>
-        this.hubspot.client.crm.associations.v4.batchApi.create('0-2', '0-1', {
+      await this.hubspot.client.crm.associations.v4.batchApi.create(
+        '0-2',
+        '0-1',
+        {
           inputs: [
             {
               _from: { id: crmCompanyId },
@@ -414,7 +423,7 @@ export class CrmCampaignsService {
               ],
             },
           ],
-        }),
+        },
       )
     } catch (error) {
       this.logger.error({
@@ -439,7 +448,7 @@ export class CrmCampaignsService {
       return
     }
 
-    this.logger.debug('CRM Company Properties:', crmCompanyProperties)
+    this.logger.debug(crmCompanyProperties, 'CRM Company Properties:')
 
     let crmCompany: SimplePublicObject | undefined
     if (existingHubspotId) {
@@ -461,7 +470,7 @@ export class CrmCampaignsService {
     if (!user) {
       const message = `No user found for campaign ${campaignId}`
       this.logger.error(message)
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message,
       })
       return
@@ -473,7 +482,7 @@ export class CrmCampaignsService {
     if (!crmContactId) {
       const message = `No hubspot id found for user ${userId}`
       this.logger.debug(message)
-      this.slack.errorMessage({
+      await this.slack.errorMessage({
         message,
       })
       try {
@@ -481,8 +490,8 @@ export class CrmCampaignsService {
         crmContactId = crmContact?.id
       } catch (error) {
         this.logger.error(
+          { error },
           `Error tracking user for campaign ${campaignId} in hubspot`,
-          error,
         )
         return
       }
@@ -516,7 +525,7 @@ export class CrmCampaignsService {
       await this.associateCompanyWithContact(crmContactId, crmCompanyId)
     } catch (e) {
       const message = `Error associating user ${userId}. hubspot id: ${crmContactId} to campaign ${campaign.id} in hubspot`
-      this.logger.error(message, e)
+      this.logger.error({ e }, message)
       await this.slack.errorMessage({
         message,
         error: e,
@@ -542,14 +551,15 @@ export class CrmCampaignsService {
       },
     }
 
-    if (propertyName === HubSpot.IncomingProperty.verified_candidates) {
+    if (propertyName === String(HubSpot.IncomingProperty.verified_candidates)) {
       updatePayload.isVerified =
-        propertyValue.toLowerCase() === HubSpot.VerifiedCandidate.YES
+        propertyValue.toLowerCase() === String(HubSpot.VerifiedCandidate.YES)
     }
 
-    if (propertyName === HubSpot.IncomingProperty.election_results) {
+    if (propertyName === String(HubSpot.IncomingProperty.election_results)) {
       updatePayload.didWin =
-        propertyValue.toLowerCase() === HubSpot.ElectionResult.WON_GENERAL
+        propertyValue.toLowerCase() ===
+        String(HubSpot.ElectionResult.WON_GENERAL)
     }
 
     this.campaigns.update({
@@ -573,7 +583,7 @@ export class CrmCampaignsService {
         updated++
       } catch (error) {
         failures.push(campaignId)
-        this.logger.error('error updating campaign', error)
+        this.logger.error({ error }, 'error updating campaign')
         await this.slack.errorMessage({
           message: `Error updating campaign ${campaignId} in hubspot`,
           error,
@@ -674,7 +684,7 @@ export class CrmCampaignsService {
 
   private logBatchProgress(offset: number, batchSize: number, count: number) {
     const batchNumber = Math.floor(offset / batchSize) + 1
-    this.logger.log(`Processing batch ${batchNumber}: ${count} campaigns`)
+    this.logger.info(`Processing batch ${batchNumber}: ${count} campaigns`)
   }
 
   private async processCampaignBatch(
@@ -693,7 +703,10 @@ export class CrmCampaignsService {
           companyUpdateMap.set(updateObject.id, updateObject)
         }
       } catch (error) {
-        this.logger.error(`Error processing campaign ${campaign.id}:`, error)
+        this.logger.error(
+          { error },
+          `Error processing campaign ${campaign.id}:`,
+        )
       }
     }
 
@@ -704,6 +717,8 @@ export class CrmCampaignsService {
     campaign: Campaign,
     fields: Array<keyof CRMCompanyProperties | 'all'>,
   ): Promise<SimplePublicObjectBatchInput | null> {
+    // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const id = campaign.data.hubspotId as string
     const crmCompanyProperties =
       await this.calculateCRMCompanyProperties(campaign)
@@ -717,6 +732,8 @@ export class CrmCampaignsService {
       fields,
     )
 
+    // HubSpot SDK types are loosely typed — properties bag is Record<string, string>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return { id, properties } as SimplePublicObjectBatchInput
   }
 
@@ -751,16 +768,14 @@ export class CrmCampaignsService {
     }
 
     try {
-      const updates = await this.hubspot.throttleRequest(() =>
-        this.hubspot.client.crm.companies.batchApi.update({
-          inputs: companyUpdateObjects,
-        }),
-      )
+      const updates = await this.hubspot.client.crm.companies.batchApi.update({
+        inputs: companyUpdateObjects,
+      })
       const updatedCount = updates?.results?.length || 0
-      this.logger.log(`Batch completed: ${updatedCount} companies updated`)
+      this.logger.info(`Batch completed: ${updatedCount} companies updated`)
       return updatedCount
     } catch (error) {
-      this.logger.error('Error updating batch in HubSpot:', error)
+      this.logger.error({ error }, 'Error updating batch in HubSpot:')
       await this.slack.errorMessage({
         message: `Error updating batch of ${companyUpdateObjects.length} companies in HubSpot`,
         error,
@@ -774,151 +789,5 @@ export class CrmCampaignsService {
       global.gc()
     }
     await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-
-  /** Pulls Hubspot data and updates campaign
-   *
-   * @param campaignId - The unique identifier of the campaign to sync. If provided, only that campaign is processed;
-   *                     otherwise, all campaigns are processed.
-   * @param resync - If false, skips campaigns that already have HubSpot updates.
-   * @param batchSize - Number of campaigns to process per batch when syncing all campaigns (default: 100)
-   */
-  async syncCampaign(
-    campaignId?: number,
-    resync: boolean = false,
-    batchSize: number = 100,
-  ) {
-    let updated = 0
-
-    if (campaignId) {
-      const campaign = await this.campaigns.findFirst({
-        where: { id: campaignId },
-      })
-      if (campaign) {
-        await this.processSingleCampaignSync(campaign, resync)
-        updated = 1
-      }
-    } else {
-      let offset = 0
-      let hasMore = true
-
-      while (hasMore) {
-        const campaigns = await this.campaigns.findMany({
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: batchSize,
-          skip: offset,
-        })
-
-        if (campaigns.length === 0) {
-          hasMore = false
-          break
-        }
-
-        this.logger.log(
-          `Syncing batch ${Math.floor(offset / batchSize) + 1}: ${campaigns.length} campaigns`,
-        )
-
-        for (const campaign of campaigns) {
-          try {
-            const syncResult = await this.processSingleCampaignSync(
-              campaign,
-              resync,
-            )
-            if (syncResult) {
-              updated++
-            }
-          } catch (error) {
-            this.logger.error('error at crm/sync', error)
-            this.slack.errorMessage({
-              message: `error at crm/sync - campaignSlug: ${campaign?.slug}`,
-              error,
-            })
-          }
-        }
-
-        if (campaigns.length < batchSize) {
-          hasMore = false
-        } else {
-          offset += batchSize
-        }
-
-        if (global.gc) {
-          global.gc()
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
-    }
-
-    this.slack.message(
-      { body: `completed crm/sync - updated: ${updated}` },
-      SlackChannel.botDev,
-    )
-
-    return {
-      message: 'ok',
-      updated,
-    }
-  }
-
-  private async processSingleCampaignSync(
-    campaign: Campaign,
-    resync: boolean,
-  ): Promise<boolean> {
-    const { id: campaignId } = campaign
-
-    if (campaign?.data?.hubSpotUpdates && !resync) {
-      this.logger.log(`Skipping resync - ${campaignId}`)
-      return false
-    }
-
-    const { data: campaignData } = campaign || {}
-    const { hubspotId } = campaignData || {}
-    const company = hubspotId ? await this.getCrmCompanyById(hubspotId) : null
-
-    if (!company) {
-      this.logger.error(`No company found - ${campaignId}`)
-      return false
-    }
-
-    this.logger.log(`Syncing - ${campaignId}`)
-
-    const hubSpotUpdates = pick(
-      company.properties,
-      HUBSPOT_COMPANY_PROPERTIES,
-    ) as Partial<Record<HubSpot.IncomingProperty, string>>
-
-    const updatedCampaign: Prisma.CampaignUpdateInput = {
-      data: campaign?.data,
-    }
-
-    if (
-      String(hubSpotUpdates.verified_candidates).toLowerCase() ===
-      HubSpot.VerifiedCandidate.YES
-    ) {
-      updatedCampaign.isVerified = true
-    }
-
-    if (
-      String(hubSpotUpdates.election_results).toLowerCase() ===
-      HubSpot.ElectionResult.WON_GENERAL
-    ) {
-      updatedCampaign.didWin = true
-    }
-
-    await this.campaigns.update({
-      where: { id: campaignId },
-      data: updatedCampaign,
-    })
-
-    await this.campaigns.updateJsonFields(campaignId, {
-      data: {
-        hubSpotUpdates,
-      },
-    })
-
-    return true
   }
 }

@@ -1,15 +1,24 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import {
-  BallotReadyPositionLevel,
-  ElectionLevel,
-} from 'src/campaigns/campaigns.types'
+  BallotReadyPositionLevelSchema,
+  CampaignSchema,
+  ElectionLevelSchema,
+} from '@goodparty_org/contracts'
 
-// AI'ed from the CampaignDetails type
+// TODO(ENG-6410): This schema uses .passthrough() which allows ANY fields to be sent through,
+// even if not defined here. This is a security/data integrity concern because:
+// 1. Subscription fields (subscriptionId, subscriptionCancelAt, etc.) can be directly
+//    modified via this API, potentially causing desync with Stripe.
+// 2. These fields should ONLY be modified by Stripe webhook handlers.
+// 3. To fix: Add .transform() to strip subscription fields, or remove .passthrough()
+//    and explicitly define all allowed fields.
+// See: ENG-4918, ENG-6495 for related subscription sync bugs.
+
 const CampaignDetailsSchema = z
   .object({
     state: z.string(),
-    ballotLevel: z.nativeEnum(BallotReadyPositionLevel),
+    ballotLevel: BallotReadyPositionLevelSchema,
     electionDate: z.string(),
     primaryElectionDate: z.string(),
     zip: z.string(),
@@ -44,8 +53,8 @@ const CampaignDetailsSchema = z
     party: z.string(),
     otherParty: z.string(),
     district: z.string(),
-    raceId: z.string(),
-    level: z.nativeEnum(ElectionLevel),
+    raceId: z.string().nullish(),
+    level: ElectionLevelSchema,
     noNormalizedOffice: z.boolean(),
     website: z.string(),
     pastExperience: z.union([z.string(), z.record(z.string(), z.string())]),
@@ -53,6 +62,8 @@ const CampaignDetailsSchema = z
     funFact: z.string(),
     campaignCommittee: z.string(),
     statementName: z.string(),
+    // TODO(ENG-6410): These subscription fields should be BLOCKED from direct updates, not just validated.
+    // They should only be modified via Stripe webhook handlers (paymentEventsService.ts).
     subscriptionId: z.string().nullish(),
     endOfElectionSubscriptionCanceled: z.boolean(),
     subscriptionCanceledAt: z.number(),
@@ -60,7 +71,7 @@ const CampaignDetailsSchema = z
     filingPeriodsStart: z.string().nullish(),
     filingPeriodsEnd: z.string().nullish(),
     officeTermLength: z.string(),
-    partisanType: z.string(),
+    partisanType: z.string().nullish().optional(),
     priorElectionDates: z.array(z.string()),
     positionId: z.string().nullish(),
     electionId: z.string().nullish(),
@@ -71,21 +82,27 @@ const CampaignDetailsSchema = z
 
 // TODO: make schemas data, pathToVictory, aiContent
 export class UpdateCampaignSchema extends createZodDto(
-  z
-    .object({
-      slug: z.string().optional(),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      data: z.record(z.string(), z.unknown()).optional(),
+  CampaignSchema.pick({
+    slug: true,
+    data: true,
+    aiContent: true,
+    formattedAddress: true,
+    placeId: true,
+    canDownloadFederal: true,
+  })
+    .partial()
+    .extend({
       details: CampaignDetailsSchema.optional(),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       pathToVictory: z.record(z.string(), z.unknown()).optional(),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      aiContent: z.record(z.string(), z.unknown()).optional(),
-      formattedAddress: z.string().optional(),
-      placeId: z.string().optional(),
-      canDownloadFederal: z.boolean().optional(),
     })
     .strict(),
+) {}
+
+export class CreateCampaignSchema extends createZodDto(
+  z.object({
+    details: CampaignDetailsSchema,
+    data: z.record(z.string(), z.unknown()).optional(),
+  }),
 ) {}
 
 export class SetDistrictDTO extends createZodDto(

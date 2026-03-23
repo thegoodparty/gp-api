@@ -1,11 +1,16 @@
-import { BadGatewayException, Controller, Get, Logger } from '@nestjs/common'
+import { BadGatewayException, Controller, Get } from '@nestjs/common'
 import { QueueProducerService } from './queueProducer.service'
 import { QueueMessage, QueueType } from '../queue.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('queue')
 export class QueueProducerController {
-  private readonly logger = new Logger(QueueProducerController.name)
-  constructor(private readonly queueService: QueueProducerService) {}
+  constructor(
+    private readonly queueService: QueueProducerService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(QueueProducerController.name)
+  }
 
   @Get()
   async testQueue() {
@@ -22,7 +27,7 @@ export class QueueProducerController {
       return await this.queueService.sendMessage(body)
     } catch (e) {
       if (e instanceof Error) {
-        this.logger.log(`Error at queueController e.message: ${e.message}`, e)
+        this.logger.info(e, `Error at queueController e.message: ${e.message}`)
         throw new BadGatewayException(
           e.message || 'Error occurred while enqueueing message',
         )

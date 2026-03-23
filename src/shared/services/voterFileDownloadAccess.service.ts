@@ -1,45 +1,48 @@
-import { CampaignWith } from '../../campaigns/campaigns.types'
-import { Logger } from '@nestjs/common'
-import { SlackService } from './slack.service'
+import { CampaignWith } from '@/campaigns/campaigns.types'
+import { IS_PROD } from '@/shared/util/appEnvironment.util'
+import { SlackService } from '@/vendors/slack/services/slack.service'
+import { SlackChannel } from '@/vendors/slack/slackService.types'
+import { Inject, OnModuleInit } from '@nestjs/common'
 import { User } from '@prisma/client'
-import { IS_PROD } from '../util/appEnvironment.util'
-import { SlackChannel } from './slackService.types'
+import { PinoLogger } from 'nestjs-pino'
 
-export class VoterFileDownloadAccessService {
-  private readonly logger = new Logger(VoterFileDownloadAccessService.name)
+export class VoterFileDownloadAccessService implements OnModuleInit {
+  @Inject()
+  private readonly logger!: PinoLogger
+
   constructor(private readonly slack: SlackService) {}
+
+  onModuleInit() {
+    this.logger.setContext(VoterFileDownloadAccessService.name)
+  }
 
   canDownload(campaign?: CampaignWith<'pathToVictory'>) {
     if (!campaign) return false
 
-    let electionTypeRequired = true
-    if (
-      campaign.details.ballotLevel &&
-      campaign.details.ballotLevel !== 'FEDERAL' &&
-      campaign.details.ballotLevel !== 'STATE'
-    ) {
-      // not required for local races
-      // so we can fall back to the whole state.
-      electionTypeRequired = false
-    } else if (
-      campaign.details.ballotLevel &&
-      (campaign.details.ballotLevel === 'FEDERAL' ||
-        campaign.details.ballotLevel === 'STATE') &&
-      campaign.canDownloadFederal
-    ) {
-      // not required for federal/state races with canDownloadFederal flag
-      electionTypeRequired = false
+    const ballotLevel = campaign.details?.ballotLevel
+    const hasElectionData =
+      campaign.pathToVictory?.data?.electionType &&
+      campaign.pathToVictory?.data?.electionLocation
+
+    const canDownload = Boolean(
+      // Local races (CITY, TOWNSHIP, etc.) - not required, can fall back to whole state
+      (ballotLevel && ballotLevel !== 'FEDERAL' && ballotLevel !== 'STATE') ||
+        // FEDERAL/STATE races with canDownloadFederal flag
+        (ballotLevel &&
+          (ballotLevel === 'FEDERAL' || ballotLevel === 'STATE') &&
+          campaign.canDownloadFederal) ||
+        // FEDERAL/STATE races with election data from PathToVictory SQS job
+        hasElectionData,
+    )
+
+    if (!canDownload) {
+      this.logger.info(
+        { id: campaign.id },
+        'Campaign is not eligible for download.',
+      )
     }
-    if (
-      electionTypeRequired &&
-      (!campaign.pathToVictory?.data?.electionType ||
-        !campaign.pathToVictory?.data?.electionLocation)
-    ) {
-      this.logger.log('Campaign is not eligible for download.', campaign.id)
-      return false
-    } else {
-      return true
-    }
+
+    return canDownload
   }
 
   async downloadAccessAlert(

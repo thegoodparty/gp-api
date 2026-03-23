@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod'
 import { LEVELS } from 'src/shared/constants/governmentLevels'
-import { ZipSchema } from 'src/shared/schemas'
+import { ZipSchema } from '@goodparty_org/contracts'
 import { z } from 'zod'
 
 export class RacesByZipSchema extends createZodDto(

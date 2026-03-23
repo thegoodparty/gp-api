@@ -6,7 +6,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Param,
   ParseIntPipe,
   Post,
@@ -17,30 +16,32 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { UsersService } from 'src/users/services/users.service'
 import {
-  DateRangeFilter,
   AdminUserListSchema,
+  DateRangeFilter,
 } from './schemas/AdminUserList.schema'
 import { subDays, subMonths } from 'date-fns'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminCreateUserSchema } from './schemas/AdminCreateUser.schema'
 import { AdminImpersonateSchema } from './schemas/AdminImpersonate.schema'
 import { AuthenticationService } from 'src/authentication/authentication.service'
-import { SlackService } from 'src/shared/services/slack.service'
-import { ReadUserOutputSchema } from 'src/users/schemas/ReadUserOutput.schema'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { ReadUserOutputSchema } from '@goodparty_org/contracts'
 import { UserRole } from '@prisma/client'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('admin/users')
 @Roles(UserRole.admin)
 @UsePipes(ZodValidationPipe)
 export class AdminUsersController {
-  private readonly logger = new Logger(AdminUsersController.name)
-
   constructor(
     private readonly usersService: UsersService,
     private readonly campaignsService: CampaignsService,
     private readonly authService: AuthenticationService,
     private readonly slack: SlackService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AdminUsersController.name)
+  }
 
   @Get()
   async list(@Query() { dateRange }: AdminUserListSchema) {

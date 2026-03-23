@@ -3,7 +3,6 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  Logger,
 } from '@nestjs/common'
 import { Campaign, User } from '@prisma/client'
 import { UsersService } from './users.service'
@@ -13,45 +12,55 @@ import { HubspotService } from '../../crm/hubspot.service'
 import { CRMContactProperties } from '../../crm/crm.types'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
-import { SlackService } from '../../shared/services/slack.service'
+import { SlackService } from '../../vendors/slack/services/slack.service'
 import { Headers, MimeTypes } from 'http-constants-ts'
 import { AxiosError, isAxiosError } from 'axios'
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts'
+import { PinoLogger } from 'nestjs-pino'
+import { WrapperType } from 'src/shared/types/utility.types'
 
 @Injectable()
 export class CrmUsersService {
-  private readonly logger = new Logger(this.constructor.name)
-
   constructor(
     private readonly hubspot: HubspotService,
     @Inject(forwardRef(() => UsersService))
-    private readonly users: UsersService,
+    private readonly users: WrapperType<UsersService>,
     @Inject(forwardRef(() => CampaignsService))
-    private readonly campaigns: CampaignsService,
+    private readonly campaigns: WrapperType<CampaignsService>,
     private readonly httpService: HttpService,
     private readonly slack: SlackService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(this.constructor.name)
+  }
 
   async calculateCRMContactProperties(
     user: User,
     campaign: Campaign,
   ): Promise<CRMContactProperties> {
     const { firstName, lastName, email, phone, zip, metaData } = user
-    const { accountType, whyBrowsing } = metaData || {}
+    const meta =
+      metaData && typeof metaData === 'object' && !Array.isArray(metaData)
+        ? metaData
+        : null
+    const accountType =
+      typeof meta?.accountType === 'string' ? meta.accountType : undefined
+    const whyBrowsing =
+      typeof meta?.whyBrowsing === 'string' ? meta.whyBrowsing : undefined
 
-    let browsing_intent: string = ''
+    let browsingIntent: string = ''
     switch (whyBrowsing) {
       case 'considering':
-        browsing_intent = 'considering run'
+        browsingIntent = 'considering run'
         break
       case 'learning':
-        browsing_intent = 'learning about gp'
+        browsingIntent = 'learning about gp'
         break
       case 'test':
-        browsing_intent = 'testing tools'
+        browsingIntent = 'testing tools'
         break
       case 'else':
-        browsing_intent = 'other'
+        browsingIntent = 'other'
         break
     }
 
@@ -91,7 +100,7 @@ export class CrmUsersService {
             product_user: 'yes',
           }
         : {}),
-      ...(browsing_intent ? { browsing_intent } : {}),
+      ...(browsingIntent ? { browsing_intent: browsingIntent } : {}),
     }
   }
 
@@ -102,7 +111,7 @@ export class CrmUsersService {
   }
 
   private async findCrmContactIdByEmail(email: string) {
-    this.logger.debug('Looking up contact by email:', email)
+    this.logger.debug({ email }, 'Looking up contact by email:')
     let crmContactId: string
     try {
       const searchResultObj =
@@ -120,7 +129,7 @@ export class CrmUsersService {
             },
           ],
         })
-      this.logger.debug('Search result:', searchResultObj)
+      this.logger.debug(searchResultObj, 'Search result:')
       const { total, results } = searchResultObj
 
       if (!total) {
@@ -138,8 +147,8 @@ export class CrmUsersService {
       return crmContactId
     } catch (e) {
       this.logger.debug(
+        { e },
         'could not find contact by email. user has never filled a form!',
-        e,
       )
     }
   }
@@ -181,7 +190,7 @@ export class CrmUsersService {
 
     if (!crmContactId) {
       crmContactId = await this.findCrmContactIdByEmail(email)
-      this.logger.debug('Found CRM Contact ID by email:', crmContactId)
+      this.logger.debug({ crmContactId }, 'Found CRM Contact ID by email:')
       crmContactId &&
         (await this.users.patchUserMetaData(userId, {
           hubspotId: crmContactId,
@@ -196,8 +205,8 @@ export class CrmUsersService {
     }
 
     this.logger.debug(
-      'Aggregated CRM Contact Properties:',
       aggregatedCrmContactProperties,
+      'Aggregated CRM Contact Properties:',
     )
 
     if (crmContactId) {
@@ -209,7 +218,7 @@ export class CrmUsersService {
       const newCrmContact = await this.createCrmContact(
         aggregatedCrmContactProperties,
       )
-      this.logger.debug('New CRM Contact:', newCrmContact)
+      this.logger.debug({ newCrmContact }, 'New CRM Contact:')
       const { id: newCrmContactId } = newCrmContact || {}
       newCrmContactId &&
         (await this.users.patchUserMetaData(userId, {
@@ -264,10 +273,10 @@ export class CrmUsersService {
           message += axiosError.message
         }
       } else {
-        this.logger.error('Unexpected Error:', error)
+        this.logger.error({ error }, 'Unexpected Error:')
       }
-      this.logger.error('hubspot error', message, error)
-      this.slack.errorMessage({ message: 'Error submitting form', error })
+      this.logger.error({ message, error }, 'hubspot error')
+      await this.slack.errorMessage({ message: 'Error submitting form', error })
       throw new BadGatewayException(message)
     }
   }
@@ -285,8 +294,8 @@ export class CrmUsersService {
       )
     } catch (e) {
       this.logger.error(
+        { e },
         `error updating contact with CRM id: ${crmContactId}`,
-        e,
       )
     }
   }
@@ -300,7 +309,7 @@ export class CrmUsersService {
         },
       })
     } catch (e) {
-      this.logger.error('error creating contact', e)
+      this.logger.error({ e }, 'error creating contact')
     }
   }
 }

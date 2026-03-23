@@ -7,7 +7,6 @@ import {
   HttpCode,
   HttpStatus,
   InternalServerErrorException,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -31,21 +30,23 @@ import { AiService, PromptReplaceCampaign } from 'src/ai/ai.service'
 import { Roles } from 'src/authentication/decorators/Roles.decorator'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { AnalyticsService } from 'src/analytics/analytics.service'
-import { EVENTS } from '../../../segment/segment.types'
+import { EVENTS } from '../../../vendors/segment/segment.types'
+import { PinoLogger } from 'nestjs-pino'
 
 @Controller('campaigns/ai')
 @UseCampaign()
 @UsePipes(ZodValidationPipe)
 export class AiContentController {
-  private readonly logger = new Logger(AiContentController.name)
-
   constructor(
     private readonly aiContent: AiContentService,
     private readonly ai: AiService,
     private readonly campaigns: CampaignsService,
     private readonly content: ContentService,
     private readonly analytics: AnalyticsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiContentController.name)
+  }
 
   @Post()
   async create(
@@ -57,7 +58,6 @@ export class AiContentController {
     try {
       const result = await this.aiContent.createContent(campaign, body)
 
-      // Don't need to await here, don't want to wait for this call
       this.analytics.track(user.id, EVENTS.AiContent.GenerationStarted, {
         slug: campaign.slug,
         key: body.key,
@@ -127,6 +127,8 @@ export class AiContentController {
   async systemPrompt(
     @Query() { slug, initial = false }: GetSystemPromptSchema,
   ) {
+    // Prisma include-based query — result type loses included relations without assertion
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const campaign = (await this.campaigns.findFirst({
       where: { slug },
       include: {

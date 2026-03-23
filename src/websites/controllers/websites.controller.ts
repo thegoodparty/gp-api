@@ -7,7 +7,6 @@ import {
   Put,
   UsePipes,
   UseInterceptors,
-  Logger,
   ForbiddenException,
   Query,
 } from '@nestjs/common'
@@ -34,6 +33,9 @@ import { WebsiteViewsService } from '../services/websiteViews.service'
 import { TrackWebsiteViewSchema } from '../schemas/TrackWebsiteView.schema'
 import { GetWebsiteViewsSchema } from '../schemas/GetWebsiteViews.schema'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
+import { AnalyticsService } from 'src/analytics/analytics.service'
+import { EVENTS } from 'src/vendors/segment/segment.types'
+import { PinoLogger } from 'nestjs-pino'
 
 const LOGO_FIELDNAME = 'logoFile'
 const HERO_FIELDNAME = 'heroFile'
@@ -54,15 +56,17 @@ const WEBSITE_CONTENT_INCLUDES = {
 @Controller('websites')
 @UsePipes(ZodValidationPipe)
 export class WebsitesController {
-  private readonly logger = new Logger(WebsitesController.name)
-
   constructor(
     private readonly websites: WebsitesService,
     private readonly contacts: WebsiteContactsService,
     private readonly files: FilesService,
     private readonly siteViews: WebsiteViewsService,
     private readonly campaigns: CampaignsService,
-  ) {}
+    private readonly analytics: AnalyticsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(WebsitesController.name)
+  }
 
   @Post()
   @UseCampaign({
@@ -104,6 +108,7 @@ export class WebsitesController {
       page = 1,
     }: GetWebsiteContactsSchema,
   ) {
+    const offset = (page - 1) * limit
     const website = await this.websites.findUniqueOrThrow({
       where: { campaignId },
     })
@@ -111,9 +116,9 @@ export class WebsitesController {
     const [contacts, total] = await Promise.all([
       this.contacts.findMany({
         where: { websiteId: website.id },
-        orderBy: sortBy ? { [sortBy]: sortOrder } : undefined,
         take: limit,
-        skip: (page - 1) * limit,
+        skip: offset,
+        ...(sortBy ? { orderBy: { [sortBy]: sortOrder } } : {}),
       }),
       this.contacts.count({
         where: { websiteId: website.id },
@@ -156,6 +161,7 @@ export class WebsitesController {
     }),
   )
   async updateWebsite(
+    @ReqUser() user: User,
     @ReqCampaign() { id: campaignId }: Campaign,
     @Body() body: UpdateWebsiteSchema,
     @ReqFiles() files?: FileUpload[],
@@ -163,13 +169,15 @@ export class WebsitesController {
     const logoFile = files?.find((file) => file.fieldname === LOGO_FIELDNAME)
     const heroFile = files?.find((file) => file.fieldname === HERO_FIELDNAME)
 
-    const { content: currentContent } = await this.websites.findUniqueOrThrow({
-      where: { campaignId },
-      select: {
-        content: true,
-        domain: true,
-      },
-    })
+    const { content: currentContent, hasEverBeenPublished } =
+      await this.websites.findUniqueOrThrow({
+        where: { campaignId },
+        select: {
+          content: true,
+          domain: true,
+          hasEverBeenPublished: true,
+        },
+      })
 
     const updatedContent: PrismaJson.WebsiteContent = merge(
       currentContent || {},
@@ -200,7 +208,10 @@ export class WebsitesController {
       updatedContent.main.image = undefined
     }
 
-    return this.websites.update({
+    const isFirstPublish =
+      body.status === WebsiteStatus.published && !hasEverBeenPublished
+
+    const result = await this.websites.update({
       where: { campaignId },
       data: {
         content: updatedContent,
@@ -210,11 +221,31 @@ export class WebsitesController {
         ...(body.status !== undefined && {
           status: body.status,
         }),
+        ...(isFirstPublish && {
+          hasEverBeenPublished: true,
+        }),
       },
       include: {
         domain: true,
       },
     })
+
+    // We only want to trigger this event when the website is first published.
+    // This is because we want the 10DLC actions for HubSpot to happen sequentially.
+    // We don't want to reset users back to a previous step if they unpublished and then republished their
+    // GoodParty website. We don't care oh so much about the GoodParty website and might remove it in the future.
+    if (isFirstPublish) {
+      try {
+        await this.analytics.track(user.id, EVENTS.CandidateWebsite.Published)
+      } catch (e) {
+        this.logger.error(
+          { e },
+          `Failed to track website published event for user ${user.id}`,
+        )
+      }
+    }
+
+    return result
   }
 
   @Post('validate-vanity-path')

@@ -1,18 +1,22 @@
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import { BaseMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
+
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { OpenAI } from 'openai'
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai'
-import { Injectable, Logger } from '@nestjs/common'
-import { SlackService } from 'src/shared/services/slack.service'
-import { Prisma, User } from '@prisma/client'
-import { getUserFullName } from 'src/users/util/users.util'
-import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
-import { SlackChannel } from '../shared/services/slackService.types'
 import {
   ChatCompletion,
   ChatCompletionNamedToolChoice,
   ChatCompletionTool,
 } from 'openai/resources/chat/completions'
+import { getUserFullName } from 'src/users/util/users.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { AiChatMessage } from '../campaigns/ai/chat/aiChat.types'
+import { SlackChannel } from '../vendors/slack/slackService.types'
+import { againstToStr, positionsToStr, replaceAll } from './util/aiContent.util'
+import { PinoLogger } from 'nestjs-pino'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 const { TOGETHER_AI_KEY, OPEN_AI_KEY, AI_MODELS = '' } = process.env
 if (!TOGETHER_AI_KEY) {
@@ -59,11 +63,19 @@ type GetAssistantCompletionArgs = {
   topP?: number
 }
 
+/**
+ * @deprecated This service is deprecated. Use `LlmService` from `src/llm/services/llm.service` instead.
+ */
 @Injectable()
 export class AiService {
-  private readonly logger = new Logger(AiService.name)
-
-  constructor(private slack: SlackService) {}
+  constructor(
+    private slack: SlackService,
+    @Inject(forwardRef(() => OrganizationsService))
+    private readonly organizations: OrganizationsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AiService.name)
+  }
 
   async llmChatCompletion(
     messages: AiChatMessage[],
@@ -88,8 +100,8 @@ export class AiService {
       maxRetries: 0,
     }
 
-    let firstModel
-    let fallbackModel
+    let firstModel: BaseChatModel | undefined
+    let fallbackModel: BaseChatModel | undefined
 
     for (const model of models) {
       if (model.includes('gpt')) {
@@ -108,22 +120,28 @@ export class AiService {
         }
       } else {
         if (!firstModel) {
-          firstModel = new ChatTogetherAI({
+          firstModel = new ChatOpenAI({
             apiKey: TOGETHER_AI_KEY,
             model,
             ...aiOptions,
+            configuration: {
+              baseURL: 'https://api.together.xyz/v1',
+            },
           })
         } else {
-          fallbackModel = new ChatTogetherAI({
+          fallbackModel = new ChatOpenAI({
             apiKey: TOGETHER_AI_KEY,
             model,
             ...aiOptions,
+            configuration: {
+              baseURL: 'https://api.together.xyz/v1',
+            },
           })
         }
       }
     }
 
-    const modelWithFallback = firstModel.withFallbacks([fallbackModel])
+    const modelWithFallback = firstModel!.withFallbacks([fallbackModel!])
 
     const sanitizedMessages = messages.map((message) => {
       let sanitizedContent = message.content
@@ -138,13 +156,16 @@ export class AiService {
       }
     })
 
-    let completion
+    let completion: BaseMessage | undefined
     try {
       completion = await modelWithFallback.invoke(sanitizedMessages)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      this.logger.error('Error in utils/ai/llmChatCompletion', error)
-      this.logger.error('error response', error?.response)
+    } catch (error) {
+      this.logger.error({ err: error }, 'Error in utils/ai/llmChatCompletion')
+      const errorResponse =
+        error instanceof Error && 'response' in error
+          ? error.response
+          : undefined
+      this.logger.error({ response: errorResponse }, 'error response')
 
       await this.slack.errorMessage({
         message: 'Error in AI completion (raw)',
@@ -153,17 +174,27 @@ export class AiService {
     }
 
     if (completion && completion?.content) {
-      let content = completion.content
+      // OpenAI SDK returns broad union types — content can be string | null | Array<ContentPart>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      let content = completion.content as string
       if (content.includes('```html')) {
-        content = content.match(/```html([\s\S]*?)```/)[1]
+        content = content.match(/```html([\s\S]*?)```/)![1]
       }
       content = content.replace('/n', '<br/><br/>')
 
+      // Verbose narrowing required: LangChain types response_metadata as Record<string, any>
+      const tokenUsage: unknown = completion?.response_metadata?.tokenUsage
+      const totalTokens =
+        tokenUsage &&
+        typeof tokenUsage === 'object' &&
+        'totalTokens' in tokenUsage &&
+        typeof tokenUsage.totalTokens === 'number'
+          ? tokenUsage.totalTokens
+          : 0
+
       return {
         content,
-        tokens:
-          (completion?.response_metadata?.tokenUsage?.totalTokens as number) ||
-          0,
+        tokens: totalTokens,
       }
     } else {
       return {
@@ -184,7 +215,7 @@ export class AiService {
     for (const model of models) {
       // Lama 3.3 supports native function calling
       // so we can modify the OpenAI base url to use the together.ai api
-      this.logger.debug('model', model)
+      this.logger.debug({ model }, 'model')
       const togetherAi = model.includes('meta-llama') || model.includes('Qwen')
       const client = new OpenAI({
         apiKey: togetherAi ? TOGETHER_AI_KEY : OPEN_AI_KEY,
@@ -257,13 +288,13 @@ export class AiService {
           content = match?.length ? match[1] : content
         }
         content = content.replace('/n', '<br/><br/>')
-        this.logger.debug('completion success', content)
+        this.logger.debug({ content }, 'completion success')
         return {
           content,
           tokens: completion?.usage?.total_tokens || 0,
         }
       } catch (error) {
-        this.logger.error('error', error)
+        this.logger.error({ error }, 'error')
         await this.slack.formattedMessage({
           message: `Error in getChatToolCompletion. model: ${model}`,
           error,
@@ -278,26 +309,31 @@ export class AiService {
     }
   }
 
-  private parseToolResponse(response: string) {
-    {
-      const functionRegex = /<function=(\w+)>(.*?)<\/function>/
-      const match = response.match(functionRegex)
-
-      if (match) {
-        const [functionName, argsString] = match
-        try {
-          const args = JSON.parse(argsString)
-          return {
-            function: functionName,
-            arguments: args,
-          }
-        } catch (error) {
-          this.logger.error(`Error parsing function arguments: ${error}`)
-          return undefined
-        }
+  private parseToolResponse(response: string):
+    | {
+        function: string
+        arguments: string
       }
-      return undefined
+    | undefined {
+    const functionRegex = /<function=(\w+)>(.*?)<\/function>/
+    const match = response.match(functionRegex)
+
+    if (match) {
+      const [functionName, argsString] = match
+      try {
+        // JSON.parse returns unknown — no way to infer parsed shape at compile time
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const args = JSON.parse(argsString) as string
+        return {
+          function: functionName,
+          arguments: args,
+        }
+      } catch (error) {
+        this.logger.error(`Error parsing function arguments: ${error}`)
+        return undefined
+      }
     }
+    return undefined
   }
 
   async getAssistantCompletion({
@@ -313,18 +349,18 @@ export class AiService {
   }: GetAssistantCompletionArgs) {
     try {
       if (!assistantId || !systemPrompt) {
-        this.logger.log('missing assistantId or systemPrompt')
-        this.logger.log('assistantId', assistantId)
-        this.logger.log('systemPrompt', systemPrompt)
+        this.logger.info('missing assistantId or systemPrompt')
+        this.logger.info({ assistantId }, 'assistantId')
+        this.logger.info({ systemPrompt }, 'systemPrompt')
         return
       }
 
       if (!threadId) {
-        this.logger.log('missing threadId')
+        this.logger.info('missing threadId')
         return
       }
 
-      this.logger.log(`running assistant ${assistantId} on thread ${threadId}`)
+      this.logger.info(`running assistant ${assistantId} on thread ${threadId}`)
 
       let messages: AiChatMessage[] = []
       messages.push({
@@ -339,7 +375,7 @@ export class AiService {
       }
 
       if (messageId) {
-        this.logger.log('deleting message', messageId)
+        this.logger.info({ messageId }, 'deleting message')
         messages = messages.filter((m) => m.id !== messageId)
       } else {
         messages.push({
@@ -350,7 +386,7 @@ export class AiService {
         })
       }
 
-      this.logger.log('messages', messages)
+      this.logger.info({ messages }, 'messages')
 
       const result = await this.llmChatCompletion(
         messages,
@@ -368,7 +404,7 @@ export class AiService {
         usage: result?.tokens,
       }
     } catch (error) {
-      this.logger.log('error', error)
+      this.logger.info({ error }, 'error')
       await this.slack.message(
         {
           body: `Error in getAssistantCompletion. Error: ${error}`,
@@ -384,7 +420,10 @@ export class AiService {
       let newPrompt = prompt
 
       const campaignPositions = campaign.campaignPositions
-      const user = campaign.user as User
+      if (!campaign.user) {
+        throw new Error('Campaign has no associated user')
+      }
+      const user = campaign.user
 
       const name = getUserFullName(user)
       const details = campaign.details
@@ -398,8 +437,11 @@ export class AiService {
       if (party === 'Independent') {
         party = 'Independent / non-partisan'
       }
-      const office =
-        details.office === 'Other' ? details.otherOffice : details?.office
+      const positionName = campaign.organizationSlug
+        ? await this.organizations.resolvePositionNameByOrganizationSlug(
+            campaign.organizationSlug,
+          )
+        : null
 
       const replaceArr: {
         find: string
@@ -435,9 +477,10 @@ export class AiService {
         },
         {
           find: 'office',
-          replace: `${office}${
-            details.district ? ` in ${details.district}` : ''
-          }`,
+          replace:
+            positionName && details.district
+              ? `${positionName} in ${details.district}`
+              : positionName || '',
         },
         {
           find: 'positions',
@@ -502,6 +545,8 @@ export class AiService {
           totalRegisteredVoters,
           budgetLow,
           budgetHigh,
+          // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         } = pathToVictory.data as Record<string, string | number> // TODO: better type here!!
         replaceArr.push(
           {
@@ -698,17 +743,17 @@ export class AiService {
             item.replace ? item.replace.toString().trim() : '',
           )
         } catch (e) {
-          this.logger.error('error at prompt replace', e)
+          this.logger.error({ e }, 'error at prompt replace')
         }
       })
 
       newPrompt += `\n
-        
+
       `
 
       return newPrompt
     } catch (e) {
-      this.logger.error('Error in helpers/ai/promptReplace', e)
+      this.logger.error({ e }, 'Error in helpers/ai/promptReplace')
       return ''
     }
   }

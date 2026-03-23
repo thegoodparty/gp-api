@@ -20,6 +20,17 @@ const getDistrictTypesSchema = z.object({
     .transform((v) => v.toUpperCase())
     .refine((v) => STATE_CODES.includes(v), 'Invalid state code'),
   electionYear: z.coerce.number().int(),
+  excludeInvalid: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined
+      if (typeof v === 'string') {
+        const lower = v.toLowerCase()
+        return lower === 'true' || lower === '1'
+      }
+      return v === true
+    }),
 })
 
 const getDistrictNamesSchema = z.object({
@@ -29,6 +40,17 @@ const getDistrictNamesSchema = z.object({
     .refine((v) => STATE_CODES.includes(v), 'Invalid state code'),
   electionYear: z.coerce.number().int(),
   L2DistrictType: z.string(),
+  excludeInvalid: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined
+      if (typeof v === 'string') {
+        const lower = v.toLowerCase()
+        return lower === 'true' || lower === '1'
+      }
+      return v === true
+    }),
 })
 
 export class GetDistrictTypesDTO extends createZodDto(getDistrictTypesSchema) {}

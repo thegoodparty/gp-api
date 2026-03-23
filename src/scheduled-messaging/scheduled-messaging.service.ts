@@ -3,8 +3,8 @@ import { createPrismaBase, MODELS } from '../prisma/util/prisma.util'
 import { ScheduledMessage } from '@prisma/client'
 import { EmailService } from '../email/email.service'
 import { ScheduledMessageTypes } from '../email/email.types'
-import { SlackService } from 'src/shared/services/slack.service'
-import { Interval, Timeout } from '@nestjs/schedule'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { Interval } from '@nestjs/schedule'
 
 const SCHEDULED_MESSAGING_INTERVAL_SECS = process.env
   .SCHEDULED_MESSAGING_INTERVAL_SECS
@@ -22,7 +22,6 @@ export class ScheduledMessagingService extends createPrismaBase(
     super()
   }
 
-  @Timeout(0) // This will run immediately when the module is loaded
   @Interval(SCHEDULED_MESSAGING_INTERVAL_SECS * 1000) // This will run based on the environment variable
   private async processScheduledMessages() {
     this.logger.debug(
@@ -35,14 +34,14 @@ export class ScheduledMessagingService extends createPrismaBase(
       return []
     }
 
-    this.logger.debug(`Found ${messages.length} messages to send`, messages)
+    this.logger.debug({ messages }, `Found ${messages.length} messages to send`)
 
     return this.sendMessagesAndUpdate(messages)
   }
 
   private async queryScheduledMessagesAndFlag() {
     let messages: ScheduledMessage[] = []
-    await this.client.$transaction(async (tx) => {
+    await this.client.$transaction(async () => {
       messages = await this.model.findMany({
         where: {
           scheduledAt: {
@@ -82,7 +81,7 @@ export class ScheduledMessagingService extends createPrismaBase(
 
   private async sendMessagesAndUpdate(messages: ScheduledMessage[]) {
     const updatedMessages: ScheduledMessage[] = []
-    this.logger.debug('Sending messages:', messages)
+    this.logger.debug({ messages }, 'Sending messages:')
     await this.client.$transaction(async (tx) => {
       for (const m of messages) {
         let updatedScheduledMsg: ScheduledMessage
@@ -93,24 +92,24 @@ export class ScheduledMessagingService extends createPrismaBase(
               this.sendEmailMessage(m)
           }
         } catch (e) {
-          this.logger.error('Error sending message', e)
+          this.logger.error({ e }, 'Error sending message')
           const errorMessage = e instanceof Error ? e.toString() : String(e)
-          this.slack.errorMessage({
+          await this.slack.errorMessage({
             message: 'Error sending scheduled message',
             error: e,
           })
-          updatedScheduledMsg = await tx.scheduledMessage.update({
+          updatedScheduledMsg = (await tx.scheduledMessage.update({
             where: {
               id: m.id,
             },
             data: {
               error: errorMessage,
             },
-          })
+          })) as ScheduledMessage
           continue
         }
 
-        updatedScheduledMsg = await tx.scheduledMessage.update({
+        updatedScheduledMsg = (await tx.scheduledMessage.update({
           where: {
             id: m.id,
           },
@@ -118,7 +117,7 @@ export class ScheduledMessagingService extends createPrismaBase(
             sentAt: new Date(),
             processing: false,
           },
-        })
+        })) as ScheduledMessage
         updatedMessages.push(updatedScheduledMsg)
       }
     })
@@ -131,11 +130,14 @@ export class ScheduledMessagingService extends createPrismaBase(
     messageConfig: PrismaJson.ScheduledMessageConfig,
     sendDate: Date,
   ) {
-    this.logger.debug('Scheduling message: ', {
-      campaignId,
-      messageConfig,
-      sendDate,
-    })
+    this.logger.debug(
+      {
+        campaignId,
+        messageConfig,
+        sendDate,
+      },
+      'Scheduling message: ',
+    )
     return await this.model.create({
       data: {
         campaignId,

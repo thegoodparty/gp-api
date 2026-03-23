@@ -1,11 +1,12 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable } from '@nestjs/common'
 import { Campaign, OutreachType, User } from '@prisma/client'
 import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { CampaignTaskType } from 'src/campaigns/tasks/campaignTasks.types'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { IS_PROD } from 'src/shared/util/appEnvironment.util'
+import { WrapperType } from 'src/shared/types/utility.types'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
-import { SlackChannel } from '../../shared/services/slackService.types'
+import { SlackChannel } from '../../vendors/slack/slackService.types'
 import { VoterDatabaseService } from '../services/voterDatabase.service'
 import { GetVoterFileSchema } from './schemas/GetVoterFile.schema'
 import { HelpMessageSchema } from './schemas/HelpMessage.schema'
@@ -16,17 +17,21 @@ import {
   TASK_TO_TYPE_MAP,
   VoterFileType,
 } from './voterFile.types'
+import { PinoLogger } from 'nestjs-pino'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 @Injectable()
 export class VoterFileService {
-  private readonly logger = new Logger(VoterFileService.name)
-
   constructor(
     private readonly voterDb: VoterDatabaseService,
     private readonly slack: SlackService,
     @Inject(forwardRef(() => CrmCampaignsService))
-    private readonly crm: CrmCampaignsService,
-  ) {}
+    private readonly crm: WrapperType<CrmCampaignsService>,
+    private readonly organizations: OrganizationsService,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(VoterFileService.name)
+  }
 
   async getCsvOrCount(
     campaign: CampaignWith<'pathToVictory'>,
@@ -43,10 +48,14 @@ export class VoterFileService {
       type === VoterFileType.custom && customFilters?.channel
         ? CHANNEL_TO_TYPE_MAP[customFilters.channel]
         : (Object.values(CampaignTaskType) as string[]).includes(type as string)
-          ? TASK_TO_TYPE_MAP[type as CampaignTaskType]
+          ? // Union narrowing from dynamic input — runtime value comes from user request
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            TASK_TO_TYPE_MAP[type as CampaignTaskType]
           : type === OutreachType.p2p
             ? VoterFileType.sms
-            : (type as VoterFileType)
+            : // Union narrowing from dynamic input — runtime value comes from user request
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              (type as VoterFileType)
 
     if (countOnly) {
       return this.getVoterCount(resolvedType, campaign, customFilters)
@@ -68,29 +77,33 @@ export class VoterFileService {
   ): Promise<number> {
     // Try regular count first
     const countQuery = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
       true,
       false,
     )
-    this.logger.debug('Count Query:', countQuery)
+    this.logger.debug({ countQuery }, 'Count Query:')
 
-    const sqlResponse = await this.voterDb.query(countQuery)
-    const count = parseInt(sqlResponse.rows[0].count)
+    const sqlResponse = await this.voterDb.query<{ count: string }>(countQuery)
+    const count = parseInt(String(sqlResponse.rows[0].count))
 
     // If count is 0, try with fix columns as fallback
     if (count === 0) {
       const countQueryWithFix = typeToQuery(
+        this.logger,
         resolvedType,
         campaign,
         customFilters,
         true,
         true,
       )
-      this.logger.debug('Count Query with Fix Columns:', countQueryWithFix)
-      const sqlResponseWithFix = await this.voterDb.query(countQueryWithFix)
-      return parseInt(sqlResponseWithFix.rows[0].count)
+      this.logger.debug({ countQueryWithFix }, 'Count Query with Fix Columns:')
+      const sqlResponseWithFix = await this.voterDb.query<{ count: string }>(
+        countQueryWithFix,
+      )
+      return parseInt(String(sqlResponseWithFix.rows[0].count))
     }
 
     return count
@@ -105,22 +118,24 @@ export class VoterFileService {
   ) {
     // Check if we need to use fixColumns by doing a quick count check
     const countQuery = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
       true,
       false,
     )
-    this.logger.debug('Count Query:', countQuery)
+    this.logger.debug({ countQuery }, 'Count Query:')
 
-    const sqlResponse = await this.voterDb.query(countQuery)
-    const count = parseInt(sqlResponse.rows[0].count)
+    const sqlResponse = await this.voterDb.query<{ count: string }>(countQuery)
+    const count = parseInt(String(sqlResponse.rows[0].count))
     const withFixColumns = count === 0
 
-    this.logger.debug('count', count)
+    this.logger.debug({ count }, 'count')
 
     // Generate CSV with appropriate fixColumns setting
     const query = typeToQuery(
+      this.logger,
       resolvedType,
       campaign,
       customFilters,
@@ -129,7 +144,7 @@ export class VoterFileService {
       selectedColumns,
       limit,
     )
-    this.logger.debug('Constructed Query:', query)
+    this.logger.debug({ query }, 'Constructed Query:')
     return this.voterDb.csvStream(query, 'voters', selectedColumns)
   }
 
@@ -149,16 +164,17 @@ export class VoterFileService {
     const { details, tier, data } = campaign
     const { hubspotId: crmCompanyId } = data
 
-    const candidateOffice =
-      details.office?.toLowerCase().trim() === 'other'
-        ? details.otherOffice
-        : details.office
+    const candidatePositionName = campaign.organizationSlug
+      ? await this.organizations.resolvePositionNameByOrganizationSlug(
+          campaign.organizationSlug,
+        )
+      : null
 
     const slackBlocks = buildSlackBlocks({
       name: `${firstName} ${lastName}`,
       email,
       phone,
-      office: candidateOffice,
+      office: candidatePositionName ?? undefined,
       state: details.state,
       tier,
       type,

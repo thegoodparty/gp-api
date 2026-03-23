@@ -1,6 +1,7 @@
 {
+  "exclude": ["node_modules", "contracts", "dist", "scripts"],
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "NodeNext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -10,6 +11,14 @@
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ],
+      "@e2e-tests/*": [
+        "e2e-tests/*"
+      ],
+    },
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,
@@ -20,6 +29,7 @@
     "noFallthroughCasesInSwitch": false,
     "lib": ["esnext"],
     "resolveJsonModule": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "preserveWatchOutput": true
   }
 }

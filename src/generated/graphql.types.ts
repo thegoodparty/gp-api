@@ -18,7 +18,7 @@ export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & {
 }
 export type MakeEmpty<
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-T extends { [key: string]: unknown },
+  T extends { [key: string]: unknown },
   K extends keyof T,
 > = { [_ in K]?: never }
 export type Incremental<T> =

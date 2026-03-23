@@ -8,6 +8,7 @@ const STATUS_FILTERS = ['active', 'inactive'] as const
 export class CampaignListSchema extends createZodDto(
   z.object({
     id: z.coerce.number().optional(),
+    userId: z.coerce.number().optional(),
     state: StateSchema()
       .transform((val) => val.toUpperCase())
       .optional(),

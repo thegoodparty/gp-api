@@ -1,20 +1,39 @@
 import {
+  BadGatewayException,
   ConflictException,
   forwardRef,
   Inject,
   Injectable,
 } from '@nestjs/common'
 import { Campaign, Prisma, User } from '@prisma/client'
+import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import {
+  PaginatedResults,
+  WithOptional,
+  WrapperType,
+} from 'src/shared/types/utility.types'
+import { AnalyticsService } from '../../analytics/analytics.service'
+import { trimMany } from '../../shared/util/strings.util'
 import {
   CreateUserInputDto,
   SIGN_UP_MODE,
 } from '../schemas/CreateUserInput.schema'
 import { hashPassword } from '../util/passwords.util'
-import { trimMany } from '../../shared/util/strings.util'
-import { WithOptional } from 'src/shared/types/utility.types'
-import { AnalyticsService } from '../../analytics/analytics.service'
-import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { CrmUsersService } from './crmUsers.service'
+import { StripeService } from '../../vendors/stripe/services/stripe.service'
+import Stripe from 'stripe'
+import { Interval } from '@nestjs/schedule'
+import { subHours } from 'date-fns'
+import throttle from 'p-throttle'
+import { chunk } from 'es-toolkit'
+import ms from 'ms'
+import {
+  DEFAULT_PAGINATION_LIMIT,
+  DEFAULT_PAGINATION_OFFSET,
+  DEFAULT_SORT_BY,
+  DEFAULT_SORT_ORDER,
+} from '@/shared/constants/paginationOptions.consts'
+import { type ListUsersPagination } from '@goodparty_org/contracts'
 
 const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 
@@ -22,9 +41,11 @@ const REGISTER_USER_CRM_FORM_ID = '37d98f01-7062-405f-b0d1-c95179057db1'
 export class UsersService extends createPrismaBase(MODELS.User) {
   constructor(
     @Inject(forwardRef(() => AnalyticsService))
-    private readonly analytics: AnalyticsService,
+    private readonly analytics: WrapperType<AnalyticsService>,
     @Inject(forwardRef(() => CrmUsersService))
-    private readonly crm: CrmUsersService,
+    private readonly crm: WrapperType<CrmUsersService>,
+    @Inject(forwardRef(() => StripeService))
+    private readonly stripeService: WrapperType<StripeService>,
   ) {
     super()
   }
@@ -169,13 +190,19 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     return user
   }
 
-  async updateUser(
-    where: Prisma.UserWhereUniqueInput,
-    data: Prisma.UserUpdateInput,
-  ) {
-    return this.model.update({
-      where,
-      data,
+  async updateUser(where: Prisma.UserWhereUniqueInput, data: Partial<User>) {
+    return this.optimisticLockingUpdate({ where }, (existing) => {
+      const { metaData: incomingMetaData, ...fields } = data
+      if (incomingMetaData === undefined) {
+        return fields
+      }
+      return {
+        ...fields,
+        metaData: {
+          ...(existing.metaData ?? {}),
+          ...(incomingMetaData ?? {}),
+        },
+      }
     })
   }
 
@@ -183,33 +210,181 @@ export class UsersService extends createPrismaBase(MODELS.User) {
     userId: number,
     newMetaData: PrismaJson.UserMetaData,
   ) {
-    const currentUser = await this.findUser({ id: userId })
-    if (!currentUser) {
-      this.logger.warn(
-        `User with id ${userId} not found. Skipping metadata update`,
-      )
-      return null
-    }
-
-    const currentMetaData = currentUser?.metaData
-    return this.updateUser(
-      {
-        id: userId,
-      },
-      {
-        metaData: {
-          ...currentMetaData,
-          ...newMetaData,
-        },
+    const updatedUser = await this.optimisticLockingUpdate(
+      { where: { id: userId } },
+      (user) => {
+        this.logger.info(
+          { data: user.metaData ?? {} },
+          `User ${user.id} metadata pre-update: `,
+        )
+        return {
+          metaData: { ...(user.metaData ?? {}), ...(newMetaData ?? {}) },
+        }
       },
     )
+    this.logger.info(
+      { data: updatedUser.metaData ?? {} },
+      `User ${updatedUser.id} metadata post-update: `,
+    )
+
+    return updatedUser
   }
 
   async deleteUser(id: number) {
+    const user = await this.model.findUnique({
+      where: { id },
+      include: { campaigns: true },
+    })
+
+    const campaign = user?.campaigns?.[0]
+    // Prisma JSON column typed as JsonValue — requires prisma-json-types-generator to narrow
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const subscriptionId = (campaign?.details as { subscriptionId?: string })
+      ?.subscriptionId
+
+    if (subscriptionId) {
+      try {
+        await this.stripeService.cancelSubscription(subscriptionId)
+      } catch (error) {
+        if (
+          error instanceof BadGatewayException &&
+          error.cause instanceof Stripe.errors.StripeError
+        ) {
+          const stripeError = error.cause
+          this.logger.error(
+            {
+              data: {
+                code: stripeError.code,
+                type: stripeError.type,
+                statusCode: stripeError.statusCode,
+              },
+            },
+            `Failed to cancel subscription ${subscriptionId}: ${stripeError.message} `,
+          )
+        } else {
+          this.logger.error(
+            { error },
+            `Unexpected error canceling subscription ${subscriptionId}`,
+          )
+        }
+        throw new BadGatewayException(
+          `Failed to cancel subscription before user deletion`,
+        )
+      }
+    }
     return this.model.delete({
       where: {
         id,
       },
     })
+  }
+
+  async flushLastVisited(
+    userId: number,
+    pendingLastVisitedMs: number,
+    sessionTimeoutMs: number,
+  ) {
+    // Update lastVisited to the max of existing and pending; increment sessionCount if a new session
+    return this.client.$executeRaw`
+      UPDATE "user" u
+      SET
+        meta_data = jsonb_set(
+          jsonb_set(
+            COALESCE(u.meta_data, '{}'::jsonb),
+            '{lastVisited}',
+            to_jsonb(GREATEST(
+              COALESCE((u.meta_data->>'lastVisited')::bigint, 0),
+              ${pendingLastVisitedMs}::bigint
+            )),
+            true
+          ),
+          '{sessionCount}',
+          to_jsonb(
+            CASE
+              WHEN COALESCE((u.meta_data->>'lastVisited')::bigint, 0) + ${sessionTimeoutMs}::bigint < ${pendingLastVisitedMs}::bigint
+                THEN COALESCE((u.meta_data->>'sessionCount')::bigint, 0) + 1
+              ELSE COALESCE((u.meta_data->>'sessionCount')::bigint, 0)
+            END
+          ),
+          true
+        ),
+        updated_at = NOW()
+      WHERE u.id = ${userId}
+    `
+  }
+
+  async listUsers({
+    offset: skip = DEFAULT_PAGINATION_OFFSET,
+    limit = DEFAULT_PAGINATION_LIMIT,
+    sortBy = DEFAULT_SORT_BY,
+    sortOrder = DEFAULT_SORT_ORDER,
+    firstName,
+    lastName,
+    email,
+  }: ListUsersPagination): Promise<PaginatedResults<User>> {
+    const where: Prisma.UserWhereInput = {
+      ...(firstName
+        ? {
+            firstName: {
+              contains: firstName,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          }
+        : {}),
+      ...(lastName
+        ? {
+            lastName: {
+              contains: lastName,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          }
+        : {}),
+      ...(email
+        ? { email: { contains: email, mode: Prisma.QueryMode.insensitive } }
+        : {}),
+    }
+
+    return {
+      data: await this.model.findMany({
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        where,
+      }),
+      meta: {
+        total: await this.model.count({ where }),
+        offset: skip,
+        limit,
+      },
+    }
+  }
+
+  /**
+   * Regularly automatically delete old test users that were
+   * created more than 3 hours ago.
+   */
+  @Interval(ms('6h'))
+  async deleteTestUsers() {
+    const testUsers = await this.model.findMany({
+      where: {
+        email: { endsWith: '@test.goodparty.org' },
+        createdAt: { lt: subHours(new Date(), 3) },
+      },
+    })
+
+    this.logger.info(`Found ${testUsers.length} test users to delete`)
+
+    const deleteUsers = throttle({ limit: 1, interval: 1000 })(
+      async (userIds: number[]) =>
+        this.model.deleteMany({ where: { id: { in: userIds } } }),
+    )
+
+    for (const users of chunk(testUsers, 10)) {
+      await deleteUsers(users.map((user) => user.id))
+      this.logger.info({
+        ids: users.map((user) => user.id),
+        msg: 'Deleted users',
+      })
+    }
   }
 }

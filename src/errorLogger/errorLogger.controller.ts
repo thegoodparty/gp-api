@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common'
-import { SlackService } from '../shared/services/slack.service'
+import { SlackService } from '../vendors/slack/services/slack.service'
 
 type FrontEndError = {
   message: string

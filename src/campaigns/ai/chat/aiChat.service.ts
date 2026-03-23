@@ -5,17 +5,14 @@ import { ContentService } from 'src/content/services/content.service'
 import { UpdateAiChatSchema } from './schemas/UpdateAiChat.schema'
 import { AiChatMessage } from './aiChat.types'
 import { AiChatFeedbackSchema } from './schemas/AiChatFeedback.schema'
-import { SlackService } from 'src/shared/services/slack.service'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { User } from '@prisma/client'
 import { buildSlackBlocks } from './util/buildSlackBlocks.util'
-import { SlackChannel } from '../../../shared/services/slackService.types'
+import { SlackChannel } from '../../../vendors/slack/slackService.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { requireEnv } from 'src/shared/utils/env'
 
-const LLAMA_AI_ASSISTANT = process.env.LLAMA_AI_ASSISTANT as string
-
-if (!LLAMA_AI_ASSISTANT) {
-  throw new Error('Please set LLAMA_AI_ASSISTANT in your .env')
-}
+const LLAMA_AI_ASSISTANT = requireEnv('LLAMA_AI_ASSISTANT')
 
 @Injectable()
 export class AiChatService extends createPrismaBase(MODELS.AiChat) {
@@ -48,28 +45,37 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
     }
 
     // TODO: these aren't used (threadId is always created, just use const assignment)
-    let threadId
-    let messageId
+    let threadId: string | undefined
+    let messageId: string | undefined
 
     if (!threadId) {
-      this.logger.log('creating thread')
+      this.logger.info('creating thread')
       threadId = crypto.randomUUID()
-      this.logger.log('threadId', threadId)
+      this.logger.info({ threadId }, 'threadId')
     }
 
-    this.logger.log('candidateContext', candidateContext)
-    this.logger.log('systemPrompt', systemPrompt)
+    this.logger.info({ candidateContext }, 'candidateContext')
+    this.logger.info({ systemPrompt }, 'systemPrompt')
 
-    const completion = await this.aiService.getAssistantCompletion({
+    const completion = (await this.aiService.getAssistantCompletion({
       systemPrompt,
       candidateContext,
       assistantId: LLAMA_AI_ASSISTANT,
       threadId,
       message: chatMessage,
-      messageId,
-    })
+      messageId: messageId!,
+    })) as
+      | {
+          content: string
+          threadId: string
+          id: string
+          role: string
+          createdAt: number
+          usage: number
+        }
+      | undefined
 
-    this.logger.log('completion', completion)
+    this.logger.info({ completion }, 'completion')
 
     if (completion && completion?.content) {
       const chatResponse: AiChatMessage = {
@@ -80,11 +86,14 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         usage: completion.usage,
       }
 
+      if (!campaign.user?.id) {
+        throw new Error('Campaign has no associated user')
+      }
       await this.model.create({
         data: {
           assistant: LLAMA_AI_ASSISTANT,
           threadId: completion.threadId,
-          userId: campaign.user?.id as number,
+          userId: campaign.user.id,
           campaignId: campaign.id,
           data: {
             messages: [chatMessage, chatResponse],
@@ -115,7 +124,8 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         userId: campaign.user?.id,
       },
     })
-    const messages = aiChat.data.messages
+    const data = aiChat.data as { messages: AiChatMessage[] }
+    const messages = data.messages
 
     const { candidateJson, systemPrompt } =
       await this.contentService.getChatSystemPrompt()
@@ -125,7 +135,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
       campaign,
     )
 
-    let messageId
+    let messageId: string | undefined
     if (regenerate) {
       // regenerate last chat response
       const aiMessage = messages[messages.length - 1]
@@ -137,24 +147,35 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
 
     const chatMessage: AiChatMessage = {
       role: 'user',
+      // Type narrowing from nullable — runtime context guarantees string but type is broader
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       content: message as string,
       id: crypto.randomUUID(),
       createdAt: new Date().valueOf(),
     }
 
-    const completion = await this.aiService.getAssistantCompletion({
+    const completion = (await this.aiService.getAssistantCompletion({
       systemPrompt,
       candidateContext,
       assistantId: LLAMA_AI_ASSISTANT,
       threadId,
       message: chatMessage,
-      messageId,
+      messageId: messageId!,
       existingMessages: messages,
-    })
+    })) as
+      | {
+          content: string
+          threadId: string
+          id: string
+          role: string
+          createdAt: number
+          usage: number
+        }
+      | undefined
 
-    this.logger.log('completion', completion)
+    this.logger.info({ completion }, 'completion')
 
-    let chatResponse
+    let chatResponse: AiChatMessage | undefined
     if (completion && completion.content) {
       chatResponse = {
         role: 'assistant',
@@ -200,7 +221,7 @@ export class AiChatService extends createPrismaBase(MODELS.AiChat) {
         userId: user.id,
       },
     })
-    const chatData = aiChat.data
+    const chatData = aiChat.data as { messages: AiChatMessage[] }
 
     await this.model.update({
       where: { id: aiChat.id },

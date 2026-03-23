@@ -1,16 +1,19 @@
 import { Prisma } from '@prisma/client'
 import { createZodDto } from 'nestjs-zod'
-import { PaginationSchema } from 'src/shared/schemas/Pagination.schema'
+import { z } from 'zod'
+import { SortablePaginationSchema } from '@goodparty_org/contracts'
 
 const FIELDS = Prisma.WebsiteContactScalarFieldEnum
 
 export class GetWebsiteContactsSchema extends createZodDto(
-  PaginationSchema([
+  SortablePaginationSchema([
     FIELDS.createdAt,
     FIELDS.updatedAt,
     FIELDS.name,
     FIELDS.email,
     FIELDS.phone,
     FIELDS.smsConsent,
-  ]),
+  ]).extend({
+    page: z.coerce.number().min(1).optional(),
+  }),
 ) {}

@@ -14,7 +14,7 @@ export class TopIssuesService extends createPrismaBase(MODELS.TopIssue) {
     super()
   }
 
-  async getByLocation(zip: string): Promise<TopIssue[]> {
+  async getByLocation(zip: string): Promise<string[]> {
     const messages: AiChatMessage[] = [
       {
         role: 'system',

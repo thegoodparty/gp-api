@@ -2,19 +2,23 @@ import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { isAxiosError } from 'axios'
+import { PinoLogger } from 'nestjs-pino'
 import { lastValueFrom } from 'rxjs'
+import { serializeError } from 'serialize-error'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
-import { SlackService } from 'src/shared/services/slack.service'
-import { SlackChannel } from 'src/shared/services/slackService.types'
 import { DateFormats, formatDate } from 'src/shared/util/date.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
+import { SlackChannel } from 'src/vendors/slack/slackService.types'
 import { ElectionApiRoutes } from '../constants/elections.const'
 import {
   BuildRaceTargetDetailsInput,
-  PositionWithMatchedDistrict,
+  District,
+  DistrictNameItem,
+  DistrictTypeItem,
+  PositionWithOptionalDistrict,
   ProjectedTurnout,
   RaceTargetMetrics,
 } from '../types/elections.types'
@@ -30,14 +34,14 @@ export class ElectionsService {
   private static readonly WIN_NUMBER_MULTIPLIER = 0.5
   private static readonly API_VERSION = 'v1'
 
-  private readonly logger = new Logger(ElectionsService.name)
-
   constructor(
     private readonly httpService: HttpService,
     private readonly slack: SlackService,
+    private readonly logger: PinoLogger,
   ) {
+    this.logger.setContext(ElectionsService.name)
     if (!ElectionsService.BASE_URL) {
-      throw new Error(`Please set ELECTION_API_URL in your .env. 
+      throw new Error(`Please set ELECTION_API_URL in your .env.
         Recommendation is to point it at dev if you are developing`)
     }
   }
@@ -47,25 +51,37 @@ export class ElectionsService {
     query?: Q,
   ): Promise<Res | null> {
     const fullUrl = `${ElectionsService.BASE_URL}/${ElectionsService.API_VERSION}/${path}`
+    const rawParams = (query ?? {}) as Record<
+      string,
+      string | number | boolean | null | undefined
+    >
+    // Object.keys/fromEntries returns string[] — TypeScript deliberately widens key types
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const filteredParams = Object.fromEntries(
+      Object.entries(rawParams).filter(
+        ([, v]) => v !== undefined && v !== null,
+      ),
+    ) as Record<string, string | number | boolean>
+    this.logger.debug({ filteredParams }, `Election API GET ${path} params: `)
     try {
-      const { data, status } = await lastValueFrom(
+      const { data, status } = (await lastValueFrom(
         this.httpService.get(fullUrl, {
           params: query,
           paramsSerializer: (params) =>
             Object.entries(params)
               .filter(([, v]) => v !== undefined && v !== null)
-              .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+              .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
               .join('&'),
         }),
-      )
+      )) as { data: Res; status: number }
       if (status >= 200 && status < 300) return data
       this.logger.warn(`Election API GET ${path}} responded ${status}`)
       return null
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     } catch (error: unknown) {
       const baseMessage = `Election API GET ${path} failed`
       if (isAxiosError(error)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        // Axios error response is untyped — AxiosError.response.data is unknown
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const data = error.response?.data as Record<string, unknown> | undefined
         const apiMessage =
           typeof data?.message === 'string' ? data.message : undefined
@@ -84,7 +100,6 @@ export class ElectionsService {
   private buildSlackErrorMessage(
     title: string,
     context: Record<string, string | number | boolean | null | undefined>,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     error: unknown,
   ): string {
     const contextLines = Object.entries(context)
@@ -96,7 +111,12 @@ export class ElectionsService {
       ? JSON.stringify(
           {
             status: error.response?.status,
-            data: error.response?.data,
+            // Axios error response is untyped — AxiosError.response.data is unknown
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            data: error.response?.data as Record<
+              string,
+              string | number | boolean
+            >,
           },
           null,
           2,
@@ -120,36 +140,156 @@ export class ElectionsService {
     }
   }
 
-  async getBallotReadyMatchedRaceTargetDetails(
+  async getPositionByBallotReadyId(
     ballotreadyPositionId: string,
-    electionDate: string,
+    options?: { includeDistrict?: boolean },
   ) {
+    return this.electionApiGet<
+      PositionWithOptionalDistrict,
+      { includeDistrict: boolean; includeTurnout: boolean }
+    >(
+      ElectionApiRoutes.positions.findByBrId.path + `/${ballotreadyPositionId}`,
+      {
+        includeDistrict: options?.includeDistrict ?? false,
+        includeTurnout: false,
+      },
+    )
+  }
+  async getPositionById(
+    positionId: string,
+    options?: {
+      includeDistrict?: boolean
+      includeTurnout?: boolean
+      electionDate?: string
+    },
+  ) {
+    return this.electionApiGet<
+      PositionWithOptionalDistrict,
+      {
+        includeDistrict: boolean
+        includeTurnout: boolean
+        electionDate?: string
+      }
+    >(`positions/${positionId}`, {
+      includeDistrict: options?.includeDistrict ?? false,
+      includeTurnout: options?.includeTurnout ?? false,
+      electionDate: options?.electionDate,
+    })
+  }
+
+  async getDistrict(id: string): Promise<District | null> {
+    return this.electionApiGet<District, object>(`districts/${id}`, {})
+  }
+
+  async getDistrictId(
+    state: string,
+    l2DistrictType: string,
+    l2DistrictName: string,
+  ): Promise<string | null> {
+    const districts = await this.electionApiGet<
+      { id: string }[],
+      {
+        state: string
+        L2DistrictType: string
+        L2DistrictName: string
+        districtColumns: string
+      }
+    >(ElectionApiRoutes.districts.list.path, {
+      state,
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: this.cleanDistrictName(l2DistrictName),
+      districtColumns: 'id',
+    })
+    return districts?.[0]?.id ?? null
+  }
+
+  // Gold flow: match a district via BallotReady position ID.
+  // Returns district data even when projected turnout is unavailable,
+  // using sentinel values (-1) so callers can distinguish partial matches.
+  async getBallotReadyMatchedRaceTargetDetails(params: {
+    ballotreadyPositionId: string
+    electionDate?: string
+    includeTurnout: boolean
+    campaignId: number
+    officeName: string | undefined
+  }) {
+    const {
+      ballotreadyPositionId,
+      electionDate,
+      includeTurnout,
+      campaignId,
+      officeName,
+    } = params
+    let positionWithDistrict: PositionWithOptionalDistrict | null = null
     try {
-      const positionWithDistrict = await this.electionApiGet<
-        PositionWithMatchedDistrict,
-        { electionDate: string; includeDistrict: boolean }
+      positionWithDistrict = await this.electionApiGet<
+        PositionWithOptionalDistrict,
+        {
+          electionDate: string | undefined
+          includeDistrict: boolean
+          includeTurnout: boolean
+        }
       >(
         ElectionApiRoutes.positions.findByBrId.path +
           `/${ballotreadyPositionId}`,
         {
-          electionDate,
+          electionDate: electionDate ?? undefined,
           includeDistrict: true,
+          includeTurnout,
         },
       )
-      if (!positionWithDistrict) {
-        throw new NotFoundException('No positionWithDistrict found')
+      if (!positionWithDistrict || !positionWithDistrict?.district) {
+        throw new NotFoundException(
+          'No position and/or associated district was found',
+        )
       }
 
+      const turnoutValue =
+        positionWithDistrict?.district?.projectedTurnout?.projectedTurnout
+      const hasTurnout = includeTurnout && !!turnoutValue
+
+      this.logger.info({
+        event: 'DistrictMatch',
+        matchType: 'gold',
+        result: hasTurnout ? 'success' : 'partial',
+        electionDate,
+        campaignId,
+        ballotreadyPositionId,
+        officeName,
+        districtType: positionWithDistrict?.district?.L2DistrictType,
+        districtName: positionWithDistrict?.district?.L2DistrictName,
+        projectedTurnout: turnoutValue,
+      })
       return {
-        ...this.calculateRaceTargetMetrics(
-          positionWithDistrict?.district.projectedTurnout.projectedTurnout,
-        ),
-        district: positionWithDistrict.district,
+        district: positionWithDistrict?.district,
+        ...(hasTurnout
+          ? this.calculateRaceTargetMetrics(turnoutValue)
+          : {
+              // Sentinel values: turnout unavailable or not requested
+              winNumber: -1,
+              voterContactGoal: -1,
+              projectedTurnout: -1,
+            }),
       }
     } catch (error) {
+      this.logger.info({
+        event: 'DistrictMatch',
+        matchType: 'gold',
+        result: 'failure',
+        reason: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
+        electionDate,
+        campaignId,
+        ballotreadyPositionId,
+        officeName,
+        districtType: positionWithDistrict?.district?.L2DistrictType,
+        districtName: positionWithDistrict?.district?.L2DistrictName,
+        projectedTurnout:
+          positionWithDistrict?.district?.projectedTurnout?.projectedTurnout,
+      })
       const message = this.buildSlackErrorMessage(
         'Election API error: getBallotReadyMatchedRaceTargetDetails',
-        { ballotreadyPositionId, electionDate },
+        { ballotreadyPositionId, electionDate, campaignId },
         error,
       )
       await this.slack.formattedMessage({
@@ -157,7 +297,7 @@ export class ElectionsService {
         error,
         channel: SlackChannel.botPathToVictoryIssues,
       })
-      return null
+      throw error
     }
   }
 
@@ -216,32 +356,48 @@ export class ElectionsService {
     }
   }
 
-  async getValidDistrictTypes(state: string, electionYear: string | number) {
-    return await this.electionApiGet(ElectionApiRoutes.districts.types.path, {
-      electionYear,
+  async getValidDistrictTypes(
+    state: string,
+    electionYear: string | number,
+    excludeInvalid = true,
+  ) {
+    const shouldExclude = excludeInvalid === true
+    const query = {
       state,
-      excludeInvalid: true,
-    })
+      excludeInvalid: shouldExclude,
+      ...(shouldExclude ? { electionYear } : {}),
+    }
+    return await this.electionApiGet<DistrictTypeItem[], typeof query>(
+      ElectionApiRoutes.districts.types.path,
+      query,
+    )
   }
 
   async getValidDistrictNames(
-    L2DistrictType: string,
+    l2DistrictType: string,
     state?: string,
     electionYear?: string | number,
+    excludeInvalid = true,
   ) {
-    return await this.electionApiGet(ElectionApiRoutes.districts.names.path, {
-      L2DistrictType,
+    const shouldExclude = excludeInvalid === true
+    const query = {
+      L2DistrictType: l2DistrictType,
       state,
-      electionYear,
-      excludeInvalid: true,
-    })
+      excludeInvalid: shouldExclude,
+      ...(shouldExclude ? { electionYear } : {}),
+    }
+    return await this.electionApiGet<DistrictNameItem[], typeof query>(
+      ElectionApiRoutes.districts.names.path,
+      query,
+    )
   }
 
-  private cleanDistrictName(L2DistrictName: string) {
-    const segments = L2DistrictName.split('##')
+  cleanDistrictName(l2DistrictName: string) {
+    const segments = l2DistrictName
+      .split('##')
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
-    if (segments.length === 0) return L2DistrictName
+    if (segments.length === 0) return l2DistrictName
     let longest = segments[0]
     for (let i = 1; i < segments.length; i++) {
       if (segments[i].length > longest.length) {

@@ -3,25 +3,21 @@ import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
 import { Campaign, Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
-import { getUserFullName } from 'src/users/util/users.util'
-import { EmailTemplateName } from 'src/email/email.types'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { AdminP2VService } from '../services/adminP2V.service'
-import {
-  CampaignCreatedBy,
-  CampaignWith,
-  OnboardingStep,
-} from 'src/campaigns/campaigns.types'
-import { WEBAPP_ROOT } from 'src/shared/util/appEnvironment.util'
+import { CampaignCreatedBy, OnboardingStep } from '@goodparty_org/contracts'
+import { CampaignWith } from 'src/campaigns/campaigns.types'
 import { formatDate } from 'date-fns'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
 import { DateFormats } from 'src/shared/util/date.util'
 import { CrmCampaignsService } from '../../campaigns/services/crmCampaigns.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
 import { AuthenticationService } from 'src/authentication/authentication.service'
-import { EVENTS } from 'src/segment/segment.types'
+import { EVENTS } from 'src/vendors/segment/segment.types'
 import { AnalyticsService } from 'src/analytics/analytics.service'
+import { PinoLogger } from 'nestjs-pino'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 
 @Injectable()
 export class AdminCampaignsService {
@@ -34,7 +30,10 @@ export class AdminCampaignsService {
     private readonly crm: CrmCampaignsService,
     private readonly auth: AuthenticationService,
     private readonly analytics: AnalyticsService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(AdminCampaignsService.name)
+  }
 
   async create(body: AdminCreateCampaignSchema) {
     const {
@@ -74,18 +73,35 @@ export class AdminCampaignsService {
     }
 
     // create new campaign
-    const newCampaign = await this.campaigns.create({
-      data: {
-        slug,
-        data,
-        isActive: true,
-        userId: user.id,
-        details: {
-          zip: user.zip,
-          knowRun: 'yes',
-          pledged: true,
+    const newCampaign = await this.campaigns.client.$transaction(async (tx) => {
+      const [{ nextval: id }] = await tx.$queryRaw<[{ nextval: bigint }]>`
+        SELECT nextval('campaign_id_seq')`
+
+      const campaignId = Number(id)
+      const orgSlug = OrganizationsService.campaignOrgSlug(campaignId)
+      await tx.organization.create({
+        data: {
+          slug: orgSlug,
+          ownerId: user.id,
         },
-      },
+      })
+      const campaign = await tx.campaign.create({
+        data: {
+          id: campaignId,
+          slug,
+          organizationSlug: orgSlug,
+          data,
+          isActive: true,
+          userId: user.id,
+          details: {
+            zip: user.zip,
+            knowRun: 'yes',
+            pledged: true,
+          },
+        },
+      })
+
+      return campaign
     })
 
     await this.crm.trackCampaign(newCampaign.id)
@@ -116,14 +132,22 @@ export class AdminCampaignsService {
       data: attributes,
     })
     if (isPro === true) {
-      this.analytics.track(
-        updatedCampaign?.userId,
-        EVENTS.Account.ProSubscriptionConfirmed,
-        {
-          price: 0,
-          paymentMethod: 'admin',
-        },
-      )
+      try {
+        await this.analytics.track(
+          updatedCampaign?.userId,
+          EVENTS.Account.ProSubscriptionConfirmed,
+          {
+            price: 0,
+            paymentMethod: 'admin',
+          },
+        )
+      } catch (error) {
+        this.logger.error(
+          { error },
+          `[ADMIN] Failed to track admin pro subscription analytics - User: ${updatedCampaign?.userId}, Campaign: ${id}`,
+        )
+        // Don't throw - we don't want to fail the admin operation for analytics issues
+      }
     }
     await this.crm.trackCampaign(updatedCampaign.id)
 
@@ -192,21 +216,6 @@ export class AdminCampaignsService {
     }
 
     await this.adminP2V.completeP2V(user.id, pathToVictory)
-
-    if (campaign?.data?.createdBy !== CampaignCreatedBy.ADMIN) {
-      const variables = {
-        name: getUserFullName(user),
-        link: `${WEBAPP_ROOT}/dashboard`,
-      }
-
-      await this.email.sendTemplateEmail({
-        to: user.email,
-        subject: 'Exciting News: Your Customized Campaign Plan is Updated!',
-        template: EmailTemplateName.candidateVictoryReady,
-        variables,
-        from: 'jared@goodparty.org',
-      })
-    }
 
     return true
   }

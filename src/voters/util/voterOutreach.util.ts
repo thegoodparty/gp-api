@@ -1,7 +1,7 @@
 import {
   SlackMessageBlock,
   SlackMessageType,
-} from 'src/shared/services/slackService.types'
+} from 'src/vendors/slack/slackService.types'
 import { OutreachType } from '@prisma/client'
 
 export type AudienceSlackBlock = {
@@ -35,6 +35,7 @@ type SlackBlocksParams = {
   message?: string
   formattedAudience: Array<AudienceSlackBlock>
   audienceRequest?: string
+  peerlyJobUrl?: string
 }
 
 export function buildSlackBlocks({
@@ -51,6 +52,7 @@ export function buildSlackBlocks({
   message,
   formattedAudience,
   audienceRequest,
+  peerlyJobUrl,
 }: SlackBlocksParams) {
   const blocks = [
     {
@@ -194,23 +196,28 @@ export function buildSlackBlocks({
                 },
               ],
             },
-            {
-              type: SlackMessageType.RICH_TEXT_SECTION,
-              elements: [
-                {
-                  type: SlackMessageType.TEXT,
-                  text: 'AI-Generated Script: ',
-                  style: {
-                    bold: true,
-                  },
-                },
-                {
-                  type: SlackMessageType.TEXT,
-                  text: String(script),
-                },
-              ],
-            },
           ].filter((elem) => elem !== undefined),
+        },
+        {
+          type: SlackMessageType.RICH_TEXT_SECTION,
+          elements: [
+            {
+              type: SlackMessageType.TEXT,
+              text: 'Message Script: ',
+              style: {
+                bold: true,
+              },
+            },
+          ],
+        },
+        {
+          type: SlackMessageType.RICH_TEXT_PREFORMATTED,
+          elements: [
+            {
+              type: SlackMessageType.TEXT,
+              text: String(script),
+            },
+          ],
         },
       ],
     },
@@ -249,40 +256,62 @@ export function buildSlackBlocks({
         }`,
       },
     },
-    {
-      type: SlackMessageType.RICH_TEXT,
-      elements: [
-        {
-          type: SlackMessageType.RICH_TEXT_SECTION,
-          elements: [
-            {
-              type: SlackMessageType.EMOJI,
-              name: 'lock',
-            },
-            {
-              type: SlackMessageType.TEXT,
-              text: ' Voter File Download Link\n',
-              style: {
-                bold: true,
-              },
-            },
-            voterFileUrl
-              ? {
-                  type: 'link',
-                  text: 'Voter File Download',
-                  url: String(voterFileUrl),
-                }
-              : {
-                  type: SlackMessageType.TEXT,
-                  text: 'Error: Not provided or invalid',
-                  style: {
-                    bold: true,
+    ...(voterFileUrl
+      ? [
+          {
+            type: SlackMessageType.RICH_TEXT,
+            elements: [
+              {
+                type: SlackMessageType.RICH_TEXT_SECTION,
+                elements: [
+                  {
+                    type: SlackMessageType.EMOJI,
+                    name: 'lock',
                   },
-                },
-          ],
-        },
-      ],
-    },
+                  {
+                    type: SlackMessageType.TEXT,
+                    text: ' Voter File Download Link\n',
+                    style: {
+                      bold: true,
+                    },
+                  },
+                  {
+                    type: 'link',
+                    text: 'Voter File Download',
+                    url: String(voterFileUrl),
+                  },
+                ],
+              },
+            ],
+          },
+        ]
+      : []),
+    ...(peerlyJobUrl
+      ? [
+          {
+            type: SlackMessageType.RICH_TEXT,
+            elements: [
+              {
+                type: SlackMessageType.RICH_TEXT_SECTION,
+                elements: [
+                  {
+                    type: SlackMessageType.TEXT,
+                    text: 'Peerly Job Link\n',
+                    style: {
+                      bold: true,
+                    },
+                  },
+                  {
+                    type: 'link',
+                    text: 'View Job in Peerly',
+                    url: String(peerlyJobUrl),
+                  },
+                ],
+              },
+            ],
+          },
+        ]
+      : []),
     {
       type: SlackMessageType.DIVIDER,
     },
@@ -319,55 +348,59 @@ export function buildSlackBlocks({
         },
       ],
     },
-    {
-      type: SlackMessageType.RICH_TEXT,
-      elements: [
-        {
-          type: SlackMessageType.RICH_TEXT_SECTION,
-          elements: [
-            {
-              type: SlackMessageType.EMOJI,
-              name: 'busts_in_silhouette',
-            },
-            {
-              type: SlackMessageType.TEXT,
-              text: ' Audience Selection:',
-              style: {
-                bold: true,
-              },
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: SlackMessageType.RICH_TEXT,
-      elements: [
-        {
-          type: SlackMessageType.RICH_TEXT_LIST,
-          style: 'bullet',
-          elements: [
-            ...formattedAudience,
-            {
-              type: SlackMessageType.RICH_TEXT_SECTION,
-              elements: [
-                {
-                  type: SlackMessageType.TEXT,
-                  text: 'Audience Request: ',
-                  style: {
-                    bold: true,
+    ...(formattedAudience.length > 0 || audienceRequest
+      ? [
+          {
+            type: SlackMessageType.RICH_TEXT,
+            elements: [
+              {
+                type: SlackMessageType.RICH_TEXT_SECTION,
+                elements: [
+                  {
+                    type: SlackMessageType.EMOJI,
+                    name: 'busts_in_silhouette',
                   },
-                },
-                {
-                  type: SlackMessageType.TEXT,
-                  text: audienceRequest ? String(audienceRequest) : 'N/A',
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
+                  {
+                    type: SlackMessageType.TEXT,
+                    text: ' Audience Selection:',
+                    style: {
+                      bold: true,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: SlackMessageType.RICH_TEXT,
+            elements: [
+              {
+                type: SlackMessageType.RICH_TEXT_LIST,
+                style: 'bullet',
+                elements: [
+                  ...formattedAudience,
+                  {
+                    type: SlackMessageType.RICH_TEXT_SECTION,
+                    elements: [
+                      {
+                        type: SlackMessageType.TEXT,
+                        text: 'Audience Request: ',
+                        style: {
+                          bold: true,
+                        },
+                      },
+                      {
+                        type: SlackMessageType.TEXT,
+                        text: audienceRequest ? String(audienceRequest) : 'N/A',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ]
+      : []),
     {
       type: SlackMessageType.DIVIDER,
     },
@@ -405,6 +438,8 @@ export function buildSlackBlocks({
       : undefined,
   ]
 
+  // SlackMessageBlock type doesn't include all properties used in blocks (e.g. url) — needs type update
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     blocks: blocks.filter((block) => block !== undefined),
   } as { blocks: SlackMessageBlock[] }

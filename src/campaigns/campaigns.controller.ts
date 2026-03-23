@@ -1,3 +1,14 @@
+import { M2MOnly } from '@/authentication/guards/M2MOnly.guard'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
+import { ResponseSchema } from '@/shared/decorators/ResponseSchema.decorator'
+import { ZodResponseInterceptor } from '@/shared/interceptors/ZodResponse.interceptor'
+import { IdParamSchema } from '@/shared/schemas/IdParam.schema'
+import { PaginatedResponseSchema } from '@/shared/schemas/PaginatedResponse.schema'
+import {
+  ListCampaignsPaginationSchema,
+  ReadCampaignOutputSchema,
+  UpdateCampaignM2MSchema,
+} from '@goodparty_org/contracts'
 import {
   BadRequestException,
   Body,
@@ -7,17 +18,18 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  InternalServerErrorException,
-  Logger,
   NotFoundException,
   Param,
   Post,
   Put,
   Query,
+  UseGuards,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import { Campaign, Prisma, User, UserRole } from '@prisma/client'
-import { ZodValidationPipe } from 'nestjs-zod'
+import { PinoLogger } from 'nestjs-pino'
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
@@ -33,15 +45,17 @@ import {
 import { EnqueuePathToVictoryService } from 'src/pathToVictory/services/enqueuePathToVictory.service'
 import { PathToVictoryService } from 'src/pathToVictory/services/pathToVictory.service'
 import { P2VSource } from 'src/pathToVictory/types/pathToVictory.types'
-import { SlackService } from 'src/shared/services/slack.service'
 import { userHasRole } from 'src/users/util/users.util'
+import { SlackService } from 'src/vendors/slack/services/slack.service'
 import { ReqUser } from '../authentication/decorators/ReqUser.decorator'
 import { Roles } from '../authentication/decorators/Roles.decorator'
 import { ReqCampaign } from './decorators/ReqCampaign.decorator'
 import { UseCampaign } from './decorators/UseCampaign.decorator'
+import { UpdateRaceTargetDetailsBySlugQueryDTO } from './schemas/adminRaceTargetDetails.schema'
 import { CampaignListSchema } from './schemas/campaignList.schema'
 import { CreateP2VSchema } from './schemas/createP2V.schema'
 import {
+  CreateCampaignSchema,
   SetDistrictDTO,
   UpdateCampaignSchema,
 } from './schemas/updateCampaign.schema'
@@ -49,11 +63,16 @@ import { CampaignPlanVersionsService } from './services/campaignPlanVersions.ser
 import { CampaignsService } from './services/campaigns.service'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
+class ListCampaignsPaginationDto extends createZodDto(
+  ListCampaignsPaginationSchema,
+) {}
+
+class UpdateCampaignM2MDto extends createZodDto(UpdateCampaignM2MSchema) {}
+
 @Controller('campaigns')
 @UsePipes(ZodValidationPipe)
+@UseInterceptors(ZodResponseInterceptor)
 export class CampaignsController {
-  private readonly logger = new Logger(CampaignsController.name)
-
   constructor(
     private readonly campaigns: CampaignsService,
     private readonly planVersions: CampaignPlanVersionsService,
@@ -61,9 +80,13 @@ export class CampaignsController {
     private readonly p2v: PathToVictoryService,
     private readonly enqueuePathToVictory: EnqueuePathToVictoryService,
     private readonly elections: ElectionsService,
+    private readonly organizations: OrganizationsService,
     private readonly analytics: AnalyticsService,
     private readonly queueProducerService: QueueProducerService,
-  ) {}
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(CampaignsController.name)
+  }
 
   // TODO: this is a placeholder, remove once actual implememntation is in place!!!
   @Post('mine/path-to-victory')
@@ -111,12 +134,13 @@ export class CampaignsController {
     }
 
     if (p2vStatus === P2VStatus.waiting) {
-      await this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
     }
 
     return p2v
   }
 
+  //TODO: remove this when we start using the admin portal.
   @Roles(UserRole.admin)
   @Get()
   findAll(@Query() query: CampaignListSchema) {
@@ -144,9 +168,17 @@ export class CampaignsController {
   }
 
   @Get('mine')
-  @UseCampaign()
+  @UseCampaign({ include: { pathToVictory: true, organization: true } })
   async findMine(@ReqCampaign() campaign: Campaign) {
     return campaign
+  }
+
+  @UseGuards(M2MOnly)
+  @Get('list')
+  @ResponseSchema(PaginatedResponseSchema(ReadCampaignOutputSchema))
+  async list(@Query() query: ListCampaignsPaginationDto) {
+    const { data, meta } = await this.campaigns.listCampaigns(query)
+    return { data, meta }
   }
 
   @Get('mine/status')
@@ -170,22 +202,34 @@ export class CampaignsController {
   async findBySlug(@Param('slug') slug: string) {
     const campaign = await this.campaigns.findFirst({
       where: { slug },
-      include: { pathToVictory: true },
+      include: {
+        pathToVictory: true,
+        organization: {
+          select: {
+            customPositionName: true,
+            positionId: true,
+          },
+        },
+      },
     })
 
     if (!campaign) throw new NotFoundException()
 
-    return campaign
+    const { positionName } = await this.organizations.resolvePositionContext({
+      customPositionName: campaign.organization?.customPositionName,
+      positionId: campaign.organization?.positionId,
+    })
+
+    return { ...campaign, positionName }
   }
 
   @Post()
-  async create(@ReqUser() user: User) {
-    // see if the user already has campaign
+  async create(@ReqUser() user: User, @Body() body: CreateCampaignSchema) {
     const existing = await this.campaigns.findByUserId(user.id)
     if (existing) {
       throw new ConflictException('User campaign already exists.')
     }
-    return await this.campaigns.createForUser(user)
+    return this.campaigns.createForUser(user, body)
   }
 
   @Put('mine')
@@ -212,7 +256,7 @@ export class CampaignsController {
 
       if (body?.details) {
         const { city, office, electionDate, pledged, party } = body.details
-        this.analytics.identify(campaign.userId, {
+        await this.analytics.identify(campaign.userId, {
           ...(city && {
             officeMunicipality: city,
           }),
@@ -232,20 +276,53 @@ export class CampaignsController {
       }
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign', campaign, { slug, body })
+    this.logger.debug({ campaign, ...{ slug, body } }, 'Updating campaign')
 
     return this.campaigns.updateJsonFields(campaign.id, body)
+  }
+
+  @UseGuards(M2MOnly)
+  @Get(':id')
+  @ResponseSchema(ReadCampaignOutputSchema)
+  async findById(@Param() { id }: IdParamSchema) {
+    return this.campaigns.findUniqueOrThrow({
+      where: { id },
+    })
+  }
+
+  @UseGuards(M2MOnly)
+  @Put(':id')
+  @ResponseSchema(ReadCampaignOutputSchema)
+  async updateCampaign(
+    @Param() { id }: IdParamSchema,
+    @Body() body: UpdateCampaignM2MDto,
+  ) {
+    await this.campaigns.findUniqueOrThrow({
+      where: { id },
+      select: { id: true },
+    })
+
+    const { data, details, aiContent, ...scalarFields } = body
+
+    return this.campaigns.updateJsonFields(
+      id,
+      { data, details, aiContent },
+      true,
+      Object.values(scalarFields).some((v) => v !== undefined)
+        ? scalarFields
+        : undefined,
+    )
   }
 
   @Post('launch')
   @UseCampaign()
   @HttpCode(HttpStatus.OK)
-  async launch(@ReqUser() user: User, @ReqCampaign() campaign: Campaign) {
+  async launch(@ReqCampaign() campaign: Campaign) {
     try {
-      const launchResult = await this.campaigns.launch(user, campaign)
+      const launchResult = await this.campaigns.launch(campaign)
       return launchResult
     } catch (e) {
-      this.logger.error('Error at campaign launch', e)
+      this.logger.error({ e }, 'Error at campaign launch')
       await this.slack.errorMessage({
         message: 'Error at campaign launch',
         error: e,
@@ -260,7 +337,12 @@ export class CampaignsController {
   async setDistrict(
     @ReqCampaign() campaign: Campaign,
     @ReqUser() user: User,
-    @Body() { slug, L2DistrictType, L2DistrictName }: SetDistrictDTO,
+    @Body()
+    {
+      slug,
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
+    }: SetDistrictDTO,
   ) {
     if (
       slug &&
@@ -273,68 +355,123 @@ export class CampaignsController {
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    this.logger.debug('Updating campaign with district', campaign, {
-      slug,
-      L2DistrictType,
-      L2DistrictName,
-    })
+    this.logger.debug(
+      {
+        campaign,
+        ...{
+          slug,
+          L2DistrictType: l2DistrictType,
+          L2DistrictName: l2DistrictName,
+        },
+      },
+      'Updating campaign with district',
+    )
 
     const raceTargetDetails = await this.elections.buildRaceTargetDetails({
-      L2DistrictType,
-      L2DistrictName,
+      L2DistrictType: l2DistrictType,
+      L2DistrictName: l2DistrictName,
       electionDate: campaign.details?.electionDate || '',
       state: campaign.details?.state || '',
     })
 
-    if (!raceTargetDetails || raceTargetDetails?.projectedTurnout === 0) {
-      throw new InternalServerErrorException(
-        'Error: An invalid L2District was likely passed to the user and selected by the user',
-      )
-    }
+    const hasTurnout =
+      !!raceTargetDetails?.projectedTurnout &&
+      raceTargetDetails.projectedTurnout > 0
+
+    const campaignOrg = await this.organizations.findUnique({
+      where: { slug: OrganizationsService.campaignOrgSlug(campaign.id) },
+    })
+
+    const overrideDistrictId =
+      await this.organizations.resolveOverrideDistrictId({
+        positionId: campaignOrg?.positionId ?? undefined,
+        state: campaign.details?.state || '',
+        L2DistrictType: l2DistrictType,
+        L2DistrictName: l2DistrictName,
+      })
+
     return this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
-        ...raceTargetDetails,
-        electionType: L2DistrictType,
-        electionLocation: L2DistrictName,
+        ...(raceTargetDetails || {}),
+        electionType: l2DistrictType,
+        electionLocation: l2DistrictName,
         districtManuallySet: true,
+        ...(!hasTurnout
+          ? {
+              projectedTurnout: -1,
+              winNumber: -1,
+              voterContactGoal: -1,
+              p2vStatus: P2VStatus.districtMatched,
+            }
+          : {}),
+        // Reset stale silver state when district changes
+        p2vAttempts: 0,
+        officeContextFingerprint: null,
       },
+      overrideDistrictId,
     })
   }
 
   @Put('mine/race-target-details')
   @UseCampaign()
   async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
-    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+    const { ballotreadyPositionId, positionName } =
+      await this.resolveRaceTargetPositionContext(campaign)
+
+    if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
     }
-    const raceTargetDetails =
-      await this.elections.getBallotReadyMatchedRaceTargetDetails(
-        campaign.details.positionId,
-        campaign.details.electionDate,
-      )
+
+    // Gold flow: look up district + turnout from election-api.
+    // If this fails, fall back to silver (LLM-based matching).
+    const raceTargetDetails = await this.elections
+      .getBallotReadyMatchedRaceTargetDetails({
+        campaignId: campaign.id,
+        ballotreadyPositionId,
+        electionDate: campaign.details.electionDate,
+        includeTurnout: true,
+        officeName: positionName ?? undefined,
+      })
+      .catch(() => null)
+
     if (!raceTargetDetails) {
-      throw new NotFoundException(
-        'Failed to fetch the raceTargetDetails for the requested campaign',
-      )
+      // Gold flow failed or returned nothing. Ensure a P2V record exists
+      // with Waiting status so silver can attempt district matching.
+      const result = await this.campaigns.updateJsonFields(campaign.id, {
+        pathToVictory: {
+          p2vStatus: P2VStatus.waiting,
+          p2vAttempts: 0,
+          officeContextFingerprint: null,
+        },
+      })
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      return result
     }
+
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
-
-    const res = this.campaigns.updateJsonFields(campaign.id, {
+    const hasTurnout = projectedTurnout > 0
+    const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
+        // Always write turnout values: real data when available, sentinel -1
+        // when district matched but no turnout. This ensures stale turnout
+        // from a previous district is cleared.
         winNumber,
         voterContactGoal,
         projectedTurnout,
         source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
+        p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
+        // Always reset stale silver state when district changes
+        p2vAttempts: 0,
+        officeContextFingerprint: null,
       },
     })
 
@@ -350,47 +487,94 @@ export class CampaignsController {
       MessageGroup.default,
     )
 
-    return res
+    return result
   }
 
   @Put('admin/:slug/race-target-details')
-  @Roles(UserRole.admin)
-  async updateRaceTargetDetailsBySlug(@Param('slug') slug: string) {
+  @Roles(UserRole.admin, UserRole.sales)
+  async updateRaceTargetDetailsBySlug(
+    @Param('slug') slug: string,
+    @Query() query: UpdateRaceTargetDetailsBySlugQueryDTO,
+  ) {
+    const { includeTurnout } =
+      UpdateRaceTargetDetailsBySlugQueryDTO.create(query)
     const campaign = await this.campaigns.findFirstOrThrow({
       where: { slug },
     })
+    const { ballotreadyPositionId, positionName } =
+      await this.resolveRaceTargetPositionContext(campaign)
 
-    if (!campaign?.details?.positionId || !campaign.details.electionDate) {
+    if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
         `Error: The campaign has no ballotready 'positionId' or electionDate and likely hasn't selected an office yet`,
       )
     }
-    const raceTargetDetails =
-      await this.elections.getBallotReadyMatchedRaceTargetDetails(
-        campaign.details.positionId,
-        campaign.details.electionDate,
-      )
+    // Gold flow: look up district + turnout from election-api.
+    // If this fails, fall back to silver (LLM-based matching).
+    const raceTargetDetails = await this.elections
+      .getBallotReadyMatchedRaceTargetDetails({
+        campaignId: campaign.id,
+        ballotreadyPositionId,
+        electionDate: campaign.details.electionDate,
+        includeTurnout: includeTurnout ?? true,
+        officeName: positionName ?? undefined,
+      })
+      .catch(() => null)
+
     if (!raceTargetDetails) {
-      throw new NotFoundException(
-        'Failed to fetch the raceTargetDetails for the requested campaign',
-      )
+      // Gold flow failed or returned nothing. Ensure a P2V record exists
+      // with Waiting status so silver can attempt district matching.
+      const result = await this.campaigns.updateJsonFields(campaign.id, {
+        pathToVictory: {
+          p2vStatus: P2VStatus.waiting,
+          p2vAttempts: 0,
+          officeContextFingerprint: null,
+        },
+      })
+      this.enqueuePathToVictory.enqueuePathToVictory(campaign.id)
+      return result
     }
+
     const { district, winNumber, voterContactGoal, projectedTurnout } =
       raceTargetDetails
     const { L2DistrictType, L2DistrictName } = district
-    return this.campaigns.updateJsonFields(campaign.id, {
+    const hasTurnout = projectedTurnout > 0
+    const result = await this.campaigns.updateJsonFields(campaign.id, {
       pathToVictory: {
         districtId: district.id,
         electionType: L2DistrictType,
         electionLocation: L2DistrictName,
+        // Always write turnout values: real data when available, sentinel -1
+        // when district matched but no turnout. This ensures stale turnout
+        // from a previous district is cleared.
         winNumber,
         voterContactGoal,
         projectedTurnout,
         source: P2VSource.ElectionApi,
-        p2vStatus: P2VStatus.complete,
+        p2vStatus: hasTurnout ? P2VStatus.complete : P2VStatus.districtMatched,
         p2vCompleteDate: new Date().toISOString().slice(0, 10),
         districtManuallySet: false,
+        // Always reset stale silver state when district changes
+        p2vAttempts: 0,
+        officeContextFingerprint: null,
       },
     })
+
+    return result
+  }
+
+  private async resolveRaceTargetPositionContext(campaign: Campaign) {
+    const campaignOrganization = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+    const { ballotReadyPositionId: ballotreadyPositionId, positionName } =
+      await this.organizations.resolvePositionContext({
+        customPositionName: campaignOrganization?.customPositionName,
+        positionId: campaignOrganization?.positionId,
+      })
+
+    return { ballotreadyPositionId, positionName }
   }
 }

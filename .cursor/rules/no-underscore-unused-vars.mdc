@@ -1,0 +1,26 @@
+---
+description: Delete unused variables instead of prefixing with underscore
+alwaysApply: true
+---
+
+# No Underscore Hacks for Unused Variables
+
+When a destructured property or variable is unused, DELETE it.
+Do NOT rename it with an underscore prefix.
+
+```typescript
+// BAD — underscore cruft
+const { token, user: _user } = data
+
+// GOOD — just don't destructure it
+const { token } = data
+```
+
+The `_` prefix is ONLY acceptable for:
+
+- Callback parameters required by a signature where you
+  need a later positional arg (e.g. `(_req, res)`)
+- Intentionally ignored iterator variables
+  (e.g. `Array.from({ length: 3 }, (_, i) => i)`)
+
+If neither of those applies, remove the declaration.

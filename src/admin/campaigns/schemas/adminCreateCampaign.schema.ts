@@ -1,6 +1,7 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { PhoneSchema, WriteEmailSchema, ZipSchema } from 'src/shared/schemas'
+import { PhoneSchema, ZipSchema } from '@goodparty_org/contracts'
+import { WriteEmailSchema } from 'src/shared/schemas'
 
 export class AdminCreateCampaignSchema extends createZodDto(
   z

@@ -1,13 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import FormData from 'form-data'
 import Mailgun, { MailgunMessageData } from 'mailgun.js'
 import { IMailgunClient } from 'mailgun.js/Interfaces'
+import { PinoLogger } from 'nestjs-pino'
+import { requireEnv } from 'src/shared/utils/env'
 
 const EMAIL_DOMAIN = 'mg.goodparty.org'
-const API_KEY = process.env.MAILGUN_API_KEY as string
-if (!API_KEY) {
-  throw new Error('Please set MAILGUN_API_KEY in your .env')
-}
+const API_KEY = requireEnv('MAILGUN_API_KEY')
 
 export type EmailData = MailgunMessageData & {
   variables?: Record<string, string | number | boolean>
@@ -16,11 +15,11 @@ export type EmailData = MailgunMessageData & {
 
 @Injectable()
 export class MailgunService {
-  private logger = new Logger(MailgunService.name)
   private mailgun: Mailgun
   private client: IMailgunClient
 
-  constructor() {
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(MailgunService.name)
     this.mailgun = new Mailgun(FormData)
     this.client = this.mailgun.client({
       key: API_KEY,
@@ -32,10 +31,10 @@ export class MailgunService {
     if (variables) {
       try {
         emailData['h:X-Mailgun-Variables'] = JSON.stringify(variables)
-      } catch (_error) {
+      } catch {
         this.logger.error(
-          `Failed to stringify variables for email ${emailData.to}:`,
           variables,
+          `Failed to stringify variables for email ${emailData.to}:`,
         )
         throw new Error(
           `Failed to stringify variables for email: ${emailData.to}`,
