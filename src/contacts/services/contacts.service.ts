@@ -7,6 +7,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { Organization } from '@prisma/client'
 import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
@@ -90,9 +91,48 @@ export class ContactsService {
     }
   }
 
+  private async resolveDistrictIdFromOrg(
+    org: Organization,
+  ): Promise<string | null> {
+    if (org.overrideDistrictId) {
+      return org.overrideDistrictId
+    }
+
+    if (org.positionId) {
+      const position = await this.elections.getPositionById(org.positionId, {
+        includeDistrict: true,
+      })
+      return position?.district?.id ?? null
+    }
+
+    return null
+  }
+
+  private async withOrgDistrictResolution<Result>(
+    org: Organization,
+    campaign: CampaignWithPathToVictory,
+    fn: (params: { districtId?: string; state?: string }) => Promise<Result>,
+  ): Promise<Result> {
+    const districtId = await this.resolveDistrictIdFromOrg(org)
+
+    if (districtId) {
+      return fn({ districtId })
+    }
+
+    // No district on the org (statewide/federal case).
+    const state = this.getCampaignState(campaign)
+    if (!this.canUseStatewideFallback(campaign)) {
+      throw new BadRequestException(
+        'Statewide or federal contacts require admin approval',
+      )
+    }
+    return fn({ state })
+  }
+
   async findContacts(
     { resultsPerPage, page, search, segment }: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
+    organization?: Organization,
   ) {
     if (search) {
       const electedOffice =
@@ -105,41 +145,47 @@ export class ContactsService {
     }
     const filters = await this.segmentToFilters(segment, campaign)
 
-    return this.withFallbackDistrictName(
-      campaign,
-      async ({ state, districtType, districtName }) => {
-        try {
-          const response = await lastValueFrom(
-            this.httpService.post(
-              `${PEOPLE_API_URL}/v1/people`,
-              {
-                state,
-                districtType,
-                districtName,
-                resultsPerPage,
-                page,
-                filters,
-                search,
-              },
-              {
-                headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
-              },
-            ),
-          )
-          // People API response is untyped — external API returns unknown response shape
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          return response.data as PeopleListResponse
-        } catch (error) {
-          this.logger.error(
+    const fetchPeople = async (districtParams: {
+      districtId?: string
+      state?: string
+      districtType?: string
+      districtName?: string
+    }) => {
+      try {
+        const response = await lastValueFrom(
+          this.httpService.post(
+            `${PEOPLE_API_URL}/v1/people`,
             {
-              error,
+              ...districtParams,
+              resultsPerPage,
+              page,
+              filters,
+              search,
             },
-            `Failed to fetch from people API`,
-          )
-          throw new BadGatewayException(`Failed to fetch from people API`)
-        }
-      },
-    )
+            {
+              headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
+            },
+          ),
+        )
+        // People API response is untyped — external API returns unknown response shape
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return response.data as PeopleListResponse
+      } catch (error) {
+        this.logger.error(
+          {
+            error,
+          },
+          `Failed to fetch from people API`,
+        )
+        throw new BadGatewayException(`Failed to fetch from people API`)
+      }
+    }
+
+    if (organization) {
+      return this.withOrgDistrictResolution(organization, campaign, fetchPeople)
+    }
+
+    return this.withFallbackDistrictName(campaign, fetchPeople)
   }
 
   async sampleContacts(
@@ -188,47 +234,58 @@ export class ContactsService {
   async findPerson(
     id: string,
     campaign: CampaignWithPathToVictory,
+    organization?: Organization,
   ): Promise<PersonOutput> {
+    const fetchPerson = async (districtParams: {
+      districtId?: string
+      state?: string
+      districtType?: string
+      districtName?: string
+    }) => {
+      try {
+        const response = await lastValueFrom(
+          this.httpService.get<PersonOutput>(
+            `${PEOPLE_API_URL}/v1/people/${id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${this.getValidS2SToken()}`,
+              },
+              params: districtParams,
+            },
+          ),
+        )
+
+        return response.data
+      } catch (error) {
+        if (error instanceof HttpException) {
+          throw error
+        }
+        this.logger.error(
+          { data: JSON.stringify(error) },
+          'Failed to fetch person from people API',
+        )
+
+        if (isAxiosError(error) && error.response?.status === 404) {
+          throw new NotFoundException('Person not found')
+        }
+
+        throw new BadGatewayException('Failed to fetch person from people API')
+      }
+    }
+
+    if (organization) {
+      return this.withOrgDistrictResolution(organization, campaign, fetchPerson)
+    }
+
     return this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
-        try {
-          const params: Record<string, string> = { state }
-          if (districtType && districtName) {
-            params.districtType = districtType
-            params.districtName = districtName
-          }
-
-          const response = await lastValueFrom(
-            this.httpService.get<PersonOutput>(
-              `${PEOPLE_API_URL}/v1/people/${id}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${this.getValidS2SToken()}`,
-                },
-                params,
-              },
-            ),
-          )
-
-          return response.data
-        } catch (error) {
-          if (error instanceof HttpException) {
-            throw error
-          }
-          this.logger.error(
-            { data: JSON.stringify(error) },
-            'Failed to fetch person from people API',
-          )
-
-          if (isAxiosError(error) && error.response?.status === 404) {
-            throw new NotFoundException('Person not found')
-          }
-
-          throw new BadGatewayException(
-            'Failed to fetch person from people API',
-          )
+        const params: Record<string, string> = { state }
+        if (districtType && districtName) {
+          params.districtType = districtType
+          params.districtName = districtName
         }
+        return fetchPerson(params)
       },
     )
   }
@@ -237,6 +294,7 @@ export class ContactsService {
     { segment }: DownloadContactsDTO,
     campaign: CampaignWithPathToVictory,
     res: FastifyReply,
+    organization?: Organization,
   ) {
     const electedOffice =
       await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
@@ -245,45 +303,85 @@ export class ContactsService {
     }
     const filters = await this.segmentToFilters(segment, campaign)
 
-    return this.withFallbackDistrictName(
-      campaign,
-      async ({ state, districtType, districtName }) => {
-        try {
-          const response = await lastValueFrom(
-            this.httpService.post<Readable>(
-              `${PEOPLE_API_URL}/v1/people/download`,
-              { state, districtType, districtName, filters },
-              {
-                headers: {
-                  Authorization: `Bearer ${this.getValidS2SToken()}`,
-                },
-                responseType: 'stream',
-              },
-            ),
-          )
-
-          return new Promise<void>((resolve, reject) => {
-            response.data.pipe(res.raw)
-            response.data.on('end', resolve)
-            response.data.on('error', reject)
-          })
-        } catch (error) {
-          this.logger.error(
+    const downloadPeople = async (districtParams: {
+      districtId?: string
+      state?: string
+      districtType?: string
+      districtName?: string
+    }) => {
+      try {
+        const response = await lastValueFrom(
+          this.httpService.post<Readable>(
+            `${PEOPLE_API_URL}/v1/people/download`,
+            { ...districtParams, filters },
             {
-              error,
+              headers: {
+                Authorization: `Bearer ${this.getValidS2SToken()}`,
+              },
+              responseType: 'stream',
             },
-            'Failed to download contacts from people API',
-          )
+          ),
+        )
 
-          throw new BadGatewayException(
-            'Failed to download contacts from people API',
-          )
-        }
-      },
-    )
+        return new Promise<void>((resolve, reject) => {
+          response.data.pipe(res.raw)
+          response.data.on('end', resolve)
+          response.data.on('error', reject)
+        })
+      } catch (error) {
+        this.logger.error(
+          {
+            error,
+          },
+          'Failed to download contacts from people API',
+        )
+
+        throw new BadGatewayException(
+          'Failed to download contacts from people API',
+        )
+      }
+    }
+
+    if (organization) {
+      return this.withOrgDistrictResolution(
+        organization,
+        campaign,
+        downloadPeople,
+      )
+    }
+
+    return this.withFallbackDistrictName(campaign, downloadPeople)
   }
 
-  async getDistrictStats(campaign: CampaignWithPathToVictory) {
+  async getDistrictStats(
+    campaign: CampaignWithPathToVictory,
+    organization?: Organization,
+  ) {
+    const fetchStats = async (districtParams: {
+      districtId?: string
+      state?: string
+      districtType?: string
+      districtName?: string
+    }) => {
+      const token = this.getValidS2SToken()
+
+      const response = await lastValueFrom(
+        this.httpService.get<StatsResponse>(
+          `${PEOPLE_API_URL}/v1/people/stats`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: districtParams,
+          },
+        ),
+      )
+
+      return response.data
+    }
+
+    if (organization) {
+      return this.withOrgDistrictResolution(organization, campaign, fetchStats)
+    }
+
     return this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
@@ -299,24 +397,12 @@ export class ContactsService {
           throw new BadRequestException(msg)
         }
 
-        const token = this.getValidS2SToken()
         const params: Record<string, string> = { state }
         if (districtType && districtName) {
           params.districtType = districtType
           params.districtName = districtName
         }
-
-        const response = await lastValueFrom(
-          this.httpService.get<StatsResponse>(
-            `${PEOPLE_API_URL}/v1/people/stats`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              params,
-            },
-          ),
-        )
-
-        return response.data
+        return fetchStats(params)
       },
     )
   }
