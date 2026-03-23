@@ -138,18 +138,20 @@ export class PaymentEventsService {
     })
     await this.campaignsService.setIsPro(campaignId)
 
-    const district = campaign.organizationSlug
-      ? await this.organizationsService.getDistrictForOrgSlug(
-          campaign.organizationSlug,
-        )
-      : null
     await Promise.allSettled([
       this.sendProSubscriptionResumedSlackMessage(user, campaign),
-      this.voterFileDownloadAccess.downloadAccessAlert(
-        campaign,
-        user,
-        district,
-      ),
+      (async () => {
+        const district = campaign.organizationSlug
+          ? await this.organizationsService.getDistrictForOrgSlug(
+              campaign.organizationSlug,
+            )
+          : null
+        return this.voterFileDownloadAccess.downloadAccessAlert(
+          campaign,
+          user,
+          district,
+        )
+      })(),
     ])
   }
 
@@ -277,18 +279,20 @@ export class PaymentEventsService {
     })
 
     // Non-critical: Send notifications - log failures but don't fail webhook
-    const checkoutDistrict = campaign.organizationSlug
-      ? await this.organizationsService.getDistrictForOrgSlug(
-          campaign.organizationSlug,
-        )
-      : null
     const results = await Promise.allSettled([
       this.sendProSignUpSlackMessage(user, campaign),
-      this.voterFileDownloadAccess.downloadAccessAlert(
-        campaign,
-        user,
-        checkoutDistrict,
-      ),
+      (async () => {
+        const district = campaign.organizationSlug
+          ? await this.organizationsService.getDistrictForOrgSlug(
+              campaign.organizationSlug,
+            )
+          : null
+        return this.voterFileDownloadAccess.downloadAccessAlert(
+          campaign,
+          user,
+          district,
+        )
+      })(),
     ])
 
     // Log any notification failures

@@ -168,25 +168,23 @@ export class AdminCampaignsService {
       },
     })) as CampaignWith<'pathToVictory'>[]
 
-    const noVoterFile: Campaign[] = []
-
-    // TODO: this check could probably be integrated into the above query
-    for (const campaign of campaigns) {
-      const district = campaign.organizationSlug
-        ? await this.organizations.getDistrictForOrgSlug(
-            campaign.organizationSlug,
+    return (
+      await Promise.all(
+        campaigns.map(async (campaign) => {
+          const district = campaign.organizationSlug
+            ? await this.organizations.getDistrictForOrgSlug(
+                campaign.organizationSlug,
+              )
+            : null
+          return this.voterFileDownloadAccess.canDownload(
+            campaign as CampaignWith<'pathToVictory'>,
+            district,
           )
-        : null
-      const canDownload = this.voterFileDownloadAccess.canDownload(
-        campaign as CampaignWith<'pathToVictory'>,
-        district,
+            ? null
+            : campaign
+        }),
       )
-      if (!canDownload) {
-        noVoterFile.push(campaign)
-      }
-    }
-
-    return noVoterFile
+    ).filter((campaign): campaign is Campaign => campaign !== null)
   }
 
   async p2vStats() {
