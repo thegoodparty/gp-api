@@ -30,6 +30,7 @@ export class AdminCampaignsService {
     private readonly crm: CrmCampaignsService,
     private readonly auth: AuthenticationService,
     private readonly analytics: AnalyticsService,
+    private readonly organizations: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AdminCampaignsService.name)
@@ -171,8 +172,14 @@ export class AdminCampaignsService {
 
     // TODO: this check could probably be integrated into the above query
     for (const campaign of campaigns) {
+      const district = campaign.organizationSlug
+        ? await this.organizations.getDistrictForOrgSlug(
+            campaign.organizationSlug,
+          )
+        : null
       const canDownload = this.voterFileDownloadAccess.canDownload(
         campaign as CampaignWith<'pathToVictory'>,
+        district,
       )
       if (!canDownload) {
         noVoterFile.push(campaign)

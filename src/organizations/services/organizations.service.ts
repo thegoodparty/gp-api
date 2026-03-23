@@ -13,12 +13,14 @@ import {
 } from '../schemas/organization.schema'
 import pmap from 'p-map'
 
+import { OrgDistrict } from '../organizations.types'
+
 export type FriendlyOrganization = {
   slug: string
   hasDistrictOverride: boolean
   customPositionName: string | null
   position: { id: string; name: string; brPositionId: string } | null
-  district: { id: string; l2Type: string; l2Name: string } | null
+  district: OrgDistrict | null
   campaign: Campaign | null
   electedOffice: ElectedOffice | null
 }
@@ -267,6 +269,33 @@ export class OrganizationsService extends createPrismaBase(
       L2DistrictType,
       L2DistrictName,
     )
+  }
+
+  async getDistrictForOrgSlug(slug: string): Promise<OrgDistrict | null> {
+    const org = await this.model.findUnique({ where: { slug } })
+    if (!org) {
+      throw new Error(`Organization with slug ${slug} not found`)
+    }
+
+    const [position, overrideDistrict] = await Promise.all([
+      org.positionId
+        ? this.electionsService.getPositionById(org.positionId, {
+            includeDistrict: true,
+          })
+        : Promise.resolve(null),
+      org.overrideDistrictId
+        ? this.electionsService.getDistrict(org.overrideDistrictId)
+        : Promise.resolve(null),
+    ])
+
+    const district = overrideDistrict ?? position?.district
+    if (!district) return null
+
+    return {
+      id: district.id,
+      l2Type: district.L2DistrictType,
+      l2Name: district.L2DistrictName,
+    }
   }
 
   private async makeFriendly(

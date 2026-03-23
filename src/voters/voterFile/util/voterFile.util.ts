@@ -1,4 +1,5 @@
 import { CampaignWith } from 'src/campaigns/campaigns.types'
+import { OrgDistrict } from 'src/organizations/organizations.types'
 import { GetVoterFileSchema } from '../schemas/GetVoterFile.schema'
 import {
   CustomFilter,
@@ -35,6 +36,7 @@ export function typeToQuery(
   logger: PinoLogger,
   type: VoterFileType,
   campaign: CampaignWith<'pathToVictory'>,
+  district: OrgDistrict | null,
   customFilters?: Pick<CustomVoterFile, 'channel' | 'filters' | 'purpose'>,
   justCount?: boolean,
   fixColumns?: boolean,
@@ -50,8 +52,8 @@ export function typeToQuery(
     typeof electionYear === 'number' ? electionYear % 2 === 0 : true
   let whereClause = ''
   let nestedWhereClause = ''
-  let l2ColumnName = campaign.pathToVictory?.data.electionType
-  const l2ColumnValue = campaign.pathToVictory?.data.electionLocation
+  let l2ColumnName = district?.l2Type
+  const l2ColumnValue = district?.l2Name
 
   logger.debug(
     `Building query: state=${state}, electionType=${l2ColumnName}, electionLocation=${l2ColumnValue}`,
