@@ -17,6 +17,18 @@ export {
   CampaignPlanTaskMetadata,
 } from '../aiCampaignManager.types'
 
+function isProgressStreamData(value: unknown): value is ProgressStreamData {
+  if (typeof value !== 'object' || value === null) return false
+  return (
+    'progress' in value &&
+    typeof value.progress === 'number' &&
+    'status' in value &&
+    typeof value.status === 'string' &&
+    'message' in value &&
+    typeof value.message === 'string'
+  )
+}
+
 @Injectable()
 export class AiCampaignManagerService {
   private readonly apiBaseUrl: string | undefined
@@ -80,8 +92,10 @@ export class AiCampaignManagerService {
       for (const line of lines) {
         try {
           const jsonStr = line.replace('data: ', '')
-          const data = JSON.parse(jsonStr) as ProgressStreamData
-          progressData.push(data)
+          const parsed: unknown = JSON.parse(jsonStr)
+          if (isProgressStreamData(parsed)) {
+            progressData.push(parsed)
+          }
         } catch (parseError) {
           this.logger.warn('Failed to parse progress line', {
             line,

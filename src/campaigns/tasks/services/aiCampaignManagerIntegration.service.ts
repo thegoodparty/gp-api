@@ -12,6 +12,18 @@ import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
 const CAMPAIGN_PLAN_VERSION = process.env.CAMPAIGN_PLAN_VERSION || 1
 
+function isCampaignPlanResponse(value: unknown): value is CampaignPlanResponse {
+  if (typeof value !== 'object' || value === null) return false
+  return (
+    'campaign_plan' in value &&
+    typeof value.campaign_plan === 'string' &&
+    'candidate_name' in value &&
+    typeof value.candidate_name === 'string' &&
+    'ai_tasks' in value &&
+    Array.isArray(value.ai_tasks)
+  )
+}
+
 type CampaignWithPathToVictory = Campaign & {
   pathToVictory?: PathToVictory | null
   details: PrismaJson.CampaignDetails
@@ -72,7 +84,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     const office = details.office || details.normalizedOffice || 'Local Office'
     const jurisdiction = details.state || 'Unknown State'
     const district = details.district ? ` - ${details.district}` : ''
-    const office_and_jurisdiction = `${office} in ${jurisdiction}${district}`
+    const officeAndJurisdiction = `${office} in ${jurisdiction}${district}`
 
     const pathData = pathToVictory?.data as
       | PrismaJson.PathToVictoryData
@@ -93,7 +105,7 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       candidate_name: data.name || `Campaign ${campaign.id}`,
       election_date:
         details.electionDate || new Date().toISOString().split('T')[0],
-      office_and_jurisdiction,
+      office_and_jurisdiction: officeAndJurisdiction,
       race_type: this.determineRaceType(details),
       incumbent_status: this.determineIncumbentStatus(details),
       seats_available: 1,
@@ -213,14 +225,15 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       where: { campaignId: campaign.id },
     })
 
-    if (existingPlan && existingPlan.campaignInfoHash === currentHash) {
+    if (
+      existingPlan &&
+      existingPlan.campaignInfoHash === currentHash &&
+      isCampaignPlanResponse(existingPlan.rawJson)
+    ) {
       this.logger.log(
         `Campaign plan unchanged for campaign ${campaign.id}, returning existing tasks`,
       )
-      return this.parseCampaignPlanToTasks(
-        existingPlan.rawJson as CampaignPlanResponse,
-        campaign,
-      )
+      return this.parseCampaignPlanToTasks(existingPlan.rawJson, campaign)
     }
 
     return null
@@ -421,13 +434,11 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   private generateCampaignInfoHash(
     campaignInfo: Record<string, string | number | boolean | null | undefined>,
   ): string {
-    const { generated_date: _generated_date, ...campaignInfoWithoutDate } =
-      campaignInfo
-    const sortedInfo = Object.keys(campaignInfoWithoutDate)
+    const sortedInfo = Object.keys(campaignInfo)
       .sort()
       .reduce(
         (result, key) => {
-          result[key] = campaignInfoWithoutDate[key]
+          result[key] = campaignInfo[key]
           return result
         },
         {} as Record<string, string | number | boolean | null | undefined>,
@@ -442,14 +453,13 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
     campaign: CampaignWithPathToVictory,
     request: StartCampaignPlanRequest,
   ): Promise<void> {
-    const planData = campaignPlanJson
     const campaignInfoHash = this.generateCampaignInfoHashFromRequest(request)
 
     const campaignPlanData = {
       campaignId: campaign.id,
       campaignInfoHash,
-      plan: planData.campaign_plan,
-      rawJson: planData,
+      plan: campaignPlanJson.campaign_plan,
+      rawJson: campaignPlanJson,
     }
 
     try {

@@ -1,34 +1,34 @@
 enum CampaignTaskType {
-    text
-    robocall
-    doorKnocking
-    phoneBanking
-    socialMedia
-    events
-    education
-    compliance
+  text
+  robocall
+  doorKnocking
+  phoneBanking
+  socialMedia
+  events
+  education
+  compliance
 }
 
 model CampaignTask {
-    id                  String           @id @default(cuid())
-    createdAt           DateTime         @default(now()) @map("created_at")
-    updatedAt           DateTime         @updatedAt @map("updated_at")
-    title               String
-    description         String
-    cta                 String
-    flowType            CampaignTaskType @map("flow_type")
-    week                Int
-    date                DateTime?
-    link                String?
-    proRequired         Boolean?         @default(false) @map("pro_required")
-    isDefaultTask       Boolean?         @default(false) @map("is_default_task")
-    deadline            Int?
-    defaultAiTemplateId String?          @map("default_ai_template_id")
-    completed           Boolean          @default(false)
-    campaign            Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-    campaignId          Int              @map("campaign_id")
+  id                  String           @id @default(cuid())
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  title               String
+  description         String
+  cta                 String
+  flowType            CampaignTaskType @map("flow_type")
+  week                Int
+  date                DateTime?
+  link                String?
+  proRequired         Boolean?         @default(false) @map("pro_required")
+  isDefaultTask       Boolean?         @default(false) @map("is_default_task")
+  deadline            Int?
+  defaultAiTemplateId String?          @map("default_ai_template_id")
+  completed           Boolean          @default(false)
+  campaign            Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId          Int              @map("campaign_id")
 
-    @@index([campaignId])
-    @@index([campaignId, completed])
-    @@map("campaign_task")
+  @@index([campaignId])
+  @@index([campaignId, completed])
+  @@map("campaign_task")
 }

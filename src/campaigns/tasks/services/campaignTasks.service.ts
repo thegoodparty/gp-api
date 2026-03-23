@@ -83,12 +83,8 @@ export class CampaignTasksService extends createPrismaBase(
         await this.aiCampaignManagerIntegration.generateCampaignTasks(campaign)
 
       return this.saveTasks(campaign.id, generatedTasks)
-    } catch (_error) {
-      try {
-        return await this.saveTasks(campaign.id, [])
-      } catch (fallbackError) {
-        throw fallbackError
-      }
+    } catch {
+      return this.saveTasks(campaign.id, [])
     }
   }
 
@@ -127,7 +123,6 @@ export class CampaignTasksService extends createPrismaBase(
       data: tasksToCreate,
     })
 
-    // Return the created tasks
     return this.model.findMany({
       where: { campaignId },
       orderBy: { week: 'desc' },

@@ -33,12 +33,10 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
-import {
-  QueueProducerService,
-  MessageGroup,
-} from 'src/queue/producer/queueProducer.service'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import {
   GenerateTasksMessage,
+  MessageGroup,
   QueueMessage,
   QueueType,
 } from 'src/queue/queue.types'
@@ -482,10 +480,17 @@ export class CampaignsController {
       } as GenerateTasksMessage,
     }
 
-    await this.queueProducerService.sendMessage(
-      taskGenerationMessage,
-      MessageGroup.default,
-    )
+    try {
+      await this.queueProducerService.sendMessage(
+        taskGenerationMessage,
+        MessageGroup.default,
+      )
+    } catch (error) {
+      this.logger.error(
+        { error, campaignId: campaign.id },
+        'Failed to queue task generation',
+      )
+    }
 
     return result
   }
