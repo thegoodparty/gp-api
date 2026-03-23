@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Campaign, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -168,25 +168,22 @@ export class AdminCampaignsService {
       },
     })) as CampaignWith<'pathToVictory'>[]
 
-    const noVoterFile: Campaign[] = []
-
     // TODO: this check could probably be integrated into the above query
-    for (const campaign of campaigns) {
-      const district = campaign.organizationSlug
-        ? await this.organizations.getDistrictForOrgSlug(
-            campaign.organizationSlug,
-          )
-        : null
-      const canDownload = this.voterFileDownloadAccess.canDownload(
-        campaign as CampaignWith<'pathToVictory'>,
-        district,
-      )
-      if (!canDownload) {
-        noVoterFile.push(campaign)
-      }
-    }
+    const districts = await Promise.all(
+      campaigns.map((c) =>
+        c.organizationSlug
+          ? this.organizations.getDistrictForOrgSlug(c.organizationSlug)
+          : null,
+      ),
+    )
 
-    return noVoterFile
+    return campaigns.filter(
+      (campaign, i) =>
+        !this.voterFileDownloadAccess.canDownload(
+          campaign as CampaignWith<'pathToVictory'>,
+          districts[i],
+        ),
+    )
   }
 
   async p2vStats() {

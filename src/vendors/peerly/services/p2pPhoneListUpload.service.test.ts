@@ -51,7 +51,11 @@ const mockCampaign: CampaignWith<'pathToVictory'> = {
   },
 }
 
-const mockDistrict = { l2Type: 'City_Portland', l2Name: 'PORTLAND' }
+const mockDistrict = {
+  id: 'dist-1',
+  l2Type: 'City_Portland',
+  l2Name: 'PORTLAND',
+}
 const mockRequest: P2pPhoneListRequestSchema = { name: 'My List' }
 const mockRequestShort: P2pPhoneListRequestSchema = { name: 'List' }
 

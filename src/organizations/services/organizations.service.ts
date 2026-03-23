@@ -277,6 +277,12 @@ export class OrganizationsService extends createPrismaBase(
       throw new Error(`Organization with slug ${slug} not found`)
     }
 
+    return this.resolveDistrict(org)
+  }
+
+  private async resolveDistrict(
+    org: Organization,
+  ): Promise<OrgDistrict | null> {
     const [position, overrideDistrict] = await Promise.all([
       org.positionId
         ? this.electionsService.getPositionById(org.positionId, {
@@ -304,7 +310,7 @@ export class OrganizationsService extends createPrismaBase(
       electedOffice: ElectedOffice | null
     },
   ): Promise<FriendlyOrganization> {
-    const [position, overrideDistrict] = await Promise.all([
+    const [position, district] = await Promise.all([
       org.positionId
         ? this.electionsService
             .getPositionById(org.positionId, { includeDistrict: true })
@@ -317,21 +323,8 @@ export class OrganizationsService extends createPrismaBase(
               return position
             })
         : Promise.resolve(null),
-      org.overrideDistrictId
-        ? this.electionsService
-            .getDistrict(org.overrideDistrictId)
-            .then((district) => {
-              if (!district) {
-                throw new InternalServerErrorException(
-                  'Organization references a non-existent district',
-                )
-              }
-              return district
-            })
-        : Promise.resolve(null),
+      this.resolveDistrict(org),
     ])
-
-    const district = overrideDistrict ?? position?.district
 
     return {
       slug: org.slug,
@@ -344,13 +337,7 @@ export class OrganizationsService extends createPrismaBase(
             brPositionId: position.brPositionId,
           }
         : null,
-      district: district
-        ? {
-            id: district.id,
-            l2Type: district.L2DistrictType,
-            l2Name: district.L2DistrictName,
-          }
-        : null,
+      district,
       campaign: org.campaign,
       electedOffice: org.electedOffice,
     }
