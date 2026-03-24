@@ -36,7 +36,9 @@ export class TestSeedService {
     if (dto.tcrComplianceStatus !== undefined) {
       result.tcrCompliance = await this.prisma.tcrCompliance.upsert({
         where: { campaignId: campaign.id },
-        update: { status: dto.tcrComplianceStatus },
+        update: {
+          status: dto.tcrComplianceStatus,
+        },
         create: {
           campaignId: campaign.id,
           ein: '00-0000000',

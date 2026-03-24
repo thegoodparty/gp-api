@@ -341,8 +341,6 @@ export = async () => {
       HOST: '0.0.0.0',
       LOG_LEVEL: 'debug',
       OTEL_SERVICE_ENVIRONMENT: environment,
-      TCR_COMPLIANCE_BACKDOOR_ENABLED:
-        environment === 'prod' ? 'false' : 'true',
       CORS_ORIGIN: productDomain,
       AWS_REGION: 'us-west-2',
       ASSET_DOMAIN: select({

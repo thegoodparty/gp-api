@@ -14,7 +14,7 @@ import { SeedCampaignSchema } from './schemas/seedCampaign.schema'
 
 /**
  * Test-only controller for seeding campaign data.
- * Entire module is conditionally loaded when TCR_COMPLIANCE_BACKDOOR_ENABLED=true.
+ * Entire module is conditionally loaded when PEERLY_TEST_IDENTITY_ID is set.
  */
 @Controller('test/seed')
 @UsePipes(ZodValidationPipe)

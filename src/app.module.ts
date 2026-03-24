@@ -87,11 +87,7 @@ import { loggerModule } from './observability/logging/logger-module'
     // with a local mock queue, or https://www.localstack.cloud, or by migrating to a
     // more local-friendly background-work service like e.g. https://www.inngest.com.
     .concat(process.env.NODE_ENV === 'test' ? [] : [QueueConsumerModule])
-    .concat(
-      process.env.TCR_COMPLIANCE_BACKDOOR_ENABLED === 'true'
-        ? [TestSeedModule]
-        : [],
-    ),
+    .concat(process.env.PEERLY_TEST_IDENTITY_ID ? [TestSeedModule] : []),
   providers: [
     SessionsService,
     {
