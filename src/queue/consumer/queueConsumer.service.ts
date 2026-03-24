@@ -1054,9 +1054,7 @@ export class QueueConsumerService {
 
     const organization = office.organization
     if (!organization) {
-      this.logger.info(
-        'Elected office has no organization, ignoring event',
-      )
+      this.logger.info('Elected office has no organization, ignoring event')
       return
     }
 
