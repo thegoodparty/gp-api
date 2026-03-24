@@ -14,10 +14,11 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { ElectedOffice, Prisma, User } from '@prisma/client'
+import { ElectedOffice, Organization, Prisma, User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
-import { OrganizationsService } from 'src/organizations/services/organizations.service'
+import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
+import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
 import { toDateOnlyString } from 'src/shared/util/date.util'
 import { ReqElectedOffice } from './decorators/ReqElectedOffice.decorator'
 import { UseElectedOffice } from './decorators/UseElectedOffice.decorator'
@@ -32,18 +33,12 @@ import { ElectedOfficeService } from './services/electedOffice.service'
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)
 export class ElectedOfficeController {
-  constructor(
-    private readonly electedOfficeService: ElectedOfficeService,
-    private readonly organizationsService: OrganizationsService,
-  ) {}
+  constructor(private readonly electedOfficeService: ElectedOfficeService) {}
 
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
       id: record.id,
-      electedDate: toDateOnlyString(record.electedDate),
       swornInDate: toDateOnlyString(record.swornInDate),
-      termStartDate: toDateOnlyString(record.termStartDate),
-      termEndDate: toDateOnlyString(record.termEndDate),
     }
   }
 
@@ -72,9 +67,41 @@ export class ElectedOfficeController {
     return req.m2mToken ? record : this.toApi(record)
   }
 
+  // LEGACY: When org migration is complete:
+  //         - @UseOrganization becomes required (remove continueIfNotFound)
+  //         - Remove the entire legacy branch (findFirst by userId, campaign.organization/details fallback)
+  //         - organization param becomes non-optional
   @Post('/')
-  async create(@ReqUser() user: User, @Body() body: CreateElectedOfficeDto) {
-    // Do this without guard to hopefully slowly move away from the hard link to campaign
+  @UseOrganization({ continueIfNotFound: true })
+  async create(
+    @ReqUser() user: User,
+    @Body() body: CreateElectedOfficeDto,
+    @ReqOrganization() organization: Organization | undefined,
+  ) {
+    if (organization) {
+      // Org path: get campaign from the organization
+      const campaign =
+        await this.electedOfficeService.client.campaign.findUnique({
+          where: { organizationSlug: organization.slug },
+        })
+      if (!campaign) {
+        throw new ForbiddenException('Not allowed to link campaign')
+      }
+
+      const created = await this.electedOfficeService.create({
+        ...body,
+        userId: user.id,
+        campaignId: campaign.id,
+        orgData: {
+          positionId: organization.positionId,
+          customPositionName: organization.customPositionName,
+          overrideDistrictId: organization.overrideDistrictId,
+        },
+      })
+      return this.toApi(created)
+    }
+
+    // LEGACY: Remove this entire branch when org migration is complete.
     const campaign = await this.electedOfficeService.client.campaign.findFirst({
       where: { userId: user.id },
       include: { organization: true },
@@ -82,19 +109,23 @@ export class ElectedOfficeController {
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
     }
-    const ballotreadyPositionId = campaign.organization?.positionId
-      ? await this.organizationsService.resolveBallotReadyPositionId(
-          campaign.organization.positionId,
-        )
-      : undefined
 
     const created = await this.electedOfficeService.create({
       ...body,
       userId: user.id,
       campaignId: campaign.id,
-      ballotreadyPositionId,
-      office: campaign.details.office,
-      otherOffice: campaign.details.otherOffice,
+      ...(campaign.organization
+        ? {
+            orgData: {
+              positionId: campaign.organization.positionId,
+              customPositionName: campaign.organization.customPositionName,
+              overrideDistrictId: campaign.organization.overrideDistrictId,
+            },
+          }
+        : {
+            office: campaign.details.office,
+            otherOffice: campaign.details.otherOffice,
+          }),
     })
     return this.toApi(created)
   }
@@ -116,12 +147,7 @@ export class ElectedOfficeController {
       throw new ForbiddenException('Not allowed to access this elected office')
     }
     const data: Prisma.ElectedOfficeUpdateInput = {
-      electedDate: body.electedDate,
       swornInDate: body.swornInDate,
-      termStartDate: body.termStartDate,
-      termEndDate: body.termEndDate,
-      termLengthDays: body.termLengthDays,
-      isActive: body.isActive,
     }
     const updated = await this.electedOfficeService.update({
       where: { id },

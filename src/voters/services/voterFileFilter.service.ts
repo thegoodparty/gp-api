@@ -56,6 +56,15 @@ export class VoterFileFilterService extends createPrismaBase(
     })
   }
 
+  findByIdAndOrganizationSlug(
+    id: number,
+    organizationSlug: string,
+  ): Promise<VoterFileFilter | null> {
+    return this.findFirst({
+      where: { id, organizationSlug },
+    })
+  }
+
   updateByIdAndCampaignId(
     id: number,
     campaignId: number,

@@ -48,7 +48,6 @@ beforeEach(async () => {
     data: {
       userId: service.user.id,
       campaignId: campaign.id,
-      isActive: true,
     },
   })
 
