@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, User, UserRole } from '@prisma/client'
+import { createClerkClient } from '@clerk/backend'
 import { userFactory } from './factories/user.factory'
 import { hashPasswordSync } from '../src/users/util/passwords.util'
 
@@ -55,6 +56,76 @@ const USER_W_NO_CAMPAIGN = {
   password: hashPasswordSync('tellMeAllAboutFightClub123'),
   hasPassword: true,
 }
+interface ClerkSeedUser {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+}
+
+const ensureClerkUser = async (
+  prisma: PrismaClient,
+  localUserId: number,
+  userData: ClerkSeedUser,
+) => {
+  const secretKey = process.env.CLERK_SECRET_KEY
+  if (!secretKey) {
+    console.log(
+      `  [SKIP] No CLERK_SECRET_KEY — skipping Clerk sync for ${userData.email}`,
+    )
+    return
+  }
+
+  const clerk = createClerkClient({ secretKey })
+
+  try {
+    const clerkUser = await clerk.users.createUser({
+      emailAddress: [userData.email],
+      password: userData.password,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      skipPasswordChecks: true,
+      skipLegalChecks: true,
+      externalId: String(localUserId),
+    })
+
+    await prisma.user.update({
+      where: { id: localUserId },
+      data: { clerkId: clerkUser.id },
+    })
+
+    const { email } = userData
+    console.log(`  [CLERK] Created ${email} → ${clerkUser.id}`)
+  } catch (error) {
+    const { email } = userData
+    const clerkErrors =
+      typeof error === 'object' && error !== null && 'errors' in error
+        ? (error as { errors: { code: string }[] }).errors
+        : []
+
+    const isDuplicate =
+      Array.isArray(clerkErrors) &&
+      clerkErrors[0]?.code === 'form_identifier_exists'
+
+    if (isDuplicate) {
+      const existing = await clerk.users.getUserList({
+        emailAddress: [email],
+      })
+
+      if (existing.data.length > 0) {
+        const clerkUser = existing.data[0]
+        await prisma.user.update({
+          where: { id: localUserId },
+          data: { clerkId: clerkUser.id },
+        })
+        console.log(`  [CLERK] Linked ${email} → ${clerkUser.id}`)
+      }
+    } else {
+      console.error(`  [CLERK] Failed to sync ${email}:`, error)
+    }
+  }
+}
+
 // define some user objects here for non random seeds
 const FIXED_USERS: Partial<User>[] = [
   ADMIN_USER,
@@ -99,6 +170,20 @@ export default async function seedUsers(prisma: PrismaClient) {
       roles: CANDIDATE_USER.roles,
     },
     create: CANDIDATE_USER as Prisma.UserCreateInput,
+  })
+
+  await ensureClerkUser(prisma, adminUser.id, {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+    firstName: ADMIN_FIRST_NAME,
+    lastName: ADMIN_LAST_NAME,
+  })
+
+  await ensureClerkUser(prisma, candidateUser.id, {
+    email: CANDIDATE_EMAIL,
+    password: CANDIDATE_PASSWORD,
+    firstName: 'Test',
+    lastName: 'Candidate',
   })
 
   const fakeUsers = new Array(NUM_USERS)
