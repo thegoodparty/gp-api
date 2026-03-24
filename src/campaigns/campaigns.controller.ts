@@ -27,7 +27,7 @@ import {
   UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
-import { Campaign, Organization, Prisma, User, UserRole } from '@prisma/client'
+import { Campaign, Prisma, User, UserRole } from '@prisma/client'
 import { PinoLogger } from 'nestjs-pino'
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod'
 import { AnalyticsService } from 'src/analytics/analytics.service'
@@ -52,6 +52,7 @@ import {
 } from './schemas/updateCampaign.schema'
 import { CampaignPlanVersionsService } from './services/campaignPlanVersions.service'
 import { CampaignsService } from './services/campaigns.service'
+import { CampaignWith } from './campaigns.types'
 import { buildCampaignListFilters } from './util/buildCampaignListFilters'
 
 class ListCampaignsPaginationDto extends createZodDto(
@@ -159,10 +160,11 @@ export class CampaignsController {
 
   @Get('mine')
   @UseCampaign({ include: { pathToVictory: true, organization: true } })
-  async findMine(@ReqCampaign() campaign: Campaign) {
-    const org = (
-      campaign as Campaign & { organization?: Organization | null }
-    ).organization
+  async findMine(
+    @ReqCampaign()
+    campaign: CampaignWith<'pathToVictory' | 'organization'>,
+  ) {
+    const { organization: org } = campaign
 
     const { positionName } = await this.organizations.resolvePositionContext({
       customPositionName: org?.customPositionName,
