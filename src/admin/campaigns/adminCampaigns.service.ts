@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { AdminCreateCampaignSchema } from './schemas/adminCreateCampaign.schema'
 import { AdminUpdateCampaignSchema } from './schemas/adminUpdateCampaign.schema'
-import { Campaign, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { EmailService } from 'src/email/email.service'
 import { UsersService } from 'src/users/services/users.service'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
@@ -30,6 +30,7 @@ export class AdminCampaignsService {
     private readonly crm: CrmCampaignsService,
     private readonly auth: AuthenticationService,
     private readonly analytics: AnalyticsService,
+    private readonly organizations: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AdminCampaignsService.name)
@@ -167,19 +168,24 @@ export class AdminCampaignsService {
       },
     })) as CampaignWith<'pathToVictory'>[]
 
-    const noVoterFile: Campaign[] = []
-
     // TODO: this check could probably be integrated into the above query
-    for (const campaign of campaigns) {
-      const canDownload = this.voterFileDownloadAccess.canDownload(
-        campaign as CampaignWith<'pathToVictory'>,
-      )
-      if (!canDownload) {
-        noVoterFile.push(campaign)
-      }
-    }
+    const districtResults = await Promise.allSettled(
+      campaigns.map((c) =>
+        c.organizationSlug
+          ? this.organizations.getDistrictForOrgSlug(c.organizationSlug)
+          : null,
+      ),
+    )
 
-    return noVoterFile
+    return campaigns.filter(
+      (campaign, i) =>
+        !this.voterFileDownloadAccess.canDownload(
+          campaign as CampaignWith<'pathToVictory'>,
+          districtResults[i].status === 'fulfilled'
+            ? districtResults[i].value
+            : null,
+        ),
+    )
   }
 
   async p2vStats() {

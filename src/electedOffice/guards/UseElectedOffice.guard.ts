@@ -63,10 +63,7 @@ export class UseElectedOfficeGuard implements CanActivate {
       if (org && eo) {
         electedOffice = eo
       }
-    }
-
-    // Step 2: Legacy fallback — user's active elected office
-    if (!electedOffice) {
+    } else {
       electedOffice = await this.electedOfficeService.findFirst({
         where: { userId, isActive: true },
         include,
