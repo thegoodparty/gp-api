@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
 import { Observable, Subscriber } from 'rxjs'
+
+const CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY = 918_273
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
 import { MessageGroup, QueueType } from 'src/queue/queue.types'
@@ -215,17 +217,27 @@ export class CampaignTasksService extends createPrismaBase(
   }
 
   async generateDefaultTasks(campaign: Campaign) {
-    const tasks = await this.model.findMany({
-      where: { campaignId: campaign.id, isDefaultTask: true },
+    await this.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CAMPAIGN_DEFAULT_TASKS_ADVISORY_LOCK_KEY}::integer, ${campaign.id}::integer)`
+      const existingDefaults = await tx.campaignTask.count({
+        where: { campaignId: campaign.id, isDefaultTask: true },
+      })
+      if (existingDefaults > 0) {
+        return
+      }
+      await this.replaceCampaignTasksInTransaction(
+        tx,
+        campaign.id,
+        defaultTasks,
+      )
     })
-    if (tasks.length > 0) {
-      return
-    }
-    return this.saveTasks(campaign.id, defaultTasks)
   }
 
-  async saveTasks(campaignId: number, tasks: CampaignTask[]) {
-    const tasksToCreate = tasks.map((task) => ({
+  private mapTasksToCreateData(
+    campaignId: number,
+    tasks: CampaignTask[],
+  ): Prisma.CampaignTaskCreateManyInput[] {
+    return tasks.map((task) => ({
       campaignId,
       title: task.title,
       description: task.description,
@@ -240,14 +252,25 @@ export class CampaignTasksService extends createPrismaBase(
       completed: false,
       isDefaultTask: task.isDefaultTask || false,
     }))
+  }
 
+  private async replaceCampaignTasksInTransaction(
+    tx: Prisma.TransactionClient,
+    campaignId: number,
+    tasks: CampaignTask[],
+  ) {
+    const tasksToCreate = this.mapTasksToCreateData(campaignId, tasks)
+    await tx.campaignTask.deleteMany({
+      where: { campaignId, isDefaultTask: false },
+    })
+    await tx.campaignTask.createMany({
+      data: tasksToCreate,
+    })
+  }
+
+  async saveTasks(campaignId: number, tasks: CampaignTask[]) {
     await this.client.$transaction(async (tx) => {
-      await tx.campaignTask.deleteMany({
-        where: { campaignId, isDefaultTask: false },
-      })
-      await tx.campaignTask.createMany({
-        data: tasksToCreate,
-      })
+      await this.replaceCampaignTasksInTransaction(tx, campaignId, tasks)
     })
 
     return this.model.findMany({
