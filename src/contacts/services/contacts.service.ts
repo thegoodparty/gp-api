@@ -1,4 +1,4 @@
-import { Readable } from 'node:stream'
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
@@ -11,8 +11,9 @@ import { Organization } from '@prisma/client'
 import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
+import { PinoLogger } from 'nestjs-pino'
+import { Readable } from 'node:stream'
 import { lastValueFrom } from 'rxjs'
-import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
@@ -30,7 +31,6 @@ import {
   convertVoterFileFilterToFilters,
   type FilterObject,
 } from '../utils/voterFileFilter.utils'
-import { PinoLogger } from 'nestjs-pino'
 
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
@@ -91,6 +91,22 @@ export class ContactsService {
     }
   }
 
+  private async hasElectedOfficeAccess(
+    userId: number,
+    organization?: Organization,
+  ): Promise<boolean> {
+    if (organization) {
+      // Org path: check if this organization has an elected office
+      const eo = await this.electedOfficeService.findFirst({
+        where: { organizationSlug: organization.slug },
+      })
+      return eo !== null
+    }
+    // Legacy: check by userId + isActive
+    const eo = await this.electedOfficeService.getCurrentElectedOffice(userId)
+    return eo !== null
+  }
+
   private async resolveDistrictIdFromOrg(
     org: Organization,
   ): Promise<string | null> {
@@ -135,9 +151,11 @@ export class ContactsService {
     organization?: Organization,
   ) {
     if (search) {
-      const electedOffice =
-        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-      if (!campaign.isPro && !electedOffice) {
+      const hasElectedOffice = await this.hasElectedOfficeAccess(
+        campaign.userId,
+        organization,
+      )
+      if (!campaign.isPro && !hasElectedOffice) {
         throw new BadRequestException(
           'Search is only available for pro campaigns',
         )
@@ -296,9 +314,11 @@ export class ContactsService {
     res: FastifyReply,
     organization?: Organization,
   ) {
-    const electedOffice =
-      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-    if (!campaign.isPro && !electedOffice) {
+    const hasElectedOffice = await this.hasElectedOfficeAccess(
+      campaign.userId,
+      organization,
+    )
+    if (!campaign.isPro && !hasElectedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
     const filters = await this.segmentToFilters(segment, campaign)

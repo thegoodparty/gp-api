@@ -1,10 +1,10 @@
+import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { BadRequestException } from '@nestjs/common'
 import { Organization } from '@prisma/client'
 import { of } from 'rxjs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CampaignWithPathToVictory } from '../contacts.types'
 import { ContactsService } from './contacts.service'
-import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 
 vi.mock('@nestjs/axios', () => ({
   HttpService: vi.fn(),
@@ -41,6 +41,7 @@ describe('ContactsService', () => {
     let mockCampaignsService: { updateJsonFields: ReturnType<typeof vi.fn> }
     let mockElectedOfficeService: {
       getCurrentElectedOffice: ReturnType<typeof vi.fn>
+      findFirst: ReturnType<typeof vi.fn>
     }
 
     const baseCampaign = {
@@ -72,6 +73,7 @@ describe('ContactsService', () => {
       }
       mockElectedOfficeService = {
         getCurrentElectedOffice: vi.fn().mockResolvedValue(null),
+        findFirst: vi.fn().mockResolvedValue(null),
       }
 
       service = new ContactsService(
@@ -143,6 +145,56 @@ describe('ContactsService', () => {
           mockElectedOfficeService.getCurrentElectedOffice,
         ).toHaveBeenCalledWith(campaign.userId)
       })
+
+      it('uses findFirst with organizationSlug check when organization is provided', async () => {
+        mockElectedOfficeService.findFirst.mockResolvedValue({
+          id: 'office-1',
+          userId: 100,
+          organizationSlug: 'eo-office-1',
+        })
+        const campaign = { ...baseCampaign, isPro: false }
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
+            campaign,
+            org,
+          ),
+        ).resolves.toBeDefined()
+
+        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
+          where: { organizationSlug: org.slug },
+        })
+        expect(
+          mockElectedOfficeService.getCurrentElectedOffice,
+        ).not.toHaveBeenCalled()
+      })
+
+      it('throws when search is used with organization and user has no org-linked elected office', async () => {
+        mockElectedOfficeService.findFirst.mockResolvedValue(null)
+        const campaign = { ...baseCampaign, isPro: false }
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+
+        await expect(
+          service.findContacts(
+            { resultsPerPage: 10, page: 1, search: 'smith', segment: 'all' },
+            campaign,
+            org,
+          ),
+        ).rejects.toThrow('Search is only available for pro campaigns')
+
+        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
+          where: { organizationSlug: org.slug },
+        })
+        expect(
+          mockElectedOfficeService.getCurrentElectedOffice,
+        ).not.toHaveBeenCalled()
+      })
     })
 
     describe('downloadContacts', () => {
@@ -207,6 +259,57 @@ describe('ContactsService', () => {
         expect(
           mockElectedOfficeService.getCurrentElectedOffice,
         ).toHaveBeenCalledWith(campaign.userId)
+      })
+
+      it('uses findFirst with organizationSlug check when organization is provided', async () => {
+        mockElectedOfficeService.findFirst.mockResolvedValue({
+          id: 'office-1',
+          userId: 100,
+          organizationSlug: 'eo-office-1',
+        })
+        const campaign = { ...baseCampaign, isPro: false }
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+        const mockStream = {
+          pipe: vi.fn(),
+          on: vi.fn((event: string, cb: () => void) => {
+            if (event === 'end') setImmediate(cb)
+          }),
+        }
+        mockHttpService.post.mockReturnValue(of({ data: mockStream }))
+        const res = { raw: {} } as never
+
+        await expect(
+          service.downloadContacts({ segment: 'all' }, campaign, res, org),
+        ).resolves.toBeUndefined()
+
+        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
+          where: { organizationSlug: org.slug },
+        })
+        expect(
+          mockElectedOfficeService.getCurrentElectedOffice,
+        ).not.toHaveBeenCalled()
+      })
+
+      it('throws when organization is provided but user has no org-linked elected office', async () => {
+        mockElectedOfficeService.findFirst.mockResolvedValue(null)
+        const campaign = { ...baseCampaign, isPro: false }
+        const org = makeOrganization({
+          overrideDistrictId: 'override-district-uuid',
+        })
+        const res = { raw: {} } as never
+
+        await expect(
+          service.downloadContacts({ segment: 'all' }, campaign, res, org),
+        ).rejects.toThrow('Campaign is not pro')
+
+        expect(mockElectedOfficeService.findFirst).toHaveBeenCalledWith({
+          where: { organizationSlug: org.slug },
+        })
+        expect(
+          mockElectedOfficeService.getCurrentElectedOffice,
+        ).not.toHaveBeenCalled()
       })
     })
 
