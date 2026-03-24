@@ -10,6 +10,7 @@ import {
   UpdateCampaignM2MSchema,
 } from '@goodparty_org/contracts'
 import {
+  BadGatewayException,
   BadRequestException,
   Body,
   ConflictException,
@@ -479,12 +480,10 @@ export class CampaignsController {
       await this.queueProducerService.sendMessage(
         taskGenerationMessage,
         MessageGroup.default,
+        { throwOnError: true },
       )
-    } catch (error) {
-      this.logger.error(
-        { error, campaignId: campaign.id },
-        'Failed to queue task generation',
-      )
+    } catch {
+      throw new BadGatewayException('Failed to queue task generation')
     }
 
     return result

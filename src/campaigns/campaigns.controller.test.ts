@@ -211,6 +211,10 @@ describe('CampaignsController', () => {
     }
     analyticsService = analyticsServiceMock as AnalyticsService
 
+    const queueProducerServiceMock: Partial<QueueProducerService> = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    }
+
     controller = new CampaignsController(
       campaignsService,
       planVersionsService,
@@ -220,7 +224,7 @@ describe('CampaignsController', () => {
       electionsService,
       organizationsService,
       analyticsService,
-      {} as QueueProducerService,
+      queueProducerServiceMock as QueueProducerService,
       createMockLogger(),
     )
   })
