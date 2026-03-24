@@ -11,7 +11,7 @@ import {
 import { CampaignTask, CampaignTaskType } from '../campaignTasks.types'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 
-const CAMPAIGN_PLAN_VERSION = process.env.CAMPAIGN_PLAN_VERSION || 1
+const CAMPAIGN_PLAN_VERSION = Number(process.env.CAMPAIGN_PLAN_VERSION) || 1
 
 function isCampaignPlanResponse(value: unknown): value is CampaignPlanResponse {
   if (typeof value !== 'object' || value === null) return false

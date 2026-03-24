@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { HttpStatus } from '@nestjs/common'
 import {
   deleteUser,
   generateRandomEmail,
@@ -8,6 +9,8 @@ import {
   RegisterResponse,
 } from '../../../../e2e-tests/utils/auth.util'
 import { CampaignTask } from '../campaignTasks.types'
+
+const TASKS_BASE_PATH = '/v1/campaigns/tasks'
 
 test.describe('Campaigns Tasks - List Tasks', () => {
   let reg: RegisterResponse
@@ -23,11 +26,28 @@ test.describe('Campaigns Tasks - List Tasks', () => {
       signUpMode: 'candidate',
     })
 
-    await request.post('/v1/campaigns/tasks/generate', {
+    const generateResponse = await request.post(`${TASKS_BASE_PATH}/generate`, {
       headers: {
         Authorization: `Bearer ${reg.token}`,
       },
     })
+    expect(generateResponse.status()).toBe(HttpStatus.ACCEPTED)
+
+    await expect
+      .poll(
+        async () => {
+          const response = await request.get(TASKS_BASE_PATH, {
+            headers: {
+              Authorization: `Bearer ${reg.token}`,
+            },
+          })
+          expect(response.status()).toBe(HttpStatus.OK)
+          const tasks = (await response.json()) as CampaignTask[]
+          return tasks.length
+        },
+        { timeout: 120_000 },
+      )
+      .toBeGreaterThan(0)
   })
 
   test.afterAll(async ({ request }) => {
@@ -37,7 +57,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
   })
 
   test('should list all tasks', async ({ request }) => {
-    const response = await request.get('/v1/campaigns/tasks', {
+    const response = await request.get(TASKS_BASE_PATH, {
       headers: {
         Authorization: `Bearer ${reg.token}`,
       },
@@ -54,7 +74,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
   })
 
   test('should return tasks with valid structure', async ({ request }) => {
-    const response = await request.get('/v1/campaigns/tasks', {
+    const response = await request.get(TASKS_BASE_PATH, {
       headers: {
         Authorization: `Bearer ${reg.token}`,
       },
@@ -77,7 +97,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
   test('should return tasks ordered by week descending', async ({
     request,
   }) => {
-    const response = await request.get('/v1/campaigns/tasks', {
+    const response = await request.get(TASKS_BASE_PATH, {
       headers: {
         Authorization: `Bearer ${reg.token}`,
       },
@@ -96,7 +116,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
   test('should return default tasks with isDefaultTask flag', async ({
     request,
   }) => {
-    const response = await request.get('/v1/campaigns/tasks', {
+    const response = await request.get(TASKS_BASE_PATH, {
       headers: {
         Authorization: `Bearer ${reg.token}`,
       },
@@ -110,7 +130,7 @@ test.describe('Campaigns Tasks - List Tasks', () => {
   })
 
   test('should return unique task ids', async ({ request }) => {
-    const response = await request.get('/v1/campaigns/tasks', {
+    const response = await request.get(TASKS_BASE_PATH, {
       headers: {
         Authorization: `Bearer ${reg.token}`,
       },
@@ -129,14 +149,14 @@ test.describe('Campaigns Tasks - List Tasks', () => {
     const date = '2025-03-25T21:17:31.648Z'
     const endDate = '2025-04-01T21:17:31.648Z'
 
-    const allResponse = await request.get('/v1/campaigns/tasks', {
+    const allResponse = await request.get(TASKS_BASE_PATH, {
       headers: {
         Authorization: `Bearer ${reg.token}`,
       },
     })
 
     const filteredResponse = await request.get(
-      `/v1/campaigns/tasks?date=${date}&endDate=${endDate}`,
+      `${TASKS_BASE_PATH}?date=${date}&endDate=${endDate}`,
       {
         headers: {
           Authorization: `Bearer ${reg.token}`,

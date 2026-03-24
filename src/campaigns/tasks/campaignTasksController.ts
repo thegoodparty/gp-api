@@ -2,6 +2,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   MessageEvent,
   Param,
   Post,
@@ -41,8 +43,9 @@ export class CampaignTasksController {
   }
 
   @Post('generate')
-  async generateTasks(@ReqCampaign() campaign: Campaign) {
-    return this.tasksService.generateTasks(campaign)
+  @HttpCode(HttpStatus.ACCEPTED)
+  enqueueGenerateTasks(@ReqCampaign() campaign: Campaign) {
+    return this.tasksService.enqueueGenerateTasks(campaign)
   }
 
   @Sse('generate/stream')

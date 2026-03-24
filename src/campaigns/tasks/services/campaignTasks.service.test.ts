@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { NotFoundException } from '@nestjs/common'
+import { BadGatewayException, NotFoundException } from '@nestjs/common'
 import { Campaign } from '@prisma/client'
 import { CampaignTaskType } from '../campaignTasks.types'
 import { firstValueFrom, toArray } from 'rxjs'
 import { CampaignTasksService } from './campaignTasks.service'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
+import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { createMockLogger } from '@/shared/test-utils/mockLogger.util'
 import { defaultTasks } from '../fixtures/defaultTasks'
 import { CampaignTask } from '../campaignTasks.types'
@@ -37,6 +39,10 @@ const mockAiIntegration: Partial<AiCampaignManagerIntegrationService> = {
   startOrGetCached: vi.fn(),
   getLatestProgress: vi.fn(),
   finishGeneration: vi.fn(),
+}
+
+const mockQueueProducer: Partial<QueueProducerService> = {
+  sendMessage: vi.fn(),
 }
 
 const makeCampaign = (overrides: Partial<Campaign> = {}): Campaign =>
@@ -81,6 +87,7 @@ describe('CampaignTasksService', () => {
   beforeEach(() => {
     service = new CampaignTasksService(
       mockAiIntegration as AiCampaignManagerIntegrationService,
+      mockQueueProducer as QueueProducerService,
     )
     Object.defineProperty(service, '_prisma', {
       get: () => ({
@@ -179,6 +186,34 @@ describe('CampaignTasksService', () => {
       await expect(
         service.unCompleteTask(makeCampaign(), 'missing'),
       ).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  describe('enqueueGenerateTasks', () => {
+    it('queues GENERATE_TASKS and returns accepted', async () => {
+      vi.mocked(mockQueueProducer.sendMessage!).mockResolvedValue(undefined)
+
+      const result = await service.enqueueGenerateTasks(makeCampaign())
+
+      expect(mockQueueProducer.sendMessage).toHaveBeenCalledWith(
+        {
+          type: QueueType.GENERATE_TASKS,
+          data: { campaignId: 1 },
+        },
+        MessageGroup.default,
+        { throwOnError: true },
+      )
+      expect(result).toEqual({ accepted: true })
+    })
+
+    it('throws BadGatewayException when queue send fails', async () => {
+      vi.mocked(mockQueueProducer.sendMessage!).mockRejectedValue(
+        new Error('SQS down'),
+      )
+
+      await expect(
+        service.enqueueGenerateTasks(makeCampaign()),
+      ).rejects.toThrow(BadGatewayException)
     })
   })
 

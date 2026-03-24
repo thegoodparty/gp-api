@@ -1,7 +1,14 @@
-import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common'
+import {
+  BadGatewayException,
+  Injectable,
+  MessageEvent,
+  NotFoundException,
+} from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
 import { Observable, Subscriber } from 'rxjs'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
+import { QueueProducerService } from 'src/queue/producer/queueProducer.service'
+import { MessageGroup, QueueType } from 'src/queue/queue.types'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { CampaignTask } from '../campaignTasks.types'
 import { defaultTasks } from '../fixtures/defaultTasks'
@@ -13,8 +20,25 @@ export class CampaignTasksService extends createPrismaBase(
 ) {
   constructor(
     private readonly aiCampaignManagerIntegration: AiCampaignManagerIntegrationService,
+    private readonly queueProducerService: QueueProducerService,
   ) {
     super()
+  }
+
+  async enqueueGenerateTasks(campaign: Campaign): Promise<{ accepted: true }> {
+    try {
+      await this.queueProducerService.sendMessage(
+        {
+          type: QueueType.GENERATE_TASKS,
+          data: { campaignId: campaign.id },
+        },
+        MessageGroup.default,
+        { throwOnError: true },
+      )
+    } catch {
+      throw new BadGatewayException('Failed to queue task generation')
+    }
+    return { accepted: true }
   }
 
   async listCampaignTasks({ id: campaignId }: Campaign) {
