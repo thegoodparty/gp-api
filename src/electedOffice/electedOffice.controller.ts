@@ -14,12 +14,14 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common'
-import { Organization, Prisma, User } from '@prisma/client'
+import { ElectedOffice, Organization, Prisma, User } from '@prisma/client'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { ReqUser } from 'src/authentication/decorators/ReqUser.decorator'
 import { ReqOrganization } from 'src/organizations/decorators/ReqOrganization.decorator'
 import { UseOrganization } from 'src/organizations/decorators/UseOrganization.decorator'
 import { toDateOnlyString } from 'src/shared/util/date.util'
+import { ReqElectedOffice } from './decorators/ReqElectedOffice.decorator'
+import { UseElectedOffice } from './decorators/UseElectedOffice.decorator'
 import { UserOrM2MGuard } from './guards/UserOrM2M.guard'
 import {
   CreateElectedOfficeDto,
@@ -31,9 +33,7 @@ import { ElectedOfficeService } from './services/electedOffice.service'
 @Controller('elected-office')
 @UsePipes(ZodValidationPipe)
 export class ElectedOfficeController {
-  constructor(
-    private readonly electedOfficeService: ElectedOfficeService,
-  ) {}
+  constructor(private readonly electedOfficeService: ElectedOfficeService) {}
 
   private toApi(record: Prisma.ElectedOfficeGetPayload<object>) {
     return {
@@ -51,15 +51,10 @@ export class ElectedOfficeController {
     return this.electedOfficeService.listElectedOffices(query)
   }
 
+  @UseElectedOffice()
   @Get('current')
-  async getCurrent(@ReqUser() user: User) {
-    const record = await this.electedOfficeService.getCurrentElectedOffice(
-      user.id,
-    )
-    if (!record) {
-      throw new NotFoundException('No active elected office found')
-    }
-    return this.toApi(record)
+  async getCurrent(@ReqElectedOffice() electedOffice: ElectedOffice) {
+    return this.toApi(electedOffice)
   }
 
   @UseGuards(UserOrM2MGuard)
@@ -110,11 +105,10 @@ export class ElectedOfficeController {
     }
 
     // LEGACY: Remove this entire branch when org migration is complete.
-    const campaign =
-      await this.electedOfficeService.client.campaign.findFirst({
-        where: { userId: user.id },
-        include: { organization: true },
-      })
+    const campaign = await this.electedOfficeService.client.campaign.findFirst({
+      where: { userId: user.id },
+      include: { organization: true },
+    })
     if (!campaign) {
       throw new ForbiddenException('Not allowed to link campaign')
     }

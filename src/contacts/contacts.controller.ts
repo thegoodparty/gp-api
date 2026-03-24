@@ -51,7 +51,7 @@ export class ContactsController {
   }
 
   @Get('stats')
-  async getContactsStats(
+  getContactsStats(
     @ReqCampaign() campaign: CampaignWithPathToVictory,
     @ReqOrganization() organization: Organization | undefined,
   ) {

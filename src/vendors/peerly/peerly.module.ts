@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios'
 import { forwardRef, Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from 'src/ai/ai.module'
+import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { CampaignsModule } from '../../campaigns/campaigns.module'
 import { OutreachModule } from '../../outreach/outreach.module'
 import { VoterSharedModule } from '../../shared/modules/voterShared.module'
@@ -23,6 +24,7 @@ import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
     JwtModule,
     AiModule,
     GoogleModule,
+    OrganizationsModule,
     VoterSharedModule,
     SlackModule,
     forwardRef(() => CampaignsModule),

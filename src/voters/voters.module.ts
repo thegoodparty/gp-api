@@ -1,7 +1,7 @@
 import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
-import { OrganizationsModule } from '@/organizations/organizations.module'
 import { FilesModule } from 'src/files/files.module'
+import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { OutreachModule } from 'src/outreach/outreach.module'
 import { SlackModule } from 'src/vendors/slack/slack.module'
 import { ElectedOfficeModule } from '../electedOffice/electedOffice.module'
@@ -17,11 +17,11 @@ import { VoterFileService } from './voterFile/voterFile.service'
   imports: [
     FilesModule,
     HttpModule,
+    OrganizationsModule,
     OutreachModule,
     PeerlyModule,
     SlackModule,
     ElectedOfficeModule,
-    OrganizationsModule,
   ],
   controllers: [VoterFileController],
   providers: [

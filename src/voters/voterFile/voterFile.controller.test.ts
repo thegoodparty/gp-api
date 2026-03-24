@@ -60,6 +60,7 @@ describe('VoterFileController', () => {
       mockVoterFileFilterService as never,
       mockOutreachService as never,
       mockElectedOfficeService as never,
+      {} as never,
       createMockLogger(),
     )
     vi.clearAllMocks()
