@@ -134,7 +134,6 @@ jobs:
 
       - name: Calculate overall coverage
         id: coverage-calc
-        if: always()
         run: |
           if [ -f "coverage/coverage-summary.json" ]; then
             OVERALL=$(jq -r '(.total.lines.pct + .total.statements.pct + .total.functions.pct + .total.branches.pct) / 4' coverage/coverage-summary.json)
@@ -149,13 +148,12 @@ jobs:
           fi
 
       - name: Publish coverage to PR + summary
-        if: always()
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           threshold-icons: "{0: '🔴', 80: '🟠', 90: '🟢'}"
 
       - name: Add overall coverage to PR comment
-        if: always() && github.event_name == 'pull_request' && steps.coverage-calc.outputs.overall_pct != '0'
+        if: github.event_name == 'pull_request' && steps.coverage-calc.outputs.overall_pct != '0'
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.number }}
