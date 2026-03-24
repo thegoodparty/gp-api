@@ -169,7 +169,7 @@ export class AdminCampaignsService {
     })) as CampaignWith<'pathToVictory'>[]
 
     // TODO: this check could probably be integrated into the above query
-    const districts = await Promise.all(
+    const districtResults = await Promise.allSettled(
       campaigns.map((c) =>
         c.organizationSlug
           ? this.organizations.getDistrictForOrgSlug(c.organizationSlug)
@@ -181,7 +181,9 @@ export class AdminCampaignsService {
       (campaign, i) =>
         !this.voterFileDownloadAccess.canDownload(
           campaign as CampaignWith<'pathToVictory'>,
-          districts[i],
+          districtResults[i].status === 'fulfilled'
+            ? districtResults[i].value
+            : null,
         ),
     )
   }

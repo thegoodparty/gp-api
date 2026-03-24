@@ -273,9 +273,7 @@ export class OrganizationsService extends createPrismaBase(
 
   async getDistrictForOrgSlug(slug: string): Promise<OrgDistrict | null> {
     const org = await this.model.findUnique({ where: { slug } })
-    if (!org) {
-      throw new Error(`Organization with slug ${slug} not found`)
-    }
+    if (!org) return null
 
     return this.resolveDistrict(org)
   }
@@ -310,7 +308,7 @@ export class OrganizationsService extends createPrismaBase(
       electedOffice: ElectedOffice | null
     },
   ): Promise<FriendlyOrganization> {
-    const [position, district] = await Promise.all([
+    const [position, overrideDistrict] = await Promise.all([
       org.positionId
         ? this.electionsService
             .getPositionById(org.positionId, { includeDistrict: true })
@@ -323,8 +321,19 @@ export class OrganizationsService extends createPrismaBase(
               return position
             })
         : Promise.resolve(null),
-      this.resolveDistrict(org),
+      org.overrideDistrictId
+        ? this.electionsService.getDistrict(org.overrideDistrictId)
+        : Promise.resolve(null),
     ])
+
+    const rawDistrict = overrideDistrict ?? position?.district
+    const district: OrgDistrict | null = rawDistrict
+      ? {
+          id: rawDistrict.id,
+          l2Type: rawDistrict.L2DistrictType,
+          l2Name: rawDistrict.L2DistrictName,
+        }
+      : null
 
     return {
       slug: org.slug,

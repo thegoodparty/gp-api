@@ -67,6 +67,7 @@ import {
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
+import { OrgDistrict } from '@/organizations/organizations.types'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -824,11 +825,19 @@ export class QueueConsumerService {
       },
     })
 
-    const district = campaign.organizationSlug
-      ? await this.organizationsService.getDistrictForOrgSlug(
+    let district: OrgDistrict | null = null
+    if (campaign.organizationSlug) {
+      try {
+        district = await this.organizationsService.getDistrictForOrgSlug(
           campaign.organizationSlug,
         )
-      : null
+      } catch (e) {
+        this.logger.warn(
+          { e },
+          'Failed to fetch district for analytics, defaulting to null',
+        )
+      }
+    }
 
     await Promise.all([
       this.analytics.identify(campaignUserId, { pollcount: pollCount }),
