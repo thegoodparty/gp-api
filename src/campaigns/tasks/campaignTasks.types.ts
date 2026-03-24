@@ -21,6 +21,5 @@ export type CampaignTask = {
   proRequired?: boolean
   isDefaultTask?: boolean
   deadline?: number
-  /** CMS ID of the default AI template to use for the task */
   defaultAiTemplateId?: string
 }

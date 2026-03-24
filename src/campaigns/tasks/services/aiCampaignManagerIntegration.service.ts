@@ -42,37 +42,32 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   async generateCampaignTasks(
     campaign: CampaignWithPathToVictory,
   ): Promise<CampaignTask[]> {
-    try {
-      const request = this.buildCampaignPlanRequest(campaign)
-      const existingTasks = await this.checkForExistingPlanVersion(
-        campaign,
-        request,
-      )
-      if (existingTasks) {
-        return existingTasks
-      }
-      const session =
-        await this.aiCampaignManager.startCampaignPlanGeneration(request)
-      this.logger.info(
-        `Started campaign plan generation with session ID: ${session.session_id}`,
-      )
-
-      await this.aiCampaignManager.waitForCompletion(session.session_id)
-      this.logger.info(
-        `Campaign plan generation completed for session: ${session.session_id}`,
-      )
-
-      const campaignPlanJson = await this.aiCampaignManager.downloadJson(
-        session.session_id,
-      )
-
-      await this.saveCampaignPlan(campaignPlanJson, campaign, request)
-
-      return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
-    } catch (error) {
-      this.logger.error('Failed to generate campaign tasks', error)
-      throw error
+    const request = this.buildCampaignPlanRequest(campaign)
+    const existingTasks = await this.checkForExistingPlanVersion(
+      campaign,
+      request,
+    )
+    if (existingTasks) {
+      return existingTasks
     }
+    const session =
+      await this.aiCampaignManager.startCampaignPlanGeneration(request)
+    this.logger.info(
+      `Started campaign plan generation with session ID: ${session.session_id}`,
+    )
+
+    await this.aiCampaignManager.waitForCompletion(session.session_id)
+    this.logger.info(
+      `Campaign plan generation completed for session: ${session.session_id}`,
+    )
+
+    const campaignPlanJson = await this.aiCampaignManager.downloadJson(
+      session.session_id,
+    )
+
+    await this.saveCampaignPlan(campaignPlanJson, campaign, request)
+
+    return this.parseCampaignPlanToTasks(campaignPlanJson, campaign)
   }
 
   async startOrGetCached(
@@ -396,7 +391,6 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
       events: CampaignTaskType.events,
       education: CampaignTaskType.education,
       compliance: CampaignTaskType.compliance,
-      // Map invalid values to valid ones
       general: CampaignTaskType.education,
     }
 
@@ -495,34 +489,23 @@ export class AiCampaignManagerIntegrationService extends createPrismaBase(
   ): Promise<void> {
     const campaignInfoHash = this.generateCampaignInfoHashFromRequest(request)
 
-    const campaignPlanData = {
-      campaignId: campaign.id,
-      campaignInfoHash,
-      plan: campaignPlanJson.campaign_plan,
-      rawJson: campaignPlanJson,
-    }
+    await this.model.upsert({
+      where: { campaignId: campaign.id },
+      update: {
+        campaignInfoHash,
+        plan: campaignPlanJson.campaign_plan,
+        rawJson: campaignPlanJson,
+      },
+      create: {
+        campaignId: campaign.id,
+        campaignInfoHash,
+        plan: campaignPlanJson.campaign_plan,
+        rawJson: campaignPlanJson,
+      },
+    })
 
-    try {
-      const existingPlan = await this.model.findUnique({
-        where: { campaignId: campaign.id },
-      })
-
-      if (existingPlan) {
-        await this.model.delete({
-          where: { campaignId: campaign.id },
-        })
-      }
-
-      await this.model.create({
-        data: campaignPlanData,
-      })
-
-      this.logger.info(
-        `Campaign plan saved for campaign ${campaign.id} with hash ${campaignInfoHash}`,
-      )
-    } catch (error) {
-      this.logger.error('Failed to save campaign plan', error)
-      throw error
-    }
+    this.logger.info(
+      `Campaign plan saved for campaign ${campaign.id} with hash ${campaignInfoHash}`,
+    )
   }
 }

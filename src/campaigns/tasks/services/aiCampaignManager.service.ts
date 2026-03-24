@@ -1,5 +1,10 @@
 import { HttpService } from '@nestjs/axios'
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  Logger,
+} from '@nestjs/common'
 import { lastValueFrom } from 'rxjs'
 import {
   StartCampaignPlanRequest,
@@ -7,6 +12,7 @@ import {
   ProgressStreamData,
   CampaignPlanResponse,
 } from '../aiCampaignManager.types'
+import { sleep } from 'src/shared/util/sleep.util'
 
 export {
   StartCampaignPlanRequest,
@@ -17,25 +23,40 @@ export {
   CampaignPlanTaskMetadata,
 } from '../aiCampaignManager.types'
 
+const VALID_SESSION_ID_PATTERN = /^[\w-]+$/
+
 function isProgressStreamData(value: unknown): value is ProgressStreamData {
   if (typeof value !== 'object' || value === null) return false
+  const obj = value as Record<string, unknown>
   return (
-    'progress' in value &&
-    typeof value.progress === 'number' &&
-    'status' in value &&
-    typeof value.status === 'string' &&
-    'message' in value &&
-    typeof value.message === 'string'
+    typeof obj.progress === 'number' &&
+    typeof obj.status === 'string' &&
+    (obj.status === 'processing' ||
+      obj.status === 'completed' ||
+      obj.status === 'failed') &&
+    typeof obj.message === 'string'
   )
 }
 
 @Injectable()
 export class AiCampaignManagerService {
-  private readonly apiBaseUrl: string | undefined
+  private readonly apiBaseUrl: string
   private readonly logger = new Logger(AiCampaignManagerService.name)
 
   constructor(private readonly httpService: HttpService) {
-    this.apiBaseUrl = process.env.AI_CAMPAIGN_MANAGER_BASE
+    const baseUrl = process.env.AI_CAMPAIGN_MANAGER_BASE
+    if (!baseUrl) {
+      throw new Error(
+        'AI_CAMPAIGN_MANAGER_BASE environment variable is required',
+      )
+    }
+    this.apiBaseUrl = baseUrl
+  }
+
+  private validateSessionId(sessionId: string): void {
+    if (!VALID_SESSION_ID_PATTERN.test(sessionId)) {
+      throw new BadRequestException('Invalid session ID format')
+    }
   }
 
   async startCampaignPlanGeneration(
@@ -44,11 +65,11 @@ export class AiCampaignManagerService {
     const url = `${this.apiBaseUrl}/start-campaign-plan-generation`
 
     const params = new URLSearchParams()
-    Object.keys(request).forEach((key) => {
-      if (request[key] !== null && request[key] !== undefined) {
-        params.append(key, String(request[key]))
+    for (const [key, value] of Object.entries(request)) {
+      if (value !== null && value !== undefined) {
+        params.append(key, String(value))
       }
-    })
+    }
     const requestData = params.toString()
     try {
       const response = await lastValueFrom(
@@ -64,6 +85,7 @@ export class AiCampaignManagerService {
   }
 
   async downloadJson(sessionId: string): Promise<CampaignPlanResponse> {
+    this.validateSessionId(sessionId)
     const url = `${this.apiBaseUrl}/download-json/${sessionId}`
 
     try {
@@ -78,6 +100,7 @@ export class AiCampaignManagerService {
   }
 
   async getProgressStream(sessionId: string): Promise<ProgressStreamData[]> {
+    this.validateSessionId(sessionId)
     const url = `${this.apiBaseUrl}/progress-stream/${sessionId}`
 
     try {
@@ -110,12 +133,10 @@ export class AiCampaignManagerService {
     }
   }
 
-  // TODO: each poll re-fetches and re-parses the entire progress stream history.
-  // Consider tracking position or fetching only new events to avoid O(n^2) work.
   async waitForCompletion(
     sessionId: string,
-    maxWaitTimeMs = 300000, // 5 minutes default
-    pollIntervalMs = 5000, // 5 seconds default
+    maxWaitTimeMs = 300000,
+    pollIntervalMs = 5000,
   ): Promise<ProgressStreamData> {
     const startTime = Date.now()
 
@@ -131,13 +152,9 @@ export class AiCampaignManagerService {
         throw new BadGatewayException('Campaign plan generation failed')
       }
 
-      await this.sleep(pollIntervalMs)
+      await sleep(pollIntervalMs)
     }
 
     throw new BadGatewayException('Campaign plan generation timed out')
-  }
-
-  private async sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 }

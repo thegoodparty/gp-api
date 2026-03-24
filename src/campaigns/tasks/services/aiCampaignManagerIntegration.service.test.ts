@@ -14,6 +14,7 @@ const mockModel = {
   findFirst: vi.fn(),
   create: vi.fn(),
   delete: vi.fn(),
+  upsert: vi.fn(),
 }
 
 const mockAiManager: Partial<AiCampaignManagerService> = {
@@ -384,13 +385,11 @@ describe('AiCampaignManagerIntegrationService', () => {
   })
 
   describe('saveCampaignPlan', () => {
-    it('saves plan and stores hash for caching', async () => {
+    it('saves plan and stores hash for caching via upsert', async () => {
       const campaign = makeCampaign()
       const planResponse = makePlanResponse()
 
-      mockModel.findUnique
-        .mockResolvedValueOnce(null) // checkForExistingPlanVersion
-        .mockResolvedValueOnce(null) // saveCampaignPlan check
+      mockModel.findUnique.mockResolvedValueOnce(null)
       vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
         session_id: 'session-1',
       })
@@ -408,12 +407,18 @@ describe('AiCampaignManagerIntegrationService', () => {
         files_ready: { pdf: false, json: true, total: 1 },
       })
       vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(planResponse)
-      mockModel.create.mockResolvedValue({})
+      mockModel.upsert.mockResolvedValue({})
 
       await service.generateCampaignTasks(campaign)
 
-      expect(mockModel.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      expect(mockModel.upsert).toHaveBeenCalledWith({
+        where: { campaignId: 1 },
+        update: expect.objectContaining({
+          plan: planResponse.campaign_plan,
+          rawJson: planResponse,
+          campaignInfoHash: expect.any(String),
+        }),
+        create: expect.objectContaining({
           campaignId: 1,
           plan: planResponse.campaign_plan,
           rawJson: planResponse,
@@ -422,7 +427,7 @@ describe('AiCampaignManagerIntegrationService', () => {
       })
     })
 
-    it('deletes existing plan before creating new one', async () => {
+    it('upserts when existing plan exists with different hash', async () => {
       const campaign = makeCampaign()
       const planResponse = makePlanResponse()
       const existingPlan = {
@@ -433,10 +438,7 @@ describe('AiCampaignManagerIntegrationService', () => {
         rawJson: null,
       }
 
-      mockModel.findUnique
-        .mockResolvedValueOnce(existingPlan) // checkForExistingPlanVersion (hash mismatch)
-        .mockResolvedValueOnce(existingPlan) // saveCampaignPlan check
-      mockModel.delete.mockResolvedValue(existingPlan)
+      mockModel.findUnique.mockResolvedValueOnce(existingPlan)
       vi.mocked(mockAiManager.startCampaignPlanGeneration!).mockResolvedValue({
         session_id: 'session-1',
       })
@@ -454,14 +456,15 @@ describe('AiCampaignManagerIntegrationService', () => {
         files_ready: { pdf: false, json: true, total: 1 },
       })
       vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(planResponse)
-      mockModel.create.mockResolvedValue({})
+      mockModel.upsert.mockResolvedValue({})
 
       await service.generateCampaignTasks(campaign)
 
-      expect(mockModel.delete).toHaveBeenCalledWith({
-        where: { campaignId: 1 },
-      })
-      expect(mockModel.create).toHaveBeenCalled()
+      expect(mockModel.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { campaignId: 1 },
+        }),
+      )
     })
   })
 
@@ -494,7 +497,7 @@ describe('AiCampaignManagerIntegrationService', () => {
         files_ready: { pdf: false, json: true, total: 1 },
       })
       vi.mocked(mockAiManager.downloadJson!).mockResolvedValue(planResponse)
-      mockModel.create.mockResolvedValue({})
+      mockModel.upsert.mockResolvedValue({})
 
       const tasks = await service.generateCampaignTasks(campaign)
 

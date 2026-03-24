@@ -1,10 +1,11 @@
-import { Injectable, MessageEvent } from '@nestjs/common'
+import { Injectable, MessageEvent, NotFoundException } from '@nestjs/common'
 import { Campaign, Prisma } from '@prisma/client'
 import { Observable, Subscriber } from 'rxjs'
 import { createPrismaBase, MODELS } from 'src/prisma/util/prisma.util'
 import { AiCampaignManagerIntegrationService } from './aiCampaignManagerIntegration.service'
 import { CampaignTask } from '../campaignTasks.types'
 import { defaultTasks } from '../fixtures/defaultTasks'
+import { sleep } from 'src/shared/util/sleep.util'
 
 @Injectable()
 export class CampaignTasksService extends createPrismaBase(
@@ -42,7 +43,7 @@ export class CampaignTasksService extends createPrismaBase(
       },
     })
     if (!task) {
-      return null
+      throw new NotFoundException(`Task ${id} not found`)
     }
 
     return this.model.update({
@@ -64,7 +65,7 @@ export class CampaignTasksService extends createPrismaBase(
     })
 
     if (!task) {
-      return null
+      throw new NotFoundException(`Task ${id} not found`)
     }
 
     return this.model.update({
@@ -137,6 +138,8 @@ export class CampaignTasksService extends createPrismaBase(
       const startTime = Date.now()
 
       while (Date.now() - startTime < maxWaitTimeMs) {
+        if (subscriber.closed) return
+
         const progress =
           await this.aiCampaignManagerIntegration.getLatestProgress(sessionId)
 
@@ -168,11 +171,13 @@ export class CampaignTasksService extends createPrismaBase(
           }
         }
 
-        await this.sleep(pollIntervalMs)
+        await sleep(pollIntervalMs)
       }
 
       throw new Error('Campaign plan generation timed out')
     } catch (error) {
+      if (subscriber.closed) return
+
       this.logger.error(
         { error, campaignId: campaign.id },
         'AI task generation failed during stream, saving empty task set',
@@ -183,10 +188,6 @@ export class CampaignTasksService extends createPrismaBase(
       })
       subscriber.complete()
     }
-  }
-
-  private async sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   async generateDefaultTasks(campaign: Campaign) {
