@@ -5,6 +5,7 @@ import { queueConfig } from '../queue.config'
 import { CampaignsAiModule } from 'src/campaigns/ai/campaignsAi.module'
 import { PathToVictoryModule } from '../../pathToVictory/pathToVictory.module'
 import { ElectionsModule } from 'src/elections/elections.module'
+import { OrganizationsModule } from 'src/organizations/organizations.module'
 import { QueueProducerModule } from '../producer/queueProducer.module'
 import { AnalyticsModule } from '../../analytics/analytics.module'
 import { WebsitesModule } from '../../websites/websites.module'
@@ -27,6 +28,7 @@ import { AwsModule } from 'src/vendors/aws/aws.module'
     CampaignsAiModule,
     PathToVictoryModule,
     ElectionsModule,
+    OrganizationsModule,
     QueueProducerModule,
     AnalyticsModule,
     WebsitesModule,
