@@ -98,7 +98,7 @@ export class ContactsService {
     if (organization) {
       // Org path: check if this organization has an elected office
       const eo = await this.electedOfficeService.findFirst({
-        where: { organizationSlug: organization.slug },
+        where: { organizationSlug: organization.slug, isActive: true },
       })
       return eo !== null
     }
