@@ -10,6 +10,7 @@ import {
 import { WrapperType } from '../shared/types/utility.types'
 import { UsersService } from '../users/services/users.service'
 import { PinoLogger } from 'nestjs-pino'
+import { getImpersonationContext } from './impersonation-context'
 
 @Injectable()
 export class AnalyticsService {
@@ -63,9 +64,14 @@ export class AnalyticsService {
 
     const userContext = await this.getUserContext(userId)
 
+    const impersonationState = getImpersonationContext()
+
     const eventData = {
       ...(userContext?.email ? { email: userContext.email as string } : {}),
       ...properties,
+      ...(impersonationState !== undefined
+        ? { impersonation: impersonationState }
+        : {}),
     }
 
     try {
