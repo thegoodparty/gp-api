@@ -192,12 +192,25 @@ export class CampaignsController {
   async findBySlug(@Param('slug') slug: string) {
     const campaign = await this.campaigns.findFirst({
       where: { slug },
-      include: { pathToVictory: true },
+      include: {
+        pathToVictory: true,
+        organization: {
+          select: {
+            customPositionName: true,
+            positionId: true,
+          },
+        },
+      },
     })
 
     if (!campaign) throw new NotFoundException()
 
-    return campaign
+    const { positionName } = await this.organizations.resolvePositionContext({
+      customPositionName: campaign.organization?.customPositionName,
+      positionId: campaign.organization?.positionId,
+    })
+
+    return { ...campaign, positionName }
   }
 
   @Post()
@@ -392,16 +405,8 @@ export class CampaignsController {
   @Put('mine/race-target-details')
   @UseCampaign()
   async updateRaceTargetDetails(@ReqCampaign() campaign: Campaign) {
-    const campaignOrg = campaign.organizationSlug
-      ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
-        })
-      : null
-    const ballotreadyPositionId = campaignOrg?.positionId
-      ? await this.organizations.resolveBallotReadyPositionId(
-          campaignOrg.positionId,
-        )
-      : null
+    const { ballotreadyPositionId, positionName } =
+      await this.resolveRaceTargetPositionContext(campaign)
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
@@ -417,7 +422,7 @@ export class CampaignsController {
         ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: true,
-        officeName: campaign.details.otherOffice,
+        officeName: positionName ?? undefined,
       })
       .catch(() => null)
 
@@ -474,16 +479,8 @@ export class CampaignsController {
     const campaign = await this.campaigns.findFirstOrThrow({
       where: { slug },
     })
-    const campaignOrg = campaign.organizationSlug
-      ? await this.organizations.findUnique({
-          where: { slug: campaign.organizationSlug },
-        })
-      : null
-    const ballotreadyPositionId = campaignOrg?.positionId
-      ? await this.organizations.resolveBallotReadyPositionId(
-          campaignOrg.positionId,
-        )
-      : null
+    const { ballotreadyPositionId, positionName } =
+      await this.resolveRaceTargetPositionContext(campaign)
 
     if (!ballotreadyPositionId || !campaign.details.electionDate) {
       throw new BadRequestException(
@@ -498,7 +495,7 @@ export class CampaignsController {
         ballotreadyPositionId,
         electionDate: campaign.details.electionDate,
         includeTurnout: includeTurnout ?? true,
-        officeName: campaign.details.otherOffice,
+        officeName: positionName ?? undefined,
       })
       .catch(() => null)
 
@@ -542,5 +539,20 @@ export class CampaignsController {
     })
 
     return result
+  }
+
+  private async resolveRaceTargetPositionContext(campaign: Campaign) {
+    const campaignOrganization = campaign.organizationSlug
+      ? await this.organizations.findUnique({
+          where: { slug: campaign.organizationSlug },
+        })
+      : null
+    const { ballotReadyPositionId: ballotreadyPositionId, positionName } =
+      await this.organizations.resolvePositionContext({
+        customPositionName: campaignOrganization?.customPositionName,
+        positionId: campaignOrganization?.positionId,
+      })
+
+    return { ballotreadyPositionId, positionName }
   }
 }

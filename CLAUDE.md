@@ -127,6 +127,7 @@ The `QueueConsumerModule` is excluded when `NODE_ENV === 'test'`.
 
 ### Global Interceptors
 
+- `ImpersonationInterceptor` — propagates impersonation state from JWT to AsyncLocalStorage for analytics tagging
 - `AdminAuditInterceptor` — logs all admin route accesses
 - `BlockedStateInterceptor` — records user-blocking failures to New Relic/OpenTelemetry
 

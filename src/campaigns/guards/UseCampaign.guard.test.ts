@@ -110,59 +110,47 @@ describe('UseCampaignGuard', () => {
       })
     })
 
-    it('falls back to userId when org has no campaign', async () => {
+    it('throws NotFoundException when org has no campaign', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(null)
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'campaign-100' },
       })
-      const result = await guard.canActivate(ctx)
 
-      expect(result).toBe(true)
-      expect(campaignsService.findByUserId).toHaveBeenCalledWith(1, {
-        pathToVictory: true,
-      })
+      await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
+      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
     })
 
-    it('falls back to userId when org not found', async () => {
+    it('throws NotFoundException when org not found', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue(null)
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(null)
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'nonexistent' },
       })
-      const result = await guard.canActivate(ctx)
 
-      expect(result).toBe(true)
-      expect(campaignsService.findByUserId).toHaveBeenCalledWith(1, {
-        pathToVictory: true,
-      })
+      await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
+      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
     })
 
-    it('falls back when ownerId does not match', async () => {
+    it('throws NotFoundException when ownerId does not match', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue(null)
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(null)
-      vi.spyOn(campaignsService, 'findByUserId').mockResolvedValue(mockCampaign)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'campaign-100' },
         userId: 999,
       })
-      const result = await guard.canActivate(ctx)
 
-      expect(result).toBe(true)
+      await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
       expect(mockOrgFindFirst).toHaveBeenCalledWith({
         where: { slug: 'campaign-100', ownerId: 999 },
       })
-      expect(campaignsService.findByUserId).toHaveBeenCalledWith(999, {
-        pathToVictory: true,
-      })
+      expect(campaignsService.findByUserId).not.toHaveBeenCalled()
     })
 
     it('does not call findByUserId when org header resolves campaign', async () => {

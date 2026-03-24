@@ -97,6 +97,10 @@ import { loggerModule } from './observability/logging/logger-module'
     },
     {
       provide: APP_INTERCEPTOR,
+      useClass: ImpersonationInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
       useClass: AdminAuditInterceptor,
     },
     {

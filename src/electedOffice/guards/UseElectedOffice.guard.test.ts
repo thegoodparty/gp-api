@@ -116,70 +116,48 @@ describe('UseElectedOfficeGuard', () => {
       })
     })
 
-    it('falls back to legacy when org has no elected office', async () => {
+    it('throws NotFoundException when org has no elected office', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue({ slug: 'campaign-100', ownerId: 1 })
-      vi.spyOn(electedOfficeService, 'findFirst')
-        .mockResolvedValueOnce(null) // org slug lookup — no EO for this org
-        .mockResolvedValueOnce(mockEO) // legacy fallback
+      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(null)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'campaign-100' },
       })
-      const result = await guard.canActivate(ctx)
 
-      expect(result).toBe(true)
-      expect(electedOfficeService.findFirst).toHaveBeenCalledTimes(2)
-      expect(electedOfficeService.findFirst).toHaveBeenNthCalledWith(1, {
+      await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
+      expect(electedOfficeService.findFirst).toHaveBeenCalledTimes(1)
+      expect(electedOfficeService.findFirst).toHaveBeenCalledWith({
         where: { organizationSlug: 'campaign-100', userId: 1 },
-        include: undefined,
-      })
-      expect(electedOfficeService.findFirst).toHaveBeenNthCalledWith(2, {
-        where: { userId: 1, isActive: true },
         include: undefined,
       })
     })
 
-    it('falls back to legacy when org not found', async () => {
+    it('throws NotFoundException when org not found', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue(null)
-      vi.spyOn(electedOfficeService, 'findFirst')
-        .mockResolvedValueOnce(mockEO) // org slug lookup finds EO, but org is null
-        .mockResolvedValueOnce(mockEO) // legacy fallback
+      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(null)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'nonexistent' },
       })
-      const result = await guard.canActivate(ctx)
 
-      expect(result).toBe(true)
-      // EO from Promise.all is discarded because org is null
-      expect(electedOfficeService.findFirst).toHaveBeenNthCalledWith(2, {
-        where: { userId: 1, isActive: true },
-        include: undefined,
-      })
+      await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
     })
 
-    it('falls back when ownerId does not match', async () => {
+    it('throws NotFoundException when ownerId does not match', async () => {
       mockMetadata()
       mockOrgFindFirst.mockResolvedValue(null)
-      vi.spyOn(electedOfficeService, 'findFirst')
-        .mockResolvedValueOnce(null) // org slug lookup
-        .mockResolvedValueOnce(mockEO) // legacy fallback
+      vi.spyOn(electedOfficeService, 'findFirst').mockResolvedValue(null)
 
       const ctx = buildContext({
         headers: { 'x-organization-slug': 'campaign-100' },
         userId: 999,
       })
-      const result = await guard.canActivate(ctx)
 
-      expect(result).toBe(true)
+      await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException)
       expect(mockOrgFindFirst).toHaveBeenCalledWith({
         where: { slug: 'campaign-100', ownerId: 999 },
-      })
-      expect(electedOfficeService.findFirst).toHaveBeenNthCalledWith(2, {
-        where: { userId: 999, isActive: true },
-        include: undefined,
       })
     })
   })

@@ -4,19 +4,21 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common'
-import { Observable, Subscription } from 'rxjs'
-import { runWithImpersonation } from '@/analytics/impersonation-context'
-import { IncomingRequest } from '@/authentication/authentication.types'
+
+import { Observable } from 'rxjs'
+import { runWithImpersonation } from '../impersonation-context'
 
 @Injectable()
 export class ImpersonationInterceptor implements NestInterceptor {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest<IncomingRequest>()
-    const isImpersonating = request.user?.impersonating === true
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: { impersonating?: boolean } }>()
+    const user = request.user
+    const isImpersonating = user?.impersonating === true
 
     return new Observable((subscriber) => {
-      let inner: Subscription | undefined
+      let inner: ReturnType<Observable<unknown>['subscribe']> | undefined
       runWithImpersonation(isImpersonating, () => {
         inner = next.handle().subscribe(subscriber)
       })

@@ -26,6 +26,7 @@ describe('VoterFileController', () => {
     id: 1,
     userId: 100,
     isPro: false,
+    organizationSlug: 'campaign-1',
   } as Campaign
 
   const mockFilter = {
@@ -59,6 +60,7 @@ describe('VoterFileController', () => {
       mockVoterFileFilterService as never,
       mockOutreachService as never,
       mockElectedOfficeService as never,
+      {} as never,
       createMockLogger(),
     )
     vi.clearAllMocks()
@@ -95,17 +97,20 @@ describe('VoterFileController', () => {
       ).toHaveBeenCalledWith(campaign.userId)
       expect(mockVoterFileFilterService.create).toHaveBeenCalledWith(
         campaign.id,
+        campaign.organizationSlug,
         body,
       )
       expect(result).toEqual(mockFilter)
     })
 
     it('creates filter when user has elected office', async () => {
-      mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue({
+      const mockEO = {
         id: 'office-1',
         userId: 100,
         isActive: true,
-      })
+        organizationSlug: 'eo-office-1',
+      }
+      mockElectedOfficeService.getCurrentElectedOffice.mockResolvedValue(mockEO)
       const campaign = { ...baseCampaign, isPro: false }
       const body = { name: 'My Filter' } as never
 
@@ -114,10 +119,19 @@ describe('VoterFileController', () => {
       expect(
         mockElectedOfficeService.getCurrentElectedOffice,
       ).toHaveBeenCalledWith(campaign.userId)
+      // Creates filter for campaign org
       expect(mockVoterFileFilterService.create).toHaveBeenCalledWith(
         campaign.id,
+        campaign.organizationSlug,
         body,
       )
+      // Also creates filter for elected office org
+      expect(mockVoterFileFilterService.create).toHaveBeenCalledWith(
+        campaign.id,
+        mockEO.organizationSlug,
+        body,
+      )
+      expect(mockVoterFileFilterService.create).toHaveBeenCalledTimes(2)
       expect(result).toEqual(mockFilter)
     })
   })

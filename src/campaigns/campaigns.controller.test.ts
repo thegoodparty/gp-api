@@ -195,8 +195,14 @@ describe('CampaignsController', () => {
 
     const organizationsServiceMock: Partial<OrganizationsService> = {
       resolveOverrideDistrictId: vi.fn().mockResolvedValue(null),
-      findUnique: vi.fn().mockResolvedValue({ positionId: 'pos-1' }),
+      findUnique: vi
+        .fn()
+        .mockResolvedValue({ positionId: 'pos-1', customPositionName: null }),
       resolveBallotReadyPositionId: vi.fn().mockResolvedValue('br-pos-1'),
+      resolvePositionContext: vi.fn().mockResolvedValue({
+        ballotReadyPositionId: 'br-pos-1',
+        positionName: 'Mayor',
+      }),
     }
     organizationsService = organizationsServiceMock as OrganizationsService
 
@@ -498,17 +504,61 @@ describe('CampaignsController', () => {
   })
 
   describe('findBySlug', () => {
-    it('returns campaign with pathToVictory', async () => {
-      const campaignWithP2V = { ...mockCampaign, pathToVictory: mockP2V }
+    it('returns campaign with resolved positionName', async () => {
+      const campaignWithP2V = {
+        ...mockCampaign,
+        pathToVictory: mockP2V,
+        organization: { customPositionName: null, positionId: 'pos-1' },
+      }
       vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: 'br-pos-1',
+        positionName: 'Mayor',
+      })
 
       const result = await controller.findBySlug(mockCampaign.slug)
 
       expect(campaignsService.findFirst).toHaveBeenCalledWith({
         where: { slug: mockCampaign.slug },
-        include: { pathToVictory: true },
+        include: {
+          pathToVictory: true,
+          organization: {
+            select: { customPositionName: true, positionId: true },
+          },
+        },
       })
-      expect(result).toEqual(campaignWithP2V)
+      expect(organizationsService.resolvePositionContext).toHaveBeenCalledWith({
+        customPositionName: null,
+        positionId: 'pos-1',
+      })
+      expect(result).toEqual({ ...campaignWithP2V, positionName: 'Mayor' })
+    })
+
+    it('returns null positionName when no organization', async () => {
+      const campaignWithP2V = {
+        ...mockCampaign,
+        pathToVictory: mockP2V,
+        organization: null,
+      }
+      vi.spyOn(campaignsService, 'findFirst').mockResolvedValue(campaignWithP2V)
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: null,
+        positionName: null,
+      })
+
+      const result = await controller.findBySlug(mockCampaign.slug)
+
+      expect(organizationsService.resolvePositionContext).toHaveBeenCalledWith({
+        customPositionName: undefined,
+        positionId: undefined,
+      })
+      expect(result.positionName).toBeNull()
     })
 
     it('throws NotFoundException when slug not found', async () => {
@@ -1091,6 +1141,13 @@ describe('CampaignsController', () => {
         details: { electionDate: '2025-11-04' },
       }
       vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: null,
+        positionName: null,
+      })
 
       await expect(
         controller.updateRaceTargetDetails(campaign),
@@ -1232,6 +1289,33 @@ describe('CampaignsController', () => {
         officeName: 'Mayor',
       })
     })
+
+    it('passes undefined officeName when org resolver returns null', async () => {
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: 'br-pos-1',
+        positionName: null,
+      })
+      vi.spyOn(
+        electionsService,
+        'getBallotReadyMatchedRaceTargetDetails',
+      ).mockResolvedValue(mockRaceTargetDetails)
+      vi.spyOn(campaignsService, 'updateJsonFields').mockResolvedValue(
+        mockCampaignWithP2V,
+      )
+
+      await controller.updateRaceTargetDetails(mockCampaign)
+
+      expect(
+        electionsService.getBallotReadyMatchedRaceTargetDetails,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          officeName: undefined,
+        }),
+      )
+    })
   })
 
   describe('updateRaceTargetDetailsBySlug', () => {
@@ -1289,6 +1373,13 @@ describe('CampaignsController', () => {
         campaignNoPosition,
       )
       vi.spyOn(organizationsService, 'findUnique').mockResolvedValue(null)
+      vi.spyOn(
+        organizationsService,
+        'resolvePositionContext',
+      ).mockResolvedValue({
+        ballotReadyPositionId: null,
+        positionName: null,
+      })
 
       await expect(
         controller.updateRaceTargetDetailsBySlug(mockCampaign.slug, {}),

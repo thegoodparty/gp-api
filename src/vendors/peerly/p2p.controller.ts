@@ -13,6 +13,7 @@ import { ZodValidationPipe } from 'nestjs-zod'
 import { FastifyReply } from 'fastify'
 import { ReqCampaign } from '../../campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from '../../campaigns/decorators/UseCampaign.decorator'
+import { OrganizationsService } from '../../organizations/services/organizations.service'
 import { PeerlyPhoneListService } from './services/peerlyPhoneList.service'
 import { PhoneListState } from './peerly.types'
 import {
@@ -31,6 +32,7 @@ export class P2pController {
   constructor(
     private readonly peerlyPhoneListService: PeerlyPhoneListService,
     private readonly p2pPhoneListUploadService: P2pPhoneListUploadService,
+    private readonly organizationsService: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(P2pController.name)
@@ -97,9 +99,15 @@ export class P2pController {
     @Body() request: P2pPhoneListRequestSchema,
   ): Promise<P2pPhoneListResponseSchema> {
     try {
+      const district = campaign.organizationSlug
+        ? await this.organizationsService.getDistrictForOrgSlug(
+            campaign.organizationSlug,
+          )
+        : null
       const { token } = await this.p2pPhoneListUploadService.uploadPhoneList(
         campaign,
         request,
+        district,
       )
 
       return { token }

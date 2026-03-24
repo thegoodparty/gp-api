@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
 import { useTestService } from '@/test-service'
 import { Campaign } from '@prisma/client'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 const service = useTestService()
 
@@ -61,6 +61,73 @@ describe('ElectedOfficeController', () => {
 
     it('returns 404 when no active elected office exists', async () => {
       const result = await service.client.get('/v1/elected-office/current')
+
+      expect(result.status).toBe(404)
+    })
+
+    it('resolves elected office via x-organization-slug header', async () => {
+      const created = await createElectedOffice({
+        electedDate: '2024-01-01',
+        swornInDate: '2024-01-15',
+        termStartDate: '2024-01-15',
+        termEndDate: '2026-01-15',
+        termLengthDays: 730,
+        isActive: true,
+      })
+      expect(created.status).toBe(201)
+
+      const eoOrgSlug = `eo-${created.data.id}`
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': eoOrgSlug },
+      })
+
+      expect(result.status).toBe(200)
+      expect(result.data).toEqual({
+        id: created.data.id,
+        electedDate: '2024-01-01',
+        swornInDate: '2024-01-15',
+        termStartDate: '2024-01-15',
+        termEndDate: '2026-01-15',
+      })
+    })
+
+    it('returns 404 when x-organization-slug does not match any elected office', async () => {
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': 'nonexistent-org' },
+      })
+
+      expect(result.status).toBe(404)
+    })
+
+    it('returns 404 when org belongs to another user', async () => {
+      const otherUser = await service.prisma.user.create({
+        data: {
+          email: 'other-eo@goodparty.org',
+          firstName: 'Other',
+          lastName: 'User',
+        },
+      })
+
+      const otherOrg = await service.prisma.organization.create({
+        data: {
+          slug: `other-eo-org-${Date.now()}`,
+          ownerId: otherUser.id,
+        },
+      })
+
+      await service.prisma.electedOffice.create({
+        data: {
+          userId: otherUser.id,
+          campaignId: campaign.id,
+          isActive: true,
+          organizationSlug: otherOrg.slug,
+          electedDate: new Date('2024-01-01'),
+        },
+      })
+
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': otherOrg.slug },
+      })
 
       expect(result.status).toBe(404)
     })

@@ -24,6 +24,7 @@ import { ReqCampaign } from 'src/campaigns/decorators/ReqCampaign.decorator'
 import { UseCampaign } from 'src/campaigns/decorators/UseCampaign.decorator'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { userHasRole } from 'src/users/util/users.util'
 import { OutreachService } from '../../outreach/services/outreach.service'
 import { VoterFileDownloadAccessService } from '../../shared/services/voterFileDownloadAccess.service'
@@ -49,6 +50,7 @@ export class VoterFileController {
     private readonly voterFileFilterService: VoterFileFilterService,
     private readonly outreachService: OutreachService,
     private readonly electedOfficeService: ElectedOfficeService,
+    private readonly organizationsService: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(VoterFileController.name)
@@ -78,7 +80,12 @@ export class VoterFileController {
       })
     } else if (!campaign) throw new NotFoundException('Campaign not found')
 
-    return this.voterFileService.getCsvOrCount(campaign, query)
+    const district = campaign.organizationSlug
+      ? await this.organizationsService.getDistrictForOrgSlug(
+          campaign.organizationSlug,
+        )
+      : null
+    return this.voterFileService.getCsvOrCount(campaign, query, district)
   }
 
   @Get('wake-up')
@@ -128,11 +135,16 @@ export class VoterFileController {
 
   @Get('can-download')
   @UseCampaign({ include: { pathToVictory: true }, continueIfNotFound: true })
-  canDownload(
+  async canDownload(
     @ReqCampaign()
     campaign?: CampaignWith<'pathToVictory'>,
   ) {
-    return this.voterFileDownloadAccess.canDownload(campaign)
+    const district = campaign?.organizationSlug
+      ? await this.organizationsService.getDistrictForOrgSlug(
+          campaign.organizationSlug,
+        )
+      : null
+    return this.voterFileDownloadAccess.canDownload(campaign, district)
   }
 
   @Post('filter')
@@ -146,7 +158,19 @@ export class VoterFileController {
     if (!campaign.isPro && !electedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
-    return this.voterFileFilterService.create(campaign.id, voterFileFilter)
+    const campaignFilter = await this.voterFileFilterService.create(
+      campaign.id,
+      campaign.organizationSlug,
+      voterFileFilter,
+    )
+    if (electedOffice) {
+      await this.voterFileFilterService.create(
+        campaign.id,
+        electedOffice.organizationSlug,
+        voterFileFilter,
+      )
+    }
+    return campaignFilter
   }
 
   @Get('filters')

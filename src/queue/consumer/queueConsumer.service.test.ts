@@ -6,6 +6,7 @@ import { CampaignsService } from '@/campaigns/services/campaigns.service'
 import { CampaignTcrComplianceService } from '@/campaigns/tcrCompliance/services/campaignTcrCompliance.service'
 import { ContactsService } from '@/contacts/services/contacts.service'
 import { ElectedOfficeService } from '@/electedOffice/services/electedOffice.service'
+import { OrganizationsService } from '@/organizations/services/organizations.service'
 import { P2VStatus } from '@/elections/types/pathToVictory.types'
 import { PathToVictoryService } from '@/pathToVictory/services/pathToVictory.service'
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
@@ -219,6 +220,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
       electedOfficeService as never,
       contactsService as never,
       s3Service as never,
+      {} as never,
       {} as never,
       createMockLogger(),
     )
@@ -789,6 +791,7 @@ describe('QueueConsumerService - handlePollAnalysisComplete', () => {
           { provide: ContactsService, useValue: {} },
           { provide: S3Service, useValue: {} },
           { provide: UsersService, useValue: {} },
+          { provide: OrganizationsService, useValue: {} },
         ],
       }).compile()
 
@@ -1039,6 +1042,7 @@ describe('QueueConsumerService - triggerPollExecution', () => {
       contactsService as never,
       s3Service as never,
       usersService as never,
+      {} as never,
       createMockLogger(),
     )
   })
