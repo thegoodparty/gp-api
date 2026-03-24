@@ -59,8 +59,7 @@ jobs:
         run: cd contracts && npm run build
 
       - run: npx tsc --noEmit
-      - run: npx eslint "{src,apps,libs,test}/**/*.ts" --quiet
-      - run: npx prettier --check "src/**/*.{ts,js,json}"
+      - run: npm run lint
       - run: npm run test -- --coverage
 
       - run: npm run build
