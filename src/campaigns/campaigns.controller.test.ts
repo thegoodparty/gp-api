@@ -7,7 +7,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, PathToVictory, User, UserRole } from '@prisma/client'
+import { Campaign, Organization, PathToVictory, User, UserRole } from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
@@ -436,9 +436,19 @@ describe('CampaignsController', () => {
   })
 
   describe('findMine', () => {
-    it('returns the campaign directly', async () => {
-      const result = await controller.findMine(mockCampaign)
-      expect(result).toBe(mockCampaign)
+    it('returns the campaign with positionName', async () => {
+      const campaignWithRelations = {
+        ...mockCampaign,
+        pathToVictory: null as PathToVictory | null,
+        organization: null as Organization | null,
+      }
+
+      const result = await controller.findMine(campaignWithRelations)
+
+      expect(result).toEqual({
+        ...campaignWithRelations,
+        positionName: 'Mayor',
+      })
     })
   })
 
