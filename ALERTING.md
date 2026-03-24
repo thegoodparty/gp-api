@@ -22,7 +22,7 @@ These cover system-wide concerns that aren't tied to a specific endpoint:
 - **High CPU utilization** (>80% for 5 min)
 - **High memory utilization** (>90% for 5 min)
 - **Missing health check logs** (no `/v1/health` requests logged for 2 min)
-- **Slow Prisma connection acquisitions** (p99 connection duration exceeding 150ms)
+- **Slow Prisma connection acquisitions** (10+ connections exceeding 150ms in a 2-minute window)
 
 ## Where do alerts show up?
 
