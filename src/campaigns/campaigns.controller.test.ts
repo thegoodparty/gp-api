@@ -7,7 +7,13 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common'
-import { Campaign, Organization, PathToVictory, User, UserRole } from '@prisma/client'
+import {
+  Campaign,
+  Organization,
+  PathToVictory,
+  User,
+  UserRole,
+} from '@prisma/client'
 import { AnalyticsService } from 'src/analytics/analytics.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
 import { P2VStatus } from 'src/elections/types/pathToVictory.types'
