@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
 import { useTestService } from '@/test-service'
 import { Campaign } from '@prisma/client'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 const service = useTestService()
 
@@ -26,22 +26,13 @@ describe('ElectedOfficeController', () => {
     })
   })
 
-  const createElectedOffice = (
-    body: Record<string, unknown> = {
-      electedDate: '2024-01-01',
-      isActive: true,
-    },
-  ) => service.client.post('/v1/elected-office', body)
+  const createElectedOffice = (body: Record<string, unknown> = {}) =>
+    service.client.post('/v1/elected-office', body)
 
   describe('GET /elected-office/current', () => {
-    it('returns current active elected office', async () => {
+    it('returns current elected office', async () => {
       const created = await createElectedOffice({
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
-        termLengthDays: 730,
-        isActive: true,
       })
       expect(created.status).toBe(201)
 
@@ -50,15 +41,69 @@ describe('ElectedOfficeController', () => {
       expect(result.status).toBe(200)
       expect(result.data).toEqual({
         id: created.data.id,
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
       })
     })
 
-    it('returns 404 when no active elected office exists', async () => {
+    it('returns 404 when no elected office exists', async () => {
       const result = await service.client.get('/v1/elected-office/current')
+
+      expect(result.status).toBe(404)
+    })
+
+    it('resolves elected office via x-organization-slug header', async () => {
+      const created = await createElectedOffice({
+        swornInDate: '2024-01-15',
+      })
+      expect(created.status).toBe(201)
+
+      const eoOrgSlug = `eo-${created.data.id}`
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': eoOrgSlug },
+      })
+
+      expect(result.status).toBe(200)
+      expect(result.data).toEqual({
+        id: created.data.id,
+        swornInDate: '2024-01-15',
+      })
+    })
+
+    it('returns 404 when x-organization-slug does not match any elected office', async () => {
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': 'nonexistent-org' },
+      })
+
+      expect(result.status).toBe(404)
+    })
+
+    it('returns 404 when org belongs to another user', async () => {
+      const otherUser = await service.prisma.user.create({
+        data: {
+          email: 'other-eo@goodparty.org',
+          firstName: 'Other',
+          lastName: 'User',
+        },
+      })
+
+      const otherOrg = await service.prisma.organization.create({
+        data: {
+          slug: `other-eo-org-${Date.now()}`,
+          ownerId: otherUser.id,
+        },
+      })
+
+      await service.prisma.electedOffice.create({
+        data: {
+          userId: otherUser.id,
+          campaignId: campaign.id,
+          organizationSlug: otherOrg.slug,
+        },
+      })
+
+      const result = await service.client.get('/v1/elected-office/current', {
+        headers: { 'x-organization-slug': otherOrg.slug },
+      })
 
       expect(result.status).toBe(404)
     })
@@ -67,12 +112,7 @@ describe('ElectedOfficeController', () => {
   describe('GET /elected-office/:id', () => {
     it('returns toApi format for owner', async () => {
       const created = await createElectedOffice({
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
-        termLengthDays: 730,
-        isActive: true,
       })
 
       const result = await service.client.get(
@@ -82,10 +122,7 @@ describe('ElectedOfficeController', () => {
       expect(result.status).toBe(200)
       expect(result.data).toEqual({
         id: created.data.id,
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
       })
     })
 
@@ -124,8 +161,6 @@ describe('ElectedOfficeController', () => {
       })
       const office = await service.prisma.electedOffice.create({
         data: {
-          electedDate: new Date('2024-01-01'),
-          isActive: true,
           userId: otherUser.id,
           campaignId: campaign.id,
           organizationSlug: eoOrgSlug,
@@ -141,21 +176,13 @@ describe('ElectedOfficeController', () => {
   describe('POST /elected-office', () => {
     it('creates elected office when user has a campaign', async () => {
       const result = await createElectedOffice({
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
-        termLengthDays: 730,
-        isActive: true,
       })
 
       expect(result.status).toBe(201)
       expect(result.data).toEqual({
         id: expect.any(String),
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
       })
 
       const organization = await service.prisma.organization.findUnique({
@@ -172,14 +199,11 @@ describe('ElectedOfficeController', () => {
     })
 
     it('creates elected office with only required fields', async () => {
-      const result = await createElectedOffice({
-        electedDate: '2024-01-01',
-      })
+      const result = await createElectedOffice()
 
       expect(result.status).toBe(201)
       expect(result.data).toMatchObject({
         id: expect.any(String),
-        electedDate: '2024-01-01',
       })
 
       const organization = await service.prisma.organization.findUnique({
@@ -201,15 +225,11 @@ describe('ElectedOfficeController', () => {
         data: { positionId: null },
       })
 
-      const result = await createElectedOffice({
-        electedDate: '2024-01-01',
-        isActive: true,
-      })
+      const result = await createElectedOffice()
 
       expect(result.status).toBe(201)
       expect(result.data).toMatchObject({
         id: expect.any(String),
-        electedDate: '2024-01-01',
       })
     })
 
@@ -226,28 +246,19 @@ describe('ElectedOfficeController', () => {
 
   describe('PUT /elected-office/:id', () => {
     it('updates elected office fields', async () => {
-      const created = await createElectedOffice({
-        electedDate: '2024-01-01',
-        isActive: true,
-      })
+      const created = await createElectedOffice()
 
       const result = await service.client.put(
         `/v1/elected-office/${created.data.id}`,
         {
           swornInDate: '2024-01-15',
-          termStartDate: '2024-01-15',
-          termEndDate: '2026-01-15',
-          termLengthDays: 730,
         },
       )
 
       expect(result.status).toBe(200)
       expect(result.data).toEqual({
         id: created.data.id,
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
       })
     })
 
@@ -275,8 +286,6 @@ describe('ElectedOfficeController', () => {
       })
       const office = await service.prisma.electedOffice.create({
         data: {
-          electedDate: new Date('2024-01-01'),
-          isActive: true,
           userId: otherUser.id,
           campaignId: campaign.id,
           organizationSlug: eoOrgSlug,
@@ -293,32 +302,21 @@ describe('ElectedOfficeController', () => {
 
     it('updates elected office with null values', async () => {
       const created = await createElectedOffice({
-        electedDate: '2024-01-01',
         swornInDate: '2024-01-15',
-        termStartDate: '2024-01-15',
-        termEndDate: '2026-01-15',
-        termLengthDays: 730,
-        isActive: true,
       })
 
       const result = await service.client.put(
         `/v1/elected-office/${created.data.id}`,
         {
           swornInDate: null,
-          termStartDate: null,
-          termEndDate: null,
-          termLengthDays: null,
         },
       )
 
       expect(result.status).toBe(200)
       expect(result.data).toMatchObject({
         id: created.data.id,
-        electedDate: '2024-01-01',
       })
       expect(result.data.swornInDate).toBeUndefined()
-      expect(result.data.termStartDate).toBeUndefined()
-      expect(result.data.termEndDate).toBeUndefined()
     })
   })
 })

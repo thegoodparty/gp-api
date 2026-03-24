@@ -54,7 +54,6 @@ beforeEach(async () => {
       id: electedOfficeId,
       userId: service.user.id,
       campaignId: campaign.id,
-      isActive: true,
       organizationSlug: eoOrgSlug,
     },
   })

@@ -38,6 +38,7 @@ import {
   POLL_INDIVIDUAL_MESSAGE_NAMESPACE,
   sendTevynAPIPollMessage,
 } from 'src/polls/utils/polls.utils'
+import { OrganizationsService } from 'src/organizations/services/organizations.service'
 import { UsersService } from 'src/users/services/users.service'
 import { S3Service } from 'src/vendors/aws/services/s3.service'
 import { SlackService } from 'src/vendors/slack/services/slack.service'
@@ -66,6 +67,7 @@ import {
 import { PollIndividualMessageService } from '@/polls/services/pollIndividualMessage.service'
 import { v5 as uuidv5 } from 'uuid'
 import { PinoLogger } from 'nestjs-pino'
+import { OrgDistrict } from '@/organizations/organizations.types'
 
 type PollAnalysisIssue = PollAnalysisCompleteEvent['data']['issues'][number]
 
@@ -108,6 +110,7 @@ export class QueueConsumerService {
     private readonly contactsService: ContactsService,
     private readonly s3Service: S3Service,
     private readonly usersService: UsersService,
+    private readonly organizationsService: OrganizationsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueConsumerService.name)
@@ -629,14 +632,14 @@ export class QueueConsumerService {
   private async handlePollAnalysisComplete(event: PollAnalysisCompleteEvent) {
     const { pollId, totalResponses, responsesLocation, issues } = event.data
     this.logger.info(`Handling poll analysis complete event for poll ${pollId}`)
-    const data = await this.getPollAndCampaign(pollId)
+    const data = await this.getPollAndOrganization(pollId)
     if (!data) {
       this.logger.info('Poll not found, ignoring event')
       return
     }
-    const { poll, campaign } = data
+    const { poll, organization, campaign } = data
     const { electedOfficeId } = poll
-    const { userId: campaignUserId, pathToVictory } = campaign
+    const { userId: campaignUserId } = campaign
 
     if (!electedOfficeId) {
       throw new InternalServerErrorException(
@@ -663,6 +666,7 @@ export class QueueConsumerService {
     const constituency = await this.contactsService.findContacts(
       { segment: 'all', resultsPerPage: 5, page: 1 },
       campaign,
+      organization,
     )
 
     let highConfidence = false
@@ -822,6 +826,20 @@ export class QueueConsumerService {
       },
     })
 
+    let district: OrgDistrict | null = null
+    if (campaign.organizationSlug) {
+      try {
+        district = await this.organizationsService.getDistrictForOrgSlug(
+          campaign.organizationSlug,
+        )
+      } catch (e) {
+        this.logger.warn(
+          { e },
+          'Failed to fetch district for analytics, defaulting to null',
+        )
+      }
+    }
+
     await Promise.all([
       this.analytics.identify(campaignUserId, { pollcount: pollCount }),
       this.analytics.track(
@@ -830,7 +848,7 @@ export class QueueConsumerService {
         {
           pollId,
           path: `/dashboard/polls/${pollId}`,
-          constituencyName: pathToVictory?.data.electionLocation,
+          constituencyName: district?.l2Name,
           'issue 1': issues?.at(0)?.theme || null,
           'issue 2': issues?.at(1)?.theme || null,
           'issue 3': issues?.at(2)?.theme || null,
@@ -895,12 +913,12 @@ export class QueueConsumerService {
     sampleParams: (poll: Poll) => Promise<SampleContacts> | SampleContacts
     isExpansion: boolean
   }) {
-    const data = await this.getPollAndCampaign(params.pollId)
+    const data = await this.getPollAndOrganization(params.pollId)
     if (!data) {
       this.logger.info(`${params.pollId} Poll not found, ignoring event`)
       return
     }
-    const { poll, campaign } = data
+    const { poll, organization, campaign } = data
 
     const user = await this.usersService.findUnique({
       where: { id: campaign.userId },
@@ -941,6 +959,7 @@ export class QueueConsumerService {
       const sample = await this.contactsService.sampleContacts(
         sampleParams,
         campaign,
+        organization,
       )
       if (sample.length === 0) {
         throw new Error(`No contacts returned in sample for poll ${poll.id}`)
@@ -1008,7 +1027,7 @@ export class QueueConsumerService {
     return true
   }
 
-  private async getPollAndCampaign(pollId: string) {
+  private async getPollAndOrganization(pollId: string) {
     const poll = await this.pollsService.findUnique({
       where: { id: pollId },
     })
@@ -1022,12 +1041,20 @@ export class QueueConsumerService {
       return
     }
 
-    const office = await this.electedOfficeService.findUnique({
-      where: { id: poll.electedOfficeId },
-    })
+    const office =
+      await this.electedOfficeService.client.electedOffice.findUnique({
+        where: { id: poll.electedOfficeId },
+        include: { organization: true },
+      })
 
     if (!office) {
       this.logger.info('Elected office not found, ignoring event')
+      return
+    }
+
+    const organization = office.organization
+    if (!organization) {
+      this.logger.info('Elected office has no organization, ignoring event')
       return
     }
 
@@ -1040,7 +1067,7 @@ export class QueueConsumerService {
       this.logger.info('No campaign found, ignoring event')
       return
     }
-    return { poll, office, campaign }
+    return { poll, office, organization, campaign }
   }
 
   async findMappedPersonIdsForCellPhones(params: {

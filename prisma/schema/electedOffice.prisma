@@ -3,13 +3,7 @@ model ElectedOffice {
   organizationSlug String        @unique @map("organization_slug")
   organization     Organization  @relation(fields: [organizationSlug], references: [slug], onDelete: Cascade)
 
-  electedDate    DateTime? @map("elected_date") @db.Date
-  swornInDate    DateTime? @map("sworn_in_date") @db.Date
-  termStartDate  DateTime? @map("term_start_date") @db.Date
-  termLengthDays Int?      @map("term_length_days")
-  termEndDate    DateTime? @map("term_end_date") @db.Date
-
-  isActive Boolean @default(true) @map("is_active")
+  swornInDate DateTime? @map("sworn_in_date") @db.Date
 
   user   User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId Int   @map("user_id")

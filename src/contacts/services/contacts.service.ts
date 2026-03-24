@@ -1,4 +1,5 @@
-import { Readable } from 'node:stream'
+// LEGACY: Remove when org migration is complete (only used by canUseStatewideFallback).
+import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { HttpService } from '@nestjs/axios'
 import {
   BadGatewayException,
@@ -7,14 +8,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { Organization } from '@prisma/client'
 import { isAxiosError } from 'axios'
 import { FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
+import { PinoLogger } from 'nestjs-pino'
+import { Readable } from 'node:stream'
 import { lastValueFrom } from 'rxjs'
-import { BallotReadyPositionLevel } from '@goodparty_org/contracts'
 import { CampaignsService } from 'src/campaigns/services/campaigns.service'
 import { ElectedOfficeService } from 'src/electedOffice/services/electedOffice.service'
 import { ElectionsService } from 'src/elections/services/elections.service'
+// LEGACY: Remove when org migration is complete (only used by isStatewideSelection).
 import { SHORT_TO_LONG_STATE } from 'src/shared/constants/states'
 import { VoterFileFilterService } from 'src/voters/services/voterFileFilter.service'
 import { CampaignWithPathToVictory, StatsResponse } from '../contacts.types'
@@ -29,7 +33,6 @@ import {
   convertVoterFileFilterToFilters,
   type FilterObject,
 } from '../utils/voterFileFilter.utils'
-import { PinoLogger } from 'nestjs-pino'
 
 const P2V_ELECTION_INFO_MISSING_MESSAGE =
   'Campaign path to victory data is missing required election information'
@@ -58,6 +61,8 @@ export class ContactsService {
     this.logger.setContext(ContactsService.name)
   }
 
+  // LEGACY: Remove when org migration is complete.
+  //         Replaced by withOrgDistrictResolution which uses org.overrideDistrictId / position.district.id.
   async withFallbackDistrictName<Result>(
     campaign: CampaignWithPathToVictory,
     fn: (params: {
@@ -90,200 +95,357 @@ export class ContactsService {
     }
   }
 
+  private async hasElectedOfficeAccess(
+    userId: number,
+    organization?: Organization,
+  ): Promise<boolean> {
+    if (organization) {
+      // Org path: check if this organization has an elected office.
+      // Campaign orgs (campaign-*) won't match — this is intentional.
+      // The org header represents the user's chosen context (campaign vs EO).
+      const eo = await this.electedOfficeService.findFirst({
+        where: { organizationSlug: organization.slug },
+      })
+      return eo !== null
+    }
+    // LEGACY: Remove this branch when org migration is complete.
+    //         The userId param and getCurrentElectedOffice call become unnecessary.
+    const eo = await this.electedOfficeService.getCurrentElectedOffice(userId)
+    return eo !== null
+  }
+
+  private async resolveDistrictInfoFromOrg(
+    org: Organization,
+  ): Promise<{ districtId: string | null; state: string | null }> {
+    if (org.overrideDistrictId) {
+      return { districtId: org.overrideDistrictId, state: null }
+    }
+
+    if (org.positionId) {
+      const position = await this.elections.getPositionById(org.positionId, {
+        includeDistrict: true,
+      })
+      return {
+        districtId: position?.district?.id ?? null,
+        state: position?.state ?? null,
+      }
+    }
+
+    return { districtId: null, state: null }
+  }
+
+  private async withOrgDistrictResolution<Result>(
+    org: Organization,
+    campaign: CampaignWithPathToVictory,
+    fn: (params: { districtId?: string; state?: string }) => Promise<Result>,
+  ): Promise<Result> {
+    const { districtId, state } = await this.resolveDistrictInfoFromOrg(org)
+
+    if (districtId) {
+      return fn({ districtId })
+    }
+
+    // No district on the org (statewide/federal case).
+    // Position having no district already proves it's statewide — only check admin approval.
+    if (!state) {
+      throw new BadRequestException(
+        'Organization does not have sufficient data to resolve district',
+      )
+    }
+    const canDownloadFederal = Boolean(
+      (campaign as { canDownloadFederal?: boolean }).canDownloadFederal,
+    )
+    if (!canDownloadFederal) {
+      throw new BadRequestException(
+        'Statewide or federal contacts require admin approval',
+      )
+    }
+    return fn({ state })
+  }
+
+  // LEGACY: Remove campaign param when org migration is complete.
+  //         organization becomes required, remove legacy branch.
   async findContacts(
     { resultsPerPage, page, search, segment }: ListContactsDTO,
     campaign: CampaignWithPathToVictory,
+    organization?: Organization,
   ) {
     if (search) {
-      const electedOffice =
-        await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-      if (!campaign.isPro && !electedOffice) {
+      const hasElectedOffice = await this.hasElectedOfficeAccess(
+        campaign.userId,
+        organization,
+      )
+      // LEGACY: Remove campaign.isPro check when org migration is complete.
+      if (!campaign.isPro && !hasElectedOffice) {
         throw new BadRequestException(
           'Search is only available for pro campaigns',
         )
       }
     }
-    const filters = await this.segmentToFilters(segment, campaign)
 
-    return this.withFallbackDistrictName(
-      campaign,
-      async ({ state, districtType, districtName }) => {
-        try {
-          const response = await lastValueFrom(
-            this.httpService.post(
-              `${PEOPLE_API_URL}/v1/people`,
-              {
-                state,
-                districtType,
-                districtName,
-                resultsPerPage,
-                page,
-                filters,
-                search,
-              },
-              {
-                headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
-              },
-            ),
-          )
-          // People API response is untyped — external API returns unknown response shape
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          return response.data as PeopleListResponse
-        } catch (error) {
-          this.logger.error(
-            {
-              error,
-            },
-            `Failed to fetch from people API`,
-          )
-          throw new BadGatewayException(`Failed to fetch from people API`)
-        }
+    const fetchPeople = async (
+      districtParams: {
+        districtId?: string
+        state?: string
+        districtType?: string
+        districtName?: string
       },
+      filters: FilterObject,
+    ) => {
+      try {
+        const response = await lastValueFrom(
+          this.httpService.post(
+            `${PEOPLE_API_URL}/v1/people`,
+            {
+              ...districtParams,
+              resultsPerPage,
+              page,
+              filters,
+              search,
+            },
+            {
+              headers: { Authorization: `Bearer ${this.getValidS2SToken()}` },
+            },
+          ),
+        )
+        // People API response is untyped — external API returns unknown response shape
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return response.data as PeopleListResponse
+      } catch (error) {
+        this.logger.error(
+          {
+            error,
+          },
+          `Failed to fetch from people API`,
+        )
+        throw new BadGatewayException(`Failed to fetch from people API`)
+      }
+    }
+
+    if (organization) {
+      const filters = await this.segmentToFilters(segment, organization)
+      return this.withOrgDistrictResolution(organization, campaign, (params) =>
+        fetchPeople(params, filters),
+      )
+    }
+
+    // LEGACY: Remove when org migration is complete.
+    const filters = await this.legacySegmentToFilters(segment, campaign)
+    return this.withFallbackDistrictName(campaign, (params) =>
+      fetchPeople(params, filters),
     )
   }
 
+  // LEGACY: Remove campaign param when org migration is complete.
   async sampleContacts(
     dto: SampleContacts,
     campaign: CampaignWithPathToVictory,
+    organization: Organization,
   ) {
-    return this.withFallbackDistrictName(
-      campaign,
-      async ({ state, districtType, districtName }) => {
-        const body = {
-          state,
-          districtType,
-          districtName,
-          size: String(dto.size ?? 500),
-          hasCellPhone: 'true',
-          excludeIds: (dto.excludeIds ?? []) as string[],
-        }
+    const fetchSample = async (districtParams: {
+      districtId?: string
+      state?: string
+    }) => {
+      const body = {
+        ...districtParams,
+        size: String(dto.size ?? 500),
+        hasCellPhone: 'true',
+        excludeIds: (dto.excludeIds ?? []) as string[],
+      }
 
-        try {
-          const token = this.getValidS2SToken()
-          const response = await lastValueFrom(
-            this.httpService.post<PersonOutput[]>(
-              `${PEOPLE_API_URL}/v1/people/sample`,
-              body,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
+      try {
+        const token = this.getValidS2SToken()
+        const response = await lastValueFrom(
+          this.httpService.post<PersonOutput[]>(
+            `${PEOPLE_API_URL}/v1/people/sample`,
+            body,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
               },
-            ),
-          )
-          return response.data
-        } catch (error) {
-          this.logger.error(
-            { error },
-            'Failed to sample contacts from people API',
-          )
-          throw new BadGatewayException(
-            'Failed to sample contacts from people API',
-          )
-        }
-      },
-    )
+            },
+          ),
+        )
+        return response.data
+      } catch (error) {
+        this.logger.error(
+          { error },
+          'Failed to sample contacts from people API',
+        )
+        throw new BadGatewayException(
+          'Failed to sample contacts from people API',
+        )
+      }
+    }
+
+    return this.withOrgDistrictResolution(organization, campaign, fetchSample)
   }
 
+  // LEGACY: Remove campaign param when org migration is complete.
+  //         organization becomes required, remove withFallbackDistrictName branch.
   async findPerson(
     id: string,
     campaign: CampaignWithPathToVictory,
+    organization?: Organization,
   ): Promise<PersonOutput> {
+    const fetchPerson = async (districtParams: {
+      districtId?: string
+      state?: string
+      districtType?: string
+      districtName?: string
+    }) => {
+      try {
+        const response = await lastValueFrom(
+          this.httpService.get<PersonOutput>(
+            `${PEOPLE_API_URL}/v1/people/${id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${this.getValidS2SToken()}`,
+              },
+              params: districtParams,
+            },
+          ),
+        )
+
+        return response.data
+      } catch (error) {
+        if (error instanceof HttpException) {
+          throw error
+        }
+        this.logger.error(
+          { data: JSON.stringify(error) },
+          'Failed to fetch person from people API',
+        )
+
+        if (isAxiosError(error) && error.response?.status === 404) {
+          throw new NotFoundException('Person not found')
+        }
+
+        throw new BadGatewayException('Failed to fetch person from people API')
+      }
+    }
+
+    if (organization) {
+      return this.withOrgDistrictResolution(organization, campaign, fetchPerson)
+    }
+
     return this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
-        try {
-          const params: Record<string, string> = { state }
-          if (districtType && districtName) {
-            params.districtType = districtType
-            params.districtName = districtName
-          }
-
-          const response = await lastValueFrom(
-            this.httpService.get<PersonOutput>(
-              `${PEOPLE_API_URL}/v1/people/${id}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${this.getValidS2SToken()}`,
-                },
-                params,
-              },
-            ),
-          )
-
-          return response.data
-        } catch (error) {
-          if (error instanceof HttpException) {
-            throw error
-          }
-          this.logger.error(
-            { data: JSON.stringify(error) },
-            'Failed to fetch person from people API',
-          )
-
-          if (isAxiosError(error) && error.response?.status === 404) {
-            throw new NotFoundException('Person not found')
-          }
-
-          throw new BadGatewayException(
-            'Failed to fetch person from people API',
-          )
+        const params: Record<string, string> = { state }
+        if (districtType && districtName) {
+          params.districtType = districtType
+          params.districtName = districtName
         }
+        return fetchPerson(params)
       },
     )
   }
 
+  // LEGACY: Remove campaign param when org migration is complete.
+  //         organization becomes required, remove legacy branch.
   async downloadContacts(
     { segment }: DownloadContactsDTO,
     campaign: CampaignWithPathToVictory,
     res: FastifyReply,
+    organization?: Organization,
   ) {
-    const electedOffice =
-      await this.electedOfficeService.getCurrentElectedOffice(campaign.userId)
-    if (!campaign.isPro && !electedOffice) {
+    const hasElectedOffice = await this.hasElectedOfficeAccess(
+      campaign.userId,
+      organization,
+    )
+    // LEGACY: Remove campaign.isPro check when org migration is complete.
+    if (!campaign.isPro && !hasElectedOffice) {
       throw new BadRequestException('Campaign is not pro')
     }
-    const filters = await this.segmentToFilters(segment, campaign)
 
-    return this.withFallbackDistrictName(
-      campaign,
-      async ({ state, districtType, districtName }) => {
-        try {
-          const response = await lastValueFrom(
-            this.httpService.post<Readable>(
-              `${PEOPLE_API_URL}/v1/people/download`,
-              { state, districtType, districtName, filters },
-              {
-                headers: {
-                  Authorization: `Bearer ${this.getValidS2SToken()}`,
-                },
-                responseType: 'stream',
-              },
-            ),
-          )
-
-          return new Promise<void>((resolve, reject) => {
-            response.data.pipe(res.raw)
-            response.data.on('end', resolve)
-            response.data.on('error', reject)
-          })
-        } catch (error) {
-          this.logger.error(
-            {
-              error,
-            },
-            'Failed to download contacts from people API',
-          )
-
-          throw new BadGatewayException(
-            'Failed to download contacts from people API',
-          )
-        }
+    const downloadPeople = async (
+      districtParams: {
+        districtId?: string
+        state?: string
+        districtType?: string
+        districtName?: string
       },
+      filters: FilterObject,
+    ) => {
+      try {
+        const response = await lastValueFrom(
+          this.httpService.post<Readable>(
+            `${PEOPLE_API_URL}/v1/people/download`,
+            { ...districtParams, filters },
+            {
+              headers: {
+                Authorization: `Bearer ${this.getValidS2SToken()}`,
+              },
+              responseType: 'stream',
+            },
+          ),
+        )
+
+        return new Promise<void>((resolve, reject) => {
+          response.data.pipe(res.raw)
+          response.data.on('end', resolve)
+          response.data.on('error', reject)
+        })
+      } catch (error) {
+        this.logger.error(
+          {
+            error,
+          },
+          'Failed to download contacts from people API',
+        )
+
+        throw new BadGatewayException(
+          'Failed to download contacts from people API',
+        )
+      }
+    }
+
+    if (organization) {
+      const filters = await this.segmentToFilters(segment, organization)
+      return this.withOrgDistrictResolution(organization, campaign, (params) =>
+        downloadPeople(params, filters),
+      )
+    }
+
+    // LEGACY: Remove when org migration is complete.
+    const filters = await this.legacySegmentToFilters(segment, campaign)
+    return this.withFallbackDistrictName(campaign, (params) =>
+      downloadPeople(params, filters),
     )
   }
 
-  async getDistrictStats(campaign: CampaignWithPathToVictory) {
+  // LEGACY: Remove campaign param when org migration is complete.
+  //         organization becomes required, remove withFallbackDistrictName branch.
+  async getDistrictStats(
+    campaign: CampaignWithPathToVictory,
+    organization?: Organization,
+  ) {
+    const fetchStats = async (districtParams: {
+      districtId?: string
+      state?: string
+      districtType?: string
+      districtName?: string
+    }) => {
+      const token = this.getValidS2SToken()
+
+      const response = await lastValueFrom(
+        this.httpService.get<StatsResponse>(
+          `${PEOPLE_API_URL}/v1/people/stats`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: districtParams,
+          },
+        ),
+      )
+
+      return response.data
+    }
+
+    if (organization) {
+      return this.withOrgDistrictResolution(organization, campaign, fetchStats)
+    }
+
     return this.withFallbackDistrictName(
       campaign,
       async ({ state, districtType, districtName }) => {
@@ -299,24 +461,12 @@ export class ContactsService {
           throw new BadRequestException(msg)
         }
 
-        const token = this.getValidS2SToken()
         const params: Record<string, string> = { state }
         if (districtType && districtName) {
           params.districtType = districtType
           params.districtName = districtName
         }
-
-        const response = await lastValueFrom(
-          this.httpService.get<StatsResponse>(
-            `${PEOPLE_API_URL}/v1/people/stats`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              params,
-            },
-          ),
-        )
-
-        return response.data
+        return fetchStats(params)
       },
     )
   }
@@ -361,6 +511,8 @@ export class ContactsService {
     return this.cachedToken
   }
 
+  // LEGACY: Remove when org migration is complete.
+  //         Replaced by the simpler canDownloadFederal check in withOrgDistrictResolution.
   private canUseStatewideFallback(
     campaign: CampaignWithPathToVictory,
   ): boolean {
@@ -379,6 +531,8 @@ export class ContactsService {
     )
   }
 
+  // LEGACY: Remove when org migration is complete.
+  //         Org path gets state from position via election API instead.
   private getCampaignState(campaign: CampaignWithPathToVictory): string {
     if (!campaign.details) {
       throw new BadRequestException({
@@ -396,6 +550,8 @@ export class ContactsService {
     return state.toUpperCase()
   }
 
+  // LEGACY: Remove when org migration is complete.
+  //         Replaced by resolveDistrictInfoFromOrg which uses org.overrideDistrictId / position.district.id.
   private resolveLocationForRequest(campaign: CampaignWithPathToVictory): {
     state: string
     districtType?: string
@@ -446,6 +602,8 @@ export class ContactsService {
     })
   }
 
+  // LEGACY: Remove when org migration is complete.
+  //         Org path infers statewide from absence of district on the position.
   private isStatewideSelection(
     stateCode: string,
     electionType: string,
@@ -465,23 +623,30 @@ export class ContactsService {
 
   private async segmentToFilters(
     segment: string | undefined,
+    organization: Organization,
+  ): Promise<FilterObject> {
+    const resolvedSegment = segment || 'all'
+    const builtInFilters = this.resolveBuiltInSegment(resolvedSegment)
+    if (builtInFilters) return builtInFilters
+
+    const customSegment =
+      await this.voterFileFilterService.findByIdAndOrganizationSlug(
+        parseInt(resolvedSegment),
+        organization.slug,
+      )
+
+    return customSegment ? convertVoterFileFilterToFilters(customSegment) : {}
+  }
+
+  // LEGACY: Remove when org migration is complete.
+  //         Replaced by segmentToFilters which uses organization.slug.
+  private async legacySegmentToFilters(
+    segment: string | undefined,
     campaign: CampaignWithPathToVictory,
   ): Promise<FilterObject> {
     const resolvedSegment = segment || 'all'
-    const segmentToFiltersMap =
-      defaultSegmentToFiltersMap[
-        // Dynamic key lookup into const object — TypeScript cannot narrow string to known keys
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        resolvedSegment as keyof typeof defaultSegmentToFiltersMap
-      ]
-
-    if (segmentToFiltersMap) {
-      const filters: Record<string, boolean> = {}
-      for (const filterName of segmentToFiltersMap.filters) {
-        filters[filterName] = true
-      }
-      return filters
-    }
+    const builtInFilters = this.resolveBuiltInSegment(resolvedSegment)
+    if (builtInFilters) return builtInFilters
 
     const customSegment =
       await this.voterFileFilterService.findByIdAndCampaignId(
@@ -490,5 +655,22 @@ export class ContactsService {
       )
 
     return customSegment ? convertVoterFileFilterToFilters(customSegment) : {}
+  }
+
+  private resolveBuiltInSegment(segment: string): FilterObject | undefined {
+    const segmentToFiltersMap =
+      defaultSegmentToFiltersMap[
+        // Dynamic key lookup into const object — TypeScript cannot narrow string to known keys
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        segment as keyof typeof defaultSegmentToFiltersMap
+      ]
+
+    if (!segmentToFiltersMap) return undefined
+
+    const filters: Record<string, boolean> = {}
+    for (const filterName of segmentToFiltersMap.filters) {
+      filters[filterName] = true
+    }
+    return filters
   }
 }

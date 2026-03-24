@@ -85,6 +85,7 @@ export class AdminUsersController {
     const token = await this.authService.generateAuthToken({
       email: user.email,
       sub: user.id,
+      impersonating: true,
     })
 
     return { user: ReadUserOutputSchema.parse(user), token }
